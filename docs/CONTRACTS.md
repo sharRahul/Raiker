@@ -4,6 +4,8 @@ This document defines the implementation contracts that builder agents must foll
 
 Contracts are deliberately explicit so local and cloud builder models can implement modules without guessing. Phase 1 implements the minimum contract subset, while phase-scheduled features extend the same schemas rather than inventing parallel shapes.
 
+All primary interfaces use the same contracts. CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and other governed clients must not create separate prompt, approval, checkpoint, memory, model, or task-control schemas.
+
 ---
 
 ## Contract Design Rules
@@ -15,12 +17,14 @@ Contracts are deliberately explicit so local and cloud builder models can implem
 5. Contract tests must validate required fields and common invalid inputs.
 6. Events must be append-only and never mutated after write.
 7. Phase-scheduled capabilities must extend these contracts through versioned fields or new versioned contracts.
+8. The originating interface/client identity must be preserved for audit and routing.
+9. No interface may bypass these contracts because it is terminal, mobile, chat, desktop, web, or programmatic.
 
 ---
 
 ## PromptEnvelope
 
-Used by every client to submit work. In Phase 1, the primary user-facing client is the TUI opened by the global `raiker` command.
+Used by every client to submit work. In Phase 1, the first implemented user-facing path is the configured local terminal client opened by the global `raiker` command. That path is not contractually primary over other interfaces.
 
 ```json
 {
@@ -31,7 +35,8 @@ Used by every client to submit work. In Phase 1, the primary user-facing client 
   "client": {
     "type": "tui",
     "name": "raiker-tui",
-    "version": "0.1.0"
+    "version": "0.1.0",
+    "interface_status": "equal_primary_when_enabled"
   },
   "user": {
     "id": "local_user",
@@ -64,6 +69,29 @@ Required fields:
 - `options.planning_mode`
 - `options.approval_mode`
 
+Allowed `client.type` values include:
+
+- `cli`
+- `tui`
+- `desktop`
+- `web_ui`
+- `dashboard`
+- `ide`
+- `voice`
+- `hotkeys`
+- `rest`
+- `webhooks`
+- `email`
+- `slack`
+- `teams`
+- `discord`
+- `signal`
+- `browser_extension`
+- `apple_mobile`
+- `android_mobile`
+- `mobile_companion`
+- `test_harness`
+
 Allowed `planning_mode` values:
 
 - `auto`
@@ -91,7 +119,9 @@ Every meaningful activity is recorded as an event.
   "turn_id": "turn_01H...",
   "event_type": "prompt_received",
   "actor": "agent_gateway",
-  "payload": {},
+  "payload": {
+    "client_type": "tui"
+  },
   "parent_event_id": null
 }
 ```
@@ -99,8 +129,10 @@ Every meaningful activity is recorded as an event.
 Required event types for Phase 1:
 
 - `global_command_invoked`
+- `terminal_client_started`
 - `tui_started`
 - `tui_prompt_submitted`
+- `ui_action_submitted`
 - `prompt_received`
 - `prompt_normalised`
 - `intent_classified`
@@ -316,7 +348,8 @@ Allowed statuses:
 
 Minimum tests:
 
-- valid TUI-originated `PromptEnvelope` is accepted;
+- valid terminal-originated `PromptEnvelope` is accepted;
+- valid non-terminal `client.type` values are accepted by contract tests even when their runtime implementations are phase-scheduled;
 - missing required `PromptEnvelope` field is rejected;
 - invalid planning mode is rejected;
 - valid `AgentEvent` is accepted;
@@ -325,4 +358,5 @@ Minimum tests:
 - workspace file read is allowed;
 - outside-workspace file read is denied;
 - denied action produces no tool execution;
-- completed turn writes checkpoint.
+- completed turn writes checkpoint;
+- interface/client identity is preserved in events and responses.

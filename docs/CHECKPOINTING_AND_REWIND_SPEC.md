@@ -1,0 +1,258 @@
+# Checkpointing And Rewind Specification
+
+Raiker checkpoints provide local recovery, rewind, resume, fork, and auditability for agent work.
+
+Checkpoints are not a replacement for Git, backups, or source control. They are a local agent-runtime safety mechanism.
+
+---
+
+## Checkpoint Goals
+
+Raiker checkpoints must support:
+
+1. restoring session state;
+2. restoring task state;
+3. restoring file-edit snapshots where configured;
+4. comparing before/after changes;
+5. forking from a previous state;
+6. summarising a checkpoint;
+7. cleaning up old snapshots;
+8. linking checkpoints to event logs;
+9. audit and provenance;
+10. safe TUI rewind UX.
+
+---
+
+## Checkpoint Types
+
+| Type | Purpose |
+|---|---|
+| `turn_checkpoint` | Created after each completed turn. |
+| `tool_checkpoint` | Created before risky file/tool action. |
+| `file_snapshot` | Captures file content before edit/write/delete. |
+| `task_checkpoint` | Captures background task state. |
+| `session_checkpoint` | Captures session-level state. |
+| `manual_checkpoint` | User-requested checkpoint. |
+| `fork_checkpoint` | Created when user forks from previous state. |
+
+---
+
+## Checkpoint Lifecycle
+
+```text
+checkpoint_requested
+  -> collect runtime state
+  -> collect task state
+  -> collect changed-file metadata
+  -> snapshot files if required
+  -> write checkpoint manifest
+  -> emit checkpoint_created event
+```
+
+Restore lifecycle:
+
+```text
+restore_requested
+  -> validate checkpoint
+  -> show restore plan
+  -> request approval if files will change
+  -> pause active tasks
+  -> restore state/files
+  -> emit checkpoint_restored event
+  -> resume or stop as requested
+```
+
+Fork lifecycle:
+
+```text
+fork_requested
+  -> validate checkpoint
+  -> create new session or worktree if configured
+  -> copy checkpoint state
+  -> emit session_forked event
+```
+
+---
+
+## Checkpoint Manifest Schema
+
+```json
+{
+  "schema_version": "1.0",
+  "checkpoint_id": "ckpt_01H...",
+  "checkpoint_type": "turn_checkpoint",
+  "session_id": "sess_01H...",
+  "turn_id": "turn_01H...",
+  "task_id": null,
+  "created_at": "2026-06-17T12:00:00Z",
+  "created_by": "checkpoint_service",
+  "summary": "Listed project files and answered user.",
+  "last_event_id": "evt_01H...",
+  "runtime_state": "CLOSED",
+  "files": [
+    {
+      "path": "README.md",
+      "snapshot_id": "snap_01H...",
+      "sha256_before": "...",
+      "sha256_after": "...",
+      "change_type": "modified"
+    }
+  ],
+  "artifacts": [],
+  "memory_candidates": [],
+  "restore_policy": {
+    "can_restore_state": true,
+    "can_restore_files": true,
+    "requires_approval": true
+  }
+}
+```
+
+---
+
+## File Snapshot Rules
+
+Create file snapshots before:
+
+- write file;
+- edit file;
+- delete file;
+- apply patch;
+- bulk refactor;
+- generated file overwrite;
+- package/config file mutation.
+
+Do not snapshot:
+
+- large files above configured size unless allowed;
+- binary files unless explicitly enabled;
+- secrets unless secure storage/redaction is configured;
+- ignored directories such as `.git`, `node_modules`, virtualenvs, caches.
+
+---
+
+## Restore Modes
+
+| Mode | Behaviour |
+|---|---|
+| `state_only` | Restore runtime/session/task state only. |
+| `files_only` | Restore file snapshots only. |
+| `state_and_files` | Restore both. |
+| `fork_only` | Create new branch/session without touching current state. |
+| `summarise_only` | Show summary and diff only. |
+
+---
+
+## Rewind UX Requirements
+
+Rich TUI must show:
+
+- checkpoint timeline;
+- checkpoint summary;
+- files changed;
+- event range;
+- risk warning;
+- diff preview;
+- restore mode choices;
+- approval requirement;
+- rollback outcome.
+
+User must be able to:
+
+- inspect checkpoint;
+- compare checkpoints;
+- restore;
+- fork;
+- export;
+- delete/clean up;
+- ask side question about checkpoint without stopping active work.
+
+---
+
+## Session Resume
+
+Resume must:
+
+- load session metadata;
+- load latest checkpoint;
+- load event log pointer;
+- reconstruct task list;
+- mark interrupted tasks as recoverable/failed/paused;
+- ask user before resuming risky pending actions;
+- never auto-run shell/network after resume without fresh approval.
+
+---
+
+## Session Fork
+
+Fork creates a new session lineage:
+
+```json
+{
+  "new_session_id": "sess_new",
+  "parent_session_id": "sess_old",
+  "forked_from_checkpoint_id": "ckpt_01H...",
+  "reason": "Try an alternate implementation approach"
+}
+```
+
+Fork can optionally create a Git worktree or branch in future phases.
+
+---
+
+## Cleanup And Retention
+
+Checkpoint retention policy must support:
+
+- max checkpoints per session;
+- max storage size;
+- max age;
+- keep manual checkpoints;
+- keep checkpoints linked to unresolved tasks;
+- secure deletion for sensitive snapshots where available.
+
+---
+
+## Checkpoint Events
+
+Required events:
+
+- `checkpoint_requested`
+- `checkpoint_created`
+- `checkpoint_failed`
+- `checkpoint_inspected`
+- `checkpoint_compare_requested`
+- `checkpoint_restore_requested`
+- `checkpoint_restore_approved`
+- `checkpoint_restored`
+- `checkpoint_restore_failed`
+- `checkpoint_fork_requested`
+- `session_forked`
+- `checkpoint_deleted`
+- `checkpoint_cleanup_completed`
+
+---
+
+## Checkpoint Security Requirements
+
+- Snapshots may contain sensitive data.
+- Snapshot storage path must be local and access-controlled where possible.
+- Secrets must be redacted or snapshot skipped according to policy.
+- Restore must show diff before file mutation.
+- Restore must require approval if files change.
+- Checkpoints must not be sent to remote model providers unless explicitly allowed.
+
+---
+
+## Testing Requirements
+
+Tests must prove:
+
+- checkpoint manifest writes correctly;
+- latest checkpoint can be loaded;
+- file snapshot captures before-edit content;
+- restore requires approval for file changes;
+- state-only restore does not change files;
+- fork creates new session lineage;
+- shell/network pending actions do not auto-run after resume;
+- cleanup preserves manual checkpoints.

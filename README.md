@@ -4,21 +4,15 @@
 
 Raiker is not just a chatbot. Raiker is an **agent runtime** that connects user interfaces, language models, tools, memory, plugins, hooks, subagents, channels, checkpoints, execution environments, and rich interactive clients behind a security and privacy boundary.
 
-Raiker installs a global command named `raiker`. The global command is the canonical entry point for CLI use, Rich TUI, model launch, gateway mode, connector linking, diagnostics, sessions, memory, graph search, and provider routing.
+Raiker installs one human-facing global command named `raiker`.
 
 ```bash
-raiker ask "List files in this project"
-raiker chat
-raiker tui
-raiker launch --provider ollama --model <model>
-raiker launch --provider llama.cpp --model <path-to-gguf> --ctx 32768
-raiker launch --provider lm-studio --model <model>
-raiker launch --provider openai-compatible --endpoint <endpoint> --model <model>
-raiker gateway start
-raiker doctor
+raiker
 ```
 
-Provider-specific adapters may map commands such as `ollama launch raiker --model <model>` into the canonical `raiker launch --provider ollama --model <model>` path when the provider supports that style of extension.
+Running `raiker` launches the Rich TUI. From the TUI, the user can submit normal prompts, ask side questions, approve or deny actions, launch or switch models, link channels, inspect memory, query graph context, open diagnostics, manage sessions, review checkpoints, and control tasks.
+
+Provider-specific adapters may still map commands such as `ollama launch raiker --model <model>` into a Raiker model-launch request when the provider supports that style of extension, but the user-facing Raiker entry point remains `raiker`.
 
 ---
 
@@ -33,7 +27,7 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Phased architecture, component responsibilities, global command flow, and implementation boundaries. |
 | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Contracts for prompts, events, plans, actions, policy decisions, tool results, responses, and checkpoints. |
 | [`docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md`](docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md) | SQLite, JSONL, FTS5, vector metadata, graph tables, recursive CTEs, checkpoint and memory storage. |
-| [`docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`](docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) | Global `raiker` command, launch flows, slash commands, Rich TUI, side questions, approvals, keyboard UX. |
+| [`docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`](docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) | Global `raiker` command, TUI actions, slash commands, model launch, side questions, approvals, keyboard UX. |
 | [`docs/UI_UX_DESIGN_SPEC.md`](docs/UI_UX_DESIGN_SPEC.md) | Rich TUI, status bar, Desktop UI, Web UI, Dashboard, IDE, Voice UI, and shared UX design. |
 | [`docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`](docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md) | Model profiles, local providers, hosted policy gates, launch contract, streaming, tool-call modes. |
 | [`config/model-profiles.json`](config/model-profiles.json) | Built-in model launch profile registry for mock, Ollama, llama.cpp, LM Studio, OpenAI-compatible, hosted providers. |
@@ -108,7 +102,9 @@ Every prompt, model call, tool proposal, approval, denial, tool result, hook, pl
 ## High-Level User Flow
 
 ```text
-User prompt or channel message
+User runs `raiker`
+  -> Rich TUI opens
+  -> user submits prompt, slash command, side question, approval, or model/channel action
   -> client/channel envelope
   -> agent gateway
   -> session manager
@@ -156,7 +152,7 @@ Interface and Channel Layer
 
 Phase 1 builds the secure local core:
 
-- global `raiker` command;
+- global `raiker` TUI launch command;
 - repository scaffold;
 - contracts;
 - event log writer;
@@ -169,10 +165,10 @@ Phase 1 builds the secure local core:
 - list_directory;
 - glob;
 - grep;
-- command execution with approval;
+- local command proposal with approval;
 - mock model provider;
 - deterministic runtime state machine;
-- CLI client;
+- Rich TUI shell with prompt input and status panels;
 - checkpoint stub;
 - unit tests.
 

@@ -1,8 +1,8 @@
 # Execution Environments Specification
 
-Raiker can execute work locally or, in future phases, in isolated or remote environments. Execution environments are high-risk because they can mutate files, consume resources, leak data, or run untrusted code.
+Raiker can execute work locally or in isolated, remote, containerised, or cloud environments according to phase-scheduled execution profiles. Execution environments are high-risk because they can mutate files, consume resources, leak data, or run untrusted code.
 
-Phase 1 supports local native execution only through policy-gated tools.
+Phase 1 supports local native execution only through policy-gated tools, but every execution type has a documented profile and safety contract now.
 
 ---
 
@@ -11,32 +11,34 @@ Phase 1 supports local native execution only through policy-gated tools.
 Raiker execution environments must support:
 
 1. local native tool execution;
-2. shell/PowerShell approval gates;
-3. Docker sandboxing in future phases;
+2. command approval gates;
+3. container sandboxing;
 4. Git worktree isolation;
 5. SSH remote hosts;
-6. cloud/serverless/GPU jobs;
-7. resource limits;
-8. network egress policy;
-9. artifact capture;
-10. cancellation and cleanup;
-11. event logging.
+6. VPS and persistent sandbox profiles;
+7. Kubernetes and managed cloud profiles;
+8. cloud/serverless/GPU jobs;
+9. resource limits;
+10. network egress policy;
+11. artifact capture;
+12. cancellation and cleanup;
+13. event logging.
 
 ---
 
 ## Environment Types
 
-| Environment | Phase | Default policy |
-|---|---:|---|
-| `local_native` | Phase 1 | tools policy-gated |
-| `git_worktree` | Phase 2 | needs approval |
-| `docker` | Phase 3 | deny until configured |
-| `ssh` | Future | deny until configured |
-| `vps` | Future | deny until configured |
-| `kubernetes` | Future | deny until configured |
-| `modal` | Future | deny until configured |
-| `daytona` | Future | deny until configured |
-| `managed_cloud` | Future | deny until configured |
+| Environment | Build phase | Default policy | Profile state |
+|---|---:|---|---|
+| `local_native` | Phase 1 | tools policy-gated | enabled |
+| `git_worktree` | Phase 2 | needs approval | disabled until configured |
+| `container` | Phase 4 | disabled until configured | profile available |
+| `ssh` | Phase 4 | disabled until configured | profile available |
+| `vps` | Phase 4 | disabled until configured | profile available |
+| `kubernetes` | Phase 5 | disabled until configured | profile available |
+| `modal` | Phase 5 | disabled until budget configured | profile available |
+| `daytona` | Phase 4 | disabled until configured | profile available |
+| `managed_cloud` | Phase 5 | disabled until managed policy configured | profile available |
 
 ---
 
@@ -47,6 +49,8 @@ Raiker execution environments must support:
   "schema_version": "1.0",
   "execution_profile_id": "local-safe",
   "environment_type": "local_native",
+  "build_phase": "phase_1",
+  "default_state": "enabled",
   "workspace_root": "/workspace/project",
   "network": {
     "egress_allowed": false,
@@ -66,6 +70,11 @@ Raiker execution environments must support:
   "secrets": {
     "inject_env": false,
     "allowed_secret_refs": []
+  },
+  "artifacts": {
+    "capture_stdout": true,
+    "capture_stderr": true,
+    "retention": "task_lifetime"
   }
 }
 ```
@@ -91,7 +100,7 @@ Requirements:
 
 ## Git Worktree Isolation
 
-Future worktree execution creates a separate working tree for risky edits.
+Git worktree execution creates a separate working tree for risky edits.
 
 Rules:
 
@@ -99,13 +108,14 @@ Rules:
 - branch/worktree name must be deterministic and safe;
 - cleanup must be explicit;
 - checkpoints must link to worktree;
-- diff/merge plan must be shown before applying to main workspace.
+- diff/merge plan must be shown before applying to main workspace;
+- worktree state appears in TUI/Desktop/Web dashboard.
 
 ---
 
-## Docker Execution
+## Container Execution
 
-Future Docker execution must define:
+Container execution must define:
 
 - image source;
 - image digest/checksum;
@@ -113,7 +123,7 @@ Future Docker execution must define:
 - mounted paths;
 - user ID;
 - resource limits;
-- secrets policy;
+- secret reference policy;
 - artifact paths;
 - cleanup policy.
 
@@ -121,25 +131,25 @@ No unpinned image execution by default.
 
 ---
 
-## SSH And Remote Execution
+## SSH, VPS, And Persistent Sandbox Execution
 
-Remote execution requires:
+Remote or persistent sandbox execution requires:
 
-- host allowlist;
+- host/profile allowlist;
 - credential reference, not raw secret;
 - command policy;
 - environment profile;
 - data egress review;
 - artifact retrieval policy;
-- audit log.
-
-Remote execution cannot use approval inherited from local shell.
+- audit log;
+- explicit cleanup or persistence policy;
+- no inherited approval from local command execution.
 
 ---
 
-## Cloud/Batch/GPU Execution
+## Kubernetes And Managed Cloud Execution
 
-Cloud execution requires:
+Managed remote execution requires:
 
 - provider policy;
 - cost budget;
@@ -148,22 +158,14 @@ Cloud execution requires:
 - artifact retention;
 - cancellation support;
 - billing event logs;
+- managed policy if multi-user or enterprise;
 - no silent fallback from local to cloud.
 
 ---
 
 ## Artifact Handling
 
-Execution artifacts must include:
-
-- artifact ID;
-- source task/action;
-- path or storage URI;
-- size;
-- checksum;
-- sensitivity;
-- retention;
-- export policy.
+Execution artifacts must include artifact ID, source task/action, path or storage URI, size, checksum, sensitivity, retention, export policy, and linked execution profile.
 
 ---
 
@@ -171,6 +173,7 @@ Execution artifacts must include:
 
 Required events:
 
+- `execution_profile_available`
 - `execution_profile_loaded`
 - `execution_environment_prepared`
 - `execution_started`
@@ -190,10 +193,11 @@ Required events:
 
 Tests must prove:
 
-- shell cannot run outside broker;
+- local command execution cannot run outside broker;
 - timeout cancels command;
 - output is truncated and logged;
 - network commands denied by default;
-- Docker/SSH/cloud profiles denied until configured;
+- container, SSH, VPS, Kubernetes, Modal, Daytona, and managed cloud profiles exist but are disabled until configured;
 - artifact metadata includes checksum;
-- cancellation emits events.
+- cancellation emits events;
+- dashboard can list configured and unconfigured execution profiles.

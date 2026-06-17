@@ -6,3 +6,6 @@
 .claude
 cli_output.txt
 /raiker.egg-info
+__pycache__/
+*.py[cod]
+*$py.class

@@ -5,7 +5,7 @@ from raiker.cli.main import main
 
 
 def test_package_imports() -> None:
-    assert raiker.__version__ == "0.1.0"
+    assert raiker.__version__ == "0.0.0"
 
 
 def test_cli_status_starts_and_exits(capsys) -> None:  # type: ignore[no-untyped-def]

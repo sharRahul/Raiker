@@ -5,8 +5,10 @@ This plan decomposes Raiker Phase 1 into small implementation tasks suitable for
 Phase 1 objective:
 
 ```text
-Build a local TUI-driven agent runtime opened by the global `raiker` command, with explicit contracts, deterministic state transitions, append-only event logging, SQLite bootstrap, static policy review, a tool broker for safe filesystem/search tools, approval-gated local action proposals, a mock model provider, checkpoint stubs, and tests.
+Build a local agent runtime core opened first through the global `raiker` terminal command, with explicit contracts, deterministic state transitions, append-only event logging, SQLite bootstrap, static policy review, a tool broker for safe filesystem/search tools, approval-gated local action proposals, a mock model provider, checkpoint stubs, connector/model registries, and tests.
 ```
+
+The Phase 1 terminal client is the first implementation target only. It is not the privileged human interface. CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and other governed clients are equal-status primary interfaces when implemented and enabled.
 
 ---
 
@@ -16,10 +18,10 @@ Included:
 
 - Python package scaffold;
 - global `raiker` command;
-- minimal Rich TUI shell;
-- TUI prompt input;
-- TUI slash-command parser;
-- TUI approval cards;
+- minimal terminal client shell, usually Rich TUI;
+- terminal prompt input;
+- terminal slash-command parser;
+- terminal approval cards;
 - contracts;
 - agent gateway;
 - session manager;
@@ -38,6 +40,7 @@ Included:
 - channel connector profile registry;
 - checkpoint service;
 - memory governance candidate path;
+- interface/client metadata preservation;
 - tests.
 
 Phase-scheduled but not wired in Phase 1:
@@ -45,6 +48,8 @@ Phase-scheduled but not wired in Phase 1:
 - Desktop UI;
 - Web UI;
 - Dashboard;
+- Apple mobile app;
+- Android mobile app;
 - remote/container execution;
 - plugin execution;
 - durable vector memory writes;
@@ -54,7 +59,7 @@ Phase-scheduled but not wired in Phase 1:
 - external channel implementations;
 - hosted model billing controls.
 
-These are not vague exclusions. The specs and registries must remain compatible with them.
+These are not vague exclusions and do not imply lower interface status. The specs and registries must remain compatible with all equal-status primary interfaces.
 
 ---
 
@@ -67,7 +72,7 @@ Create the recommended directory structure from `docs/ARCHITECTURE.md`.
 Acceptance criteria:
 
 - package imports as `raiker`;
-- TUI entry module exists;
+- terminal entry module exists;
 - `tests/` exists;
 - no runtime behaviour yet;
 - README points to the docs map.
@@ -93,6 +98,8 @@ Implement contracts from `docs/CONTRACTS.md`.
 Acceptance criteria:
 
 - `PromptEnvelope`, `AgentEvent`, `ToolAction`, `PolicyDecision`, `ToolResult`, `AgentResponse`, and `Checkpoint` are represented in code;
+- client/interface metadata is preserved;
+- valid phase-scheduled client types are accepted by contract tests even when not wired yet;
 - invalid enum values are rejected;
 - required fields are tested;
 - schema version is present on public contracts.
@@ -127,6 +134,7 @@ Acceptance criteria:
 - never rewrites existing events;
 - validates event contract before writing;
 - indexes event metadata in SQLite;
+- records originating interface/client metadata;
 - tests verify multiple events are appended in order.
 
 ### RAIKER-0203: Load built-in registries
@@ -134,9 +142,11 @@ Acceptance criteria:
 Acceptance criteria:
 
 - every connector profile has required fields;
+- Apple and Android mobile connector profiles exist;
+- every connector profile declares equal-primary status when enabled;
 - every model profile has required fields;
 - disabled profiles are listable but not wired;
-- TUI `/channels` and `/models` can show profiles when TUI command support lands;
+- terminal `/channels` and `/models` can show profiles when terminal command support lands;
 - tests cover invalid registry entries.
 
 ---
@@ -160,7 +170,8 @@ Acceptance criteria:
 - returns `PolicyDecision`;
 - includes reasons;
 - logs decision event when integrated;
-- no action can execute without policy decision.
+- no action can execute without policy decision;
+- no interface can bypass policy.
 
 ---
 
@@ -209,7 +220,7 @@ Acceptance criteria:
 
 - approval-gated action always requires approval in Phase 1;
 - without approval, the action is not executed;
-- approval-required response is rendered in the TUI approval area;
+- approval-required response is rendered in the terminal approval area;
 - event log records proposal and approval request.
 
 ---
@@ -234,13 +245,14 @@ Acceptance criteria:
 - no hosted calls happen in Phase 1 tests;
 - model profile registry is used.
 
-### RAIKER-0503: Implement TUI launch profile resolution
+### RAIKER-0503: Implement terminal launch profile resolution
 
 Acceptance criteria:
 
 - `/launch --provider mock --model mock-deterministic` resolves the mock profile;
 - unknown provider/model returns structured error;
 - launch request emits model launch events;
+- launch action is interface-neutral in contract shape;
 - tests cover success and unknown provider.
 
 ---
@@ -284,7 +296,8 @@ Acceptance criteria:
 
 - invalid envelope returns failed response;
 - valid envelope reaches runtime;
-- gateway logs prompt received.
+- gateway logs prompt received;
+- gateway preserves client/interface metadata.
 
 ### RAIKER-0702: Implement session manager
 
@@ -306,28 +319,28 @@ Acceptance criteria:
 
 ---
 
-## Milestone 8: TUI MVP
+## Milestone 8: Terminal Client MVP
 
-### RAIKER-0801: Implement global `raiker` TUI launch
+### RAIKER-0801: Implement global `raiker` terminal launch
 
 Acceptance criteria:
 
-- `raiker` starts the TUI;
-- TUI shows prompt input and status area;
-- TUI can exit safely;
+- `raiker` starts the configured local terminal client;
+- terminal client shows prompt input and status area;
+- terminal client can exit safely;
 - tests cover dispatch.
 
-### RAIKER-0802: Implement TUI prompt path
+### RAIKER-0802: Implement terminal prompt path
 
 Acceptance criteria:
 
-- plain TUI input builds `PromptEnvelope`;
-- TUI calls gateway;
-- TUI renders final response;
+- plain terminal input builds `PromptEnvelope`;
+- terminal client calls gateway;
+- terminal client renders final response;
 - event log is created;
 - checkpoint is created.
 
-### RAIKER-0803: Add TUI approval behaviour
+### RAIKER-0803: Add terminal approval behaviour
 
 Acceptance criteria:
 
@@ -335,7 +348,7 @@ Acceptance criteria:
 - approval card explains approval is required;
 - event log contains approval request.
 
-### RAIKER-0804: Add TUI registry panels
+### RAIKER-0804: Add terminal registry panels
 
 Add Phase 1 registry panels:
 
@@ -348,6 +361,7 @@ Acceptance criteria:
 
 - lists profiles from config registries;
 - disabled profiles are visible as disabled;
+- Apple and Android mobile app profiles are visible as disabled Phase 3 profiles;
 - invalid registry produces structured error.
 
 ---
@@ -358,14 +372,15 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- global `raiker` opens TUI;
-- simple prompt completes through TUI;
-- list directory completes through TUI;
+- global `raiker` opens the configured local terminal client;
+- simple prompt completes through terminal path;
+- list directory completes through terminal path;
 - approval-gated request pauses for approval;
 - denied outside-workspace read does not execute;
 - event log contains expected event sequence;
 - checkpoint exists after completion;
-- `/launch --provider mock --model mock-deterministic` resolves a profile.
+- `/launch --provider mock --model mock-deterministic` resolves a profile;
+- equal-interface invariant is asserted in docs/config tests.
 
 ---
 
@@ -374,15 +389,17 @@ Acceptance criteria:
 Phase 1 is complete when:
 
 - all tests pass;
-- global `raiker` command opens TUI;
-- TUI can run a simple prompt;
-- TUI can run safe filesystem query;
+- global `raiker` command opens the configured local terminal client;
+- terminal client can run a simple prompt;
+- terminal client can run safe filesystem query;
 - approval-gated local action is policy-gated;
 - event log is created for every turn;
 - checkpoint is created for every completed turn;
-- connector/model registries load and list inside TUI;
+- connector/model registries load and list inside terminal client;
+- connector registry includes Apple and Android mobile app profiles;
 - phase-scheduled features are not wired beyond the Phase 1 task scope;
-- docs remain consistent with implementation.
+- docs remain consistent with implementation;
+- docs do not describe any interface as primary over another.
 
 ---
 
@@ -395,7 +412,7 @@ python -m mypy raiker apps tests
 raiker
 ```
 
-Expected manual TUI validation actions:
+Expected manual terminal validation actions:
 
 ```text
 normal prompt: Hello Raiker

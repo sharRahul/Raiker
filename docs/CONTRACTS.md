@@ -1,8 +1,8 @@
-# Raiker Phase 1 Contracts
+# Raiker Contracts
 
 This document defines the implementation contracts that builder agents must follow.
 
-Contracts are deliberately explicit so small local models can implement modules without guessing.
+Contracts are deliberately explicit so local and cloud builder models can implement modules without guessing. Phase 1 implements the minimum contract subset, while phase-scheduled features extend the same schemas rather than inventing parallel shapes.
 
 ---
 
@@ -14,6 +14,7 @@ Contracts are deliberately explicit so small local models can implement modules 
 4. Unknown fields should be rejected during Phase 1 unless explicitly allowed.
 5. Contract tests must validate required fields and common invalid inputs.
 6. Events must be append-only and never mutated after write.
+7. Phase-scheduled capabilities must extend these contracts through versioned fields or new versioned contracts.
 
 ---
 
@@ -163,8 +164,8 @@ Minimum Phase 1 risk rules:
 
 - simple chat: `low`
 - file read/list/glob/grep inside workspace: `medium`
-- file write/delete: `high` and not in Phase 1 MVP unless explicitly added later
-- shell command: `high` and approval required
+- file write/delete: `high`, phase-scheduled for Phase 2 implementation, and denied in Phase 1 unless a Phase 1 task explicitly changes the rule
+- local command execution: `high` and approval required
 - network access: `high` or `blocked` depending on policy
 - access outside workspace: `blocked` by default
 
@@ -214,6 +215,8 @@ Allowed Phase 1 tools:
 - `glob`
 - `grep`
 - `shell`
+
+Phase-scheduled tools are listed in `docs/TOOLS_AND_PERMISSIONS_SPEC.md` and must use this same action contract when wired.
 
 ---
 
@@ -313,7 +316,7 @@ Minimum tests:
 - invalid planning mode is rejected;
 - valid `AgentEvent` is accepted;
 - event without timestamp is rejected;
-- shell action produces `needs_approval` policy decision;
+- local command action produces `needs_approval` policy decision;
 - workspace file read is allowed;
 - outside-workspace file read is denied;
 - denied action produces no tool execution;

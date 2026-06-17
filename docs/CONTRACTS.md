@@ -20,7 +20,7 @@ Contracts are deliberately explicit so local and cloud builder models can implem
 
 ## PromptEnvelope
 
-Used by every client to submit work.
+Used by every client to submit work. In Phase 1, the primary user-facing client is the TUI opened by the global `raiker` command.
 
 ```json
 {
@@ -29,8 +29,8 @@ Used by every client to submit work.
   "session_id": "sess_01H...",
   "turn_id": "turn_01H...",
   "client": {
-    "type": "cli",
-    "name": "raiker-cli",
+    "type": "tui",
+    "name": "raiker-tui",
     "version": "0.1.0"
   },
   "user": {
@@ -40,7 +40,9 @@ Used by every client to submit work.
   "prompt": {
     "text": "List files in this project",
     "attachments": [],
-    "metadata": {}
+    "metadata": {
+      "entry_command": "raiker"
+    }
   },
   "options": {
     "planning_mode": "auto",
@@ -96,6 +98,9 @@ Every meaningful activity is recorded as an event.
 
 Required event types for Phase 1:
 
+- `global_command_invoked`
+- `tui_started`
+- `tui_prompt_submitted`
 - `prompt_received`
 - `prompt_normalised`
 - `intent_classified`
@@ -138,7 +143,7 @@ Allowed Phase 1 intents:
 - `filesystem_query`
 - `code_inspection`
 - `code_change_request`
-- `shell_request`
+- `local_action_request`
 - `unknown`
 
 ---
@@ -165,7 +170,7 @@ Minimum Phase 1 risk rules:
 - simple chat: `low`
 - file read/list/glob/grep inside workspace: `medium`
 - file write/delete: `high`, phase-scheduled for Phase 2 implementation, and denied in Phase 1 unless a Phase 1 task explicitly changes the rule
-- local command execution: `high` and approval required
+- local action that can affect the machine: `high` and approval required
 - network access: `high` or `blocked` depending on policy
 - access outside workspace: `blocked` by default
 
@@ -311,12 +316,12 @@ Allowed statuses:
 
 Minimum tests:
 
-- valid `PromptEnvelope` is accepted;
+- valid TUI-originated `PromptEnvelope` is accepted;
 - missing required `PromptEnvelope` field is rejected;
 - invalid planning mode is rejected;
 - valid `AgentEvent` is accepted;
 - event without timestamp is rejected;
-- local command action produces `needs_approval` policy decision;
+- local action produces `needs_approval` policy decision;
 - workspace file read is allowed;
 - outside-workspace file read is denied;
 - denied action produces no tool execution;

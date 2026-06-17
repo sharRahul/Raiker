@@ -28,7 +28,7 @@ def test_launch_resolves_mock_profile(tmp_path) -> None:  # type: ignore[no-unty
         "mock-deterministic",
         session_id=new_id("sess_"),
         turn_id=None,
-        client=ClientMetadata(type="test_harness", name="tests", version="0.1.0"),
+        client=ClientMetadata(type="test_harness", name="tests", version="0.0.0"),
     )
     assert result.status == "completed"
     assert result.profile is not None

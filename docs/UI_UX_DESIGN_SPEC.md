@@ -58,31 +58,32 @@ The Rich TUI is one equal-status primary interface. It is not the primary human 
 ### Default Layout
 
 ```text
-┌──────────────────────────────────────── Raiker v0.0.0────────────────────────────────────────┐
-│                               │ Recent Activity:                                             │
-│                               │ ✓ Inspect specs                                              │
-│ Hello / Welcome back <user>   │ ▶ Update architecture                                        │
-│                               │ • Verify docs                                                │
-│                               │                                                              │
-|                               │──────────────────────────────────────────────────────────────┤
-│                               │ What's new:                                                  │
-│                               │                                                              │
-│      <model> • <effort>       │                                                              │
-│        <workspace>            │                                                              │
-│                               │                                                              │
-├──────────────────────────────────────────────────────────────────────────────────────────────┤
-│ ? side question | / command | normal prompt | ! command proposal | @ file mention            │
-├──────────────────────────────────────────────────────────────────────────────────────────────┤
-│ RUNNING | task:docs | approvals:2 | model:qwen | ctx:18k/32k | mem:project | net:block       │
-└──────────────────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────── Raiker v0.0.0─────────────────────────────────────────────────────────────────────┐
+│                               │ Recent Activity:                                                                          │
+│                               │ ✓ Inspect specs                                                                           │
+│ Hello / Welcome back <user>   │ ▶ Update architecture                                                                     │
+│                               │ • Verify docs                                                                             │
+│         .-----------.         │                                                                                           │
+|       .-░░▒▒░▒▒▒░▒▒░░-.       │───────────────────────────────────────────────────────────────────────────────────────────┤
+│      (░░▒▒▒▒▓▓▓▒▒▒▓▓░░░)      │ What's new:                                                                               │
+│     (░░▒▒▒▓▓▓▓▓▓▓▓▒▒▓▓▒░)     │                                                                                           │
+│                               │                                                                                           │
+│      <model> • <effort>       │                                                                                           │
+│        <workspace>            │                                                                                           │
+│                               │                                                                                           │
+├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ > ? side question | / command | normal prompt | ! command proposal | @ file mention                                       │
+├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ RUNNING | task:docs | approvals:2 | model:qwen | ctx: ███████░░░░░░░ <used>% <used>/<max> | mem:project | net:block       │
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### TUI Status Bar
 
-Required fields, left to right:
+Configurable fields, left to right:
 
 ```text
-STATE | task:<status> | approvals:<n> | model:<profile> | ctx:  ███████░░░░░░░ <used>% <used>/<max> | mem:<scope> | net:<policy> | exec:<profile> | last:<event> | cost:<amount> | clock
+STATE | task:<status> | approvals:<n> | model:<profile> | ctx: ███████░░░░░░░ <used>% <used>/<max> | mem:<scope> | net:<policy> | exec:<profile> | last:<event> | cost:<amount> | clock
 ```
 
 Example:
@@ -109,7 +110,12 @@ If terminal does not support colours, use text labels only.
 
 Required panels:
 
-- Transcript panel;
+- Primary / Main Panel (Left);
+- Activity Panel (Right)
+- Input panel
+- Status Bar Panel
+
+Optional panels (user can add and help user build):
 - Active plan panel;
 - Approvals panel;
 - Task progress panel;
@@ -121,6 +127,273 @@ Required panels:
 - Skill/eidetic memory inspector.
 
 Side questions must be visually separated from the main task and must not overwrite streamed task progress.
+
+## Transcript / Event Stream Behaviour
+
+The transcript panel is a **structured, streaming event system** (not plain chat).
+
+### Event Types
+
+* Tool actions: `List(...)`, `Read(...)`, `Update(...)`, `Search(...)`, `Execute(...)`
+* Reasoning steps: natural language explanations
+* Results: summaries, outputs, diffs
+
+### Visual Indicators
+
+* `●` successful tool/action
+* `○` reasoning/explanation step
+* `⚠` warning or risk state
+* `✖` failure state
+
+### Behaviour
+
+* Events stream **incrementally (token-level rendering)**
+* Tool execution and reasoning are **interleaved**
+* Each event is **atomic and traceable**
+* No hidden actions — all system behaviour must be visible
+
+## Hierarchical Tree Rendering
+
+The interface supports structured, nested outputs using ASCII tree formatting.
+
+### Characters
+
+* `│` continuation
+* `├` branch
+* `└` final branch
+* `|_` fallback rendering (low compatibility terminals)
+
+### Example
+
+```text
+List(Modules/Tests)
+│
+├ Listed 57 paths
+│
+└ Read(file.swift)
+  └ Read 85 lines
+```
+
+### Usage
+
+* File and directory listings
+* Execution breakdowns
+* Nested tool outputs
+
+## Expandable / Collapsible Nodes
+
+Large outputs must be collapsible by default.
+
+### Format
+
+```text
+└ Listed 57 paths (ctrl+r to expand)
+```
+
+### Behaviour
+
+* Default: collapsed for large content
+* Shows summary metadata:
+  * item count
+  * size (lines/files)
+* Keyboard accessible (e.g. `ctrl+r`)
+* Expansion must preserve hierarchy
+
+## Inline Diff Viewer
+
+File updates must render inline as structured diffs.
+
+### Format
+
+```diff
+- import WordPressShared
++ @testable import WordPressShared
+```
+
+### Behaviour
+
+* Syntax highlighted code
+* Line numbers preserved
+* Color semantics:
+  * Removed → red (`-`)
+  * Added → green (`+`)
+* Expandable for large diffs
+* Scrollable within block
+
+## Tool / Event Integration Model
+
+Tool execution is embedded directly into the transcript (no separate panel required).
+
+### Rules
+
+* Every tool call appears as a first-class event
+* Must include:
+  * Action name
+  * Target resource
+  * Summary result
+* Detailed output is collapsible
+
+### Example
+
+```text
+● Read(file.swift)
+└ Read 85 lines (ctrl+r to expand)
+```
+
+## Live Execution Indicator
+
+Displays real-time operation status above the input.
+
+### Format
+
+```text
+☁ Searching... (27s • ↓ 425 tokens • esc to interrupt)
+```
+
+### Fields
+
+* Activity label (Searching, Generating, Updating)
+* Elapsed time
+* ↑ ↓ for Token input and output
+* Token usage
+* Interrupt hint
+
+### Behaviour
+
+* Updates in real time
+* Replaces itself per active task
+* Disappears when task completes
+
+## Command Input Behaviour
+
+### Prompt Modes
+
+* `?` → side question
+* `/` → command
+* `!` → command proposal
+* `@` → file or entity reference
+* default → normal prompt
+
+### Behaviour
+
+* Real-time input parsing
+* Supports command + natural language mixing
+* Context-aware suggestions (if supported)
+
+## Side Question Handling
+
+Side questions must not interrupt or overwrite active tasks.
+
+### Rules
+
+* Rendered in **separate visual context**
+* Do not mutate:
+  * current task state
+  * execution stream
+* Status bar switches to `SIDE-Q`
+
+## Approval Mode System
+
+### Indicator
+
+```text
+▶ auto-accept edits: ON (shift+tab to cycle)
+```
+
+### Modes
+
+* `manual` → explicit approval required
+* `auto-accept` → changes applied automatically
+
+### Behaviour
+
+* Always visible to user
+* Keyboard toggle supported
+* Applies only to **mutating actions (e.g. Update, Execute)**
+
+## Execution & Interruptibility
+
+### Behaviour
+
+* All long-running operations must be interruptible
+* Interrupt via `esc`
+* Partial results must be preserved when interrupted
+
+## Streaming Model
+
+### Behaviour
+
+* Output appears incrementally (not batch-rendered)
+* Supports:
+  * partial reasoning
+  * progressive tool results
+* Ensures low-latency feedback loop
+
+## Tool Feedback & Summaries
+
+Each tool must return:
+
+* **Summary line (always visible)**
+* **Detailed output (collapsible)**
+
+### Example
+
+```text
+● Update(file.swift)
+└ Updated with 1 addition and 1 removal
+```
+## Status Bar Behaviour
+
+The status bar reflects **real-time system state**.
+
+### Dynamic Updates
+
+* `STATE` changes per lifecycle
+* `task` reflects current activity
+* `approvals` increments when user action required
+* `last` shows most recent event
+* `cost` accumulates usage
+
+### Context Usage Bar
+
+```text
+ctx: ███████░░░░░░░ 50% 18k/32k
+```
+
+* Updates continuously
+* Visual + numeric representation
+
+## Window Header Behaviour
+
+### Format
+
+```text
+<view name> (#<session/task id>)
+```
+
+### Behaviour
+
+* Updates when switching context/session
+* Provides persistent orientation
+
+## Enterprise / Audit Behaviour
+
+* All actions must be:
+  * visible
+  * timestampable
+  * reproducible
+* No silent background execution
+* Network policy must be honoured and reflected (`net:blocked/open`)
+* Approval-sensitive operations must respect mode
+
+## Core Interaction Principles
+
+1. **Transparency** — every action is observable
+2. **Interleaving** — reasoning + execution coexist
+3. **Progressive disclosure** — collapse complexity by default
+4. **Interruptibility** — user retains control at all times
+5. **Traceability** — full audit trail in transcript
+6. **Consistency** — all tools follow same event model
 
 ---
 

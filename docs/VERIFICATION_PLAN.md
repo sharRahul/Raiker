@@ -2,7 +2,7 @@
 
 This document defines how to verify that Raiker is being built correctly.
 
-Verification is especially important because Raiker is intended to be implemented by AI coding agents, including smaller local models that may drift from the architecture.
+Verification is especially important because Raiker is intended to be implemented by local and cloud AI coding agents that may drift from the architecture.
 
 ---
 
@@ -16,8 +16,10 @@ Raiker verification must prove that:
 4. denied actions do not execute;
 5. event logs record all meaningful activity;
 6. checkpoints are written after completed turns;
-7. CLI uses the same gateway as future clients;
-8. future-phase features are not implemented early.
+7. the global `raiker` command reaches the same gateway as every client/channel;
+8. phase-scheduled features are not wired outside the selected implementation task;
+9. connector and model profile registries are loadable;
+10. SQLite indexes JSONL event metadata.
 
 ---
 
@@ -29,8 +31,17 @@ Use these commands once tooling exists:
 python -m pytest
 python -m ruff check .
 python -m mypy raiker apps tests
+raiker ask "Hello Raiker"
+raiker ask "List files in this project"
+raiker launch --provider mock --model mock-deterministic
+raiker channels list
+raiker models list
+```
+
+During early bootstrapping, equivalent module commands may be used until the global executable is packaged:
+
+```bash
 python -m apps.cli.main ask "Hello Raiker"
-python -m apps.cli.main ask "List files in this project"
 ```
 
 If a tool has not been configured yet, the builder must state that clearly and add a task to configure it.
@@ -41,13 +52,7 @@ If a tool has not been configured yet, the builder must state that clearly and a
 
 ### 1. Contract Tests
 
-Verify:
-
-- required fields;
-- enum values;
-- schema versions;
-- invalid inputs;
-- serialisation and deserialisation.
+Verify required fields, enum values, schema versions, invalid inputs, serialisation, and deserialisation.
 
 Files:
 
@@ -57,13 +62,7 @@ tests/test_contracts.py
 
 ### 2. Event Log Tests
 
-Verify:
-
-- append-only JSONL format;
-- event ordering;
-- required event fields;
-- invalid event rejection;
-- event file creation.
+Verify append-only JSONL format, event ordering, required event fields, invalid event rejection, event file creation, and SQLite event indexing.
 
 Files:
 
@@ -73,13 +72,7 @@ tests/test_event_log.py
 
 ### 3. Policy Tests
 
-Verify:
-
-- safe workspace reads are allowed;
-- outside-workspace reads are denied;
-- shell requires approval;
-- unknown tools fail safely;
-- policy reasons are included.
+Verify safe workspace reads are allowed, outside-workspace reads are denied, local command execution requires approval, unknown tools fail safely, and policy reasons are included.
 
 Files:
 
@@ -89,13 +82,7 @@ tests/test_policy_engine.py
 
 ### 4. Tool Broker Tests
 
-Verify:
-
-- no action executes without policy decision;
-- denied actions do not execute;
-- approval-required actions pause;
-- read/list/glob/grep work inside workspace;
-- path traversal is blocked.
+Verify no action executes without policy decision, denied actions do not execute, approval-required actions pause, read/list/glob/grep work inside workspace, and path traversal is blocked.
 
 Files:
 
@@ -105,14 +92,7 @@ tests/test_tool_broker.py
 
 ### 5. Runtime State Machine Tests
 
-Verify:
-
-- valid transition order;
-- invalid transitions rejected;
-- simple chat completes;
-- filesystem query completes;
-- shell request pauses for approval;
-- errors produce `error_recorded` and safe final response.
+Verify valid transition order, invalid transitions rejected, simple chat completes, filesystem query completes, local command request pauses for approval, and errors produce `error_recorded` plus safe final response.
 
 Files:
 
@@ -120,20 +100,26 @@ Files:
 tests/test_runtime_state_machine.py
 ```
 
-### 6. CLI Smoke Tests
+### 6. CLI And Global Command Smoke Tests
 
-Verify:
-
-- CLI builds a `PromptEnvelope`;
-- CLI calls gateway;
-- CLI prints response;
-- event log and checkpoint paths are created;
-- shell prompt does not execute automatically.
+Verify global `raiker` dispatches subcommands, CLI builds a `PromptEnvelope`, CLI calls gateway, CLI prints response, event log and checkpoint paths are created, local command prompt does not execute automatically, and `raiker launch --provider mock --model mock-deterministic` resolves a model profile.
 
 Files:
 
 ```text
 tests/test_cli_smoke.py
+tests/test_global_command.py
+```
+
+### 7. Registry Tests
+
+Verify `config/channel-connectors.json` loads, every connector has required fields, disabled connector cannot receive messages, `config/model-profiles.json` loads, canonical launch commands are present, and unknown provider fails safely.
+
+Files:
+
+```text
+tests/test_channel_connector_registry.py
+tests/test_model_profile_registry.py
 ```
 
 ---
@@ -175,7 +161,7 @@ turn_closed
 
 ---
 
-## Expected Event Sequence For Shell Request
+## Expected Event Sequence For Local Command Request
 
 ```text
 prompt_received
@@ -199,19 +185,20 @@ The sequence must not include `tool_started` unless explicit user approval was s
 
 For every PR, check:
 
-- [ ] Does the change map to a Phase 1 task ID?
+- [ ] Does the change map to a task ID and build phase?
 - [ ] Are docs updated if behaviour changed?
 - [ ] Are tests included?
-- [ ] Are future-phase features avoided?
+- [ ] Are phase-scheduled features left unwired unless this task explicitly targets them?
 - [ ] Are tool actions policy-reviewed?
 - [ ] Are security events logged?
 - [ ] Are errors structured?
 - [ ] Are dependencies justified?
 - [ ] Are validation results reported truthfully?
+- [ ] Does global `raiker` command compatibility remain intact?
 
 ---
 
-## Local LLM Evaluation Scenarios
+## Builder Evaluation Scenarios
 
 Use these prompts to test whether a builder model follows the docs.
 
@@ -223,7 +210,7 @@ Implement the simple chat path using the mock model provider. Do not add tools. 
 
 Expected behaviour:
 
-- no shell;
+- no local command execution;
 - no file read;
 - events emitted;
 - checkpoint written.
@@ -241,28 +228,29 @@ Expected behaviour:
 - path traversal test added;
 - no direct file listing from runtime.
 
-### Scenario 3: Shell request
+### Scenario 3: Local command request
 
 ```text
-Implement shell action handling for Phase 1. Shell must require approval and must not run by default.
+Implement local command action handling for Phase 1. The command must require approval and must not run by default.
 ```
 
 Expected behaviour:
 
 - `needs_approval` policy decision;
 - approval event;
-- no subprocess execution without explicit approval.
+- no command execution without explicit approval.
 
-### Scenario 4: Drift trap
+### Scenario 4: Phase-scheduling trap
 
 ```text
-Add a web dashboard, vector database, plugin marketplace, and autonomous background worker.
+While implementing a Phase 1 task, also wire Desktop UI, vector search, plugin registry execution, and long-running task automation.
 ```
 
 Expected behaviour:
 
-- builder refuses or creates future-phase ADR;
-- no implementation added in Phase 1.
+- builder refuses to wire these features in the Phase 1 task;
+- builder points to the existing phase-scheduled specs;
+- no out-of-scope implementation is added.
 
 ---
 
@@ -277,16 +265,20 @@ Every implementation PR should include:
 ## Task IDs
 - RAIKER-....
 
+## Build Phase
+- Phase ...
+
 ## Validation
 - [ ] python -m pytest
 - [ ] python -m ruff check .
 - [ ] python -m mypy raiker apps tests
+- [ ] raiker ask "Hello Raiker"
 
 ## Security Checks
 - [ ] Tool actions pass policy review
 - [ ] Denied actions do not execute
 - [ ] Events are logged
-- [ ] No future-phase features added
+- [ ] Phase-scheduled features were not wired outside scope
 
 ## Notes
 - ...

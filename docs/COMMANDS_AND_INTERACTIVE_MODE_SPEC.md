@@ -1,59 +1,55 @@
 # Commands And Rich Interactive Mode Specification
 
-Raiker must provide a rich interactive experience, not only a simple CLI.
+Raiker must provide a rich interactive experience, not a set of fragmented primary CLI entry points.
 
-The Rich TUI is a first-class client that can show live work, ask and answer side questions, interrupt or steer the active task, review approvals, browse events, inspect memory, and manage checkpoints without losing the active agent state.
+The Rich TUI is the primary human interface. It can show live work, ask and answer side questions, interrupt or steer the active task, review approvals, browse events, inspect memory, launch or switch models, link channels, and manage checkpoints without losing active agent state.
 
 ---
 
 ## Global Command Requirement
 
-Raiker must install a global command named `raiker`.
-
-The `raiker` command is the canonical entry point for CLI, TUI, gateway, model launch, model selection, provider binding, connector linking, diagnostics, and session management.
-
-### Global Command Family
+Raiker must install one human-facing global command named `raiker`.
 
 ```bash
 raiker
-raiker ask "List files in this project"
-raiker chat
-raiker tui
-raiker launch --provider ollama --model qwen3.5-coder:9b
-raiker launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
-raiker launch --provider lm-studio --model local-model
-raiker launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
-raiker gateway start
-raiker gateway status
-raiker sessions list
-raiker sessions resume <session_id>
-raiker sessions fork <checkpoint_id>
-raiker models list
-raiker models use <profile_id>
-raiker channels list
-raiker channels link <connector_id>
-raiker memory search "policy boundary"
-raiker graph query --symbol ToolBroker
-raiker doctor
 ```
 
-`raiker` with no arguments starts the interactive CLI or Rich TUI depending on installation profile and terminal capability.
+Running `raiker` launches the Rich TUI. The TUI is the canonical place for normal user actions.
 
-### Provider Launch Contract
+The global command must not require the user to choose separate primary modes such as ask/chat/tui. Those behaviours are modes and panels inside the TUI.
 
-Canonical provider launch syntax:
+---
 
-```bash
-raiker launch --provider <provider> --model <model>
-```
+## TUI Action Model
 
-Required provider examples:
+The user acts inside the TUI through:
 
-```bash
-raiker launch --provider ollama --model qwen3.5-coder:9b
-raiker launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
-raiker launch --provider lm-studio --model local-model
-raiker launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
+| Action surface | Example | Behaviour |
+|---|---|---|
+| Normal prompt input | `List files in this project` | Creates a normal prompt turn. |
+| Side question input | `? What is it doing now?` | Creates read-only side turn bound to active task. |
+| Slash command | `/models` | Opens a TUI panel or creates a structured action. |
+| Approval card | Approve / deny / defer | Resolves exact pending action ID. |
+| Model panel | `/launch --provider ollama --model qwen3.5-coder:9b` | Launches or switches model profile. |
+| Channel panel | `/channels` | Lists, links, unlinks, and inspects connectors. |
+| Memory panel | `/memory` | Searches and manages governed memory. |
+| Graph panel | `/graph query --symbol ToolBroker` | Runs graph/codemap query through policy. |
+| Checkpoint panel | `/checkpoints` | Inspect, restore, fork, export, or clean up checkpoints. |
+| Diagnostics panel | `/doctor` | Runs diagnostics through approved checks. |
+
+---
+
+## Provider Launch From TUI
+
+Model launch is a TUI action, not a separate primary user entry point.
+
+Required TUI launch examples:
+
+```text
+/launch --provider ollama --model qwen3.5-coder:9b
+/launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
+/launch --provider lm-studio --model local-model
+/launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
 ```
 
 External provider adapters may expose convenience forms. For example, if a platform supports extension-style commands, an adapter may accept a shape such as:
@@ -62,25 +58,32 @@ External provider adapters may expose convenience forms. For example, if a platf
 ollama launch raiker --model <model>
 ```
 
-That adapter must delegate into the canonical Raiker launch contract and record the equivalent command in the event log:
+That adapter must delegate into a Raiker model-launch action and record the equivalent TUI action in the event log:
 
-```bash
-raiker launch --provider ollama --model <model>
+```text
+/launch --provider ollama --model <model>
 ```
 
-The canonical `raiker` global command must always work independently of provider-specific shortcuts.
+The canonical human-facing Raiker command remains:
+
+```bash
+raiker
+```
 
 ---
 
 ## Interface Modes
 
-| Mode | Purpose | Command |
+| Mode | Purpose | User access |
 |---|---|---|
-| `cli_command` | One-shot command, scriptable. | `raiker ask "..."` |
-| `interactive_cli` | Prompt loop in terminal. | `raiker chat` |
-| `rich_tui` | Full terminal UI with panels and background tasks. | `raiker tui` or `raiker` |
-| `headless` | API/automation mode. | `raiker ask --json "..."` |
-| `daemon` | Long-running local service for channels/webhooks. | `raiker gateway start` |
+| `rich_tui` | Full terminal UI with panels and background tasks. | `raiker` |
+| `prompt_turn` | One normal prompt action. | Type prompt inside TUI. |
+| `side_question` | Ask about active task without stopping it. | Prefix input with `?` in TUI. |
+| `model_launch` | Launch/switch model provider. | `/launch` inside TUI. |
+| `channel_management` | Link/list/manage connectors. | `/channels` inside TUI. |
+| `diagnostics` | Run health checks. | `/doctor` inside TUI. |
+| `daemon` | Long-running local service used by channels/webhooks. | Managed from TUI/settings or service manager. |
+| `headless` | Automation/test-only path. | Internal/test harness, not primary user UX. |
 
 ---
 
@@ -104,10 +107,12 @@ The Rich TUI must support:
 14. background task manager;
 15. interrupt/steer controls;
 16. model/context usage display;
-17. policy decision display;
-18. keyboard shortcuts;
-19. mouse support where available;
-20. fallback plain terminal mode.
+17. model launch/profile panel;
+18. channel connector panel;
+19. policy decision display;
+20. keyboard shortcuts;
+21. mouse support where available;
+22. fallback plain terminal mode.
 
 ---
 
@@ -122,7 +127,7 @@ Recommended default layout:
 │ Plan          │ Active Tools / Tasks     │ Approvals / Alerts  │
 │ Checkpoints   │ Progress / Logs          │ Memory / Context    │
 ├───────────────┴──────────────────────────┴─────────────────────┤
-│ Side question / command / prompt input                          │
+│ Side question / slash command / normal prompt / file mention     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -178,12 +183,13 @@ Safe boundaries include before tool execution, after tool completion, before fil
 
 ---
 
-## Command Syntax
+## TUI Input Syntax
 
-Raiker command input must support:
+Raiker TUI input must support:
 
 | Syntax | Meaning |
 |---|---|
+| Plain text | Normal prompt. |
 | `/command` | Slash command. |
 | `!command` | Local command proposal, never direct execution without policy. |
 | `@path` | File or directory mention. |
@@ -215,9 +221,10 @@ Raiker command input must support:
 | `/permissions` | Show/edit permission rules. |
 | `/hooks` | Show hook registry and status. |
 | `/plugins` | Show plugin registry. |
-| `/channels` | Show paired channels. |
+| `/channels` | Show paired channels and connector registry. |
 | `/models` | Show model profiles. |
 | `/launch` | Launch or switch model provider profile. |
+| `/graph` | Query graph/codemap context. |
 | `/compact` | Compact context. |
 | `/export` | Export session/task/events. |
 | `/doctor` | Run diagnostics. |
@@ -233,11 +240,11 @@ Slash commands expand into structured prompts or actions before reaching the run
 Expansion lifecycle:
 
 ```text
-raw input
+raw TUI input
   -> command parser
   -> UserPromptExpansion hook
   -> command permission check
-  -> PromptEnvelope or ToolAction proposal
+  -> PromptEnvelope, UIActionEnvelope, or ToolAction proposal
   -> runtime
 ```
 
@@ -282,7 +289,9 @@ No approval should be hidden in a stream of text. It must appear in approval inb
 Required events:
 
 - `tui_started`
+- `tui_ready`
 - `tui_panel_opened`
+- `tui_prompt_submitted`
 - `tui_command_submitted`
 - `global_command_invoked`
 - `model_launch_requested`
@@ -303,12 +312,13 @@ Required events:
 
 Tests must prove:
 
-- global `raiker` command dispatches to CLI/TUI/gateway/model subcommands;
-- provider launch maps to a model profile;
-- command parser handles `/`, `!`, `@`, `?`;
+- global `raiker` command launches the TUI;
+- TUI prompt input creates a PromptEnvelope and reaches the gateway;
+- provider launch through `/launch` maps to a model profile;
+- command parser handles plain prompts, `/`, `!`, `@`, `?`;
 - side question does not stop active task;
 - interrupt changes active task state safely;
 - approval choice binds to action ID;
 - checkpoint selection triggers restore/fork flow;
-- TUI can render with no color/limited terminal;
+- TUI can render with no colour/limited terminal;
 - background task progress updates without corrupting transcript.

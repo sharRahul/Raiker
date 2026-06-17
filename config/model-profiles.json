@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0",
+  "description": "Built-in Raiker model profile registry. Running the global raiker command opens the TUI, and the TUI uses these profiles for local and policy-controlled providers.",
+  "profiles": [
+    {
+      "profile_id": "mock-test",
+      "provider": "mock",
+      "model": "mock-deterministic",
+      "build_phase": "phase_1",
+      "default_state": "enabled_for_tests",
+      "tui_launch_action": "/launch --provider mock --model mock-deterministic",
+      "local_only": true,
+      "requires_network": false,
+      "supports_streaming": false,
+      "supports_tool_calls": true,
+      "tool_call_mode": "json_schema"
+    },
+    {
+      "profile_id": "ollama-local-default",
+      "provider": "ollama",
+      "model": "<model>",
+      "build_phase": "phase_2",
+      "default_state": "disabled_until_provider_detected",
+      "tui_launch_action": "/launch --provider ollama --model <model>",
+      "adapter_command_shape": "ollama launch raiker --model <model>",
+      "local_only": true,
+      "requires_network": false,
+      "supports_streaming": true,
+      "supports_tool_calls": false,
+      "tool_call_mode": "text_json"
+    },
+    {
+      "profile_id": "llama-cpp-local-gguf",
+      "provider": "llama.cpp",
+      "model": "<path-to-gguf>",
+      "build_phase": "phase_2",
+      "default_state": "disabled_until_provider_detected",
+      "tui_launch_action": "/launch --provider llama.cpp --model <path-to-gguf> --ctx <tokens>",
+      "local_only": true,
+      "requires_network": false,
+      "supports_streaming": true,
+      "supports_tool_calls": false,
+      "tool_call_mode": "text_json"
+    },
+    {
+      "profile_id": "lm-studio-local",
+      "provider": "lm-studio",
+      "model": "<model>",
+      "build_phase": "phase_2",
+      "default_state": "disabled_until_provider_detected",
+      "tui_launch_action": "/launch --provider lm-studio --model <model>",
+      "local_only": true,
+      "requires_network": false,
+      "supports_streaming": true,
+      "supports_tool_calls": true,
+      "tool_call_mode": "openai_compatible"
+    },
+    {
+      "profile_id": "openai-compatible-local",
+      "provider": "openai-compatible",
+      "model": "<model>",
+      "build_phase": "phase_2",
+      "default_state": "disabled_until_endpoint_configured",
+      "tui_launch_action": "/launch --provider openai-compatible --endpoint <endpoint> --model <model>",
+      "local_only": false,
+      "requires_network": false,
+      "supports_streaming": true,
+      "supports_tool_calls": true,
+      "tool_call_mode": "native_or_json_schema"
+    },
+    {
+      "profile_id": "hosted-policy-controlled",
+      "provider": "hosted",
+      "model": "<provider-model>",
+      "build_phase": "phase_3_to_phase_5",
+      "default_state": "disabled_until_policy_approved",
+      "tui_launch_action": "/launch --provider <provider> --model <model>",
+      "local_only": false,
+      "requires_network": true,
+      "supports_streaming": true,
+      "supports_tool_calls": true,
+      "tool_call_mode": "provider_specific",
+      "requires_egress_policy": true,
+      "requires_budget_policy": true
+    }
+  ]
+}

@@ -1,330 +1,181 @@
-
 # Raiker
 
 **Raiker** is a local-first AI agent platform designed to run as a secure, observable, extensible agent operating layer on a personal workstation, home lab, or governed enterprise environment.
 
-Raiker is not just a chatbot. Raiker is an **agent runtime** that connects user interfaces, language models, tools, memory, plugins, hooks, subagents, and execution environments behind a security and privacy boundary.
+Raiker is not just a chatbot. Raiker is an **agent runtime** that connects user interfaces, language models, tools, memory, plugins, hooks, subagents, channels, checkpoints, execution environments, and rich interactive clients behind a security and privacy boundary.
 
-The goal is simple:
+Raiker installs one human-facing global command named `raiker`.
 
-```text
-Just Ask
-  -> interrupt, steer, or add context at any time
-  -> Raiker gathers context
-  -> Raiker plans when the task is complex or risky
-  -> Raiker acts through approved tools, skills, plugins, hooks, and subagents
-  -> Raiker verifies the result
-  -> Raiker records every action
-  -> Raiker updates governed long-term memory only when appropriate
+```bash
+raiker
 ```
+
+Running `raiker` launches the Rich TUI. From the TUI, the user can submit normal prompts, ask side questions, approve or deny actions, launch or switch models, link channels, inspect memory, query graph context, open diagnostics, manage sessions, review checkpoints, and control tasks.
+
+Provider-specific adapters may still map commands such as `ollama launch raiker --model <model>` into a Raiker model-launch request when the provider supports that style of extension, but the user-facing Raiker entry point remains `raiker`.
 
 ---
 
-## Why Raiker Exists
+## Implementation Documentation Map
 
-Modern AI coding agents are powerful, but they often have several gaps:
+Raiker is intended to be implemented by local or cloud AI coding agents. Implementation is phased, but the specification is not vague. Every phase-scheduled feature must already have contracts, storage, runtime lifecycle, UI surface, security rules, events, tests, and failure handling.
 
-- They may rely heavily on cloud models.
-- They may not preserve useful memory across long periods.
-- They may lack strong security boundaries around shell, files, plugins, and network access.
-- They may not provide OS-like event logs for every action.
-- They may treat terminal, chat, desktop, and API experiences as separate products instead of equal clients.
-- They may drift when smaller local models are used to implement complex systems.
+| Document | Purpose |
+|---|---|
+| [`docs/FEATURE_COVERAGE_MATRIX.md`](docs/FEATURE_COVERAGE_MATRIX.md) | Full platform coverage checklist, phase placement, and non-negotiable invariants. |
+| [`docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`](docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md) | Phase 1 to Phase 5 implementation blueprint and builder hand-off flow. |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Phased architecture, component responsibilities, global command flow, and implementation boundaries. |
+| [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Contracts for prompts, events, plans, actions, policy decisions, tool results, responses, and checkpoints. |
+| [`docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md`](docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md) | SQLite, JSONL, FTS5, vector metadata, graph tables, recursive CTEs, checkpoint and memory storage. |
+| [`docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`](docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) | Global `raiker` command, TUI actions, slash commands, model launch, side questions, approvals, keyboard UX. |
+| [`docs/UI_UX_DESIGN_SPEC.md`](docs/UI_UX_DESIGN_SPEC.md) | Rich TUI, status bar, Desktop UI, Web UI, Dashboard, IDE, Voice UI, and shared UX design. |
+| [`docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`](docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md) | Model profiles, local providers, hosted policy gates, launch contract, streaming, tool-call modes. |
+| [`config/model-profiles.json`](config/model-profiles.json) | Built-in model launch profile registry for mock, Ollama, llama.cpp, LM Studio, OpenAI-compatible, hosted providers. |
+| [`docs/CHANNELS_SPEC.md`](docs/CHANNELS_SPEC.md) | Channel connector profiles, pairing, sender trust, routing, side questions, approval relay, link/unlink lifecycle. |
+| [`config/channel-connectors.json`](config/channel-connectors.json) | Built-in connector profile registry used by UI listing/linking flows before implementation wiring. |
+| [`docs/MEMORY_AND_CONTEXT_STRATEGY.md`](docs/MEMORY_AND_CONTEXT_STRATEGY.md) | Working, profile, project, episodic, procedural, semantic, graph, eidetic observation, and gist memory. |
+| [`docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`](docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md) | Eidetic-style raw observations, gist memory, retention, exact replay, skill learning, and self-improvement controls. |
+| [`docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`](docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md) | Graph entities, relationships, codemap indexing, graph queries, staleness, and graph-context retrieval. |
+| [`docs/RUNTIME_ORCHESTRATION_SPEC.md`](docs/RUNTIME_ORCHESTRATION_SPEC.md) | Runtime state machine, background tasks, interrupts, side questions, verification, and deterministic event ordering. |
+| [`docs/TOOLS_AND_PERMISSIONS_SPEC.md`](docs/TOOLS_AND_PERMISSIONS_SPEC.md) | Tool catalogue, broker lifecycle, approvals, permission scopes, command policy, and testing rules. |
+| [`docs/HOOKS_SPEC.md`](docs/HOOKS_SPEC.md) | Hook lifecycle events, handlers, matchers, async hooks, decision authority, and hook security. |
+| [`docs/PLUGIN_SYSTEM_SPEC.md`](docs/PLUGIN_SYSTEM_SPEC.md) | Plugin manifests, components, permissions, trust levels, lifecycle, skills, channels, and supply-chain controls. |
+| [`docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md`](docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md) | Subagents, multi-agent teams, bounded delegation, side questions, and parent verification. |
+| [`docs/EXECUTION_ENVIRONMENTS_SPEC.md`](docs/EXECUTION_ENVIRONMENTS_SPEC.md) | Local, worktree, container, SSH, VPS, Kubernetes, cloud/GPU execution profiles, artifacts, and resource controls. |
+| [`docs/OWASP_GENAI_SECURITY_MAPPING.md`](docs/OWASP_GENAI_SECURITY_MAPPING.md) | GenAI/LLM risk mapping, controls, and security test matrix. |
+| [`docs/REFERENCE_PLATFORM_COMPATIBILITY.md`](docs/REFERENCE_PLATFORM_COMPATIBILITY.md) | Mapping to Claude Code, OpenClaw, Hermes, memory, graph, local inference, and security reference concepts. |
+| [`docs/PHASE_1_MVP_BUILD_PLAN.md`](docs/PHASE_1_MVP_BUILD_PLAN.md) | Task-by-task Phase 1 build plan with acceptance criteria. |
+| [`docs/PHASE_1_ALIGNMENT_ADDENDUM.md`](docs/PHASE_1_ALIGNMENT_ADDENDUM.md) | Phase 1 addendum for global command, registries, and phase-scheduled feature compatibility. |
+| [`docs/ROADMAP_PHASE_2_TO_PHASE_5.md`](docs/ROADMAP_PHASE_2_TO_PHASE_5.md) | Phase-scheduled roadmap from local MVP to governed enterprise/home-lab platform. |
+| [`docs/SECURITY_AND_POLICY.md`](docs/SECURITY_AND_POLICY.md) | Phase 1 security model, policy matrix, path safety, command approval, memory governance, security tests. |
+| [`docs/VERIFICATION_PLAN.md`](docs/VERIFICATION_PLAN.md) | Validation commands, event sequences, PR checklist, local/cloud builder evaluation scenarios. |
+| [`docs/LOCAL_LLM_BUILDER_GUIDE.md`](docs/LOCAL_LLM_BUILDER_GUIDE.md) | Operating rules, prompt template, and anti-drift checklist for local/cloud builder agents. |
+| [`docs/ADR_TEMPLATE.md`](docs/ADR_TEMPLATE.md) | Template for documenting design decisions instead of silently inventing behaviour. |
 
-Raiker is designed to solve those problems with a **local-first, policy-gated, event-sourced agent architecture**.
+---
+
+## Builder Reading Flow
+
+A builder model must use this flow before coding:
+
+```text
+README.md
+  -> docs/FEATURE_COVERAGE_MATRIX.md
+  -> docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
+  -> docs/ARCHITECTURE.md
+  -> docs/CONTRACTS.md
+  -> docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md
+  -> docs/SECURITY_AND_POLICY.md
+  -> task-specific spec
+  -> docs/VERIFICATION_PLAN.md
+```
+
+For every task, the builder must identify the phase, task ID, files to change, contracts affected, storage affected, events emitted, policy gates, UI surface, tests, and documentation updates.
 
 ---
 
 ## Core Principles
 
 ### 1. Local-first by default
-Raiker should be able to run fully locally with local models such as llama.cpp, Ollama, or LM Studio. Remote models and cloud execution are optional and policy-controlled.
+Raiker should run fully locally with local models such as llama.cpp, Ollama, or LM Studio. Remote models and cloud execution are optional and policy-controlled.
 
 ### 2. Equal-status clients
-Raiker is not tied to one interface. CLI, chat, rich TUI, desktop, web, IDE, voice, hotkeys, REST, and webhooks are all clients of the same agent gateway.
+CLI, Rich TUI, Desktop, Web, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Mobile Companion, and other phase-scheduled clients all use the same agent gateway.
 
-### 3. Security and privacy are architectural layers
-Raiker treats security as a boundary around the agent core. Tool execution, memory writes, plugin actions, remote calls, shell commands, and external execution all pass through policy.
+### 3. Rich interruptible UX
+Raiker must support background work, progress visibility, side questions, pause, cancel, steer, approve, deny, rewind, fork, and inspect without losing task state.
 
-### 4. OS-like event logging
-Every prompt, model call, tool proposal, approval, denial, tool result, hook, plugin action, memory write, checkpoint, subagent event, verification result, and error is recorded.
+### 4. Concrete storage design
+Raiker uses local storage with SQLite for state/search/index metadata, JSONL for append-only event logs, checkpoint manifests and file snapshots for recovery, local vector metadata, graph tables, and recursive CTEs.
 
-### 5. Durable but governed memory
-Raiker can remember across sessions, months, and years, but memory is not uncontrolled. Memory records include provenance, confidence, sensitivity, retention, trust score, and approval state.
+### 5. Governed memory and learning
+Raiker memory includes candidates, working context, profile/project memory, episodic/procedural memory, eidetic observations, gist memory, semantic memory, graph memory, and self-improving skills, all governed by provenance, confidence, sensitivity, retention, approval, correction, and deletion.
 
-### 6. Small-model friendly implementation
-Raiker’s build plan is intentionally decomposed into small, explicit tasks so a local model running on consumer hardware can implement the platform without hallucinating or drifting.
+### 6. Security and privacy are architectural layers
+Tool execution, memory writes, plugin actions, channel messages, remote calls, local commands, and external execution all pass through policy.
+
+### 7. OS-like event logging
+Every prompt, model call, tool proposal, approval, denial, tool result, hook, plugin action, channel message, memory write, checkpoint, subagent event, verification result, and error is recorded.
 
 ---
 
 ## High-Level User Flow
 
 ```text
-User prompt
-  -> Client interface
-  -> Agent gateway
-  -> Session manager
-  -> Agent runtime
-  -> Context gathering
-  -> Planning
-  -> Policy review
-  -> Tool/model/memory/subagent action
-  -> Verification
-  -> Final response
-  -> Checkpoint
-  -> Event log
-  -> Memory governance
+User runs `raiker`
+  -> Rich TUI opens
+  -> user submits prompt, slash command, side question, approval, or model/channel action
+  -> client/channel envelope
+  -> agent gateway
+  -> session manager
+  -> runtime orchestration
+  -> context gathering
+  -> planning
+  -> policy review
+  -> hooks
+  -> tool/model/memory/subagent/channel action
+  -> verification
+  -> response or side answer
+  -> checkpoint
+  -> event log
+  -> governed memory review
 ```
 
 ---
 
 ## Main Architecture
 
-Raiker uses a nested control-boundary architecture:
-
 ```text
-Interface Layer
+Interface and Channel Layer
   Event Logging Layer
     Security and Privacy Layer
       Agent Core
-        Agent Runtime
+        Agent Gateway
+        Session Manager
+        Runtime Orchestrator
         Tool Broker
         Hook Engine
+        Plugin Manager
+        Channel Manager
         Memory Service
+        Graph/Codemap Service
         Model Router
-        Plugin and Skill System
+        Checkpoint Service
         Subagent Orchestrator
         Execution Adapters
+        SQLite State Store
 ```
-
-The nested design is intentional:
-
-- The **interface layer** is outside the core and never executes tools directly.
-- The **event logging layer** wraps all meaningful activity.
-- The **security and privacy layer** mediates all risky operations.
-- The **agent core** reasons, plans, acts, verifies, and delegates.
-- The **execution layer** runs commands only through approved adapters.
-- The **persistence layer** stores logs, checkpoints, memory, vectors, graphs, and artifacts.
-
----
-
-## Equal-Status Clients
-
-Raiker supports these clients as first-class citizens:
-
-```text
-CLI
-Chat: Signal, Slack, Teams, Discord, email
-Rich TUI
-Desktop
-Web
-IDE extension
-Voice
-Hotkeys
-REST API
-Webhooks
-```
-
-Each client sends the same `PromptEnvelope` contract and receives the same `AgentEvent` stream.
-
----
-
-## Agent Core Capabilities
-
-### Agent Runtime
-The runtime controls the deterministic loop:
-
-```text
-prompt received
-  -> prompt normalised
-  -> intent classified
-  -> risk classified
-  -> context gathered
-  -> context validated
-  -> plan created or skipped with reason
-  -> policy reviewed
-  -> action dispatched
-  -> tool results ingested
-  -> verification completed
-  -> memory candidates reviewed
-  -> final response created
-  -> checkpoint created
-  -> turn closed
-```
-
-### Tool Broker
-The tool broker is the only path to tools. It controls:
-
-- file read/write/edit/list/delete
-- grep/glob/search
-- shell and PowerShell
-- Git and worktrees
-- LSP/code intelligence
-- memory search/write/forget/export
-- graph query
-- web fetch/search
-- subagent spawning
-- user clarification
-- Docker, SSH, Daytona, Modal, external hosting
-
-### Memory Service
-Raiker memory includes:
-
-- **Profile memory** — stable user preferences and facts
-- **Project memory** — project decisions and architecture
-- **Episodic memory** — timestamped session summaries
-- **Procedural memory** — repeated workflows distilled into skills
-- **Semantic memory** — vector-searchable knowledge
-- **Graph memory** — entities, relationships, code maps, decisions
-
-### Model Router
-The model router can connect to:
-
-- local models
-- llama.cpp
-- Ollama
-- LM Studio
-- OpenRouter or OpenAI-compatible providers
-- Anthropic/OpenAI-style hosted providers
-- Modal-hosted inference
-- custom provider plugins
-
-### Plugins, Skills, and Hooks
-Raiker supports extension through:
-
-- skills
-- commands
-- plugin manifests
-- subagents
-- hooks
-- channels
-- MCP-compatible servers
-- monitors
-- UI panels
-
-Plugins must declare permissions and are policy-gated.
-
----
-
-## Execution Targets
-
-Raiker can run work in multiple execution environments:
-
-```text
-Local native runner
-Docker
-SSH remote host
-Daytona sandbox
-Modal serverless/GPU/batch
-External hosting: VPS, Kubernetes, private cloud, managed app
-```
-
-External execution is always governed by policy, egress controls, budgets, and event logging.
-
----
-
-## Security Model
-
-Raiker’s security layer is designed around common GenAI and agentic risks:
-
-- prompt injection
-- sensitive information disclosure
-- plugin and dependency supply-chain risk
-- data, model, and memory poisoning
-- improper output handling
-- excessive agency
-- system prompt leakage
-- vector and embedding weaknesses
-- misinformation
-- unbounded consumption
-
-High-risk actions require explicit approval unless a policy grants them.
-
----
-
-## Non-Deviation Rules for Builder Agents
-
-Raiker is intended to be implemented by AI coding agents, including smaller local models. To prevent drift:
-
-1. The build agent must follow the roadmap task-by-task.
-2. The build agent must not invent unplanned services or databases.
-3. The build agent must not add dependencies without explanation.
-4. The build agent must not implement future-phase features early.
-5. The build agent must not bypass policy, tool broker, or memory governance.
-6. The build agent must ask for clarification or create an ADR when uncertain.
 
 ---
 
 ## Phase 1 MVP
 
-The first implementation phase should build only:
+Phase 1 builds the secure local core:
 
-- repository scaffold
-- contracts
-- event log writer
-- static policy engine
-- tool broker skeleton
-- read_file
-- list_directory
-- glob
-- grep
-- shell with approval
-- mock model provider
-- deterministic runtime state machine
-- CLI client
-- checkpoint stub
-- unit tests
+- global `raiker` TUI launch command;
+- repository scaffold;
+- contracts;
+- event log writer;
+- static policy engine;
+- SQLite bootstrap;
+- connector profile registry;
+- model profile registry;
+- tool broker skeleton;
+- read_file;
+- list_directory;
+- glob;
+- grep;
+- local command proposal with approval;
+- mock model provider;
+- deterministic runtime state machine;
+- Rich TUI shell with prompt input and status panels;
+- checkpoint stub;
+- unit tests.
 
-Future features should be added only as stubs or interfaces until their phase.
-
----
-
-## Suggested Repository Structure
-
-```text
-/core
-  /contracts
-  /agent_gateway
-  /session_manager
-  /agent_runtime
-  /model_router
-  /tool_broker
-  /policy_engine
-  /memory_service
-  /event_log
-  /checkpoint_service
-  /plugin_manager
-  /hook_engine
-  /channel_manager
-  /security
-  /deployment_adapters
-/apps
-  /cli
-  /tui
-  /desktop
-  /web
-  /ide
-/clients
-  /slack
-  /signal
-  /teams
-  /discord
-  /email
-  /voice
-  /hotkeys
-  /rest
-  /webhooks
-/plugins
-/skills
-/agents
-/docs
-/tests
-/security_tests
-/examples
-```
+Phase-scheduled features are fully specified in the docs listed above and must be implemented according to the phase blueprint.
 
 ---
 
 ## Project Status
 
-Raiker is currently at the architecture and implementation-blueprint stage. The next step is to implement the Phase 1 MVP from the implementation plan.
+Raiker is currently at the architecture and implementation-blueprint stage. The next step is to implement the Phase 1 MVP from the implementation plan while preserving the full platform specifications and phase boundaries.

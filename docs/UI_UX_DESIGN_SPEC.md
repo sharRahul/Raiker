@@ -58,7 +58,7 @@ The Rich TUI is one equal-status primary interface. It is not the primary human 
 ### Default Layout
 
 ```text
-┌──────────────────────────────────────── Raiker ────────────────────────────────────────┐
+┌──────────────────────────────────────── Raiker v0.0.0────────────────────────────────────────┐
 │ Session: sess_abc  Project: Raiker  Branch: main  Mode: Plan+Act                       │
 │ Model: qwen-local  Context: 18.2k/32k  Policy: default  Net: blocked  Mem: project     │
 ├───────────────────────────────┬──────────────────────────────┬─────────────────────────┤
@@ -83,13 +83,13 @@ The Rich TUI is one equal-status primary interface. It is not the primary human 
 Required fields, left to right:
 
 ```text
-STATE | task:<status> | approvals:<n> | model:<profile> | ctx:<used>/<max> | tools:<n> | mem:<scope> | net:<policy> | exec:<profile> | last:<event> | cost:<amount> | clock
+STATE | task:<status> | approvals:<n> | model:<profile> | ctx:  ███████░░░░░░░ <used>% <used>/<max> | mem:<scope> | net:<policy> | exec:<profile> | last:<event> | cost:<amount> | clock
 ```
 
 Example:
 
 ```text
-RUNNING | task:docs-expansion | approvals:1 | model:qwen9b | ctx:18k/32k | tools:14 | mem:project | net:blocked | exec:local | last:tool_completed | cost:£0.00 | 13:42
+RUNNING | task:docs-expansion | approvals:1 | model:qwen9b | ctx: ███████░░░░░░░ 50% 18k/32k | mem:project | net:blocked | exec:local | last:tool_completed | cost:£0.00 | 13:42
 ```
 
 Status labels:

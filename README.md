@@ -1,18 +1,20 @@
 # Raiker
 
-**Raiker** is a local-first AI agent platform designed to run as a secure, observable, extensible agent operating layer on a personal workstation, home lab, or governed enterprise environment.
+**Raiker** is a local-first AI agent platform designed to run as a secure, observable, extensible agent operating layer on a personal workstation, home lab, mobile device, browser, chat workspace, or governed enterprise environment.
 
 Raiker is not just a chatbot. Raiker is an **agent runtime** that connects user interfaces, language models, tools, memory, plugins, hooks, subagents, channels, checkpoints, execution environments, and rich interactive clients behind a security and privacy boundary.
 
-Raiker installs one human-facing global command named `raiker`.
+Raiker does **not** have one privileged human interface. CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and other governed clients are all equal-status primary interfaces when implemented and enabled.
+
+Raiker installs one human-facing global command named `raiker` as the local terminal entry point.
 
 ```bash
 raiker
 ```
 
-Running `raiker` launches the Rich TUI. From the TUI, the user can submit normal prompts, ask side questions, approve or deny actions, launch or switch models, link channels, inspect memory, query graph context, open diagnostics, manage sessions, review checkpoints, and control tasks.
+Running `raiker` launches the local terminal client, which may be implemented as a Rich TUI, plain terminal client, or another configured terminal renderer. This command is one primary interface, not the canonical or exclusive interface. The same actions must also be available through every other enabled primary interface according to that interface's UX capabilities and security policy.
 
-Provider-specific adapters may still map commands such as `ollama launch raiker --model <model>` into a Raiker model-launch request when the provider supports that style of extension, but the user-facing Raiker entry point remains `raiker`.
+Provider-specific adapters may still map commands such as `ollama launch raiker --model <model>` into a Raiker model-launch request when the provider supports that style of extension, but provider adapters must delegate into the same Agent Gateway, contracts, policy gates, event log, and runtime as every other interface.
 
 ---
 
@@ -24,11 +26,11 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 |---|---|
 | [`docs/FEATURE_COVERAGE_MATRIX.md`](docs/FEATURE_COVERAGE_MATRIX.md) | Full platform coverage checklist, phase placement, and non-negotiable invariants. |
 | [`docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`](docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md) | Phase 1 to Phase 5 implementation blueprint and builder hand-off flow. |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Phased architecture, component responsibilities, global command flow, and implementation boundaries. |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Phased architecture, component responsibilities, equal-interface flow, and implementation boundaries. |
 | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Contracts for prompts, events, plans, actions, policy decisions, tool results, responses, and checkpoints. |
 | [`docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md`](docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md) | SQLite, JSONL, FTS5, vector metadata, graph tables, recursive CTEs, checkpoint and memory storage. |
-| [`docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`](docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) | Global `raiker` command, TUI actions, slash commands, model launch, side questions, approvals, keyboard UX. |
-| [`docs/UI_UX_DESIGN_SPEC.md`](docs/UI_UX_DESIGN_SPEC.md) | Rich TUI, status bar, Desktop UI, Web UI, Dashboard, IDE, Voice UI, and shared UX design. |
+| [`docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`](docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) | Global `raiker` command, equal primary interfaces, TUI actions, slash commands, model launch, side questions, approvals, keyboard UX. |
+| [`docs/UI_UX_DESIGN_SPEC.md`](docs/UI_UX_DESIGN_SPEC.md) | Shared UX, Rich TUI, Desktop UI, Web UI, Dashboard, IDE, Voice UI, Apple/Android mobile apps, and channel clients. |
 | [`docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`](docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md) | Model profiles, local providers, hosted policy gates, launch contract, streaming, tool-call modes. |
 | [`config/model-profiles.json`](config/model-profiles.json) | Built-in model launch profile registry for mock, Ollama, llama.cpp, LM Studio, OpenAI-compatible, hosted providers. |
 | [`docs/CHANNELS_SPEC.md`](docs/CHANNELS_SPEC.md) | Channel connector profiles, pairing, sender trust, routing, side questions, approval relay, link/unlink lifecycle. |
@@ -79,33 +81,41 @@ For every task, the builder must identify the phase, task ID, files to change, c
 ### 1. Local-first by default
 Raiker should run fully locally with local models such as llama.cpp, Ollama, or LM Studio. Remote models and cloud execution are optional and policy-controlled.
 
-### 2. Equal-status clients
-CLI, Rich TUI, Desktop, Web, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Mobile Companion, and other phase-scheduled clients all use the same agent gateway.
+### 2. Equal-status primary interfaces
+CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and other phase-scheduled clients all use the same Agent Gateway. No interface is primary over another. Any interface can be the user's primary way to operate Raiker when enabled.
 
-### 3. Rich interruptible UX
-Raiker must support background work, progress visibility, side questions, pause, cancel, steer, approve, deny, rewind, fork, and inspect without losing task state.
+### 3. Full action parity by interface capability
+All primary interfaces must expose the same Raiker action set: prompts, side questions, approvals, task pause/cancel/steer, model launch/switch, channel linking, memory inspection, graph/codemap queries, diagnostics, session management, checkpoints, rewind/fork, tool proposals, and settings. Interface-specific UX may differ, but the underlying action contract and policy checks must be equivalent.
 
-### 4. Concrete storage design
+### 4. Rich interruptible UX
+Raiker must support background work, progress visibility, side questions, pause, cancel, steer, approve, deny, rewind, fork, and inspect without losing task state across every enabled primary interface.
+
+### 5. Concrete storage design
 Raiker uses local storage with SQLite for state/search/index metadata, JSONL for append-only event logs, checkpoint manifests and file snapshots for recovery, local vector metadata, graph tables, and recursive CTEs.
 
-### 5. Governed memory and learning
+### 6. Governed memory and learning
 Raiker memory includes candidates, working context, profile/project memory, episodic/procedural memory, eidetic observations, gist memory, semantic memory, graph memory, and self-improving skills, all governed by provenance, confidence, sensitivity, retention, approval, correction, and deletion.
 
-### 6. Security and privacy are architectural layers
+### 7. Security and privacy are architectural layers
 Tool execution, memory writes, plugin actions, channel messages, remote calls, local commands, and external execution all pass through policy.
 
-### 7. OS-like event logging
-Every prompt, model call, tool proposal, approval, denial, tool result, hook, plugin action, channel message, memory write, checkpoint, subagent event, verification result, and error is recorded.
+### 8. OS-like event logging
+Every prompt, model call, tool proposal, approval, denial, tool result, hook, plugin action, channel message, memory write, checkpoint, subagent event, verification result, and error is recorded regardless of which interface initiated it.
 
 ---
 
 ## High-Level User Flow
 
 ```text
-User runs `raiker`
-  -> Rich TUI opens
-  -> user submits prompt, slash command, side question, approval, or model/channel action
-  -> client/channel envelope
+User acts through any enabled primary interface
+  -> CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys,
+     REST, Webhooks, Slack, Teams, Discord, Signal, Email,
+     Browser Extension, Apple mobile app, Android mobile app,
+     Mobile Companion, or another governed client
+  -> user submits prompt, slash/quick command, side question,
+     approval, model/channel action, memory action, graph query,
+     checkpoint action, diagnostics action, or task control
+  -> PromptEnvelope, UIActionEnvelope, or ChannelMessageEnvelope
   -> agent gateway
   -> session manager
   -> runtime orchestration
@@ -119,6 +129,7 @@ User runs `raiker`
   -> checkpoint
   -> event log
   -> governed memory review
+  -> response/event stream returned to the originating interface
 ```
 
 ---
@@ -150,9 +161,9 @@ Interface and Channel Layer
 
 ## Phase 1 MVP
 
-Phase 1 builds the secure local core:
+Phase 1 builds the secure local core and the first local terminal client while preserving equal-interface contracts:
 
-- global `raiker` TUI launch command;
+- global `raiker` terminal entry command;
 - repository scaffold;
 - contracts;
 - event log writer;
@@ -168,14 +179,15 @@ Phase 1 builds the secure local core:
 - local command proposal with approval;
 - mock model provider;
 - deterministic runtime state machine;
-- Rich TUI shell with prompt input and status panels;
+- first local terminal client shell with prompt input and status panels;
+- equal-interface capability contract and connector registry compatibility;
 - checkpoint stub;
 - unit tests.
 
-Phase-scheduled features are fully specified in the docs listed above and must be implemented according to the phase blueprint.
+Phase-scheduled features are fully specified in the docs listed above and must be implemented according to the phase blueprint. Later implementation phases may wire additional interfaces, but those interfaces are not subordinate to the first terminal client.
 
 ---
 
 ## Project Status
 
-Raiker is currently at the architecture and implementation-blueprint stage. The next step is to implement the Phase 1 MVP from the implementation plan while preserving the full platform specifications and phase boundaries.
+Raiker is currently at the architecture and implementation-blueprint stage. The next step is to implement the Phase 1 MVP from the implementation plan while preserving the full platform specifications, phase boundaries, and equal-primary-interface invariant.

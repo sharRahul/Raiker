@@ -102,13 +102,18 @@ Recommended builder flow:
 
 ```text
 README.md
+  -> docs/IMPLEMENTATION_STATUS.md
   -> docs/FEATURE_COVERAGE_MATRIX.md
   -> docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
+  -> docs/BUILD_ORDER.md
   -> docs/ARCHITECTURE.md
   -> docs/CONTRACTS.md
+  -> docs/API_AND_CONTRACT_SCHEMAS.md
+  -> docs/EVENT_CATALOG.md
   -> docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md
   -> docs/SECURITY_AND_POLICY.md
   -> task-specific spec
+  -> docs/ACCEPTANCE_TESTS_BY_PHASE.md
   -> docs/VERIFICATION_PLAN.md
 ```
 
@@ -206,12 +211,26 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 | [`docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`](docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md) | Phase 1 to Phase 5 implementation blueprint and builder hand-off flow. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Phased architecture, component responsibilities, equal-interface flow, and implementation boundaries. |
 | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Contracts for prompts, events, plans, actions, policy decisions, tool results, responses, and checkpoints. |
+| [`docs/API_AND_CONTRACT_SCHEMAS.md`](docs/API_AND_CONTRACT_SCHEMAS.md) | Strict schema reference for IDs, client metadata, prompts, UI/channel actions, tools, approvals, responses, and checkpoints. |
+| [`docs/EVENT_CATALOG.md`](docs/EVENT_CATALOG.md) | Canonical event names, payload expectations, ordering, actors, and event indexing rules. |
+| [`docs/RUNTIME_STATE_MACHINE.md`](docs/RUNTIME_STATE_MACHINE.md) | Legal Phase 1 runtime transitions, invalid transitions, guards, state events, and state-machine tests. |
 | [`docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md`](docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md) | SQLite, JSONL, FTS5, vector metadata, graph tables, recursive CTEs, checkpoint and memory storage. |
 | [`docs/SECURITY_AND_POLICY.md`](docs/SECURITY_AND_POLICY.md) | Phase 1 security model, policy matrix, path safety, command approval, memory governance, security tests. |
-| [`docs/RUNTIME_ORCHESTRATION_SPEC.md`](docs/RUNTIME_ORCHESTRATION_SPEC.md) | Runtime state machine, background tasks, interrupts, side questions, verification, and deterministic event ordering. |
+| [`docs/RUNTIME_ORCHESTRATION_SPEC.md`](docs/RUNTIME_ORCHESTRATION_SPEC.md) | Runtime orchestration, background tasks, interrupts, side questions, verification, and deterministic event ordering. |
 | [`docs/TOOLS_AND_PERMISSIONS_SPEC.md`](docs/TOOLS_AND_PERMISSIONS_SPEC.md) | Tool catalogue, broker lifecycle, approvals, permission scopes, command policy, and testing rules. |
 | [`docs/VERIFICATION_PLAN.md`](docs/VERIFICATION_PLAN.md) | Validation commands, event sequences, PR checklist, local/cloud builder evaluation scenarios. |
 | [`docs/PHASE_1_MVP_BUILD_PLAN.md`](docs/PHASE_1_MVP_BUILD_PLAN.md) | Single source of truth for Phase 1 build scope, task order, and acceptance criteria. |
+
+### Builder-proof control docs
+
+| Document | Purpose |
+|---|---|
+| [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) | Status ledger for specified, implemented, disabled, blocked, and out-of-scope capabilities. |
+| [`docs/BUILD_ORDER.md`](docs/BUILD_ORDER.md) | Dependency-safe implementation order and PR completion gate. |
+| [`docs/ACCEPTANCE_TESTS_BY_PHASE.md`](docs/ACCEPTANCE_TESTS_BY_PHASE.md) | Phase-by-phase acceptance tests required before a feature can be called complete. |
+| [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) | Assets, trust boundaries, threats, controls, and threat-driven tests. |
+| [`docs/NON_GOALS_AND_BOUNDARIES.md`](docs/NON_GOALS_AND_BOUNDARIES.md) | Explicit product, phase, architecture, storage, model, memory, and security boundaries. |
+| [`docs/REFERENCE_REQUIREMENTS_MATRIX.md`](docs/REFERENCE_REQUIREMENTS_MATRIX.md) | Mapping from reference agent-platform capabilities to Raiker contracts, events, storage, policy, tests, and phases. |
 
 ### Interface, model, channel, and UX docs
 
@@ -220,6 +239,7 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 | [`docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`](docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) | Global `raiker` command, equal primary interfaces, TUI actions, slash commands, model launch, side questions, approvals, keyboard UX. |
 | [`docs/UI_UX_DESIGN_SPEC.md`](docs/UI_UX_DESIGN_SPEC.md) | Shared UX, Rich TUI, configurable status bar, optional panels, Desktop UI, Web UI, Dashboard, IDE, Voice UI, Apple/Android mobile apps, and channel clients. |
 | [`docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`](docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md) | Model profiles, local providers, hosted policy gates, launch contract, streaming, tool-call modes. |
+| [`docs/MODEL_PROVIDER_CONTRACT.md`](docs/MODEL_PROVIDER_CONTRACT.md) | Provider adapter interface, model request/response schema, provider policy, events, and Phase 1 mock-provider acceptance. |
 | [`config/model-profiles.json`](config/model-profiles.json) | Built-in model launch profile registry for mock, Ollama, llama.cpp, LM Studio, OpenAI-compatible, and hosted providers. |
 | [`docs/CHANNELS_SPEC.md`](docs/CHANNELS_SPEC.md) | Channel connector profiles, pairing, sender trust, routing, side questions, approval relay, link/unlink lifecycle. |
 | [`config/channel-connectors.json`](config/channel-connectors.json) | Built-in connector profile registry used by UI listing/linking flows before implementation wiring. |
@@ -229,10 +249,12 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 | Document | Purpose |
 |---|---|
 | [`docs/MEMORY_AND_CONTEXT_STRATEGY.md`](docs/MEMORY_AND_CONTEXT_STRATEGY.md) | Working, profile, project, episodic, procedural, semantic, graph, eidetic observation, and gist memory. |
+| [`docs/MEMORY_GOVERNANCE_RULES.md`](docs/MEMORY_GOVERNANCE_RULES.md) | Memory candidate/record schemas, sensitivity levels, write/use/poisoning controls, and memory-governance tests. |
 | [`docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`](docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md) | Eidetic-style raw observations, gist memory, retention, exact replay, skill learning, and self-improvement controls. |
 | [`docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`](docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md) | Graph entities, relationships, codemap indexing, graph queries, staleness, and graph-context retrieval. |
 | [`docs/HOOKS_SPEC.md`](docs/HOOKS_SPEC.md) | Hook lifecycle events, handlers, matchers, async hooks, decision authority, and hook security. |
 | [`docs/PLUGIN_SYSTEM_SPEC.md`](docs/PLUGIN_SYSTEM_SPEC.md) | Plugin manifests, components, permissions, trust levels, lifecycle, skills, channels, and supply-chain controls. |
+| [`docs/PLUGIN_MANIFEST_SCHEMA.md`](docs/PLUGIN_MANIFEST_SCHEMA.md) | Strict plugin manifest schema, required fields, permission declaration rules, trust rules, events, and tests. |
 | [`docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md`](docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md) | Subagents, multi-agent teams, bounded delegation, side questions, and parent verification. |
 | [`docs/EXECUTION_ENVIRONMENTS_SPEC.md`](docs/EXECUTION_ENVIRONMENTS_SPEC.md) | Local, worktree, container, SSH, VPS, Kubernetes, cloud/GPU execution profiles, artifacts, and resource controls. |
 | [`docs/OWASP_GENAI_SECURITY_MAPPING.md`](docs/OWASP_GENAI_SECURITY_MAPPING.md) | GenAI/LLM risk mapping, controls, and security test matrix. |

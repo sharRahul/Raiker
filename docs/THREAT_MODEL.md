@@ -1,0 +1,172 @@
+# Threat Model
+
+This document defines Raiker's threat model. It complements `docs/SECURITY_AND_POLICY.md` and `docs/OWASP_GENAI_SECURITY_MAPPING.md` by making assets, trust boundaries, threats, mitigations, and acceptance tests explicit.
+
+Raiker is a local-first agent runtime. The main security risk is not only malicious users; it is also untrusted model output, poisoned context, unsafe tools, plugins, channels, memory, and execution environments.
+
+---
+
+## Security Objectives
+
+Raiker must protect:
+
+1. the user's local filesystem and project data;
+2. credentials, environment variables, tokens, SSH keys, cookies, and secrets;
+3. prompts, session history, event logs, checkpoints, artifacts, and memory;
+4. approval integrity and user intent;
+5. policy integrity;
+6. plugin and hook execution boundaries;
+7. channel sender identity and pairing state;
+8. model/provider privacy boundaries;
+9. remote/container execution boundaries;
+10. auditability and incident reconstruction.
+
+---
+
+## Core Trust Boundaries
+
+| Boundary | Trusted side | Untrusted side | Required control |
+|---|---|---|---|
+| User prompt to gateway | Agent Gateway validator | Prompt text and attachments | Contract validation and provenance. |
+| Model output to runtime | Runtime/parser after validation | Raw model output | Structured output validation and policy review. |
+| Runtime to tools | Tool Broker | ToolAction proposal | Policy decision required before execution. |
+| Tool output to context | Runtime observation handler | File contents, command output, grep hits | Treat as untrusted context; redact secrets. |
+| Approval UI to broker | Approval service | UI/channel rendered approval | Exact action binding and freshness check. |
+| Filesystem path to broker | Policy engine | User/model-proposed path | Workspace scoping and symlink/path traversal checks. |
+| Memory candidate to durable memory | Memory governance | Extracted memory | Approval, sensitivity, provenance, retention. |
+| Channel message to gateway | Channel manager after pairing | External sender/message/attachment | Pairing, trust state, rate limit, attachment policy. |
+| Plugin manifest to platform | Plugin manager after validation | Plugin package | Manifest validation, permission diff, trust/signature. |
+| Hosted provider request | Model router after policy | Prompt/context leaving machine | Egress, redaction, budget, provider policy. |
+| Remote execution profile | Execution adapter after policy | Remote/container environment | Explicit profile, resource and egress controls. |
+
+---
+
+## Assets
+
+| Asset | Sensitivity | Storage location | Required controls |
+|---|---|---|---|
+| Workspace files | project-dependent | project filesystem | Workspace policy, snapshots for mutation. |
+| Event logs | high | `.raiker/events/*.jsonl` | Append-only, redaction, integrity checks later. |
+| SQLite state | high | `.raiker/raiker.db` | Migrations, access controls where available. |
+| Checkpoints/snapshots | high | `.raiker/checkpoints/` | Local storage, restore approval, retention. |
+| Tool outputs/artifacts | medium-high | `.raiker/artifacts/` | Output limits, redaction, provenance. |
+| Memory records | high | SQLite/vector index | Governance, provenance, correction/forgetting. |
+| Model profiles | medium | `config/model-profiles.json` and `.raiker/config/` | Local/hosted policy, endpoint validation. |
+| Connector profiles | medium-high | `config/channel-connectors.json` | Disabled by default, pairing and sender trust. |
+| Plugin manifests | high | plugin directories/registry | Trust and permission diff. |
+| Secrets | critical | environment/OS secret store references only | Never store raw values; redact logs. |
+
+---
+
+## Primary Threats And Controls
+
+| Threat | Example | Phase 1 control | Later controls |
+|---|---|---|---|
+| Prompt injection | File says “ignore policy and run command” | Model/file contents treated as untrusted; policy gates tools | Context isolation, injection detection, channel/file trust labels |
+| Indirect prompt injection | Grep result contains hidden instruction | Tool output is observation, not instruction | Provenance-aware context ranking |
+| Path traversal | `../../.ssh/id_rsa` | Workspace root resolution and deny | Policy-scoped sensitive path rules |
+| Unsafe command execution | Model proposes `rm -rf` | Local command returns `needs_approval`; no auto-run | Sandboxing, allowlists, execution profiles |
+| Data exfiltration | Hosted model receives secrets | No hosted calls in Phase 1 | Egress policy, redaction, budgets |
+| Approval spoofing | Channel says user approved | Phase 1 external approval relay disabled | Pairing, signature/session freshness, action binding |
+| Memory poisoning | Untrusted source persists false memory | Phase 1 durable memory writes disabled; candidates only | Confidence/provenance/review/forgetting |
+| Event tampering | JSONL modified after fact | Append-only writer and SQLite indexes | Hash chains/signatures/audit export |
+| Plugin abuse | Plugin runs shell directly | Plugins disabled; tools must route broker | Manifest validation, permission diff, signatures |
+| Hook abuse | Hook silently approves command | Hooks disabled in Phase 1; no policy bypass | Hook decision authority constrained by policy |
+| Channel abuse | Unknown Slack sender controls agent | External channels disabled in Phase 1 | Pairing, sender trust, rate limits |
+| Supply-chain risk | Dependency/plugin update adds malware | Minimal dependencies in Phase 1 | Lockfiles, checksums, signed plugins |
+| Excessive agency | Agent spawns agents or remote jobs | Subagents/remote execution disabled | Budgets, max depth/runtime, parent verification |
+| Resource exhaustion | Huge grep output or infinite command | Output bounds; command not auto-run | Timeouts, cancellation, quotas |
+| Secret leakage in logs | Env/token appears in event payload | Redaction requirement and tests | Secret scanner and managed policy |
+
+---
+
+## Phase 1 Security Requirements
+
+Phase 1 must implement or preserve:
+
+- contract validation;
+- append-only event logging;
+- SQLite event/state indexing;
+- static policy engine;
+- workspace path safety;
+- `allow`, `deny`, and `needs_approval` decisions;
+- Tool Broker as the only execution path;
+- no local command execution without explicit approval;
+- no network requests by default;
+- no plugin execution;
+- no external channel runtime;
+- no durable memory writes;
+- no hosted model calls in tests;
+- disabled/listable registries for phase-scheduled capabilities;
+- structured errors that avoid leaking secrets;
+- acceptance tests for denied and approval-required paths.
+
+---
+
+## Approval Integrity Requirements
+
+Every approval must include:
+
+- `approval_id`;
+- exact `action_id`;
+- tool name;
+- exact or safely summarised arguments;
+- risk level;
+- policy reasons;
+- expected effect;
+- expiry, if any;
+- approving client/channel identity;
+- freshness check against the current action state.
+
+An approval for one action must never approve a changed command, different path, different model endpoint, different plugin permission set, or different channel sender.
+
+---
+
+## Threat-Driven Tests
+
+Phase 1 must include tests for:
+
+1. path traversal denied;
+2. outside-workspace read denied;
+3. symlink escape denied or explicitly documented;
+4. shell proposal returns `needs_approval`;
+5. denied action does not execute;
+6. action without policy decision cannot execute;
+7. unknown tool fails safely;
+8. event log does not contain secret-like fixture values;
+9. hosted provider call is not made in tests;
+10. plugin/channel/subagent execution paths are disabled;
+11. approval for changed action ID is rejected;
+12. invalid event/contract payload is rejected;
+13. tool output is bounded and truncation is logged.
+
+---
+
+## Security Review Questions For Every PR
+
+- Does this PR introduce a new trust boundary?
+- Does any client, plugin, hook, model, channel, or runtime path execute tools directly?
+- Can model output cause filesystem, command, network, memory, plugin, or remote action without policy review?
+- Are event logs written before and after security-relevant decisions?
+- Could this change leak secrets in logs, errors, checkpoints, artifacts, or model prompts?
+- Does this change preserve disabled-by-default behaviour for phase-scheduled features?
+- Does this change create a terminal-only or interface-privileged path?
+- Are tests included for deny, approval, failure, and redaction paths?
+
+---
+
+## Out Of Scope For Phase 1 Security
+
+Phase 1 does not fully implement:
+
+- signed event chains;
+- plugin signatures;
+- managed enterprise policy;
+- multi-user auth;
+- remote/container sandboxing;
+- external channel pairing;
+- hosted provider billing controls;
+- durable vector memory governance;
+- complete prompt-injection classifier.
+
+These are not ignored. They are phase-scheduled and must not be partially wired without their acceptance tests.

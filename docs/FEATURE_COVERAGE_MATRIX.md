@@ -28,19 +28,28 @@ A feature must never be marked as merely "future" without a full specification.
 
 | Area | Spec status | Build phase | Specification document |
 |---|---:|---:|---|
+| Implementation status ledger | fully-specified | phase-1-to-5-build | `docs/IMPLEMENTATION_STATUS.md` |
+| Builder dependency order | fully-specified | phase-1-to-5-build | `docs/BUILD_ORDER.md` |
+| Reference requirement mapping | fully-specified | phase-1-to-5-build | `docs/REFERENCE_REQUIREMENTS_MATRIX.md` |
+| Non-goals and boundaries | fully-specified | phase-1-to-5-build | `docs/NON_GOALS_AND_BOUNDARIES.md` |
+| Threat model | fully-specified | phase-1-to-5-build | `docs/THREAT_MODEL.md`, `docs/SECURITY_AND_POLICY.md` |
+| Acceptance tests by phase | fully-specified | phase-1-to-5-build | `docs/ACCEPTANCE_TESTS_BY_PHASE.md`, `docs/VERIFICATION_PLAN.md` |
+| API and contract schemas | fully-specified | phase-1-build | `docs/API_AND_CONTRACT_SCHEMAS.md`, `docs/CONTRACTS.md` |
+| Event catalog | fully-specified | phase-1-build | `docs/EVENT_CATALOG.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
+| Runtime state transition table | fully-specified | phase-1-build | `docs/RUNTIME_STATE_MACHINE.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
 | Equal primary interface invariant | fully-specified | phase-1-to-5-build | `README.md`, `docs/ARCHITECTURE.md`, `docs/UI_UX_DESIGN_SPEC.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
 | Global `raiker` terminal command | fully-specified | phase-1-build | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/ARCHITECTURE.md` |
 | Interface action parity | fully-specified | phase-1-to-5-build | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/UI_UX_DESIGN_SPEC.md`, `docs/CHANNELS_SPEC.md` |
-| Model launch action | fully-specified | phase-1-to-2-build | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `config/model-profiles.json` |
+| Model launch action | fully-specified | phase-1-to-2-build | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `docs/MODEL_PROVIDER_CONTRACT.md`, `config/model-profiles.json` |
 | Agent gateway | fully-specified | phase-1-build | `docs/ARCHITECTURE.md`, `docs/CONTRACTS.md` |
-| Deterministic runtime loop | fully-specified | phase-1-build | `docs/ARCHITECTURE.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
+| Deterministic runtime loop | fully-specified | phase-1-build | `docs/ARCHITECTURE.md`, `docs/RUNTIME_STATE_MACHINE.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
 | Context gathering | fully-specified | phase-1-build | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
-| Planning | fully-specified | phase-1-build | `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
+| Planning | fully-specified | phase-1-build | `docs/RUNTIME_STATE_MACHINE.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
 | Tool broker | fully-specified | phase-1-build | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
 | Tool catalogue | fully-specified | phase-1-to-5-build | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
-| Permissions and approvals | fully-specified | phase-1-to-5-build | `docs/TOOLS_AND_PERMISSIONS_SPEC.md`, `docs/SECURITY_AND_POLICY.md` |
+| Permissions and approvals | fully-specified | phase-1-to-5-build | `docs/TOOLS_AND_PERMISSIONS_SPEC.md`, `docs/SECURITY_AND_POLICY.md`, `docs/API_AND_CONTRACT_SCHEMAS.md` |
 | Hooks | fully-specified | phase-2-build | `docs/HOOKS_SPEC.md` |
-| Plugins | fully-specified | phase-3-build | `docs/PLUGIN_SYSTEM_SPEC.md` |
+| Plugins | fully-specified | phase-3-build | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` |
 | Channels | fully-specified | phase-3-to-5-build | `docs/CHANNELS_SPEC.md`, `config/channel-connectors.json` |
 | Commands and slash commands | fully-specified | phase-1-to-2-build | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
 | Rich interactive TUI | fully-specified | phase-1-to-2-build | `docs/UI_UX_DESIGN_SPEC.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
@@ -55,19 +64,20 @@ A feature must never be marked as merely "future" without a full specification.
 | Voice UI | fully-specified | phase-4-build | `docs/UI_UX_DESIGN_SPEC.md`, `docs/CHANNELS_SPEC.md` |
 | Browser Extension | fully-specified | phase-4-build | `docs/UI_UX_DESIGN_SPEC.md`, `docs/CHANNELS_SPEC.md` |
 | Checkpoint and rewind | fully-specified | phase-2-build | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` |
-| Event log | fully-specified | phase-1-build | `docs/CONTRACTS.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
+| Event log | fully-specified | phase-1-build | `docs/EVENT_CATALOG.md`, `docs/CONTRACTS.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
 | Session resume/fork | fully-specified | phase-2-build | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` |
 | SQLite storage | fully-specified | phase-1-to-2-build | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
 | FTS5 search | fully-specified | phase-2-build | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
+| Memory governance | fully-specified | phase-1-to-5-build | `docs/MEMORY_GOVERNANCE_RULES.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | Eidetic observation memory | fully-specified | phase-2-build | `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | Gist memory | fully-specified | phase-2-build | `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | Self-improving skills | fully-specified | phase-2-to-3-build | `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
 | Semantic/vector memory | fully-specified | phase-3-build | `docs/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
 | Graph memory/code map | fully-specified | phase-3-build | `docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
 | Recursive CTE graph queries | fully-specified | phase-3-build | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
-| Local inference | fully-specified | phase-2-build | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
-| Hosted/cloud inference | fully-specified | phase-3-to-5-build | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
-| Model router | fully-specified | phase-1-to-2-build | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
+| Local inference | fully-specified | phase-2-build | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `docs/MODEL_PROVIDER_CONTRACT.md` |
+| Hosted/cloud inference | fully-specified | phase-3-to-5-build | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `docs/MODEL_PROVIDER_CONTRACT.md` |
+| Model router | fully-specified | phase-1-to-2-build | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `docs/MODEL_PROVIDER_CONTRACT.md` |
 | Scheduled automations | fully-specified | phase-3-build | `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`, `docs/UI_UX_DESIGN_SPEC.md` |
 | OpenClaw-style gateway and channels | fully-specified | phase-3-to-4-build | `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`, `docs/CHANNELS_SPEC.md` |
 | Hermes-style learning loop | fully-specified | phase-2-to-4-build | `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
@@ -77,10 +87,10 @@ A feature must never be marked as merely "future" without a full specification.
 | Container execution | fully-specified | phase-4-build | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
 | SSH execution | fully-specified | phase-4-build | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
 | Cloud batch/GPU execution | fully-specified | phase-5-build | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
-| OWASP LLM Top 10 controls | fully-specified | phase-1-to-5-build | `docs/OWASP_GENAI_SECURITY_MAPPING.md` |
-| Agentic AI threat controls | fully-specified | phase-1-to-5-build | `docs/OWASP_GENAI_SECURITY_MAPPING.md` |
-| Supply-chain controls | fully-specified | phase-3-to-5-build | `docs/OWASP_GENAI_SECURITY_MAPPING.md`, `docs/PLUGIN_SYSTEM_SPEC.md` |
-| Verification and test plan | fully-specified | phase-1-to-5-build | `docs/VERIFICATION_PLAN.md` |
+| OWASP LLM Top 10 controls | fully-specified | phase-1-to-5-build | `docs/OWASP_GENAI_SECURITY_MAPPING.md`, `docs/THREAT_MODEL.md` |
+| Agentic AI threat controls | fully-specified | phase-1-to-5-build | `docs/OWASP_GENAI_SECURITY_MAPPING.md`, `docs/THREAT_MODEL.md` |
+| Supply-chain controls | fully-specified | phase-3-to-5-build | `docs/OWASP_GENAI_SECURITY_MAPPING.md`, `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` |
+| Verification and test plan | fully-specified | phase-1-to-5-build | `docs/VERIFICATION_PLAN.md`, `docs/ACCEPTANCE_TESTS_BY_PHASE.md` |
 | Full phase implementation blueprint | fully-specified | phase-1-to-5-build | `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
 
 ---

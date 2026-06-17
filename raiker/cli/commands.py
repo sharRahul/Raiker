@@ -18,7 +18,7 @@ def terminal_client() -> ClientMetadata:
     return ClientMetadata(
         type="tui",
         name="raiker-terminal",
-        version="0.1.0",
+        version="0.0.0",
         interface_status="equal_primary_when_enabled",
     )
 

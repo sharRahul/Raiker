@@ -6,13 +6,15 @@ Contracts are deliberately explicit so local and cloud builder models can implem
 
 All primary interfaces use the same contracts. CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and other governed clients must not create separate prompt, approval, checkpoint, memory, model, or task-control schemas.
 
+Raiker package/application versioning starts at `0.0.0`. Patch updates must progress through `0.0.1` to `0.0.99` before the project is bumped to `0.1.0`.
+
 ---
 
 ## Contract Design Rules
 
 1. Every public contract must have a schema version.
 2. IDs must be strings.
-3. Timestamps must be ISO 8601 UTC strings.
+3. Timestamps must be ISO 8601 UTC strings ending in `Z`.
 4. Unknown fields should be rejected during Phase 1 unless explicitly allowed.
 5. Contract tests must validate required fields and common invalid inputs.
 6. Events must be append-only and never mutated after write.
@@ -35,7 +37,7 @@ Used by every client to submit work. In Phase 1, the first implemented user-faci
   "client": {
     "type": "tui",
     "name": "raiker-tui",
-    "version": "0.1.0",
+    "version": "0.0.0",
     "interface_status": "equal_primary_when_enabled"
   },
   "user": {
@@ -52,7 +54,7 @@ Used by every client to submit work. In Phase 1, the first implemented user-faci
   "options": {
     "planning_mode": "auto",
     "approval_mode": "interactive",
-    "model_profile": "mock",
+    "model_profile": "mock-test",
     "max_tool_calls": 10
   }
 }
@@ -65,6 +67,9 @@ Required fields:
 - `session_id`
 - `turn_id`
 - `client.type`
+- `client.name`
+- `client.version`
+- `client.interface_status`
 - `prompt.text`
 - `options.planning_mode`
 - `options.approval_mode`
@@ -117,6 +122,7 @@ Every meaningful activity is recorded as an event.
   "timestamp": "2026-06-17T12:00:00Z",
   "session_id": "sess_01H...",
   "turn_id": "turn_01H...",
+  "task_id": null,
   "event_type": "prompt_received",
   "actor": "agent_gateway",
   "payload": {
@@ -141,6 +147,7 @@ Required event types for Phase 1:
 - `plan_created`
 - `plan_skipped`
 - `action_proposed`
+- `action_validated`
 - `policy_decision`
 - `approval_requested`
 - `approval_received`
@@ -152,6 +159,7 @@ Required event types for Phase 1:
 - `memory_candidate_reviewed`
 - `response_created`
 - `checkpoint_created`
+- `turn_state_changed`
 - `turn_closed`
 - `error_recorded`
 
@@ -234,7 +242,11 @@ A plan must be logged when the runtime decides a plan is required. If skipped, a
 
 ```json
 {
+  "schema_version": "1.0",
   "action_id": "act_01H...",
+  "session_id": "sess_01H...",
+  "turn_id": "turn_01H...",
+  "task_id": null,
   "tool_name": "list_directory",
   "arguments": {
     "path": "."
@@ -252,8 +264,10 @@ Allowed Phase 1 tools:
 - `glob`
 - `grep`
 - `shell`
+- `ask_user`
+- `memory_candidate`
 
-Phase-scheduled tools are listed in `docs/TOOLS_AND_PERMISSIONS_SPEC.md` and must use this same action contract when wired.
+`shell` exists only as an approval-gated local action proposal in Phase 1. It must not auto-run.
 
 ---
 
@@ -261,6 +275,7 @@ Phase-scheduled tools are listed in `docs/TOOLS_AND_PERMISSIONS_SPEC.md` and mus
 
 ```json
 {
+  "schema_version": "1.0",
   "decision_id": "pol_01H...",
   "action_id": "act_01H...",
   "decision": "allow",
@@ -278,10 +293,36 @@ Allowed decisions:
 
 ---
 
+## ApprovalRequest
+
+```json
+{
+  "schema_version": "1.0",
+  "approval_id": "appr_01H...",
+  "action_id": "act_01H...",
+  "session_id": "sess_01H...",
+  "turn_id": "turn_01H...",
+  "tool_name": "shell",
+  "arguments_preview": {
+    "command": "pytest tests/test_policy_engine.py"
+  },
+  "risk_level": "high",
+  "policy_reasons": ["shell_requires_approval"],
+  "expected_effect": "Runs tests in the current workspace.",
+  "choices": ["approve_once", "deny"],
+  "expires_at": null
+}
+```
+
+Approvals must bind to exact `action_id`; changed arguments require a new action and approval.
+
+---
+
 ## ToolResult
 
 ```json
 {
+  "schema_version": "1.0",
   "action_id": "act_01H...",
   "tool_name": "list_directory",
   "status": "success",
@@ -300,6 +341,7 @@ Allowed statuses:
 - `failed`
 - `denied`
 - `approval_required`
+- `cancelled`
 
 ---
 
@@ -314,7 +356,12 @@ Allowed statuses:
   "status": "completed",
   "message": "I found README.md and docs/ in the project root.",
   "events_path": ".raiker/events/sess_01H.jsonl",
-  "checkpoint_path": ".raiker/checkpoints/sess_01H/turn_01H.json"
+  "checkpoint_path": ".raiker/checkpoints/sess_01H/ckpt_01H.json",
+  "client": {
+    "type": "tui",
+    "name": "raiker-tui",
+    "interface_status": "equal_primary_when_enabled"
+  }
 }
 ```
 
@@ -324,6 +371,7 @@ Allowed statuses:
 - `needs_approval`
 - `denied`
 - `failed`
+- `cancelled`
 
 ---
 
@@ -332,6 +380,7 @@ Allowed statuses:
 ```json
 {
   "schema_version": "1.0",
+  "checkpoint_id": "ckpt_01H...",
   "session_id": "sess_01H...",
   "turn_id": "turn_01H...",
   "created_at": "2026-06-17T12:00:02Z",

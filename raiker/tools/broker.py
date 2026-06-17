@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ClientMetadata, PolicyDecision, ToolAction, ToolResult
@@ -83,6 +84,14 @@ class ToolBroker:
         )
         if self.store is not None:
             self.store.insert_tool_action(action, session_id, turn_id, "proposed")
+        self._event(
+            session_id=session_id,
+            turn_id=turn_id,
+            event_type="action_validated",
+            actor="tool_broker",
+            payload={"action_id": action.action_id, "tool_name": action.tool_name, "validation_status": "ok"},
+            client=client,
+        )
         decision = self.policy_engine.review(action)
         self._event(
             session_id=session_id,

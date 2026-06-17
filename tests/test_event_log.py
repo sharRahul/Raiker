@@ -14,7 +14,7 @@ def test_event_writer_appends_and_indexes(tmp_path) -> None:  # type: ignore[no-
     writer = EventLogWriter(store)
     session_id = new_id("sess_")
     turn_id = new_id("turn_")
-    client = ClientMetadata(type="tui", name="raiker-terminal", version="0.1.0")
+    client = ClientMetadata(type="tui", name="raiker-terminal", version="0.0.0")
     first = make_event(session_id=session_id, turn_id=turn_id, event_type="prompt_received", actor="test", payload={}, client=client)
     second = make_event(session_id=session_id, turn_id=turn_id, event_type="turn_closed", actor="test", payload={}, client=client)
     path1, offset1 = writer.append(first)

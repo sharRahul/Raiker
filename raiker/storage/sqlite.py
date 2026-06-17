@@ -7,7 +7,14 @@ from pathlib import Path
 from typing import Any
 
 from raiker.contracts.ids import utc_now
-from raiker.contracts.models import AgentEvent, Checkpoint, ConnectorProfile, ModelProfile, PolicyDecision, ToolAction
+from raiker.contracts.models import (
+    AgentEvent,
+    Checkpoint,
+    ConnectorProfile,
+    ModelProfile,
+    PolicyDecision,
+    ToolAction,
+)
 from raiker.storage.migrations import PHASE_1_MIGRATION_ID, PHASE_1_SQL
 
 

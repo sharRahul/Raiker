@@ -16,7 +16,7 @@ class StatusContext:
     network: str = "blocked"
     execution: str = "local"
     last_event: str = "none"
-    cost: str = "£0.00"
+    cost: str = "$0.00"
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,7 @@ class StatusBarRenderer:
     def _bar(self, percent: int) -> str:
         filled = round(percent / 100 * 14)
         if self.config.use_blocks:
-            return "█" * filled + "░" * (14 - filled)
+            return "#" * filled + "-" * (14 - filled)
         return "#" * filled + "-" * (14 - filled)
 
     def render_item(self, item: str, context: StatusContext) -> str:

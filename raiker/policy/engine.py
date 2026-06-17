@@ -30,8 +30,7 @@ class PolicyEngine:
             if not self._is_inside_workspace(resolved):
                 reasons.append(f"outside_workspace:{key}")
         pattern = action.arguments.get("pattern")
-        if action.tool_name == "glob" and isinstance(pattern, str):
-            if Path(pattern).is_absolute() or ".." in Path(pattern).parts:
+        if action.tool_name == "glob" and isinstance(pattern, str) and (Path(pattern).is_absolute() or ".." in Path(pattern).parts):
                 reasons.append("outside_workspace:pattern")
         return (not reasons, reasons)
 

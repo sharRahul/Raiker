@@ -26,7 +26,7 @@ def test_broker_routes_list_directory_and_logs(tmp_path) -> None:  # type: ignor
         ToolAction(new_id("act_"), "list_directory", {"path": "."}, "medium", False),
         session_id=new_id("sess_"),
         turn_id=new_id("turn_"),
-        client=ClientMetadata(type="test_harness", name="tests", version="0.1.0"),
+        client=ClientMetadata(type="test_harness", name="tests", version="0.0.0"),
     )
     assert decision.decision == "allow"
     assert result.status == "success"

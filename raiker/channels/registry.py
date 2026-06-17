@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
 
 from raiker.contracts.models import ConnectorProfile
 from raiker.models.registry import RegistryError

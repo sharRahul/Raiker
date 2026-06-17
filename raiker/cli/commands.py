@@ -6,7 +6,13 @@ from pathlib import Path
 
 from raiker.channels.registry import ConnectorRegistry
 from raiker.contracts.ids import new_id
-from raiker.contracts.models import ClientMetadata, PromptEnvelope, PromptOptions, PromptPayload, UserMetadata
+from raiker.contracts.models import (
+    ClientMetadata,
+    PromptEnvelope,
+    PromptOptions,
+    PromptPayload,
+    UserMetadata,
+)
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.models.registry import ModelProfileRegistry, RegistryError

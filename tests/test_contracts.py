@@ -4,7 +4,12 @@ import pytest
 
 from raiker.cli.commands import build_prompt_envelope
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import AgentEvent, ClientMetadata, ContractValidationError, PromptOptions
+from raiker.contracts.models import (
+    AgentEvent,
+    ClientMetadata,
+    ContractValidationError,
+    PromptOptions,
+)
 
 
 def test_valid_terminal_prompt_envelope() -> None:

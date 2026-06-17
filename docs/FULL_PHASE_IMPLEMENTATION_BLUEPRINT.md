@@ -2,7 +2,7 @@
 
 This document defines every Raiker phase in detail. A phase may be built later, but the behaviour, UI, storage, security, contracts, and tests are documented now.
 
-No builder agent should interpret "later phase" as "unspecified". Phase means implementation order only.
+No builder agent should interpret "later phase" as "unspecified" or "lower priority interface". Phase means implementation order only. Every implemented and enabled interface is an equal-status primary interface.
 
 ---
 
@@ -22,28 +22,38 @@ README.md
   -> docs/VERIFICATION_PLAN.md
 ```
 
-For any task, the builder must identify phase, task ID, files to change, contracts affected, storage affected, events emitted, policy gates, UI surface, tests, and documentation updates.
+For any task, the builder must identify phase, task ID, files to change, contracts affected, storage affected, events emitted, policy gates, UI surface, tests, documentation updates, and interface/action parity impact.
 
 ---
 
-## Phase 1: Secure Local TUI Core
+## Cross-Phase Equal Interface Rule
+
+CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and other governed clients are equal-status primary interfaces when implemented and enabled.
+
+All actions available through one enabled primary interface must have an equivalent action path in every other enabled primary interface that supports the relevant capability. UI shape can differ, but the underlying gateway contract, policy review, event logging, approval binding, session state, checkpoint handling, memory governance, and runtime orchestration must be the same.
+
+---
+
+## Phase 1: Secure Local Interface Core
 
 ### User Experience
 
 - Global command: `raiker`.
-- Running `raiker` opens the Rich TUI.
-- Normal prompts are typed inside the TUI.
-- Side questions are typed inside the TUI with `?`.
-- Model launch and switching are done inside the TUI with `/launch` and `/models`.
-- Channel listing/linking is done inside the TUI with `/channels`.
-- Diagnostics are opened inside the TUI with `/doctor`.
-- Approval prompts are rendered as TUI approval cards.
-- Event log path and checkpoint path are visible in the TUI status/details panels after each turn.
+- Running `raiker` opens the configured local terminal client, usually the Rich TUI during early implementation.
+- The terminal client is the first implementation target, not the privileged human interface.
+- Normal prompts are submitted through the terminal client in Phase 1 and through every enabled primary interface in its build phase.
+- Side questions use terminal syntax such as `?` in Phase 1 and equivalent native controls in other interfaces.
+- Model launch and switching use terminal commands such as `/launch` and `/models` in Phase 1 and equivalent model controls in other interfaces.
+- Channel listing/linking uses terminal commands such as `/channels` in Phase 1 and equivalent settings/linking screens in other interfaces.
+- Diagnostics use terminal commands such as `/doctor` in Phase 1 and equivalent diagnostics screens/actions in other interfaces.
+- Approval prompts are rendered as terminal approval cards in Phase 1 and equivalent approval inbox/cards/drawers/mobile controls in other interfaces.
+- Event log path and checkpoint path are visible in the terminal status/details panels after each turn and must be exposed by other interfaces through equivalent status surfaces.
 
 ### Runtime
 
 - PromptEnvelope validation.
-- UIActionEnvelope validation for TUI actions.
+- UIActionEnvelope validation for interface actions.
+- ChannelMessageEnvelope validation for channel/mobile/chat/API inputs.
 - Session creation.
 - Deterministic state machine.
 - Tool broker.
@@ -52,6 +62,7 @@ For any task, the builder must identify phase, task ID, files to change, contrac
 - Event logging.
 - SQLite bootstrap.
 - Basic checkpoint manifest.
+- Equal-interface client metadata preserved on events and responses.
 
 ### Tools
 
@@ -82,12 +93,13 @@ For any task, the builder must identify phase, task ID, files to change, contrac
 - policy;
 - broker;
 - runtime state machine;
-- global `raiker` launches TUI;
-- TUI prompt path reaches gateway;
+- global `raiker` launches the configured local terminal client;
+- terminal prompt path reaches gateway;
+- interface client metadata is preserved;
 - SQLite bootstrap;
 - connector registry load;
 - model profile registry load;
-- TUI smoke.
+- terminal/TUI smoke.
 
 ---
 
@@ -95,7 +107,7 @@ For any task, the builder must identify phase, task ID, files to change, contrac
 
 ### User Experience
 
-- Full Rich TUI becomes the primary interface.
+- Full Rich TUI becomes a complete local terminal interface, but not the primary interface over others.
 - Background tasks visible in task panel.
 - User can ask side questions without stopping active task.
 - Approval inbox.
@@ -104,6 +116,7 @@ For any task, the builder must identify phase, task ID, files to change, contrac
 - Event viewer.
 - Status bar.
 - Local provider launch/switch UI.
+- Shared action contracts remain compatible with Desktop, Web, Mobile, IDE, Voice, Hotkeys, REST, Webhooks, and channels.
 
 ### TUI Required Screens
 
@@ -177,10 +190,11 @@ For any task, the builder must identify phase, task ID, files to change, contrac
 - Local model profile validation.
 - Eidetic observation retention.
 - Skill candidate requires verification.
+- Equal-interface contracts remain unchanged when TUI features expand.
 
 ---
 
-## Phase 3: Desktop, Web, Plugins, Graph, Semantic Memory
+## Phase 3: Desktop, Web, Mobile, Plugins, Graph, Semantic Memory
 
 ### Desktop UI
 
@@ -235,6 +249,40 @@ Web technical requirements:
 - CORS lockdown;
 - approval actions require session auth.
 
+### Apple And Android Mobile Apps
+
+Apple mobile app and Android mobile app are equal primary interfaces and must not be treated as notification-only companions.
+
+Mobile screens:
+
+1. Home and session list.
+2. Active session transcript.
+3. Prompt and side-question composer.
+4. Active task progress.
+5. Approval inbox.
+6. Checkpoint timeline.
+7. Memory/context inspector.
+8. Graph/codemap query view or deep-link handoff.
+9. Models launch/switch screen.
+10. Channels link/unlink and pairing screen.
+11. Diagnostics.
+12. Settings and security summary.
+
+Mobile requirements:
+
+- prompt submission;
+- side questions;
+- pause/cancel/steer;
+- approve/deny/defer with exact action binding;
+- checkpoint restore/fork;
+- model launch/switch;
+- channel link/unlink;
+- memory search and correction request;
+- graph/codemap query;
+- diagnostics;
+- push notifications for task updates and approval requests;
+- stale mobile state cannot approve actions until refreshed against the gateway.
+
 ### Dashboard
 
 Dashboard widgets:
@@ -265,6 +313,7 @@ Dashboard widgets:
 - plugin hooks;
 - plugin skills;
 - plugin TUI panels;
+- plugin UI panels for Desktop, Web, and Mobile where supported;
 - plugin tool adapters through broker;
 - bundled/global/workspace skills with precedence;
 - skill self-improvement through proposals, tests, and approval.
@@ -288,12 +337,14 @@ Dashboard widgets:
 
 ### Tests
 
-- Desktop/web calls gateway only.
+- Desktop/web/mobile clients call gateway only.
+- Mobile approval rejects stale state.
 - Plugin permission diff blocks expansion.
 - Graph recursive CTE impact analysis.
 - Semantic search uses sensitivity filters.
 - Dashboard widgets read from SQLite state.
 - Skill precedence and self-improvement proposal flow works.
+- Prompt, side-question, approval, task-control, model, channel, memory, graph, diagnostics, and checkpoint actions use equivalent contracts across enabled interfaces.
 
 ---
 
@@ -314,7 +365,7 @@ Connector profiles already exist in `config/channel-connectors.json`. Phase 4 wi
 - MCP channel;
 - Browser extension.
 
-All channel connectors must implement pairing, sender trust, rate limits, attachment policy, approval relay disabled by default, session binding, side-question routing, and event logging.
+All channel connectors must implement pairing, sender trust, rate limits, attachment policy, approval relay disabled by default, session binding, side-question routing, task controls where permitted, and event logging.
 
 ### OpenClaw-Style Gateway Coverage
 
@@ -327,13 +378,15 @@ Raiker must include:
 - daemon mode;
 - channel-to-agent routing;
 - companion app control surfaces;
-- live workspace/canvas equivalent through Web/Desktop dashboard panels;
+- live workspace/canvas equivalent through Web/Desktop/Mobile dashboard panels;
 - skills available from bundled, global, and workspace scopes;
 - channel security diagnostics.
 
 ### Channel UI
 
 Dashboard channel panel shows paired channels, sender identities, last inbound message, rate-limit status, pending approval relay requests, revoked channels, connector implementation status, package needed, and security warnings.
+
+Channel/chat/email/browser-extension interfaces are equal primary interfaces when linked and enabled, but their enabled capabilities are constrained by policy, trust, transport limitations, and pairing state.
 
 ### Multi-Agent
 
@@ -384,6 +437,7 @@ Requirements:
 
 - unknown channel sender rejected;
 - side question from channel does not stop task;
+- channel task control obeys sender trust and policy;
 - subagent cannot exceed tools;
 - container profile requires pinned image;
 - cloud profile requires budget approval;
@@ -446,7 +500,8 @@ Widgets:
 - audit export complete;
 - signed plugin verification;
 - budget limits stop cloud execution;
-- retention cleanup preserves legal holds/manual checkpoints.
+- retention cleanup preserves legal holds/manual checkpoints;
+- managed policies preserve the equal primary interface invariant unless explicitly restricting a capability for all interfaces by policy.
 
 ---
 
@@ -463,6 +518,7 @@ For every feature in every phase, the relevant spec must define:
 7. tests;
 8. UI surface;
 9. failure handling;
-10. migration/upgrade impact.
+10. migration/upgrade impact;
+11. equal-interface action parity impact.
 
-A feature is not considered documented until all ten are covered.
+A feature is not considered documented until all eleven are covered.

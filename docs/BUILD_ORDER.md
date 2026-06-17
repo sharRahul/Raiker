@@ -20,14 +20,31 @@ README.md
   -> docs/CONTRACTS.md
   -> docs/API_AND_CONTRACT_SCHEMAS.md
   -> docs/EVENT_CATALOG.md
+  -> docs/RUNTIME_STATE_MACHINE.md
   -> docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md
   -> docs/SECURITY_AND_POLICY.md
-  -> task-specific spec
+  -> docs/THREAT_MODEL.md
+  -> docs/NON_GOALS_AND_BOUNDARIES.md
+  -> docs/PHASE_1_MVP_BUILD_PLAN.md
+  -> docs/RUNTIME_ORCHESTRATION_SPEC.md
+  -> docs/TOOLS_AND_PERMISSIONS_SPEC.md
+  -> docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md
+  -> docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md
+  -> docs/MODEL_PROVIDER_CONTRACT.md
+  -> docs/CHANNELS_SPEC.md
+  -> docs/UI_UX_DESIGN_SPEC.md
+  -> docs/MEMORY_AND_CONTEXT_STRATEGY.md
+  -> docs/MEMORY_GOVERNANCE_RULES.md
+  -> docs/PLUGIN_SYSTEM_SPEC.md
+  -> docs/PLUGIN_MANIFEST_SCHEMA.md
   -> docs/ACCEPTANCE_TESTS_BY_PHASE.md
+  -> docs/REFERENCE_REQUIREMENTS_MATRIX.md
   -> docs/VERIFICATION_PLAN.md
+  -> config/model-profiles.json
+  -> config/channel-connectors.json
 ```
 
-A builder must not skip the status, schema, event, security, or acceptance-test docs because they are the controls that keep the implementation deterministic.
+A builder must not skip the status, schema, event, runtime state, storage, security, threat-model, non-goals, acceptance-test, verification, or registry docs because they are the controls that keep the implementation deterministic.
 
 ---
 

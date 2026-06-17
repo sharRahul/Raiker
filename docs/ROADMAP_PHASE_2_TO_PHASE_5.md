@@ -6,34 +6,38 @@ The roadmap is an implementation schedule, not a placeholder for missing design.
 
 ---
 
-## Phase 1: Secure Local CLI MVP
+## Phase 1: Secure Local TUI MVP
 
-Goal: prove the core loop and install the canonical global command.
+Goal: prove the core loop and install the canonical global command that opens the TUI.
 
 Features:
 
 - global `raiker` command;
+- minimal Rich TUI shell;
+- TUI prompt input;
+- TUI slash commands;
+- TUI approval cards;
 - contracts;
 - SQLite bootstrap;
 - event log;
 - static policy;
 - tool broker;
 - read/list/glob/grep;
-- local command approval gate;
+- local action approval gate;
 - mock model provider;
 - model profile registry;
 - channel connector profile registry;
 - deterministic runtime;
 - checkpoint stub;
-- CLI;
 - tests.
 
 Acceptance:
 
-- `raiker ask "Hello Raiker"` reaches the gateway;
-- `raiker launch --provider mock --model mock-deterministic` loads the mock profile;
-- connector and model registries load successfully;
-- local command execution requires approval;
+- `raiker` launches the TUI;
+- a normal prompt typed inside the TUI reaches the gateway;
+- `/launch --provider mock --model mock-deterministic` loads the mock profile;
+- `/channels` and `/models` list registry profiles;
+- local action proposals that can affect the machine require approval;
 - event log and checkpoint are created.
 
 ---
@@ -44,7 +48,7 @@ Goal: make Raiker useful as a local coding/research/work agent.
 
 Features:
 
-- Rich TUI;
+- full Rich TUI;
 - background task manager;
 - side questions while work continues;
 - pause/cancel/steer;
@@ -189,7 +193,7 @@ Every phase must preserve:
 - user interruptibility;
 - verification;
 - documentation-first implementation;
-- global `raiker` command compatibility;
+- global `raiker` TUI entry compatibility;
 - connector and model registry compatibility.
 
 ---

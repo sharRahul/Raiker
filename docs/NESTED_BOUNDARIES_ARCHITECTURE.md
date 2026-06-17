@@ -40,28 +40,30 @@ The detailed component responsibilities remain in:
 
 ## Clean Nested Boundary Map
 
+The Mermaid diagram below intentionally uses simple quoted labels. Avoid raw escaped newlines, slash-heavy labels, or command flags inside node labels because GitHub's Mermaid renderer can reject them.
+
 ```mermaid
 flowchart TB
-  user((User))
+  user(("User"))
 
-  subgraph PRIMARY[Equal-status primary interface boundary]
-    cli[CLI / raiker terminal entry]
-    tui[Rich TUI]
-    desktop[Desktop]
-    web[Web UI]
-    dashboard[Dashboard]
-    ide[IDE Extension]
-    mobile[Apple + Android Mobile Apps]
-    voice[Voice]
-    hotkeys[Hotkeys]
-    api[REST API]
-    browser[Browser Extension]
-    chat[Slack / Teams / Discord / Signal]
-    email[Email]
-    webhooks[Webhooks]
+  subgraph PRIMARY["Equal-status primary interface boundary"]
+    cli["CLI and raiker terminal entry"]
+    tui["Rich TUI"]
+    desktop["Desktop"]
+    web["Web UI"]
+    dashboard["Dashboard"]
+    ide["IDE Extension"]
+    mobile["Apple and Android Mobile Apps"]
+    voice["Voice"]
+    hotkeys["Hotkeys"]
+    api["REST API"]
+    browser["Browser Extension"]
+    chat["Slack, Teams, Discord, Signal"]
+    email["Email"]
+    webhooks["Webhooks"]
   end
 
-  provider[Provider shortcut\nollama launch raiker --model model]
+  provider["Provider shortcut delegates to model action"]
 
   user --> cli
   user --> tui
@@ -75,63 +77,63 @@ flowchart TB
   user --> chat
   user --> email
   user --> browser
-  provider -. delegates to same model action .-> cli
+  provider -.-> cli
 
-  subgraph HOST[Host boundary\nworkstation / home lab / governed enterprise]
-    subgraph TRUST[Security and privacy boundary]
-      subgraph GATE[Gateway and contract boundary]
-        gateway[Agent Gateway\nonly ingress point]
-        contracts[PromptEnvelope\nUIActionEnvelope\nChannelMessageEnvelope\nToolAction]
+  subgraph HOST["Host boundary"]
+    subgraph TRUST["Security and privacy boundary"]
+      subgraph GATE["Gateway and contract boundary"]
+        gateway["Agent Gateway only ingress point"]
+        contracts["Shared envelopes and actions"]
       end
 
-      subgraph CORE[Raiker core runtime boundary]
-        session[Session Manager]
-        runtime[Runtime Orchestrator]
-        planner[Planner + Classifier]
-        context[Context Gatherer]
-        verifier[Verifier]
-        checkpoints[Checkpoint Service]
+      subgraph CORE["Raiker core runtime boundary"]
+        session["Session Manager"]
+        runtime["Runtime Orchestrator"]
+        planner["Planner and Classifier"]
+        context["Context Gatherer"]
+        verifier["Verifier"]
+        checkpoints["Checkpoint Service"]
       end
 
-      subgraph SAFETY[Policy, approval, and audit boundary]
-        policy[Policy Engine]
-        approvals[Action-bound Approval Manager]
-        audit[Append-only Event Log]
+      subgraph SAFETY["Policy, approval, and audit boundary"]
+        policy["Policy Engine"]
+        approvals["Action-bound Approval Manager"]
+        audit["Append-only Event Log"]
       end
 
-      subgraph MODEL[Model boundary]
-        router[Model Router]
-        local_models[Local Providers\nOllama / llama.cpp / LM Studio]
-        hosted[Hosted Providers\npolicy-gated]
+      subgraph MODEL["Model boundary"]
+        router["Model Router"]
+        local_models["Local Providers"]
+        hosted["Hosted Providers policy gated"]
       end
 
-      subgraph EXEC[Tool and execution boundary]
-        broker[Tool Broker\nonly execution path]
-        fs[Filesystem Tools]
-        search[Search / Graph Query Tools]
-        shell[Shell / Local Action Proposals]
-        exec_profiles[Execution Profiles\nlocal / worktree / container / SSH / cloud]
+      subgraph EXEC["Tool and execution boundary"]
+        broker["Tool Broker only execution path"]
+        fs["Filesystem Tools"]
+        search["Search and Graph Query Tools"]
+        shell["Shell and Local Action Proposals"]
+        exec_profiles["Execution Profiles"]
       end
 
-      subgraph KNOW[Memory, graph, and context boundary]
-        memory[Memory Service\nprofile / project / episodic / procedural]
-        eidetic[Eidetic + Gist Memory]
-        graph[Graph / Codemap Service]
-        retrieval[FTS5 / Vector / Graph Retrieval]
+      subgraph KNOW["Memory, graph, and context boundary"]
+        memory["Memory Service"]
+        eidetic["Eidetic and Gist Memory"]
+        graph["Graph and Codemap Service"]
+        retrieval["FTS, Vector, and Graph Retrieval"]
       end
 
-      subgraph EXT[Extension boundary]
-        hooks[Hooks]
-        plugins[Plugins]
-        channels[Channel Manager]
-        subagents[Subagents]
+      subgraph EXT["Extension boundary"]
+        hooks["Hooks"]
+        plugins["Plugins"]
+        channels["Channel Manager"]
+        subagents["Subagents"]
       end
 
-      subgraph STORE[Local persistence boundary: .raiker/]
-        sqlite[(SQLite raiker.db)]
-        events[(JSONL event logs)]
-        snapshot_store[(Checkpoints + snapshots)]
-        artifacts[(Artifacts + indexes + config)]
+      subgraph STORE["Local persistence boundary"]
+        sqlite[("SQLite raiker database")]
+        events[("JSONL event logs")]
+        snapshot_store[("Checkpoints and snapshots")]
+        artifacts[("Artifacts, indexes, and config")]
       end
     end
   end
@@ -151,7 +153,9 @@ flowchart TB
   email --> gateway
   webhooks --> gateway
 
-  gateway --> contracts --> session --> runtime
+  gateway --> contracts
+  contracts --> session
+  session --> runtime
   runtime --> planner
   runtime --> context
   runtime --> router
@@ -230,31 +234,31 @@ sequenceDiagram
   participant E as Event Log
   participant C as Checkpoint Service
 
-  U->>I: Prompt / action / side question / approval / task control
-  I->>G: PromptEnvelope or UIActionEnvelope or ChannelMessageEnvelope
-  G->>E: global_command_invoked / ui_action_submitted / channel_message_received
-  G->>S: validate and bind session
-  S->>R: start or resume turn/task
-  R->>R: classify, gather context, plan or skip plan
-  R->>P: proposed action with risk context
-  P->>E: policy_decision
-  alt needs approval
-    P->>A: create action-bound approval request
-    A->>I: approval card / push / command / API challenge
-    I->>A: approve / deny / defer
-    A->>E: approval_received or approval_denied
+  U->>I: Prompt, action, side question, approval, or task control
+  I->>G: Shared envelope
+  G->>E: Record ingress event
+  G->>S: Validate and bind session
+  S->>R: Start or resume turn
+  R->>R: Classify, gather context, and plan
+  R->>P: Proposed action with risk context
+  P->>E: Record policy decision
+  alt Needs approval
+    P->>A: Create action-bound approval request
+    A->>I: Render approval challenge
+    I->>A: Approve, deny, or defer
+    A->>E: Record approval result
   end
-  alt allowed
-    A->>B: dispatch approved action
-    B->>E: tool_started
-    B->>V: ToolResult
-    V->>E: verification_completed
-  else denied or deferred
-    A->>R: paused / denied state
+  alt Allowed
+    A->>B: Dispatch approved action
+    B->>E: Record tool start
+    B->>V: Return tool result
+    V->>E: Record verification
+  else Denied or deferred
+    A->>R: Return paused or denied state
   end
-  R->>C: create checkpoint if turn completes or before risky mutation
-  C->>E: checkpoint_created
-  R->>I: response / task update / side answer / approval status
+  R->>C: Create checkpoint when required
+  C->>E: Record checkpoint
+  R->>I: Return response or task update
 ```
 
 ---
@@ -265,22 +269,28 @@ This is the non-bypass path every tool, command, plugin action, channel action, 
 
 ```mermaid
 flowchart LR
-  proposal[Action proposal\ninterface / model / runtime / plugin / channel / subagent]
-  validate[Contract validation\nPromptEnvelope / UIActionEnvelope / ChannelMessageEnvelope / ToolAction]
-  risk[Intent + risk classification]
-  policy[Policy Engine\nallow / deny / needs_approval]
-  approval{Needs approval?}
-  approve[Action-bound user approval\nexact action ID + exact args]
-  broker[Tool Broker\nsingle dispatcher]
-  result[ToolResult / action result]
-  verify[Verification]
-  audit[Append-only event log\nJSONL + SQLite index]
+  proposal["Action proposal"]
+  validate["Contract validation"]
+  risk["Intent and risk classification"]
+  policy["Policy Engine"]
+  approval{"Needs approval"}
+  approve["Action-bound approval"]
+  broker["Tool Broker"]
+  result["Tool or action result"]
+  verify["Verification"]
+  audit["Append-only event log"]
 
-  proposal --> validate --> risk --> policy --> approval
-  approval -- no --> broker
-  approval -- yes --> approve --> broker
-  approval -- denied --> audit
-  broker --> result --> verify --> audit
+  proposal --> validate
+  validate --> risk
+  risk --> policy
+  policy --> approval
+  approval -->|No| broker
+  approval -->|Yes| approve
+  approve --> broker
+  approval -->|Denied| audit
+  broker --> result
+  result --> verify
+  verify --> audit
 ```
 
 ---

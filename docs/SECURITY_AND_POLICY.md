@@ -2,7 +2,7 @@
 
 Raiker is an agent runtime. Security is not an optional feature; it is part of the execution path.
 
-This document defines Phase 1 security behaviour and future policy boundaries.
+This document defines Phase 1 security behaviour and phase-scheduled policy boundaries. Phase scheduling controls build order only; the security behaviour for later phases must already be specified before implementation.
 
 ---
 
@@ -18,30 +18,15 @@ ToolAction proposal
   -> EventLog recording
 ```
 
-Clients, runtime modules, plugins, models, and subagents must never execute tools directly.
+Clients, runtime modules, plugins, models, channels, and subagents must never execute tools directly.
 
 ---
 
 ## Threats Raiker Must Consider
 
-Raiker must be designed around these risks:
+Raiker must be designed around prompt injection, indirect prompt injection, data exfiltration, unsafe command execution, path traversal, hidden instruction leakage, memory poisoning, dependency supply-chain risk, plugin abuse, excessive agency, unbounded cost/resource usage, network egress abuse, user approval spoofing, channel abuse, and event log tampering.
 
-- prompt injection;
-- indirect prompt injection from files or web content;
-- data exfiltration;
-- unsafe shell execution;
-- path traversal;
-- hidden instruction leakage;
-- memory poisoning;
-- dependency supply-chain risk;
-- plugin abuse;
-- excessive agency;
-- unbounded cost or resource usage;
-- network egress abuse;
-- user approval spoofing;
-- event log tampering.
-
-Phase 1 does not solve every future threat, but it must establish the boundaries that future phases preserve.
+Phase 1 does not solve every threat completely, but it must establish boundaries that every phase preserves.
 
 ---
 
@@ -59,7 +44,7 @@ Event log: append-only audit record
 
 ---
 
-## Phase 1 Policy Decisions
+## Policy Decisions
 
 Every `ToolAction` receives one decision:
 
@@ -67,25 +52,28 @@ Every `ToolAction` receives one decision:
 - `deny` — broker must not execute;
 - `needs_approval` — broker must pause and request user approval.
 
+Phase-scheduled decisions such as `defer`, `allow_once`, `allow_for_session`, `allow_for_project`, and `allow_managed` are defined in `docs/TOOLS_AND_PERMISSIONS_SPEC.md`.
+
 ---
 
 ## Default Phase 1 Policy Matrix
 
 | Action | Default decision | Notes |
 |---|---:|---|
-| Simple chat | allow | No tool execution |
-| Read file inside workspace | allow | Text files only unless explicitly handled |
-| List directory inside workspace | allow | Stable sorted output |
-| Glob inside workspace | allow | Bounded results |
-| Grep inside workspace | allow | Bounded results; text files only |
-| Read outside workspace | deny | Prevent path traversal |
-| Write file | deny | Future phase unless task explicitly adds it |
-| Delete file | deny | Future phase |
-| Shell command | needs_approval | Never auto-run in Phase 1 |
-| Network request | deny | Future phase |
-| Memory write | deny/defer | Only memory candidate review in Phase 1 |
-| Plugin execution | deny | Future phase |
-| Remote execution | deny | Future phase |
+| Simple chat | allow | No tool execution. |
+| Read file inside workspace | allow | Text files only unless explicitly handled. |
+| List directory inside workspace | allow | Stable sorted output. |
+| Glob inside workspace | allow | Bounded results. |
+| Grep inside workspace | allow | Bounded results; text files only. |
+| Read outside workspace | deny | Prevent path traversal. |
+| Write file | deny | Phase 2 implements approval-gated file writes. |
+| Delete file | deny | Phase 2 implements tightly scoped approval flow. |
+| Local command execution | needs_approval | Never auto-run in Phase 1. |
+| Network request | deny | Phase 3 implements egress-policy-gated web access. |
+| Memory write | deny/defer | Phase 1 creates candidates; Phase 2 writes governed memory. |
+| Plugin execution | deny | Phase 3 implements plugin lifecycle and permission diff. |
+| Remote execution | deny | Phase 4/5 implement execution profiles. |
+| Channel approval relay | deny | Disabled by default in all channels unless explicitly configured. |
 
 ---
 
@@ -97,22 +85,22 @@ All filesystem tools must:
 2. resolve workspace root to an absolute path;
 3. verify requested path is inside workspace root;
 4. reject path traversal attempts;
-5. reject symlink escapes unless explicitly allowed by future policy;
+5. reject symlink escapes unless explicitly allowed by a phase-scheduled policy rule;
 6. return structured errors instead of raw tracebacks.
 
 ---
 
-## Shell Safety Requirements
+## Command Safety Requirements
 
-Phase 1 shell behaviour:
+Phase 1 local command behaviour:
 
-- shell actions are proposed, logged, and policy-reviewed;
+- command actions are proposed, logged, and policy-reviewed;
 - policy returns `needs_approval`;
 - command is not executed unless an explicit approval object exists;
 - CLI MVP may stop at approval-required response;
 - no silent background execution is allowed.
 
-Future phases may add allowlists, sandboxing, timeout, environment restrictions, command previews, and kill controls.
+Phase 2 adds scoped allowlists, sandboxing rules, timeout enforcement, environment restrictions, command previews, and kill/cancel controls according to `docs/TOOLS_AND_PERMISSIONS_SPEC.md`.
 
 ---
 
@@ -139,21 +127,19 @@ Event log records must not include secrets unless explicitly redacted.
 
 Phase 1 must not require secrets.
 
-If future tasks introduce secrets:
+Phase-scheduled tasks that introduce secret references must:
 
 - never commit secrets;
 - load from environment or OS secret store;
 - redact values in logs;
 - store only references, not secret values;
-- tests must use fake secrets.
+- use fake secrets in tests.
 
 ---
 
 ## Memory Governance Requirements
 
-Phase 1 must not write long-term memory automatically.
-
-It may produce memory candidates:
+Phase 1 must not write long-term memory automatically. It may produce memory candidates.
 
 ```json
 {
@@ -166,28 +152,13 @@ It may produce memory candidates:
 }
 ```
 
-Future memory writes must include:
-
-- provenance;
-- confidence;
-- sensitivity;
-- retention;
-- approval state;
-- deletion support.
+Phase-scheduled memory writes must include provenance, confidence, sensitivity, retention, approval state, deletion support, and poisoning controls.
 
 ---
 
 ## Approval Requirements
 
-Approval prompts must include:
-
-- action ID;
-- tool name;
-- exact arguments;
-- risk level;
-- policy reasons;
-- expected effect;
-- whether action changes files, runs shell, uses network, or may cost money.
+Approval prompts must include action ID, tool name, exact arguments, risk level, policy reasons, expected effect, and whether the action changes files, runs a command, uses network, exports data, persists memory, or may cost money.
 
 Approvals must be bound to action ID. A user approving one action must not approve a different action accidentally.
 
@@ -199,7 +170,7 @@ Minimum tests:
 
 - outside-workspace file read is denied;
 - path traversal is denied;
-- shell action requires approval;
+- local command action requires approval;
 - denied action is not executed;
 - policy decision is logged;
 - tool output failure is logged;
@@ -213,11 +184,11 @@ Minimum tests:
 
 Builder agents must not:
 
-- call `subprocess` outside the shell tool implementation;
+- call command execution APIs outside the approved command tool implementation;
 - read files directly from runtime code as an agent action;
 - add network libraries for Phase 1;
 - add plugin execution in Phase 1;
-- add memory writes in Phase 1;
-- bypass approval for shell;
+- add durable memory writes in Phase 1;
+- bypass approval for local commands;
 - suppress security events;
 - hide failures behind vague messages.

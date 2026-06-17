@@ -316,6 +316,8 @@ README.md
   -> docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
   -> docs/ARCHITECTURE.md
   -> docs/CONTRACTS.md
+  -> docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md
+  -> docs/SECURITY_AND_POLICY.md
   -> task-specific spec
   -> docs/VERIFICATION_PLAN.md
 ```

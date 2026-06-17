@@ -57,6 +57,8 @@ The Rich TUI is one equal-status primary interface. It is not the primary human 
 
 ### Default Layout
 
+The default Rich TUI starts simple so Phase 1 can ship a small, safe terminal client without losing the future panel model. It must support a compact welcome/workspace view, recent activity, an input area, and a configurable status bar.
+
 ```text
 ┌──────── Raiker v0.0.0 ────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                               │ Recent Activity:                                                                          │
@@ -74,22 +76,24 @@ The Rich TUI is one equal-status primary interface. It is not the primary human 
 ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ > ? side question | / command | normal prompt | ! command proposal | @ file mention                                       │
 ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ RUNNING | task:docs | approvals:2 | model:qwen | ctx: ███████░░░░░░░ <used>% <used>/<max> | mem:project | net:block       │
+│ RUNNING | task:docs | approvals:2 | model:qwen | ctx: ███████░░░░░░░ 50% 18k/32k | mem:project | net:block              │
 └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### TUI Status Bar
 
-Configurable fields, left to right:
+The TUI status bar must be configurable by user, project, workspace, managed policy, or terminal capability. The default field order is only a preset. Builders must implement the status bar as a list of named status items, not as one hard-coded string.
+
+Default fields, left to right:
 
 ```text
-STATE | task:<status> | approvals:<n> | model:<profile> | ctx: ███████░░░░░░░ <used>% <used>/<max> | mem:<scope> | net:<policy> | exec:<profile> | last:<event> | cost:<amount> | clock
+STATE | task:<status> | approvals:<n> | model:<profile> | ctx_bar: ███████░░░░░░░ <used>% | ctx:<used>/<max> | mem:<scope> | net:<policy> | exec:<profile> | last:<event> | cost:<amount> | clock
 ```
 
 Example:
 
 ```text
-RUNNING | task:docs-expansion | approvals:1 | model:qwen9b | ctx: ███████░░░░░░░ 50% 18k/32k | mem:project | net:blocked | exec:local | last:tool_completed | cost:£0.00 | 13:42
+RUNNING | task:docs-expansion | approvals:1 | model:qwen9b | ctx_bar: ███████░░░░░░░ 50% | ctx:18k/32k | mem:project | net:blocked | exec:local | last:tool_completed | cost:£0.00 | 13:42
 ```
 
 Status labels:
@@ -104,27 +108,235 @@ Status labels:
 | `PAUSED` | Task paused. |
 | `SIDE-Q` | Side question mode active. |
 
-If terminal does not support colours, use text labels only.
+Configurable status item registry:
+
+| Item ID | Example rendering | Source | Default visibility |
+|---|---|---|---|
+| `state` | `RUNNING` | Runtime state machine | required |
+| `task` | `task:docs-expansion` | active task store | visible |
+| `approvals` | `approvals:1` | approval queue | visible |
+| `model` | `model:qwen9b` | model profile registry/router | visible |
+| `context_percent_bar` | `ctx_bar: ███████░░░░░░░ 50%` | context budget tracker | visible |
+| `context` | `ctx:18k/32k` | context budget tracker | visible |
+| `memory` | `mem:project` | memory/context policy | visible |
+| `network` | `net:blocked` | egress policy | visible |
+| `execution` | `exec:local` | execution profile | visible |
+| `last_event` | `last:tool_completed` | event stream | visible |
+| `cost` | `cost:£0.00` | budget/cost tracker | visible when known |
+| `clock` | `13:42` | local clock | visible |
+| `workspace` | `ws:Raiker` | project/session metadata | optional |
+| `branch` | `branch:main` | VCS metadata if available | optional |
+| `checkpoint` | `ckpt:latest` | checkpoint service | optional |
+| `policy` | `policy:default` | policy engine | optional |
+| `tool_calls` | `tools:3/10` | runtime/tool broker | optional |
+| `tokens_in_out` | `↑12k ↓425` | model/runtime token tracker | optional |
+
+Configuration rules:
+
+1. Required safety items such as `state`, `approvals`, `network`, and high-risk policy indicators must not be hidden during risky work.
+2. User preference may reorder, hide, shorten, or expand non-safety items.
+3. Project or managed policy may force security and audit fields to remain visible.
+4. The renderer must degrade gracefully for narrow terminals by moving lower-priority fields into a compact overflow indicator such as `+4`.
+5. The status bar must never show stale approval, stale policy, or stale network state after a task transition.
+6. Every visible field must derive from gateway/runtime/event/store state, not private UI-only state.
+7. `context_percent_bar` and `context` may be displayed together or separately; when shown together, the bar shows percentage used and `context` shows exact used/max values.
+
+Example configuration shape:
+
+```json
+{
+  "schema_version": "1.0",
+  "status_bar": {
+    "preset": "developer_compact",
+    "fields": [
+      "state",
+      "task",
+      "approvals",
+      "model",
+      "context_percent_bar",
+      "context",
+      "network",
+      "last_event",
+      "clock"
+    ],
+    "pinned_fields": ["state", "approvals", "network"],
+    "hide_when_idle": ["tool_calls", "cost"],
+    "compact_below_columns": 100,
+    "overflow_mode": "summary_count"
+  }
+}
+```
+
+Preset examples:
+
+| Preset | Purpose | Fields |
+|---|---|---|
+| `minimal` | Small terminals and low-noise use | `state`, `task`, `approvals`, `model`, `clock` |
+| `developer_compact` | Default local development | `state`, `task`, `approvals`, `model`, `context_percent_bar`, `context`, `network`, `last_event`, `clock` |
+| `security_audit` | Security-heavy work | `state`, `task`, `approvals`, `policy`, `network`, `execution`, `last_event`, `checkpoint`, `cost`, `clock` |
+| `model_debug` | Model/runtime debugging | `state`, `model`, `context_percent_bar`, `context`, `tokens_in_out`, `tool_calls`, `last_event`, `cost`, `clock` |
+
+If terminal does not support colours, use text labels only. If terminal width is limited, prefer exact safety labels over decorative bars.
 
 ### TUI Panels
 
 Required panels:
 
 - Primary / Main Panel (Left);
-- Activity Panel (Right)
-- Input panel
-- Status Bar Panel
+- Activity Panel (Right);
+- Input Panel;
+- Status Bar Panel.
 
-Optional panels (user can add and help user build):
-- Active plan panel;
-- Approvals panel;
-- Task progress panel;
-- Tool/event stream panel;
-- Context/memory/graph panel;
-- Checkpoint timeline;
-- Model/profile picker;
-- Channel connector list;
-- Skill/eidetic memory inspector.
+The required panels form the minimum bootable TUI. Optional panels must be addable without creating a second runtime path, bypassing the gateway, or duplicating contracts.
+
+#### Required layout shell
+
+```text
+┌────────────────────────────── Raiker Session ──────────────────────────────┐
+│ Primary / Main Panel                 │ Activity Panel                      │
+│ Transcript, welcome, active answer    │ Recent tasks, recent events, news   │
+├───────────────────────────────────────┴─────────────────────────────────────┤
+│ Input Panel: ? side question | / command | prompt | ! proposal | @ mention │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Status Bar Panel: configurable status items                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Optional panels (user can add and help user build)
+
+Optional panels are user-buildable UI modules. They may be first-party, project-local, or plugin-provided in later phases, but they must behave as display/action surfaces over the same gateway, contracts, policy engine, event log, and store. The user should be able to ask Raiker to help build a panel by describing the panel purpose, data source, layout, actions, events, policy needs, and tests.
+
+Panel build flow:
+
+```text
+User requests custom panel
+  -> Raiker creates panel proposal
+  -> identify data sources, contracts, actions, and events
+  -> policy review for any action-capable panel
+  -> generate panel manifest/config
+  -> add tests or validation checklist
+  -> load panel only if trusted/enabled
+  -> panel reads from gateway/event/store state
+```
+
+Optional panel manifest shape:
+
+```json
+{
+  "schema_version": "1.0",
+  "panel_id": "panel.active_plan",
+  "display_name": "Active Plan",
+  "owner_scope": "builtin",
+  "default_region": "left_drawer",
+  "data_sources": ["runtime_state", "event_log"],
+  "actions": ["inspect_step", "ask_side_question"],
+  "requires_policy": false,
+  "can_mutate_state": false,
+  "events_consumed": ["plan_created", "task_progress", "turn_state_changed"],
+  "events_emitted": ["ui_panel_opened"],
+  "fallback_rendering": "text_table"
+}
+```
+
+Supported panel regions:
+
+```text
+┌────────────────────────────── Raiker Session ──────────────────────────────┐
+│ top_banner / notification strip                                            │
+├───────────────┬──────────────────────────────────────────┬────────────────┤
+│ left_drawer   │ main_workspace                           │ right_drawer   │
+│ panels        │ transcript / selected panel / split view │ panels         │
+├───────────────┴──────────────────────────────────────────┴────────────────┤
+│ bottom_drawer / timeline / tool output / diff viewer                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ input_panel                                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ status_bar                                                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+Optional panel catalogue:
+
+| Panel | Purpose | Default region | Primary sources | Allowed actions |
+|---|---|---|---|---|
+| Active Plan | Show plan steps, status, blockers, next action. | `left_drawer` | runtime state, plan events | inspect step, ask side question |
+| Approvals | Show pending approvals as cards, never inline-only text. | `right_drawer` | approval queue, policy events | approve, deny, defer, inspect |
+| Task Progress | Show task status, elapsed time, safe boundaries, cancel/steer state. | `right_drawer` | tasks table, task events | pause, cancel, steer, side question |
+| Tool/Event Stream | Show brokered tool calls and event timeline. | `bottom_drawer` | JSONL event log, events index | inspect event, copy event ID |
+| Context/Memory/Graph | Show context sources, memory hits, graph references, trust labels. | `right_drawer` | context bundle, memory, graph | inspect provenance, request correction |
+| Checkpoint Timeline | Show checkpoints, summaries, changed files, restore/fork options. | `bottom_drawer` | checkpoint service, event log | inspect, compare, restore, fork |
+| Model/Profile Picker | Show model profiles, active model, local/hosted policy state. | `right_drawer` | model profile registry | launch/switch model via gateway action |
+| Channel Connector List | Show connector profiles, enabled state, pairing status. | `right_drawer` | connector registry | link, unlink, inspect risk |
+| Skill/Eidetic Memory Inspector | Show skill candidates, gist memory, raw observations, retention. | `right_drawer` | memory/eidetic tables | inspect, approve candidate, delete/request correction |
+| Security/Policy Panel | Show policy decisions, denied actions, egress state, redactions. | `right_drawer` | policy engine, security events | inspect rule, open approval card |
+| Diff Viewer | Show file diffs and snapshots for proposed edits. | `main_workspace` or `bottom_drawer` | checkpoint/file snapshot events | inspect diff, request explanation |
+| Diagnostics Panel | Show health checks, registry errors, missing providers, DB state. | `main_workspace` | diagnostics actions, storage metrics | run approved diagnostic checks |
+| Storage Panel | Show SQLite/event/checkpoint/artifact sizes. | `right_drawer` | storage metrics | inspect, export with approval |
+| Custom User Panel | User-described panel generated from a panel manifest. | user choice | declared manifest sources | declared manifest actions |
+
+Optional panel layout examples:
+
+Active plan panel:
+
+```text
+┌─ Active Plan ─────────────────────┐
+│ Objective: Update docs            │
+│ ✓ Read README/docs map            │
+│ ✓ Align architecture hand-off     │
+│ ▶ Expand TUI optional panels      │
+│ • Verify changed docs             │
+│ Blockers: none                    │
+└───────────────────────────────────┘
+```
+
+Approvals panel:
+
+```text
+┌─ Approvals ───────────────────────────────────────────┐
+│ RISK: shell                                           │
+│ Action: act_01H...                                    │
+│ Command: pytest tests/test_policy_engine.py           │
+│ Reason: shell_requires_approval                       │
+│ Choices: [approve once] [deny] [defer] [inspect]      │
+└───────────────────────────────────────────────────────┘
+```
+
+Tool/event stream panel:
+
+```text
+┌─ Tool / Event Stream ─────────────────────────────────┐
+│ prompt_received       tui        13:41:02             │
+│ action_proposed       grep       docs/**              │
+│ policy_decision       allow      workspace_read       │
+│ tool_completed        grep       18 matches           │
+│ checkpoint_created    ckpt_01H   after turn           │
+└───────────────────────────────────────────────────────┘
+```
+
+Context/memory/graph panel:
+
+```text
+┌─ Context / Memory / Graph ────────────────────────────┐
+│ Context: 18.2k / 32k                                  │
+│ Sources: prompt, docs/ARCHITECTURE.md, event_log      │
+│ Trust: user_input, project_file, tool_result          │
+│ Memory: 3 candidates, 0 durable writes pending        │
+│ Graph: 12 nodes, 18 edges, 2 stale                    │
+└───────────────────────────────────────────────────────┘
+```
+
+Panel rules:
+
+1. A panel that only displays state may read from the event log, SQLite state, or gateway snapshots according to policy.
+2. A panel that can mutate state must emit a `UIActionEnvelope` or approved action through the gateway.
+3. A panel must not call tools, models, memory writes, plugin code, channel connectors, or execution environments directly.
+4. Every panel open, close, focus, action, and error must be event-loggable.
+5. Every panel must define a fallback text rendering for plain terminal and low-colour terminals.
+6. User-built panels must be disabled by default until trusted or explicitly enabled.
+7. Plugin-provided panels must follow plugin manifest, permission diff, and trust rules.
+8. Panels must support keyboard navigation and must not trap focus during risky approval flows.
+9. Panels must declare whether they can display sensitive data and whether export requires approval.
+10. Panel state must be restorable from session/event/checkpoint state, not hidden UI memory only.
 
 Side questions must be visually separated from the main task and must not overwrite streamed task progress.
 
@@ -215,8 +427,8 @@ File updates must render inline as structured diffs.
 * Syntax highlighted code
 * Line numbers preserved
 * Color semantics:
-  * Removed → red (`-`)
-  * Added → green (`+`)
+  * Removed -> red (`-`)
+  * Added -> green (`+`)
 * Expandable for large diffs
 * Scrollable within block
 
@@ -268,17 +480,17 @@ Displays real-time operation status above the input.
 
 ### Prompt Modes
 
-* `?` → side question
-* `/` → command
-* `!` → command proposal
-* `@` → file or entity reference
-* default → normal prompt
+* `?` -> side question
+* `/` -> command
+* `!` -> command proposal
+* `@` -> file or entity reference
+* default -> normal prompt
 
 ### Behaviour
 
 * Real-time input parsing
 * Supports command + natural language mixing
-* Context-aware suggestions (if supported)
+* Context-aware suggestions if supported
 
 ## Side Question Handling
 
@@ -302,14 +514,15 @@ Side questions must not interrupt or overwrite active tasks.
 
 ### Modes
 
-* `manual` → explicit approval required
-* `auto-accept` → changes applied automatically
+* `manual` -> explicit approval required
+* `auto-accept` -> changes applied automatically only where policy permits
 
 ### Behaviour
 
 * Always visible to user
 * Keyboard toggle supported
-* Applies only to **mutating actions (e.g. Update, Execute)**
+* Applies only to mutating actions where policy explicitly permits it
+* Must not override approval requirements for high-risk command, delete, export, network, memory, plugin, channel, remote execution, or managed-policy actions
 
 ## Execution & Interruptibility
 
@@ -323,7 +536,7 @@ Side questions must not interrupt or overwrite active tasks.
 
 ### Behaviour
 
-* Output appears incrementally (not batch-rendered)
+* Output appears incrementally, not batch-rendered
 * Supports:
   * partial reasoning
   * progressive tool results
@@ -333,8 +546,8 @@ Side questions must not interrupt or overwrite active tasks.
 
 Each tool must return:
 
-* **Summary line (always visible)**
-* **Detailed output (collapsible)**
+* **Summary line, always visible**
+* **Detailed output, collapsible**
 
 ### Example
 
@@ -342,26 +555,33 @@ Each tool must return:
 ● Update(file.swift)
 └ Updated with 1 addition and 1 removal
 ```
+
 ## Status Bar Behaviour
 
-The status bar reflects **real-time system state**.
+The status bar reflects **real-time system state** and is configured from the status item registry defined above.
 
 ### Dynamic Updates
 
 * `STATE` changes per lifecycle
 * `task` reflects current activity
 * `approvals` increments when user action required
+* `context_percent_bar` updates the visual percentage-used bar from the active context budget
+* `context` updates the exact used/max token numbers from the active context budget
 * `last` shows most recent event
-* `cost` accumulates usage
+* `cost` accumulates usage where available
+* configured fields re-render when their backing event/store state changes
 
 ### Context Usage Bar
 
 ```text
-ctx: ███████░░░░░░░ 50% 18k/32k
+ctx_bar: ███████░░░░░░░ 50%
+ctx:18k/32k
 ```
 
 * Updates continuously
-* Visual + numeric representation
+* Visual + numeric percentage representation through `context_percent_bar`
+* Exact used/max representation through `context`
+* Falls back to `ctx_bar: 50%` and `ctx:18k/32k` when block rendering is unavailable
 
 ## Window Header Behaviour
 
@@ -384,7 +604,7 @@ ctx: ███████░░░░░░░ 50% 18k/32k
   * reproducible
 * No silent background execution
 * Network policy must be honoured and reflected (`net:blocked/open`)
-* Approval-sensitive operations must respect mode
+* Approval-sensitive operations must respect mode and policy
 
 ## Core Interaction Principles
 
@@ -621,6 +841,11 @@ Every UI action maps to runtime events:
 
 - `ui_session_opened`
 - `ui_panel_opened`
+- `ui_panel_closed`
+- `ui_panel_focused`
+- `ui_panel_action_submitted`
+- `ui_status_bar_config_loaded`
+- `ui_status_bar_config_changed`
 - `ui_prompt_submitted`
 - `ui_side_question_submitted`
 - `ui_interrupt_requested`
@@ -643,7 +868,12 @@ Every UI action maps to runtime events:
 Tests must prove:
 
 - TUI renders in small terminal;
+- configurable status bar loads default and user/project overrides;
+- safety-critical status fields remain visible during risky work;
 - status bar updates from events;
+- optional panels render in fallback text mode;
+- optional panel actions route through `UIActionEnvelope` and the gateway;
+- user-built panel manifests are validated before loading;
 - side question does not pause task;
 - approval card binds to action ID;
 - checkpoint timeline opens restore flow;

@@ -24,6 +24,7 @@ A feature marked as specified is not automatically implemented. A feature marked
 
 PR #6 added the initial Phase 1 MVP runtime core.
 PR #8 reconciled documentation and version baseline.
+PR #11 removed generated Python bytecode artifacts and strengthened .gitignore.
 
 **Validation status (2026-06-17):** The full validation set was run on the `phase-1-runtime-core-validation-baseline` branch. All validation commands pass, event sequences are verified, and security invariants hold. The Phase 1 final acceptance criteria are met. See the validation PR for exact command outputs and artifact inspection results.
 

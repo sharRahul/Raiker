@@ -4,6 +4,8 @@ Channels allow external interfaces to send messages into Raiker sessions and rec
 
 A channel is not just a UI. It is an untrusted input surface and must be treated as a security boundary.
 
+Implementation can be phased, but every channel type must already have a documented connector profile, setup flow, permission model, event model, and disabled-by-default behaviour before code is written.
+
 ---
 
 ## Channel Goals
@@ -19,28 +21,138 @@ Raiker channels must support:
 7. attachment handling;
 8. background task notifications;
 9. rate limits;
-10. audit logging.
+10. audit logging;
+11. connector manifests;
+12. enable, disable, link, and unlink flow;
+13. per-channel capability policies.
 
 ---
 
-## Channel Types
+## Channel Type Matrix
 
-| Channel | Phase | Notes |
-|---|---:|---|
-| CLI | Phase 1 | First client |
-| Rich TUI | Phase 2 | Interactive terminal app |
-| REST API | Phase 2 | Local API server |
-| Web UI | Phase 3 | Browser client |
-| Desktop | Phase 3 | Native shell or webview |
-| IDE | Phase 3 | Editor extension |
-| Webhooks | Phase 3 | Inbound automation |
-| Email | Future | High injection risk |
-| Slack | Future | Requires workspace auth and sender policy |
-| Teams | Future | Requires tenant policy |
-| Discord | Future | Community/server risk controls |
-| Signal | Future | Personal assistant mode |
-| Voice | Future | Speech input/output pipeline |
-| Hotkeys | Future | Local OS event source |
+No channel is undefined future work. A later-phase channel is a fully specified connector profile that is disabled by default until the user or managed policy links it.
+
+| Channel | Build phase | Default state | Connector availability | Notes |
+|---|---:|---|---|---|
+| CLI | Phase 1 | enabled | built-in client | First command-line client. |
+| Rich TUI | Phase 2 | enabled when installed | built-in client | Interactive terminal app with side questions. |
+| REST API | Phase 2 | disabled | built-in connector profile | Local API server behind auth and policy. |
+| Web UI | Phase 3 | disabled | built-in connector profile | Browser client using same gateway/event stream. |
+| Desktop | Phase 3 | disabled | built-in connector profile | Native shell/webview/tray client. |
+| IDE | Phase 3 | disabled | connector profile | Editor extension, gateway-only. |
+| Webhooks | Phase 3 | disabled | connector profile | Inbound automation with signed messages. |
+| Email | Phase 4 | disabled | connector profile | High injection risk; mailbox pairing required. |
+| Slack | Phase 4 | disabled | connector profile | Workspace authorization and sender allowlist. |
+| Teams | Phase 4 | disabled | connector profile | Tenant authorization and sender policy. |
+| Discord | Phase 4 | disabled | connector profile | Server/channel allowlist and app policy. |
+| Signal | Phase 4 | disabled | connector profile | Personal assistant mode with device pairing. |
+| Voice | Phase 4 | disabled | connector profile | Speech input/output pipeline with confirmation gates. |
+| Hotkeys | Phase 4 | disabled | connector profile | Local OS event source with scoped commands. |
+| MCP Channel | Phase 4 | disabled | connector profile | MCP server can push messages/events into Raiker. |
+| Browser Extension | Phase 4 | disabled | connector profile | Local browser context and selected-page handoff. |
+| Mobile Companion | Phase 5 | disabled | connector profile | Push notifications, approvals, and side questions. |
+
+---
+
+## Connector Profile Contract
+
+Every channel connector must define this profile before implementation:
+
+```json
+{
+  "schema_version": "1.0",
+  "connector_id": "channel.slack",
+  "channel_type": "slack",
+  "display_name": "Slack",
+  "build_phase": "phase_4",
+  "default_state": "disabled",
+  "transport": "provider_event_api",
+  "auth_method": "provider_authorization",
+  "supports_inbound_messages": true,
+  "supports_replies": true,
+  "supports_attachments": true,
+  "supports_approvals": false,
+  "supports_side_questions": true,
+  "supports_interrupts": true,
+  "requires_pairing": true,
+  "requires_sender_allowlist": true,
+  "requires_network": true,
+  "setup_ui": "channel_link_wizard",
+  "capability_policy_template": "channel.slack.default.json"
+}
+```
+
+Required fields:
+
+- `connector_id`;
+- `channel_type`;
+- `display_name`;
+- `build_phase`;
+- `default_state`;
+- `transport`;
+- `auth_method`;
+- `supports_*` capabilities;
+- `requires_pairing`;
+- `requires_sender_allowlist`;
+- `setup_ui`;
+- `capability_policy_template`.
+
+---
+
+## Connector Lifecycle
+
+```text
+connector_profile_available
+  -> user opens Channels UI
+  -> user selects connector
+  -> link wizard starts
+  -> authorization and pairing completed
+  -> sender/session policy configured
+  -> test message sent or received
+  -> connector linked
+  -> connector enabled/disabled state stored
+  -> channel_linked event emitted
+```
+
+Unlink lifecycle:
+
+```text
+unlink requested
+  -> revoke local authorization reference
+  -> stop background listeners
+  -> disable approval relay
+  -> keep audit history
+  -> channel_unlinked event emitted
+```
+
+---
+
+## Channel Link Wizard
+
+The Desktop, Web, and TUI channel settings screens must provide a link wizard for every connector profile, even if the connector implementation package is not installed yet.
+
+If implementation is missing, the UI shows:
+
+```text
+Connector profile available.
+Implementation package not installed.
+Install or enable package: raiker-channel-slack
+Required permissions: network, inbound messages, replies, attachments
+Default approval relay: disabled
+```
+
+Wizard steps:
+
+1. Select connector.
+2. Show capabilities and risks.
+3. Confirm required permissions.
+4. Configure provider authorization or local pairing.
+5. Configure sender allowlist.
+6. Configure session/project binding.
+7. Configure approval relay, default disabled.
+8. Send or receive test message.
+9. Save connector config.
+10. Emit link event.
 
 ---
 
@@ -50,6 +162,7 @@ Raiker channels must support:
 {
   "schema_version": "1.0",
   "channel_message_id": "chanmsg_01H...",
+  "connector_id": "channel.tui",
   "channel_type": "tui",
   "channel_name": "raiker-tui",
   "session_id": "sess_01H...",
@@ -93,7 +206,7 @@ Raiker channels must support:
 
 ## Side Questions Without Stopping Work
 
-Raiker must support side questions in rich TUI and channels.
+Raiker must support side questions in rich TUI and all linked channels whose connector profile has `supports_side_questions=true`.
 
 Rules:
 
@@ -112,6 +225,32 @@ Events:
 - `side_question_answered`
 - `side_question_escalated_to_interrupt`
 - `side_question_applied_to_task`
+
+---
+
+## Built-In Connector Profiles
+
+Each connector profile must exist in code or configuration before the connector implementation is wired.
+
+| Connector ID | Phase | Default | Side questions | Approvals | Notes |
+|---|---:|---|---:|---:|---|
+| `channel.cli` | 1 | enabled | interactive only | yes | Local CLI. |
+| `channel.tui` | 2 | enabled when installed | yes | yes | Rich interactive terminal. |
+| `channel.rest` | 2 | disabled | yes | disabled by default | Local API server. |
+| `channel.web_ui` | 3 | disabled | yes | authenticated only | Browser client. |
+| `channel.desktop` | 3 | disabled | yes | yes | Desktop companion. |
+| `channel.ide` | 3 | disabled | yes | yes | Editor extension. |
+| `channel.webhooks` | 3 | disabled | no by default | no by default | Signed inbound automation. |
+| `channel.email` | 4 | disabled | trusted senders only | disabled by default | High injection risk. |
+| `channel.slack` | 4 | disabled | yes | disabled by default | Workspace connector. |
+| `channel.teams` | 4 | disabled | yes | disabled by default | Tenant connector. |
+| `channel.discord` | 4 | disabled | trusted channels only | disabled by default | Community/server connector. |
+| `channel.signal` | 4 | disabled | yes | disabled by default | Personal assistant connector. |
+| `channel.voice` | 4 | disabled | yes | visual handoff for high risk | Local-first STT/TTS. |
+| `channel.hotkeys` | 4 | disabled | quick status only | no | Local OS shortcuts. |
+| `channel.mcp` | 4 | disabled | trusted server only | disabled by default | MCP inbound channel. |
+| `channel.browser_extension` | 4 | disabled | yes | disabled by default | Selected browser context only. |
+| `channel.mobile` | 5 | disabled | yes | medium risk only by default | Mobile companion. |
 
 ---
 
@@ -149,6 +288,7 @@ Channel permissions define what a channel can do:
 ```json
 {
   "schema_version": "1.0",
+  "connector_id": "channel.slack",
   "channel_name": "slack-personal",
   "allowed_senders": ["U123"],
   "allowed_sessions": ["sess_01H..."],
@@ -195,7 +335,7 @@ Approval relay is disabled by default. To enable it:
 - sender must be trusted;
 - channel must be paired;
 - approval must show exact action ID and arguments;
-- approval response must be signed or authenticated;
+- approval response must be authenticated by the linked channel;
 - action must not have changed since approval request;
 - event log must record channel approval source.
 
@@ -209,7 +349,7 @@ Channels must defend against:
 - spoofed senders;
 - replayed approvals;
 - malicious attachments;
-- channel bot compromise;
+- connector account compromise;
 - over-permissive approval relay;
 - data exfiltration through replies;
 - channel-to-channel leakage;
@@ -222,6 +362,12 @@ Channels must defend against:
 
 Required events:
 
+- `connector_profile_available`
+- `channel_link_started`
+- `channel_link_failed`
+- `channel_linked`
+- `channel_unlink_requested`
+- `channel_unlinked`
 - `channel_registered`
 - `channel_pairing_started`
 - `channel_paired`
@@ -242,6 +388,9 @@ Required events:
 
 Tests must prove:
 
+- every channel type has a connector profile;
+- disabled connector cannot receive messages;
+- connector link wizard validates required fields;
 - unpaired channel cannot start task;
 - unknown sender rejected;
 - side question does not stop background task;
@@ -249,4 +398,5 @@ Tests must prove:
 - replayed approval rejected;
 - attachment over size limit rejected;
 - channel replies only to bound session/thread;
-- rate limit works.
+- rate limit works;
+- unlink revokes local capability but preserves audit history.

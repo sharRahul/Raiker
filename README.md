@@ -4,98 +4,103 @@
 
 Raiker is not just a chatbot. Raiker is an **agent runtime** that connects user interfaces, language models, tools, memory, plugins, hooks, subagents, channels, checkpoints, execution environments, and rich interactive clients behind a security and privacy boundary.
 
-The goal is simple:
+Raiker installs a global command named `raiker`. The global command is the canonical entry point for CLI use, Rich TUI, model launch, gateway mode, connector linking, diagnostics, sessions, memory, graph search, and provider routing.
 
-```text
-Just Ask
-  -> interrupt, steer, or add context at any time
-  -> Raiker gathers context
-  -> Raiker plans when the task is complex or risky
-  -> Raiker acts through approved tools, skills, plugins, hooks, channels, and subagents
-  -> Raiker can answer side questions while work continues
-  -> Raiker verifies the result
-  -> Raiker records every action
-  -> Raiker checkpoints and can rewind/fork work
-  -> Raiker updates governed long-term memory only when appropriate
+```bash
+raiker ask "List files in this project"
+raiker chat
+raiker tui
+raiker launch --provider ollama --model <model>
+raiker launch --provider llama.cpp --model <path-to-gguf> --ctx 32768
+raiker launch --provider lm-studio --model <model>
+raiker launch --provider openai-compatible --endpoint <endpoint> --model <model>
+raiker gateway start
+raiker doctor
 ```
+
+Provider-specific adapters may map commands such as `ollama launch raiker --model <model>` into the canonical `raiker launch --provider ollama --model <model>` path when the provider supports that style of extension.
 
 ---
 
 ## Implementation Documentation Map
 
-Raiker is intended to be implemented by AI coding agents, including smaller local or cloud models. The README explains the product vision, but builders must use the detailed documents below before writing code.
+Raiker is intended to be implemented by local or cloud AI coding agents. Implementation is phased, but the specification is not vague. Every phase-scheduled feature must already have contracts, storage, runtime lifecycle, UI surface, security rules, events, tests, and failure handling.
 
 | Document | Purpose |
 |---|---|
-| [`docs/FEATURE_COVERAGE_MATRIX.md`](docs/FEATURE_COVERAGE_MATRIX.md) | Full platform feature coverage checklist, phase placement, and non-negotiable invariants. |
-| [`docs/REFERENCE_PLATFORM_COMPATIBILITY.md`](docs/REFERENCE_PLATFORM_COMPATIBILITY.md) | Mapping from reference systems and concepts to Raiker specifications. |
-| [`docs/LOCAL_LLM_BUILDER_GUIDE.md`](docs/LOCAL_LLM_BUILDER_GUIDE.md) | Operating rules, prompt template, and anti-drift checklist for Qwen/Gemma-class builder agents. |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Implementation-ready architecture, component responsibilities, data flow, invariants, and Phase 1 boundaries. |
-| [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Explicit contracts for prompt envelopes, events, plans, tool actions, policy decisions, tool results, responses, and checkpoints. |
-| [`docs/RUNTIME_ORCHESTRATION_SPEC.md`](docs/RUNTIME_ORCHESTRATION_SPEC.md) | Deterministic runtime, background task, interrupt, side-question, verification, and orchestration rules. |
-| [`docs/UI_UX_DESIGN_SPEC.md`](docs/UI_UX_DESIGN_SPEC.md) | TUI, status bar, Desktop UI, Web UI, Dashboard, IDE, Voice UI, and shared UX design. |
-| [`docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md`](docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md) | SQLite schema, event indexing, memory tables, FTS5, semantic search, graph tables, recursive CTEs, and backup/export. |
-| [`docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`](docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md) | Fully documented Phase 1 to Phase 5 implementation blueprint. |
-| [`docs/TOOLS_AND_PERMISSIONS_SPEC.md`](docs/TOOLS_AND_PERMISSIONS_SPEC.md) | Tool catalogue, broker lifecycle, approval modes, permission scopes, shell policy, and testing rules. |
-| [`docs/HOOKS_SPEC.md`](docs/HOOKS_SPEC.md) | Hook lifecycle events, handlers, matchers, async hooks, decision authority, and hook security. |
-| [`docs/PLUGIN_SYSTEM_SPEC.md`](docs/PLUGIN_SYSTEM_SPEC.md) | Plugin manifests, components, permissions, trust levels, lifecycle, and supply-chain controls. |
-| [`docs/CHANNELS_SPEC.md`](docs/CHANNELS_SPEC.md) | Channel envelopes, pairing, sender trust, approval relay, attachments, and side-question routing. |
-| [`docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`](docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) | Slash commands, command expansion, rich TUI, background work, side questions, approvals, and keyboard UX. |
-| [`docs/CHECKPOINTING_AND_REWIND_SPEC.md`](docs/CHECKPOINTING_AND_REWIND_SPEC.md) | Checkpoint types, file snapshots, restore, fork, rewind UX, cleanup, and security. |
-| [`docs/MEMORY_AND_CONTEXT_STRATEGY.md`](docs/MEMORY_AND_CONTEXT_STRATEGY.md) | Memory types, context bundles, retrieval, governance, correction, compaction, and poisoning controls. |
+| [`docs/FEATURE_COVERAGE_MATRIX.md`](docs/FEATURE_COVERAGE_MATRIX.md) | Full platform coverage checklist, phase placement, and non-negotiable invariants. |
+| [`docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`](docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md) | Phase 1 to Phase 5 implementation blueprint and builder hand-off flow. |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Phased architecture, component responsibilities, global command flow, and implementation boundaries. |
+| [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Contracts for prompts, events, plans, actions, policy decisions, tool results, responses, and checkpoints. |
+| [`docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md`](docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md) | SQLite, JSONL, FTS5, vector metadata, graph tables, recursive CTEs, checkpoint and memory storage. |
+| [`docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`](docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md) | Global `raiker` command, launch flows, slash commands, Rich TUI, side questions, approvals, keyboard UX. |
+| [`docs/UI_UX_DESIGN_SPEC.md`](docs/UI_UX_DESIGN_SPEC.md) | Rich TUI, status bar, Desktop UI, Web UI, Dashboard, IDE, Voice UI, and shared UX design. |
+| [`docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`](docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md) | Model profiles, local providers, hosted policy gates, launch contract, streaming, tool-call modes. |
+| [`config/model-profiles.json`](config/model-profiles.json) | Built-in model launch profile registry for mock, Ollama, llama.cpp, LM Studio, OpenAI-compatible, hosted providers. |
+| [`docs/CHANNELS_SPEC.md`](docs/CHANNELS_SPEC.md) | Channel connector profiles, pairing, sender trust, routing, side questions, approval relay, link/unlink lifecycle. |
+| [`config/channel-connectors.json`](config/channel-connectors.json) | Built-in connector profile registry used by UI listing/linking flows before implementation wiring. |
+| [`docs/MEMORY_AND_CONTEXT_STRATEGY.md`](docs/MEMORY_AND_CONTEXT_STRATEGY.md) | Working, profile, project, episodic, procedural, semantic, graph, eidetic observation, and gist memory. |
+| [`docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`](docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md) | Eidetic-style raw observations, gist memory, retention, exact replay, skill learning, and self-improvement controls. |
 | [`docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`](docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md) | Graph entities, relationships, codemap indexing, graph queries, staleness, and graph-context retrieval. |
-| [`docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`](docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md) | Model router, local inference, hosted providers, tool-call modes, streaming, context budgets, and privacy. |
-| [`docs/EXECUTION_ENVIRONMENTS_SPEC.md`](docs/EXECUTION_ENVIRONMENTS_SPEC.md) | Local, worktree, Docker, SSH, cloud/GPU execution profiles, artifacts, and resource controls. |
-| [`docs/OWASP_GENAI_SECURITY_MAPPING.md`](docs/OWASP_GENAI_SECURITY_MAPPING.md) | Mapping from GenAI/LLM risks to concrete Raiker controls and security tests. |
-| [`docs/PHASE_1_MVP_BUILD_PLAN.md`](docs/PHASE_1_MVP_BUILD_PLAN.md) | Task-by-task Phase 1 build plan with acceptance criteria suitable for local LLM builders. |
-| [`docs/ROADMAP_PHASE_2_TO_PHASE_5.md`](docs/ROADMAP_PHASE_2_TO_PHASE_5.md) | Full platform roadmap with phase boundaries from local MVP to governed enterprise/home-lab platform. |
-| [`docs/SECURITY_AND_POLICY.md`](docs/SECURITY_AND_POLICY.md) | Phase 1 security model, policy matrix, path safety, shell approval, memory governance, and security tests. |
-| [`docs/VERIFICATION_PLAN.md`](docs/VERIFICATION_PLAN.md) | Test strategy, expected event sequences, PR checklist, and local LLM evaluation scenarios. |
+| [`docs/RUNTIME_ORCHESTRATION_SPEC.md`](docs/RUNTIME_ORCHESTRATION_SPEC.md) | Runtime state machine, background tasks, interrupts, side questions, verification, and deterministic event ordering. |
+| [`docs/TOOLS_AND_PERMISSIONS_SPEC.md`](docs/TOOLS_AND_PERMISSIONS_SPEC.md) | Tool catalogue, broker lifecycle, approvals, permission scopes, command policy, and testing rules. |
+| [`docs/HOOKS_SPEC.md`](docs/HOOKS_SPEC.md) | Hook lifecycle events, handlers, matchers, async hooks, decision authority, and hook security. |
+| [`docs/PLUGIN_SYSTEM_SPEC.md`](docs/PLUGIN_SYSTEM_SPEC.md) | Plugin manifests, components, permissions, trust levels, lifecycle, skills, channels, and supply-chain controls. |
+| [`docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md`](docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md) | Subagents, multi-agent teams, bounded delegation, side questions, and parent verification. |
+| [`docs/EXECUTION_ENVIRONMENTS_SPEC.md`](docs/EXECUTION_ENVIRONMENTS_SPEC.md) | Local, worktree, container, SSH, VPS, Kubernetes, cloud/GPU execution profiles, artifacts, and resource controls. |
+| [`docs/OWASP_GENAI_SECURITY_MAPPING.md`](docs/OWASP_GENAI_SECURITY_MAPPING.md) | GenAI/LLM risk mapping, controls, and security test matrix. |
+| [`docs/REFERENCE_PLATFORM_COMPATIBILITY.md`](docs/REFERENCE_PLATFORM_COMPATIBILITY.md) | Mapping to Claude Code, OpenClaw, Hermes, memory, graph, local inference, and security reference concepts. |
+| [`docs/PHASE_1_MVP_BUILD_PLAN.md`](docs/PHASE_1_MVP_BUILD_PLAN.md) | Task-by-task Phase 1 build plan with acceptance criteria. |
+| [`docs/ROADMAP_PHASE_2_TO_PHASE_5.md`](docs/ROADMAP_PHASE_2_TO_PHASE_5.md) | Phase-scheduled roadmap from local MVP to governed enterprise/home-lab platform. |
+| [`docs/SECURITY_AND_POLICY.md`](docs/SECURITY_AND_POLICY.md) | Phase 1 security model, policy matrix, path safety, command approval, memory governance, security tests. |
+| [`docs/VERIFICATION_PLAN.md`](docs/VERIFICATION_PLAN.md) | Validation commands, event sequences, PR checklist, local/cloud builder evaluation scenarios. |
+| [`docs/LOCAL_LLM_BUILDER_GUIDE.md`](docs/LOCAL_LLM_BUILDER_GUIDE.md) | Operating rules, prompt template, and anti-drift checklist for local/cloud builder agents. |
 | [`docs/ADR_TEMPLATE.md`](docs/ADR_TEMPLATE.md) | Template for documenting design decisions instead of silently inventing behaviour. |
 
 ---
 
-## Documentation-First Rule
+## Builder Reading Flow
 
-Implementation can be phased, but specification cannot be vague. Every feature must define:
+A builder model must use this flow before coding:
 
-1. user experience;
-2. contract/schema;
-3. storage;
-4. runtime lifecycle;
-5. security policy;
-6. events;
-7. tests;
-8. UI surface;
-9. failure handling;
-10. migration or upgrade impact.
+```text
+README.md
+  -> docs/FEATURE_COVERAGE_MATRIX.md
+  -> docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
+  -> docs/ARCHITECTURE.md
+  -> docs/CONTRACTS.md
+  -> docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md
+  -> docs/SECURITY_AND_POLICY.md
+  -> task-specific spec
+  -> docs/VERIFICATION_PLAN.md
+```
 
-A feature is not considered ready for implementation until those ten areas are documented.
+For every task, the builder must identify the phase, task ID, files to change, contracts affected, storage affected, events emitted, policy gates, UI surface, tests, and documentation updates.
 
 ---
 
 ## Core Principles
 
 ### 1. Local-first by default
-Raiker should be able to run fully locally with local models such as llama.cpp, Ollama, or LM Studio. Remote models and cloud execution are optional and policy-controlled.
+Raiker should run fully locally with local models such as llama.cpp, Ollama, or LM Studio. Remote models and cloud execution are optional and policy-controlled.
 
 ### 2. Equal-status clients
-Raiker is not tied to one interface. CLI, rich TUI, desktop, web, IDE, voice, hotkeys, REST, webhooks, Slack, Teams, Discord, Signal, email, and future clients all use the same agent gateway.
+CLI, Rich TUI, Desktop, Web, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Mobile Companion, and other phase-scheduled clients all use the same agent gateway.
 
 ### 3. Rich interruptible UX
 Raiker must support background work, progress visibility, side questions, pause, cancel, steer, approve, deny, rewind, fork, and inspect without losing task state.
 
 ### 4. Concrete storage design
-Raiker uses local storage with SQLite for state/search/index metadata, JSONL for append-only event logs, checkpoint manifests and file snapshots for recovery, and local vector/graph indexes where needed.
+Raiker uses local storage with SQLite for state/search/index metadata, JSONL for append-only event logs, checkpoint manifests and file snapshots for recovery, local vector metadata, graph tables, and recursive CTEs.
 
-### 5. Security and privacy are architectural layers
-Tool execution, memory writes, plugin actions, channel messages, remote calls, shell commands, and external execution all pass through policy.
+### 5. Governed memory and learning
+Raiker memory includes candidates, working context, profile/project memory, episodic/procedural memory, eidetic observations, gist memory, semantic memory, graph memory, and self-improving skills, all governed by provenance, confidence, sensitivity, retention, approval, correction, and deletion.
 
-### 6. OS-like event logging
+### 6. Security and privacy are architectural layers
+Tool execution, memory writes, plugin actions, channel messages, remote calls, local commands, and external execution all pass through policy.
+
+### 7. OS-like event logging
 Every prompt, model call, tool proposal, approval, denial, tool result, hook, plugin action, channel message, memory write, checkpoint, subagent event, verification result, and error is recorded.
-
-### 7. Durable but governed memory
-Raiker can remember across sessions, months, and years, but memory is governed by provenance, confidence, sensitivity, retention, trust score, approval state, correction, and deletion.
 
 ---
 
@@ -123,8 +128,6 @@ User prompt or channel message
 
 ## Main Architecture
 
-Raiker uses a nested control-boundary architecture:
-
 ```text
 Interface and Channel Layer
   Event Logging Layer
@@ -143,32 +146,36 @@ Interface and Channel Layer
         Checkpoint Service
         Subagent Orchestrator
         Execution Adapters
+        SQLite State Store
 ```
 
 ---
 
 ## Phase 1 MVP
 
-Phase 1 builds only the secure local core:
+Phase 1 builds the secure local core:
 
+- global `raiker` command;
 - repository scaffold;
 - contracts;
 - event log writer;
 - static policy engine;
 - SQLite bootstrap;
+- connector profile registry;
+- model profile registry;
 - tool broker skeleton;
 - read_file;
 - list_directory;
 - glob;
 - grep;
-- shell with approval;
+- command execution with approval;
 - mock model provider;
 - deterministic runtime state machine;
 - CLI client;
 - checkpoint stub;
 - unit tests.
 
-Later phases are fully specified in the docs listed above and must be implemented according to the phase blueprint.
+Phase-scheduled features are fully specified in the docs listed above and must be implemented according to the phase blueprint.
 
 ---
 

@@ -1,8 +1,39 @@
 # Full Phase Implementation Blueprint
 
-This document defines every Raiker phase in detail. A phase may be implemented later, but the behaviour, UI, storage, security, contracts, and tests must be documented now.
+This document defines every Raiker phase in detail. A phase may be built later, but the behaviour, UI, storage, security, contracts, and tests are documented now.
 
-No builder agent should interpret "later phase" as "unspecified".
+No builder agent should interpret "later phase" as "unspecified". Phase means implementation order only.
+
+---
+
+## Builder Flow Across All Files
+
+A local or cloud builder model must follow this order:
+
+```text
+README.md
+  -> docs/FEATURE_COVERAGE_MATRIX.md
+  -> docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
+  -> docs/ARCHITECTURE.md
+  -> docs/CONTRACTS.md
+  -> docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md
+  -> docs/SECURITY_AND_POLICY.md
+  -> task-specific spec
+  -> docs/VERIFICATION_PLAN.md
+```
+
+For any task, the builder must identify:
+
+1. phase;
+2. task ID;
+3. files to change;
+4. contracts affected;
+5. storage affected;
+6. events emitted;
+7. policy gates;
+8. UI surface;
+9. tests;
+10. documentation updates.
 
 ---
 
@@ -10,7 +41,10 @@ No builder agent should interpret "later phase" as "unspecified".
 
 ### User Experience
 
+- Global command: `raiker`.
 - One-shot CLI command: `raiker ask "..."`.
+- Interactive command: `raiker chat`.
+- Model launch command: `raiker launch --provider <provider> --model <model>`.
 - Plain terminal output.
 - Approval prompts rendered in terminal.
 - Event log path and checkpoint path shown after each turn.
@@ -24,6 +58,7 @@ No builder agent should interpret "later phase" as "unspecified".
 - Static policy engine.
 - Mock model provider.
 - Event logging.
+- SQLite bootstrap.
 - Basic checkpoint manifest.
 
 ### Tools
@@ -36,14 +71,17 @@ No builder agent should interpret "later phase" as "unspecified".
 
 ### Storage
 
+- `.raiker/raiker.db` bootstrap.
 - `.raiker/events/*.jsonl`.
 - `.raiker/checkpoints/*`.
-- Optional minimal SQLite bootstrap with sessions, turns, tasks, events_index, tool_actions, policy_decisions.
+- SQLite tables for sessions, turns, tasks, events_index, tool_actions, policy_decisions, approvals, memory_candidates, connector profiles, and model profiles.
 
 ### Memory
 
-- Memory candidates only.
-- No durable memory writes unless manually approved and schema exists.
+- Memory candidates.
+- Scratchpad memory for current task.
+- Eidetic observation metadata table available but raw capture disabled until Phase 2 policy is wired.
+- No durable memory write without approval and schema.
 
 ### Tests
 
@@ -52,6 +90,10 @@ No builder agent should interpret "later phase" as "unspecified".
 - policy;
 - broker;
 - runtime state machine;
+- global CLI command dispatch;
+- SQLite bootstrap;
+- connector registry load;
+- model profile registry load;
 - CLI smoke.
 
 ---
@@ -68,6 +110,7 @@ No builder agent should interpret "later phase" as "unspecified".
 - Context/memory panel.
 - Event viewer.
 - Status bar.
+- Local provider launch/switch UI.
 
 ### TUI Required Screens
 
@@ -80,6 +123,8 @@ No builder agent should interpret "later phase" as "unspecified".
 7. Model profile picker.
 8. Permission editor.
 9. Diagnostics screen.
+10. Provider launch screen.
+11. Channel connector listing screen.
 
 ### Runtime
 
@@ -89,6 +134,7 @@ No builder agent should interpret "later phase" as "unspecified".
 - Safe boundaries.
 - Verification framework.
 - Context compaction.
+- Provider launch and health-check path.
 
 ### Tools
 
@@ -105,13 +151,20 @@ No builder agent should interpret "later phase" as "unspecified".
 - FTS5 for memory/event search.
 - Checkpoint metadata tables.
 - Approval history tables.
+- Eidetic observation tables.
+- Gist memory records.
 
 ### Memory
 
 - Approved profile memory.
 - Approved project memory.
+- Episodic memory.
+- Procedural memory.
+- Eidetic observation snapshots with retention.
+- Gist summaries.
 - Memory correction/deletion.
 - Memory usage attribution in context bundles.
+- Hermes-style skill candidate proposals after verified successful tasks.
 
 ### Model Runtime
 
@@ -129,6 +182,8 @@ No builder agent should interpret "later phase" as "unspecified".
 - File snapshot before edit.
 - SQLite migrations.
 - Local model profile validation.
+- Eidetic observation retention.
+- Skill candidate requires verification.
 
 ---
 
@@ -147,6 +202,9 @@ Desktop app screens:
 7. Plugin manager.
 8. Model/runtime settings.
 9. Security dashboard.
+10. Channel connector wizard.
+11. Skill manager.
+12. Scheduled automation manager.
 
 Desktop status bar:
 
@@ -169,12 +227,15 @@ Web screens:
 9. Graph.
 10. Plugins.
 11. Channels.
-12. Settings.
+12. Models.
+13. Skills.
+14. Automations.
+15. Settings.
 
 Web technical requirements:
 
 - local web server by default;
-- websocket event stream;
+- websocket or SSE event stream;
 - REST API client of gateway;
 - auth for remote access;
 - CSRF protection;
@@ -191,14 +252,17 @@ Dashboard widgets:
 - tool activity;
 - security alerts;
 - memory health;
+- eidetic observation retention;
 - graph index;
 - checkpoints;
 - storage;
 - execution environments;
 - plugins;
-- channels.
+- channels;
+- skills;
+- scheduled automations.
 
-### Plugins
+### Plugins And Skills
 
 - plugin manager;
 - manifest validation;
@@ -208,7 +272,9 @@ Dashboard widgets:
 - plugin hooks;
 - plugin skills;
 - plugin TUI panels;
-- plugin tool adapters through broker.
+- plugin tool adapters through broker;
+- bundled/global/workspace skills with precedence;
+- skill self-improvement through proposals, tests, and approval.
 
 ### Graph/Codemap
 
@@ -234,6 +300,7 @@ Dashboard widgets:
 - Graph recursive CTE impact analysis.
 - Semantic search uses sensitivity filters.
 - Dashboard widgets read from SQLite state.
+- Skill precedence and self-improvement proposal flow works.
 
 ---
 
@@ -241,38 +308,39 @@ Dashboard widgets:
 
 ### Channels
 
-Channels implemented:
+Connector profiles already exist in `config/channel-connectors.json`. Phase 4 wires the implementation packages for these connectors:
 
 - REST webhooks;
+- Email;
 - Slack;
 - Teams;
 - Discord;
 - Signal;
-- Email;
 - Voice;
-- Hotkeys.
+- Hotkeys;
+- MCP channel;
+- Browser extension.
 
-All channel connectors must implement:
+All channel connectors must implement pairing, sender trust, rate limits, attachment policy, approval relay disabled by default, session binding, side-question routing, and event logging.
 
-- pairing;
-- sender trust;
-- rate limits;
-- attachment policy;
-- approval relay disabled by default;
-- session binding;
-- event logging.
+### OpenClaw-Style Gateway Coverage
+
+Raiker must include:
+
+- local-first gateway;
+- multi-channel inbox;
+- pairing for unknown senders;
+- channel allowlists;
+- daemon mode;
+- channel-to-agent routing;
+- companion app control surfaces;
+- live workspace/canvas equivalent through Web/Desktop dashboard panels;
+- skills available from bundled, global, and workspace scopes;
+- channel security diagnostics.
 
 ### Channel UI
 
-Dashboard channel panel shows:
-
-- paired channels;
-- sender identities;
-- last inbound message;
-- rate-limit status;
-- pending approval relay requests;
-- revoked channels;
-- security warnings.
+Dashboard channel panel shows paired channels, sender identities, last inbound message, rate-limit status, pending approval relay requests, revoked channels, connector implementation status, package needed, and security warnings.
 
 ### Multi-Agent
 
@@ -282,7 +350,8 @@ Subagent modes:
 - parallel reviewers;
 - planner/executor;
 - critic/refiner;
-- red/blue security review.
+- red/blue security review;
+- manager/planner/executor memory intelligence pattern.
 
 Requirements:
 
@@ -292,19 +361,21 @@ Requirements:
 - max runtime;
 - cost budget;
 - parent verification;
-- cancellation cascade.
+- cancellation cascade;
+- memory writes as candidates unless governance approves.
 
 ### Remote Execution
 
 Execution profiles:
 
 - Git worktree;
-- Docker;
+- container;
 - SSH;
 - VPS;
 - Kubernetes;
 - Modal/cloud GPU;
-- managed cloud runner.
+- managed cloud runner;
+- Daytona-style persistent sandbox.
 
 Requirements:
 
@@ -321,8 +392,9 @@ Requirements:
 - unknown channel sender rejected;
 - side question from channel does not stop task;
 - subagent cannot exceed tools;
-- Docker profile requires pinned image;
-- cloud profile requires budget approval.
+- container profile requires pinned image;
+- cloud profile requires budget approval;
+- channel connector can be listed before implementation is installed.
 
 ---
 
@@ -350,6 +422,7 @@ Widgets:
 - user approvals;
 - channel trust;
 - memory governance;
+- eidetic retention and deletion status;
 - security findings;
 - execution spend;
 - audit export status.
@@ -370,7 +443,8 @@ Widgets:
 - plugin supply-chain scanning;
 - channel replay tests;
 - memory poisoning tests;
-- model egress tests.
+- model egress tests;
+- eidetic raw-observation retention tests.
 
 ### Tests
 

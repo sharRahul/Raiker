@@ -1,6 +1,6 @@
 # Architecture Decision Record Template
 
-Use this template when a builder agent is unsure, when a design choice may affect future phases, or when a dependency or architecture change is proposed.
+Use this template when a builder agent is unsure, when a design choice may affect phase-scheduled implementation, or when a dependency or architecture change is proposed.
 
 Create ADRs under:
 
@@ -52,9 +52,9 @@ Cons:
 
 ## Consequences
 
-Describe implementation, security, testing, documentation, and future-phase impact.
+Describe implementation, security, testing, documentation, storage, UI, event, and phase impact.
 
-## Security Review
+## Review Checklist
 
 Does this decision affect:
 
@@ -62,9 +62,8 @@ Does this decision affect:
 - policy;
 - memory;
 - event logs;
-- secrets;
-- network access;
-- shell execution;
+- connector profiles;
+- model profiles;
 - user approval;
 - dependencies?
 

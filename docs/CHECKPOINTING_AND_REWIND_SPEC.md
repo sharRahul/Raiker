@@ -112,22 +112,9 @@ fork_requested
 
 ## File Snapshot Rules
 
-Create file snapshots before:
+Create file snapshots before write file, edit file, delete file, apply patch, bulk refactor, generated file overwrite, and package/config file mutation.
 
-- write file;
-- edit file;
-- delete file;
-- apply patch;
-- bulk refactor;
-- generated file overwrite;
-- package/config file mutation.
-
-Do not snapshot:
-
-- large files above configured size unless allowed;
-- binary files unless explicitly enabled;
-- secrets unless secure storage/redaction is configured;
-- ignored directories such as `.git`, `node_modules`, virtualenvs, caches.
+Do not snapshot large files above configured size unless allowed, binary files unless explicitly enabled, secrets unless secure storage/redaction is configured, or ignored directories such as `.git`, `node_modules`, virtualenvs, and caches.
 
 ---
 
@@ -145,41 +132,15 @@ Do not snapshot:
 
 ## Rewind UX Requirements
 
-Rich TUI must show:
+Rich TUI must show checkpoint timeline, checkpoint summary, files changed, event range, risk warning, diff preview, restore mode choices, approval requirement, and rollback outcome.
 
-- checkpoint timeline;
-- checkpoint summary;
-- files changed;
-- event range;
-- risk warning;
-- diff preview;
-- restore mode choices;
-- approval requirement;
-- rollback outcome.
-
-User must be able to:
-
-- inspect checkpoint;
-- compare checkpoints;
-- restore;
-- fork;
-- export;
-- delete/clean up;
-- ask side question about checkpoint without stopping active work.
+User must be able to inspect checkpoint, compare checkpoints, restore, fork, export, delete/clean up, and ask side questions about checkpoints without stopping active work.
 
 ---
 
 ## Session Resume
 
-Resume must:
-
-- load session metadata;
-- load latest checkpoint;
-- load event log pointer;
-- reconstruct task list;
-- mark interrupted tasks as recoverable/failed/paused;
-- ask user before resuming risky pending actions;
-- never auto-run shell/network after resume without fresh approval.
+Resume must load session metadata, load latest checkpoint, load event log pointer, reconstruct task list, mark interrupted tasks as recoverable/failed/paused, ask user before resuming risky pending actions, and never auto-run local commands or network actions after resume without fresh approval.
 
 ---
 
@@ -196,20 +157,13 @@ Fork creates a new session lineage:
 }
 ```
 
-Fork can optionally create a Git worktree or branch in future phases.
+Phase 2 implements session-only fork. Phase 3 implements optional Git branch/worktree fork according to the execution profile and worktree isolation rules.
 
 ---
 
 ## Cleanup And Retention
 
-Checkpoint retention policy must support:
-
-- max checkpoints per session;
-- max storage size;
-- max age;
-- keep manual checkpoints;
-- keep checkpoints linked to unresolved tasks;
-- secure deletion for sensitive snapshots where available.
+Checkpoint retention policy must support max checkpoints per session, max storage size, max age, keep manual checkpoints, keep checkpoints linked to unresolved tasks, and secure deletion for sensitive snapshots where available.
 
 ---
 
@@ -254,5 +208,6 @@ Tests must prove:
 - restore requires approval for file changes;
 - state-only restore does not change files;
 - fork creates new session lineage;
-- shell/network pending actions do not auto-run after resume;
-- cleanup preserves manual checkpoints.
+- local command/network pending actions do not auto-run after resume;
+- cleanup preserves manual checkpoints;
+- Git branch/worktree fork is unavailable until Phase 3 execution profile is configured.

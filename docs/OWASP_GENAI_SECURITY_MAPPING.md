@@ -33,7 +33,7 @@ Raiker must prevent or mitigate:
 | Supply-chain risk | Plugin manifest, trust levels, checksums/signatures, permission diff, dependency approval. |
 | Data/model/memory poisoning | Memory provenance, confidence, approval, correction/forgetting, stale/contradiction detection. |
 | Improper output handling | Structured output validation, schema rejection, safe rendering, command injection prevention. |
-| Excessive agency | Tool broker, max tool calls, approval gates, task bounds, no autonomous recursion. |
+| Excessive agency | Tool broker, max tool calls, approval gates, task bounds, no unmanaged recursion. |
 | System prompt leakage | Separate system/security policy, redaction, no direct prompt export by default. |
 | Vector/embedding weaknesses | Semantic memory provenance, sensitivity filters, poisoning tests, graph corroboration. |
 | Misinformation | Verification, citations/provenance, confidence labels, human review gates. |
@@ -41,97 +41,51 @@ Raiker must prevent or mitigate:
 | Channel abuse | Pairing, sender allowlists, attachment scanning, rate limits, approval relay controls. |
 | Plugin abuse | Disabled by default, manifest validation, scoped permissions, managed policy override. |
 | Hook abuse | Decision authority rules, timeouts, scope priority, audit logs. |
-| Audit tampering | Append-only event logs, checksums in future phase, checkpoint/event linkage. |
+| Audit tampering | Append-only event logs, Phase 5 event-log integrity checks, checkpoint/event linkage. |
+| Eidetic observation abuse | Retention limits, provenance, exact-replay policy, deletion support, sensitivity controls. |
 
 ---
 
 ## Prompt Injection Requirements
 
-Raiker must:
-
-- label every context source by trust level;
-- never treat retrieved content as system instruction;
-- block external content from granting permissions;
-- preserve source provenance in context bundle;
-- support prompt-injection scanning hooks;
-- verify model tool calls against policy.
+Raiker must label every context source by trust level, never treat retrieved content as system instruction, block external content from granting permissions, preserve source provenance in context bundles, support prompt-injection scanning hooks, and verify model tool calls against policy.
 
 ---
 
 ## Sensitive Data Requirements
 
-Raiker must:
-
-- classify sensitivity before model egress;
-- prefer local models for sensitive data;
-- reject hosted provider use when local-only policy is active;
-- redact secrets from logs;
-- avoid storing secrets in memory;
-- require approval for memory export, graph export, artifact export.
+Raiker must classify sensitivity before model egress, prefer local models for sensitive data, reject hosted provider use when local-only policy is active, redact secrets from logs, avoid storing secrets in memory, and require approval for memory export, graph export, artifact export, or exact raw-observation replay.
 
 ---
 
 ## Supply Chain Requirements
 
-Raiker must:
-
-- validate plugin manifests;
-- show permission diffs;
-- reject untrusted plugin auto-enable;
-- pin or review dependencies;
-- record plugin provenance;
-- support managed-trusted plugins;
-- log plugin install/update/enable events.
+Raiker must validate plugin manifests, show permission diffs, reject untrusted plugin auto-enable, pin or review dependencies, record plugin provenance, support managed-trusted plugins, and log plugin install/update/enable events.
 
 ---
 
 ## Excessive Agency Requirements
 
-Raiker must enforce:
-
-- max tool calls per turn;
-- max task duration;
-- max subagent depth;
-- no autonomous background work without task contract;
-- approval for shell/network/write/delete/export;
-- cancellation and pause controls;
-- no self-granted permissions.
+Raiker must enforce max tool calls per turn, max task duration, max subagent depth, task contracts for background work, approval for command/network/write/delete/export, cancellation and pause controls, and no self-granted permissions.
 
 ---
 
 ## Memory Poisoning Requirements
 
-Raiker must:
-
-- create memory candidates before durable writes;
-- require provenance;
-- assign confidence;
-- detect contradictions;
-- isolate channel/web-derived memories;
-- allow user correction/deletion;
-- test poisoned memory cases;
-- prevent memory from overriding policy.
+Raiker must create memory candidates before durable writes, require provenance, assign confidence, detect contradictions, isolate channel/web-derived memories, allow user correction/deletion, test poisoned memory cases, prevent memory from overriding policy, and apply retention/deletion to eidetic observations.
 
 ---
 
 ## Channel Security Requirements
 
-Channels must protect against:
-
-- spoofed sender;
-- replayed approval;
-- malicious attachment;
-- session cross-talk;
-- prompt injection through forwarded messages;
-- bot compromise;
-- data leakage in replies.
+Channels must protect against spoofed sender, replayed approval, malicious attachment, session cross-talk, prompt injection through forwarded messages, connector compromise, and data leakage in replies.
 
 Controls:
 
 - pairing;
 - sender allowlist;
 - session binding;
-- approval signing/binding;
+- approval binding;
 - attachment scanning;
 - rate limiting;
 - event logging.
@@ -143,15 +97,16 @@ Controls:
 | Test | Required outcome |
 |---|---|
 | File contains instruction to bypass policy | Treated as untrusted content; policy not changed. |
-| Memory says shell is allowed | Ignored unless policy allows shell. |
-| Plugin requests broad shell access | Permission diff shown; disabled until approved. |
+| Memory says local commands are allowed | Ignored unless policy allows command execution. |
+| Plugin requests broad command access | Permission diff shown; disabled until approved. |
 | Channel sends approval replay | Rejected. |
 | Model emits malformed tool JSON | Rejected or retried safely. |
-| Shell command tries destructive action | Denied or high-risk approval. |
+| Local command tries destructive action | Denied or high-risk approval. |
 | Hosted model selected with local-only data | Denied. |
 | Hook silently allows denied action | Denied by policy priority. |
 | Long-running task exceeds limit | Cancelled or paused with event. |
 | Secret-like text in tool output | Redacted from event logs. |
+| Exact eidetic replay requested for sensitive data | Requires policy approval or is denied. |
 
 ---
 
@@ -168,6 +123,7 @@ Required events:
 - `approval_replay_rejected`
 - `policy_override_attempt_blocked`
 - `secret_redacted`
+- `eidetic_replay_policy_decision`
 - `security_test_completed`
 
 ---
@@ -179,7 +135,7 @@ Every new feature must answer:
 1. What trust boundary does it cross?
 2. What data can it read?
 3. What data can it write?
-4. Can it execute code?
+4. Can it execute code or commands?
 5. Can it use network?
 6. Can it persist memory?
 7. Can it approve actions?

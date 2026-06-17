@@ -58,6 +58,10 @@ Raiker provides the architecture and implementation plan for a local-first agent
 - list model and connector registries before full provider/channel wiring;
 - preserve equal-interface contracts for terminal, desktop, web, mobile, IDE, voice, chat, REST, webhook, browser-extension, and channel clients.
 
+### Versioning
+
+Raiker starts at package/application version `0.0.0`. Patch updates must progress through `0.0.1` to `0.0.99` before the project is bumped to `0.1.0`.
+
 ### Phase 1 MVP
 
 Phase 1 builds the secure local core and the first local terminal client while preserving equal-interface contracts:
@@ -82,7 +86,7 @@ Phase 1 builds the secure local core and the first local terminal client while p
 - checkpoint stub;
 - unit and integration tests.
 
-Raiker is currently at the architecture and implementation-blueprint stage. The next step is to implement the Phase 1 MVP from [`docs/PHASE_1_MVP_BUILD_PLAN.md`](docs/PHASE_1_MVP_BUILD_PLAN.md).
+Raiker now contains a Phase 1 runtime-core implementation on `main`. Continue to use [`docs/PHASE_1_MVP_BUILD_PLAN.md`](docs/PHASE_1_MVP_BUILD_PLAN.md) as the single source of truth for Phase 1 scope and [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) as the status ledger.
 
 ---
 
@@ -90,7 +94,7 @@ Raiker is currently at the architecture and implementation-blueprint stage. The 
 
 ### Current repository status
 
-Raiker is currently documentation-first. The Phase 1 implementation has not been completed yet.
+Raiker contains the initial Phase 1 MVP runtime core. Check [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) before continuing work, and do not mark any capability `implemented_verified` unless its tests exist and the relevant validation has passed.
 
 Start by reading the Phase 1 plan:
 
@@ -110,11 +114,28 @@ README.md
   -> docs/CONTRACTS.md
   -> docs/API_AND_CONTRACT_SCHEMAS.md
   -> docs/EVENT_CATALOG.md
+  -> docs/RUNTIME_STATE_MACHINE.md
   -> docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md
   -> docs/SECURITY_AND_POLICY.md
-  -> task-specific spec
+  -> docs/THREAT_MODEL.md
+  -> docs/NON_GOALS_AND_BOUNDARIES.md
+  -> docs/PHASE_1_MVP_BUILD_PLAN.md
+  -> docs/RUNTIME_ORCHESTRATION_SPEC.md
+  -> docs/TOOLS_AND_PERMISSIONS_SPEC.md
+  -> docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md
+  -> docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md
+  -> docs/MODEL_PROVIDER_CONTRACT.md
+  -> docs/CHANNELS_SPEC.md
+  -> docs/UI_UX_DESIGN_SPEC.md
+  -> docs/MEMORY_AND_CONTEXT_STRATEGY.md
+  -> docs/MEMORY_GOVERNANCE_RULES.md
+  -> docs/PLUGIN_SYSTEM_SPEC.md
+  -> docs/PLUGIN_MANIFEST_SCHEMA.md
   -> docs/ACCEPTANCE_TESTS_BY_PHASE.md
+  -> docs/REFERENCE_REQUIREMENTS_MATRIX.md
   -> docs/VERIFICATION_PLAN.md
+  -> config/model-profiles.json
+  -> config/channel-connectors.json
 ```
 
 After Phase 1 is implemented, the expected local entry point is:
@@ -147,8 +168,6 @@ If the global `raiker` command is not configured during early bootstrapping, mod
 ---
 
 ## CLI Install
-
-The CLI install flow becomes active once Phase 1 packaging is implemented.
 
 ### macOS/Linux/WSL/Git Bash
 
@@ -267,7 +286,7 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 
 ## Support
 
-Raiker is currently in the architecture and Phase 1 planning stage.
+Raiker is currently in Phase 1 MVP runtime-core implementation and validation.
 
 For now:
 

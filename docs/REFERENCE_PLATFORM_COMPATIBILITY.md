@@ -19,7 +19,7 @@ Raiker is not a clone of any one system. It combines local-first agent runtime, 
 | Plugins | `docs/PLUGIN_SYSTEM_SPEC.md` |
 | Channels | `docs/CHANNELS_SPEC.md`, `config/channel-connectors.json` |
 | Commands | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
-| CLI reference | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/ARCHITECTURE.md` |
+| TUI-first command reference | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/ARCHITECTURE.md` |
 | Session events | `docs/HOOKS_SPEC.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
 | Tool events | `docs/TOOLS_AND_PERMISSIONS_SPEC.md`, `docs/HOOKS_SPEC.md` |
 | Permission requests | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
@@ -53,7 +53,7 @@ Raiker is not a clone of any one system. It combines local-first agent runtime, 
 |---|---|
 | Tool-using agent loop | `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
 | Model-router/provider abstraction | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `config/model-profiles.json` |
-| Global CLI command and provider launch | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/ARCHITECTURE.md` |
+| Global `raiker` TUI entry and in-TUI provider launch | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/ARCHITECTURE.md`, `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
 | Structured tool proposal | `docs/CONTRACTS.md`, `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
 | Verification/reflection | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/VERIFICATION_PLAN.md` |
 | Local-first inference support | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
@@ -144,7 +144,7 @@ Raiker is not a clone of any one system. It combines local-first agent runtime, 
 |---|---|
 | Local inference profiles | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `config/model-profiles.json` |
 | Provider abstraction | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
-| Global launch | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
+| TUI model launch | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
 | Context windows | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
 | Quantisation/hardware notes | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
 | Streaming | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |

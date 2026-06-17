@@ -16,10 +16,12 @@ Raiker verification must prove that:
 4. denied actions do not execute;
 5. event logs record all meaningful activity;
 6. checkpoints are written after completed turns;
-7. the global `raiker` command opens the TUI and reaches the same gateway as every client/channel;
-8. phase-scheduled features are not wired outside the selected implementation task;
-9. connector and model profile registries are loadable;
-10. SQLite indexes JSONL event metadata.
+7. the global `raiker` command opens the configured local terminal client and reaches the same gateway as every client/channel;
+8. no interface is described or implemented as primary over another enabled interface;
+9. phase-scheduled features are not wired outside the selected implementation task;
+10. connector and model profile registries are loadable;
+11. Apple and Android mobile connector profiles exist;
+12. SQLite indexes JSONL event metadata.
 
 ---
 
@@ -34,7 +36,7 @@ python -m mypy raiker apps tests
 raiker
 ```
 
-Expected validation actions inside the TUI:
+Expected validation actions inside the terminal client:
 
 ```text
 normal prompt: Hello Raiker
@@ -54,7 +56,7 @@ If a tool has not been configured yet, the builder must state that clearly and a
 
 ### 1. Contract Tests
 
-Verify required fields, enum values, schema versions, invalid inputs, serialisation, and deserialisation.
+Verify required fields, enum values, schema versions, invalid inputs, serialisation, deserialisation, client/interface type values, and equal-primary-interface metadata.
 
 Files:
 
@@ -64,7 +66,7 @@ tests/test_contracts.py
 
 ### 2. Event Log Tests
 
-Verify append-only JSONL format, event ordering, required event fields, invalid event rejection, event file creation, and SQLite event indexing.
+Verify append-only JSONL format, event ordering, required event fields, invalid event rejection, event file creation, SQLite event indexing, and originating interface/client metadata.
 
 Files:
 
@@ -74,7 +76,7 @@ tests/test_event_log.py
 
 ### 3. Policy Tests
 
-Verify safe workspace reads are allowed, outside-workspace reads are denied, local command execution requires approval, unknown tools fail safely, and policy reasons are included.
+Verify safe workspace reads are allowed, outside-workspace reads are denied, local command execution requires approval, unknown tools fail safely, policy reasons are included, and no interface can bypass policy.
 
 Files:
 
@@ -102,20 +104,20 @@ Files:
 tests/test_runtime_state_machine.py
 ```
 
-### 6. TUI And Global Command Smoke Tests
+### 6. Terminal And Global Command Smoke Tests
 
-Verify global `raiker` launches the TUI, TUI prompt input builds a `PromptEnvelope`, TUI calls gateway, TUI renders response/status, event log and checkpoint paths are created, local command prompt does not execute automatically, and `/launch --provider mock --model mock-deterministic` resolves a model profile.
+Verify global `raiker` launches the configured local terminal client, terminal prompt input builds a `PromptEnvelope`, terminal client calls gateway, terminal client renders response/status, event log and checkpoint paths are created, local command prompt does not execute automatically, and `/launch --provider mock --model mock-deterministic` resolves a model profile.
 
 Files:
 
 ```text
-tests/test_tui_smoke.py
+tests/test_terminal_client_smoke.py
 tests/test_global_command.py
 ```
 
 ### 7. Registry Tests
 
-Verify `config/channel-connectors.json` loads, every connector has required fields, disabled connector cannot receive messages, `config/model-profiles.json` loads, TUI launch actions are present, and unknown provider fails safely.
+Verify `config/channel-connectors.json` loads, every connector has required fields, disabled connector cannot receive messages, Apple and Android mobile app connector profiles exist, every connector has `interface_status=equal_primary_when_enabled`, `config/model-profiles.json` loads, terminal launch actions are present, and unknown provider fails safely.
 
 Files:
 
@@ -123,6 +125,23 @@ Files:
 tests/test_channel_connector_registry.py
 tests/test_model_profile_registry.py
 ```
+
+### 8. Equal Primary Interface Drift Tests
+
+Verify docs and config do not reintroduce a single primary interface.
+
+Files:
+
+```text
+tests/test_equal_interface_invariant.py
+```
+
+Suggested assertions:
+
+- no document says the Rich TUI is the primary human interface;
+- no document says the TUI is the canonical place for normal user actions;
+- no document says mobile is notification-only or Phase 5-only;
+- README, architecture, commands, UI/UX, channels, contracts, roadmap, and phase plans all state or preserve equal primary interface status.
 
 ---
 
@@ -196,7 +215,9 @@ For every PR, check:
 - [ ] Are errors structured?
 - [ ] Are dependencies justified?
 - [ ] Are validation results reported truthfully?
-- [ ] Does global `raiker` TUI entry compatibility remain intact?
+- [ ] Does global `raiker` terminal entry compatibility remain intact?
+- [ ] Does the change preserve equal primary interface status?
+- [ ] Does the change avoid describing TUI, Desktop, Web, Mobile, API, or channel clients as superior to each other?
 
 ---
 
@@ -204,25 +225,26 @@ For every PR, check:
 
 Use these prompts to test whether a builder model follows the docs.
 
-### Scenario 1: Safe chat from TUI
+### Scenario 1: Safe chat from terminal client
 
 ```text
-Implement the TUI prompt path using the mock model provider. Do not add tools. Add tests.
+Implement the terminal prompt path using the mock model provider. Do not add tools. Add tests.
 ```
 
 Expected behaviour:
 
-- global `raiker` opens TUI;
-- plain TUI prompt creates PromptEnvelope;
+- global `raiker` opens configured local terminal client;
+- plain terminal prompt creates PromptEnvelope;
 - no local command execution;
 - no file read;
 - events emitted;
-- checkpoint written.
+- checkpoint written;
+- terminal implementation does not create a privileged path.
 
-### Scenario 2: Safe filesystem query from TUI
+### Scenario 2: Safe filesystem query from terminal client
 
 ```text
-Implement list_directory through the tool broker for a normal prompt submitted inside the TUI. It must pass policy review and block outside-workspace paths.
+Implement list_directory through the tool broker for a normal prompt submitted inside the terminal client. It must pass policy review and block outside-workspace paths.
 ```
 
 Expected behaviour:
@@ -232,7 +254,7 @@ Expected behaviour:
 - path traversal test added;
 - no direct file listing from runtime.
 
-### Scenario 3: Local command request from TUI
+### Scenario 3: Local command request from terminal client
 
 ```text
 Implement local command action handling for Phase 1. The command must require approval and must not run by default.
@@ -254,7 +276,8 @@ Expected behaviour:
 
 - builder refuses to wire these features in the Phase 1 task;
 - builder points to the existing phase-scheduled specs;
-- no out-of-scope implementation is added.
+- no out-of-scope implementation is added;
+- builder does not describe those interfaces as secondary.
 
 ---
 
@@ -283,6 +306,7 @@ Every implementation PR should include:
 - [ ] Denied actions do not execute
 - [ ] Events are logged
 - [ ] Phase-scheduled features were not wired outside scope
+- [ ] Equal primary interface invariant is preserved
 
 ## Notes
 - ...

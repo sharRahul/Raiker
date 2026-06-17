@@ -1,8 +1,8 @@
 # Local LLM Builder Guide
 
-This guide is written for small and mid-size coding models such as Qwen 3.5 9B, Gemma 4 31B cloud, local Ollama models, or other constrained agentic builders.
+This guide is written for local and cloud coding agents that need to implement Raiker in small, reliable steps.
 
-The goal is to reduce ambiguity so the builder can implement Raiker task-by-task without inventing architecture, skipping security boundaries, or mixing future-phase features into the MVP.
+The goal is to reduce ambiguity so the builder can implement Raiker task-by-task without inventing architecture, skipping security boundaries, or confusing phase scheduling with missing design.
 
 ---
 
@@ -11,13 +11,34 @@ The goal is to reduce ambiguity so the builder can implement Raiker task-by-task
 1. Work in one small task at a time.
 2. Read the relevant docs before editing code.
 3. Do not add a dependency unless the task explicitly allows it.
-4. Do not implement future-phase features early.
-5. Do not bypass the agent gateway, event log, policy engine, or tool broker.
-6. Every meaningful action must produce an event.
-7. Every risky action must pass policy review before execution.
-8. Every task must include tests or a clear reason tests are not applicable.
-9. Every task must update documentation when behaviour changes.
-10. If unsure, create an ADR in `docs/adr/` rather than silently inventing behaviour.
+4. Implement only the selected task's build phase.
+5. Treat phase-scheduled features as fully specified but not wired unless the task says to wire them.
+6. Do not bypass the agent gateway, event log, policy engine, storage layer, or tool broker.
+7. Every meaningful action must produce an event.
+8. Every risky action must pass policy review before execution.
+9. Every task must include tests or a clear reason tests are not applicable.
+10. Every task must update documentation when behaviour changes.
+11. If unsure, create an ADR in `docs/adr/` rather than silently inventing behaviour.
+
+---
+
+## Required Reading Flow
+
+For every task, read in this order:
+
+```text
+README.md
+  -> docs/FEATURE_COVERAGE_MATRIX.md
+  -> docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
+  -> docs/ARCHITECTURE.md
+  -> docs/CONTRACTS.md
+  -> docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md
+  -> docs/SECURITY_AND_POLICY.md
+  -> task-specific spec
+  -> docs/VERIFICATION_PLAN.md
+```
+
+Task-specific specs include tools, commands, UI, model runtime, channels, memory, eidetic learning, graph, plugins, hooks, execution environments, or multi-agent strategy depending on the task.
 
 ---
 
@@ -27,38 +48,41 @@ For each task:
 
 ```text
 1. Read the task description.
-2. List files expected to change.
-3. Inspect existing code before editing.
-4. Implement the smallest complete change.
-5. Add or update tests.
-6. Run formatting, linting, typing, and tests.
-7. Verify acceptance criteria.
-8. Summarise what changed.
-9. Stop.
+2. Identify phase, task ID, affected contracts, affected storage, affected events, policy gates, UI surface, and tests.
+3. List files expected to change.
+4. Inspect existing code before editing.
+5. Implement the smallest complete change.
+6. Add or update tests.
+7. Run formatting, linting, typing, and tests.
+8. Verify acceptance criteria.
+9. Summarise what changed.
+10. Stop.
 ```
 
 ---
 
 ## Prompt Template For Builder Agents
 
-Use this prompt when asking a local model to implement a task:
-
 ```text
 You are implementing Raiker.
 
 Before coding, read:
 - README.md
+- docs/FEATURE_COVERAGE_MATRIX.md
+- docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
 - docs/ARCHITECTURE.md
 - docs/CONTRACTS.md
-- docs/PHASE_1_MVP_BUILD_PLAN.md
+- docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md
 - docs/SECURITY_AND_POLICY.md
 - docs/VERIFICATION_PLAN.md
+- <TASK-SPECIFIC-DOC>
 
 Task ID: <TASK-ID>
 Task title: <TITLE>
+Build phase: <PHASE>
 Scope: <EXACT SCOPE>
 Allowed files: <FILES OR DIRECTORIES>
-Forbidden changes: Do not implement future-phase features. Do not bypass policy or event logging. Do not add dependencies unless explicitly listed.
+Forbidden changes: Implement only this task's phase wiring. Do not bypass policy, storage, gateway, or event logging. Do not add dependencies unless explicitly listed.
 Acceptance criteria:
 - <CHECK 1>
 - <CHECK 2>
@@ -75,32 +99,31 @@ Process:
 
 ---
 
-## Small-Model Anti-Drift Checklist
+## Anti-Drift Checklist
 
 Before accepting a change, verify:
 
 - [ ] The change matches a task in the build plan.
+- [ ] The task's build phase is identified.
+- [ ] Phase-scheduled specs were not mistaken for missing design.
 - [ ] No unplanned service, database, framework, or runtime was added.
 - [ ] Public contracts remain compatible or are intentionally versioned.
 - [ ] Tool execution still goes through the tool broker.
 - [ ] Policy review happens before risky actions.
+- [ ] SQLite/event/checkpoint storage contracts are respected.
 - [ ] Event logging wraps prompts, plans, tool proposals, approvals, denials, results, verification, errors, and checkpoints.
 - [ ] Tests cover success and failure paths.
-- [ ] The CLI still works for the basic prompt flow.
-- [ ] Future features remain as stubs or interfaces only.
+- [ ] The global `raiker` command still works for the task's command path.
+- [ ] Connector/model registries remain loadable.
 
 ---
 
-## Model-Specific Guidance
-
-### Qwen 3.5 9B-class local builder
-
-Use very small tasks. Prefer file-by-file changes. Avoid asking it to design architecture from scratch. Give it one target contract, one module, and one test file at a time.
+## Task Size Guidance
 
 Good task size:
 
 ```text
-Implement EventLogWriter with append-only JSONL output and tests.
+Implement EventLogWriter with append-only JSONL output and SQLite event index tests.
 ```
 
 Bad task size:
@@ -108,10 +131,6 @@ Bad task size:
 ```text
 Build the full agent runtime, memory system, policy engine, and CLI.
 ```
-
-### Gemma 4 31B-cloud-class builder
-
-Can handle larger tasks, but still enforce phase boundaries. It may be asked to implement a complete slice, such as contracts + event log + tests, but should not be asked to implement the full platform in one pass.
 
 ---
 
@@ -123,6 +142,8 @@ A task is done only when:
 - tests pass;
 - behaviour is observable through event logs;
 - policy rules are not bypassed;
+- SQLite/storage contracts are respected where relevant;
 - errors are handled explicitly;
 - documentation is updated where needed;
+- the global `raiker` command path remains valid where relevant;
 - the task remains inside its phase boundary.

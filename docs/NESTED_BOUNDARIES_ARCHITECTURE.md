@@ -40,11 +40,11 @@ The detailed component responsibilities remain in:
 
 ## Clean Nested Boundary Map
 
-The Mermaid diagram below intentionally uses simple quoted labels. Avoid raw escaped newlines, slash-heavy labels, or command flags inside node labels because GitHub's Mermaid renderer can reject them.
+The Mermaid diagram below intentionally uses simple quoted labels. Avoid raw escaped newlines, slash-heavy labels, database/circle node shapes, or command flags inside node labels because GitHub's Mermaid renderer can reject them.
 
 ```mermaid
 flowchart TB
-  user(("User"))
+  user["User"]
 
   subgraph PRIMARY["Equal-status primary interface boundary"]
     cli["CLI and raiker terminal entry"]
@@ -130,10 +130,10 @@ flowchart TB
       end
 
       subgraph STORE["Local persistence boundary"]
-        sqlite[("SQLite raiker database")]
-        events[("JSONL event logs")]
-        snapshot_store[("Checkpoints and snapshots")]
-        artifacts[("Artifacts, indexes, and config")]
+        sqlite["SQLite raiker database"]
+        events["JSONL event logs"]
+        snapshot_store["Checkpoints and snapshots"]
+        artifacts["Artifacts, indexes, and config"]
       end
     end
   end

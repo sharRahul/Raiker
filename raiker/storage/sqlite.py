@@ -312,7 +312,7 @@ class SQLiteStore:
 
     def list_tasks(self, session_id: str | None = None, status: str | None = None) -> list[TaskRecord]:
         query = "SELECT * FROM tasks"
-        params: list[str] = []
+        params: list[Any] = []
         conditions: list[str] = []
         if session_id is not None:
             conditions.append("session_id = ?")
@@ -359,7 +359,7 @@ class SQLiteStore:
         limit: int = 50,
     ) -> list[dict]:
         query = "SELECT * FROM events_index"
-        params: list[str] = []
+        params: list[Any] = []
         conditions: list[str] = []
         if session_id is not None:
             conditions.append("session_id = ?")
@@ -388,7 +388,7 @@ class SQLiteStore:
 
     def list_checkpoints(self, session_id: str | None = None, limit: int = 50) -> list[dict]:
         query = "SELECT * FROM checkpoints"
-        params: list[str] = []
+        params: list[Any] = []
         if session_id is not None:
             query += " WHERE session_id = ?"
             params.append(session_id)

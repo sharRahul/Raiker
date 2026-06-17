@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from raiker.storage.sqlite import SQLiteStore
@@ -39,7 +40,6 @@ class EventViewer:
         if not path.exists():
             return None
         offset = row.get("jsonl_offset")
-        import json
 
         with path.open("r", encoding="utf-8") as f:
             if offset is not None:

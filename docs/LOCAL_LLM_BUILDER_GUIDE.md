@@ -113,7 +113,7 @@ Before accepting a change, verify:
 - [ ] SQLite/event/checkpoint storage contracts are respected.
 - [ ] Event logging wraps prompts, plans, tool proposals, approvals, denials, results, verification, errors, and checkpoints.
 - [ ] Tests cover success and failure paths.
-- [ ] The global `raiker` command still works for the task's command path.
+- [ ] The global `raiker` command still opens the TUI and reaches the gateway where relevant.
 - [ ] Connector/model registries remain loadable.
 
 ---
@@ -129,7 +129,7 @@ Implement EventLogWriter with append-only JSONL output and SQLite event index te
 Bad task size:
 
 ```text
-Build the full agent runtime, memory system, policy engine, and CLI.
+Build the full agent runtime, memory system, policy engine, and all UI clients.
 ```
 
 ---
@@ -145,5 +145,5 @@ A task is done only when:
 - SQLite/storage contracts are respected where relevant;
 - errors are handled explicitly;
 - documentation is updated where needed;
-- the global `raiker` command path remains valid where relevant;
+- the global `raiker` TUI entry path remains valid where relevant;
 - the task remains inside its phase boundary.

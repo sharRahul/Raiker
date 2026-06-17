@@ -69,6 +69,18 @@ EVENT_TYPES = {
     "model_request_started",
     "model_request_completed",
     "runtime_error_recorded",
+    "task_created",
+    "task_started",
+    "task_progress",
+    "task_paused",
+    "task_cancelled",
+    "task_completed",
+    "task_failed",
+    "side_question_received",
+    "side_question_answered",
+    "interrupt_received",
+    "safe_boundary_reached",
+    "task_steered",
 }
 INTENTS = {
     "chat",
@@ -410,3 +422,42 @@ class ConnectorProfile:
         ):
             _require(getattr(self, field_name), field_name)
         _one_of(self.interface_status, INTERFACE_STATUS, "interface_status")
+
+
+TASK_STATUSES = {
+    "queued",
+    "running",
+    "waiting_for_approval",
+    "waiting_for_user_answer",
+    "paused",
+    "cancelling",
+    "cancelled",
+    "completed",
+    "failed",
+}
+
+
+@dataclass(frozen=True)
+class TaskRecord:
+    task_id: str
+    session_id: str
+    title: str
+    objective: str
+    status: str
+    created_at: str
+    updated_at: str
+    parent_turn_id: str | None = None
+    parent_task_id: str | None = None
+    current_step: str | None = None
+    progress_percent: int | None = None
+    completed_at: str | None = None
+    summary: str | None = None
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.task_id, "task_id")
+        _require(self.session_id, "session_id")
+        _require(self.title, "title")
+        _require(self.objective, "objective")
+        _one_of(self.status, TASK_STATUSES, "task_status")

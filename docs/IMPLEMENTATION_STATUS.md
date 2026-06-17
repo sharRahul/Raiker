@@ -60,7 +60,7 @@ PR #11 removed generated Python bytecode artifacts and strengthened .gitignore.
 The following capabilities may have config profiles, schemas, or storage boundaries in Phase 1, but must not be wired into active behaviour until their phase task explicitly allows it.
 
 | Capability | First active phase | Required Phase 1 behaviour |
-|---|---:|---|
+|---|---|---:|---|
 | Desktop UI | Phase 3 | Preserve equal-interface contracts only. |
 | Web UI and dashboard | Phase 3 | Preserve action parity and storage metrics contracts only. |
 | Apple mobile app | Phase 3 | Connector profile may be disabled/listable; no active transport. |
@@ -72,6 +72,39 @@ The following capabilities may have config profiles, schemas, or storage boundar
 | Subagents and multi-agent teams | Phase 4 | Contracts/spec only; no spawning. |
 | Remote/container execution | Phase 4 | Execution profiles disabled; no command routing. |
 | Hosted model billing controls | Phase 5 | Hosted providers disabled until policy and budgets exist. |
+
+---
+
+## Phase 2 Rich Local Workspace Status
+
+PR #12 established the Phase 2 build plan, CI baseline, task manager, event viewer, checkpoint timeline, and inspection commands. This table tracks all Phase 2 capabilities.
+
+| Area | Required status | Current repository status | Canonical docs | Required tests |
+|---|---|---|---:|---:|---|
+| Phase 2 build plan and status ledger | `phase_2_required` | `implemented_verified` | `docs/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md`, `docs/IMPLEMENTATION_STATUS.md` | doc consistency |
+| CI baseline | `phase_2_required` | `implemented_verified` | `.github/workflows/ci.yml`, `docs/VERIFICATION_PLAN.md` | workflow syntax |
+| Task record contract and storage helpers | `phase_2_required` | `implemented_verified` | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` | `tests/test_phase_2_task_manager.py` |
+| Background task manager service | `phase_2_required` | `implemented_verified` | `docs/RUNTIME_ORCHESTRATION_SPEC.md` | `tests/test_phase_2_task_manager.py` |
+| Task lifecycle events and event indexing | `phase_2_required` | `implemented_verified` | `docs/EVENT_CATALOG.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` | task event tests |
+| Event viewer query service | `phase_2_required` | `implemented_verified` | `docs/EVENT_CATALOG.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` | `tests/test_phase_2_event_viewer.py` |
+| Checkpoint timeline listing | `phase_2_required` | `implemented_verified` | `docs/CHECKPOINTING_AND_REWIND_SPEC.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` | `tests/test_phase_2_checkpoint_timeline.py` |
+| /status terminal command | `phase_2_required` | `implemented_verified` | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | `tests/test_phase_2_terminal_commands.py` |
+| /tasks terminal command | `phase_2_required` | `implemented_verified` | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | `tests/test_phase_2_terminal_commands.py` |
+| /events terminal command | `phase_2_required` | `implemented_verified` | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | `tests/test_phase_2_terminal_commands.py` |
+| /checkpoints terminal command | `phase_2_required` | `implemented_verified` | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | `tests/test_phase_2_terminal_commands.py` |
+| Side-question child-turn contract | `phase_2_required` | `specified_not_implemented` | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/API_AND_CONTRACT_SCHEMAS.md` | side-question contract tests |
+| Read-only side-question runtime | `phase_2_required` | `specified_not_implemented` | `docs/RUNTIME_ORCHESTRATION_SPEC.md` | side-question runtime tests |
+| Interrupt/steer action contracts | `phase_2_required` | `specified_not_implemented` | `docs/API_AND_CONTRACT_SCHEMAS.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` | interrupt contract tests |
+| Safe-boundary interrupt handling | `phase_2_required` | `specified_not_implemented` | `docs/RUNTIME_ORCHESTRATION_SPEC.md` | interrupt runtime tests |
+| Approval inbox service | `phase_2_required` | `specified_not_implemented` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | approval inbox tests |
+| Approval terminal commands | `phase_2_required` | `specified_not_implemented` | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | terminal approval tests |
+| Checkpoint restore/fork planning | `phase_2_required` | `specified_not_implemented` | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` | restore/fork tests |
+| stat_path and diff_files tools | `phase_2_required` | `specified_not_implemented` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | stat/diff tests |
+| write_file/edit_file/apply_patch | `phase_2_required` | `specified_not_implemented` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | file mutation approval tests |
+| git status/diff/log wrappers | `phase_2_required` | `specified_not_implemented` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | git wrapper tests |
+| Local provider health-check | `phase_2_required` | `specified_not_implemented` | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` | health check tests |
+| Memory candidate listing | `phase_2_required` | `specified_not_implemented` | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` | memory candidate tests |
+| Phase 2 integration validation | `phase_2_required` | `implemented_verified` | `docs/VERIFICATION_PLAN.md` | integration smoke tests |
 
 ---
 

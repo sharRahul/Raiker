@@ -5,6 +5,7 @@ import shlex
 from pathlib import Path
 
 from raiker.channels.registry import ConnectorRegistry
+from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import (
     ClientMetadata,
@@ -13,11 +14,13 @@ from raiker.contracts.models import (
     PromptPayload,
     UserMetadata,
 )
+from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.models.registry import ModelProfileRegistry, RegistryError
 from raiker.models.router import ModelRouter
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tasks.manager import TaskManager
 
 
 def terminal_client() -> ClientMetadata:
@@ -80,16 +83,86 @@ def handle_launch(command: str, *, workspace_root: str | Path = ".") -> str:
     return result.message
 
 
+def handle_status(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    events_dir = store.paths.events_dir
+    checkpoints_dir = store.paths.checkpoints_dir
+    db_path = store.db_path
+    sessions = store.list_sessions()
+    pending = 0
+    with store.connect() as connection:
+        row = connection.execute("SELECT COUNT(*) AS cnt FROM approvals WHERE status = 'pending'").fetchone()
+        if row:
+            pending = int(row["cnt"])
+    latest_session_id = sessions[0].get("session_id") if sessions else "none"
+    lines = [
+        f"workspace: {store.paths.workspace_root}",
+        f"database: {db_path}",
+        f"events: {events_dir}",
+        f"checkpoints: {checkpoints_dir}",
+        f"sessions: {len(sessions)}",
+        f"latest_session: {latest_session_id}",
+        f"pending_approvals: {pending}",
+    ]
+    return "\n".join(lines)
+
+
+def handle_tasks(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    writer = EventLogWriter(store)
+    manager = TaskManager(store, writer)
+    tasks = manager.list_tasks()
+    if not tasks:
+        return "No tasks."
+    lines = ["Tasks:"]
+    for task in tasks:
+        lines.append(f"- {task.task_id} {task.title} [{task.status}] progress={task.progress_percent or 0}%")
+    return "\n".join(lines)
+
+
+def handle_events(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    viewer = EventViewer(store)
+    events = viewer.list_events(limit=20)
+    if not events:
+        return "No events."
+    lines = ["Recent events:"]
+    for event in events:
+        lines.append(f"- {event['event_type']} {event['actor']} {event['timestamp']} {event['event_id']}")
+    return "\n".join(lines)
+
+
+def handle_checkpoints(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    service = CheckpointService(store)
+    checkpoints = service.list_checkpoints(limit=50)
+    if not checkpoints:
+        return "No checkpoints."
+    lines = ["Checkpoints:"]
+    for cp in checkpoints:
+        summary = cp.get("summary", "")
+        lines.append(f"- {cp['checkpoint_id']} session={cp['session_id']} turn={cp['turn_id']} type={cp['checkpoint_type']} created={cp['created_at']} summary={summary}")
+    return "\n".join(lines)
+
+
 def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> str:
     command = command.strip()
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
         return render_channels()
+    if command == "/status":
+        return handle_status(workspace_root=workspace_root)
+    if command == "/tasks":
+        return handle_tasks(workspace_root=workspace_root)
+    if command == "/events":
+        return handle_events(workspace_root=workspace_root)
+    if command == "/checkpoints":
+        return handle_checkpoints(workspace_root=workspace_root)
     if command.startswith("/launch "):
         try:
             return handle_launch(command, workspace_root=workspace_root)

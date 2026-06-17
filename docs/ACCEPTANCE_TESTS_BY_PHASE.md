@@ -96,8 +96,25 @@ Every phase must preserve these rules:
 
 ## Phase 2: Rich Local Workspace
 
+### Phase 2 Foundation Acceptance (Slice: task/status/event/checkpoint inspection)
+
+| Test file | Required assertions |
+|---|---|
+| `tests/test_phase_2_task_manager.py` | Task rows are created/listed/updated deterministically; task events are appended and indexed; task manager lifecycle works. |
+| `tests/test_phase_2_event_viewer.py` | Events can be listed by session, turn, task, type; event index rows are readable; event payload is readable; read-only queries do not mutate. |
+| `tests/test_phase_2_checkpoint_timeline.py` | Checkpoints can be listed by session; checkpoint metadata is readable; listing is deterministic. |
+| `tests/test_phase_2_terminal_commands.py` | `/status` shows session/workspace state; `/tasks` lists tasks; `/events` lists recent events; `/checkpoints` lists checkpoint metadata; commands do not execute tools. |
+
+### Phase 2 Full Acceptance
+
 Acceptance tests must prove:
 
+- Task rows are created/listed/updated deterministically.
+- Task lifecycle events are appended and indexed.
+- Task manager does not execute tools.
+- Event viewer queries are read-only and bounded.
+- `/status`, `/tasks`, `/events`, `/checkpoints` commands render state without tool execution.
+- CI runs on every PR and push to main.
 - Rich TUI task panel updates from event stream.
 - Background tasks can pause, cancel, steer, and resume at safe boundaries.
 - Side questions do not corrupt active task state.

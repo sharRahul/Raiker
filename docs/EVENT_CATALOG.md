@@ -138,6 +138,28 @@ Phase 1 local actions must pause at approval. The sequence must not include `too
 
 ---
 
+## Phase 2 Canonical Events: Task Lifecycle
+
+| Event | Actor | Required payload fields | Notes |
+|---|---|---|---|
+| `task_created` | `task_manager` | `task_id`, `session_id`, `title`, `objective`, `status` | Emitted when a task is created. |
+| `task_started` | `task_manager` | `task_id`, `session_id`, `started_at` | Emitted when a task actually begins execution. |
+| `task_progress` | `task_manager` | `task_id`, `current_step`, `progress_percent`, `status` | Emitted when task progress or step changes. |
+| `task_paused` | `task_manager` | `task_id`, `reason` | Emitted when a task is paused at a safe boundary. |
+| `task_cancelled` | `task_manager` | `task_id`, `reason` | Emitted when a task is cancelled. |
+| `task_completed` | `task_manager` | `task_id`, `summary` | Emitted when a task completes successfully. |
+| `task_failed` | `task_manager` | `task_id`, `reason` | Emitted when a task fails. |
+
+## Phase 2 Canonical Events: Side Questions / Interrupts / UI Actions
+
+| Event | Actor | Required payload fields | Notes |
+|---|---|---|---|
+| `side_question_received` | `runtime` | `side_turn_id`, `parent_task_id`, `mode`, `question` | Emitted when a side question is received. |
+| `side_question_answered` | `runtime` | `side_turn_id`, `answer_summary` | Emitted when a side question is answered. |
+| `interrupt_received` | `runtime` | `task_id`, `interrupt_type` | Emitted when an interrupt is received. |
+| `safe_boundary_reached` | `runtime` | `task_id`, `boundary_type` | Emitted when the runtime reaches a safe boundary. |
+| `task_steered` | `runtime` | `task_id`, `new_instruction`, `requires_approval` | Emitted when a task is steered with a new instruction. |
+
 ## Later-Phase Event Families
 
 These event names are reserved and must not be used with different meanings.

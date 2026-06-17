@@ -45,3 +45,9 @@ class CheckpointService:
     def read(self, path: str | Path) -> Checkpoint:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         return Checkpoint(**data)
+
+    def list_checkpoints(self, session_id: str | None = None, limit: int = 50) -> list[dict]:
+        return self.store.list_checkpoints(session_id=session_id, limit=limit)
+
+    def get_checkpoint(self, checkpoint_id: str) -> dict | None:
+        return self.store.load_checkpoint_by_id(checkpoint_id)

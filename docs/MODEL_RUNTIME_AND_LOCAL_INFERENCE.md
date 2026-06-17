@@ -22,7 +22,7 @@ Raiker must support:
 10. fallback and retry;
 11. privacy and egress policy;
 12. cost and budget controls;
-13. global `raiker launch` provider binding.
+13. TUI-driven model launch and provider binding from the global `raiker` session.
 
 ---
 
@@ -44,21 +44,27 @@ No provider is unspecified. A provider that is not enabled must still have a pro
 
 ---
 
-## Global Launch Contract
+## TUI Launch Contract
 
-Raiker must support global launch through:
+The human-facing command remains:
 
 ```bash
-raiker launch --provider <provider> --model <model>
+raiker
 ```
 
-Required examples:
+Running `raiker` opens the TUI. Model launch happens inside the TUI with `/launch`:
 
-```bash
-raiker launch --provider ollama --model qwen3.5-coder:9b
-raiker launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
-raiker launch --provider lm-studio --model local-model
-raiker launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
+```text
+/launch --provider <provider> --model <model>
+```
+
+Required TUI examples:
+
+```text
+/launch --provider ollama --model qwen3.5-coder:9b
+/launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
+/launch --provider lm-studio --model local-model
+/launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
 ```
 
 Provider-specific shortcut commands may exist when a provider supports extension commands. A shortcut shaped like this:
@@ -67,13 +73,13 @@ Provider-specific shortcut commands may exist when a provider supports extension
 ollama launch raiker --model <model>
 ```
 
-must resolve to the canonical Raiker launch form:
+must resolve to the equivalent Raiker TUI launch action:
 
-```bash
-raiker launch --provider ollama --model <model>
+```text
+/launch --provider ollama --model <model>
 ```
 
-The canonical global `raiker` command is required and must not depend on provider-specific shortcuts.
+The canonical human-facing Raiker command is `raiker` and it must not depend on provider-specific shortcuts.
 
 ---
 
@@ -106,7 +112,7 @@ The canonical global `raiker` command is required and must not depend on provide
     "top_p": 0.9
   },
   "launch": {
-    "canonical_command": "raiker launch --provider ollama --model qwen3.5-coder:9b",
+    "canonical_tui_action": "/launch --provider ollama --model qwen3.5-coder:9b",
     "startup_check": "provider_health_check",
     "auto_start_provider": false
   }
@@ -276,8 +282,9 @@ Required events:
 
 Tests must prove:
 
-- global `raiker launch` selects provider and profile;
-- provider shortcut command maps to canonical launch when adapter exists;
+- global `raiker` command opens the TUI;
+- TUI `/launch` selects provider and profile;
+- provider shortcut command maps to the equivalent TUI launch action when adapter exists;
 - mock provider deterministic output;
 - unknown provider fails clearly;
 - local-only profile rejects remote endpoint;

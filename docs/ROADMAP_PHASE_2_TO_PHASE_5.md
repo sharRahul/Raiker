@@ -4,20 +4,22 @@ This roadmap expands Raiker beyond the Phase 1 MVP into a full local-first agent
 
 The roadmap is an implementation schedule, not a placeholder for missing design. Every item listed here must already be backed by a detailed specification, contract, storage plan, security rule, UI surface, event model, and test plan in the related docs.
 
+Phase order does not define interface priority. CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and other governed clients are equal-status primary interfaces when implemented and enabled.
+
 ---
 
-## Phase 1: Secure Local TUI MVP
+## Phase 1: Secure Local Interface MVP
 
-Goal: prove the core loop and install the canonical global command that opens the TUI.
+Goal: prove the core loop and install the global `raiker` terminal command without making the terminal client the only primary interface.
 
 Features:
 
 - global `raiker` command;
-- minimal Rich TUI shell;
-- TUI prompt input;
-- TUI slash commands;
-- TUI approval cards;
-- contracts;
+- minimal terminal client shell, usually Rich TUI;
+- terminal prompt input;
+- terminal slash commands;
+- terminal approval cards;
+- equal-interface contracts;
 - SQLite bootstrap;
 - event log;
 - static policy;
@@ -27,24 +29,27 @@ Features:
 - mock model provider;
 - model profile registry;
 - channel connector profile registry;
+- Apple and Android mobile connector profiles as disabled Phase 3 profiles;
 - deterministic runtime;
 - checkpoint stub;
 - tests.
 
 Acceptance:
 
-- `raiker` launches the TUI;
-- a normal prompt typed inside the TUI reaches the gateway;
+- `raiker` launches the configured local terminal client;
+- a normal prompt typed inside the terminal client reaches the gateway;
 - `/launch --provider mock --model mock-deterministic` loads the mock profile;
 - `/channels` and `/models` list registry profiles;
+- Apple and Android mobile profiles are visible in the connector registry;
 - local action proposals that can affect the machine require approval;
-- event log and checkpoint are created.
+- event log and checkpoint are created;
+- no doc or test treats the terminal client as primary over another enabled interface.
 
 ---
 
 ## Phase 2: Rich Local Agent Workspace
 
-Goal: make Raiker useful as a local coding/research/work agent.
+Goal: make Raiker useful as a local coding/research/work agent while preserving equal-interface contracts.
 
 Features:
 
@@ -69,20 +74,21 @@ Features:
 
 Acceptance:
 
-- user can run a coding task in TUI;
+- user can run a coding task in the terminal client;
 - user can ask a status question while task continues;
 - user can approve/deny file edits;
 - user can rewind file change;
 - user can resume session;
 - user can use local model profile;
 - eidetic observation retention is enforced;
-- skill candidate cannot install without verification and approval.
+- skill candidate cannot install without verification and approval;
+- expanded terminal features do not create a gateway, policy, event, or runtime bypass.
 
 ---
 
-## Phase 3: Extensible Platform
+## Phase 3: Extensible Platform And Equal Primary Apps
 
-Goal: allow controlled extensibility and local platform UI.
+Goal: allow controlled extensibility and make Desktop, Web, Dashboard, Apple mobile app, Android mobile app, REST, and IDE equal primary interfaces.
 
 Features:
 
@@ -95,7 +101,10 @@ Features:
 - Desktop UI;
 - Web UI;
 - Dashboard;
+- Apple mobile app;
+- Android mobile app;
 - REST API;
+- IDE extension;
 - semantic memory;
 - graph/codemap index;
 - symbol/LSP tools;
@@ -110,13 +119,14 @@ Acceptance:
 - graph query informs context;
 - semantic memory retrieval is auditable;
 - REST client uses same gateway;
-- Desktop/Web dashboard displays tasks, approvals, memory, graph, storage, execution, channels, models, and security state.
+- Desktop/Web/Mobile/IDE clients use the same gateway, event stream, session state, policy checks, and action contracts;
+- Desktop/Web/Mobile dashboard displays tasks, approvals, memory, graph, storage, execution, channels, models, and security state.
 
 ---
 
 ## Phase 4: Multi-Channel And Multi-Agent
 
-Goal: support external interfaces and safe delegation.
+Goal: support external interfaces and safe delegation while preserving equal primary interface status.
 
 Features:
 
@@ -141,7 +151,8 @@ Acceptance:
 - subagent cannot exceed tools;
 - connector implementation can be absent while connector profile remains listable;
 - remote/container execution is denied unless profile configured;
-- all linked channels show pairing, sender trust, and rate-limit state in Dashboard.
+- all linked channels show pairing, sender trust, and rate-limit state in Dashboard;
+- enabled channel clients route actions through the same gateway and policy model as other primary interfaces.
 
 ---
 
@@ -165,8 +176,7 @@ Features:
 - security test suite;
 - red-team harness;
 - deployment guides;
-- admin dashboards;
-- mobile companion connector.
+- admin dashboards.
 
 Acceptance:
 
@@ -175,7 +185,7 @@ Acceptance:
 - budgets stop overconsumption;
 - event log tampering is detectable;
 - security tests run in CI;
-- mobile companion uses device pairing and scoped approvals.
+- managed governance preserves equal primary interface status unless policy explicitly restricts a capability across interfaces.
 
 ---
 
@@ -184,6 +194,8 @@ Acceptance:
 Every phase must preserve:
 
 - gateway-only client access;
+- equal primary interface status for every implemented and enabled client;
+- action parity through shared contracts;
 - tool-broker-only execution;
 - policy before action;
 - event logging;
@@ -193,7 +205,7 @@ Every phase must preserve:
 - user interruptibility;
 - verification;
 - documentation-first implementation;
-- global `raiker` TUI entry compatibility;
+- global `raiker` terminal entry compatibility;
 - connector and model registry compatibility.
 
 ---
@@ -210,4 +222,5 @@ Builder agents must not:
 - add subagent recursion without max depth;
 - bypass event log for performance;
 - treat a phase-scheduled roadmap item as current task scope unless the task explicitly targets that phase;
-- treat phase scheduling as missing specification.
+- treat phase scheduling as missing specification;
+- describe one interface as primary over another interface.

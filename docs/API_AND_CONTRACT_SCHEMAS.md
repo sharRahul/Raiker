@@ -4,6 +4,8 @@ This document is the builder-facing schema reference for Raiker. It does not rep
 
 All public contracts must be versioned. Unknown fields are rejected in Phase 1 unless a specific contract says otherwise.
 
+Raiker package/application versioning starts at `0.0.0`. Patch updates must progress through `0.0.1` to `0.0.99` before the project is bumped to `0.1.0`.
+
 ---
 
 ## ID Prefix Rules
@@ -38,7 +40,7 @@ Every interface-originated envelope must preserve client metadata:
 {
   "type": "tui",
   "name": "raiker-tui",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "interface_status": "equal_primary_when_enabled"
 }
 ```
@@ -85,7 +87,7 @@ Required fields:
   "client": {
     "type": "tui",
     "name": "raiker-tui",
-    "version": "0.1.0",
+    "version": "0.0.0",
     "interface_status": "equal_primary_when_enabled"
   },
   "user": {
@@ -100,7 +102,7 @@ Required fields:
   "options": {
     "planning_mode": "auto",
     "approval_mode": "interactive",
-    "model_profile": "mock",
+    "model_profile": "mock-test",
     "max_tool_calls": 10
   }
 }
@@ -125,7 +127,7 @@ Used for slash commands and interface actions such as `/models`, `/channels`, `/
   "client": {
     "type": "tui",
     "name": "raiker-tui",
-    "version": "0.1.0",
+    "version": "0.0.0",
     "interface_status": "equal_primary_when_enabled"
   },
   "action": {

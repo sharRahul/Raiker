@@ -118,7 +118,7 @@ flowchart TB
       subgraph KNOW["Memory, graph, and context boundary"]
         memory["Memory Service"]
         eidetic["Eidetic and Gist Memory"]
-        graph["Graph and Codemap Service"]
+        graph_["Graph and Codemap Service"]
         retrieval["FTS, Vector, and Graph Retrieval"]
       end
 
@@ -177,7 +177,7 @@ flowchart TB
 
   context --> memory
   context --> eidetic
-  context --> graph
+  context --> graph_
   context --> retrieval
 
   hooks --> policy
@@ -189,7 +189,7 @@ flowchart TB
   session --> sqlite
   runtime --> sqlite
   memory --> sqlite
-  graph --> sqlite
+  graph_ --> sqlite
   audit --> events
   checkpoints --> snapshot_store
   broker --> artifacts

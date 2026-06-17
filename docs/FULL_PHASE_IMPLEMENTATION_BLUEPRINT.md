@@ -22,36 +22,28 @@ README.md
   -> docs/VERIFICATION_PLAN.md
 ```
 
-For any task, the builder must identify:
-
-1. phase;
-2. task ID;
-3. files to change;
-4. contracts affected;
-5. storage affected;
-6. events emitted;
-7. policy gates;
-8. UI surface;
-9. tests;
-10. documentation updates.
+For any task, the builder must identify phase, task ID, files to change, contracts affected, storage affected, events emitted, policy gates, UI surface, tests, and documentation updates.
 
 ---
 
-## Phase 1: Secure Local CLI Core
+## Phase 1: Secure Local TUI Core
 
 ### User Experience
 
 - Global command: `raiker`.
-- One-shot CLI command: `raiker ask "..."`.
-- Interactive command: `raiker chat`.
-- Model launch command: `raiker launch --provider <provider> --model <model>`.
-- Plain terminal output.
-- Approval prompts rendered in terminal.
-- Event log path and checkpoint path shown after each turn.
+- Running `raiker` opens the Rich TUI.
+- Normal prompts are typed inside the TUI.
+- Side questions are typed inside the TUI with `?`.
+- Model launch and switching are done inside the TUI with `/launch` and `/models`.
+- Channel listing/linking is done inside the TUI with `/channels`.
+- Diagnostics are opened inside the TUI with `/doctor`.
+- Approval prompts are rendered as TUI approval cards.
+- Event log path and checkpoint path are visible in the TUI status/details panels after each turn.
 
 ### Runtime
 
 - PromptEnvelope validation.
+- UIActionEnvelope validation for TUI actions.
 - Session creation.
 - Deterministic state machine.
 - Tool broker.
@@ -67,7 +59,7 @@ For any task, the builder must identify:
 - `list_directory`.
 - `glob`.
 - `grep`.
-- `shell` as approval-required only.
+- local command proposal as approval-required only.
 
 ### Storage
 
@@ -90,11 +82,12 @@ For any task, the builder must identify:
 - policy;
 - broker;
 - runtime state machine;
-- global CLI command dispatch;
+- global `raiker` launches TUI;
+- TUI prompt path reaches gateway;
 - SQLite bootstrap;
 - connector registry load;
 - model profile registry load;
-- CLI smoke.
+- TUI smoke.
 
 ---
 
@@ -102,7 +95,7 @@ For any task, the builder must identify:
 
 ### User Experience
 
-- Rich TUI becomes primary interface.
+- Full Rich TUI becomes the primary interface.
 - Background tasks visible in task panel.
 - User can ask side questions without stopping active task.
 - Approval inbox.

@@ -2,6 +2,8 @@
 
 This plan decomposes Raiker Phase 1 into small implementation tasks suitable for local or cloud builder models.
 
+This document is the single source of truth for Phase 1 build scope. The previous Phase 1 alignment addendum has been merged into this plan so builders do not need to reconcile separate Phase 1 instructions.
+
 Phase 1 objective:
 
 ```text
@@ -12,38 +14,77 @@ The Phase 1 terminal client is the first implementation target only. It is not t
 
 ---
 
+## Phase 1 Alignment Rules
+
+### Phase Scheduling Rule
+
+Phase-scheduled features are fully specified elsewhere in the docs. Phase 1 does not wire those features into active behaviour, but it must preserve their contracts, registries, storage boundaries, gateway paths, event shapes, client metadata, and policy boundaries.
+
+A builder must not treat phase scheduling as missing design, lower priority interface status, or permission to create a terminal-only architecture.
+
+### Equal Primary Interface Rule
+
+All implemented and enabled clients are equal-status primary interfaces through the same Agent Gateway. This includes CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, chat clients, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and other governed clients.
+
+Phase 1 may implement the terminal client first, but no code, contract, event, policy rule, storage table, or runtime path may describe the terminal client as the only primary human interface or grant it a private bypass path.
+
+### Global Command Rule
+
+The final Phase 1 deliverable must expose the global `raiker` command. Running `raiker` must open the configured local terminal client.
+
+During early bootstrapping, module-based commands may be used temporarily, but they must be documented as temporary and must not replace the final global command requirement.
+
+### Builder Working Rule
+
+When working on Phase 1, a builder must:
+
+1. choose exactly one task ID from this plan;
+2. read the canonical implementation docs for that task;
+3. preserve equal-interface contracts even when only the terminal client is wired;
+4. implement the smallest production-quality change that satisfies the task;
+5. add or update tests for the task;
+6. report any temporary bootstrap limitation honestly instead of pretending the final command or integration exists.
+
+---
+
 ## Phase 1 Scope
 
 Included:
 
 - Python package scaffold;
-- global `raiker` command;
-- minimal terminal client shell, usually Rich TUI;
+- global `raiker` command entry point;
+- `raiker` opens the configured local terminal client, usually Rich TUI during early implementation;
+- minimal terminal client shell;
 - terminal prompt input;
 - terminal slash-command parser;
 - terminal approval cards;
+- terminal `/launch --provider mock --model mock-deterministic` profile resolution;
+- terminal `/channels` registry view;
+- terminal `/models` registry view;
 - contracts;
 - agent gateway;
 - session manager;
 - deterministic runtime state machine;
 - event log writer;
+- JSONL event log;
 - SQLite bootstrap;
 - static policy engine;
-- tool broker skeleton;
+- policy-gated tool broker skeleton;
 - `read_file` tool;
 - `list_directory` tool;
 - `glob` tool;
 - `grep` tool;
-- approval-gated local action proposal path;
+- approval-gated local command/action proposal path;
 - mock model provider;
 - model profile registry;
 - channel connector profile registry;
-- checkpoint service;
+- Apple and Android mobile app connector profiles as disabled Phase 3 profiles;
+- checkpoint service stub;
 - memory governance candidate path;
 - interface/client metadata preservation;
 - tests.
 
-Phase-scheduled but not wired in Phase 1:
+Phase-scheduled but not wired in Phase 1 unless a future task explicitly changes scope:
 
 - Desktop UI;
 - Web UI;
@@ -53,8 +94,10 @@ Phase-scheduled but not wired in Phase 1:
 - remote/container execution;
 - plugin execution;
 - durable vector memory writes;
+- semantic/vector write path;
 - graph runtime indexing;
 - autonomous agent teams;
+- subagent teams;
 - production authentication;
 - external channel implementations;
 - hosted model billing controls.
@@ -392,11 +435,13 @@ Phase 1 is complete when:
 - global `raiker` command opens the configured local terminal client;
 - terminal client can run a simple prompt;
 - terminal client can run safe filesystem query;
+- terminal client can resolve `/launch --provider mock --model mock-deterministic`;
+- terminal client can show `/channels` and `/models` registry views;
 - approval-gated local action is policy-gated;
 - event log is created for every turn;
 - checkpoint is created for every completed turn;
 - connector/model registries load and list inside terminal client;
-- connector registry includes Apple and Android mobile app profiles;
+- connector registry includes Apple and Android mobile app profiles as disabled Phase 3 profiles;
 - phase-scheduled features are not wired beyond the Phase 1 task scope;
 - docs remain consistent with implementation;
 - docs do not describe any interface as primary over another.
@@ -422,4 +467,4 @@ normal prompt: List files in this project
 /models
 ```
 
-If mypy or the global command is not configured yet during bootstrapping, document that explicitly rather than pretending it ran.
+If mypy or the global command is not configured yet during bootstrapping, document that explicitly rather than pretending it ran. During early packaging, module-based commands may be used temporarily, but the final Phase 1 deliverable must expose the global `raiker` command that opens the configured local terminal client.

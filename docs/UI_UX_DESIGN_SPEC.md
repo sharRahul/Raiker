@@ -76,7 +76,7 @@ The default Rich TUI starts simple so Phase 1 can ship a small, safe terminal cl
 ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
 │ > ? side question | / command | normal prompt | ! command proposal | @ file mention                                       │
 ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ RUNNING | task:docs | approvals:2 | model:qwen | ctx: ███████░░░░░░░ <used>% <used>/<max> | mem:project | net:block       │
+│ RUNNING | task:docs | approvals:2 | model:qwen | ctx: ███████░░░░░░░ 50% 18k/32k | mem:project | net:block              │
 └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -87,13 +87,13 @@ The TUI status bar must be configurable by user, project, workspace, managed pol
 Default fields, left to right:
 
 ```text
-STATE | task:<status> | approvals:<n> | model:<profile> | ctx: ███████░░░░░░░ <used>% <used>/<max> | mem:<scope> | net:<policy> | exec:<profile> | last:<event> | cost:<amount> | clock
+STATE | task:<status> | approvals:<n> | model:<profile> | ctx_bar: ███████░░░░░░░ <used>% | ctx:<used>/<max> | mem:<scope> | net:<policy> | exec:<profile> | last:<event> | cost:<amount> | clock
 ```
 
 Example:
 
 ```text
-RUNNING | task:docs-expansion | approvals:1 | model:qwen9b | ctx: ███████░░░░░░░ 50% 18k/32k | mem:project | net:blocked | exec:local | last:tool_completed | cost:£0.00 | 13:42
+RUNNING | task:docs-expansion | approvals:1 | model:qwen9b | ctx_bar: ███████░░░░░░░ 50% | ctx:18k/32k | mem:project | net:blocked | exec:local | last:tool_completed | cost:£0.00 | 13:42
 ```
 
 Status labels:
@@ -116,7 +116,8 @@ Configurable status item registry:
 | `task` | `task:docs-expansion` | active task store | visible |
 | `approvals` | `approvals:1` | approval queue | visible |
 | `model` | `model:qwen9b` | model profile registry/router | visible |
-| `context` | `ctx: 18k/32k 50%` | context budget tracker | visible |
+| `context_percent_bar` | `ctx_bar: ███████░░░░░░░ 50%` | context budget tracker | visible |
+| `context` | `ctx:18k/32k` | context budget tracker | visible |
 | `memory` | `mem:project` | memory/context policy | visible |
 | `network` | `net:blocked` | egress policy | visible |
 | `execution` | `exec:local` | execution profile | visible |
@@ -138,6 +139,7 @@ Configuration rules:
 4. The renderer must degrade gracefully for narrow terminals by moving lower-priority fields into a compact overflow indicator such as `+4`.
 5. The status bar must never show stale approval, stale policy, or stale network state after a task transition.
 6. Every visible field must derive from gateway/runtime/event/store state, not private UI-only state.
+7. `context_percent_bar` and `context` may be displayed together or separately; when shown together, the bar shows percentage used and `context` shows exact used/max values.
 
 Example configuration shape:
 
@@ -151,6 +153,7 @@ Example configuration shape:
       "task",
       "approvals",
       "model",
+      "context_percent_bar",
       "context",
       "network",
       "last_event",
@@ -169,9 +172,9 @@ Preset examples:
 | Preset | Purpose | Fields |
 |---|---|---|
 | `minimal` | Small terminals and low-noise use | `state`, `task`, `approvals`, `model`, `clock` |
-| `developer_compact` | Default local development | `state`, `task`, `approvals`, `model`, `context`, `network`, `last_event`, `clock` |
+| `developer_compact` | Default local development | `state`, `task`, `approvals`, `model`, `context_percent_bar`, `context`, `network`, `last_event`, `clock` |
 | `security_audit` | Security-heavy work | `state`, `task`, `approvals`, `policy`, `network`, `execution`, `last_event`, `checkpoint`, `cost`, `clock` |
-| `model_debug` | Model/runtime debugging | `state`, `model`, `context`, `tokens_in_out`, `tool_calls`, `last_event`, `cost`, `clock` |
+| `model_debug` | Model/runtime debugging | `state`, `model`, `context_percent_bar`, `context`, `tokens_in_out`, `tool_calls`, `last_event`, `cost`, `clock` |
 
 If terminal does not support colours, use text labels only. If terminal width is limited, prefer exact safety labels over decorative bars.
 
@@ -562,6 +565,8 @@ The status bar reflects **real-time system state** and is configured from the st
 * `STATE` changes per lifecycle
 * `task` reflects current activity
 * `approvals` increments when user action required
+* `context_percent_bar` updates the visual percentage-used bar from the active context budget
+* `context` updates the exact used/max token numbers from the active context budget
 * `last` shows most recent event
 * `cost` accumulates usage where available
 * configured fields re-render when their backing event/store state changes
@@ -569,12 +574,14 @@ The status bar reflects **real-time system state** and is configured from the st
 ### Context Usage Bar
 
 ```text
-ctx: ███████░░░░░░░ 50% 18k/32k
+ctx_bar: ███████░░░░░░░ 50%
+ctx:18k/32k
 ```
 
 * Updates continuously
-* Visual + numeric representation
-* Falls back to `ctx: 18k/32k 50%` when block rendering is unavailable
+* Visual + numeric percentage representation through `context_percent_bar`
+* Exact used/max representation through `context`
+* Falls back to `ctx_bar: 50%` and `ctx:18k/32k` when block rendering is unavailable
 
 ## Window Header Behaviour
 

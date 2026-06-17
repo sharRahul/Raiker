@@ -10,18 +10,19 @@ from raiker.contracts.models import AgentEvent, ClientMetadata, ContractValidati
 def test_valid_terminal_prompt_envelope() -> None:
     envelope = build_prompt_envelope("Hello")
     assert envelope.schema_version == "1.0"
+    assert envelope.client.version == "0.0.0"
     assert envelope.client.interface_status == "equal_primary_when_enabled"
 
 
 def test_phase_scheduled_client_types_are_valid() -> None:
     for client_type in ["desktop", "web_ui", "apple_mobile", "android_mobile", "rest", "slack"]:
-        client = ClientMetadata(type=client_type, name=f"raiker-{client_type}", version="0.1.0")
+        client = ClientMetadata(type=client_type, name=f"raiker-{client_type}", version="0.0.0")
         assert client.type == client_type
 
 
 def test_invalid_client_type_rejected() -> None:
     with pytest.raises(ContractValidationError):
-        ClientMetadata(type="terminal_only", name="bad", version="0.1.0")
+        ClientMetadata(type="terminal_only", name="bad", version="0.0.0")
 
 
 def test_invalid_planning_mode_rejected() -> None:

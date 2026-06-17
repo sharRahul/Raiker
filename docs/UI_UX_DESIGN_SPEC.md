@@ -59,23 +59,22 @@ The Rich TUI is one equal-status primary interface. It is not the primary human 
 
 ```text
 ┌──────────────────────────────────────── Raiker v0.0.0────────────────────────────────────────┐
-│ Session: sess_abc  Project: Raiker  Branch: main  Mode: Plan+Act                       │
-│ Model: qwen-local  Context: 18.2k/32k  Policy: default  Net: blocked  Mem: project     │
-├───────────────────────────────┬──────────────────────────────┬─────────────────────────┤
-│ Transcript                    │ Active Plan                  │ Approvals               │
-│ User: Add docs...             │ ✓ Inspect specs              │ pending: command check   │
-│ Assistant: Working...         │ ▶ Update architecture         │ pending: file snapshot   │
-│ Side Q: What is it doing?     │ • Verify docs                │                         │
-├───────────────────────────────┼──────────────────────────────┼─────────────────────────┤
-│ Tool / Event Stream           │ Task Progress                │ Context / Memory / Graph │
-│ action_proposed write_file    │ Task: docs expansion         │ Sources: 12              │
-│ policy_decision allow         │ Step 3/7  █████░░ 43%        │ Memory hits: 5           │
-│ checkpoint_created ckpt_123   │ Elapsed: 00:08:42            │ Graph nodes: 27          │
-├───────────────────────────────┴──────────────────────────────┴─────────────────────────┤
-│ ? side question | / command | normal prompt | ! command proposal | @ file mention       │
-├─────────────────────────────────────────────────────────────────────────────────────────┤
-│ RUNNING | task:docs | approvals:2 | model:qwen | ctx:18k/32k | mem:project | net:block │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
+│                               │ Recent Activity:                                             │
+│                               │ ✓ Inspect specs                                              │
+│ Hello / Welcome back <user>   │ ▶ Update architecture                                        │
+│                               │ • Verify docs                                                │
+│                               │                                                              │
+|                               │──────────────────────────────────────────────────────────────┤
+│                               │ What's new:                                                  │
+│                               │                                                              │
+│      <model> • <effort>       │                                                              │
+│        <workspace>            │                                                              │
+│                               │                                                              │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│ ? side question | / command | normal prompt | ! command proposal | @ file mention            │
+├──────────────────────────────────────────────────────────────────────────────────────────────┤
+│ RUNNING | task:docs | approvals:2 | model:qwen | ctx:18k/32k | mem:project | net:block       │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### TUI Status Bar

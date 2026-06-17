@@ -5,3 +5,4 @@
 .mypy_cache
 .claude
 cli_output.txt
+/raiker.egg-info

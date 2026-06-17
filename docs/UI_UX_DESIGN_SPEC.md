@@ -58,7 +58,7 @@ The Rich TUI is one equal-status primary interface. It is not the primary human 
 ### Default Layout
 
 ```text
-┌──────────────────────────────────────── Raiker v0.0.0─────────────────────────────────────────────────────────────────────┐
+┌──────── Raiker v0.0.0 ────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                               │ Recent Activity:                                                                          │
 │                               │ ✓ Inspect specs                                                                           │
 │ Hello / Welcome back <user>   │ ▶ Update architecture                                                                     │

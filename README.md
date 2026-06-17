@@ -1,4 +1,3 @@
-
 # Raiker
 
 **Raiker** is a local-first AI agent platform designed to run as a secure, observable, extensible agent operating layer on a personal workstation, home lab, or governed enterprise environment.
@@ -16,6 +15,34 @@ Just Ask
   -> Raiker verifies the result
   -> Raiker records every action
   -> Raiker updates governed long-term memory only when appropriate
+```
+
+---
+
+## Implementation Documentation Map
+
+Raiker is intended to be implemented by AI coding agents, including smaller local or cloud models. The README explains the product vision, but builders must use the detailed documents below before writing code.
+
+| Document | Purpose |
+|---|---|
+| [`docs/LOCAL_LLM_BUILDER_GUIDE.md`](docs/LOCAL_LLM_BUILDER_GUIDE.md) | Operating rules, prompt template, and anti-drift checklist for Qwen/Gemma-class builder agents. |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Implementation-ready architecture, component responsibilities, data flow, invariants, and Phase 1 boundaries. |
+| [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Explicit contracts for prompt envelopes, events, plans, tool actions, policy decisions, tool results, responses, and checkpoints. |
+| [`docs/PHASE_1_MVP_BUILD_PLAN.md`](docs/PHASE_1_MVP_BUILD_PLAN.md) | Task-by-task Phase 1 build plan with acceptance criteria suitable for local LLM builders. |
+| [`docs/SECURITY_AND_POLICY.md`](docs/SECURITY_AND_POLICY.md) | Security model, policy matrix, path safety, shell approval, memory governance, and security tests. |
+| [`docs/VERIFICATION_PLAN.md`](docs/VERIFICATION_PLAN.md) | Test strategy, expected event sequences, PR checklist, and local LLM evaluation scenarios. |
+| [`docs/ADR_TEMPLATE.md`](docs/ADR_TEMPLATE.md) | Template for documenting design decisions instead of silently inventing behaviour. |
+
+Recommended builder order:
+
+```text
+README.md
+  -> docs/LOCAL_LLM_BUILDER_GUIDE.md
+  -> docs/ARCHITECTURE.md
+  -> docs/CONTRACTS.md
+  -> docs/SECURITY_AND_POLICY.md
+  -> docs/PHASE_1_MVP_BUILD_PLAN.md
+  -> docs/VERIFICATION_PLAN.md
 ```
 
 ---
@@ -105,6 +132,8 @@ The nested design is intentional:
 - The **agent core** reasons, plans, acts, verifies, and delegates.
 - The **execution layer** runs commands only through approved adapters.
 - The **persistence layer** stores logs, checkpoints, memory, vectors, graphs, and artifacts.
+
+For implementation details, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
@@ -240,6 +269,8 @@ Raiker’s security layer is designed around common GenAI and agentic risks:
 
 High-risk actions require explicit approval unless a policy grants them.
 
+For implementation details, see [`docs/SECURITY_AND_POLICY.md`](docs/SECURITY_AND_POLICY.md).
+
 ---
 
 ## Non-Deviation Rules for Builder Agents
@@ -276,6 +307,8 @@ The first implementation phase should build only:
 - unit tests
 
 Future features should be added only as stubs or interfaces until their phase.
+
+For the detailed task-by-task plan, see [`docs/PHASE_1_MVP_BUILD_PLAN.md`](docs/PHASE_1_MVP_BUILD_PLAN.md).
 
 ---
 

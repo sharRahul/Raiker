@@ -171,6 +171,7 @@ risk_classified
 context_gathered
 plan_skipped or plan_created
 action_proposed
+action_validated
 policy_decision
 tool_started
 tool_completed
@@ -179,6 +180,8 @@ response_created
 checkpoint_created
 turn_closed
 ```
+
+A denied filesystem query must include `policy_decision` and must not include `tool_started`.
 
 ---
 
@@ -192,13 +195,14 @@ risk_classified
 context_gathered
 plan_created
 action_proposed
+action_validated
 policy_decision
 approval_requested
 response_created
 turn_closed
 ```
 
-The sequence must not include `tool_started` unless explicit user approval was supplied.
+The sequence must not include `tool_started` unless explicit user approval was supplied and the task scope includes executing that action.
 
 ---
 

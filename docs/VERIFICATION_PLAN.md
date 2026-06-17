@@ -25,6 +25,18 @@ Raiker verification must prove that:
 
 ---
 
+## CI Gate
+
+Every implementation PR must pass CI before merging:
+
+```bash
+python -m pytest
+python -m ruff check .
+python -m mypy raiker apps tests
+```
+
+CI runs on `ubuntu-latest` with Python 3.11. See `.github/workflows/ci.yml`.
+
 ## Required Validation Commands
 
 Use these commands once tooling exists:
@@ -213,6 +225,7 @@ For every PR, check:
 - [ ] Does the change map to a task ID and build phase?
 - [ ] Are docs updated if behaviour changed?
 - [ ] Are tests included?
+- [ ] Does CI pass on the branch?
 - [ ] Are phase-scheduled features left unwired unless this task explicitly targets them?
 - [ ] Are tool actions policy-reviewed?
 - [ ] Are security events logged?

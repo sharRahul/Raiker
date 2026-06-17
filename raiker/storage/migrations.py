@@ -50,7 +50,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   progress_percent INTEGER,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  completed_at TEXT
+  completed_at TEXT,
+  summary TEXT
 );
 
 CREATE TABLE IF NOT EXISTS events_index (
@@ -154,4 +155,10 @@ CREATE TABLE IF NOT EXISTS checkpoints (
   can_restore_state INTEGER NOT NULL,
   can_restore_files INTEGER NOT NULL
 );
+"""
+
+PHASE_2_MIGRATION_ID = "RAIKER-1101-phase2-task-summary"
+
+PHASE_2_MIGRATION_SQL = """
+ALTER TABLE tasks ADD COLUMN summary TEXT;
 """

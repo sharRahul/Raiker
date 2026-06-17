@@ -118,6 +118,55 @@ If a builder needs to violate this order for bootstrap reasons, it must document
 
 ---
 
+## Phase 2 Dependency Graph
+
+```text
+RAIKER-1001 Phase 2 plan
+  -> RAIKER-1002 CI baseline
+    -> RAIKER-1101 task contract + storage
+      -> RAIKER-1102 task manager
+        -> RAIKER-1103 task events
+    -> RAIKER-1601 event query service
+      -> RAIKER-1602 /events command
+    -> RAIKER-1701 /status and /tasks
+    -> RAIKER-1501 checkpoint timeline
+  -> RAIKER-1201 side-question contract
+    -> RAIKER-1202 side-question runtime
+  -> RAIKER-1301 interrupt/steer contracts
+    -> RAIKER-1302 safe-boundary handling
+  -> RAIKER-1401 approval inbox
+    -> RAIKER-1402 approval commands
+  -> RAIKER-1502 checkpoint restore/fork
+  -> RAIKER-1801 stat_path/diff_files
+    -> RAIKER-1802 write/edit/patch with snapshots
+  -> RAIKER-1901 git wrappers
+  -> RAIKER-2001 provider health check
+    -> RAIKER-2002 Ollama detection
+  -> RAIKER-2101 memory candidate listing
+    -> RAIKER-2201 integration validation
+```
+
+---
+
+## Phase 2 Build Slices
+
+| Slice | Task IDs | Output | Must not do |
+|---|---|---|---|
+| Foundation | RAIKER-1001 to RAIKER-1002 | CI, status ledger, build plan | No runtime behaviour change. |
+| Task management | RAIKER-1101 to RAIKER-1103 | Task storage, manager, events | No tool execution. |
+| Event viewer | RAIKER-1601 to RAIKER-1602 | Event query service and /events | No event log mutation. |
+| Terminal inspection | RAIKER-1701, RAIKER-1501 | /status, /tasks, /checkpoints | No restore/fork execution. |
+| Side questions | RAIKER-1201 to RAIKER-1202 | Child-turn contract and runtime | No active task mutation. |
+| Interrupt/steer | RAIKER-1301 to RAIKER-1302 | Interrupt contracts and safe-boundary | No silent cancellation. |
+| Approvals | RAIKER-1401 to RAIKER-1402 | Approval inbox and commands | No auto-approval. |
+| File tools | RAIKER-1801 to RAIKER-1802 | stat_path, diff_files, write/patch proposal | No unrestricted file mutation. |
+| Git wrappers | RAIKER-1901 | Git status/diff/log with policy | No git push/merge without approval. |
+| Model providers | RAIKER-2001 to RAIKER-2002 | Health check, Ollama detection | No hosted model calls. |
+| Memory | RAIKER-2101 | Memory candidate listing | No durable memory writes. |
+| Validation | RAIKER-2201 | Integration tests and status update | No unverified completion claim. |
+
+---
+
 ## Builder Stop Conditions
 
 A builder must stop and update documentation before coding if:

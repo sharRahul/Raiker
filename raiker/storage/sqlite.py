@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 from dataclasses import dataclass
@@ -13,9 +14,15 @@ from raiker.contracts.models import (
     ConnectorProfile,
     ModelProfile,
     PolicyDecision,
+    TaskRecord,
     ToolAction,
 )
-from raiker.storage.migrations import PHASE_1_MIGRATION_ID, PHASE_1_SQL
+from raiker.storage.migrations import (
+    PHASE_1_MIGRATION_ID,
+    PHASE_1_SQL,
+    PHASE_2_MIGRATION_ID,
+    PHASE_2_MIGRATION_SQL,
+)
 
 
 @dataclass(frozen=True)
@@ -72,6 +79,18 @@ class SQLiteStore:
                 "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
                 (PHASE_1_MIGRATION_ID, utc_now()),
             )
+            self._apply_migration(PHASE_2_MIGRATION_ID, PHASE_2_MIGRATION_SQL, connection)
+
+    def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
+        row = connection.execute("SELECT applied_at FROM migrations WHERE migration_id = ?", (migration_id,)).fetchone()
+        if row is not None:
+            return
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.executescript(sql)
+        connection.execute(
+            "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
+            (migration_id, utc_now()),
+        )
 
     def table_names(self) -> set[str]:
         with self.connect() as connection:
@@ -94,6 +113,11 @@ class SQLiteStore:
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
         return dict(row) if row else None
+
+    def list_sessions(self, limit: int = 10) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute("SELECT * FROM sessions ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(row) for row in rows]
 
     def insert_turn(self, session_id: str, turn_id: str, prompt_text: str, status: str = "running") -> None:
         with self.connect() as connection:
@@ -254,3 +278,127 @@ class SQLiteStore:
                         now,
                     ),
                 )
+
+    def insert_task(self, task: TaskRecord) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO tasks
+                (task_id, session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    task.task_id,
+                    task.session_id,
+                    task.parent_turn_id,
+                    task.parent_task_id,
+                    task.title,
+                    task.objective,
+                    task.status,
+                    task.current_step,
+                    task.progress_percent,
+                    task.created_at,
+                    task.updated_at,
+                    task.completed_at,
+                ),
+            )
+
+    def load_task(self, task_id: str) -> TaskRecord | None:
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,)).fetchone()
+        if row is None:
+            return None
+        return TaskRecord(**dict(row))
+
+    def list_tasks(self, session_id: str | None = None, status: str | None = None) -> list[TaskRecord]:
+        query = "SELECT * FROM tasks"
+        params: list[Any] = []
+        conditions: list[str] = []
+        if session_id is not None:
+            conditions.append("session_id = ?")
+            params.append(session_id)
+        if status is not None:
+            conditions.append("status = ?")
+            params.append(status)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [TaskRecord(**dict(row)) for row in rows]
+
+    def _update_task(self, task_id: str, **updates: str | int | None) -> None:
+        now = utc_now()
+        updates["updated_at"] = now
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [task_id]
+        with self.connect() as connection:
+            connection.execute(f"UPDATE tasks SET {set_clause} WHERE task_id = ?", values)
+
+    def update_task_progress(self, task_id: str, current_step: str, progress_percent: int) -> None:
+        self._update_task(task_id, current_step=current_step, progress_percent=progress_percent)
+
+    def complete_task(self, task_id: str, summary: str | None = None) -> None:
+        now = utc_now()
+        self._update_task(task_id, status="completed", completed_at=now, summary=summary)
+
+    def fail_task(self, task_id: str, reason: str) -> None:
+        now = utc_now()
+        self._update_task(task_id, status="failed", completed_at=now, summary=reason)
+
+    def cancel_task(self, task_id: str, reason: str) -> None:
+        now = utc_now()
+        self._update_task(task_id, status="cancelled", completed_at=now, summary=reason)
+
+    def list_event_index(
+        self,
+        session_id: str | None = None,
+        turn_id: str | None = None,
+        task_id: str | None = None,
+        event_type: str | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        query = "SELECT * FROM events_index"
+        params: list[Any] = []
+        conditions: list[str] = []
+        if session_id is not None:
+            conditions.append("session_id = ?")
+            params.append(session_id)
+        if turn_id is not None:
+            conditions.append("turn_id = ?")
+            params.append(turn_id)
+        if task_id is not None:
+            conditions.append("task_id = ?")
+            params.append(task_id)
+        if event_type is not None:
+            conditions.append("event_type = ?")
+            params.append(event_type)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(str(limit))
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_event_index(self, event_id: str) -> dict | None:
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM events_index WHERE event_id = ?", (event_id,)).fetchone()
+        return dict(row) if row else None
+
+    def list_checkpoints(self, session_id: str | None = None, limit: int = 50) -> list[dict]:
+        query = "SELECT * FROM checkpoints"
+        params: list[Any] = []
+        if session_id is not None:
+            query += " WHERE session_id = ?"
+            params.append(session_id)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(str(limit))
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_checkpoint_by_id(self, checkpoint_id: str) -> dict | None:
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM checkpoints WHERE checkpoint_id = ?", (checkpoint_id,)).fetchone()
+        return dict(row) if row else None

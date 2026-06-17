@@ -27,12 +27,15 @@ Raiker is intended to be implemented by AI coding agents, including smaller loca
 
 | Document | Purpose |
 |---|---|
-| [`docs/FEATURE_COVERAGE_MATRIX.md`](docs/FEATURE_COVERAGE_MATRIX.md) | Full platform feature coverage checklist and non-negotiable invariants. |
+| [`docs/FEATURE_COVERAGE_MATRIX.md`](docs/FEATURE_COVERAGE_MATRIX.md) | Full platform feature coverage checklist, phase placement, and non-negotiable invariants. |
 | [`docs/REFERENCE_PLATFORM_COMPATIBILITY.md`](docs/REFERENCE_PLATFORM_COMPATIBILITY.md) | Mapping from reference systems and concepts to Raiker specifications. |
 | [`docs/LOCAL_LLM_BUILDER_GUIDE.md`](docs/LOCAL_LLM_BUILDER_GUIDE.md) | Operating rules, prompt template, and anti-drift checklist for Qwen/Gemma-class builder agents. |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Implementation-ready architecture, component responsibilities, data flow, invariants, and Phase 1 boundaries. |
 | [`docs/CONTRACTS.md`](docs/CONTRACTS.md) | Explicit contracts for prompt envelopes, events, plans, tool actions, policy decisions, tool results, responses, and checkpoints. |
 | [`docs/RUNTIME_ORCHESTRATION_SPEC.md`](docs/RUNTIME_ORCHESTRATION_SPEC.md) | Deterministic runtime, background task, interrupt, side-question, verification, and orchestration rules. |
+| [`docs/UI_UX_DESIGN_SPEC.md`](docs/UI_UX_DESIGN_SPEC.md) | TUI, status bar, Desktop UI, Web UI, Dashboard, IDE, Voice UI, and shared UX design. |
+| [`docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md`](docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md) | SQLite schema, event indexing, memory tables, FTS5, semantic search, graph tables, recursive CTEs, and backup/export. |
+| [`docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`](docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md) | Fully documented Phase 1 to Phase 5 implementation blueprint. |
 | [`docs/TOOLS_AND_PERMISSIONS_SPEC.md`](docs/TOOLS_AND_PERMISSIONS_SPEC.md) | Tool catalogue, broker lifecycle, approval modes, permission scopes, shell policy, and testing rules. |
 | [`docs/HOOKS_SPEC.md`](docs/HOOKS_SPEC.md) | Hook lifecycle events, handlers, matchers, async hooks, decision authority, and hook security. |
 | [`docs/PLUGIN_SYSTEM_SPEC.md`](docs/PLUGIN_SYSTEM_SPEC.md) | Plugin manifests, components, permissions, trust levels, lifecycle, and supply-chain controls. |
@@ -50,48 +53,24 @@ Raiker is intended to be implemented by AI coding agents, including smaller loca
 | [`docs/VERIFICATION_PLAN.md`](docs/VERIFICATION_PLAN.md) | Test strategy, expected event sequences, PR checklist, and local LLM evaluation scenarios. |
 | [`docs/ADR_TEMPLATE.md`](docs/ADR_TEMPLATE.md) | Template for documenting design decisions instead of silently inventing behaviour. |
 
-Recommended builder order:
-
-```text
-README.md
-  -> FEATURE_COVERAGE_MATRIX.md
-  -> REFERENCE_PLATFORM_COMPATIBILITY.md
-  -> LOCAL_LLM_BUILDER_GUIDE.md
-  -> ARCHITECTURE.md
-  -> CONTRACTS.md
-  -> SECURITY_AND_POLICY.md
-  -> RUNTIME_ORCHESTRATION_SPEC.md
-  -> TOOLS_AND_PERMISSIONS_SPEC.md
-  -> HOOKS_SPEC.md
-  -> PLUGIN_SYSTEM_SPEC.md
-  -> CHANNELS_SPEC.md
-  -> COMMANDS_AND_INTERACTIVE_MODE_SPEC.md
-  -> CHECKPOINTING_AND_REWIND_SPEC.md
-  -> MEMORY_AND_CONTEXT_STRATEGY.md
-  -> GRAPH_MEMORY_AND_CODEMAP_SPEC.md
-  -> MODEL_RUNTIME_AND_LOCAL_INFERENCE.md
-  -> EXECUTION_ENVIRONMENTS_SPEC.md
-  -> OWASP_GENAI_SECURITY_MAPPING.md
-  -> PHASE_1_MVP_BUILD_PLAN.md
-  -> ROADMAP_PHASE_2_TO_PHASE_5.md
-  -> VERIFICATION_PLAN.md
-```
-
 ---
 
-## Why Raiker Exists
+## Documentation-First Rule
 
-Modern AI coding agents are powerful, but they often have several gaps:
+Implementation can be phased, but specification cannot be vague. Every feature must define:
 
-- They may rely heavily on cloud models.
-- They may not preserve useful memory across long periods.
-- They may lack strong security boundaries around shell, files, plugins, channels, and network access.
-- They may not provide OS-like event logs for every action.
-- They may treat terminal, chat, desktop, web, IDE, API, and external channels as separate products instead of equal clients.
-- They may stop work when the user asks a side question instead of answering without corrupting the active task.
-- They may drift when smaller local models are used to implement complex systems.
+1. user experience;
+2. contract/schema;
+3. storage;
+4. runtime lifecycle;
+5. security policy;
+6. events;
+7. tests;
+8. UI surface;
+9. failure handling;
+10. migration or upgrade impact.
 
-Raiker is designed to solve those problems with a **local-first, policy-gated, event-sourced, checkpointable agent runtime**.
+A feature is not considered ready for implementation until those ten areas are documented.
 
 ---
 
@@ -106,17 +85,17 @@ Raiker is not tied to one interface. CLI, rich TUI, desktop, web, IDE, voice, ho
 ### 3. Rich interruptible UX
 Raiker must support background work, progress visibility, side questions, pause, cancel, steer, approve, deny, rewind, fork, and inspect without losing task state.
 
-### 4. Security and privacy are architectural layers
+### 4. Concrete storage design
+Raiker uses local storage with SQLite for state/search/index metadata, JSONL for append-only event logs, checkpoint manifests and file snapshots for recovery, and local vector/graph indexes where needed.
+
+### 5. Security and privacy are architectural layers
 Tool execution, memory writes, plugin actions, channel messages, remote calls, shell commands, and external execution all pass through policy.
 
-### 5. OS-like event logging
+### 6. OS-like event logging
 Every prompt, model call, tool proposal, approval, denial, tool result, hook, plugin action, channel message, memory write, checkpoint, subagent event, verification result, and error is recorded.
 
-### 6. Durable but governed memory
+### 7. Durable but governed memory
 Raiker can remember across sessions, months, and years, but memory is governed by provenance, confidence, sensitivity, retention, trust score, approval state, correction, and deletion.
-
-### 7. Documentation-first implementation
-Every feature must have contracts, lifecycle, security rules, events, tests, and roadmap phase before implementation.
 
 ---
 
@@ -166,15 +145,6 @@ Interface and Channel Layer
         Execution Adapters
 ```
 
-The nested design is intentional:
-
-- clients and channels never execute tools directly;
-- event logging wraps meaningful activity;
-- security and privacy mediate risky operations;
-- the runtime reasons, plans, acts, verifies, checkpoints, and delegates;
-- execution adapters run commands only through approved profiles;
-- persistence stores logs, checkpoints, memory, vectors, graphs, and artifacts.
-
 ---
 
 ## Phase 1 MVP
@@ -185,6 +155,7 @@ Phase 1 builds only the secure local core:
 - contracts;
 - event log writer;
 - static policy engine;
+- SQLite bootstrap;
 - tool broker skeleton;
 - read_file;
 - list_directory;
@@ -197,7 +168,7 @@ Phase 1 builds only the secure local core:
 - checkpoint stub;
 - unit tests.
 
-Future features are fully specified in docs but must be added according to the roadmap.
+Later phases are fully specified in the docs listed above and must be implemented according to the phase blueprint.
 
 ---
 

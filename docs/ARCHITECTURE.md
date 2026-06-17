@@ -20,8 +20,11 @@ Raiker must provide:
 8. resumable checkpoints and rewind/fork flows;
 9. testable contracts;
 10. SQLite-backed state, memory, graph, and search metadata;
-11. rich interruptible UX across CLI, TUI, Desktop, Web, IDE, Voice, and Channels;
-12. small-model-friendly implementation boundaries.
+11. rich interruptible UX across CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and Channels;
+12. equal primary-interface status for every implemented and enabled client;
+13. small-model-friendly implementation boundaries.
+
+No user interface is architecturally primary over another. Interface implementation can be phased, but phase order must not create privileged runtime paths.
 
 ---
 
@@ -40,21 +43,21 @@ Raiker uses phased delivery. A later build phase does **not** mean vague design.
 9. failure handling;
 10. migration or upgrade impact.
 
-Phase boundaries exist to control implementation order, not to hide missing design.
+Phase boundaries exist to control implementation order, not to hide missing design or define interface priority.
 
 | Phase | Build focus | Required architectural state |
 |---|---|---|
-| Phase 1 | Secure Local TUI Core | Contracts, gateway, sessions, runtime, policy, broker, event log, SQLite bootstrap, Rich TUI shell, mock model, checkpoint stub. |
-| Phase 2 | Rich Local Workspace | Full Rich TUI panels, background tasks, side questions, full checkpoints/rewind, local model providers, hooks, approved project/profile memory. |
-| Phase 3 | Desktop/Web/Plugin/Graph Platform | Desktop UI, Web UI, Dashboard, plugin manager, semantic search, graph/codemap, REST API, worktree isolation. |
-| Phase 4 | Channels/Multi-Agent/Remote Execution | Channel connectors, subagents, agent teams, container/remote profiles, voice/hotkeys/browser extension. |
+| Phase 1 | Secure Local Interface Core | Contracts, gateway, sessions, runtime, policy, broker, event log, SQLite bootstrap, first local terminal client, mock model, checkpoint stub, equal-interface contracts. |
+| Phase 2 | Rich Local Workspace | Full terminal/TUI panels, background tasks, side questions, full checkpoints/rewind, local model providers, hooks, approved project/profile memory. |
+| Phase 3 | Desktop/Web/Mobile/Plugin/Graph Platform | Desktop UI, Web UI, Dashboard, Apple mobile app, Android mobile app, plugin manager, semantic search, graph/codemap, REST API, worktree isolation. |
+| Phase 4 | Channels/Multi-Agent/Remote Execution | Channel connectors, subagents, agent teams, container/remote profiles, voice/hotkeys/browser extension, chat/email clients. |
 | Phase 5 | Governed Enterprise/Home-Lab Platform | Managed policies, multi-user governance, signed plugins, event integrity, audit export, cloud/GPU budgets, deployment operations. |
 
 ### Phase 1 Exclusions Are Implementation Exclusions Only
 
-Phase 1 does not wire these features into user-facing behaviour: Desktop UI, Web UI, Dashboard, plugin marketplace, autonomous multi-agent teams, durable vector/graph memory writes, cloud deployment, container/remote execution, external messaging channels, voice channels, or production hosted-model billing controls.
+Phase 1 does not wire these features into active behaviour: Desktop UI, Web UI, Dashboard, Apple mobile app, Android mobile app, plugin marketplace, autonomous multi-agent teams, durable vector/graph memory writes, cloud deployment, container/remote execution, external messaging channels, voice channels, or production hosted-model billing controls.
 
-However, Phase 1 must still preserve the contracts, registries, storage hooks, policy boundaries, and extension points that make those phase-scheduled features implementable without redesign.
+However, Phase 1 must still preserve the contracts, registries, storage hooks, policy boundaries, and extension points that make those phase-scheduled features implementable without redesign. Those phase-scheduled interfaces are equal primary interfaces once implemented and enabled.
 
 ---
 
@@ -82,7 +85,7 @@ Interface and Channel Layer
       -> SQLite State Store
 ```
 
-Every client talks to the gateway. No client can call tools directly.
+Every client talks to the gateway. No client can call tools directly. No client gets a private bypass path because it was implemented earlier or has a richer UI.
 
 ---
 
@@ -90,7 +93,7 @@ Every client talks to the gateway. No client can call tools directly.
 
 ### Agent Gateway
 
-Responsible for accepting `PromptEnvelope` and `ChannelMessageEnvelope` input, validating request shape, assigning request IDs if missing, forwarding requests to the session manager, and returning an `AgentEvent` stream or final `AgentResponse`.
+Responsible for accepting `PromptEnvelope`, `UIActionEnvelope`, and `ChannelMessageEnvelope` input from any enabled primary interface, validating request shape, assigning request IDs if missing, forwarding requests to the session manager, and returning an `AgentEvent` stream or final `AgentResponse` to the originating interface.
 
 Must not execute tools, call models directly, write memory directly, bypass event logging, or accept channel approval without approval binding.
 
@@ -118,7 +121,7 @@ RECEIVED
   -> CLOSED
 ```
 
-The runtime must expose state transitions in logs, SQLite state, TUI status, and tests.
+The runtime must expose state transitions in logs, SQLite state, interface status surfaces, and tests.
 
 ### Context Gatherer
 
@@ -170,42 +173,42 @@ Responsible for memory candidates, durable memory records, provenance, sensitivi
 
 ---
 
-## Data Flow For A Phase 1 TUI Prompt
+## Data Flow For Any Interface Prompt
 
 ```text
-1. User runs global `raiker` command.
-2. Raiker opens the Rich TUI.
-3. User submits a normal prompt, slash command, side question, approval choice, model action, channel action, memory action, graph query, checkpoint action, or diagnostics action inside the TUI.
-4. TUI builds a PromptEnvelope, UIActionEnvelope, or ChannelMessageEnvelope.
-5. AgentGateway validates envelope.
-6. SessionManager opens or creates session.
-7. Runtime logs prompt_received or ui_action_received.
-8. Runtime classifies intent and risk.
-9. Runtime gathers context.
-10. Runtime creates or skips plan.
-11. Runtime proposes actions.
-12. PolicyEngine reviews actions.
-13. ToolBroker executes approved actions or pauses for approval.
-14. Runtime verifies result.
-15. Runtime updates the TUI stream/panels.
-16. CheckpointService writes checkpoint.
-17. EventLogWriter records all events.
-18. SQLite state store indexes session, turn, events, task, action, approval, and checkpoint metadata.
+1. User acts through any enabled primary interface.
+2. Interface captures prompt, command/action, side question, approval choice, model action, channel action, memory action, graph query, checkpoint action, diagnostics action, or task control.
+3. Interface builds a PromptEnvelope, UIActionEnvelope, or ChannelMessageEnvelope with client metadata.
+4. AgentGateway validates envelope.
+5. SessionManager opens or creates session.
+6. Runtime logs prompt_received, ui_action_received, or channel_message_received.
+7. Runtime classifies intent and risk.
+8. Runtime gathers context.
+9. Runtime creates or skips plan.
+10. Runtime proposes actions.
+11. PolicyEngine reviews actions.
+12. ToolBroker executes approved actions or pauses for approval.
+13. Runtime verifies result.
+14. Runtime updates event stream and interface state.
+15. CheckpointService writes checkpoint.
+16. EventLogWriter records all events.
+17. SQLite state store indexes session, turn, events, task, action, approval, and checkpoint metadata.
+18. Response, side answer, task update, approval request, or diagnostic result is returned to the originating interface and any subscribed linked interfaces allowed by policy.
 ```
 
 ---
 
-## Global Command And Launch Architecture
+## Global Command And Local Terminal Launch Architecture
 
-Raiker must install one human-facing global command named `raiker`.
+Raiker must install one human-facing global command named `raiker` as the local terminal entry point.
 
 ```bash
 raiker
 ```
 
-Running `raiker` launches the Rich TUI. All normal user actions happen inside the TUI through prompt input, side-question input, slash commands, approval cards, model/profile panels, channel-linking panels, memory panels, graph panels, checkpoint panels, diagnostics panels, and task controls.
+Running `raiker` launches the configured local terminal client. The default terminal client may be a Rich TUI, but it is not the canonical or exclusive human interface.
 
-Required TUI actions:
+Required terminal actions:
 
 ```text
 normal prompt: "List files in this project"
@@ -221,7 +224,9 @@ checkpoints: /checkpoints
 doctor: /doctor
 ```
 
-Provider-specific convenience launchers, including a platform adapter that accepts a command shaped like `ollama launch raiker --model <model>`, may delegate into a Raiker model-launch request when that platform supports such extension behaviour. Documentation and tests must keep the canonical human entry point as `raiker`.
+Every terminal action above must have an equivalent action contract available to Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, chat channels, Email, Browser Extension, Apple mobile app, Android mobile app, and Mobile Companion when those interfaces are implemented and enabled.
+
+Provider-specific convenience launchers, including a platform adapter that accepts a command shaped like `ollama launch raiker --model <model>`, may delegate into a Raiker model-launch request when that platform supports such extension behaviour. Documentation and tests must keep the equal-interface invariant intact.
 
 ---
 
@@ -231,7 +236,7 @@ These choices minimise drift and complexity while preserving the full architectu
 
 - Language: Python 3.11 or 3.12.
 - Package manager: uv or pip with a lockfile.
-- TUI: Textual, Rich, or a minimal dependency-free terminal renderer. Prefer the smallest implementation that supports panels and input safely.
+- Terminal client: Textual, Rich, or a minimal dependency-free terminal renderer. Prefer the smallest implementation that supports panels and input safely.
 - Data validation: Pydantic or dataclasses. Use one consistently.
 - Tests: pytest.
 - Event log: JSONL files plus SQLite indexes.
@@ -273,7 +278,7 @@ tests/
   test_policy_engine.py
   test_tool_broker.py
   test_runtime_state_machine.py
-  test_tui_smoke.py
+  test_terminal_client_smoke.py
   test_storage_sqlite.py
   test_channel_connector_registry.py
 ```
@@ -290,11 +295,12 @@ These must be tested:
 4. A risky action requiring approval pauses instead of executing.
 5. Runtime state transitions happen in valid order.
 6. A checkpoint is written after a completed turn.
-7. The `raiker` TUI path uses the same gateway as every scheduled client and channel.
+7. Every enabled primary interface uses the same gateway, contracts, policy, event log, and session state.
 8. The model router can use a deterministic mock provider.
-9. The global `raiker` command launches the TUI and the TUI can create a PromptEnvelope and reach the gateway.
+9. The global `raiker` command launches the configured local terminal client and can create a PromptEnvelope that reaches the gateway.
 10. Connector profiles can be listed even before connector implementations are enabled.
 11. SQLite state indexes events written to JSONL.
+12. No interface is allowed to bypass or outrank another interface because of phase order, implementation order, or UI richness.
 
 ---
 

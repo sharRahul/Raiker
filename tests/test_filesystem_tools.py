@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from raiker.tools.filesystem import FilesystemSafetyError, glob_paths, grep_files, list_directory, read_file
+from raiker.tools.filesystem import (
+    FilesystemSafetyError,
+    glob_paths,
+    grep_files,
+    list_directory,
+    read_file,
+)
 
 
 def test_read_file_success_missing_binary_and_denial(tmp_path) -> None:  # type: ignore[no-untyped-def]

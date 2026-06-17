@@ -1,8 +1,8 @@
 # UI And UX Design Specification
 
-Raiker must provide consistent UI behaviour across CLI, Rich TUI, Desktop UI, Web UI, Dashboard, IDE extension, and channel clients.
+Raiker must provide consistent UI behaviour across CLI, Rich TUI, Desktop UI, Web UI, Dashboard, IDE extension, Voice UI, and channel clients.
 
-The implementation may be phased, but the user experience must be fully specified now. No builder agent should invent how a screen, panel, status bar, or dashboard works.
+Implementation is phased, but the user experience is fully specified now. No builder agent should invent how a screen, panel, status bar, connector wizard, dashboard widget, or approval surface works.
 
 ---
 
@@ -16,6 +16,7 @@ The implementation may be phased, but the user experience must be fully specifie
 6. Approvals are never hidden inside normal assistant text.
 7. Risk, cost, model, memory, network, and execution environment must be visible.
 8. UI actions map to explicit runtime commands/events.
+9. Connector and model registries must be visible before their implementations are wired.
 
 ---
 
@@ -32,6 +33,8 @@ Home
   Events
   Checkpoints
   Memory
+  Eidetic Observations
+  Skills
   Graph / Codemap
   Models
   Plugins
@@ -52,30 +55,26 @@ The Rich TUI is the primary power-user interface.
 
 ```text
 ┌──────────────────────────────────────── Raiker ────────────────────────────────────────┐
-│ Session: sess_abc  Project: Raiker  Branch: docs/local-llm-blueprint  Mode: Plan+Act     │
-│ Model: qwen-local-coder  Context: 18.2k/32k  Policy: default  Net: blocked  Mem: project │
+│ Session: sess_abc  Project: Raiker  Branch: main  Mode: Plan+Act                       │
+│ Model: qwen-local  Context: 18.2k/32k  Policy: default  Net: blocked  Mem: project     │
 ├───────────────────────────────┬──────────────────────────────┬─────────────────────────┤
 │ Transcript                    │ Active Plan                  │ Approvals               │
-│ ───────────────────────────── │ ───────────────────────────  │ ─────────────────────── │
-│ User: Add full UI docs...     │ ✓ Read reference docs        │ pending: shell pytest    │
-│ Assistant: Working...         │ ✓ Add UI spec                │ pending: file snapshot   │
-│ Tool: write_file docs/...     │ ▶ Add storage spec           │                         │
-│ Side Q: What is it doing?     │ • Update roadmap             │                         │
+│ User: Add docs...             │ ✓ Inspect specs              │ pending: command check   │
+│ Assistant: Working...         │ ▶ Update architecture         │ pending: file snapshot   │
+│ Side Q: What is it doing?     │ • Verify docs                │                         │
 ├───────────────────────────────┼──────────────────────────────┼─────────────────────────┤
 │ Tool / Event Stream           │ Task Progress                │ Context / Memory / Graph │
 │ action_proposed write_file    │ Task: docs expansion         │ Sources: 12              │
 │ policy_decision allow         │ Step 3/7  █████░░ 43%        │ Memory hits: 5           │
 │ checkpoint_created ckpt_123   │ Elapsed: 00:08:42            │ Graph nodes: 27          │
 ├───────────────────────────────┴──────────────────────────────┴─────────────────────────┤
-│ ? side question | / command | normal prompt | ! shell proposal | @ file mention          │
+│ ? side question | / command | normal prompt | ! command proposal | @ file mention       │
 ├─────────────────────────────────────────────────────────────────────────────────────────┤
-│ READY  task:running  approvals:2  last:event checkpoint_created  cpu:12%  ram:4.1GB     │
+│ RUNNING | task:docs | approvals:2 | model:qwen | ctx:18k/32k | mem:project | net:block │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### TUI Status Bar
-
-The status bar must be visible in rich mode unless hidden by user setting.
 
 Required fields, left to right:
 
@@ -89,109 +88,36 @@ Example:
 RUNNING | task:docs-expansion | approvals:1 | model:qwen9b | ctx:18k/32k | tools:14 | mem:project | net:blocked | exec:local | last:tool_completed | cost:£0.00 | 13:42
 ```
 
-Status colours:
+Status labels:
 
 | State | Meaning |
 |---|---|
-| green `READY` | Waiting for user input. |
-| blue `RUNNING` | Task is active. |
-| yellow `WAITING` | Waiting for approval/user answer. |
-| orange `RISK` | High-risk action proposed. |
-| red `FAILED` | Current task failed. |
-| grey `PAUSED` | Task paused. |
-| purple `SIDE-Q` | Side question mode active. |
+| `READY` | Waiting for user input. |
+| `RUNNING` | Task is active. |
+| `WAITING` | Waiting for approval/user answer. |
+| `RISK` | High-risk action proposed. |
+| `FAILED` | Current task failed. |
+| `PAUSED` | Task paused. |
+| `SIDE-Q` | Side question mode active. |
 
 If terminal does not support colours, use text labels only.
 
 ### TUI Panels
 
-#### Transcript Panel
+Required panels:
 
-Shows user messages, assistant messages, side questions, tool summaries, and final responses.
+- Transcript panel;
+- Active plan panel;
+- Approvals panel;
+- Task progress panel;
+- Tool/event stream panel;
+- Context/memory/graph panel;
+- Checkpoint timeline;
+- Model/profile picker;
+- Channel connector list;
+- Skill/eidetic memory inspector.
 
-Rules:
-
-- Tool output is collapsed by default.
-- High-risk actions are highlighted.
-- Side questions are visually separated from main task messages.
-- Streaming assistant output should not overwrite task progress.
-
-#### Active Plan Panel
-
-Shows plan steps:
-
-- step ID;
-- status;
-- description;
-- tool expected;
-- risk level;
-- dependencies;
-- verification criteria.
-
-Statuses:
-
-- pending;
-- running;
-- blocked;
-- waiting_for_approval;
-- completed;
-- failed;
-- skipped.
-
-#### Approvals Panel
-
-Shows approval cards:
-
-```text
-Approval: appr_123
-Tool: shell
-Command: pytest tests/test_policy.py
-Risk: high
-Reason: shell_requires_approval
-Choices: [a] approve once  [s] approve session  [d] deny  [i] inspect  [x] defer
-```
-
-#### Task Progress Panel
-
-Shows:
-
-- task ID;
-- objective;
-- phase;
-- progress;
-- current step;
-- elapsed time;
-- pending approvals;
-- child subagents;
-- changed files;
-- last event;
-- controls.
-
-#### Context / Memory / Graph Panel
-
-Tabs:
-
-- context sources;
-- memory hits;
-- memory candidates;
-- graph nodes;
-- graph relationships;
-- redactions;
-- token budget.
-
-#### Event Stream Panel
-
-Shows recent events with filters:
-
-- all;
-- tool;
-- policy;
-- hook;
-- checkpoint;
-- memory;
-- channel;
-- security;
-- error.
+Side questions must be visually separated from the main task and must not overwrite streamed task progress.
 
 ---
 
@@ -230,8 +156,11 @@ Desktop UI is a local application shell around the same gateway.
 │ ─ Active Tasks               │ Recent Tasks              │
 │ ─ Approvals                  │ Pending Approvals         │
 │ ─ Memory                     │ Project Context           │
+│ ─ Eidetic Observations       │ Retention / Replay        │
 │ ─ Graph                      │ Quick Actions             │
-│ ─ Plugins                    │                           │
+│ ─ Channels                   │ Link / Unlink             │
+│ ─ Models                     │ Launch / Switch           │
+│ ─ Plugins                    │ Registry / Risk           │
 │ ─ Settings                   │                           │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -249,25 +178,14 @@ Required regions:
 - memory/context drawer;
 - graph/codemap drawer;
 - side-question input;
+- channel connector drawer;
 - status bar.
 
-### Desktop Status Bar
+Desktop status bar:
 
 ```text
 Session sess_abc | Task running | Model qwen-local | Context 18k/32k | Net blocked | Exec local | Approvals 1 | Checkpoint ckpt_123
 ```
-
-### Desktop Notification UX
-
-Notifications:
-
-- approval required;
-- task completed;
-- task failed;
-- checkpoint created;
-- channel message received;
-- memory candidate pending;
-- security warning.
 
 Notifications must open the relevant panel, not just show text.
 
@@ -277,19 +195,17 @@ Notifications must open the relevant panel, not just show text.
 
 Web UI uses the same gateway and event stream. It may be local-only or authenticated remote depending on deployment policy.
 
-### Web Layout
+Layout:
 
 ```text
 Top Nav: Project | Session | Model | Policy | Search | User
-Left Nav: Sessions, Tasks, Approvals, Memory, Graph, Tools, Plugins, Settings
+Left Nav: Sessions, Tasks, Approvals, Memory, Eidetic, Graph, Tools, Plugins, Channels, Settings
 Main: Transcript / Dashboard / Inspector
 Right Drawer: Context, Plan, Approval, Memory, Graph, Event Details
 Bottom: Prompt / Side Question / Command Bar
 ```
 
-### Web Session Page
-
-Components:
+Web session page components:
 
 - transcript stream;
 - plan timeline;
@@ -299,14 +215,16 @@ Components:
 - file diff viewer;
 - checkpoint timeline;
 - side-question bar;
-- event timeline.
+- event timeline;
+- channel connector wizard;
+- model launch panel.
 
-### Web Security Requirements
+Web security requirements:
 
 - local-only mode by default;
 - CSRF protection if browser server exists;
 - auth for remote access;
-- websocket event stream auth;
+- websocket/SSE event stream auth;
 - no approval relay without trusted session;
 - attachments scanned before context use;
 - CORS locked down.
@@ -317,8 +235,6 @@ Components:
 
 Dashboard is the operational overview for Raiker.
 
-### Dashboard Widgets
-
 | Widget | Shows |
 |---|---|
 | Active Tasks | Running, waiting, failed, completed tasks. |
@@ -327,14 +243,16 @@ Dashboard is the operational overview for Raiker.
 | Tool Activity | Recent tools, failures, denied actions. |
 | Checkpoints | Recent checkpoints and restore options. |
 | Memory Health | Candidates, stale records, corrections, poisoning warnings. |
+| Eidetic Retention | Raw observations, expiry, deletion, exact replay warnings. |
+| Skill Learning | Skill candidates, proposals, verification status. |
 | Graph Index | Last index time, stale files, node/edge counts. |
-| Channels | Paired channels, recent inbound messages. |
+| Channels | Connector profiles, paired channels, inbound messages. |
 | Plugins | Enabled plugins, permission warnings. |
 | Security | OWASP control alerts, policy blocks, secret redactions. |
 | Storage | SQLite DB size, vector index size, event log size. |
 | Execution | Running processes, environment profile, resource usage. |
 
-### Dashboard Layout
+Dashboard layout:
 
 ```text
 ┌────────────────────── Raiker Dashboard ──────────────────────┐
@@ -342,7 +260,7 @@ Dashboard is the operational overview for Raiker.
 ├──────────────┬──────────────┬──────────────┬─────────────────┤
 │ Active Tasks │ Approvals    │ Model Usage  │ Security Alerts │
 ├──────────────┼──────────────┼──────────────┼─────────────────┤
-│ Memory       │ Graph Index  │ Tool Activity│ Checkpoints     │
+│ Memory       │ Eidetic      │ Graph Index  │ Checkpoints     │
 ├──────────────┼──────────────┼──────────────┼─────────────────┤
 │ Channels     │ Plugins      │ Storage      │ Execution       │
 └──────────────┴──────────────┴──────────────┴─────────────────┘
@@ -352,23 +270,13 @@ Dashboard is the operational overview for Raiker.
 
 ## IDE Extension Design
 
-IDE extension must provide:
-
-- side panel transcript;
-- inline file diff previews;
-- diagnostics integration;
-- symbol/context picker;
-- approval prompts;
-- checkpoint/rewind from editor;
-- commands palette;
-- task status badge;
-- no direct tool execution outside gateway.
+IDE extension must provide side panel transcript, inline file diff previews, diagnostics integration, symbol/context picker, approval prompts, checkpoint/rewind from editor, command palette, task status badge, and no direct tool execution outside gateway.
 
 ---
 
 ## Voice UI Design
 
-Voice is a future client but fully specified.
+Voice is Phase 4-scheduled and fully specified.
 
 Requirements:
 
@@ -377,7 +285,7 @@ Requirements:
 - confirmation for risky actions;
 - spoken summaries;
 - screen/TUI handoff for approvals;
-- no voice-only approval for high-risk shell/write/delete unless policy permits;
+- no voice-only approval for high-risk command/write/delete unless policy permits;
 - transcript stored as normal channel message.
 
 ---
@@ -397,6 +305,8 @@ Every UI action maps to runtime events:
 - `ui_graph_node_opened`
 - `ui_task_cancel_requested`
 - `ui_task_steer_submitted`
+- `ui_connector_link_started`
+- `ui_model_launch_requested`
 
 ---
 
@@ -411,4 +321,6 @@ Tests must prove:
 - checkpoint timeline opens restore flow;
 - dashboard widgets derive from event/store state;
 - desktop/web clients call gateway only;
-- remote web UI requires auth before event stream.
+- remote web UI requires auth before event stream;
+- channel connector wizard reads `config/channel-connectors.json`;
+- model launch panel reads `config/model-profiles.json`.

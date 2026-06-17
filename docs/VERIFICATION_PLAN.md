@@ -16,7 +16,7 @@ Raiker verification must prove that:
 4. denied actions do not execute;
 5. event logs record all meaningful activity;
 6. checkpoints are written after completed turns;
-7. the global `raiker` command reaches the same gateway as every client/channel;
+7. the global `raiker` command opens the TUI and reaches the same gateway as every client/channel;
 8. phase-scheduled features are not wired outside the selected implementation task;
 9. connector and model profile registries are loadable;
 10. SQLite indexes JSONL event metadata.
@@ -31,18 +31,20 @@ Use these commands once tooling exists:
 python -m pytest
 python -m ruff check .
 python -m mypy raiker apps tests
-raiker ask "Hello Raiker"
-raiker ask "List files in this project"
-raiker launch --provider mock --model mock-deterministic
-raiker channels list
-raiker models list
+raiker
 ```
 
-During early bootstrapping, equivalent module commands may be used until the global executable is packaged:
+Expected validation actions inside the TUI:
 
-```bash
-python -m apps.cli.main ask "Hello Raiker"
+```text
+normal prompt: Hello Raiker
+normal prompt: List files in this project
+/launch --provider mock --model mock-deterministic
+/channels
+/models
 ```
+
+During early bootstrapping, equivalent module commands may be used until the global executable is packaged.
 
 If a tool has not been configured yet, the builder must state that clearly and add a task to configure it.
 
@@ -100,20 +102,20 @@ Files:
 tests/test_runtime_state_machine.py
 ```
 
-### 6. CLI And Global Command Smoke Tests
+### 6. TUI And Global Command Smoke Tests
 
-Verify global `raiker` dispatches subcommands, CLI builds a `PromptEnvelope`, CLI calls gateway, CLI prints response, event log and checkpoint paths are created, local command prompt does not execute automatically, and `raiker launch --provider mock --model mock-deterministic` resolves a model profile.
+Verify global `raiker` launches the TUI, TUI prompt input builds a `PromptEnvelope`, TUI calls gateway, TUI renders response/status, event log and checkpoint paths are created, local command prompt does not execute automatically, and `/launch --provider mock --model mock-deterministic` resolves a model profile.
 
 Files:
 
 ```text
-tests/test_cli_smoke.py
+tests/test_tui_smoke.py
 tests/test_global_command.py
 ```
 
 ### 7. Registry Tests
 
-Verify `config/channel-connectors.json` loads, every connector has required fields, disabled connector cannot receive messages, `config/model-profiles.json` loads, canonical launch commands are present, and unknown provider fails safely.
+Verify `config/channel-connectors.json` loads, every connector has required fields, disabled connector cannot receive messages, `config/model-profiles.json` loads, TUI launch actions are present, and unknown provider fails safely.
 
 Files:
 
@@ -194,7 +196,7 @@ For every PR, check:
 - [ ] Are errors structured?
 - [ ] Are dependencies justified?
 - [ ] Are validation results reported truthfully?
-- [ ] Does global `raiker` command compatibility remain intact?
+- [ ] Does global `raiker` TUI entry compatibility remain intact?
 
 ---
 
@@ -202,23 +204,25 @@ For every PR, check:
 
 Use these prompts to test whether a builder model follows the docs.
 
-### Scenario 1: Safe chat
+### Scenario 1: Safe chat from TUI
 
 ```text
-Implement the simple chat path using the mock model provider. Do not add tools. Add tests.
+Implement the TUI prompt path using the mock model provider. Do not add tools. Add tests.
 ```
 
 Expected behaviour:
 
+- global `raiker` opens TUI;
+- plain TUI prompt creates PromptEnvelope;
 - no local command execution;
 - no file read;
 - events emitted;
 - checkpoint written.
 
-### Scenario 2: Safe filesystem query
+### Scenario 2: Safe filesystem query from TUI
 
 ```text
-Implement list_directory through the tool broker. It must pass policy review and block outside-workspace paths.
+Implement list_directory through the tool broker for a normal prompt submitted inside the TUI. It must pass policy review and block outside-workspace paths.
 ```
 
 Expected behaviour:
@@ -228,7 +232,7 @@ Expected behaviour:
 - path traversal test added;
 - no direct file listing from runtime.
 
-### Scenario 3: Local command request
+### Scenario 3: Local command request from TUI
 
 ```text
 Implement local command action handling for Phase 1. The command must require approval and must not run by default.
@@ -272,7 +276,7 @@ Every implementation PR should include:
 - [ ] python -m pytest
 - [ ] python -m ruff check .
 - [ ] python -m mypy raiker apps tests
-- [ ] raiker ask "Hello Raiker"
+- [ ] raiker
 
 ## Security Checks
 - [ ] Tool actions pass policy review

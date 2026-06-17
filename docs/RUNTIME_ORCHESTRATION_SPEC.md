@@ -8,20 +8,7 @@ The runtime must be deterministic in state transitions even when work is asynchr
 
 ## Runtime Goals
 
-The runtime must support:
-
-1. normal prompt turns;
-2. planned multi-step work;
-3. background tasks;
-4. side questions while tasks continue;
-5. interrupts and steering;
-6. approvals;
-7. tool batches;
-8. subagent delegation;
-9. verification;
-10. checkpoints;
-11. cancellation;
-12. error recovery.
+The runtime must support normal prompt turns, planned multi-step work, background tasks, side questions while tasks continue, interrupts and steering, approvals, tool batches, subagent delegation, verification, checkpoints, cancellation, and error recovery.
 
 ---
 
@@ -167,7 +154,7 @@ The runtime must not modify an executing tool mid-flight except through cancella
 
 ## Parallel Tool Batches
 
-Future phases may allow parallel safe tools.
+Parallel safe tool batches are phase-scheduled for Phase 3+ implementation and are fully specified here.
 
 Rules:
 
@@ -176,7 +163,9 @@ Rules:
 - output order is deterministic by action ID;
 - failures are isolated;
 - PostToolBatch hooks run after all complete;
-- event log records start/end per action and batch.
+- event log records start/end per action and batch;
+- cancellation can stop queued actions and request cancellation for running actions;
+- TUI/Web/Desktop task panels must show batch progress.
 
 ---
 
@@ -249,6 +238,8 @@ Required events:
 - `verification_started`
 - `verification_completed`
 - `runtime_error_recorded`
+- `tool_batch_started`
+- `tool_batch_completed`
 
 ---
 
@@ -260,7 +251,8 @@ Tests must prove:
 - side question runs without pausing task;
 - interrupt waits for safe boundary;
 - steering updates plan only after classification;
-- cancelled task stops future tool execution;
+- cancelled task stops scheduled tool execution;
 - verification result is logged;
 - recoverable error leads to safe response;
-- event order is deterministic.
+- event order is deterministic;
+- phase-scheduled parallel batches preserve deterministic result ordering.

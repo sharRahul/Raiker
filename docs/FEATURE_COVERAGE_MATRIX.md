@@ -2,7 +2,7 @@
 
 This document tracks Raiker feature coverage against modern agent platforms, local-first coding agents, memory systems, graph-context systems, GenAI security guidance, and local inference runtimes.
 
-Raiker must not rely on vague phrases such as "support plugins" or "support memory". Each capability must be documented with contracts, lifecycle rules, permissions, event logging, verification requirements, and phase boundaries.
+Raiker must not rely on vague phrases such as "support plugins", "future memory", "web UI later", or "dashboard later". Each capability must be documented with user experience, contracts, lifecycle rules, storage, permissions, event logging, verification requirements, and phase placement.
 
 ---
 
@@ -10,51 +10,65 @@ Raiker must not rely on vague phrases such as "support plugins" or "support memo
 
 | Status | Meaning |
 |---|---|
-| `specified` | Behaviour is fully specified enough for a builder agent to implement without guessing. |
-| `phase-boundary` | The feature is intentionally postponed, but the contract/boundary is documented. |
-| `stub-required` | The codebase must include interfaces/stubs now, but full implementation is later. |
-| `not-allowed-in-phase-1` | Builder agents must not implement this in Phase 1. |
+| `fully-specified` | Behaviour is specified enough for a builder agent to implement without guessing. |
+| `phase-scheduled` | Implementation is scheduled for a later phase, but the full behaviour is already specified in docs. |
+| `phase-1-build` | Implement in Phase 1. |
+| `phase-2-build` | Implement in Phase 2 according to the existing full specification. |
+| `phase-3-build` | Implement in Phase 3 according to the existing full specification. |
+| `phase-4-build` | Implement in Phase 4 according to the existing full specification. |
+| `phase-5-build` | Implement in Phase 5 according to the existing full specification. |
+
+A feature must never be marked as merely "future" without a full specification.
 
 ---
 
 ## Platform Coverage Summary
 
-| Area | Required Raiker status | Specification document |
-|---|---:|---|
-| Agent gateway | specified | `docs/ARCHITECTURE.md`, `docs/CONTRACTS.md` |
-| Deterministic runtime loop | specified | `docs/ARCHITECTURE.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
-| Context gathering | specified | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
-| Planning | specified | `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
-| Tool broker | specified | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
-| Tool catalogue | specified | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
-| Permissions and approvals | specified | `docs/TOOLS_AND_PERMISSIONS_SPEC.md`, `docs/SECURITY_AND_POLICY.md` |
-| Hooks | specified | `docs/HOOKS_SPEC.md` |
-| Plugins | specified | `docs/PLUGIN_SYSTEM_SPEC.md` |
-| Channels | specified | `docs/CHANNELS_SPEC.md` |
-| Commands and slash commands | specified | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
-| Rich interactive TUI | specified | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
-| Async side questions during work | specified | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
-| Checkpoint and rewind | specified | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` |
-| Event log | specified | `docs/CONTRACTS.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
-| Session resume/fork | specified | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` |
-| Local inference | specified | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
-| Hosted/cloud inference | specified with policy gates | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
-| Model router | specified | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
-| Memory governance | specified | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
-| Semantic/vector memory | phase-boundary | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
-| Graph memory/code map | phase-boundary | `docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md` |
-| Skills/procedural workflows | specified | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
-| Subagents | specified | `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
-| Multi-agent teams | phase-boundary | `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
-| Remote execution | phase-boundary | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
-| Docker execution | phase-boundary | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
-| SSH execution | phase-boundary | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
-| Cloud batch/GPU execution | phase-boundary | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
-| OWASP LLM Top 10 controls | specified | `docs/OWASP_GENAI_SECURITY_MAPPING.md` |
-| Agentic AI threat controls | specified | `docs/OWASP_GENAI_SECURITY_MAPPING.md` |
-| Supply-chain controls | specified | `docs/OWASP_GENAI_SECURITY_MAPPING.md`, `docs/PLUGIN_SYSTEM_SPEC.md` |
-| Verification and test plan | specified | `docs/VERIFICATION_PLAN.md` |
-| Roadmap | specified | `docs/ROADMAP_PHASE_2_TO_PHASE_5.md` |
+| Area | Spec status | Build phase | Specification document |
+|---|---:|---:|---|
+| Agent gateway | fully-specified | phase-1-build | `docs/ARCHITECTURE.md`, `docs/CONTRACTS.md` |
+| Deterministic runtime loop | fully-specified | phase-1-build | `docs/ARCHITECTURE.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
+| Context gathering | fully-specified | phase-1-build | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
+| Planning | fully-specified | phase-1-build | `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
+| Tool broker | fully-specified | phase-1-build | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
+| Tool catalogue | fully-specified | phase-1-to-3-build | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
+| Permissions and approvals | fully-specified | phase-1-to-2-build | `docs/TOOLS_AND_PERMISSIONS_SPEC.md`, `docs/SECURITY_AND_POLICY.md` |
+| Hooks | fully-specified | phase-2-build | `docs/HOOKS_SPEC.md` |
+| Plugins | fully-specified | phase-3-build | `docs/PLUGIN_SYSTEM_SPEC.md` |
+| Channels | fully-specified | phase-4-build | `docs/CHANNELS_SPEC.md` |
+| Commands and slash commands | fully-specified | phase-2-build | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
+| Rich interactive TUI | fully-specified | phase-2-build | `docs/UI_UX_DESIGN_SPEC.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
+| TUI status bar | fully-specified | phase-2-build | `docs/UI_UX_DESIGN_SPEC.md` |
+| Async side questions during work | fully-specified | phase-2-build | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/CHANNELS_SPEC.md` |
+| Desktop UI | fully-specified | phase-3-build | `docs/UI_UX_DESIGN_SPEC.md` |
+| Web UI | fully-specified | phase-3-build | `docs/UI_UX_DESIGN_SPEC.md` |
+| Dashboard | fully-specified | phase-3-build | `docs/UI_UX_DESIGN_SPEC.md` |
+| IDE extension | fully-specified | phase-3-build | `docs/UI_UX_DESIGN_SPEC.md` |
+| Voice UI | fully-specified | phase-4-build | `docs/UI_UX_DESIGN_SPEC.md`, `docs/CHANNELS_SPEC.md` |
+| Checkpoint and rewind | fully-specified | phase-2-build | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` |
+| Event log | fully-specified | phase-1-build | `docs/CONTRACTS.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
+| Session resume/fork | fully-specified | phase-2-build | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` |
+| SQLite storage | fully-specified | phase-1-to-2-build | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
+| FTS5 search | fully-specified | phase-2-build | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
+| Semantic/vector memory | fully-specified | phase-3-build | `docs/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
+| Graph memory/code map | fully-specified | phase-3-build | `docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
+| Recursive CTE graph queries | fully-specified | phase-3-build | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
+| Local inference | fully-specified | phase-2-build | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
+| Hosted/cloud inference | fully-specified | phase-3-to-5-build | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
+| Model router | fully-specified | phase-1-to-2-build | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
+| Memory governance | fully-specified | phase-1-to-2-build | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
+| Skills/procedural workflows | fully-specified | phase-3-build | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
+| Subagents | fully-specified | phase-4-build | `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
+| Multi-agent teams | fully-specified | phase-4-build | `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
+| Remote execution | fully-specified | phase-4-to-5-build | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
+| Docker execution | fully-specified | phase-4-build | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
+| SSH execution | fully-specified | phase-4-build | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
+| Cloud batch/GPU execution | fully-specified | phase-5-build | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
+| OWASP LLM Top 10 controls | fully-specified | phase-1-to-5-build | `docs/OWASP_GENAI_SECURITY_MAPPING.md` |
+| Agentic AI threat controls | fully-specified | phase-1-to-5-build | `docs/OWASP_GENAI_SECURITY_MAPPING.md` |
+| Supply-chain controls | fully-specified | phase-3-to-5-build | `docs/OWASP_GENAI_SECURITY_MAPPING.md`, `docs/PLUGIN_SYSTEM_SPEC.md` |
+| Verification and test plan | fully-specified | phase-1-to-5-build | `docs/VERIFICATION_PLAN.md` |
+| Full phase implementation blueprint | fully-specified | phase-1-to-5-build | `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
 
 ---
 
@@ -72,10 +86,12 @@ Raiker must cover these equivalent capability classes:
 | Plugins | Plugins must package commands, hooks, skills, agents, channels, MCP servers, themes, and UI panels with manifests and permissions. |
 | Channels | External clients must send `ChannelMessageEnvelope` into a session and receive replies or events through scoped permissions. |
 | Commands | Slash commands, quick commands, shell passthrough, file mentions, macros, aliases, and command expansion must be specified. |
-| TUI | Rich TUI must support background task progress and allow user side questions without blocking running work. |
+| TUI | Rich TUI must support background task progress, status bar, approval inbox, checkpoint timeline, and side questions without blocking running work. |
+| Desktop/Web/Dashboard | Full layouts, panels, widgets, auth/event-stream rules, and operational dashboard widgets must be specified before implementation. |
 | Checkpoints | Checkpoints must support restore, fork, compare, summarise, clean up, and file-edit snapshots. |
 | Permissions | Permission rules must support project/user/local/managed scopes, path patterns, tool names, argument patterns, and time-limited approvals. |
 | Memory | Memory must support profile, project, episodic, procedural, semantic, graph, and scratchpad memory with governance. |
+| Storage | SQLite must store state/metadata; JSONL stores append-only events; SQLite FTS5/vector metadata/recursive CTEs support search and graph traversal. |
 | Local models | Model runtime must support llama.cpp, Ollama, LM Studio, OpenAI-compatible providers, context limits, streaming, tool call formats, and quantisation profiles. |
 
 ---
@@ -94,7 +110,7 @@ Raiker must cover these equivalent capability classes:
 10. External execution is denied unless policy explicitly enables it.
 11. Rich TUI side questions must not corrupt or reorder the active task state.
 12. Background tasks must be cancellable, observable, and event-logged.
-13. Every feature must have tests, event types, contracts, and security notes before implementation.
+13. Every feature must have tests, event types, contracts, storage notes, UI surfaces, and security notes before implementation.
 
 ---
 

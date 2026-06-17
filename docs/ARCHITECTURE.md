@@ -44,8 +44,8 @@ Phase boundaries exist to control implementation order, not to hide missing desi
 
 | Phase | Build focus | Required architectural state |
 |---|---|---|
-| Phase 1 | Secure Local CLI Core | Contracts, gateway, sessions, runtime, policy, broker, event log, SQLite bootstrap, CLI, mock model, checkpoint stub. |
-| Phase 2 | Rich Local Workspace | Rich TUI, background tasks, side questions, full checkpoints/rewind, local model providers, hooks, approved project/profile memory. |
+| Phase 1 | Secure Local TUI Core | Contracts, gateway, sessions, runtime, policy, broker, event log, SQLite bootstrap, Rich TUI shell, mock model, checkpoint stub. |
+| Phase 2 | Rich Local Workspace | Full Rich TUI panels, background tasks, side questions, full checkpoints/rewind, local model providers, hooks, approved project/profile memory. |
 | Phase 3 | Desktop/Web/Plugin/Graph Platform | Desktop UI, Web UI, Dashboard, plugin manager, semantic search, graph/codemap, REST API, worktree isolation. |
 | Phase 4 | Channels/Multi-Agent/Remote Execution | Channel connectors, subagents, agent teams, container/remote profiles, voice/hotkeys/browser extension. |
 | Phase 5 | Governed Enterprise/Home-Lab Platform | Managed policies, multi-user governance, signed plugins, event integrity, audit export, cloud/GPU budgets, deployment operations. |
@@ -170,57 +170,58 @@ Responsible for memory candidates, durable memory records, provenance, sensitivi
 
 ---
 
-## Data Flow For A Phase 1 Prompt
+## Data Flow For A Phase 1 TUI Prompt
 
 ```text
-1. User runs global `raiker ask "..."` command.
-2. CLI builds PromptEnvelope.
-3. AgentGateway validates envelope.
-4. SessionManager opens or creates session.
-5. Runtime logs prompt_received.
-6. Runtime classifies intent and risk.
-7. Runtime gathers context.
-8. Runtime creates or skips plan.
-9. Runtime proposes actions.
-10. PolicyEngine reviews actions.
-11. ToolBroker executes approved actions or pauses for approval.
-12. Runtime verifies result.
-13. Runtime produces final response.
-14. CheckpointService writes checkpoint.
-15. EventLogWriter records all events.
-16. SQLite state store indexes session, turn, events, task, action, and checkpoint metadata.
+1. User runs global `raiker` command.
+2. Raiker opens the Rich TUI.
+3. User submits a normal prompt, slash command, side question, approval choice, model action, channel action, memory action, graph query, checkpoint action, or diagnostics action inside the TUI.
+4. TUI builds a PromptEnvelope, UIActionEnvelope, or ChannelMessageEnvelope.
+5. AgentGateway validates envelope.
+6. SessionManager opens or creates session.
+7. Runtime logs prompt_received or ui_action_received.
+8. Runtime classifies intent and risk.
+9. Runtime gathers context.
+10. Runtime creates or skips plan.
+11. Runtime proposes actions.
+12. PolicyEngine reviews actions.
+13. ToolBroker executes approved actions or pauses for approval.
+14. Runtime verifies result.
+15. Runtime updates the TUI stream/panels.
+16. CheckpointService writes checkpoint.
+17. EventLogWriter records all events.
+18. SQLite state store indexes session, turn, events, task, action, approval, and checkpoint metadata.
 ```
 
 ---
 
 ## Global Command And Launch Architecture
 
-Raiker must install a global command named `raiker`.
-
-Minimum command family:
+Raiker must install one human-facing global command named `raiker`.
 
 ```bash
-raiker ask "List files in this project"
-raiker chat
-raiker tui
-raiker launch --provider ollama --model qwen3.5-coder:9b
-raiker launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
-raiker launch --provider lm-studio --model local-model
-raiker launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
-raiker gateway start
-raiker gateway status
-raiker models list
-raiker channels list
-raiker doctor
+raiker
 ```
 
-Canonical launch path:
+Running `raiker` launches the Rich TUI. All normal user actions happen inside the TUI through prompt input, side-question input, slash commands, approval cards, model/profile panels, channel-linking panels, memory panels, graph panels, checkpoint panels, diagnostics panels, and task controls.
 
-```bash
-raiker launch --provider <provider> --model <model>
+Required TUI actions:
+
+```text
+normal prompt: "List files in this project"
+side question: ? What is it doing now?
+model launch: /launch --provider ollama --model qwen3.5-coder:9b
+model launch: /launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
+model launch: /launch --provider lm-studio --model local-model
+model launch: /launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
+models: /models
+channels: /channels
+sessions: /sessions
+checkpoints: /checkpoints
+doctor: /doctor
 ```
 
-Provider-specific convenience launchers, including a platform adapter that accepts a command shaped like `ollama launch raiker --model <model>`, may delegate into the canonical `raiker launch` path when that platform supports such extension behaviour. Documentation and tests must always keep the canonical global `raiker` path.
+Provider-specific convenience launchers, including a platform adapter that accepts a command shaped like `ollama launch raiker --model <model>`, may delegate into a Raiker model-launch request when that platform supports such extension behaviour. Documentation and tests must keep the canonical human entry point as `raiker`.
 
 ---
 
@@ -230,7 +231,7 @@ These choices minimise drift and complexity while preserving the full architectu
 
 - Language: Python 3.11 or 3.12.
 - Package manager: uv or pip with a lockfile.
-- CLI: argparse or Typer. Prefer argparse if dependency minimisation is more important.
+- TUI: Textual, Rich, or a minimal dependency-free terminal renderer. Prefer the smallest implementation that supports panels and input safely.
 - Data validation: Pydantic or dataclasses. Use one consistently.
 - Tests: pytest.
 - Event log: JSONL files plus SQLite indexes.
@@ -258,6 +259,7 @@ raiker/
   checkpoints/
   memory/
   channels/
+  tui/
 apps/
   cli/
     main.py
@@ -271,7 +273,7 @@ tests/
   test_policy_engine.py
   test_tool_broker.py
   test_runtime_state_machine.py
-  test_cli_smoke.py
+  test_tui_smoke.py
   test_storage_sqlite.py
   test_channel_connector_registry.py
 ```
@@ -288,9 +290,9 @@ These must be tested:
 4. A risky action requiring approval pauses instead of executing.
 5. Runtime state transitions happen in valid order.
 6. A checkpoint is written after a completed turn.
-7. The CLI path uses the same gateway as every scheduled client and channel.
+7. The `raiker` TUI path uses the same gateway as every scheduled client and channel.
 8. The model router can use a deterministic mock provider.
-9. The global `raiker` command can create a PromptEnvelope and reach the gateway.
+9. The global `raiker` command launches the TUI and the TUI can create a PromptEnvelope and reach the gateway.
 10. Connector profiles can be listed even before connector implementations are enabled.
 11. SQLite state indexes events written to JSONL.
 

@@ -1,0 +1,312 @@
+# Hooks Specification
+
+Hooks let users, projects, plugins, administrators, and skills run controlled logic at lifecycle points in Raiker.
+
+Hooks are powerful and dangerous. They must be explicit, scoped, policy-aware, event-logged, timeout-bounded, and testable.
+
+---
+
+## Hook Goals
+
+Raiker hooks must support:
+
+1. lifecycle automation;
+2. policy enforcement;
+3. validation and linting;
+4. prompt/context augmentation;
+5. notification and telemetry;
+6. tool result inspection;
+7. async background reactions;
+8. plugin/skill-provided behaviour;
+9. enterprise-managed controls.
+
+---
+
+## Hook Handler Types
+
+| Type | Description | Default trust |
+|---|---|---|
+| `command` | Local shell command or script | untrusted unless scoped |
+| `http` | HTTP endpoint | denied unless network enabled |
+| `mcp_tool` | MCP server tool | untrusted, brokered |
+| `prompt` | LLM prompt hook | untrusted model output |
+| `agent` | Subagent hook | untrusted until policy-reviewed |
+| `builtin` | Raiker built-in handler | trusted internal code |
+
+---
+
+## Hook Scopes
+
+| Scope | Location | Shareable | Notes |
+|---|---|---:|---|
+| managed | enterprise policy | yes | highest priority |
+| user | user config | no | applies across projects |
+| project | committed project config | yes | review before committing |
+| local | gitignored project config | no | personal overrides |
+| plugin | plugin package | yes | enabled with plugin |
+| skill | skill manifest/frontmatter | yes | active only while skill active |
+| agent | subagent manifest | yes | active only while agent active |
+| session | runtime session config | no | temporary |
+
+---
+
+## Hook Configuration Schema
+
+```json
+{
+  "schema_version": "1.0",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "shell|powershell",
+        "if": "shell(rm -rf *)",
+        "handlers": [
+          {
+            "id": "block-destructive-shell",
+            "type": "command",
+            "command": "./.raiker/hooks/block_destructive.sh",
+            "args": [],
+            "timeout_ms": 3000,
+            "async": false,
+            "decision_authority": true
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Matcher Rules
+
+Hook matchers must support:
+
+- `*` for all;
+- exact tool/event names;
+- `|` separated exact alternatives;
+- regular expressions when explicitly marked or containing regex characters;
+- argument-pattern `if` expressions;
+- path globs for file events;
+- subagent name matching;
+- command name matching;
+- channel name matching.
+
+If a matcher is unsupported for an event, configuration validation must warn or fail. It must not silently ignore mistakes.
+
+---
+
+## Hook Lifecycle Events
+
+### Session Events
+
+| Event | Fires when |
+|---|---|
+| `SessionStart` | New session starts or resumes |
+| `SessionResume` | Existing session is resumed |
+| `SessionFork` | Session is forked from checkpoint |
+| `SessionEnd` | Session ends |
+| `ConfigChange` | Runtime config changes |
+| `InstructionsLoaded` | Project/user instructions are loaded |
+
+### Prompt Events
+
+| Event | Fires when |
+|---|---|
+| `UserPromptSubmit` | User submits prompt before processing |
+| `UserPromptExpansion` | Slash command/macro expands into prompt |
+| `PromptNormalised` | Prompt is normalised |
+| `ContextGathered` | Context bundle is ready |
+| `PreCompact` | Before context compaction |
+| `PostCompact` | After compaction |
+
+### Tool Events
+
+| Event | Fires when |
+|---|---|
+| `PreToolUse` | Before policy finalises execution |
+| `PermissionRequest` | Approval is about to be shown |
+| `PermissionDenied` | Tool is denied |
+| `PostToolUse` | Tool succeeds |
+| `PostToolUseFailure` | Tool fails |
+| `PostToolBatch` | Parallel tool batch completes |
+| `ToolOutputChunk` | Streaming output chunk arrives |
+
+### Task And Background Events
+
+| Event | Fires when |
+|---|---|
+| `TaskCreated` | Background task is created |
+| `TaskStarted` | Background task begins |
+| `TaskProgress` | Task emits progress |
+| `TaskQuestion` | Task asks user a side question |
+| `TaskAnswered` | User answers side question |
+| `TaskCompleted` | Task completes |
+| `TaskFailed` | Task fails |
+| `TaskCancelled` | User cancels task |
+
+### Subagent Events
+
+| Event | Fires when |
+|---|---|
+| `SubagentStart` | Subagent starts |
+| `SubagentMessage` | Subagent emits message |
+| `SubagentToolUse` | Subagent proposes tool |
+| `SubagentStop` | Subagent stops |
+
+### File/Workspace Events
+
+| Event | Fires when |
+|---|---|
+| `CwdChanged` | Working directory changes |
+| `FileChanged` | Watched file changes |
+| `WorktreeCreate` | Worktree is created |
+| `WorktreeRemove` | Worktree is removed |
+| `CheckpointCreated` | Checkpoint snapshot created |
+| `CheckpointRestored` | Checkpoint restored |
+
+### Display And Notification Events
+
+| Event | Fires when |
+|---|---|
+| `MessageDisplay` | Assistant text streams to UI |
+| `Notification` | Notification is emitted |
+| `Idle` | Agent/team becomes idle |
+| `Error` | Structured error is recorded |
+
+---
+
+## Hook Input Schema
+
+```json
+{
+  "schema_version": "1.0",
+  "hook_event_name": "PreToolUse",
+  "hook_id": "hook_01H...",
+  "session_id": "sess_01H...",
+  "turn_id": "turn_01H...",
+  "task_id": null,
+  "cwd": "/workspace/project",
+  "source_scope": "project",
+  "actor": "agent_runtime",
+  "event": {},
+  "tool_name": "shell",
+  "tool_input": {
+    "command": "pytest"
+  },
+  "context": {
+    "risk_level": "high",
+    "policy_state": "pending"
+  }
+}
+```
+
+---
+
+## Hook Output Schema
+
+```json
+{
+  "schema_version": "1.0",
+  "hook_event_name": "PreToolUse",
+  "decision": "deny",
+  "decision_reason": "Destructive shell command blocked.",
+  "updated_input": null,
+  "additional_context": null,
+  "notifications": [],
+  "defer_until": null,
+  "metadata": {}
+}
+```
+
+Allowed decisions:
+
+- `allow`
+- `deny`
+- `ask`
+- `defer`
+- `no_decision`
+- `retry`
+- `cancel_task`
+- `add_context_only`
+
+Hook output can:
+
+- deny or ask for approval if the hook has decision authority;
+- add context;
+- rewrite input only when event allows it;
+- emit notification;
+- defer tool call;
+- request retry after denial/failure;
+- cancel background task if policy permits.
+
+---
+
+## Decision Authority Rules
+
+A hook may not silently grant broad permissions.
+
+1. Hooks can always make a tool stricter by denying or asking.
+2. Hooks can only allow a tool if policy grants hook decision authority.
+3. Project hooks cannot override managed denies.
+4. Plugin hooks cannot override user or managed denies.
+5. Prompt/agent hooks are advisory unless explicitly trusted.
+6. Hook output must be logged.
+
+---
+
+## Async Hooks
+
+Hooks may run asynchronously when:
+
+- they do not decide current action;
+- they do not mutate current prompt/tool input;
+- they have bounded timeout and cancellation;
+- they emit progress and completion events;
+- their output is attached to future turns or notifications.
+
+Examples:
+
+- run tests after file edit;
+- index changed files into graph memory;
+- refresh semantic memory;
+- send notification when task completes;
+- lint project config after config change.
+
+Async hooks must not block the main agent loop unless explicitly configured as blocking.
+
+---
+
+## Hook Security Requirements
+
+Hooks are untrusted by default.
+
+Required controls:
+
+- config validation;
+- path safety for command hooks;
+- timeout;
+- output limits;
+- secret redaction;
+- no implicit network access;
+- policy-controlled decision authority;
+- event logging;
+- test coverage;
+- managed-policy override.
+
+---
+
+## Hook Testing Requirements
+
+Tests must prove:
+
+- matcher selects correct tools/events;
+- matcher rejects invalid config;
+- PreToolUse can deny tool;
+- silent hook does not approve tool;
+- async hook does not block current turn;
+- hook timeout is handled;
+- hook output is logged;
+- project hook cannot override managed deny;
+- plugin hook is inactive when plugin disabled.

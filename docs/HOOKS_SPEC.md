@@ -8,17 +8,7 @@ Hooks are powerful and dangerous. They must be explicit, scoped, policy-aware, e
 
 ## Hook Goals
 
-Raiker hooks must support:
-
-1. lifecycle automation;
-2. policy enforcement;
-3. validation and linting;
-4. prompt/context augmentation;
-5. notification and telemetry;
-6. tool result inspection;
-7. async background reactions;
-8. plugin/skill-provided behaviour;
-9. enterprise-managed controls.
+Raiker hooks must support lifecycle automation, policy enforcement, validation and linting, prompt/context augmentation, notification and telemetry, tool result inspection, async background reactions, plugin/skill-provided behaviour, and enterprise-managed controls.
 
 ---
 
@@ -26,7 +16,7 @@ Raiker hooks must support:
 
 | Type | Description | Default trust |
 |---|---|---|
-| `command` | Local shell command or script | untrusted unless scoped |
+| `command` | Local command or script | untrusted unless scoped |
 | `http` | HTTP endpoint | denied unless network enabled |
 | `mcp_tool` | MCP server tool | untrusted, brokered |
 | `prompt` | LLM prompt hook | untrusted model output |
@@ -62,7 +52,7 @@ Raiker hooks must support:
         "if": "shell(rm -rf *)",
         "handlers": [
           {
-            "id": "block-destructive-shell",
+            "id": "block-destructive-command",
             "type": "command",
             "command": "./.raiker/hooks/block_destructive.sh",
             "args": [],
@@ -81,17 +71,7 @@ Raiker hooks must support:
 
 ## Matcher Rules
 
-Hook matchers must support:
-
-- `*` for all;
-- exact tool/event names;
-- `|` separated exact alternatives;
-- regular expressions when explicitly marked or containing regex characters;
-- argument-pattern `if` expressions;
-- path globs for file events;
-- subagent name matching;
-- command name matching;
-- channel name matching.
+Hook matchers must support `*` for all, exact tool/event names, `|` separated exact alternatives, regular expressions when explicitly marked, argument-pattern expressions, path globs for file events, subagent name matching, command name matching, and channel name matching.
 
 If a matcher is unsupported for an event, configuration validation must warn or fail. It must not silently ignore mistakes.
 
@@ -211,7 +191,7 @@ If a matcher is unsupported for an event, configuration validation must warn or 
   "schema_version": "1.0",
   "hook_event_name": "PreToolUse",
   "decision": "deny",
-  "decision_reason": "Destructive shell command blocked.",
+  "decision_reason": "Destructive command blocked.",
   "updated_input": null,
   "additional_context": null,
   "notifications": [],
@@ -231,15 +211,7 @@ Allowed decisions:
 - `cancel_task`
 - `add_context_only`
 
-Hook output can:
-
-- deny or ask for approval if the hook has decision authority;
-- add context;
-- rewrite input only when event allows it;
-- emit notification;
-- defer tool call;
-- request retry after denial/failure;
-- cancel background task if policy permits.
+Hook output can deny or ask for approval if the hook has decision authority, add context, rewrite input only when event allows it, emit notification, defer tool call, request retry after denial/failure, or cancel background task if policy permits.
 
 ---
 
@@ -264,7 +236,7 @@ Hooks may run asynchronously when:
 - they do not mutate current prompt/tool input;
 - they have bounded timeout and cancellation;
 - they emit progress and completion events;
-- their output is attached to future turns or notifications.
+- their output is attached to subsequent turns, task notes, memory candidates, or notifications.
 
 Examples:
 
@@ -288,7 +260,7 @@ Required controls:
 - path safety for command hooks;
 - timeout;
 - output limits;
-- secret redaction;
+- redaction;
 - no implicit network access;
 - policy-controlled decision authority;
 - event logging;

@@ -1,11 +1,11 @@
 # Phase 1 MVP Build Plan
 
-This plan decomposes Raiker Phase 1 into small implementation tasks suitable for local or mid-size LLM builders.
+This plan decomposes Raiker Phase 1 into small implementation tasks suitable for local or cloud builder models.
 
 Phase 1 objective:
 
 ```text
-Build a local CLI-driven agent runtime with explicit contracts, deterministic state transitions, append-only event logging, static policy review, a tool broker for safe filesystem/search tools, shell approval handling, a mock model provider, checkpoint stubs, and tests.
+Build a local TUI-driven agent runtime opened by the global `raiker` command, with explicit contracts, deterministic state transitions, append-only event logging, SQLite bootstrap, static policy review, a tool broker for safe filesystem/search tools, approval-gated local action proposals, a mock model provider, checkpoint stubs, and tests.
 ```
 
 ---
@@ -15,36 +15,46 @@ Build a local CLI-driven agent runtime with explicit contracts, deterministic st
 Included:
 
 - Python package scaffold;
-- CLI client;
+- global `raiker` command;
+- minimal Rich TUI shell;
+- TUI prompt input;
+- TUI slash-command parser;
+- TUI approval cards;
 - contracts;
 - agent gateway;
 - session manager;
 - deterministic runtime state machine;
 - event log writer;
+- SQLite bootstrap;
 - static policy engine;
 - tool broker skeleton;
 - `read_file` tool;
 - `list_directory` tool;
 - `glob` tool;
 - `grep` tool;
-- `shell` tool with approval gate;
+- approval-gated local action proposal path;
 - mock model provider;
+- model profile registry;
+- channel connector profile registry;
 - checkpoint service;
-- memory governance stub;
+- memory governance candidate path;
 - tests.
 
-Excluded:
+Phase-scheduled but not wired in Phase 1:
 
-- web UI;
-- desktop UI;
-- remote execution;
-- plugin marketplace;
-- real vector memory;
-- graph memory;
-- autonomous background agents;
+- Desktop UI;
+- Web UI;
+- Dashboard;
+- remote/container execution;
+- plugin execution;
+- durable vector memory writes;
+- graph runtime indexing;
+- autonomous agent teams;
 - production authentication;
-- Slack, Teams, Discord, Signal, email, or voice clients;
-- real hosted LLM billing controls.
+- external channel implementations;
+- hosted model billing controls.
+
+These are not vague exclusions. The specs and registries must remain compatible with them.
 
 ---
 
@@ -57,7 +67,7 @@ Create the recommended directory structure from `docs/ARCHITECTURE.md`.
 Acceptance criteria:
 
 - package imports as `raiker`;
-- `apps/cli/main.py` exists;
+- TUI entry module exists;
 - `tests/` exists;
 - no runtime behaviour yet;
 - README points to the docs map.
@@ -65,13 +75,6 @@ Acceptance criteria:
 ### RAIKER-0002: Add development tooling
 
 Add minimal tooling for formatting, linting, typing, and tests.
-
-Suggested tools:
-
-- pytest;
-- ruff;
-- mypy or pyright;
-- pyproject.toml.
 
 Acceptance criteria:
 
@@ -96,8 +99,6 @@ Acceptance criteria:
 
 ### RAIKER-0102: Add ID and timestamp helpers
 
-Implement deterministic helpers for IDs and UTC timestamps.
-
 Acceptance criteria:
 
 - generated IDs have prefixes such as `req_`, `sess_`, `turn_`, `evt_`;
@@ -106,11 +107,18 @@ Acceptance criteria:
 
 ---
 
-## Milestone 2: Event Logging
+## Milestone 2: Storage And Event Logging
 
-### RAIKER-0201: Implement append-only JSONL event writer
+### RAIKER-0201: Implement SQLite bootstrap
 
-The event writer stores events under `.raiker/events/`.
+Acceptance criteria:
+
+- database is created under `.raiker/`;
+- sessions, turns, tasks, events_index, tool_actions, policy_decisions, approvals, memory_candidates, connector_profiles, and model_profiles tables exist;
+- migration table exists;
+- tests verify fresh database creation.
+
+### RAIKER-0202: Implement append-only JSONL event writer
 
 Acceptance criteria:
 
@@ -118,18 +126,18 @@ Acceptance criteria:
 - appends one JSON object per line;
 - never rewrites existing events;
 - validates event contract before writing;
+- indexes event metadata in SQLite;
 - tests verify multiple events are appended in order.
 
-### RAIKER-0202: Add event logging wrapper
-
-Provide a helper used by runtime and services to emit events consistently.
+### RAIKER-0203: Load built-in registries
 
 Acceptance criteria:
 
-- every emitted event has event ID and timestamp;
-- parent event ID is optional;
-- event type is validated;
-- tests cover success and invalid event type.
+- every connector profile has required fields;
+- every model profile has required fields;
+- disabled profiles are listable but not wired;
+- TUI `/channels` and `/models` can show profiles when TUI command support lands;
+- tests cover invalid registry entries.
 
 ---
 
@@ -137,19 +145,15 @@ Acceptance criteria:
 
 ### RAIKER-0301: Implement static policy config
 
-Add a simple static policy file such as `config/policy.phase1.json`.
-
 Acceptance criteria:
 
 - workspace root is defined;
 - allowed read actions are defined;
-- shell requires approval;
+- local action proposals that can affect the machine require approval;
 - outside-workspace access is denied;
 - tests cover allow, deny, and needs_approval.
 
 ### RAIKER-0302: Implement policy engine
-
-Policy engine evaluates `ToolAction` before execution.
 
 Acceptance criteria:
 
@@ -164,8 +168,6 @@ Acceptance criteria:
 
 ### RAIKER-0401: Implement tool broker routing
 
-The broker receives `ToolAction`, asks policy engine, then dispatches if allowed.
-
 Acceptance criteria:
 
 - unknown tool is denied or failed safely;
@@ -174,8 +176,6 @@ Acceptance criteria:
 - action proposal and policy decision are logged.
 
 ### RAIKER-0402: Implement safe file read
-
-Implement `read_file` inside workspace.
 
 Acceptance criteria:
 
@@ -187,8 +187,6 @@ Acceptance criteria:
 
 ### RAIKER-0403: Implement list directory
 
-Implement `list_directory` inside workspace.
-
 Acceptance criteria:
 
 - lists file and directory names;
@@ -198,8 +196,6 @@ Acceptance criteria:
 
 ### RAIKER-0404: Implement glob and grep
 
-Implement basic project search tools.
-
 Acceptance criteria:
 
 - glob patterns are restricted to workspace;
@@ -207,15 +203,13 @@ Acceptance criteria:
 - output is bounded by max results;
 - tests cover normal and bounded output.
 
-### RAIKER-0405: Implement shell approval placeholder
-
-Implement shell action path, but do not auto-run high-risk commands.
+### RAIKER-0405: Implement approval-gated local action placeholder
 
 Acceptance criteria:
 
-- shell action always requires approval in Phase 1;
-- without approval, command is not executed;
-- approval-required response is returned;
+- approval-gated action always requires approval in Phase 1;
+- without approval, the action is not executed;
+- approval-required response is rendered in the TUI approval area;
 - event log records proposal and approval request.
 
 ---
@@ -223,8 +217,6 @@ Acceptance criteria:
 ## Milestone 5: Model Router
 
 ### RAIKER-0501: Implement mock model provider
-
-The mock provider returns deterministic responses for tests.
 
 Acceptance criteria:
 
@@ -235,21 +227,27 @@ Acceptance criteria:
 
 ### RAIKER-0502: Implement model router interface
 
-Router selects a provider by profile.
-
 Acceptance criteria:
 
 - `mock` provider works;
 - unknown provider fails clearly;
-- no real hosted calls happen in Phase 1 tests.
+- no hosted calls happen in Phase 1 tests;
+- model profile registry is used.
+
+### RAIKER-0503: Implement TUI launch profile resolution
+
+Acceptance criteria:
+
+- `/launch --provider mock --model mock-deterministic` resolves the mock profile;
+- unknown provider/model returns structured error;
+- launch request emits model launch events;
+- tests cover success and unknown provider.
 
 ---
 
 ## Milestone 6: Runtime State Machine
 
 ### RAIKER-0601: Implement runtime states
-
-Implement the states listed in `docs/ARCHITECTURE.md`.
 
 Acceptance criteria:
 
@@ -260,19 +258,15 @@ Acceptance criteria:
 
 ### RAIKER-0602: Implement simple classifier and planner
 
-Implement deterministic classifiers for Phase 1.
-
 Acceptance criteria:
 
-- simple chat does not require tools;
+- simple prompt does not require tools;
 - file listing prompt maps to `filesystem_query`;
-- shell prompt maps to `shell_request`;
-- plan is required for shell and code-change tasks;
+- local action prompt maps to approval-gated action intent;
+- plan is required for approval-gated and code-change tasks;
 - plan skipped event includes reason.
 
 ### RAIKER-0603: Implement verification stub
-
-Verification checks that required outputs exist and action status is acceptable.
 
 Acceptance criteria:
 
@@ -286,8 +280,6 @@ Acceptance criteria:
 
 ### RAIKER-0701: Implement agent gateway
 
-Gateway validates prompt envelope and starts the runtime.
-
 Acceptance criteria:
 
 - invalid envelope returns failed response;
@@ -295,8 +287,6 @@ Acceptance criteria:
 - gateway logs prompt received.
 
 ### RAIKER-0702: Implement session manager
-
-Session manager creates and loads local session metadata.
 
 Acceptance criteria:
 
@@ -307,8 +297,6 @@ Acceptance criteria:
 
 ### RAIKER-0703: Implement checkpoint service
 
-Checkpoint service writes turn checkpoint JSON.
-
 Acceptance criteria:
 
 - checkpoint path is deterministic;
@@ -318,33 +306,49 @@ Acceptance criteria:
 
 ---
 
-## Milestone 8: CLI MVP
+## Milestone 8: TUI MVP
 
-### RAIKER-0801: Implement CLI prompt command
+### RAIKER-0801: Implement global `raiker` TUI launch
 
-Add CLI command:
+Acceptance criteria:
 
-```bash
-python -m apps.cli.main ask "List files in this project"
+- `raiker` starts the TUI;
+- TUI shows prompt input and status area;
+- TUI can exit safely;
+- tests cover dispatch.
+
+### RAIKER-0802: Implement TUI prompt path
+
+Acceptance criteria:
+
+- plain TUI input builds `PromptEnvelope`;
+- TUI calls gateway;
+- TUI renders final response;
+- event log is created;
+- checkpoint is created.
+
+### RAIKER-0803: Add TUI approval behaviour
+
+Acceptance criteria:
+
+- approval-gated prompt does not execute by default;
+- approval card explains approval is required;
+- event log contains approval request.
+
+### RAIKER-0804: Add TUI registry panels
+
+Add Phase 1 registry panels:
+
+```text
+/channels
+/models
 ```
 
 Acceptance criteria:
 
-- builds `PromptEnvelope`;
-- calls gateway;
-- prints final response;
-- event log is created;
-- checkpoint is created.
-
-### RAIKER-0802: Add CLI approval behaviour
-
-For shell actions, CLI should show approval-required response instead of running automatically.
-
-Acceptance criteria:
-
-- shell command prompt does not execute by default;
-- output explains approval is required;
-- event log contains approval request.
+- lists profiles from config registries;
+- disabled profiles are visible as disabled;
+- invalid registry produces structured error.
 
 ---
 
@@ -354,12 +358,14 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- simple chat completes;
-- list directory completes;
-- shell request pauses for approval;
+- global `raiker` opens TUI;
+- simple prompt completes through TUI;
+- list directory completes through TUI;
+- approval-gated request pauses for approval;
 - denied outside-workspace read does not execute;
 - event log contains expected event sequence;
-- checkpoint exists after completion.
+- checkpoint exists after completion;
+- `/launch --provider mock --model mock-deterministic` resolves a profile.
 
 ---
 
@@ -368,12 +374,14 @@ Acceptance criteria:
 Phase 1 is complete when:
 
 - all tests pass;
-- CLI can run a simple prompt;
-- CLI can run safe filesystem query;
-- shell action is policy-gated;
+- global `raiker` command opens TUI;
+- TUI can run a simple prompt;
+- TUI can run safe filesystem query;
+- approval-gated local action is policy-gated;
 - event log is created for every turn;
 - checkpoint is created for every completed turn;
-- no future-phase features are implemented beyond stubs;
+- connector/model registries load and list inside TUI;
+- phase-scheduled features are not wired beyond the Phase 1 task scope;
 - docs remain consistent with implementation.
 
 ---
@@ -384,8 +392,17 @@ Phase 1 is complete when:
 python -m pytest
 python -m ruff check .
 python -m mypy raiker apps tests
-python -m apps.cli.main ask "Hello Raiker"
-python -m apps.cli.main ask "List files in this project"
+raiker
 ```
 
-If mypy is not configured yet, document that explicitly rather than pretending it ran.
+Expected manual TUI validation actions:
+
+```text
+normal prompt: Hello Raiker
+normal prompt: List files in this project
+/launch --provider mock --model mock-deterministic
+/channels
+/models
+```
+
+If mypy or the global command is not configured yet during bootstrapping, document that explicitly rather than pretending it ran.

@@ -6,15 +6,81 @@ The Rich TUI is a first-class client that can show live work, ask and answer sid
 
 ---
 
+## Global Command Requirement
+
+Raiker must install a global command named `raiker`.
+
+The `raiker` command is the canonical entry point for CLI, TUI, gateway, model launch, model selection, provider binding, connector linking, diagnostics, and session management.
+
+### Global Command Family
+
+```bash
+raiker
+raiker ask "List files in this project"
+raiker chat
+raiker tui
+raiker launch --provider ollama --model qwen3.5-coder:9b
+raiker launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
+raiker launch --provider lm-studio --model local-model
+raiker launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
+raiker gateway start
+raiker gateway status
+raiker sessions list
+raiker sessions resume <session_id>
+raiker sessions fork <checkpoint_id>
+raiker models list
+raiker models use <profile_id>
+raiker channels list
+raiker channels link <connector_id>
+raiker memory search "policy boundary"
+raiker graph query --symbol ToolBroker
+raiker doctor
+```
+
+`raiker` with no arguments starts the interactive CLI or Rich TUI depending on installation profile and terminal capability.
+
+### Provider Launch Contract
+
+Canonical provider launch syntax:
+
+```bash
+raiker launch --provider <provider> --model <model>
+```
+
+Required provider examples:
+
+```bash
+raiker launch --provider ollama --model qwen3.5-coder:9b
+raiker launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
+raiker launch --provider lm-studio --model local-model
+raiker launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
+```
+
+External provider adapters may expose convenience forms. For example, if a platform supports extension-style commands, an adapter may accept a shape such as:
+
+```bash
+ollama launch raiker --model <model>
+```
+
+That adapter must delegate into the canonical Raiker launch contract and record the equivalent command in the event log:
+
+```bash
+raiker launch --provider ollama --model <model>
+```
+
+The canonical `raiker` global command must always work independently of provider-specific shortcuts.
+
+---
+
 ## Interface Modes
 
-| Mode | Purpose |
-|---|---|
-| `cli_command` | One-shot command, scriptable. |
-| `interactive_cli` | Prompt loop in terminal. |
-| `rich_tui` | Full terminal UI with panels and background tasks. |
-| `headless` | API/automation mode. |
-| `daemon` | Long-running local service for channels/webhooks. |
+| Mode | Purpose | Command |
+|---|---|---|
+| `cli_command` | One-shot command, scriptable. | `raiker ask "..."` |
+| `interactive_cli` | Prompt loop in terminal. | `raiker chat` |
+| `rich_tui` | Full terminal UI with panels and background tasks. | `raiker tui` or `raiker` |
+| `headless` | API/automation mode. | `raiker ask --json "..."` |
+| `daemon` | Long-running local service for channels/webhooks. | `raiker gateway start` |
 
 ---
 
@@ -108,14 +174,7 @@ The user can interrupt active work with explicit controls:
 | `rewind` | Restore previous checkpoint. |
 | `summarise` | Summarise current task state. |
 
-Safe boundaries include:
-
-- before tool execution;
-- after tool completion;
-- before file write;
-- before shell execution;
-- before checkpoint creation;
-- before subagent handoff.
+Safe boundaries include before tool execution, after tool completion, before file write, before local command execution, before checkpoint creation, and before subagent handoff.
 
 ---
 
@@ -126,7 +185,7 @@ Raiker command input must support:
 | Syntax | Meaning |
 |---|---|
 | `/command` | Slash command. |
-| `!command` | Shell command proposal, never direct execution without policy. |
+| `!command` | Local command proposal, never direct execution without policy. |
 | `@path` | File or directory mention. |
 | `#task` | Task reference. |
 | `$memory` | Memory reference/search. |
@@ -158,6 +217,7 @@ Raiker command input must support:
 | `/plugins` | Show plugin registry. |
 | `/channels` | Show paired channels. |
 | `/models` | Show model profiles. |
+| `/launch` | Launch or switch model provider profile. |
 | `/compact` | Compact context. |
 | `/export` | Export session/task/events. |
 | `/doctor` | Run diagnostics. |
@@ -187,21 +247,7 @@ Command expansion must be event-logged.
 
 ## Background Task UI
 
-A background task must expose:
-
-- task ID;
-- title;
-- status;
-- current step;
-- progress percentage if known;
-- started time;
-- elapsed time;
-- last event;
-- pending approvals;
-- side questions;
-- changed files;
-- output artifacts;
-- cancel/pause/steer controls.
+A background task must expose task ID, title, status, current step, progress, started time, elapsed time, last event, pending approvals, side questions, changed files, output artifacts, and cancel/pause/steer controls.
 
 Task statuses:
 
@@ -219,16 +265,7 @@ Task statuses:
 
 ## Approval UX
 
-Approvals must show:
-
-- exact tool/action;
-- exact command/path/URL;
-- risk level;
-- policy reasons;
-- file diff if file write/edit;
-- network host if network;
-- shell command classification;
-- choices: approve once, approve session, deny, defer, inspect.
+Approvals must show exact tool/action, exact command/path/URL, risk level, policy reasons, file diff if file write/edit, network host if network, command classification, and choices: approve once, approve session, deny, defer, inspect.
 
 No approval should be hidden in a stream of text. It must appear in approval inbox.
 
@@ -236,13 +273,7 @@ No approval should be hidden in a stream of text. It must appear in approval inb
 
 ## File Mentions
 
-`@path` mentions must:
-
-- resolve inside workspace unless allowed;
-- show matched files before loading if ambiguous;
-- require approval for large/binary/sensitive files;
-- record provenance in context bundle;
-- never bypass policy.
+`@path` mentions must resolve inside workspace unless allowed, show matched files before loading if ambiguous, require approval for large/binary/sensitive files, record provenance in context bundle, and never bypass policy.
 
 ---
 
@@ -253,6 +284,9 @@ Required events:
 - `tui_started`
 - `tui_panel_opened`
 - `tui_command_submitted`
+- `global_command_invoked`
+- `model_launch_requested`
+- `model_launch_completed`
 - `command_expanded`
 - `side_question_received`
 - `side_question_answered`
@@ -269,6 +303,8 @@ Required events:
 
 Tests must prove:
 
+- global `raiker` command dispatches to CLI/TUI/gateway/model subcommands;
+- provider launch maps to a model profile;
 - command parser handles `/`, `!`, `@`, `?`;
 - side question does not stop active task;
 - interrupt changes active task state safely;

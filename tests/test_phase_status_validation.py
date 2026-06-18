@@ -5,7 +5,9 @@ from pathlib import Path
 
 
 def test_phase_status_validation_script_passes() -> None:
-    result = subprocess.run(["python", "scripts/validate_phase_status.py"], check=False, capture_output=True, text=True)
+    result = subprocess.run(
+        ["python", "scripts/validate_phase_status.py"], check=False, capture_output=True, text=True
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "passed" in result.stdout
 

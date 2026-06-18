@@ -10,9 +10,23 @@ class StaticPolicyConfig:
     policy_id: str = "phase1-static"
     policy_version: str = "phase1-static-v1"
     allowed_read_actions: frozenset[str] = field(
-        default_factory=lambda: frozenset({"read_file", "list_directory", "glob", "grep", "stat_path", "diff_files", "git_status", "git_diff", "git_log"})
+        default_factory=lambda: frozenset(
+            {
+                "read_file",
+                "list_directory",
+                "glob",
+                "grep",
+                "stat_path",
+                "diff_files",
+                "git_status",
+                "git_diff",
+                "git_log",
+            }
+        )
     )
-    approval_required_actions: frozenset[str] = field(default_factory=lambda: frozenset({"shell", "write_file", "edit_file", "apply_patch"}))
+    approval_required_actions: frozenset[str] = field(
+        default_factory=lambda: frozenset({"shell", "write_file", "edit_file", "apply_patch"})
+    )
     denied_actions: frozenset[str] = field(
         default_factory=lambda: frozenset(
             {

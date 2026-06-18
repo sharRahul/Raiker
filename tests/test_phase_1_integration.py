@@ -12,7 +12,9 @@ def _copy_config(tmp_path: Path) -> None:
     (tmp_path / "config").mkdir()
     source_config = Path(__file__).resolve().parents[1] / "config"
     for name in ["model-profiles.json", "channel-connectors.json"]:
-        (tmp_path / "config" / name).write_text((source_config / name).read_text(encoding="utf-8"), encoding="utf-8")
+        (tmp_path / "config" / name).write_text(
+            (source_config / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
 
 
 def test_end_to_end_event_sequences_and_checkpoint(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -23,7 +25,10 @@ def test_end_to_end_event_sequences_and_checkpoint(tmp_path, monkeypatch) -> Non
     response = gateway.submit_prompt(build_prompt_envelope("List files in this project"))
     assert response.status == "completed"
     assert response.events_path is not None
-    events = [json.loads(line)["event_type"] for line in Path(response.events_path).read_text(encoding="utf-8").splitlines()]
+    events = [
+        json.loads(line)["event_type"]
+        for line in Path(response.events_path).read_text(encoding="utf-8").splitlines()
+    ]
     for expected in [
         "prompt_received",
         "prompt_normalised",
@@ -48,9 +53,15 @@ def test_end_to_end_event_sequences_and_checkpoint(tmp_path, monkeypatch) -> Non
 def test_outside_workspace_read_denied_and_no_tool_started(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.chdir(tmp_path)
     _copy_config(tmp_path)
-    response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("read file ../secret.txt"))
+    response = AgentGateway(tmp_path).submit_prompt(
+        build_prompt_envelope("read file ../secret.txt")
+    )
     assert response.status == "denied"
-    events = [json.loads(line)["event_type"] for line in Path(response.events_path).read_text(encoding="utf-8").splitlines()]  # type: ignore[arg-type]
+    assert response.events_path is not None
+    events = [
+        json.loads(line)["event_type"]
+        for line in Path(response.events_path).read_text(encoding="utf-8").splitlines()
+    ]
     assert "policy_decision" in events
     assert "tool_started" not in events
 
@@ -60,13 +71,19 @@ def test_local_action_waits_for_approval(tmp_path, monkeypatch) -> None:  # type
     _copy_config(tmp_path)
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("!pytest"))
     assert response.status == "needs_approval"
-    events = [json.loads(line)["event_type"] for line in Path(response.events_path).read_text(encoding="utf-8").splitlines()]  # type: ignore[arg-type]
+    assert response.events_path is not None
+    events = [
+        json.loads(line)["event_type"]
+        for line in Path(response.events_path).read_text(encoding="utf-8").splitlines()
+    ]
     assert "approval_requested" in events
     assert "tool_started" not in events
 
 
 def test_status_bar_named_items_and_context_rendering() -> None:
-    rendered = StatusBarRenderer().render(StatusContext(context_used=16000, context_max=32000, last_event="tool_completed"))
+    rendered = StatusBarRenderer().render(
+        StatusContext(context_used=16000, context_max=32000, last_event="tool_completed")
+    )
     assert "ctx_bar:" in rendered
     assert "50%" in rendered
     assert "ctx:16k/32k" in rendered

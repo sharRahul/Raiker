@@ -60,7 +60,9 @@ class TestTerminalCommands:
     def test_handle_events_with_data(self, store: SQLiteStore) -> None:
         sid = new_id("sess_")
         writer = EventLogWriter(store)
-        writer.append(make_event(session_id=sid, turn_id=None, event_type="prompt_received", actor="test"))
+        writer.append(
+            make_event(session_id=sid, turn_id=None, event_type="prompt_received", actor="test")
+        )
         result = handle_events(workspace_root=str(store.paths.workspace_root))
         assert "prompt_received" in result
 

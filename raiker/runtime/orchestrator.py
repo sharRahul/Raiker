@@ -31,7 +31,9 @@ class RuntimeOrchestrator:
         self.planner = SimplePlanner()
         self.verifier = VerificationStub()
 
-    def _state(self, machine: RuntimeStateMachine, envelope: PromptEnvelope, new_state: str) -> None:
+    def _state(
+        self, machine: RuntimeStateMachine, envelope: PromptEnvelope, new_state: str
+    ) -> None:
         old_state = machine.state
         machine.transition(new_state)
         self.writer.append(
@@ -133,7 +135,9 @@ class RuntimeOrchestrator:
             },
         )
         self._state(machine, envelope, "CONTEXT_READY")
-        self._event(envelope, "context_gathered", {"sources": ["current_prompt"], "context_items": 1})
+        self._event(
+            envelope, "context_gathered", {"sources": ["current_prompt"], "context_items": 1}
+        )
         plan_result = self.planner.create_or_skip(classification)
         self._state(machine, envelope, "PLAN_READY" if plan_result.required else "PLAN_SKIPPED")
         self._event(envelope, plan_result.event_type, plan_result.payload)
@@ -142,7 +146,12 @@ class RuntimeOrchestrator:
         tool_result: ToolResult | None = None
         if action is None:
             self._state(machine, envelope, "RESPONDING")
-            message = self.model_router.generate("mock", "mock-deterministic", envelope.prompt.text, {"intent": classification.intent})
+            message = self.model_router.generate(
+                "mock",
+                "mock-deterministic",
+                envelope.prompt.text,
+                {"intent": classification.intent},
+            )
             status = "completed"
             approval = None
         else:

@@ -17,11 +17,15 @@ class ModelLaunchResult:
 
 
 class ModelRouter:
-    def __init__(self, registry: ModelProfileRegistry, writer: EventLogWriter | None = None) -> None:
+    def __init__(
+        self, registry: ModelProfileRegistry, writer: EventLogWriter | None = None
+    ) -> None:
         self.registry = registry
         self.writer = writer
 
-    def generate(self, provider: str, model: str, prompt: str, context: dict[str, object] | None = None) -> str:
+    def generate(
+        self, provider: str, model: str, prompt: str, context: dict[str, object] | None = None
+    ) -> str:
         profile = self.registry.resolve(provider, model)
         if profile.provider != "mock":
             raise RegistryError(f"provider_not_wired_in_phase_1:{profile.provider}")
@@ -69,8 +73,14 @@ class ModelRouter:
                     turn_id=turn_id,
                     event_type="model_launch_completed",
                     actor="model_router",
-                    payload={"profile_id": profile.profile_id, "provider": profile.provider, "model": profile.model},
+                    payload={
+                        "profile_id": profile.profile_id,
+                        "provider": profile.provider,
+                        "model": profile.model,
+                    },
                     client=client,
                 )
             )
-        return ModelLaunchResult("completed", profile, f"Resolved model profile {profile.profile_id}")
+        return ModelLaunchResult(
+            "completed", profile, f"Resolved model profile {profile.profile_id}"
+        )

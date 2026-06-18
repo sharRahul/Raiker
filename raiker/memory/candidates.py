@@ -18,7 +18,9 @@ class MemoryCandidate:
     created_at: str
 
 
-def create_deferred_candidate(source_event_id: str, text: str, scope: str = "project") -> MemoryCandidate:
+def create_deferred_candidate(
+    source_event_id: str, text: str, scope: str = "project"
+) -> MemoryCandidate:
     return MemoryCandidate(
         candidate_id=new_id("memcand_"),
         source_event_id=source_event_id,
@@ -33,4 +35,8 @@ def create_deferred_candidate(source_event_id: str, text: str, scope: str = "pro
 
 
 def governed_memory_status(candidates: list[dict[str, object]]) -> dict[str, object]:
-    return {"durable_writes_enabled": False, "candidate_count": len(candidates), "mode": "read_only_review"}
+    return {
+        "durable_writes_enabled": False,
+        "candidate_count": len(candidates),
+        "mode": "read_only_review",
+    }

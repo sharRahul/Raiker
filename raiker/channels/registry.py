@@ -42,7 +42,9 @@ class ConnectorRegistry:
         for entry in data["connectors"]:
             missing = required - set(entry)
             if missing:
-                raise RegistryError(f"connector_profile_missing_fields:{sorted(missing)}", entry=entry)
+                raise RegistryError(
+                    f"connector_profile_missing_fields:{sorted(missing)}", entry=entry
+                )
             if entry["interface_status"] != "equal_primary_when_enabled":
                 raise RegistryError("connector_not_equal_primary", entry=entry)
             profiles.append(

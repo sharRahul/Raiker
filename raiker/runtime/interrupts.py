@@ -13,8 +13,24 @@ class InterruptController:
 
     def apply_at_safe_boundary(self, action: InterruptAction) -> str:
         if self.writer:
-            self.writer.append(make_event(session_id=action.session_id, turn_id=None, event_type="interrupt_received", actor="runtime", payload=action.to_dict()))
-            self.writer.append(make_event(session_id=action.session_id, turn_id=None, event_type="safe_boundary_reached", actor="runtime", payload={"task_id": action.task_id}))
+            self.writer.append(
+                make_event(
+                    session_id=action.session_id,
+                    turn_id=None,
+                    event_type="interrupt_received",
+                    actor="runtime",
+                    payload=action.to_dict(),
+                )
+            )
+            self.writer.append(
+                make_event(
+                    session_id=action.session_id,
+                    turn_id=None,
+                    event_type="safe_boundary_reached",
+                    actor="runtime",
+                    payload={"task_id": action.task_id},
+                )
+            )
         if action.action_type == "pause":
             self.store.update_task_status(action.task_id, "paused")
             return "paused"
@@ -26,5 +42,13 @@ class InterruptController:
             return "running"
         self.store.update_task_progress(action.task_id, action.steer_text or action.reason, 0)
         if self.writer:
-            self.writer.append(make_event(session_id=action.session_id, turn_id=None, event_type="task_steered", actor="runtime", payload={"task_id": action.task_id, "steer_text": action.steer_text}))
+            self.writer.append(
+                make_event(
+                    session_id=action.session_id,
+                    turn_id=None,
+                    event_type="task_steered",
+                    actor="runtime",
+                    payload={"task_id": action.task_id, "steer_text": action.steer_text},
+                )
+            )
         return "steered"

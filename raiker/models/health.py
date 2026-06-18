@@ -19,5 +19,9 @@ def check_local_provider(provider: str) -> ProviderHealth:
     binary = shutil.which("ollama")
     if binary is None:
         return ProviderHealth(provider, False, False, "ollama_binary_not_found")
-    proc = subprocess.run([binary, "--version"], check=False, capture_output=True, text=True, timeout=5)
-    return ProviderHealth(provider, proc.returncode == 0, False, (proc.stdout or proc.stderr).strip())
+    proc = subprocess.run(
+        [binary, "--version"], check=False, capture_output=True, text=True, timeout=5
+    )
+    return ProviderHealth(
+        provider, proc.returncode == 0, False, (proc.stdout or proc.stderr).strip()
+    )

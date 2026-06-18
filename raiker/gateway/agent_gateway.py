@@ -46,7 +46,9 @@ class AgentGateway:
     def submit_prompt(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
         try:
             prompt_envelope = (
-                envelope if isinstance(envelope, PromptEnvelope) else PromptEnvelope.from_dict(envelope)  # type: ignore[arg-type]
+                envelope
+                if isinstance(envelope, PromptEnvelope)
+                else PromptEnvelope.from_dict(envelope)  # type: ignore[arg-type]
             )
         except (KeyError, TypeError, ContractValidationError, ValueError) as exc:
             return AgentResponse(
@@ -68,7 +70,10 @@ class AgentGateway:
                 turn_id=prompt_envelope.turn_id,
                 event_type="prompt_received",
                 actor="agent_gateway",
-                payload={"client_type": prompt_envelope.client.type, "prompt_length": len(prompt_envelope.prompt.text)},
+                payload={
+                    "client_type": prompt_envelope.client.type,
+                    "prompt_length": len(prompt_envelope.prompt.text),
+                },
                 client=prompt_envelope.client,
             )
         )

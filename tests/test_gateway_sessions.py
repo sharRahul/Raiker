@@ -22,9 +22,17 @@ def test_gateway_preserves_client_metadata_and_writes_events(tmp_path, monkeypat
     (tmp_path / "config").mkdir()
     source_config = __import__("pathlib").Path(__file__).resolve().parents[1] / "config"
     for name in ["model-profiles.json", "channel-connectors.json"]:
-        (tmp_path / "config" / name).write_text((source_config / name).read_text(encoding="utf-8"), encoding="utf-8")
+        (tmp_path / "config" / name).write_text(
+            (source_config / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("Hello Raiker"))
     assert response.status == "completed"
     assert response.checkpoint_path is not None
-    lines = [json.loads(line) for line in __import__("pathlib").Path(response.events_path).read_text(encoding="utf-8").splitlines()]  # type: ignore[arg-type]
+    lines = [
+        json.loads(line)
+        for line in __import__("pathlib")
+        .Path(response.events_path)
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]  # type: ignore[arg-type]
     assert lines[0]["payload"]["client"]["interface_status"] == "equal_primary_when_enabled"

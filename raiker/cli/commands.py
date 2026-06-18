@@ -18,10 +18,13 @@ from raiker.contracts.models import (
 from raiker.diagnostics import render_doctor
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
+from raiker.execution.profiles import list_execution_profiles
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.memory.candidates import governed_memory_status
+from raiker.memory.semantic import semantic_memory_status
 from raiker.models.registry import ModelProfileRegistry, RegistryError
 from raiker.models.router import ModelRouter
+from raiker.phase_gates import list_disabled_capabilities
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
 
@@ -35,7 +38,9 @@ def terminal_client() -> ClientMetadata:
     )
 
 
-def build_prompt_envelope(prompt: str, *, session_id: str | None = None, client: ClientMetadata | None = None) -> PromptEnvelope:
+def build_prompt_envelope(
+    prompt: str, *, session_id: str | None = None, client: ClientMetadata | None = None
+) -> PromptEnvelope:
     return PromptEnvelope(
         request_id=new_id("req_"),
         session_id=session_id or new_id("sess_"),
@@ -94,7 +99,9 @@ def handle_status(*, workspace_root: str | Path = ".") -> str:
     sessions = store.list_sessions()
     pending = 0
     with store.connect() as connection:
-        row = connection.execute("SELECT COUNT(*) AS cnt FROM approvals WHERE status = 'pending'").fetchone()
+        row = connection.execute(
+            "SELECT COUNT(*) AS cnt FROM approvals WHERE status = 'pending'"
+        ).fetchone()
         if row:
             pending = int(row["cnt"])
     latest_session_id = sessions[0].get("session_id") if sessions else "none"
@@ -119,7 +126,9 @@ def handle_tasks(*, workspace_root: str | Path = ".") -> str:
         return "No tasks."
     lines = ["Tasks:"]
     for task in tasks:
-        lines.append(f"- {task.task_id} {task.title} [{task.status}] progress={task.progress_percent or 0}%")
+        lines.append(
+            f"- {task.task_id} {task.title} [{task.status}] progress={task.progress_percent or 0}%"
+        )
     return "\n".join(lines)
 
 
@@ -131,7 +140,9 @@ def handle_events(*, workspace_root: str | Path = ".") -> str:
         return "No events."
     lines = ["Recent events:"]
     for event in events:
-        lines.append(f"- {event['event_type']} {event['actor']} {event['timestamp']} {event['event_id']}")
+        lines.append(
+            f"- {event['event_type']} {event['actor']} {event['timestamp']} {event['event_id']}"
+        )
     return "\n".join(lines)
 
 
@@ -144,10 +155,10 @@ def handle_checkpoints(*, workspace_root: str | Path = ".") -> str:
     lines = ["Checkpoints:"]
     for cp in checkpoints:
         summary = cp.get("summary", "")
-        lines.append(f"- {cp['checkpoint_id']} session={cp['session_id']} turn={cp['turn_id']} type={cp['checkpoint_type']} created={cp['created_at']} summary={summary}")
+        lines.append(
+            f"- {cp['checkpoint_id']} session={cp['session_id']} turn={cp['turn_id']} type={cp['checkpoint_type']} created={cp['created_at']} summary={summary}"
+        )
     return "\n".join(lines)
-
-
 
 
 def handle_memory(*, workspace_root: str | Path = ".") -> str:
@@ -161,8 +172,36 @@ def handle_memory(*, workspace_root: str | Path = ".") -> str:
         f"candidate_count: {status['candidate_count']}",
     ]
     for candidate in candidates[:10]:
-        lines.append(f"- {candidate['candidate_id']} decision={candidate['decision']} scope={candidate['scope']}")
+        lines.append(
+            f"- {candidate['candidate_id']} decision={candidate['decision']} scope={candidate['scope']}"
+        )
     return "\n".join(lines)
+
+
+def handle_capabilities() -> str:
+    disabled = list_disabled_capabilities()
+    lines = ["Phase capability gates:"]
+    for phase, capabilities in disabled.items():
+        lines.append(f"{phase}:")
+        for capability in capabilities:
+            lines.append(f"- {capability}: disabled")
+    return "\n".join(lines)
+
+
+def handle_execution_profiles() -> str:
+    lines = ["Execution profiles:"]
+    for profile in list_execution_profiles():
+        lines.append(
+            f"- {profile.profile_id} kind={profile.kind} state={profile.default_state} requires_approval={profile.requires_approval}"
+        )
+    return "\n".join(lines)
+
+
+def handle_semantic_memory(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    status = semantic_memory_status(len(store.list_memory_candidates()))
+    return "\n".join([f"{key}: {value}" for key, value in status.items()])
+
 
 def handle_approvals(*, workspace_root: str | Path = ".") -> str:
     inbox = ApprovalInbox(SQLiteStore(workspace_root))
@@ -171,7 +210,9 @@ def handle_approvals(*, workspace_root: str | Path = ".") -> str:
         return "No pending approvals."
     lines = ["Pending approvals:"]
     for approval in approvals:
-        lines.append(f"- {approval['approval_id']} action={approval['action_id']} tool={approval['tool_name']} risk={approval['risk_level']}")
+        lines.append(
+            f"- {approval['approval_id']} action={approval['action_id']} tool={approval['tool_name']} risk={approval['risk_level']}"
+        )
     return "\n".join(lines)
 
 
@@ -184,14 +225,17 @@ def handle_approval_resolution(command: str, *, workspace_root: str | Path = "."
         resolution = inbox.resolve(parts[1], approve=parts[0] == "/approve")
     except ValueError as exc:
         return f"Approval resolution failed: {exc}"
-    return f"Approval {resolution.approval_id} {resolution.status} for action {resolution.action_id}."
+    return (
+        f"Approval {resolution.approval_id} {resolution.status} for action {resolution.action_id}."
+    )
+
 
 def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> str:
     command = command.strip()
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -208,9 +252,19 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_approvals(workspace_root=workspace_root)
     if command == "/memory":
         return handle_memory(workspace_root=workspace_root)
+    if command == "/semantic-memory":
+        return handle_semantic_memory(workspace_root=workspace_root)
+    if command == "/capabilities":
+        return handle_capabilities()
+    if command == "/execution-profiles":
+        return handle_execution_profiles()
     if command == "/doctor":
         return render_doctor(workspace_root=workspace_root)
-    if command in {"/approve", "/deny"} or command.startswith("/approve ") or command.startswith("/deny "):
+    if (
+        command in {"/approve", "/deny"}
+        or command.startswith("/approve ")
+        or command.startswith("/deny ")
+    ):
         return handle_approval_resolution(command, workspace_root=workspace_root)
     if command.startswith("/launch "):
         try:
@@ -226,7 +280,9 @@ def submit_terminal_prompt(prompt: str, *, workspace_root: str | Path = ".") -> 
     response = gateway.submit_prompt(envelope)
     parts = [response.message]
     if response.approval is not None:
-        parts.append(f"Approval card: action={response.approval['action_id']} tool={response.approval['tool_name']} risk={response.approval['risk_level']}")
+        parts.append(
+            f"Approval card: action={response.approval['action_id']} tool={response.approval['tool_name']} risk={response.approval['risk_level']}"
+        )
     if response.events_path:
         parts.append(f"events: {response.events_path}")
     if response.checkpoint_path:

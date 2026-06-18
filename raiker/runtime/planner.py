@@ -29,11 +29,15 @@ class SimplePlanner:
                             "risk_level": classification.risk_level,
                         }
                     ],
-                    "requires_approval": classification.intent in {"local_action_request", "code_change_request"},
+                    "requires_approval": classification.intent
+                    in {"local_action_request", "code_change_request"},
                 },
             )
         return PlanResult(
             required=False,
             event_type="plan_skipped",
-            payload={"reason": "single_safe_turn_or_read_only_query", "intent": classification.intent},
+            payload={
+                "reason": "single_safe_turn_or_read_only_query",
+                "intent": classification.intent,
+            },
         )

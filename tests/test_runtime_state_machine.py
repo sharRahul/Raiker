@@ -7,7 +7,15 @@ from raiker.runtime.state_machine import InvalidStateTransition, RuntimeStateMac
 
 def test_valid_transitions() -> None:
     machine = RuntimeStateMachine()
-    for state in ["NORMALISED", "CLASSIFIED", "CONTEXT_READY", "PLAN_SKIPPED", "RESPONDING", "CHECKPOINTING", "CLOSED"]:
+    for state in [
+        "NORMALISED",
+        "CLASSIFIED",
+        "CONTEXT_READY",
+        "PLAN_SKIPPED",
+        "RESPONDING",
+        "CHECKPOINTING",
+        "CLOSED",
+    ]:
         machine.transition(state)
     assert machine.state == "CLOSED"
 

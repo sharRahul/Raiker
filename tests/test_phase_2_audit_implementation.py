@@ -27,10 +27,15 @@ from raiker.tools.git import run_git
 def test_side_question_contract_and_read_only_runtime(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     runtime = SideQuestionRuntime(EventLogWriter(store))
-    turn = runtime.answer_read_only(session_id="sess", parent_turn_id="parent", question="q", answer="a")
+    turn = runtime.answer_read_only(
+        session_id="sess", parent_turn_id="parent", question="q", answer="a"
+    )
     assert isinstance(turn, SideQuestionTurn)
     assert turn.read_only is True
-    assert {event["event_type"] for event in store.list_event_index(session_id="sess")} == {"side_question_received", "side_question_answered"}
+    assert {event["event_type"] for event in store.list_event_index(session_id="sess")} == {
+        "side_question_received",
+        "side_question_answered",
+    }
 
 
 def test_interrupt_controller_applies_at_safe_boundary(tmp_path: Path) -> None:
@@ -46,12 +51,22 @@ def test_interrupt_controller_applies_at_safe_boundary(tmp_path: Path) -> None:
 
 
 def test_approval_inbox_and_terminal_resolution(tmp_path: Path) -> None:
-    broker = ToolBroker(workspace_root=tmp_path, policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)), store=SQLiteStore(tmp_path))
-    result, _ = broker.execute(ToolAction(new_id("act_"), "write_file", {"path": "a.txt", "text": "x"}, "high", True), session_id="sess", turn_id="turn")
+    broker = ToolBroker(
+        workspace_root=tmp_path,
+        policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)),
+        store=SQLiteStore(tmp_path),
+    )
+    result, _ = broker.execute(
+        ToolAction(new_id("act_"), "write_file", {"path": "a.txt", "text": "x"}, "high", True),
+        session_id="sess",
+        turn_id="turn",
+    )
     approval_id = str(result.output["approval_id"])  # type: ignore[index]
     assert approval_id in handle_approvals(workspace_root=tmp_path)
     assert ApprovalInbox(broker.store).list_pending()[0]["approval_scope"] == "action"  # type: ignore[arg-type,union-attr]
-    assert "approved" in handle_approval_resolution(f"/approve {approval_id}", workspace_root=tmp_path)
+    assert "approved" in handle_approval_resolution(
+        f"/approve {approval_id}", workspace_root=tmp_path
+    )
     assert handle_approvals(workspace_root=tmp_path) == "No pending approvals."
 
 
@@ -63,7 +78,9 @@ def test_terminal_slash_approval_commands(tmp_path: Path) -> None:
 def test_checkpoint_restore_and_fork_are_plans_only(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     service = CheckpointService(store)
-    checkpoint, _ = service.write_turn_checkpoint(session_id="sess", turn_id="turn", runtime_state="CLOSED", summary="s", last_event_id="evt")
+    checkpoint, _ = service.write_turn_checkpoint(
+        session_id="sess", turn_id="turn", runtime_state="CLOSED", summary="s", last_event_id="evt"
+    )
     assert service.plan_restore(checkpoint.checkpoint_id)["can_execute"] is False
     assert service.plan_fork(checkpoint.checkpoint_id)["requires_approval"] is True
 
@@ -110,9 +127,21 @@ def test_write_approval_includes_before_snapshot_and_resolution_event(tmp_path: 
     (tmp_path / "a.txt").write_text("before", encoding="utf-8")
     store = SQLiteStore(tmp_path)
     writer = EventLogWriter(store)
-    broker = ToolBroker(workspace_root=tmp_path, policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)), store=store, writer=writer)
-    result, decision = broker.execute(ToolAction(new_id("act_"), "write_file", {"path": "a.txt", "text": "after"}, "high", True), session_id="sess", turn_id="turn")
-    assert decision.reasons == ["write_file_requires_approval", "phase2_action_bound_approval_required"]
+    broker = ToolBroker(
+        workspace_root=tmp_path,
+        policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)),
+        store=store,
+        writer=writer,
+    )
+    result, decision = broker.execute(
+        ToolAction(new_id("act_"), "write_file", {"path": "a.txt", "text": "after"}, "high", True),
+        session_id="sess",
+        turn_id="turn",
+    )
+    assert decision.reasons == [
+        "write_file_requires_approval",
+        "phase2_action_bound_approval_required",
+    ]
     preview = result.output["proposal_preview"]  # type: ignore[index]
     assert preview["before_snapshot"] == "before"
     approval_id = str(result.output["approval_id"])  # type: ignore[index]
@@ -122,7 +151,9 @@ def test_write_approval_includes_before_snapshot_and_resolution_event(tmp_path: 
 
 
 def test_memory_and_doctor_terminal_commands(tmp_path: Path) -> None:
-    assert "durable_writes_enabled: False" in handle_slash_command("/memory", workspace_root=tmp_path)
+    assert "durable_writes_enabled: False" in handle_slash_command(
+        "/memory", workspace_root=tmp_path
+    )
     doctor = handle_slash_command("/doctor", workspace_root=tmp_path)
     assert "ollama_runtime_enabled: False" in doctor
     assert "phase_4_disabled:" in doctor

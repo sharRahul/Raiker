@@ -223,3 +223,17 @@ New planning/review-only surfaces:
 - `/memory-review` and `/memory-review --summary` inspect governed memory candidates without semantic writes.
 
 | `/workspace-view` safe terminal snapshot command | `implemented_verified` | `raiker/cli/commands.py`, `tests/test_phase_3_workspace_views.py` |
+
+## 2026-06-18 Phase 3 Slice E — approval-preview UX/contracts
+
+Status: `implemented_verified` locally for the Slice E contract surface only; full Phase 3 is not complete.
+
+Slice E adds preview-only approval contracts for future graph/codemap indexing and semantic memory writes. The implementation exposes deterministic preview rendering, redaction of secret-like memory text, CLI preview commands, and workspace inspection summary fields.
+
+Safety status:
+
+- Graph/codemap runtime indexing remains disabled.
+- Semantic/vector memory writes remain disabled.
+- Previews are not approvals to execute; approving for later does not write memory or run indexing.
+- No embeddings, vectors, background indexers, watchers, daemons, plugins, channels, remote execution, or container execution are activated.
+- GitHub Actions remain paused due quota exhaustion; local validation evidence is mandatory and full CI must be re-enabled later when quota is available.

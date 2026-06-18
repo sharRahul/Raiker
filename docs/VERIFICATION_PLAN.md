@@ -381,3 +381,27 @@ New planning/review-only surfaces:
 - `/graph-status` reports graph/codemap indexing disabled and dry-run planning available.
 - `/graph-plan` renders a dry-run plan with `can_index: false` and `runtime_indexing_enabled: false`.
 - `/memory-review` and `/memory-review --summary` inspect governed memory candidates without semantic writes.
+
+## Phase 3 Slice E Local Validation Addendum
+
+Because GitHub Actions are paused due quota exhaustion, Slice E must be validated locally and must not be reported as GitHub CI passed. Run:
+
+```bash
+python -m ruff check .
+python -m mypy raiker apps tests
+python -m pytest
+python scripts/validate_phase_status.py
+python -m apps.cli.main --help
+python -m apps.cli.main --prompt "Hello Raiker"
+```
+
+Smoke the preview command surface without claiming runtime execution:
+
+```bash
+for c in /help /status /capabilities /semantic-memory /execution-profiles /workspace /workspace-view /clients /plugins /plugin-plan /graph-status /graph-plan /memory-review /approval-previews /graph-approval-preview /memory-approval-preview /doctor; do
+  echo "### $c"
+  python -m apps.cli.main --prompt "$c" | sed -n '1,8p'
+done
+```
+
+The preview commands must be read-only and must not write graph indexes, semantic memory, embeddings, vectors, or execute plugins/channels/remote/container paths.

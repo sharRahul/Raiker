@@ -893,3 +893,18 @@ Before a desktop app, web server, or dashboard runtime is activated, those clien
 ## Phase 3 rollout slice B read-only workspace views
 
 Future terminal, desktop, web, and dashboard clients consume the same read-only workspace inspection contract. The current implementation provides deterministic local renderers only: JSON-safe workspace data, terminal text, dashboard summary, client capability summary, and plugin-plan summary. This is not a full desktop application, a web server, or a privileged dashboard runtime.
+
+## Phase 3 Slice E Approval-preview UX
+
+Approval-preview UI surfaces make future graph indexing and semantic memory writes visible before any execution path exists.
+
+CLI surfaces:
+
+- `/approval-previews` lists preview availability and explicitly states previews are not persisted in Slice E.
+- `/graph-approval-preview` renders a fresh dry-run graph indexing approval preview.
+- `/memory-approval-preview [--summary]` renders memory preview details or summary from review candidates.
+- `/approval-preview <preview_id>` returns a helpful non-persistence message for Slice E instead of pretending durable preview lookup exists.
+
+Workspace surfaces include `approval_preview_summary` with graph/memory preview availability, pending/denied counts, `preview_only_mode=true`, and `runtime_execution_enabled=false`.
+
+These previews are not executable approvals. Graph indexing and semantic/vector memory writes remain disabled; no plugin, external channel, remote execution, container execution, subagent, or multi-agent path is activated.

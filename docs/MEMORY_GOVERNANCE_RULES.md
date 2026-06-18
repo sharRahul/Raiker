@@ -184,3 +184,19 @@ New planning/review-only surfaces:
 - `/graph-status` reports graph/codemap indexing disabled and dry-run planning available.
 - `/graph-plan` renders a dry-run plan with `can_index: false` and `runtime_indexing_enabled: false`.
 - `/memory-review` and `/memory-review --summary` inspect governed memory candidates without semantic writes.
+
+## Phase 3 Slice E Semantic Memory Approval Preview
+
+Semantic memory approval previews wrap `MemoryReviewItem` values to show what a future governed semantic-memory write would require. They are not approvals to execute, and approving a candidate for later does not write memory or run indexing.
+
+Rules:
+
+- `target_capability` is `semantic_memory_writes`.
+- `can_execute_now` is `false`.
+- `execution_enabled` is `false`.
+- `policy_decision` is `denied_or_preview_only`.
+- `semantic_vector_writes_disabled` is included in reasons.
+- Secret-like or credential-like candidates produce denied high-risk previews with redacted output.
+- Preview creation does not write durable semantic memory, create embeddings, or create vectors.
+
+Semantic/vector writes remain disabled and full Phase 3 is not complete.

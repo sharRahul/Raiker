@@ -69,3 +69,7 @@ Slice H may create only these idempotent metadata tables:
 - `phase3_storage_lifecycle_retention_events`
 
 Slice H must not add graph node tables, graph edge tables, vector tables, embedding tables, semantic-memory durable-write tables, rollback execution tables, plugin execution tables, external-channel runtime tables, or remote/container/cloud execution tables.
+
+## Phase 3 Slice I lifecycle evidence reference
+
+Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/PHASE_3_SLICE_I_LIFECYCLE_EVIDENCE_SPEC.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.

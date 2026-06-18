@@ -45,6 +45,8 @@ from raiker.plugins.policy import plan_plugin_registration
 from raiker.rollback_plans import render_rollback_plan
 from raiker.rollback_registry import create_workspace_rollback_plans, rollback_plan_summary
 from raiker.storage.lifecycle_registry import (
+    render_lifecycle_evidence_summary,
+    render_lifecycle_policy_simulation_summary,
     render_lifecycle_summary,
     render_retention_cleanup_handoff,
 )
@@ -470,6 +472,76 @@ def handle_storage_lifecycle_slice_h(command: str, *, workspace_root: str | Path
     )
 
 
+def _parse_lifecycle_slice_i(command: str, usage: str) -> tuple[bool, bool, str | None, str | None, int] | str:
+    parts = shlex.split(command)
+    summary_only = False
+    as_json = False
+    status = None
+    target = None
+    limit = 20
+    i = 1
+    allowed_targets = {"graph", "memory", "rollback", "storage", "plugin", "channel", "remote"}
+    while i < len(parts):
+        arg = parts[i]
+        if arg == "--summary":
+            summary_only = True
+            i += 1
+        elif arg == "--json":
+            as_json = True
+            i += 1
+        elif arg == "--status" and i + 1 < len(parts):
+            status = parts[i + 1]
+            i += 2
+        elif arg == "--target" and i + 1 < len(parts):
+            target = parts[i + 1]
+            if target not in allowed_targets:
+                return usage
+            i += 2
+        elif arg == "--limit" and i + 1 < len(parts):
+            try:
+                limit = int(parts[i + 1])
+            except ValueError:
+                return usage
+            if limit < 1:
+                return usage
+            i += 2
+        else:
+            return usage
+    return summary_only, as_json, status, target, limit
+
+
+def handle_storage_lifecycle_evidence(command: str, *, workspace_root: str | Path = ".") -> str:
+    usage = "Usage: /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]"
+    parsed = _parse_lifecycle_slice_i(command, usage)
+    if isinstance(parsed, str):
+        return parsed
+    summary_only, as_json, status, target, limit = parsed
+    return render_lifecycle_evidence_summary(
+        workspace_root=workspace_root,
+        summary_only=summary_only,
+        as_json=as_json,
+        status=status,
+        target=target,
+        limit=limit,
+    )
+
+
+def handle_storage_lifecycle_policy_simulation(command: str, *, workspace_root: str | Path = ".") -> str:
+    usage = "Usage: /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]"
+    parsed = _parse_lifecycle_slice_i(command, usage)
+    if isinstance(parsed, str):
+        return parsed
+    summary_only, as_json, status, target, limit = parsed
+    return render_lifecycle_policy_simulation_summary(
+        workspace_root=workspace_root,
+        summary_only=summary_only,
+        as_json=as_json,
+        status=status,
+        target=target,
+        limit=limit,
+    )
+
+
 def handle_execution_profiles() -> str:
     lines = ["Execution profiles:"]
     for profile in list_execution_profiles():
@@ -517,7 +589,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json], /storage-lifecycle-policy-simulation [--summary] [--json], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -575,6 +647,10 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         or command.startswith("/storage-lifecycle-handoff ")
     ):
         return handle_storage_lifecycle_slice_h(command, workspace_root=workspace_root)
+    if command == "/storage-lifecycle-evidence" or command.startswith("/storage-lifecycle-evidence "):
+        return handle_storage_lifecycle_evidence(command, workspace_root=workspace_root)
+    if command == "/storage-lifecycle-policy-simulation" or command.startswith("/storage-lifecycle-policy-simulation "):
+        return handle_storage_lifecycle_policy_simulation(command, workspace_root=workspace_root)
     if command == "/clients":
         return handle_clients()
     if command == "/plugins":

@@ -99,6 +99,32 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
                 "approval_handoff_execution_enabled": False,
             },
         ),
+        "storage_lifecycle_evidence_summary": safe.get(
+            "storage_lifecycle_evidence_summary",
+            {
+                "lifecycle_evidence_bundle_count": 0,
+                "lifecycle_policy_simulation_count": 0,
+                "latest_evidence_id": None,
+                "latest_policy_simulation_id": None,
+                "metadata_only": True,
+                "export_only": True,
+                "simulation_only": True,
+                "execution_enabled": False,
+                "cleanup_execution_enabled": False,
+                "approval_relay_enabled": False,
+                "graph_runtime_indexing_enabled": False,
+                "semantic_memory_write_enabled": False,
+                "vector_write_enabled": False,
+                "embedding_write_enabled": False,
+                "rollback_execution_enabled": False,
+                "plugin_execution_enabled": False,
+                "channel_execution_enabled": False,
+                "subagent_execution_enabled": False,
+                "remote_execution_enabled": False,
+                "container_execution_enabled": False,
+                "cloud_execution_enabled": False,
+            },
+        ),
         "storage_lifecycle_summary": safe.get(
             "storage_lifecycle_summary",
             {
@@ -178,6 +204,15 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
         f"storage_lifecycle_approval_handoffs: {view['storage_lifecycle_retention_summary']['approval_handoff_count']}"
     )
     lines.append(
+        f"storage_lifecycle_evidence_bundles: {view['storage_lifecycle_evidence_summary']['lifecycle_evidence_bundle_count']}"
+    )
+    lines.append(
+        f"storage_lifecycle_policy_simulations: {view['storage_lifecycle_evidence_summary']['lifecycle_policy_simulation_count']}"
+    )
+    lines.append(
+        f"storage_lifecycle_evidence_execution_enabled: {view['storage_lifecycle_evidence_summary']['execution_enabled']}"
+    )
+    lines.append(
         f"memory_governance_mode: {view['semantic_memory'].get('memory_governance_mode', 'review_queue_only_no_semantic_writes')}"
     )
     return "\n".join(lines)
@@ -200,6 +235,7 @@ def render_workspace_dashboard_summary(inspection: Mapping[str, Any]) -> dict[st
         "rollback_plan_summary": view["rollback_plan_summary"],
         "storage_lifecycle_summary": view["storage_lifecycle_summary"],
         "storage_lifecycle_retention_summary": view["storage_lifecycle_retention_summary"],
+        "storage_lifecycle_evidence_summary": view["storage_lifecycle_evidence_summary"],
     }
 
 

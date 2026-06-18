@@ -6,6 +6,7 @@ import shlex
 from pathlib import Path
 from typing import cast
 
+from raiker.approval_audit_registry import approval_audit_summary, create_workspace_audit_records
 from raiker.approval_preview_registry import (
     approval_preview_summary,
     create_fresh_graph_preview_for_workspace,
@@ -41,6 +42,8 @@ from raiker.models.registry import ModelProfileRegistry, RegistryError
 from raiker.models.router import ModelRouter
 from raiker.phase_gates import list_disabled_capabilities
 from raiker.plugins.policy import plan_plugin_registration
+from raiker.rollback_plans import render_rollback_plan
+from raiker.rollback_registry import create_workspace_rollback_plans, rollback_plan_summary
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
 from raiker.workspace.inspection import inspect_workspace
@@ -376,6 +379,46 @@ def handle_approval_preview_lookup(command: str) -> str:
     return render_stored_approval_preview(parts[1])
 
 
+
+def handle_approval_audit(command: str = "/approval-audit", *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) > 2 or (len(parts) == 2 and parts[1] != "--summary"):
+        return "Usage: /approval-audit [--summary]"
+    if len(parts) == 2:
+        summary = approval_audit_summary(workspace_root=workspace_root)
+        return "\n".join(["Approval audit summary:"] + [f"{key}: {value}" for key, value in summary.items()])
+    records = create_workspace_audit_records(workspace_root)
+    lines = ["Approval audit previews:", "persistence: in_memory_only_not_persisted", "execution_enabled: False"]
+    if not records:
+        lines.append("No approval audit records available.")
+    for record in records:
+        lines.append(f"- {record.audit_id} preview={record.preview_id} decision={record.decision} status={record.decision_status} can_execute_now={record.can_execute_now}")
+    return "\n".join(lines)
+
+
+def handle_rollback_plan(*, workspace_root: str | Path = ".") -> str:
+    summary = rollback_plan_summary(workspace_root=workspace_root)
+    return "\n".join(["Rollback planning surfaces:"] + [f"{key}: {value}" for key, value in summary.items()])
+
+
+def handle_graph_rollback_plan(*, workspace_root: str | Path = ".") -> str:
+    try:
+        plan = create_workspace_rollback_plans(workspace_root)[0]
+    except (OSError, ValueError) as exc:
+        return f"Graph rollback plan failed: {exc}"
+    return render_rollback_plan(plan)
+
+
+def handle_memory_rollback_plan(*, workspace_root: str | Path = ".") -> str:
+    try:
+        plans = create_workspace_rollback_plans(workspace_root)
+    except (OSError, ValueError) as exc:
+        return f"Memory rollback plan failed: {exc}"
+    memory_plans = [plan for plan in plans if plan.target_capability == "semantic_memory_writes"]
+    if not memory_plans:
+        return "Memory rollback plan: no semantic memory review candidates available; preview-only rollback surface is available and rollback_execution_enabled: False."
+    return render_rollback_plan(memory_plans[0])
+
 def handle_execution_profiles() -> str:
     lines = ["Execution profiles:"]
     for profile in list_execution_profiles():
@@ -423,7 +466,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -464,6 +507,14 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_memory_approval_preview(command, workspace_root=workspace_root)
     if command == "/approval-preview" or command.startswith("/approval-preview "):
         return handle_approval_preview_lookup(command)
+    if command == "/approval-audit" or command.startswith("/approval-audit "):
+        return handle_approval_audit(command, workspace_root=workspace_root)
+    if command == "/rollback-plan":
+        return handle_rollback_plan(workspace_root=workspace_root)
+    if command == "/graph-rollback-plan":
+        return handle_graph_rollback_plan(workspace_root=workspace_root)
+    if command == "/memory-rollback-plan":
+        return handle_memory_rollback_plan(workspace_root=workspace_root)
     if command == "/clients":
         return handle_clients()
     if command == "/plugins":

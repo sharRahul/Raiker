@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from raiker.approval_preview_registry import approval_preview_summary
 from raiker.approval_previews import (
     create_graph_indexing_approval_preview,
@@ -13,6 +15,15 @@ from raiker.graph.planner import GraphCodemapPlanner, create_graph_codemap_plan
 from raiker.memory.review import MemoryReviewQueue
 from raiker.phase_gates import get_capability_gate
 from raiker.workspace.inspection import inspect_workspace
+
+
+def _require_directory_symlink(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Directory symlink creation is not permitted in this environment.")
+        raise
 
 
 def test_graph_approval_preview_from_dry_run_plan_does_not_write_indexes(tmp_path: Path) -> None:
@@ -35,7 +46,7 @@ def test_graph_approval_preview_from_dry_run_plan_does_not_write_indexes(tmp_pat
 def test_unsafe_graph_plan_produces_denied_high_risk_preview(tmp_path: Path) -> None:
     outside = tmp_path.parent / "outside-preview-target"
     outside.mkdir(exist_ok=True)
-    (tmp_path / "escape").symlink_to(outside, target_is_directory=True)
+    _require_directory_symlink(tmp_path / "escape", outside)
     plan = GraphCodemapPlanner(tmp_path).create_plan()
     preview = create_graph_indexing_approval_preview(plan)
     assert preview.can_execute_now is False

@@ -64,6 +64,23 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
         "graph_codemap": safe.get(
             "graph_codemap", {"graph_indexing_enabled": False, "planning_available": True}
         ),
+        "semantic_memory_readiness": safe.get(
+            "semantic_memory_readiness",
+            {
+                "semantic_memory_readiness_contract_available": True,
+                "semantic_memory_readiness_record_count": 0,
+                "metadata_only": True,
+                "ready_for_memory_writes": False,
+                "semantic_memory_writes_enabled": False,
+                "vector_writes_enabled": False,
+                "embedding_creation_enabled": False,
+                "embedding_storage_enabled": False,
+                "vector_indexing_enabled": False,
+                "memory_write_jobs_enabled": False,
+                "runtime_execution_enabled": False,
+                "blocker_count": 0,
+            },
+        ),
         "graph_codemap_readiness": safe.get(
             "graph_codemap_readiness",
             {
@@ -194,6 +211,13 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
         f"graph_readiness_ready_for_indexing: {view['graph_codemap_readiness']['ready_for_indexing']}"
     )
     lines.append(f"semantic_writes_enabled: {view['semantic_memory']['semantic_writes_enabled']}")
+    lines.append(f"semantic_memory_readiness_metadata_only: {view['semantic_memory_readiness']['metadata_only']}")
+    lines.append(f"semantic_memory_ready_for_writes: {view['semantic_memory_readiness']['ready_for_memory_writes']}")
+    lines.append(f"semantic_memory_readiness_latest_id: {view['semantic_memory_readiness']['latest_readiness_id']}")
+    lines.append(f"semantic_memory_readiness_blockers: {view['semantic_memory_readiness']['blocker_count']}")
+    lines.append(f"semantic_vector_writes_enabled: {view['semantic_memory_readiness']['vector_writes_enabled']}")
+    lines.append(f"semantic_embedding_creation_enabled: {view['semantic_memory_readiness']['embedding_creation_enabled']}")
+    lines.append(f"semantic_memory_write_jobs_enabled: {view['semantic_memory_readiness']['memory_write_jobs_enabled']}")
     lines.append(
         f"approval_preview_only_mode: {view['approval_preview_summary']['preview_only_mode']}"
     )
@@ -248,6 +272,7 @@ def render_workspace_dashboard_summary(inspection: Mapping[str, Any]) -> dict[st
         "capabilities": view["capability_gates"],
         "semantic_memory": view["semantic_memory"],
         "graph_codemap": view["graph_codemap"],
+        "semantic_memory_readiness": view["semantic_memory_readiness"],
         "approval_preview_summary": view["approval_preview_summary"],
         "approval_audit_summary": view["approval_audit_summary"],
         "rollback_plan_summary": view["rollback_plan_summary"],

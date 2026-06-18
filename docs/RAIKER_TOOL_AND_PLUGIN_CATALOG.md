@@ -333,3 +333,10 @@ Until the relevant phase gates are fully implemented and verified:
 | `/graph-readiness` | Read-only metadata | None | Shows metadata-only readiness blockers. Does not enable graph indexing, codemap indexing, graph writes, workers, schedulers, file watchers, daemons, indexing jobs, or runtime execution/jobs. |
 | `/graph-readiness --summary` | Read-only metadata | None | Shows deterministic readiness counts and disabled runtime flags only. |
 | `/graph-readiness --json` | Read-only metadata export | None | Emits deterministic JSON-safe readiness summary only. |
+
+
+## Phase 3 Slice K — Semantic Memory Write Readiness — Metadata Only
+- Adds deterministic metadata-only semantic memory readiness contracts, registry, optional SQLite metadata table, CLI, and workspace surfaces.
+- Semantic memory writes, vector writes, embeddings, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled.
+- Reserved Slice K metadata-only events: `phase3.semantic_memory_readiness.metadata_created`, `phase3.semantic_memory_readiness.summary_viewed`, `phase3.semantic_memory_readiness.exported`. No runtime memory write events are enabled.
+- Phase 3 remains incomplete and Phase 4 remains blocked.

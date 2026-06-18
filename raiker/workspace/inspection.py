@@ -13,6 +13,7 @@ from raiker.execution.profiles import list_execution_profiles
 from raiker.graph.governance import graph_governance_status
 from raiker.graph.readiness_registry import graph_readiness_summary
 from raiker.memory.governance import memory_governance_summary
+from raiker.memory.readiness_registry import semantic_memory_readiness_summary
 from raiker.memory.semantic import semantic_memory_status
 from raiker.models.registry import ModelProfileRegistry
 from raiker.phase_gates import list_capability_states
@@ -124,6 +125,7 @@ def inspect_workspace(client_type: str, *, workspace_root: str | Path = ".") -> 
         "capability_gates": list_capability_states(),
         "semantic_memory": semantic_memory_status(len(memory_candidates))
         | memory_governance_summary(workspace_root),
+        "semantic_memory_readiness": semantic_memory_readiness_summary(workspace_root=workspace_root),
         "graph_codemap": graph_governance_status(),
         "graph_codemap_readiness": graph_readiness_summary(workspace_root=workspace_root),
         "execution_profiles": [

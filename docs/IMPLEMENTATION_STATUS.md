@@ -286,3 +286,10 @@ Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfac
 Slice J is `implemented_verified` for metadata-only readiness surfaces: deterministic contract, registry create/list/get/summary, read-only CLI, optional SQLite metadata table, workspace inspection/view fields, docs, and tests.
 
 Phase 3 remains incomplete. Phase 4 remains blocked. Graph/codemap runtime indexing, graph writes, workers, schedulers, file watchers, daemons, and runtime jobs remain disabled.
+
+
+## Phase 3 Slice K — Semantic Memory Write Readiness — Metadata Only
+- Adds deterministic metadata-only semantic memory readiness contracts, registry, optional SQLite metadata table, CLI, and workspace surfaces.
+- Semantic memory writes, vector writes, embeddings, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled.
+- Reserved Slice K metadata-only events: `phase3.semantic_memory_readiness.metadata_created`, `phase3.semantic_memory_readiness.summary_viewed`, `phase3.semantic_memory_readiness.exported`. No runtime memory write events are enabled.
+- Phase 3 remains incomplete and Phase 4 remains blocked.

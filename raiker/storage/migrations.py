@@ -287,3 +287,17 @@ CREATE TABLE IF NOT EXISTS phase3_graph_codemap_readiness (
   contract_json TEXT NOT NULL
 );
 """
+
+
+PHASE_3_SEMANTIC_MEMORY_READINESS_MIGRATION_ID = "RAIKER-1311-phase3-semantic-memory-readiness-metadata"
+
+PHASE_3_SEMANTIC_MEMORY_READINESS_SQL = """
+CREATE TABLE IF NOT EXISTS phase3_semantic_memory_readiness (
+  readiness_id TEXT PRIMARY KEY,
+  target TEXT NOT NULL,
+  status TEXT NOT NULL,
+  blockers_json TEXT NOT NULL,
+  disabled_runtime_flags_json TEXT NOT NULL,
+  contract_json TEXT NOT NULL
+);
+"""

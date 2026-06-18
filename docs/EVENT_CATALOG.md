@@ -360,3 +360,10 @@ These event names are reserved for future append-only metadata reporting only. S
 | `graph_codemap_readiness_metadata_created` | `graph_readiness_registry` | `readiness_id`, `metadata_only`, `ready_for_indexing`, `blockers` | Metadata-only readiness contract creation. |
 | `graph_codemap_readiness_metadata_viewed` | `terminal_client` or `workspace_inspection` | `readiness_id`, `client_type`, `read_only` | Optional future view event; must remain read-only. |
 | `graph_codemap_readiness_summary_viewed` | `workspace_inspection` | `metadata_only`, `ready_for_indexing`, `indexing_jobs_enabled`, `runtime_execution_enabled` | Optional summary view; must not imply runtime enablement. |
+
+
+## Phase 3 Slice K — Semantic Memory Write Readiness — Metadata Only
+- Adds deterministic metadata-only semantic memory readiness contracts, registry, optional SQLite metadata table, CLI, and workspace surfaces.
+- Semantic memory writes, vector writes, embeddings, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled.
+- Reserved Slice K metadata-only events: `phase3.semantic_memory_readiness.metadata_created`, `phase3.semantic_memory_readiness.summary_viewed`, `phase3.semantic_memory_readiness.exported`. No runtime memory write events are enabled.
+- Phase 3 remains incomplete and Phase 4 remains blocked.

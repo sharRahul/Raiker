@@ -37,6 +37,10 @@ from raiker.graph.planner import create_graph_codemap_plan
 from raiker.graph.readiness_registry import graph_readiness_summary, render_graph_readiness
 from raiker.memory.candidates import governed_memory_status
 from raiker.memory.governance import memory_governance_summary
+from raiker.memory.readiness_registry import (
+    render_semantic_memory_readiness,
+    semantic_memory_readiness_summary,
+)
 from raiker.memory.review import MemoryReviewQueue
 from raiker.memory.semantic import semantic_memory_status
 from raiker.models.registry import ModelProfileRegistry, RegistryError
@@ -339,6 +343,30 @@ def handle_graph_readiness(command: str = "/graph-readiness", *, workspace_root:
     return render_graph_readiness(workspace_root=workspace_root)
 
 
+
+def handle_memory_readiness(command: str = "/memory-readiness", *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
+        return "Usage: /memory-readiness [--summary|--json]"
+    if len(parts) == 2 and parts[1] == "--json":
+        return json.dumps(semantic_memory_readiness_summary(workspace_root=workspace_root), sort_keys=True)
+    if len(parts) == 2 and parts[1] == "--summary":
+        summary = semantic_memory_readiness_summary(workspace_root=workspace_root)
+        return "\n".join(
+            [
+                "Semantic memory write readiness summary:",
+                f"metadata_only: {summary['metadata_only']}",
+                f"ready_for_memory_writes: {summary['ready_for_memory_writes']}",
+                f"semantic_memory_writes_enabled: {summary['semantic_memory_writes_enabled']}",
+                f"vector_writes_enabled: {summary['vector_writes_enabled']}",
+                f"embedding_creation_enabled: {summary['embedding_creation_enabled']}",
+                f"memory_write_jobs_enabled: {summary['memory_write_jobs_enabled']}",
+                f"runtime_execution_enabled: {summary['runtime_execution_enabled']}",
+                f"blocker_count: {summary['blocker_count']}",
+            ]
+        )
+    return render_semantic_memory_readiness(workspace_root=workspace_root)
+
 def handle_memory_review(
     command: str = "/memory-review", *, workspace_root: str | Path = "."
 ) -> str:
@@ -611,7 +639,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -644,6 +672,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_graph_plan(workspace_root=workspace_root)
     if command == "/graph-readiness" or command.startswith("/graph-readiness "):
         return handle_graph_readiness(command, workspace_root=workspace_root)
+    if command == "/memory-readiness" or command.startswith("/memory-readiness "):
+        return handle_memory_readiness(command, workspace_root=workspace_root)
     if command == "/memory-review" or command.startswith("/memory-review "):
         return handle_memory_review(command, workspace_root=workspace_root)
     if command == "/approval-previews":

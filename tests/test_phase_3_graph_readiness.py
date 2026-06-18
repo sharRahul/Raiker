@@ -88,3 +88,19 @@ def test_graph_readiness_matches_later_slice_safety_validation() -> None:
     assert payload["metadata_only"] is True
     assert payload["ready_for_indexing"] is False
     assert payload["runtime_execution_enabled"] is False
+
+
+def test_graph_readiness_accepts_valid_blockers_and_preserves_deterministic_id() -> None:
+    first = create_readiness_contract(
+        satisfied_gates=("path_policy_defined", "source_scope_defined"),
+        blockers=("storage_schema_defined", "event_catalog_defined"),
+    )
+    second = create_readiness_contract(
+        satisfied_gates=("source_scope_defined", "path_policy_defined"),
+        blockers=("event_catalog_defined", "storage_schema_defined"),
+    )
+
+    assert first.blockers == ("storage_schema_defined", "event_catalog_defined")
+    assert first.ready_for_indexing is False
+    assert first.readiness_id == second.readiness_id
+    assert first.to_json() == second.to_json()

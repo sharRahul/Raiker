@@ -396,3 +396,13 @@ Reserved event names only; no runtime dispatch events are introduced:
 - `phase3.external_channels_notifications.readiness.sqlite_metadata_recorded`
 
 These events are metadata-only reservations and do not represent channel dispatch, notification delivery, push notification, share-link, webhook, relay, worker, scheduler, daemon, or runtime execution events.
+
+## Phase 3 Slice P — Remote/Container/Cloud Execution Readiness — Metadata Only
+
+Slice P reserves metadata-only readiness surfaces and events for future remote/container/cloud execution. Reserved metadata-only events:
+
+- `phase3.remote_container_cloud_readiness.metadata_created`
+- `phase3.remote_container_cloud_readiness.summary_viewed`
+- `phase3.remote_container_cloud_readiness.exported`
+
+No remote execution, container execution, cloud execution, hosted routines, runtime jobs, job dispatch, worker queues, workers, schedulers, file watchers, daemons, client transport, external dispatch, credential materialization, secret injection, provider integrations, sandbox runtime, process execution, shell execution, network execution, approval relay, plugin execution, channel activation, cleanup execution, graph/codemap indexing, semantic memory writes, or runtime execution events are enabled. Phase 3 remains incomplete. Phase 4 remains blocked.

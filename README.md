@@ -47,7 +47,8 @@ As of the current `main` state:
 |---|---|---|
 | Phase 1 MVP runtime core | `implemented_verified` | Package scaffold, global `raiker` command, contracts, event log, SQLite bootstrap, static policy, tool broker, safe filesystem/search tools, approval-gated local actions, mock model provider, runtime state machine, terminal shell, and checkpoint stubs are present and covered by tests. |
 | Phase 2 rich local workspace | `implemented_verified` | Task management, event viewer, checkpoint timeline, status/task/event/checkpoint/approval commands, side-question and interrupt contracts, approval inbox, governed file/git wrappers, local provider health-check, and memory candidate views are present and covered by tests. |
-| Phase 3 local rich workspace/extensibility foundations | **Foundation only; Phase 3 is not complete** | Read-only workspace inspection/view surfaces, equal client contract parity, plugin manifest/registration planning, capability gates, graph/codemap dry-run planning, semantic memory review governance, approval-preview UX/contracts, Slice G metadata-only storage lifecycle preparation, Slice H metadata-only retention/cleanup-preview/approval-handoff planning, Slice I metadata-only lifecycle evidence/export/policy-simulation surfaces, Slice J metadata-only graph/codemap readiness surfaces, Slice K metadata-only semantic memory readiness surfaces, Slice L metadata-only approval-preview persistence readiness, Slice M metadata-only storage cleanup execution readiness, Slice N metadata-only plugin/server startup readiness, and Slice O metadata-only external channels/notifications readiness are present. Runtime plugin execution, graph/codemap indexing, indexing jobs, semantic/vector memory writes, embeddings, memory write jobs, cleanup execution, deletion, purge, tombstone, rollback, cleanup/deletion jobs, approval relay, plugin/server startup, external channels/notifications, and durable approval-preview execution remain disabled. |
+| Phase 3 local rich workspace/extensibility foundations | `implemented_verified` | All Phase 3 slices A through P are implemented, tested, and documented. Runtime execution remains disabled. Phase 3 does not enable any Phase 4 behavior. |
+| Phase 3 local rich workspace/extensibility foundations | **implemented_verified** | All Phase 3 slices A through P are implemented, tested, and documented: read-only workspace inspection/view surfaces, equal client contract parity, plugin manifest/registration planning, capability gates, graph/codemap dry-run planning, semantic memory review governance, approval-preview UX/contracts, approval audit/rollback planning, storage lifecycle metadata, lifecycle retention/cleanup-preview/approval-handoff, lifecycle evidence/simulation, graph/codemap readiness metadata, semantic memory readiness metadata, approval-preview persistence readiness metadata, storage cleanup execution readiness metadata, plugin/server startup readiness metadata, external channels/notifications readiness metadata, and remote/container/cloud execution readiness metadata. All runtime execution remains disabled. Phase 3 does not enable any Phase 4 behavior. |
 | Phase 4 external channel / multi-agent / governed execution foundations | **Foundation only; Phase 4 is not complete** | Execution profiles, remote/container execution planning, subagent planning, external-channel activation status, and inspection commands are present. External transports, subagent spawning, multi-agent teams, remote execution, and container execution remain disabled. |
 | GitHub Actions | Temporarily paused | Workflows are currently `workflow_dispatch` only because GitHub Actions quota is exhausted. Use [`docs/LOCAL_VALIDATION_GATE.md`](docs/LOCAL_VALIDATION_GATE.md) until CI triggers are restored. |
 
@@ -92,7 +93,7 @@ Do **not** mark any capability `implemented_verified` unless:
 - Local provider health-check abstraction.
 - Memory candidate listing and governed memory status view.
 
-### Phase 3 safe foundations only
+### Phase 3 — implemented and verified
 
 The restored Phase 1 and Phase 2 build-plan documents remain the detailed scope sources for those completed phases; Slice G/H references are later-phase metadata-only additions and do not change Phase 1 or Phase 2 runtime scope.
 
@@ -109,6 +110,7 @@ The restored Phase 1 and Phase 2 build-plan documents remain the detailed scope 
 - `/approval-previews`, `/graph-approval-preview`, `/memory-approval-preview [--summary]`, and `/approval-preview <preview_id>` preview commands.
 - Workspace inspection/view `approval_preview_summary` showing preview availability and disabled runtime state.
 - Slice I lifecycle evidence bundles and policy simulations with deterministic `sleb_`/`slps_` IDs, redacted JSON exports, read-only CLI commands, metadata-only SQLite tables, and disabled runtime flags.
+- Slice P remote/container/cloud execution readiness contracts, registry, optional SQLite persistence, and read-only `/remote-readiness` CLI with deterministic `rccr_` IDs and all runtime execution flags disabled.
 
 ### Phase 4 safe foundations only
 
@@ -211,11 +213,29 @@ The terminal client currently exposes these inspection and controlled-action com
 /plugin-plan <manifest_path>
 /graph-status
 /graph-plan
+/graph-readiness [--summary|--json]
+/memory-readiness [--summary|--json]
+/approval-readiness [--summary|--json]
+/cleanup-readiness [--summary|--json]
+/remote-readiness [--summary|--json]
+/plugin-readiness [--summary|--json]
+/channel-readiness [--summary|--json]
+/memory-review [--summary]
 /approval-previews
 /graph-approval-preview
 /memory-approval-preview
 /memory-approval-preview --summary
 /approval-preview <preview_id>
+/approval-audit [--summary]
+/rollback-plan
+/graph-rollback-plan
+/memory-rollback-plan
+/storage-lifecycle [--summary|--graph|--memory]
+/storage-lifecycle-retention [--summary]
+/storage-lifecycle-cleanup-preview [--summary]
+/storage-lifecycle-handoff [--summary]
+/storage-lifecycle-evidence [--summary] [--json]
+/storage-lifecycle-policy-simulation [--summary] [--json]
 /doctor
 /channels
 /models
@@ -315,6 +335,7 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 | Document | Purpose |
 |---|---|
 | [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) | Status ledger for specified, implemented, disabled, blocked, and out-of-scope capabilities. |
+ | [`docs/PHASE_3_COMPLETION_AUDIT.md`](docs/PHASE_3_COMPLETION_AUDIT.md) | Phase 3 completion audit confirming all slices A-P are implemented, tested, and documented with runtime execution disabled. |
 | [`docs/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md`](docs/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md) | Audit of repeated Phase 3 readiness patterns across Slices J-O and the recommended shared internal foundation before Slice P. |
 | [`docs/LOCAL_VALIDATION_GATE.md`](docs/LOCAL_VALIDATION_GATE.md) | Required local validation while GitHub Actions are paused. |
 | [`docs/FEATURE_COVERAGE_MATRIX.md`](docs/FEATURE_COVERAGE_MATRIX.md) | Full platform coverage checklist, phase placement, and non-negotiable invariants. |
@@ -438,3 +459,7 @@ Slice N adds metadata-only plugin/server startup readiness contracts, registry, 
 ### Phase 3 Slice O: External Channels/Notifications Readiness — Metadata Only
 
 Slice O adds deterministic metadata-only readiness surfaces for future external channels and notifications. `/channel-readiness`, workspace inspection, workspace views, and optional SQLite metadata record readiness blockers and disabled runtime flags only. External channels, notifications, push notifications, share links, webhook dispatch, relay runtime, hosted channels/routines, workers, schedulers, watchers, daemons, and runtime execution remain disabled. Phase 3 remains incomplete and Phase 4 remains blocked.
+
+### Phase 3 Slice P: Remote/Container/Cloud Execution Readiness — Metadata Only
+
+Slice P adds deterministic metadata-only readiness surfaces for future remote/container/cloud execution. `/remote-readiness`, workspace inspection, workspace views, and optional SQLite metadata record readiness blockers and disabled runtime flags only. Remote execution, container execution, cloud execution, hosted routines, runtime jobs, job dispatch, worker queues, workers, schedulers, file watchers, daemons, client transport, external dispatch, credential materialization, secret injection, provider integrations, sandbox runtime, process execution, shell execution, network execution, and runtime execution remain disabled. Phase 3 remains incomplete and Phase 4 remains blocked.

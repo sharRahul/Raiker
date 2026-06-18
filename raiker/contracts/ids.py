@@ -16,6 +16,7 @@ _PREFIXES = {
     "appr_",
     "memcand_",
     "ver_",
+    "graphplan_",
 }
 
 

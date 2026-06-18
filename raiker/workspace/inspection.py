@@ -8,6 +8,8 @@ from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.models import ClientMetadata
 from raiker.events.query import EventViewer
 from raiker.execution.profiles import list_execution_profiles
+from raiker.graph.governance import graph_governance_status
+from raiker.memory.governance import memory_governance_summary
 from raiker.memory.semantic import semantic_memory_status
 from raiker.models.registry import ModelProfileRegistry
 from raiker.phase_gates import list_capability_states
@@ -66,7 +68,8 @@ def inspect_workspace(client_type: str, *, workspace_root: str | Path = ".") -> 
         "model_profiles": [{"profile_id": p.profile_id, "provider": p.provider, "model": p.model, "default_state": p.default_state} for p in model_profiles],
         "channel_connectors": [{"connector_id": c.connector_id, "channel_type": c.channel_type, "default_state": c.default_state} for c in connectors],
         "capability_gates": list_capability_states(),
-        "semantic_memory": semantic_memory_status(len(memory_candidates)),
+        "semantic_memory": semantic_memory_status(len(memory_candidates)) | memory_governance_summary(workspace_root),
+        "graph_codemap": graph_governance_status(),
         "execution_profiles": [{"profile_id": p.profile_id, "kind": p.kind, "state": p.default_state, "requires_approval": p.requires_approval} for p in list_execution_profiles()],
         "plugin_registration_plans": plugin_plans,
     }

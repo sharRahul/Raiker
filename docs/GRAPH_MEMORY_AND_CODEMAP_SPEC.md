@@ -216,3 +216,24 @@ Tests must prove:
 - graph query is brokered and policy-reviewed;
 - ignored files are not indexed;
 - graph context includes provenance.
+
+## Phase 3 Slice C/D governance update (local validation required)
+
+Full Phase 3 is not complete. Slice C adds graph/codemap governance and dry-run planning only: graph/codemap runtime indexing remains disabled, no background indexer is started, and no durable graph nodes or edges are written. Slice D adds semantic memory governance and a review queue only: semantic/vector memory writes remain disabled, no embeddings are created, and no vector records are written.
+
+Safety status for this slice:
+
+- GitHub Actions remain paused due quota exhaustion; do not claim GitHub CI passed while paused.
+- Local validation evidence remains mandatory under `docs/LOCAL_VALIDATION_GATE.md`.
+- Plugin execution remains disabled.
+- Graph/codemap runtime indexing remains disabled.
+- Semantic/vector memory writes remain disabled.
+- External channels remain disabled.
+- Subagents and multi-agent teams remain disabled.
+- Remote/container execution remains disabled.
+
+New planning/review-only surfaces:
+
+- `/graph-status` reports graph/codemap indexing disabled and dry-run planning available.
+- `/graph-plan` renders a dry-run plan with `can_index: false` and `runtime_indexing_enabled: false`.
+- `/memory-review` and `/memory-review --summary` inspect governed memory candidates without semantic writes.

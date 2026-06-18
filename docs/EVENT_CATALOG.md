@@ -227,3 +227,34 @@ These event names are reserved for the read-only workspace inspection and plugin
 | `phase3.plugin.registration.planned` | A plugin registration plan was prepared with execution disabled. |
 | `phase3.plugin.registration.denied` | A plugin registration plan was denied by manifest or policy checks. |
 | `phase3.client.contract.inspected` | A future client contract parity surface was inspected. |
+
+## Phase 3 Slice C/D governance update (local validation required)
+
+Full Phase 3 is not complete. Slice C adds graph/codemap governance and dry-run planning only: graph/codemap runtime indexing remains disabled, no background indexer is started, and no durable graph nodes or edges are written. Slice D adds semantic memory governance and a review queue only: semantic/vector memory writes remain disabled, no embeddings are created, and no vector records are written.
+
+Safety status for this slice:
+
+- GitHub Actions remain paused due quota exhaustion; do not claim GitHub CI passed while paused.
+- Local validation evidence remains mandatory under `docs/LOCAL_VALIDATION_GATE.md`.
+- Plugin execution remains disabled.
+- Graph/codemap runtime indexing remains disabled.
+- Semantic/vector memory writes remain disabled.
+- External channels remain disabled.
+- Subagents and multi-agent teams remain disabled.
+- Remote/container execution remains disabled.
+
+New planning/review-only surfaces:
+
+- `/graph-status` reports graph/codemap indexing disabled and dry-run planning available.
+- `/graph-plan` renders a dry-run plan with `can_index: false` and `runtime_indexing_enabled: false`.
+- `/memory-review` and `/memory-review --summary` inspect governed memory candidates without semantic writes.
+
+### Phase 3 Slice C/D planning and denial events
+
+- `phase3.graph.plan.requested` — graph/codemap dry-run plan requested; does not imply indexing.
+- `phase3.graph.plan.created` — graph/codemap dry-run plan rendered; no graph records written.
+- `phase3.graph.indexing.denied` — runtime graph/codemap indexing denied by Phase 3 policy.
+- `phase3.memory.review.listed` — memory review queue listed; no semantic write performed.
+- `phase3.memory.candidate.classified` — deterministic local candidate classification occurred; no model call.
+- `phase3.memory.candidate.reviewed` — review decision state changed; no semantic write performed.
+- `phase3.memory.semantic_write.denied` — semantic/vector write denied by Phase 3 policy.

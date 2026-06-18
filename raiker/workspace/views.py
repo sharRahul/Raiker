@@ -61,6 +61,7 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
         },
         "capability_gates": safe["capability_gates"],
         "semantic_memory": safe["semantic_memory"],
+        "graph_codemap": safe.get("graph_codemap", {"graph_indexing_enabled": False, "planning_available": True}),
         "execution_profiles": safe["execution_profiles"],
         "plugin_registration_plans": safe["plugin_registration_plans"],
     }
@@ -83,6 +84,11 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
         name for name, gate in view["capability_gates"].items() if gate["runtime_enabled"] is False
     )
     lines.append(f"runtime_disabled: {', '.join(disabled_runtime)}")
+    lines.append(f"plugin_execution_enabled: {view['capability_gates']['plugin_execution']['runtime_enabled']}")
+    lines.append(f"graph_indexing_enabled: {view['graph_codemap']['graph_indexing_enabled']}")
+    lines.append(f"graph_planning_available: {view['graph_codemap']['planning_available']}")
+    lines.append(f"semantic_writes_enabled: {view['semantic_memory']['semantic_writes_enabled']}")
+    lines.append(f"memory_governance_mode: {view['semantic_memory'].get('memory_governance_mode', 'review_queue_only_no_semantic_writes')}")
     return "\n".join(lines)
 
 
@@ -97,6 +103,7 @@ def render_workspace_dashboard_summary(inspection: Mapping[str, Any]) -> dict[st
         "counts": view["counts"],
         "capabilities": view["capability_gates"],
         "semantic_memory": view["semantic_memory"],
+        "graph_codemap": view["graph_codemap"],
     }
 
 

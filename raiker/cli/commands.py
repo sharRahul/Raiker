@@ -4,6 +4,7 @@ import argparse
 import json
 import shlex
 from pathlib import Path
+from typing import cast
 
 from raiker.approvals import ApprovalInbox
 from raiker.channels.registry import ConnectorRegistry
@@ -21,7 +22,11 @@ from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
 from raiker.execution.profiles import list_execution_profiles
 from raiker.gateway.agent_gateway import AgentGateway
+from raiker.graph.governance import graph_governance_status
+from raiker.graph.planner import create_graph_codemap_plan
 from raiker.memory.candidates import governed_memory_status
+from raiker.memory.governance import memory_governance_summary
+from raiker.memory.review import MemoryReviewQueue
 from raiker.memory.semantic import semantic_memory_status
 from raiker.models.registry import ModelProfileRegistry, RegistryError
 from raiker.models.router import ModelRouter
@@ -208,8 +213,6 @@ def handle_workspace(*, workspace_root: str | Path = ".") -> str:
     )
 
 
-def handle_workspace_view(*, workspace_root: str | Path = ".") -> str:
-    return render_workspace_view(workspace_root=workspace_root, client_type="terminal")
 
 
 def handle_clients() -> str:
@@ -264,8 +267,50 @@ def handle_workspace_view(command: str = "/workspace-view", *, workspace_root: s
     parts = shlex.split(command)
     if len(parts) != 1:
         return "Usage: /workspace-view"
-    summary = inspect_workspace("terminal", workspace_root=workspace_root)
-    return render_workspace_text_view(summary)
+    return render_workspace_view(workspace_root=workspace_root, client_type="terminal")
+
+
+def handle_graph_status() -> str:
+    status = graph_governance_status()
+    return "\n".join(["Graph/codemap status:"] + [f"{key}: {value}" for key, value in status.items()])
+
+
+def handle_graph_plan(*, workspace_root: str | Path = ".") -> str:
+    try:
+        plan = create_graph_codemap_plan(workspace_root).to_dict()
+        included_paths = cast(list[str], plan["included_paths"])
+        excluded_paths = cast(list[dict[str, object]], plan["excluded_paths"])
+    except (OSError, ValueError) as exc:
+        return f"Graph plan failed: {exc}"
+    return "\n".join(
+        [
+            "Graph/codemap dry-run plan:",
+            f"plan_id: {plan['plan_id']}",
+            f"can_index: {plan['can_index']}",
+            f"runtime_indexing_enabled: {plan['runtime_indexing_enabled']}",
+            f"requires_approval: {plan['requires_approval']}",
+            f"included_paths: {len(included_paths)}",
+            f"excluded_paths: {len(excluded_paths)}",
+            f"policy_decision: {plan['policy_decision']}",
+        ]
+    )
+
+
+def handle_memory_review(command: str = "/memory-review", *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) > 2 or (len(parts) == 2 and parts[1] != "--summary"):
+        return "Usage: /memory-review [--summary]"
+    queue = MemoryReviewQueue(workspace_root)
+    if len(parts) == 2:
+        summary = queue.export_summary()
+        return "\n".join(["Memory review summary:"] + [f"{key}: {value}" for key, value in summary.items()])
+    items = queue.list_candidates()
+    lines = ["Memory review queue:", f"semantic_writes_enabled: {memory_governance_summary(workspace_root)['semantic_writes_enabled']}"]
+    if not items:
+        lines.append("No memory candidates.")
+    for item in items[:10]:
+        lines.append(f"- {item.candidate_id} decision={item.decision} sensitivity={item.sensitivity} can_write_semantic_memory={item.can_write_semantic_memory}")
+    return "\n".join(lines)
 
 
 def handle_execution_profiles() -> str:
@@ -315,7 +360,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /memory-review [--summary], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -340,8 +385,14 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_execution_profiles()
     if command == "/workspace":
         return handle_workspace(workspace_root=workspace_root)
-    if command == "/workspace-view":
-        return handle_workspace_view(workspace_root=workspace_root)
+    if command == "/workspace-view" or command.startswith("/workspace-view "):
+        return handle_workspace_view(command, workspace_root=workspace_root)
+    if command == "/graph-status":
+        return handle_graph_status()
+    if command == "/graph-plan":
+        return handle_graph_plan(workspace_root=workspace_root)
+    if command == "/memory-review" or command.startswith("/memory-review "):
+        return handle_memory_review(command, workspace_root=workspace_root)
     if command == "/clients":
         return handle_clients()
     if command == "/plugins":

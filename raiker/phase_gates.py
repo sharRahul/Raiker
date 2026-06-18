@@ -24,6 +24,8 @@ PHASE_3_CAPABILITIES = {
     "plugin_execution",
     "graph_codemap_indexing",
     "semantic_memory_writes",
+    "graph_codemap_planning",
+    "semantic_memory_review_queue",
 }
 PHASE_4_DISABLED_CAPABILITIES = {
     "external_channels",
@@ -36,9 +38,12 @@ PHASE_3_DISABLED_CAPABILITIES = {
     "plugin_execution",
     "graph_codemap_indexing",
     "semantic_memory_writes",
+    "graph_codemap_planning",
+    "semantic_memory_review_queue",
 }
 
 READ_ONLY_CONTRACT_CAPABILITIES = {"desktop_ui", "web_ui", "dashboard"}
+PHASE_3_POLICY_READY_CAPABILITIES = {"graph_codemap_planning", "semantic_memory_review_queue"}
 
 
 @dataclass(frozen=True)
@@ -68,6 +73,8 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
     }
     for name in READ_ONLY_CONTRACT_CAPABILITIES:
         gates[name] = CapabilityGate(name, 3, CapabilityState.CONTRACT_READY, routed_through_shared_contracts=True, contract_ready=True)
+    for name in PHASE_3_POLICY_READY_CAPABILITIES:
+        gates[name] = CapabilityGate(name, 3, CapabilityState.POLICY_READY, policy_ready=True, contract_ready=True, event_ready=True, test_ready=True)
     for name in PHASE_4_DISABLED_CAPABILITIES:
         gates[name] = CapabilityGate(name, 4, CapabilityState.DISABLED)
     return gates

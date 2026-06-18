@@ -16,6 +16,7 @@ from raiker.storage.lifecycle_registry import (
     create_retention_policy_metadata,
     get_approval_handoff,
     get_cleanup_preview,
+    get_retention_policy,
     list_approval_handoffs,
     list_cleanup_previews,
     list_retention_policies,
@@ -41,8 +42,32 @@ def test_slice_h_contracts_are_deterministic_json_safe_and_redacted() -> None:
     encoded = json.dumps(first.to_dict(), sort_keys=True)
     assert "abcdef1234567890" not in encoded
     assert "super-secret-token" not in encoded
+    assert get_retention_policy(first.policy_id) == first
     assert first.metadata_only is True
-    assert first.execution_enabled is False
+    for flag in (
+        first.execution_enabled,
+        first.cleanup_execution_enabled,
+        first.graph_indexing_enabled,
+        first.semantic_memory_writes_enabled,
+        first.vector_writes_enabled,
+        first.embedding_creation_enabled,
+        first.rollback_execution_enabled,
+        first.plugin_execution_enabled,
+        first.mcp_lsp_plugin_server_startup_enabled,
+        first.monitor_watch_daemon_enabled,
+        first.external_channel_enabled,
+        first.approval_relay_enabled,
+        first.subagent_execution_enabled,
+        first.multi_agent_team_execution_enabled,
+        first.remote_execution_enabled,
+        first.container_execution_enabled,
+        first.cloud_execution_enabled,
+        first.hosted_routines_enabled,
+        first.marketplace_installs_enabled,
+        first.hosted_push_notifications_enabled,
+        first.share_links_enabled,
+    ):
+        assert flag is False
 
     preview = create_cleanup_preview_metadata(
         linked_lifecycle_ids=["slc_b", "slc_a"],
@@ -57,7 +82,29 @@ def test_slice_h_contracts_are_deterministic_json_safe_and_redacted() -> None:
         summaries=["token=secret-value-123456789"],
     )
     assert preview.can_cleanup_now is False
-    assert preview.cleanup_execution_enabled is False
+    for flag in (
+        preview.cleanup_execution_enabled,
+        preview.graph_execution_enabled,
+        preview.memory_execution_enabled,
+        preview.vector_execution_enabled,
+        preview.embedding_execution_enabled,
+        preview.rollback_execution_enabled,
+        preview.plugin_execution_enabled,
+        preview.mcp_lsp_plugin_server_startup_enabled,
+        preview.monitor_watch_daemon_enabled,
+        preview.external_channel_enabled,
+        preview.approval_relay_enabled,
+        preview.subagent_execution_enabled,
+        preview.multi_agent_team_execution_enabled,
+        preview.remote_execution_enabled,
+        preview.container_execution_enabled,
+        preview.cloud_execution_enabled,
+        preview.hosted_routines_enabled,
+        preview.marketplace_installs_enabled,
+        preview.hosted_push_notifications_enabled,
+        preview.share_links_enabled,
+    ):
+        assert flag is False
     assert "secret-value-123456789" not in json.dumps(preview.to_dict())
 
     handoff = create_approval_handoff_metadata(
@@ -68,7 +115,30 @@ def test_slice_h_contracts_are_deterministic_json_safe_and_redacted() -> None:
         summary="api_key=abcdef1234567890",
     )
     assert handoff.can_execute_now is False
-    assert handoff.execution_enabled is False
+    for flag in (
+        handoff.execution_enabled,
+        handoff.cleanup_execution_enabled,
+        handoff.graph_indexing_enabled,
+        handoff.semantic_memory_writes_enabled,
+        handoff.vector_writes_enabled,
+        handoff.embedding_creation_enabled,
+        handoff.rollback_execution_enabled,
+        handoff.plugin_execution_enabled,
+        handoff.mcp_lsp_plugin_server_startup_enabled,
+        handoff.monitor_watch_daemon_enabled,
+        handoff.external_channel_enabled,
+        handoff.approval_relay_enabled,
+        handoff.subagent_execution_enabled,
+        handoff.multi_agent_team_execution_enabled,
+        handoff.remote_execution_enabled,
+        handoff.container_execution_enabled,
+        handoff.cloud_execution_enabled,
+        handoff.hosted_routines_enabled,
+        handoff.marketplace_installs_enabled,
+        handoff.hosted_push_notifications_enabled,
+        handoff.share_links_enabled,
+    ):
+        assert flag is False
     assert "abcdef1234567890" not in json.dumps(handoff.to_dict())
 
 
@@ -98,7 +168,9 @@ def test_registry_list_get_create_are_deterministic_and_non_executing() -> None:
         metadata={"summary": "expired metadata"},
         created_at="2026-06-18T00:00:00Z",
     )
-    preview = create_cleanup_preview_metadata(linked_lifecycle_ids=[record.lifecycle_id], expired_candidate_count=1)
+    preview = create_cleanup_preview_metadata(
+        linked_lifecycle_ids=[record.lifecycle_id], expired_candidate_count=1
+    )
     handoff = create_approval_handoff_metadata(
         linked_lifecycle_ids=[record.lifecycle_id],
         source_preview_ids=[preview.preview_id],
@@ -127,14 +199,20 @@ def test_cli_commands_render_read_only_summaries_and_usage(tmp_path: Path) -> No
         assert "metadata" in output
         assert "execution_enabled: False" in output or "execution_enabled=False" in output
         assert "No graph indexing" in output
-    assert "Usage:" in handle_slash_command("/storage-lifecycle-retention --bad", workspace_root=tmp_path)
+    assert "Usage:" in handle_slash_command(
+        "/storage-lifecycle-retention --bad", workspace_root=tmp_path
+    )
 
 
 def test_workspace_inspection_and_views_include_slice_h_summary(tmp_path: Path) -> None:
     inspection = inspect_workspace("terminal", workspace_root=tmp_path)
     view = workspace_view_summary(inspection)
     summary = retention_cleanup_handoff_summary(workspace_root=tmp_path)
-    for source in (inspection["storage_lifecycle_retention_summary"], view["storage_lifecycle_retention_summary"], summary):
+    for source in (
+        inspection["storage_lifecycle_retention_summary"],
+        view["storage_lifecycle_retention_summary"],
+        summary,
+    ):
         assert source["retention_policy_count"] >= 1
         assert source["cleanup_preview_count"] >= 1
         assert source["approval_handoff_count"] >= 1
@@ -148,7 +226,19 @@ def test_sqlite_migration_only_creates_allowed_metadata_tables(tmp_path: Path) -
     assert "phase3_storage_lifecycle_cleanup_previews" in tables
     assert "phase3_storage_lifecycle_approval_handoffs" in tables
     assert "phase3_storage_lifecycle_retention_events" in tables
-    forbidden = {"graph_nodes", "graph_edges", "vectors", "vector_embeddings", "embeddings", "semantic_memory_writes", "rollback_execution", "plugin_execution", "external_channel_runtime", "remote_execution", "container_execution"}
+    forbidden = {
+        "graph_nodes",
+        "graph_edges",
+        "vectors",
+        "vector_embeddings",
+        "embeddings",
+        "semantic_memory_writes",
+        "rollback_execution",
+        "plugin_execution",
+        "external_channel_runtime",
+        "remote_execution",
+        "container_execution",
+    }
     assert forbidden.isdisjoint(tables)
 
 

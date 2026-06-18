@@ -164,6 +164,7 @@ def render_lifecycle_summary(
         )
     return "\n".join(lines)
 
+
 _RETENTION_POLICIES: dict[str, StorageLifecycleRetentionPolicy] = {}
 _CLEANUP_PREVIEWS: dict[str, StorageLifecycleCleanupPreview] = {}
 _APPROVAL_HANDOFFS: dict[str, StorageLifecycleApprovalHandoff] = {}
@@ -177,6 +178,10 @@ def create_retention_policy_metadata(**kwargs: Any) -> StorageLifecycleRetention
 
 def list_retention_policies() -> list[StorageLifecycleRetentionPolicy]:
     return sorted(_RETENTION_POLICIES.values(), key=lambda p: p.policy_id)
+
+
+def get_retention_policy(policy_id: str) -> StorageLifecycleRetentionPolicy | None:
+    return _RETENTION_POLICIES.get(policy_id)
 
 
 def create_cleanup_preview_metadata(**kwargs: Any) -> StorageLifecycleCleanupPreview:
@@ -233,7 +238,13 @@ def seed_workspace_retention_cleanup_handoffs(workspace_root: str | Path = ".") 
         source_preview_ids=[preview.preview_id],
         summary="approval handoff is planned only; no relay or execution",
     )
-    return {"retention_policies": list_retention_policies(), "cleanup_previews": list_cleanup_previews(), "approval_handoffs": list_approval_handoffs(), "latest_cleanup_preview": preview, "latest_approval_handoff": handoff}
+    return {
+        "retention_policies": list_retention_policies(),
+        "cleanup_previews": list_cleanup_previews(),
+        "approval_handoffs": list_approval_handoffs(),
+        "latest_cleanup_preview": preview,
+        "latest_approval_handoff": handoff,
+    }
 
 
 def retention_cleanup_handoff_summary(*, workspace_root: str | Path = ".") -> dict[str, Any]:
@@ -255,10 +266,19 @@ def retention_cleanup_handoff_summary(*, workspace_root: str | Path = ".") -> di
         "embedding_creation_enabled": False,
         "rollback_execution_enabled": False,
         "plugin_channel_subagent_remote_container_execution_enabled": False,
+        "mcp_lsp_plugin_server_startup_enabled": False,
+        "monitor_watch_daemon_enabled": False,
+        "approval_relay_enabled": False,
+        "hosted_routines_enabled": False,
+        "marketplace_installs_enabled": False,
+        "hosted_push_notifications_enabled": False,
+        "share_links_enabled": False,
     }
 
 
-def render_retention_cleanup_handoff(kind: str, *, workspace_root: str | Path = ".", summary_only: bool = False) -> str:
+def render_retention_cleanup_handoff(
+    kind: str, *, workspace_root: str | Path = ".", summary_only: bool = False
+) -> str:
     seed_workspace_retention_cleanup_handoffs(workspace_root)
     summary = retention_cleanup_handoff_summary(workspace_root=workspace_root)
     lines = [
@@ -271,9 +291,18 @@ def render_retention_cleanup_handoff(kind: str, *, workspace_root: str | Path = 
         lines.extend(f"{k}: {v}" for k, v in summary.items())
         return "\n".join(lines)
     if kind == "retention":
-        lines.extend(f"- {p.policy_id} target={p.lifecycle_target_type} class={p.retention_class} expiry={p.expiry_rule} cleanup_eligible={p.cleanup_eligible}" for p in list_retention_policies()[:20])
+        lines.extend(
+            f"- {p.policy_id} target={p.lifecycle_target_type} class={p.retention_class} expiry={p.expiry_rule} cleanup_eligible={p.cleanup_eligible}"
+            for p in list_retention_policies()[:20]
+        )
     elif kind == "cleanup-preview":
-        lines.extend(f"- {p.preview_id} linked={len(p.linked_lifecycle_ids)} expired={p.expired_candidate_count} superseded={p.superseded_candidate_count} can_cleanup_now={p.can_cleanup_now}" for p in list_cleanup_previews()[:20])
+        lines.extend(
+            f"- {p.preview_id} linked={len(p.linked_lifecycle_ids)} expired={p.expired_candidate_count} superseded={p.superseded_candidate_count} can_cleanup_now={p.can_cleanup_now}"
+            for p in list_cleanup_previews()[:20]
+        )
     else:
-        lines.extend(f"- {h.handoff_id} target={h.target_capability} state={h.approval_state} can_execute_now={h.can_execute_now}" for h in list_approval_handoffs()[:20])
+        lines.extend(
+            f"- {h.handoff_id} target={h.target_capability} state={h.approval_state} can_execute_now={h.can_execute_now}"
+            for h in list_approval_handoffs()[:20]
+        )
     return "\n".join(lines)

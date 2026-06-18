@@ -154,9 +154,9 @@ These permission labels are used in the inventory below so coding agents know wh
 | `storage_lifecycle_create` | Create lifecycle metadata records. | `storage_lifecycle:write_metadata` | Yes — Phase 3 Slice G internal service; metadata-only |
 | `storage_lifecycle_expire` | Mark lifecycle metadata expired. | `storage_lifecycle:write_metadata` | Yes — Phase 3 Slice G internal service; no execution |
 | `storage_lifecycle_supersede` | Mark lifecycle metadata superseded. | `storage_lifecycle:write_metadata` | Yes — Phase 3 Slice G internal service; no execution |
-| `storage_lifecycle_retention_policy` | Define retention policy metadata for lifecycle records. | `storage_lifecycle:plan` | No — recommended Phase 3 Slice H |
-| `storage_lifecycle_cleanup_preview` | Preview cleanup candidates without deletion/execution. | `storage_lifecycle:plan` | No — recommended Phase 3 Slice H |
-| `storage_lifecycle_approval_handoff` | Plan future approval handoff for lifecycle records. | `storage_lifecycle:plan`, `approval:read` | No — recommended Phase 3 Slice H |
+| `storage_lifecycle_retention_policy` | Define metadata-only retention policy records for lifecycle records. | `storage_lifecycle:plan` | Yes — Phase 3 Slice H metadata-only |
+| `storage_lifecycle_cleanup_preview` | Preview cleanup candidates without deletion/execution. | `storage_lifecycle:plan` | Yes — Phase 3 Slice H preview-only |
+| `storage_lifecycle_approval_handoff` | Plan future approval handoff for lifecycle records without approval relay. | `storage_lifecycle:plan`, `approval:read` | Yes — Phase 3 Slice H planning-only |
 | `approvals_list` | List pending action-bound approvals. | `approval:read` | Yes — Phase 2 |
 | `approve_action` | Approve exact pending action ID. | `approval:resolve` | Yes — Phase 2 for supported approval records |
 | `deny_action` | Deny exact pending action ID. | `approval:resolve` | Yes — Phase 2 |
@@ -310,5 +310,5 @@ Until the relevant phase gates are fully implemented and verified:
 | `/storage-lifecycle-retention --summary` | Render aggregate retention policy counts and disabled execution flags. | `storage_lifecycle:read` | Yes — metadata-only |
 | `/storage-lifecycle-cleanup-preview` | Render cleanup preview metadata for expired/superseded lifecycle records with `can_cleanup_now=false`. | `storage_lifecycle:read` | Yes — preview-only |
 | `/storage-lifecycle-cleanup-preview --summary` | Render aggregate cleanup preview counts and disabled cleanup/runtime flags. | `storage_lifecycle:read` | Yes — preview-only |
-| `/storage-lifecycle-handoff` | Render approval-handoff planning metadata without approval relay or execution. | `storage_lifecycle:read`, `approvals:read` | Yes — planning-only |
-| `/storage-lifecycle-handoff --summary` | Render aggregate approval-handoff counts and disabled execution flags. | `storage_lifecycle:read`, `approvals:read` | Yes — planning-only |
+| `/storage-lifecycle-handoff` | Render approval-handoff planning metadata without approval relay or execution. | `storage_lifecycle:read`, `approval:read` | Yes — planning-only |
+| `/storage-lifecycle-handoff --summary` | Render aggregate approval-handoff counts and disabled execution flags. | `storage_lifecycle:read`, `approval:read` | Yes — planning-only |

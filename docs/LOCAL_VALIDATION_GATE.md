@@ -114,6 +114,6 @@ Record this evidence in the PR body or `docs/IMPLEMENTATION_STATUS.md`:
 
 Restore `pull_request` and `push` triggers for the CI and Phase Status Validation workflows when Actions quota is available again. Full CI must be re-enabled before future release tagging.
 
-## Phase 3 Slice H lifecycle retention update
+## Phase 3 Slice H lifecycle retention reference
 
-Slice H adds metadata-only lifecycle retention policies, cleanup previews, expiry/supersede counts, and approval-handoff planning. The read-only commands are `/storage-lifecycle-retention`, `/storage-lifecycle-retention --summary`, `/storage-lifecycle-cleanup-preview`, `/storage-lifecycle-cleanup-preview --summary`, `/storage-lifecycle-handoff`, and `/storage-lifecycle-handoff --summary`. Slice H does not execute cleanup, graph/codemap indexing, semantic/vector memory writes, embeddings, rollback, plugins, channels, subagents, or remote/container/cloud execution.
+Slice H is metadata-only retention, cleanup-preview, and approval-handoff planning. Keep detailed contract and safety requirements in `docs/PHASE_3_SLICE_H_LIFECYCLE_RETENTION_SPEC.md`; this document only references Slice H where its local status, validation, command, event, or storage responsibility applies.

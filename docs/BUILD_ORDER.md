@@ -190,7 +190,7 @@ Slice C graph/codemap dry-run planning
     -> Slice E approval preview contracts
       -> Slice F approval audit + rollback planning
         -> Slice G storage lifecycle metadata
-          -> Slice H retention/cleanup planning OR lifecycle approval handoff contracts OR metadata-only query/read hardening
+          -> Slice H metadata-only retention/cleanup-preview/approval-handoff planning
 ```
 
 Slice G may create and inspect metadata records only. It must not be used as a trigger for graph indexing, semantic/vector memory writes, embeddings, rollback execution, plugin execution, channels, subagents, or remote/container/cloud execution.
@@ -247,6 +247,6 @@ Every implementation PR must include:
 - [ ] Slice G lifecycle metadata remains metadata-only unless a later approved task explicitly changes that with docs, tests, policy, rollback, and CI evidence
 ```
 
-## Phase 3 Slice H lifecycle retention update
+## Phase 3 Slice H lifecycle retention reference
 
-Slice H adds metadata-only lifecycle retention policies, cleanup previews, expiry/supersede counts, and approval-handoff planning. The read-only commands are `/storage-lifecycle-retention`, `/storage-lifecycle-retention --summary`, `/storage-lifecycle-cleanup-preview`, `/storage-lifecycle-cleanup-preview --summary`, `/storage-lifecycle-handoff`, and `/storage-lifecycle-handoff --summary`. Slice H does not execute cleanup, graph/codemap indexing, semantic/vector memory writes, embeddings, rollback, plugins, channels, subagents, or remote/container/cloud execution.
+Slice H is metadata-only retention, cleanup-preview, and approval-handoff planning. Keep detailed contract and safety requirements in `docs/PHASE_3_SLICE_H_LIFECYCLE_RETENTION_SPEC.md`; this document only references Slice H where its local status, validation, command, event, or storage responsibility applies.

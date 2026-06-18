@@ -46,3 +46,21 @@ def test_plugin_plan_command_validates_without_execution(tmp_path) -> None:  # t
         handle_slash_command("/plugin-plan", workspace_root=tmp_path)
         == "Usage: /plugin-plan <manifest_path>"
     )
+
+
+def test_plugin_plan_accepts_utf8_bom_manifest(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    manifest = tmp_path / "raiker-plugin-bom.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "plugin_id": "com.example.safe-bom",
+                "name": "Safe BOM",
+                "version": "1",
+                "permissions": [],
+            }
+        ),
+        encoding="utf-8-sig",
+    )
+    output = handle_slash_command(f"/plugin-plan {manifest}", workspace_root=tmp_path)
+    assert "status: planned" in output
+    assert "execution_enabled: False" in output

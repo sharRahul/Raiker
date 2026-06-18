@@ -241,3 +241,34 @@ CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_retention_events (
   payload_json TEXT NOT NULL
 );
 """
+
+PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_MIGRATION_ID = "RAIKER-1309-phase3-storage-lifecycle-evidence-simulation"
+
+PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_SQL = """
+CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_evidence_bundles (
+  evidence_id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  metadata_only INTEGER NOT NULL,
+  export_only INTEGER NOT NULL,
+  execution_enabled INTEGER NOT NULL,
+  bundle_json TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_policy_simulations (
+  simulation_id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  metadata_only INTEGER NOT NULL,
+  simulation_only INTEGER NOT NULL,
+  execution_enabled INTEGER NOT NULL,
+  simulation_json TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_evidence_events (
+  event_id TEXT PRIMARY KEY,
+  subject_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  payload_json TEXT NOT NULL
+);
+"""

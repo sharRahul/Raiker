@@ -417,3 +417,7 @@ Commands described elsewhere in this document for future rich UI panels remain r
 | `/storage-lifecycle-handoff --summary` | implemented | Shows handoff counts and disabled execution flags. |
 
 Unsupported arguments return usage output. These commands are read-only and do not execute lifecycle cleanup, graph indexing, semantic memory writes, embeddings, vectors, rollback, plugins, channels, subagents, remote execution, container execution, or cloud execution.
+
+## Phase 3 Slice I lifecycle evidence reference
+
+Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/PHASE_3_SLICE_I_LIFECYCLE_EVIDENCE_SPEC.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.

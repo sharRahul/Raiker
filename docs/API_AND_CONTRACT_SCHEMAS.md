@@ -457,3 +457,7 @@ Safety status:
 `StorageLifecycleRetentionPolicy`, `StorageLifecycleCleanupPreview`, and `StorageLifecycleApprovalHandoff` are deterministic JSON-safe metadata contracts. Their IDs are derived from canonical JSON payloads and never from random UUIDs. All secret-like metadata is redacted before ID generation and serialization.
 
 Required disabled fields include `metadata_only=true`, `can_execute_now=false` where applicable, `execution_enabled=false`, `cleanup_execution_enabled=false`, and explicit false flags for graph indexing, semantic/vector writes, embedding creation/storage, rollback execution, plugin/channel/subagent execution, and remote/container execution.
+
+## Phase 3 Slice I lifecycle evidence reference
+
+Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/PHASE_3_SLICE_I_LIFECYCLE_EVIDENCE_SPEC.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.

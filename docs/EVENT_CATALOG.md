@@ -336,3 +336,17 @@ These events are JSON-safe, redacted, metadata-only events. They must not trigge
 | `phase3.storage.lifecycle.approval_handoff.blocked` | Approval handoff is blocked until future policy. | Planning-only; no execution. |
 | `phase3.storage.lifecycle.cleanup.execution_denied` | Cleanup execution was denied by Slice H boundary. | No cleanup may run. |
 | `phase3.storage.lifecycle.handoff.execution_denied` | Approval handoff execution was denied by Slice H boundary. | No approval relay or execution may run. |
+
+## Phase 3 Slice I Lifecycle Evidence and Policy Simulation Events
+
+These events are metadata-only. They are read-only/export-only/simulation-only and never execute cleanup, graph/codemap indexing, graph writes, semantic/vector memory writes, embedding generation/storage, rollback, plugin, channel, subagent, remote, container, or cloud behavior.
+
+| Event name | Meaning | Runtime boundary |
+|---|---|---|
+| `phase3.storage.lifecycle.evidence.bundle_created` | Evidence bundle metadata was created for inspection/export. | Metadata-only; export-only; no execution. |
+| `phase3.storage.lifecycle.evidence.bundle_listed` | Evidence bundles were listed. | Read-only; no execution. |
+| `phase3.storage.lifecycle.evidence.export_rendered` | Redacted deterministic evidence JSON/text was rendered. | Export-only; no execution. |
+| `phase3.storage.lifecycle.policy_simulation.created` | Policy simulation metadata was created. | Simulation-only; no cleanup or approval relay. |
+| `phase3.storage.lifecycle.policy_simulation.listed` | Policy simulations were listed. | Read-only; no execution. |
+| `phase3.storage.lifecycle.policy_simulation.rendered` | Simulation output was rendered. | Simulation-only; no execution. |
+| `phase3.storage.lifecycle.policy_simulation.execution_denied` | Runtime execution remained denied during simulation. | No cleanup, graph, memory, vector, embedding, rollback, plugin, channel, subagent, remote, container, or cloud execution. |

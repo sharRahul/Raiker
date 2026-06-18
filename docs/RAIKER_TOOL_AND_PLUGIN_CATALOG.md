@@ -312,3 +312,16 @@ Until the relevant phase gates are fully implemented and verified:
 | `/storage-lifecycle-cleanup-preview --summary` | Render aggregate cleanup preview counts and disabled cleanup/runtime flags. | `storage_lifecycle:read` | Yes — preview-only |
 | `/storage-lifecycle-handoff` | Render approval-handoff planning metadata without approval relay or execution. | `storage_lifecycle:read`, `approval:read` | Yes — planning-only |
 | `/storage-lifecycle-handoff --summary` | Render aggregate approval-handoff counts and disabled execution flags. | `storage_lifecycle:read`, `approval:read` | Yes — planning-only |
+
+## Phase 3 Slice I lifecycle evidence and simulation tools
+
+| Tool Name | Descriptions | Permissions | Implemented |
+|---|---|---|---|
+| `storage_lifecycle_evidence_bundle` | Create/read deterministic metadata-only lifecycle evidence bundles for export and inspection. | `storage_lifecycle:read`, `audit:export` | Yes — Phase 3 Slice I |
+| `storage_lifecycle_policy_simulation` | Create/read deterministic metadata-only policy simulations; no cleanup or approval relay. | `storage_lifecycle:read`, `storage_lifecycle:plan` | Yes — Phase 3 Slice I |
+| `/storage-lifecycle-evidence` | List read-only lifecycle evidence bundles. | `storage_lifecycle:read`, `audit:export` | Yes — Phase 3 Slice I |
+| `/storage-lifecycle-evidence --summary` | Render evidence bundle summary and disabled runtime flags. | `storage_lifecycle:read`, `audit:export` | Yes — Phase 3 Slice I |
+| `/storage-lifecycle-evidence --json` | Export deterministic redacted evidence JSON. | `storage_lifecycle:read`, `audit:export` | Yes — Phase 3 Slice I |
+| `/storage-lifecycle-policy-simulation` | List metadata-only policy simulations. | `storage_lifecycle:read`, `storage_lifecycle:plan` | Yes — Phase 3 Slice I |
+| `/storage-lifecycle-policy-simulation --summary` | Render simulation summary and disabled runtime flags. | `storage_lifecycle:read`, `storage_lifecycle:plan` | Yes — Phase 3 Slice I |
+| `/storage-lifecycle-policy-simulation --json` | Export deterministic redacted policy simulation JSON. | `storage_lifecycle:read`, `storage_lifecycle:plan`, `audit:export` | Yes — Phase 3 Slice I |

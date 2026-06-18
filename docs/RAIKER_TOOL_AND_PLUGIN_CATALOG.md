@@ -339,7 +339,7 @@ Until the relevant phase gates are fully implemented and verified:
 - Adds deterministic metadata-only semantic memory readiness contracts, registry, optional SQLite metadata table, CLI, and workspace surfaces.
 - Semantic memory writes, vector writes, embeddings, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled.
 - Reserved Slice K metadata-only events: `phase3.semantic_memory_readiness.metadata_created`, `phase3.semantic_memory_readiness.summary_viewed`, `phase3.semantic_memory_readiness.exported`. No runtime memory write events are enabled.
-- Phase 3 remains incomplete and Phase 4 remains blocked.
+- Slice K did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
 
 ## Phase 3 Slice L — approval preview persistence readiness
 
@@ -349,16 +349,16 @@ Until the relevant phase gates are fully implemented and verified:
 | `/approval-readiness --summary` | Read-only metadata | None | Shows deterministic readiness counts and disabled approval execution, relay, queue, worker, scheduler, watcher, daemon, and runtime flags. |
 | `/approval-readiness --json` | Read-only metadata export | None | Emits deterministic JSON-safe readiness summary only. |
 
-Slice L does not enable approval preview persistence, approval execution, approval relay runtime, durable approval queues, workers, schedulers, watchers, daemons, or runtime execution. Phase 3 remains incomplete. Phase 4 remains blocked.
+Slice L does not enable approval preview persistence, approval execution, approval relay runtime, durable approval queues, workers, schedulers, watchers, daemons, or runtime execution. Slice L did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
 
 
 ## Phase 3 Slice M cleanup readiness surface
 
-`/cleanup-readiness [--summary|--json]` is a read-only, metadata-only CLI surface. It does not execute cleanup, deletion, purge, tombstone, rollback, jobs, workers, schedulers, watchers, daemons, plugins, or runtime execution. Phase 3 remains incomplete. Phase 4 remains blocked.
+`/cleanup-readiness [--summary|--json]` is a read-only, metadata-only CLI surface. It does not execute cleanup, deletion, purge, tombstone, rollback, jobs, workers, schedulers, watchers, daemons, plugins, or runtime execution. Slice M did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
 
 ## Phase 3 Slice N: Plugin/Server Startup Readiness — Metadata Only
 
-Slice N reserves metadata-only readiness surfaces and events for future plugin/server startup. Reserved metadata-only events: `phase3.plugin_server_readiness.metadata_created`, `phase3.plugin_server_readiness.summary_viewed`, `phase3.plugin_server_readiness.exported`. No plugin execution, plugin installation, plugin activation, MCP/LSP/plugin server startup, monitor daemon startup, marketplace install, hosted routine, external channel, worker, scheduler, watcher, daemon, relay, or runtime execution events are enabled. Phase 3 remains incomplete. Phase 4 remains blocked.
+Slice N reserves metadata-only readiness surfaces and events for future plugin/server startup. Reserved metadata-only events: `phase3.plugin_server_readiness.metadata_created`, `phase3.plugin_server_readiness.summary_viewed`, `phase3.plugin_server_readiness.exported`. No plugin execution, plugin installation, plugin activation, MCP/LSP/plugin server startup, monitor daemon startup, marketplace install, hosted routine, external channel, worker, scheduler, watcher, daemon, relay, or runtime execution events are enabled. Slice N did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
 
 ## Phase 3 Slice O channel readiness surface
 
@@ -366,4 +366,4 @@ Slice N reserves metadata-only readiness surfaces and events for future plugin/s
 
 ## Phase 3 Slice P — Remote/Container/Cloud Execution Readiness — Metadata Only
 
-Slice P adds deterministic metadata-only readiness contracts, registry, optional SQLite metadata table, `/remote-readiness [--summary|--json]`, workspace summaries, and reserved metadata-only events for future remote/container/cloud execution. No remote execution, container execution, cloud execution, hosted routines, runtime jobs, job dispatch, worker queues, workers, schedulers, file watchers, daemons, client transport, external dispatch, credential materialization, secret injection, provider integrations, sandbox runtime, process execution, shell execution, network execution, or runtime execution are enabled. Phase 3 remains incomplete. Phase 4 remains blocked.
+Slice P adds deterministic metadata-only readiness contracts, registry, optional SQLite metadata table, `/remote-readiness [--summary|--json]`, workspace summaries, and reserved metadata-only events for future remote/container/cloud execution. No remote execution, container execution, cloud execution, hosted routines, runtime jobs, job dispatch, worker queues, workers, schedulers, file watchers, daemons, client transport, external dispatch, credential materialization, secret injection, provider integrations, sandbox runtime, process execution, shell execution, network execution, or runtime execution are enabled. Slice P did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.

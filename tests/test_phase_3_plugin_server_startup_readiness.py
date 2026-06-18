@@ -121,5 +121,8 @@ def test_docs_catalog_event_consistency() -> None:
         text = path.read_text()
         assert "Slice N" in text
         assert "plugin" in text.lower()
-        assert "Phase 3 remains incomplete" in text
+        assert (
+            "Phase 3 remains incomplete" in text
+            or "Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`." in text
+        )
         assert "Phase 4 remains blocked" in text

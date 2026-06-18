@@ -92,21 +92,25 @@ PR #12 established the Phase 2 build plan, CI baseline, task manager, event view
 | /tasks terminal command | `phase_2_required` | `implemented_verified` | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | `tests/test_phase_2_terminal_commands.py` |
 | /events terminal command | `phase_2_required` | `implemented_verified` | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | `tests/test_phase_2_terminal_commands.py` |
 | /checkpoints terminal command | `phase_2_required` | `implemented_verified` | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | `tests/test_phase_2_terminal_commands.py` |
-| Side-question child-turn contract | `phase_2_required` | `specified_not_implemented` | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/API_AND_CONTRACT_SCHEMAS.md` | side-question contract tests |
-| Read-only side-question runtime | `phase_2_required` | `specified_not_implemented` | `docs/RUNTIME_ORCHESTRATION_SPEC.md` | side-question runtime tests |
-| Interrupt/steer action contracts | `phase_2_required` | `specified_not_implemented` | `docs/API_AND_CONTRACT_SCHEMAS.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` | interrupt contract tests |
-| Safe-boundary interrupt handling | `phase_2_required` | `specified_not_implemented` | `docs/RUNTIME_ORCHESTRATION_SPEC.md` | interrupt runtime tests |
-| Approval inbox service | `phase_2_required` | `specified_not_implemented` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | approval inbox tests |
-| Approval terminal commands | `phase_2_required` | `specified_not_implemented` | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | terminal approval tests |
-| Checkpoint restore/fork planning | `phase_2_required` | `specified_not_implemented` | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` | restore/fork tests |
-| stat_path and diff_files tools | `phase_2_required` | `specified_not_implemented` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | stat/diff tests |
-| write_file/edit_file/apply_patch | `phase_2_required` | `specified_not_implemented` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | file mutation approval tests |
-| git status/diff/log wrappers | `phase_2_required` | `specified_not_implemented` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | git wrapper tests |
-| Local provider health-check | `phase_2_required` | `specified_not_implemented` | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` | health check tests |
-| Memory candidate listing | `phase_2_required` | `specified_not_implemented` | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` | memory candidate tests |
+| Side-question child-turn contract | `phase_2_required` | `implemented_verified` | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/API_AND_CONTRACT_SCHEMAS.md` | side-question contract tests |
+| Read-only side-question runtime | `phase_2_required` | `implemented_verified` | `docs/RUNTIME_ORCHESTRATION_SPEC.md` | side-question runtime tests |
+| Interrupt/steer action contracts | `phase_2_required` | `implemented_verified` | `docs/API_AND_CONTRACT_SCHEMAS.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` | interrupt contract tests |
+| Safe-boundary interrupt handling | `phase_2_required` | `implemented_verified` | `docs/RUNTIME_ORCHESTRATION_SPEC.md` | interrupt runtime tests |
+| Approval inbox service | `phase_2_required` | `implemented_verified` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | approval inbox tests |
+| Approval terminal commands | `phase_2_required` | `implemented_verified` | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | terminal approval tests |
+| Checkpoint restore/fork planning | `phase_2_required` | `implemented_verified` | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` | restore/fork tests |
+| stat_path and diff_files tools | `phase_2_required` | `implemented_verified` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | stat/diff tests |
+| write_file/edit_file/apply_patch | `phase_2_required` | `implemented_verified` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | file mutation approval tests |
+| git status/diff/log wrappers | `phase_2_required` | `implemented_verified` | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | git wrapper tests |
+| Local provider health-check | `phase_2_required` | `implemented_verified` | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` | health check tests |
+| Memory candidate listing | `phase_2_required` | `implemented_verified` | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` | memory candidate tests |
 | Phase 2 integration validation | `phase_2_required` | `implemented_verified` | `docs/VERIFICATION_PLAN.md` | integration smoke tests |
 
 ---
+
+## Phase 3 and Phase 4 Planning Status
+
+Detailed Phase 3 and Phase 4 plans are now recorded in `docs/PHASE_3_BUILD_PLAN.md` and `docs/PHASE_4_BUILD_PLAN.md`. Safe foundations are limited to disabled/listable capability gates with tests proving Phase 3/4 runtime features cannot execute prematurely.
 
 ## Status Update Rule
 

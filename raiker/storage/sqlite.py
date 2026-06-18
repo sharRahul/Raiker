@@ -402,3 +402,55 @@ class SQLiteStore:
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM checkpoints WHERE checkpoint_id = ?", (checkpoint_id,)).fetchone()
         return dict(row) if row else None
+    def list_approvals(self, status: str | None = None) -> list[dict[str, Any]]:
+        query = """
+            SELECT approvals.*, tool_actions.tool_name, tool_actions.arguments_json, tool_actions.risk_level
+            FROM approvals
+            JOIN tool_actions ON approvals.action_id = tool_actions.action_id
+        """
+        params: list[Any] = []
+        if status is not None:
+            query += " WHERE approvals.status = ?"
+            params.append(status)
+        query += " ORDER BY approvals.created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_approval(self, approval_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM approvals WHERE approval_id = ?", (approval_id,)).fetchone()
+        return dict(row) if row else None
+
+    def resolve_approval(self, approval_id: str, *, status: str, resolved_by: str, resolved_at: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE approvals SET status = ?, approved_by = ?, resolved_at = ? WHERE approval_id = ? AND status = 'pending'",
+                (status, resolved_by, resolved_at, approval_id),
+            )
+
+    def update_task_status(self, task_id: str, status: str) -> None:
+        self._update_task(task_id, status=status)
+
+    def insert_memory_candidate(self, candidate: Any) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO memory_candidates
+                (candidate_id, source_event_id, memory_type, scope, text, sensitivity, confidence, decision, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (candidate.candidate_id, candidate.source_event_id, candidate.memory_type, candidate.scope, candidate.text, candidate.sensitivity, candidate.confidence, candidate.decision, candidate.created_at),
+            )
+
+    def list_memory_candidates(self, decision: str | None = None) -> list[dict[str, Any]]:
+        query = "SELECT * FROM memory_candidates"
+        params: list[Any] = []
+        if decision is not None:
+            query += " WHERE decision = ?"
+            params.append(decision)
+        query += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+

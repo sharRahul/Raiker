@@ -4,6 +4,7 @@ import argparse
 import shlex
 from pathlib import Path
 
+from raiker.approvals import ApprovalInbox
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.ids import new_id
@@ -145,12 +146,35 @@ def handle_checkpoints(*, workspace_root: str | Path = ".") -> str:
     return "\n".join(lines)
 
 
+
+def handle_approvals(*, workspace_root: str | Path = ".") -> str:
+    inbox = ApprovalInbox(SQLiteStore(workspace_root))
+    approvals = inbox.list_pending()
+    if not approvals:
+        return "No pending approvals."
+    lines = ["Pending approvals:"]
+    for approval in approvals:
+        lines.append(f"- {approval['approval_id']} action={approval['action_id']} tool={approval['tool_name']} risk={approval['risk_level']}")
+    return "\n".join(lines)
+
+
+def handle_approval_resolution(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) != 2:
+        return "Usage: /approve <approval_id> or /deny <approval_id>"
+    inbox = ApprovalInbox(SQLiteStore(workspace_root))
+    try:
+        resolution = inbox.resolve(parts[1], approve=parts[0] == "/approve")
+    except ValueError as exc:
+        return f"Approval resolution failed: {exc}"
+    return f"Approval {resolution.approval_id} {resolution.status} for action {resolution.action_id}."
+
 def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> str:
     command = command.strip()
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -163,6 +187,10 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_events(workspace_root=workspace_root)
     if command == "/checkpoints":
         return handle_checkpoints(workspace_root=workspace_root)
+    if command == "/approvals":
+        return handle_approvals(workspace_root=workspace_root)
+    if command in {"/approve", "/deny"} or command.startswith("/approve ") or command.startswith("/deny "):
+        return handle_approval_resolution(command, workspace_root=workspace_root)
     if command.startswith("/launch "):
         try:
             return handle_launch(command, workspace_root=workspace_root)

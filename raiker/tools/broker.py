@@ -10,7 +10,15 @@ from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.filesystem import FilesystemSafetyError, list_directory, read_file
+from raiker.tools.filesystem import (
+    FilesystemSafetyError,
+    diff_files,
+    list_directory,
+    proposed_write_snapshot,
+    read_file,
+    stat_path,
+)
+from raiker.tools.git import run_git
 from raiker.tools.search import glob, grep
 
 
@@ -42,6 +50,14 @@ class ToolBroker:
                 include=str(args.get("include", "*")),
                 max_results=int(args.get("max_results", 100)),
             ),
+            "stat_path": lambda args: stat_path(self.workspace_root, str(args.get("path", "."))),
+            "diff_files": lambda args: diff_files(self.workspace_root, str(args.get("before_path", ".")), str(args.get("after_path", "."))),
+            "git_status": lambda args: run_git(self.workspace_root, "status", ["--short"]),
+            "git_diff": lambda args: run_git(self.workspace_root, "diff", list(args.get("args", []))),
+            "git_log": lambda args: run_git(self.workspace_root, "log", ["--oneline", "-n", str(args.get("limit", 10))]),
+            "write_file": lambda args: proposed_write_snapshot(self.workspace_root, str(args.get("path", ".")), str(args.get("text", ""))),
+            "edit_file": lambda args: proposed_write_snapshot(self.workspace_root, str(args.get("path", ".")), str(args.get("text", ""))),
+            "apply_patch": lambda args: {"status": "proposal", "patch": str(args.get("patch", "")), "requires_approval": True},
         }
 
     def _event(
@@ -133,7 +149,7 @@ class ToolBroker:
                     "arguments_preview": action.arguments,
                     "risk_level": "high",
                     "policy_reasons": decision.reasons,
-                    "expected_effect": "Phase 1 records an approval request and does not execute the action.",
+                    "expected_effect": "Records an action-bound approval request and does not execute until resolved.",
                 },
                 client=client,
             )

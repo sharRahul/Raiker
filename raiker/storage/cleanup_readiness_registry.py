@@ -4,6 +4,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from raiker.readiness.registry import (
+    get_readiness_by_id,
+    render_readiness_records,
+    sort_readiness_records,
+    summarize_readiness_records,
+)
 from raiker.storage.cleanup_readiness import (
     DISABLED_RUNTIME_FLAGS,
     StorageCleanupExecutionReadinessContract,
@@ -49,26 +55,29 @@ def list_cleanup_readiness_metadata(*, workspace_root: str | Path | None = None)
         records = [record for record in records if record.workspace_id == workspace]
         if not records:
             records = [create_cleanup_readiness_metadata(workspace_root=workspace_root)]
-    return sorted(records, key=lambda record: record.readiness_id)
+    return sort_readiness_records(records)
 
 
 def get_cleanup_readiness_metadata(readiness_id: str) -> StorageCleanupExecutionReadinessContract | None:
-    return _RECORDS.get(readiness_id)
+    return get_readiness_by_id(list(_RECORDS.values()), readiness_id)
 
 
 def cleanup_readiness_summary(*, workspace_root: str | Path = ".") -> dict[str, Any]:
     records = list_cleanup_readiness_metadata(workspace_root=workspace_root)
     latest = records[-1] if records else create_cleanup_readiness_metadata(workspace_root=workspace_root)
-    return {
-        "storage_cleanup_readiness_contract_available": True,
-        "storage_cleanup_readiness_record_count": len(records),
-        "latest_readiness_id": latest.readiness_id,
-        "metadata_only": True,
+    summary = summarize_readiness_records(
+        records,
+        latest_key="latest_readiness_id",
+        count_key="storage_cleanup_readiness_record_count",
+        metadata_only_key="storage_cleanup_readiness_contract_available",
+    )
+    summary.update({
         "ready_for_cleanup_execution": False,
         **DISABLED_RUNTIME_FLAGS,
         "blocker_count": len(latest.blockers),
         "required_gate_count": len(latest.required_gates),
-    }
+    })
+    return summary
 
 
 def render_cleanup_readiness(*, workspace_root: str | Path = ".") -> str:
@@ -78,5 +87,5 @@ def render_cleanup_readiness(*, workspace_root: str | Path = ".") -> str:
         "persistence: metadata_only_optional_sqlite",
         "cleanup_execution_enabled: False",
     ]
-    lines.extend(f"{key}: {value}" for key, value in summary.items())
+    lines.extend(render_readiness_records(summary))
     return "\n".join(lines)

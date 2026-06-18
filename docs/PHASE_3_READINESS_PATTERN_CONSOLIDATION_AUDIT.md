@@ -156,3 +156,9 @@ Do not implement Slice P until maintainers decide whether readiness consolidatio
 The first shared readiness foundation has been implemented as pure internal contract helpers in `raiker/readiness/contracts.py`. This initial step centralizes only low-risk metadata-only readiness helpers for JSON-safe metadata validation, canonical JSON serialization, deterministic hash ID generation, tuple sorting, deterministic dictionary ordering, and non-empty string tuple validation.
 
 This foundation is intentionally narrow. It does not consolidate registry behavior, CLI behavior, workspace summaries, or SQLite persistence. It does not change existing readiness ID prefixes, public readiness contract names, public CLI commands, SQLite table names, JSON output shape, disabled runtime flags, or metadata-only boundaries. Runtime execution remains disabled, Slice P remains unimplemented, Phase 3 remains incomplete, and Phase 4 remains blocked.
+
+## Second shared readiness foundation implementation
+
+The second shared readiness foundation has been implemented as internal metadata-only registry helpers in `raiker/readiness/registry.py`. This step centralizes only low-risk in-memory helper behavior for deterministic readiness record sorting, get-by-ID lookup, common latest/count/metadata-only summary fields, and deterministic render line construction.
+
+This foundation remains intentionally narrow. There is no CLI consolidation yet, no SQLite schema consolidation, no workspace consolidation, no Slice P implementation, and no runtime behavior enabled. Existing public registry function names, readiness IDs, JSON output shapes, SQLite table names, and metadata-only disabled-runtime boundaries are preserved. Phase 3 remains incomplete, and Phase 4 remains blocked.

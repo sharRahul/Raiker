@@ -9,6 +9,12 @@ from raiker.graph.readiness import (
     GraphCodemapReadinessContract,
     create_readiness_contract,
 )
+from raiker.readiness.registry import (
+    get_readiness_by_id,
+    render_readiness_records,
+    sort_readiness_records,
+    summarize_readiness_records,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 _RECORDS: dict[str, GraphCodemapReadinessContract] = {}
@@ -51,21 +57,23 @@ def list_graph_readiness_metadata(*, workspace_root: str | Path | None = None) -
         records = [record for record in records if record.workspace_id == workspace]
         if not records:
             records = [create_graph_readiness_metadata(workspace_root=workspace_root)]
-    return sorted(records, key=lambda record: record.readiness_id)
+    return sort_readiness_records(records)
 
 
 def get_graph_readiness_metadata(readiness_id: str) -> GraphCodemapReadinessContract | None:
-    return _RECORDS.get(readiness_id)
+    return get_readiness_by_id(list(_RECORDS.values()), readiness_id)
 
 
 def graph_readiness_summary(*, workspace_root: str | Path = ".") -> dict[str, Any]:
     records = list_graph_readiness_metadata(workspace_root=workspace_root)
     latest = records[-1] if records else create_graph_readiness_metadata(workspace_root=workspace_root)
-    return {
-        "graph_readiness_contract_available": True,
-        "graph_readiness_record_count": len(records),
-        "latest_readiness_id": latest.readiness_id,
-        "metadata_only": True,
+    summary = summarize_readiness_records(
+        records,
+        latest_key="latest_readiness_id",
+        count_key="graph_readiness_record_count",
+        metadata_only_key="graph_readiness_contract_available",
+    )
+    summary.update({
         "ready_for_indexing": False,
         "graph_indexing_enabled": False,
         "graph_writes_enabled": False,
@@ -79,11 +87,12 @@ def graph_readiness_summary(*, workspace_root: str | Path = ".") -> dict[str, An
         "runtime_execution_enabled": False,
         "blocker_count": len(latest.blockers),
         "required_gate_count": len(latest.required_gates),
-    }
+    })
+    return summary
 
 
 def render_graph_readiness(*, workspace_root: str | Path = ".") -> str:
     summary = graph_readiness_summary(workspace_root=workspace_root)
     lines = ["Graph/codemap indexing readiness:", "persistence: metadata_only_optional_sqlite", "runtime_jobs_enabled: False"]
-    lines.extend(f"{key}: {value}" for key, value in summary.items())
+    lines.extend(render_readiness_records(summary))
     return "\n".join(lines)

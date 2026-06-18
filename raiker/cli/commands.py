@@ -272,10 +272,10 @@ def handle_plugins() -> str:
 
 
 def handle_plugin_plan(command: str) -> str:
-    parts = shlex.split(command)
+    parts = shlex.split(command, posix=False)
     if len(parts) != 2:
         return "Usage: /plugin-plan <manifest_path>"
-    path = Path(parts[1])
+    path = Path(parts[1].strip("\"'"))
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:

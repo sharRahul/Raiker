@@ -2,11 +2,22 @@ from __future__ import annotations
 
 from typing import cast
 
+import pytest
+
 from raiker.cli.commands import handle_slash_command
 from raiker.graph.governance import graph_governance_status
 from raiker.graph.planner import GraphCodemapPlanner, create_graph_codemap_plan
 from raiker.phase_gates import get_capability_gate
 from raiker.workspace.inspection import inspect_workspace
+
+
+def _require_directory_symlink(link_path, target_path) -> None:  # type: ignore[no-untyped-def]
+    try:
+        link_path.symlink_to(target_path, target_is_directory=True)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Directory symlink creation is not permitted in this environment.")
+        raise
 
 
 def test_graph_runtime_indexing_remains_disabled() -> None:
@@ -58,7 +69,7 @@ def test_graph_plan_excludes_default_ignored_dirs_and_symlink_escape(tmp_path) -
         (ignored / "ignored.py").write_text("x=1", encoding="utf-8")
     outside = tmp_path.parent / "outside-link-target"
     outside.mkdir(exist_ok=True)
-    (tmp_path / "escape").symlink_to(outside, target_is_directory=True)
+    _require_directory_symlink(tmp_path / "escape", outside)
     plan = create_graph_codemap_plan(tmp_path).to_dict()
     excluded_paths = cast(list[dict[str, object]], plan["excluded_paths"])
     reasons = {item["reason"] for item in excluded_paths}

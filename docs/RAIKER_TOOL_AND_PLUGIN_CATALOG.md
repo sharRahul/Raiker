@@ -330,4 +330,6 @@ Until the relevant phase gates are fully implemented and verified:
 
 | Command | Mode | Runtime effects | Notes |
 |---|---|---|---|
-| `/graph-readiness` | Read-only metadata | None | Shows metadata-only readiness blockers. Does not enable graph indexing, graph writes, workers, schedulers, file watchers, daemons, or runtime jobs. |
+| `/graph-readiness` | Read-only metadata | None | Shows metadata-only readiness blockers. Does not enable graph indexing, codemap indexing, graph writes, workers, schedulers, file watchers, daemons, indexing jobs, or runtime execution/jobs. |
+| `/graph-readiness --summary` | Read-only metadata | None | Shows deterministic readiness counts and disabled runtime flags only. |
+| `/graph-readiness --json` | Read-only metadata export | None | Emits deterministic JSON-safe readiness summary only. |

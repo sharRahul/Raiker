@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
-from raiker.graph.readiness import GraphCodemapReadinessContract, create_readiness_contract
+from raiker.graph.readiness import (
+    DISABLED_RUNTIME_FLAGS,
+    GraphCodemapReadinessContract,
+    create_readiness_contract,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 _RECORDS: dict[str, GraphCodemapReadinessContract] = {}
@@ -31,9 +36,9 @@ def create_graph_readiness_metadata(*, workspace_root: str | Path = ".", persist
                     record.target_capability,
                     1,
                     0,
-                    '{"graph_indexing_enabled": false, "graph_writes_enabled": false, "runtime_jobs_enabled": false}',
-                    __import__("json").dumps(record.to_dict()["blockers"], sort_keys=True),
-                    __import__("json").dumps(record.to_dict(), sort_keys=True),
+                    json.dumps(DISABLED_RUNTIME_FLAGS, sort_keys=True),
+                    json.dumps(record.to_dict()["blockers"], sort_keys=True),
+                    json.dumps(record.to_dict(), sort_keys=True),
                 ),
             )
     return record
@@ -64,11 +69,14 @@ def graph_readiness_summary(*, workspace_root: str | Path = ".") -> dict[str, An
         "ready_for_indexing": False,
         "graph_indexing_enabled": False,
         "graph_writes_enabled": False,
+        "codemap_indexing_enabled": False,
+        "indexing_jobs_enabled": False,
         "runtime_jobs_enabled": False,
         "workers_enabled": False,
         "schedulers_enabled": False,
         "file_watchers_enabled": False,
         "daemons_enabled": False,
+        "runtime_execution_enabled": False,
         "blocker_count": len(latest.blockers),
         "required_gate_count": len(latest.required_gates),
     }

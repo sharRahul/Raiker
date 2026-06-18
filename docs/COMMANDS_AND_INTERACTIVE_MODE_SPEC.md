@@ -34,6 +34,7 @@ The user can act through any enabled primary interface. Each interface may use i
 | Channel panel/action | `/channels` | Lists, links, unlinks, and inspects connectors. |
 | Memory panel/action | `/memory` | Searches and manages governed memory. |
 | Graph panel/action | `/graph query --symbol ToolBroker` | Runs graph/codemap query through policy. |
+| Storage lifecycle panel/action | `/storage-lifecycle --summary` | Inspects metadata-only lifecycle records; no runtime writes. |
 | Checkpoint panel/action | `/checkpoints` | Inspect, restore, fork, export, or clean up checkpoints. |
 | Diagnostics panel/action | `/doctor` | Runs diagnostics through approved checks. |
 
@@ -103,6 +104,7 @@ but it is not the only primary interface.
 | `side_question` | Ask about active task without stopping it. | Any enabled interface that supports side questions. |
 | `model_launch` | Launch/switch model provider. | Any enabled interface with model controls. |
 | `channel_management` | Link/list/manage connectors. | Any enabled interface with admin/channel settings. |
+| `storage_lifecycle_inspection` | Inspect Slice G metadata-only lifecycle summaries. | Any enabled interface with workspace/status panels. |
 | `diagnostics` | Run health checks. | Any enabled interface with diagnostics capability. |
 | `daemon` | Long-running local service used by channels/webhooks. | Managed from settings, service manager, or admin UI. |
 | `headless` | Automation/test-only path. | Internal/test harness, not human UX. |
@@ -123,18 +125,19 @@ The Rich TUI is one equal-status primary interface. It must support:
 8. checkpoint timeline;
 9. memory inspector;
 10. graph/context inspector;
-11. notifications panel;
-12. command palette;
-13. file/reference picker;
-14. background task manager;
-15. interrupt/steer controls;
-16. model/context usage display;
-17. model launch/profile panel;
-18. channel connector panel;
-19. policy decision display;
-20. keyboard shortcuts;
-21. mouse support where available;
-22. fallback plain terminal mode.
+11. storage lifecycle inspector;
+12. notifications panel;
+13. command palette;
+14. file/reference picker;
+15. background task manager;
+16. interrupt/steer controls;
+17. model/context usage display;
+18. model launch/profile panel;
+19. channel connector panel;
+20. policy decision display;
+21. keyboard shortcuts;
+22. mouse support where available;
+23. fallback plain terminal mode.
 
 ---
 
@@ -201,7 +204,7 @@ The user can interrupt active work with explicit controls from any enabled prima
 | `rewind` | Restore previous checkpoint. |
 | `summarise` | Summarise current task state. |
 
-Safe boundaries include before tool execution, after tool completion, before file write, before local command execution, before checkpoint creation, and before subagent handoff.
+Safe boundaries include before tool execution, after tool completion, before file write, before local command execution, before checkpoint creation, before storage lifecycle status mutation, and before subagent handoff.
 
 ---
 
@@ -249,6 +252,10 @@ Slash commands are terminal syntax for interface-neutral actions. Every command 
 | `/models` | Show model profiles. |
 | `/launch` | Launch or switch model provider profile. |
 | `/graph` | Query graph/codemap context. |
+| `/storage-lifecycle` | Inspect metadata-only lifecycle records. |
+| `/storage-lifecycle --summary` | Inspect aggregate metadata-only lifecycle counts and disabled runtime write flags. |
+| `/storage-lifecycle --graph` | Inspect graph/codemap lifecycle metadata only; graph runtime indexing remains disabled. |
+| `/storage-lifecycle --memory` | Inspect semantic-memory lifecycle metadata only; semantic/vector writes and embeddings remain disabled. |
 | `/compact` | Compact context. |
 | `/export` | Export session/task/events. |
 | `/doctor` | Run diagnostics. |
@@ -292,6 +299,8 @@ Task statuses:
 - `completed`
 - `failed`
 
+Slice G lifecycle status records are not background tasks. They must not appear as executable jobs unless a later approved phase explicitly adds that with policy, audit, rollback, and tests.
+
 ---
 
 ## Approval UX
@@ -299,6 +308,8 @@ Task statuses:
 Approvals must show exact tool/action, exact command/path/URL, risk level, policy reasons, file diff if file write/edit, network host if network, command classification, and choices: approve once, approve session, deny, defer, inspect.
 
 No approval should be hidden in a stream of text. It must appear in the approval surface native to the originating or currently active interface: approval inbox, card, drawer, mobile approval control, channel card, or authenticated API approval response.
+
+Slice G lifecycle records are not executable approvals. Approval-preview, approval-audit, rollback-plan, and storage-lifecycle commands remain preview/read-only unless a later phase explicitly enables execution.
 
 ---
 
@@ -342,6 +353,8 @@ Required interface-neutral events:
 - `approval_rendered`
 - `approval_selected`
 - `checkpoint_selected`
+- `storage_lifecycle_rendered`
+- `storage_lifecycle_summary_rendered`
 
 ---
 
@@ -357,18 +370,18 @@ Tests must prove:
 - interrupt changes active task state safely;
 - approval choice binds to action ID;
 - checkpoint selection triggers restore/fork flow;
+- storage lifecycle inspection is read-only and interface-equivalent;
 - TUI can render with no colour/limited terminal;
 - background task progress updates without corrupting transcript;
 - every enabled primary interface uses the same gateway, contracts, policy, event log, and session state.
 
+## Implemented Terminal Inspection Commands
 
-## Phase 2 Implemented Terminal Inspection Commands
-
-The current Phase 2 terminal client exposes these inspection and control commands through shared services rather than terminal-only privileged paths:
+The current terminal client exposes these inspection and control commands through shared services rather than terminal-only privileged paths:
 
 | Command | Status | Behaviour |
 |---|---|---|
-| `/status` | implemented | Shows workspace paths, session count, and pending approval count. |
+| `/status` | implemented | Shows workspace paths, session count, lifecycle record count, and pending approval count. |
 | `/tasks` | implemented | Lists task records from shared task storage. |
 | `/events` | implemented | Lists recent indexed events. |
 | `/checkpoints` | implemented | Lists checkpoint timeline entries. |
@@ -376,6 +389,18 @@ The current Phase 2 terminal client exposes these inspection and control command
 | `/approve <approval_id>` | implemented | Resolves one exact pending approval as approved. |
 | `/deny <approval_id>` | implemented | Resolves one exact pending approval as denied. |
 | `/memory` | implemented | Shows read-only governed memory candidate status; durable writes remain disabled. |
+| `/semantic-memory` | implemented | Shows semantic memory disabled status. |
+| `/memory-review` | implemented | Shows governed memory review queue without writes. |
+| `/memory-review --summary` | implemented | Shows governed memory review counts. |
+| `/graph-status` | implemented | Shows graph/codemap indexing disabled status. |
+| `/graph-plan` | implemented | Shows dry-run graph/codemap plan; indexing remains disabled. |
+| `/approval-previews` | implemented | Shows preview-only approval records. |
+| `/approval-audit` | implemented | Shows preview-only audit records. |
+| `/rollback-plan` | implemented | Shows preview-only rollback plans. |
+| `/storage-lifecycle` | implemented | Shows metadata-only storage lifecycle records. |
+| `/storage-lifecycle --summary` | implemented | Shows metadata-only lifecycle aggregate counts and disabled write flags. |
+| `/storage-lifecycle --graph` | implemented | Shows graph/codemap lifecycle metadata only. |
+| `/storage-lifecycle --memory` | implemented | Shows semantic-memory lifecycle metadata only. |
 | `/doctor` | implemented | Shows local diagnostics, provider health detection, and disabled Phase 3/4 gates. |
 
 Commands described elsewhere in this document for future rich UI panels remain requirements unless listed here as implemented.

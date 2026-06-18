@@ -55,6 +55,8 @@ class GraphCodemapReadinessContract:
             values = getattr(self, field_name)
             if not isinstance(values, tuple) or any(not isinstance(value, str) or not value for value in values):
                 raise ValueError(f"{field_name} must be a tuple of non-empty strings")
+        if not self.blockers:
+            raise ValueError("blockers must be non-empty while graph/codemap indexing is disabled")
         self._json_safe_metadata(self.metadata)
 
     @classmethod
@@ -106,6 +108,9 @@ class GraphCodemapReadinessContract:
             **DISABLED_RUNTIME_FLAGS,
             "metadata": {key: self.metadata[key] for key in sorted(self.metadata)},
         }
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
 
 
 def create_readiness_contract(**kwargs: Any) -> GraphCodemapReadinessContract:

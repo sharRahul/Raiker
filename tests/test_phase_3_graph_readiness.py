@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
+
 from raiker.cli.commands import handle_slash_command
-from raiker.graph.readiness import create_readiness_contract
+from raiker.graph.readiness import REQUIRED_READINESS_GATES, create_readiness_contract
 from raiker.graph.readiness_registry import (
     create_graph_readiness_metadata,
     get_graph_readiness_metadata,
@@ -72,3 +74,17 @@ def test_graph_readiness_rejects_non_json_safe_metadata() -> None:
         assert "JSON-safe" in str(exc)
     else:
         raise AssertionError("non-JSON-safe metadata was accepted")
+
+
+def test_graph_readiness_matches_later_slice_safety_validation() -> None:
+    try:
+        create_readiness_contract(satisfied_gates=REQUIRED_READINESS_GATES)
+    except ValueError as exc:
+        assert "blockers must be non-empty while graph/codemap indexing is disabled" in str(exc)
+    else:
+        raise AssertionError("graph readiness accepted an unblocked disabled-runtime contract")
+
+    payload = json.loads(create_readiness_contract().to_json())
+    assert payload["metadata_only"] is True
+    assert payload["ready_for_indexing"] is False
+    assert payload["runtime_execution_enabled"] is False

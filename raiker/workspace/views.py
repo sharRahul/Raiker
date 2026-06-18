@@ -86,6 +86,19 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
                 "preview_only_mode": True,
             },
         ),
+        "storage_lifecycle_retention_summary": safe.get(
+            "storage_lifecycle_retention_summary",
+            {
+                "retention_policy_count": 0,
+                "cleanup_preview_count": 0,
+                "approval_handoff_count": 0,
+                "expired_lifecycle_count": 0,
+                "superseded_lifecycle_count": 0,
+                "metadata_only": True,
+                "cleanup_execution_enabled": False,
+                "approval_handoff_execution_enabled": False,
+            },
+        ),
         "storage_lifecycle_summary": safe.get(
             "storage_lifecycle_summary",
             {
@@ -156,6 +169,15 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
         f"storage_lifecycle_runtime_writes_enabled: {view['storage_lifecycle_summary']['runtime_writes_enabled']}"
     )
     lines.append(
+        f"storage_lifecycle_retention_policies: {view['storage_lifecycle_retention_summary']['retention_policy_count']}"
+    )
+    lines.append(
+        f"storage_lifecycle_cleanup_previews: {view['storage_lifecycle_retention_summary']['cleanup_preview_count']}"
+    )
+    lines.append(
+        f"storage_lifecycle_approval_handoffs: {view['storage_lifecycle_retention_summary']['approval_handoff_count']}"
+    )
+    lines.append(
         f"memory_governance_mode: {view['semantic_memory'].get('memory_governance_mode', 'review_queue_only_no_semantic_writes')}"
     )
     return "\n".join(lines)
@@ -177,6 +199,7 @@ def render_workspace_dashboard_summary(inspection: Mapping[str, Any]) -> dict[st
         "approval_audit_summary": view["approval_audit_summary"],
         "rollback_plan_summary": view["rollback_plan_summary"],
         "storage_lifecycle_summary": view["storage_lifecycle_summary"],
+        "storage_lifecycle_retention_summary": view["storage_lifecycle_retention_summary"],
     }
 
 

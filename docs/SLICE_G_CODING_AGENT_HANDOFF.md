@@ -176,3 +176,7 @@ The next PR must explicitly confirm:
 The safest next target is **Phase 3 Slice H: Lifecycle Retention, Cleanup, and Approval-Handoff Planning**.
 
 Slice H should add contracts, docs, tests, and read-only/preview-only surfaces for lifecycle retention and approval handoff. It must not enable runtime graph indexing, semantic/vector writes, embeddings, rollback execution, plugins, channels, subagents, or remote/container execution.
+
+## Phase 3 Slice H lifecycle retention update
+
+Slice H adds metadata-only lifecycle retention policies, cleanup previews, expiry/supersede counts, and approval-handoff planning. The read-only commands are `/storage-lifecycle-retention`, `/storage-lifecycle-retention --summary`, `/storage-lifecycle-cleanup-preview`, `/storage-lifecycle-cleanup-preview --summary`, `/storage-lifecycle-handoff`, and `/storage-lifecycle-handoff --summary`. Slice H does not execute cleanup, graph/codemap indexing, semantic/vector memory writes, embeddings, rollback, plugins, channels, subagents, or remote/container/cloud execution.

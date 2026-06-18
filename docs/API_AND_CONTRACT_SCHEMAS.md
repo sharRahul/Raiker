@@ -451,3 +451,9 @@ Safety status:
 - Rollback execution remains disabled.
 - Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
 - GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.
+
+## Phase 3 Slice H Lifecycle Retention Contracts
+
+`StorageLifecycleRetentionPolicy`, `StorageLifecycleCleanupPreview`, and `StorageLifecycleApprovalHandoff` are deterministic JSON-safe metadata contracts. Their IDs are derived from canonical JSON payloads and never from random UUIDs. All secret-like metadata is redacted before ID generation and serialization.
+
+Required disabled fields include `metadata_only=true`, `can_execute_now=false` where applicable, `execution_enabled=false`, `cleanup_execution_enabled=false`, and explicit false flags for graph indexing, semantic/vector writes, embedding creation/storage, rollback execution, plugin/channel/subagent execution, and remote/container execution.

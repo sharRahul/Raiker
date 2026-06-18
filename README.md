@@ -409,3 +409,7 @@ Slice H adds metadata-only lifecycle retention policies, cleanup previews, expir
 ## Phase 3 Slice I lifecycle evidence reference
 
 Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/PHASE_3_SLICE_I_LIFECYCLE_EVIDENCE_SPEC.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.
+
+## Phase 3 next slice definition audit
+
+The planning-only next action after Slice I stabilization is centralized in `docs/PHASE_3_NEXT_SLICE_DEFINITION_AUDIT.md`. It does not define or implement Slice J; it asks maintainers to name the next Phase 3 slice before implementation and preserves all disabled-runtime boundaries.

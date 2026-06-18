@@ -357,3 +357,17 @@ CREATE TABLE IF NOT EXISTS phase3_external_channels_notifications_readiness (
   contract_json TEXT NOT NULL
 );
 """
+
+
+PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_MIGRATION_ID = "RAIKER-1316-phase3-remote-container-cloud-readiness-metadata"
+
+PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_SQL = """
+CREATE TABLE IF NOT EXISTS phase3_remote_container_cloud_readiness (
+  readiness_id TEXT PRIMARY KEY,
+  target TEXT NOT NULL,
+  status TEXT NOT NULL,
+  blockers_json TEXT NOT NULL,
+  disabled_runtime_flags_json TEXT NOT NULL,
+  contract_json TEXT NOT NULL
+);
+"""

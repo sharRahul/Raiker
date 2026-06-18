@@ -355,3 +355,7 @@ Slice L does not enable approval preview persistence, approval execution, approv
 ## Phase 3 Slice M cleanup readiness surface
 
 `/cleanup-readiness [--summary|--json]` is a read-only, metadata-only CLI surface. It does not execute cleanup, deletion, purge, tombstone, rollback, jobs, workers, schedulers, watchers, daemons, plugins, or runtime execution. Phase 3 remains incomplete. Phase 4 remains blocked.
+
+## Phase 3 Slice N: Plugin/Server Startup Readiness — Metadata Only
+
+Slice N reserves metadata-only readiness surfaces and events for future plugin/server startup. Reserved metadata-only events: `phase3.plugin_server_readiness.metadata_created`, `phase3.plugin_server_readiness.summary_viewed`, `phase3.plugin_server_readiness.exported`. No plugin execution, plugin installation, plugin activation, MCP/LSP/plugin server startup, monitor daemon startup, marketplace install, hosted routine, external channel, worker, scheduler, watcher, daemon, relay, or runtime execution events are enabled. Phase 3 remains incomplete. Phase 4 remains blocked.

@@ -95,6 +95,34 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
         ),
         "execution_profiles": safe["execution_profiles"],
         "plugin_registration_plans": safe["plugin_registration_plans"],
+        "plugin_server_startup_readiness": safe.get(
+            "plugin_server_startup_readiness",
+            {
+                "plugin_server_readiness_contract_available": True,
+                "plugin_server_readiness_record_count": 0,
+                "latest_readiness_id": None,
+                "metadata_only": True,
+                "ready_for_plugin_server_startup": False,
+                "plugin_execution_enabled": False,
+                "plugin_installation_enabled": False,
+                "plugin_activation_enabled": False,
+                "mcp_server_startup_enabled": False,
+                "lsp_server_startup_enabled": False,
+                "plugin_server_startup_enabled": False,
+                "monitor_daemon_startup_enabled": False,
+                "hosted_routines_enabled": False,
+                "marketplace_installs_enabled": False,
+                "external_channels_enabled": False,
+                "approval_relay_runtime_enabled": False,
+                "worker_queues_enabled": False,
+                "workers_enabled": False,
+                "schedulers_enabled": False,
+                "file_watchers_enabled": False,
+                "daemons_enabled": False,
+                "runtime_execution_enabled": False,
+                "blocker_count": 0,
+            },
+        ),
         "approval_preview_persistence_readiness": safe.get(
             "approval_preview_persistence_readiness",
             {
@@ -264,6 +292,18 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
     lines.append(f"semantic_vector_writes_enabled: {view['semantic_memory_readiness']['vector_writes_enabled']}")
     lines.append(f"semantic_embedding_creation_enabled: {view['semantic_memory_readiness']['embedding_creation_enabled']}")
     lines.append(f"semantic_memory_write_jobs_enabled: {view['semantic_memory_readiness']['memory_write_jobs_enabled']}")
+    lines.append(f"plugin_readiness_metadata_only: {view['plugin_server_startup_readiness']['metadata_only']}")
+    lines.append(f"plugin_ready_for_server_startup: {view['plugin_server_startup_readiness']['ready_for_plugin_server_startup']}")
+    lines.append(f"plugin_readiness_latest_id: {view['plugin_server_startup_readiness']['latest_readiness_id']}")
+    lines.append(f"plugin_readiness_blockers: {view['plugin_server_startup_readiness']['blocker_count']}")
+    lines.append(f"plugin_installation_enabled: {view['plugin_server_startup_readiness']['plugin_installation_enabled']}")
+    lines.append(f"plugin_activation_enabled: {view['plugin_server_startup_readiness']['plugin_activation_enabled']}")
+    lines.append(f"mcp_server_startup_enabled: {view['plugin_server_startup_readiness']['mcp_server_startup_enabled']}")
+    lines.append(f"lsp_server_startup_enabled: {view['plugin_server_startup_readiness']['lsp_server_startup_enabled']}")
+    lines.append(f"plugin_server_startup_enabled: {view['plugin_server_startup_readiness']['plugin_server_startup_enabled']}")
+    lines.append(f"monitor_daemon_startup_enabled: {view['plugin_server_startup_readiness']['monitor_daemon_startup_enabled']}")
+    lines.append(f"marketplace_installs_enabled: {view['plugin_server_startup_readiness']['marketplace_installs_enabled']}")
+    lines.append(f"external_channels_enabled: {view['plugin_server_startup_readiness']['external_channels_enabled']}")
     lines.append(
         f"approval_preview_only_mode: {view['approval_preview_summary']['preview_only_mode']}"
     )

@@ -329,3 +329,17 @@ CREATE TABLE IF NOT EXISTS phase3_storage_cleanup_execution_readiness (
   contract_json TEXT NOT NULL
 );
 """
+
+
+PHASE_3_PLUGIN_SERVER_STARTUP_READINESS_MIGRATION_ID = "RAIKER-1314-phase3-plugin-server-startup-readiness-metadata"
+
+PHASE_3_PLUGIN_SERVER_STARTUP_READINESS_SQL = """
+CREATE TABLE IF NOT EXISTS phase3_plugin_server_startup_readiness (
+  readiness_id TEXT PRIMARY KEY,
+  target TEXT NOT NULL,
+  status TEXT NOT NULL,
+  blockers_json TEXT NOT NULL,
+  disabled_runtime_flags_json TEXT NOT NULL,
+  contract_json TEXT NOT NULL
+);
+"""

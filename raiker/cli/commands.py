@@ -51,6 +51,7 @@ from raiker.models.registry import ModelProfileRegistry, RegistryError
 from raiker.models.router import ModelRouter
 from raiker.phase_gates import list_disabled_capabilities
 from raiker.plugins.policy import plan_plugin_registration
+from raiker.plugins.readiness_registry import plugin_readiness_summary, render_plugin_readiness
 from raiker.rollback_plans import render_rollback_plan
 from raiker.rollback_registry import create_workspace_rollback_plans, rollback_plan_summary
 from raiker.storage.cleanup_readiness_registry import (
@@ -400,6 +401,37 @@ def handle_approval_readiness(command: str = "/approval-readiness", *, workspace
         )
     return render_approval_readiness(workspace_root=workspace_root)
 
+
+def handle_plugin_readiness(command: str = "/plugin-readiness", *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
+        return "Usage: /plugin-readiness [--summary|--json]"
+    if len(parts) == 2 and parts[1] == "--json":
+        return json.dumps(plugin_readiness_summary(workspace_root=workspace_root), sort_keys=True)
+    if len(parts) == 2 and parts[1] == "--summary":
+        summary = plugin_readiness_summary(workspace_root=workspace_root)
+        return "\n".join(
+            [
+                "Plugin/server startup readiness summary:",
+                f"metadata_only: {summary['metadata_only']}",
+                f"ready_for_plugin_server_startup: {summary['ready_for_plugin_server_startup']}",
+                f"plugin_execution_enabled: {summary['plugin_execution_enabled']}",
+                f"plugin_installation_enabled: {summary['plugin_installation_enabled']}",
+                f"plugin_activation_enabled: {summary['plugin_activation_enabled']}",
+                f"mcp_server_startup_enabled: {summary['mcp_server_startup_enabled']}",
+                f"lsp_server_startup_enabled: {summary['lsp_server_startup_enabled']}",
+                f"plugin_server_startup_enabled: {summary['plugin_server_startup_enabled']}",
+                f"monitor_daemon_startup_enabled: {summary['monitor_daemon_startup_enabled']}",
+                f"marketplace_installs_enabled: {summary['marketplace_installs_enabled']}",
+                f"external_channels_enabled: {summary['external_channels_enabled']}",
+                f"workers_enabled: {summary['workers_enabled']}",
+                f"schedulers_enabled: {summary['schedulers_enabled']}",
+                f"runtime_execution_enabled: {summary['runtime_execution_enabled']}",
+                f"blocker_count: {summary['blocker_count']}",
+            ]
+        )
+    return render_plugin_readiness(workspace_root=workspace_root)
+
 def handle_cleanup_readiness(command: str = "/cleanup-readiness", *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
@@ -700,7 +732,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /plugin-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -739,6 +771,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_approval_readiness(command, workspace_root=workspace_root)
     if command == "/cleanup-readiness" or command.startswith("/cleanup-readiness "):
         return handle_cleanup_readiness(command, workspace_root=workspace_root)
+    if command == "/plugin-readiness" or command.startswith("/plugin-readiness "):
+        return handle_plugin_readiness(command, workspace_root=workspace_root)
     if command == "/memory-review" or command.startswith("/memory-review "):
         return handle_memory_review(command, workspace_root=workspace_root)
     if command == "/approval-previews":

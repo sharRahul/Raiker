@@ -30,7 +30,7 @@ from raiker.plugins.policy import plan_plugin_registration
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
 from raiker.workspace.inspection import inspect_workspace
-from raiker.workspace.views import render_workspace_text_view
+from raiker.workspace.views import render_workspace_view
 
 
 def terminal_client() -> ClientMetadata:
@@ -192,26 +192,43 @@ def handle_capabilities() -> str:
     return "\n".join(lines)
 
 
-
 def handle_workspace(*, workspace_root: str | Path = ".") -> str:
     summary = inspect_workspace("terminal", workspace_root=workspace_root)
-    return "\n".join([
-        "Workspace inspection:",
-        f"read_only: {summary['contract']['read_only']}",
-        f"shared_contract_path: {summary['contract']['shared_contract_path']}",
-        f"sessions: {summary['runtime_status']['session_count']}",
-        f"events: {len(summary['recent_events'])}",
-        f"checkpoints: {len(summary['checkpoint_timeline'])}",
-        f"tasks: {len(summary['tasks'])}",
-        f"pending_approvals: {len(summary['approvals'])}",
-    ])
+    return "\n".join(
+        [
+            "Workspace inspection:",
+            f"read_only: {summary['contract']['read_only']}",
+            f"shared_contract_path: {summary['contract']['shared_contract_path']}",
+            f"sessions: {summary['runtime_status']['session_count']}",
+            f"events: {len(summary['recent_events'])}",
+            f"checkpoints: {len(summary['checkpoint_timeline'])}",
+            f"tasks: {len(summary['tasks'])}",
+            f"pending_approvals: {len(summary['approvals'])}",
+        ]
+    )
+
+
+def handle_workspace_view(*, workspace_root: str | Path = ".") -> str:
+    return render_workspace_view(workspace_root=workspace_root, client_type="terminal")
 
 
 def handle_clients() -> str:
-    client_types = ["terminal", "desktop", "web", "dashboard", "ide", "voice", "mobile_companion", "browser_extension", "chat/channel client"]
+    client_types = [
+        "terminal",
+        "desktop",
+        "web",
+        "dashboard",
+        "ide",
+        "voice",
+        "mobile_companion",
+        "browser_extension",
+        "chat/channel client",
+    ]
     lines = ["Client contract parity:"]
     for client_type in client_types:
-        lines.append(f"- {client_type}: UIActionEnvelope shared_gateway equal_primary_when_enabled privileged=False")
+        lines.append(
+            f"- {client_type}: UIActionEnvelope shared_gateway equal_primary_when_enabled privileged=False"
+        )
     return "\n".join(lines)
 
 
@@ -231,14 +248,17 @@ def handle_plugin_plan(command: str) -> str:
     if not isinstance(manifest, dict):
         return "Plugin plan failed: manifest must be a JSON object"
     plan = plan_plugin_registration(manifest).to_dict()
-    return "\n".join([
-        "Plugin registration plan:",
-        f"plugin_id: {plan['plugin_id']}",
-        f"status: {plan['status']}",
-        f"execution_enabled: {plan['execution_enabled']}",
-        f"permissions: {','.join(plan['permissions'])}",
-        f"reasons: {','.join(plan['reasons']) if plan['reasons'] else 'none'}",
-    ])
+    return "\n".join(
+        [
+            "Plugin registration plan:",
+            f"plugin_id: {plan['plugin_id']}",
+            f"status: {plan['status']}",
+            f"execution_enabled: {plan['execution_enabled']}",
+            f"permissions: {','.join(plan['permissions'])}",
+            f"reasons: {','.join(plan['reasons']) if plan['reasons'] else 'none'}",
+        ]
+    )
+
 
 def handle_workspace_view(command: str = "/workspace-view", *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
@@ -320,8 +340,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_execution_profiles()
     if command == "/workspace":
         return handle_workspace(workspace_root=workspace_root)
-    if command == "/workspace-view" or command.startswith("/workspace-view "):
-        return handle_workspace_view(command, workspace_root=workspace_root)
+    if command == "/workspace-view":
+        return handle_workspace_view(workspace_root=workspace_root)
     if command == "/clients":
         return handle_clients()
     if command == "/plugins":

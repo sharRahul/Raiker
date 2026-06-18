@@ -73,15 +73,29 @@ Evidence:
 - `tests/test_phase_3_plugin_policy.py`
 - `tests/test_phase_3_terminal_commands.py`
 
+## Phase 3 rollout slice B — RAIKER-3501 read-only rich workspace view/API foundation
 
-## Phase 3 rollout slice B — workspace view/API foundation
-
-Status: `implemented_verified` for the safe read-only view layer only. This slice fixes CI compatibility for Python 3.11, keeps Python 3.13 compatibility where possible, and adds deterministic workspace rendering for future terminal, desktop, web, and dashboard clients through the shared workspace inspection contract.
+Slice B continues Phase 3 without marking full Phase 3 complete. It adds a read-only view layer over the existing shared workspace inspection contract for future terminal, desktop, web, and dashboard clients.
 
 Implemented scope:
 
-- `raiker/workspace/views.py` renders JSON-safe workspace, text/terminal, dashboard summary, client capability summary, and plugin plan summary views.
-- `/workspace-view` renders a stable read-only terminal snapshot from `inspect_workspace(...)`.
-- Acceptance tests prove equivalent read-only data for terminal, desktop, web, and dashboard clients and prove view rendering does not mutate tasks, approvals, memory candidates, plugin state, channel state, or execution gates.
+- deterministic text workspace summary;
+- JSON-safe workspace summary;
+- dashboard summary;
+- client capability summary;
+- plugin plan summary;
+- `/workspace-view` CLI command for deterministic read-only terminal inspection.
 
-Out of scope and still disabled: full desktop/web/dashboard runtime, web server, privileged UI path, plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution. Full Phase 3 is not complete.
+Safety boundaries:
+
+- views consume the shared inspection output instead of bypassing policy, storage, or event boundaries;
+- views do not execute tools;
+- views do not create approvals;
+- views do not call models;
+- views do not write semantic/vector memory;
+- views do not execute plugin code;
+- views do not activate external channels;
+- views do not start remote/container execution;
+- views redact secret-like keys before returning summaries.
+
+GitHub Actions are temporarily paused only due quota exhaustion. Local validation evidence from `docs/LOCAL_VALIDATION_GATE.md` is required while Actions are paused. Unsafe runtime capabilities remain disabled.

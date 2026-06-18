@@ -344,10 +344,11 @@ raiker --prompt "Hello Raiker"
 
 Additional terminal inspection smoke coverage should include `/workspace`, `/clients`, `/plugins`, and `/plugin-plan <safe manifest path>` when running the interactive terminal.
 
+## Temporary local validation gate while GitHub Actions are paused
 
-## Phase 3 rollout slice B validation
+GitHub Actions are temporarily paused because the Actions run limit/quota is exhausted. While paused, `docs/LOCAL_VALIDATION_GATE.md` is mandatory for validation commands and evidence capture. GitHub CI must not be marked as passed during this interval, and local validation evidence must be copied into the PR body or `docs/IMPLEMENTATION_STATUS.md` before merge or main push.
 
-Required CI parity commands for this slice, especially on Python 3.11, are:
+The required local gate remains:
 
 ```bash
 python -m ruff check .
@@ -358,4 +359,4 @@ raiker --help
 raiker --prompt "Hello Raiker"
 ```
 
-The slice is ready only when CI and Phase Status Validation pass. The validation must confirm `/workspace-view` is read-only and that plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
+Phase 3 rollout branches must also smoke `/help`, `/status`, `/capabilities`, `/semantic-memory`, `/execution-profiles`, `/workspace`, `/clients`, `/plugins`, `/plugin-plan`, `/doctor`, and any newly added read-only inspection command such as `/workspace-view`.

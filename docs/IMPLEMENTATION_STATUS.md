@@ -181,17 +181,22 @@ Phase 3 is **not complete**. The first rollout slice is `implemented_verified` a
 
 Preserved disabled gates: plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution remain non-executing.
 
+## Temporary CI Pause — GitHub Actions quota exhausted
+
+- GitHub Actions are temporarily paused or unavailable due run-limit/quota exhaustion.
+- Local validation is mandatory while Actions are paused; use `docs/LOCAL_VALIDATION_GATE.md` as the source of truth for required commands and evidence.
+- Full CI must be re-enabled before future release tagging or when quota becomes available.
+- This is not a waiver of validation requirements.
 
 ## Phase 3 rollout slice B status — 2026-06-18
 
-Phase 3 is **not complete**. Slice B is `implemented_verified` for the safe read-only workspace view/API foundation after restoring CI compatibility for Python 3.11 and preserving the disabled runtime gates.
+Phase 3 is **not complete**. Slice B adds the RAIKER-3501 read-only rich workspace view/API foundation while preserving all disabled runtime gates.
 
 | Slice | Status | Evidence |
 |---|---:|---|
-| RAIKER-3501 read-only rich workspace view/API foundation | `implemented_verified` | `raiker/workspace/views.py`, `tests/test_phase_3_workspace_views.py` |
-| `/workspace-view` safe terminal snapshot command | `implemented_verified` | `raiker/cli/commands.py`, `tests/test_phase_3_terminal_commands.py` |
-| Python 3.11 CI compatibility | `implemented_verified` | `pyproject.toml`, CI parity commands in `docs/VERIFICATION_PLAN.md` |
+| RAIKER-3501 read-only rich workspace view/API foundation | `implemented_verified` after local validation evidence is recorded | `raiker/workspace/views.py`, `tests/test_phase_3_workspace_views.py` |
+| `/workspace-view` read-only CLI summary | `implemented_verified` after local validation evidence is recorded | `raiker/cli/commands.py`, `tests/test_phase_3_workspace_views.py` |
 
-Slice B adds deterministic JSON-safe, text, dashboard, client capability, and plugin-plan summaries that consume only the shared read-only workspace inspection contract. It does not add a full desktop app, web server, dashboard runtime, privileged UI path, plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, or container execution.
+The view layer consumes the shared workspace inspection contract and renders deterministic text, JSON-safe, dashboard, client capability, and plugin plan summaries. It does not execute tools, create approvals, call models, write memory, execute plugin code, activate channels, start remote/container execution, or expose secret-like values.
 
 Preserved disabled gates: plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution remain non-executing.

@@ -646,19 +646,19 @@ Desktop UI is an equal primary local application shell around the same gateway.
 ### Desktop Home Screen
 
 ```text
-┌──────────────────── Raiker Desktop ────────────────────┐
-│ Sidebar                      │ Main Workspace            │
-│ ─ Sessions                   │ Welcome / Active Session  │
-│ ─ Active Tasks               │ Recent Tasks              │
-│ ─ Approvals                  │ Pending Approvals         │
-│ ─ Memory                     │ Project Context           │
-│ ─ Eidetic Observations       │ Retention / Replay        │
-│ ─ Graph                      │ Quick Actions             │
-│ ─ Channels                   │ Link / Unlink             │
-│ ─ Models                     │ Launch / Switch           │
-│ ─ Plugins                    │ Registry / Risk           │
-│ ─ Settings                   │                           │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────── Raiker Desktop ──────────────────────────────────────────────┐
+│ Sidebar                      │ Main Workspace                                    │
+│ ─ Sessions                   │ - Welcome / Active Session                        │
+│ ─ Active Tasks               │ - Completed / Pending / Recent Tasks              │
+│ ─ Approvals                  │ - Approved / Rejected / Pending Approvals         │
+│ ─ Memory                     │ - Recent Memory Update / Project Context          │
+│ ─ Eidetic Observations       │ - Retention / Replay                              │
+│ ─ Graph                      │ - Quick Actions                                   │
+│ ─ Channels                   │ - Link / Unlink                                   │
+│ ─ Models                     │ - Launch / Switch                                 │
+│ ─ Plugins                    │ - Registry / Risk                                 │
+│ ─ Settings                   │                                                   │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Desktop Active Session Screen

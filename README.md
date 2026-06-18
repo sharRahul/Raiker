@@ -47,7 +47,7 @@ As of the current `main` state:
 |---|---|---|
 | Phase 1 MVP runtime core | `implemented_verified` | Package scaffold, global `raiker` command, contracts, event log, SQLite bootstrap, static policy, tool broker, safe filesystem/search tools, approval-gated local actions, mock model provider, runtime state machine, terminal shell, and checkpoint stubs are present and covered by tests. |
 | Phase 2 rich local workspace | `implemented_verified` | Task management, event viewer, checkpoint timeline, status/task/event/checkpoint/approval commands, side-question and interrupt contracts, approval inbox, governed file/git wrappers, local provider health-check, and memory candidate views are present and covered by tests. |
-| Phase 3 local rich workspace/extensibility foundations | **Foundation only; Phase 3 is not complete** | Read-only workspace inspection/view surfaces, equal client contract parity, plugin manifest/registration planning, capability gates, graph/codemap dry-run planning, semantic memory review governance, and approval-preview UX/contracts are present. Runtime plugin execution, graph indexing, semantic/vector memory writes, embeddings, and durable approval-preview persistence remain disabled. |
+| Phase 3 local rich workspace/extensibility foundations | **Foundation only; Phase 3 is not complete** | Read-only workspace inspection/view surfaces, equal client contract parity, plugin manifest/registration planning, capability gates, graph/codemap dry-run planning, semantic memory review governance, approval-preview UX/contracts, Slice G metadata-only storage lifecycle preparation, and Slice H metadata-only retention/cleanup-preview/approval-handoff planning are present. Runtime plugin execution, graph indexing, semantic/vector memory writes, embeddings, cleanup execution, approval relay, and durable approval-preview persistence remain disabled. |
 | Phase 4 external channel / multi-agent / governed execution foundations | **Foundation only; Phase 4 is not complete** | Execution profiles, remote/container execution planning, subagent planning, external-channel activation status, and inspection commands are present. External transports, subagent spawning, multi-agent teams, remote execution, and container execution remain disabled. |
 | GitHub Actions | Temporarily paused | Workflows are currently `workflow_dispatch` only because GitHub Actions quota is exhausted. Use [`docs/LOCAL_VALIDATION_GATE.md`](docs/LOCAL_VALIDATION_GATE.md) until CI triggers are restored. |
 
@@ -93,6 +93,8 @@ Do **not** mark any capability `implemented_verified` unless:
 - Memory candidate listing and governed memory status view.
 
 ### Phase 3 safe foundations only
+
+The restored Phase 1 and Phase 2 build-plan documents remain the detailed scope sources for those completed phases; Slice G/H references are later-phase metadata-only additions and do not change Phase 1 or Phase 2 runtime scope.
 
 - Capability gates for Phase 3 features.
 - Read-only workspace inspection shared by terminal, desktop, web, and dashboard client types.

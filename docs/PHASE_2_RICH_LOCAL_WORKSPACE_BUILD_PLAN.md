@@ -12,6 +12,11 @@ All implemented and enabled clients are equal-status primary interfaces through 
 
 ---
 
+
+## Phase 3 Slice G/H Impact on Phase 2
+
+Phase 2 remains the rich local workspace foundation. Slice G/H depends on Phase 2 task, event, checkpoint, approval, and memory concepts, but it does not expand Phase 2 runtime authority. Lifecycle status changes remain metadata-only. Approval-preview, approval-audit, rollback-plan, cleanup-preview, and handoff surfaces remain read-only or planning-only. Semantic/vector memory writes, embeddings, rollback execution, plugin execution, channels, subagents, and remote/container/cloud execution remain disabled.
+
 ## Phase 2 Status Vocabulary
 
 | Status | Meaning | Builder action |

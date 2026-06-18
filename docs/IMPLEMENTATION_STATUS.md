@@ -22,6 +22,8 @@ A feature marked as specified is not automatically implemented. A feature marked
 
 ## Phase 1 MVP Status
 
+Post-restore audit note: the long-form Phase 1 build plan is restored and remains the detailed scope source for implemented/verified Phase 1 behavior. Later Slice G/H lifecycle metadata does not change Phase 1 runtime scope.
+
 PR #6 added the initial Phase 1 MVP runtime core.
 PR #8 reconciled documentation and version baseline.
 PR #11 removed generated Python bytecode artifacts and strengthened .gitignore.
@@ -76,6 +78,8 @@ The following capabilities may have config profiles, schemas, or storage boundar
 ---
 
 ## Phase 2 Rich Local Workspace Status
+
+Post-restore audit note: the long-form Phase 2 build plan is restored and remains the detailed scope source for implemented/verified Phase 2 behavior. Later Slice G/H lifecycle metadata depends on Phase 2 concepts but does not expand Phase 2 runtime authority.
 
 PR #12 established the Phase 2 build plan, CI baseline, task manager, event viewer, checkpoint timeline, and inspection commands. This table tracks all Phase 2 capabilities.
 
@@ -269,6 +273,6 @@ Safety status:
 - Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
 - GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.
 
-## Phase 3 Slice H lifecycle retention update
+## Phase 3 Slice H lifecycle retention status
 
-Slice H adds metadata-only lifecycle retention policies, cleanup previews, expiry/supersede counts, and approval-handoff planning. The read-only commands are `/storage-lifecycle-retention`, `/storage-lifecycle-retention --summary`, `/storage-lifecycle-cleanup-preview`, `/storage-lifecycle-cleanup-preview --summary`, `/storage-lifecycle-handoff`, and `/storage-lifecycle-handoff --summary`. Slice H does not execute cleanup, graph/codemap indexing, semantic/vector memory writes, embeddings, rollback, plugins, channels, subagents, or remote/container/cloud execution.
+Slice H is `implemented_verified` locally for metadata-only retention policies, cleanup previews, approval-handoff planning, read-only summaries, and SQLite metadata tables. Full Phase 3 is still incomplete. Keep detailed contract and safety requirements in `docs/PHASE_3_SLICE_H_LIFECYCLE_RETENTION_SPEC.md`; this document records only the status summary. Slice H does not execute cleanup, graph/codemap indexing, semantic/vector memory writes, embeddings, rollback, plugins, channels, subagents, approval relay, or remote/container/cloud execution.

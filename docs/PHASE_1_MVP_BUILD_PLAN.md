@@ -14,6 +14,11 @@ The Phase 1 terminal client is the first implementation target only. It is not t
 
 ---
 
+
+## Phase 3 Slice G/H Impact on Phase 1
+
+Phase 1 remains the secure local runtime core. Phase 3 Slice G/H storage lifecycle records are later-phase metadata-only tables and do not change Phase 1 scope. They must not be interpreted as graph tables, vector tables, semantic-memory durable-write tables, rollback execution tables, plugin execution tables, channel runtime tables, or remote/container/cloud execution tables. Tool broker, policy, approval, gateway, event logging, and equal-interface rules still apply.
+
 ## Phase 1 Alignment Rules
 
 ### Phase Scheduling Rule

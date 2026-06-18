@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shlex
 from pathlib import Path
 
@@ -25,8 +26,10 @@ from raiker.memory.semantic import semantic_memory_status
 from raiker.models.registry import ModelProfileRegistry, RegistryError
 from raiker.models.router import ModelRouter
 from raiker.phase_gates import list_disabled_capabilities
+from raiker.plugins.policy import plan_plugin_registration
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
+from raiker.workspace.inspection import inspect_workspace
 
 
 def terminal_client() -> ClientMetadata:
@@ -188,6 +191,54 @@ def handle_capabilities() -> str:
     return "\n".join(lines)
 
 
+
+def handle_workspace(*, workspace_root: str | Path = ".") -> str:
+    summary = inspect_workspace("terminal", workspace_root=workspace_root)
+    return "\n".join([
+        "Workspace inspection:",
+        f"read_only: {summary['contract']['read_only']}",
+        f"shared_contract_path: {summary['contract']['shared_contract_path']}",
+        f"sessions: {summary['runtime_status']['session_count']}",
+        f"events: {len(summary['recent_events'])}",
+        f"checkpoints: {len(summary['checkpoint_timeline'])}",
+        f"tasks: {len(summary['tasks'])}",
+        f"pending_approvals: {len(summary['approvals'])}",
+    ])
+
+
+def handle_clients() -> str:
+    client_types = ["terminal", "desktop", "web", "dashboard", "ide", "voice", "mobile_companion", "browser_extension", "chat/channel client"]
+    lines = ["Client contract parity:"]
+    for client_type in client_types:
+        lines.append(f"- {client_type}: UIActionEnvelope shared_gateway equal_primary_when_enabled privileged=False")
+    return "\n".join(lines)
+
+
+def handle_plugins() -> str:
+    return "Plugin registration plans:\n- no persisted plugin plans; use /plugin-plan <manifest_path> for read-only planning"
+
+
+def handle_plugin_plan(command: str) -> str:
+    parts = shlex.split(command)
+    if len(parts) != 2:
+        return "Usage: /plugin-plan <manifest_path>"
+    path = Path(parts[1])
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return f"Plugin plan failed: {exc}"
+    if not isinstance(manifest, dict):
+        return "Plugin plan failed: manifest must be a JSON object"
+    plan = plan_plugin_registration(manifest).to_dict()
+    return "\n".join([
+        "Plugin registration plan:",
+        f"plugin_id: {plan['plugin_id']}",
+        f"status: {plan['status']}",
+        f"execution_enabled: {plan['execution_enabled']}",
+        f"permissions: {','.join(plan['permissions'])}",
+        f"reasons: {','.join(plan['reasons']) if plan['reasons'] else 'none'}",
+    ])
+
 def handle_execution_profiles() -> str:
     lines = ["Execution profiles:"]
     for profile in list_execution_profiles():
@@ -235,7 +286,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /clients, /plugins, /plugin-plan <manifest_path>, /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -258,6 +309,14 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_capabilities()
     if command == "/execution-profiles":
         return handle_execution_profiles()
+    if command == "/workspace":
+        return handle_workspace(workspace_root=workspace_root)
+    if command == "/clients":
+        return handle_clients()
+    if command == "/plugins":
+        return handle_plugins()
+    if command == "/plugin-plan" or command.startswith("/plugin-plan "):
+        return handle_plugin_plan(command)
     if command == "/doctor":
         return render_doctor(workspace_root=workspace_root)
     if (

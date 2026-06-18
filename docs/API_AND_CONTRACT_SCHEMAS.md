@@ -355,3 +355,11 @@ Tests must prove:
 8. local action result returns `approval_required` unless approved;
 9. response preserves client metadata;
 10. checkpoint manifests include `last_event_id` and `runtime_state`.
+
+## Phase 3 workspace inspection contract
+
+`WorkspaceInspectionSummary` is a read-only service-layer contract shared by terminal, desktop, web, and dashboard clients. It includes `contract`, `runtime_status`, `recent_events`, `checkpoint_timeline`, `tasks`, `approvals`, `model_profiles`, `channel_connectors`, `capability_gates`, `semantic_memory`, `execution_profiles`, and `plugin_registration_plans` keys. Clients must not bypass this contract for privileged workspace reads.
+
+## Phase 3 plugin registration plan contract
+
+`PluginRegistrationPlan` contains `plugin_id`, `status`, `reasons`, `permissions`, `trust_level`, `execution_enabled`, `entrypoints`, and `events`. `execution_enabled` is always `false` in this slice.

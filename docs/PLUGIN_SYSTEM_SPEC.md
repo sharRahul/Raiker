@@ -309,3 +309,7 @@ Tests must verify:
 - plugin tool routes through broker;
 - plugin update rollback works;
 - plugin channel enforces sender allowlist.
+
+## Phase 3 rollout slice A plugin policy boundary
+
+Plugin registration planning now evaluates manifests as inert data. The planner may return `planned`, `pending_approval`, or `denied`; it never imports entrypoints, evaluates strings, launches subprocesses, opens network connections, or enables execution. Shell, network, and filesystem mutation permissions require explicit future policy and approval lifecycle work before activation.

@@ -328,3 +328,18 @@ Every implementation PR should include:
 ## Notes
 - ...
 ```
+
+## Phase 3 rollout slice A validation
+
+For the workspace/plugin policy boundary slice, validate with:
+
+```bash
+python -m ruff check .
+python -m mypy raiker apps tests
+python -m pytest
+python scripts/validate_phase_status.py
+raiker --help
+raiker --prompt "Hello Raiker"
+```
+
+Additional terminal inspection smoke coverage should include `/workspace`, `/clients`, `/plugins`, and `/plugin-plan <safe manifest path>` when running the interactive terminal.

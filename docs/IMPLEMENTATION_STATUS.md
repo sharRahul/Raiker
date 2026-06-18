@@ -167,3 +167,16 @@ When a builder finds conflicting or incomplete documentation, it must stop the i
 - tests required.
 
 Undocumented behaviour is not approved Raiker behaviour.
+
+## Phase 3 rollout slice A status — 2026-06-18
+
+Phase 3 is **not complete**. The first rollout slice is `implemented_verified` after adding read-only workspace contract parity and plugin policy/registration planning.
+
+| Slice | Status | Evidence |
+|---|---:|---|
+| RAIKER-3101 desktop/web/dashboard contract parity foundation | `implemented_verified` | `raiker/workspace/inspection.py`, `tests/test_phase_3_workspace_inspection.py`, `tests/test_phase_3_equal_workspace_clients.py` |
+| RAIKER-3201 plugin execution policy boundary without execution | `implemented_verified` | `raiker/plugins/policy.py`, `raiker/plugins/registry.py`, `tests/test_phase_3_plugin_policy.py` |
+| Phase 3 capability state model | `implemented_verified` | `raiker/phase_gates.py`, `tests/test_phase_3_capability_states.py` |
+| Read-only CLI inspection commands | `implemented_verified` | `/workspace`, `/clients`, `/plugins`, `/plugin-plan <manifest_path>`, `tests/test_phase_3_terminal_commands.py` |
+
+Preserved disabled gates: plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution remain non-executing.

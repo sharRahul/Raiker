@@ -301,3 +301,14 @@ Until the relevant phase gates are fully implemented and verified:
 - subagent and multi-agent runtime execution remains disabled;
 - remote/container/cloud execution remains disabled;
 - hosted routines, marketplace installs, hosted push notifications, and share links remain disabled.
+
+## Phase 3 Slice H Lifecycle Retention, Cleanup, and Handoff Commands
+
+| Tool Name | Descriptions | Permissions | Implemented |
+|---|---|---|---|
+| `/storage-lifecycle-retention` | Render metadata-only lifecycle retention policies; never executes cleanup, graph indexing, memory writes, embeddings, vectors, rollback, plugins, channels, subagents, or remote/container work. | `storage_lifecycle:read` | Yes — metadata-only |
+| `/storage-lifecycle-retention --summary` | Render aggregate retention policy counts and disabled execution flags. | `storage_lifecycle:read` | Yes — metadata-only |
+| `/storage-lifecycle-cleanup-preview` | Render cleanup preview metadata for expired/superseded lifecycle records with `can_cleanup_now=false`. | `storage_lifecycle:read` | Yes — preview-only |
+| `/storage-lifecycle-cleanup-preview --summary` | Render aggregate cleanup preview counts and disabled cleanup/runtime flags. | `storage_lifecycle:read` | Yes — preview-only |
+| `/storage-lifecycle-handoff` | Render approval-handoff planning metadata without approval relay or execution. | `storage_lifecycle:read`, `approvals:read` | Yes — planning-only |
+| `/storage-lifecycle-handoff --summary` | Render aggregate approval-handoff counts and disabled execution flags. | `storage_lifecycle:read`, `approvals:read` | Yes — planning-only |

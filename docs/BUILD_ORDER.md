@@ -246,3 +246,7 @@ Every implementation PR must include:
 - [ ] Phase-scheduled features remain disabled unless this task explicitly enables them
 - [ ] Slice G lifecycle metadata remains metadata-only unless a later approved task explicitly changes that with docs, tests, policy, rollback, and CI evidence
 ```
+
+## Phase 3 Slice H lifecycle retention update
+
+Slice H adds metadata-only lifecycle retention policies, cleanup previews, expiry/supersede counts, and approval-handoff planning. The read-only commands are `/storage-lifecycle-retention`, `/storage-lifecycle-retention --summary`, `/storage-lifecycle-cleanup-preview`, `/storage-lifecycle-cleanup-preview --summary`, `/storage-lifecycle-handoff`, and `/storage-lifecycle-handoff --summary`. Slice H does not execute cleanup, graph/codemap indexing, semantic/vector memory writes, embeddings, rollback, plugins, channels, subagents, or remote/container/cloud execution.

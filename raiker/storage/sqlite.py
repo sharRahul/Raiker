@@ -23,6 +23,8 @@ from raiker.storage.migrations import (
     PHASE_2_MIGRATION_ID,
     PHASE_2_MIGRATION_SQL,
     PHASE_3_STORAGE_LIFECYCLE_MIGRATION_ID,
+    PHASE_3_STORAGE_LIFECYCLE_RETENTION_MIGRATION_ID,
+    PHASE_3_STORAGE_LIFECYCLE_RETENTION_SQL,
     PHASE_3_STORAGE_LIFECYCLE_SQL,
 )
 
@@ -90,6 +92,11 @@ class SQLiteStore:
             self._apply_migration(PHASE_2_MIGRATION_ID, PHASE_2_MIGRATION_SQL, connection)
             self._apply_migration(
                 PHASE_3_STORAGE_LIFECYCLE_MIGRATION_ID, PHASE_3_STORAGE_LIFECYCLE_SQL, connection
+            )
+            self._apply_migration(
+                PHASE_3_STORAGE_LIFECYCLE_RETENTION_MIGRATION_ID,
+                PHASE_3_STORAGE_LIFECYCLE_RETENTION_SQL,
+                connection,
             )
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:

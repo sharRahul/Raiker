@@ -193,3 +193,51 @@ CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_events (
   payload_json TEXT NOT NULL
 );
 """
+
+PHASE_3_STORAGE_LIFECYCLE_RETENTION_MIGRATION_ID = "RAIKER-1308-phase3-storage-lifecycle-retention-cleanup-handoff"
+
+PHASE_3_STORAGE_LIFECYCLE_RETENTION_SQL = """
+CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_retention (
+  policy_id TEXT PRIMARY KEY,
+  lifecycle_target_type TEXT NOT NULL,
+  retention_class TEXT NOT NULL,
+  expiry_rule TEXT NOT NULL,
+  cleanup_eligible INTEGER NOT NULL,
+  legal_hold INTEGER NOT NULL,
+  manual_hold INTEGER NOT NULL,
+  redacted_reason_summary TEXT NOT NULL,
+  metadata_only INTEGER NOT NULL,
+  execution_enabled INTEGER NOT NULL,
+  policy_json TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_cleanup_previews (
+  preview_id TEXT PRIMARY KEY,
+  linked_lifecycle_ids_json TEXT NOT NULL,
+  expired_candidate_count INTEGER NOT NULL,
+  superseded_candidate_count INTEGER NOT NULL,
+  redacted_summaries_json TEXT NOT NULL,
+  can_cleanup_now INTEGER NOT NULL,
+  cleanup_execution_enabled INTEGER NOT NULL,
+  preview_json TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_approval_handoffs (
+  handoff_id TEXT PRIMARY KEY,
+  linked_lifecycle_ids_json TEXT NOT NULL,
+  target_capability TEXT NOT NULL,
+  approval_state TEXT NOT NULL,
+  can_execute_now INTEGER NOT NULL,
+  execution_enabled INTEGER NOT NULL,
+  redacted_summary TEXT NOT NULL,
+  handoff_json TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_retention_events (
+  event_id TEXT PRIMARY KEY,
+  subject_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  payload_json TEXT NOT NULL
+);
+"""

@@ -404,3 +404,16 @@ The current terminal client exposes these inspection and control commands throug
 | `/doctor` | implemented | Shows local diagnostics, provider health detection, and disabled Phase 3/4 gates. |
 
 Commands described elsewhere in this document for future rich UI panels remain requirements unless listed here as implemented.
+
+## Phase 3 Slice H Lifecycle Retention Commands
+
+| Command | Status | Behavior |
+|---|---|---|
+| `/storage-lifecycle-retention` | implemented | Lists metadata-only retention policy plans. |
+| `/storage-lifecycle-retention --summary` | implemented | Shows retention counts and disabled execution flags. |
+| `/storage-lifecycle-cleanup-preview` | implemented | Lists cleanup previews with `can_cleanup_now=false`. |
+| `/storage-lifecycle-cleanup-preview --summary` | implemented | Shows cleanup preview counts and disabled cleanup flags. |
+| `/storage-lifecycle-handoff` | implemented | Lists future approval handoff plans with `can_execute_now=false`. |
+| `/storage-lifecycle-handoff --summary` | implemented | Shows handoff counts and disabled execution flags. |
+
+Unsupported arguments return usage output. These commands are read-only and do not execute lifecycle cleanup, graph indexing, semantic memory writes, embeddings, vectors, rollback, plugins, channels, subagents, remote execution, container execution, or cloud execution.

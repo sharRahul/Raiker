@@ -564,3 +564,7 @@ Safety status:
 - Rollback execution remains disabled.
 - Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
 - GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.
+
+## Phase 3 Slice H Lifecycle Retention Metadata Tables
+
+Slice H may create only these metadata tables: `phase3_storage_lifecycle_retention`, `phase3_storage_lifecycle_cleanup_previews`, `phase3_storage_lifecycle_approval_handoffs`, and `phase3_storage_lifecycle_retention_events`. Migrations are idempotent. Slice H must not create graph node/edge tables, vector tables, embedding tables, semantic-memory durable-write tables, rollback execution tables, plugin execution tables, external-channel runtime tables, or remote/container/cloud execution tables.

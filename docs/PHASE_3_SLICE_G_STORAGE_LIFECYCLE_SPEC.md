@@ -366,3 +366,7 @@ Safe next slices may include one of the following, but only after docs/tests are
 4. **Slice H — Validation hardening**: add richer tests for schema idempotency, redaction, and CLI/workspace parity.
 
 Any Slice H plan must preserve the non-activation rule.
+
+## Phase 3 Slice H lifecycle retention update
+
+Slice H adds metadata-only lifecycle retention policies, cleanup previews, expiry/supersede counts, and approval-handoff planning. The read-only commands are `/storage-lifecycle-retention`, `/storage-lifecycle-retention --summary`, `/storage-lifecycle-cleanup-preview`, `/storage-lifecycle-cleanup-preview --summary`, `/storage-lifecycle-handoff`, and `/storage-lifecycle-handoff --summary`. Slice H does not execute cleanup, graph/codemap indexing, semantic/vector memory writes, embeddings, rollback, plugins, channels, subagents, or remote/container/cloud execution.

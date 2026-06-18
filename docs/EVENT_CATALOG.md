@@ -322,3 +322,17 @@ Safety status:
 - `phase3.storage.lifecycle.record_expired` — lifecycle metadata status was changed to expired only.
 - `phase3.storage.lifecycle.record_superseded` — lifecycle metadata status was changed to superseded only.
 - `phase3.storage.lifecycle.runtime_write_denied` — runtime storage write remained denied by policy.
+
+## Phase 3 Slice H Metadata-Only Lifecycle Retention Events
+
+These events are JSON-safe, redacted, metadata-only events. They must not trigger cleanup, graph/codemap indexing, graph node/edge writes, semantic/vector memory writes, embedding creation/storage, rollback execution, plugin execution, external-channel relay, subagent spawning, or remote/container/cloud execution.
+
+| Event name | Meaning | Runtime boundary |
+|---|---|---|
+| `phase3.storage.lifecycle.retention.policy_planned` | Retention policy metadata was planned. | Metadata-only; execution disabled. |
+| `phase3.storage.lifecycle.cleanup.preview_created` | Cleanup preview metadata was created. | Preview-only; cleanup execution denied. |
+| `phase3.storage.lifecycle.cleanup.preview_listed` | Cleanup preview metadata was listed. | Read-only. |
+| `phase3.storage.lifecycle.approval_handoff.planned` | Approval handoff metadata was planned. | Planning-only; no approval relay. |
+| `phase3.storage.lifecycle.approval_handoff.blocked` | Approval handoff is blocked until future policy. | Planning-only; no execution. |
+| `phase3.storage.lifecycle.cleanup.execution_denied` | Cleanup execution was denied by Slice H boundary. | No cleanup may run. |
+| `phase3.storage.lifecycle.handoff.execution_denied` | Approval handoff execution was denied by Slice H boundary. | No approval relay or execution may run. |

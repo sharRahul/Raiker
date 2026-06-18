@@ -17,6 +17,20 @@ from raiker.storage.lifecycle import (
     lifecycle_from_approval_preview,
     lifecycle_from_rollback_plan,
 )
+from raiker.storage.lifecycle_retention import (
+    StorageLifecycleApprovalHandoff,
+    StorageLifecycleCleanupPreview,
+    StorageLifecycleRetentionPolicy,
+)
+from raiker.storage.lifecycle_retention import (
+    create_approval_handoff as _create_approval_handoff,
+)
+from raiker.storage.lifecycle_retention import (
+    create_cleanup_preview as _create_cleanup_preview,
+)
+from raiker.storage.lifecycle_retention import (
+    create_retention_policy as _create_retention_policy,
+)
 
 _RECORDS: dict[str, StorageLifecycleRecord] = {}
 _WORKSPACE_RECORDS: dict[str, dict[str, StorageLifecycleRecord]] = {}
@@ -148,4 +162,118 @@ def render_lifecycle_summary(
         lines.append(
             f"- {record.lifecycle_id} target={record.target_capability} type={record.record_type} status={record.status} runtime_writes_enabled={record.runtime_writes_enabled}"
         )
+    return "\n".join(lines)
+
+_RETENTION_POLICIES: dict[str, StorageLifecycleRetentionPolicy] = {}
+_CLEANUP_PREVIEWS: dict[str, StorageLifecycleCleanupPreview] = {}
+_APPROVAL_HANDOFFS: dict[str, StorageLifecycleApprovalHandoff] = {}
+
+
+def create_retention_policy_metadata(**kwargs: Any) -> StorageLifecycleRetentionPolicy:
+    policy = _create_retention_policy(**kwargs)
+    _RETENTION_POLICIES[policy.policy_id] = policy
+    return policy
+
+
+def list_retention_policies() -> list[StorageLifecycleRetentionPolicy]:
+    return sorted(_RETENTION_POLICIES.values(), key=lambda p: p.policy_id)
+
+
+def create_cleanup_preview_metadata(**kwargs: Any) -> StorageLifecycleCleanupPreview:
+    preview = _create_cleanup_preview(**kwargs)
+    _CLEANUP_PREVIEWS[preview.preview_id] = preview
+    return preview
+
+
+def list_cleanup_previews() -> list[StorageLifecycleCleanupPreview]:
+    return sorted(_CLEANUP_PREVIEWS.values(), key=lambda p: p.preview_id)
+
+
+def get_cleanup_preview(preview_id: str) -> StorageLifecycleCleanupPreview | None:
+    return _CLEANUP_PREVIEWS.get(preview_id)
+
+
+def create_approval_handoff_metadata(**kwargs: Any) -> StorageLifecycleApprovalHandoff:
+    handoff = _create_approval_handoff(**kwargs)
+    _APPROVAL_HANDOFFS[handoff.handoff_id] = handoff
+    return handoff
+
+
+def list_approval_handoffs() -> list[StorageLifecycleApprovalHandoff]:
+    return sorted(_APPROVAL_HANDOFFS.values(), key=lambda h: h.handoff_id)
+
+
+def get_approval_handoff(handoff_id: str) -> StorageLifecycleApprovalHandoff | None:
+    return _APPROVAL_HANDOFFS.get(handoff_id)
+
+
+def seed_workspace_retention_cleanup_handoffs(workspace_root: str | Path = ".") -> dict[str, Any]:
+    records = seed_workspace_lifecycle_records(workspace_root)
+    lifecycle_ids = [record.lifecycle_id for record in records]
+    for target in sorted({r.target_capability for r in records}):
+        create_retention_policy_metadata(
+            lifecycle_target_type=target,
+            retention_class="audit_metadata",
+            expiry_rule="manual_review_required",
+            cleanup_eligible=False,
+            reason_summary=f"metadata-only retention planning for {target}",
+        )
+    expired = sum(1 for r in records if r.status == "expired")
+    superseded = sum(1 for r in records if r.status == "superseded")
+    preview = create_cleanup_preview_metadata(
+        linked_lifecycle_ids=lifecycle_ids,
+        expired_candidate_count=expired,
+        superseded_candidate_count=superseded,
+        summaries=["cleanup preview only; execution denied"],
+    )
+    handoff = create_approval_handoff_metadata(
+        linked_lifecycle_ids=lifecycle_ids,
+        target_capability="storage_lifecycle_metadata",
+        approval_state="requires_future_policy",
+        source_preview_ids=[preview.preview_id],
+        summary="approval handoff is planned only; no relay or execution",
+    )
+    return {"retention_policies": list_retention_policies(), "cleanup_previews": list_cleanup_previews(), "approval_handoffs": list_approval_handoffs(), "latest_cleanup_preview": preview, "latest_approval_handoff": handoff}
+
+
+def retention_cleanup_handoff_summary(*, workspace_root: str | Path = ".") -> dict[str, Any]:
+    seed_workspace_retention_cleanup_handoffs(workspace_root)
+    lifecycle = storage_lifecycle_summary(workspace_root=workspace_root)
+    previews = list_cleanup_previews()
+    return {
+        "retention_policy_count": len(list_retention_policies()),
+        "cleanup_preview_count": len(previews),
+        "approval_handoff_count": len(list_approval_handoffs()),
+        "expired_lifecycle_count": lifecycle["counts_by_status"].get("expired", 0),
+        "superseded_lifecycle_count": lifecycle["counts_by_status"].get("superseded", 0),
+        "metadata_only": True,
+        "cleanup_execution_enabled": False,
+        "approval_handoff_execution_enabled": False,
+        "graph_indexing_enabled": False,
+        "semantic_memory_writes_enabled": False,
+        "vector_writes_enabled": False,
+        "embedding_creation_enabled": False,
+        "rollback_execution_enabled": False,
+        "plugin_channel_subagent_remote_container_execution_enabled": False,
+    }
+
+
+def render_retention_cleanup_handoff(kind: str, *, workspace_root: str | Path = ".", summary_only: bool = False) -> str:
+    seed_workspace_retention_cleanup_handoffs(workspace_root)
+    summary = retention_cleanup_handoff_summary(workspace_root=workspace_root)
+    lines = [
+        f"Storage lifecycle {kind} metadata:",
+        "metadata_only: True",
+        "execution_enabled: False",
+        "No graph indexing, semantic memory writes, embeddings, vectors, rollback, plugins, channels, subagents, remote/container execution.",
+    ]
+    if summary_only:
+        lines.extend(f"{k}: {v}" for k, v in summary.items())
+        return "\n".join(lines)
+    if kind == "retention":
+        lines.extend(f"- {p.policy_id} target={p.lifecycle_target_type} class={p.retention_class} expiry={p.expiry_rule} cleanup_eligible={p.cleanup_eligible}" for p in list_retention_policies()[:20])
+    elif kind == "cleanup-preview":
+        lines.extend(f"- {p.preview_id} linked={len(p.linked_lifecycle_ids)} expired={p.expired_candidate_count} superseded={p.superseded_candidate_count} can_cleanup_now={p.can_cleanup_now}" for p in list_cleanup_previews()[:20])
+    else:
+        lines.extend(f"- {h.handoff_id} target={h.target_capability} state={h.approval_state} can_execute_now={h.can_execute_now}" for h in list_approval_handoffs()[:20])
     return "\n".join(lines)

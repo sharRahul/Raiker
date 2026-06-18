@@ -44,7 +44,10 @@ from raiker.phase_gates import list_disabled_capabilities
 from raiker.plugins.policy import plan_plugin_registration
 from raiker.rollback_plans import render_rollback_plan
 from raiker.rollback_registry import create_workspace_rollback_plans, rollback_plan_summary
-from raiker.storage.lifecycle_registry import render_lifecycle_summary
+from raiker.storage.lifecycle_registry import (
+    render_lifecycle_summary,
+    render_retention_cleanup_handoff,
+)
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
 from raiker.workspace.inspection import inspect_workspace
@@ -452,6 +455,21 @@ def handle_storage_lifecycle(
     return render_lifecycle_summary(workspace_root=workspace_root)
 
 
+def handle_storage_lifecycle_slice_h(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    command_name = parts[0] if parts else command
+    mapping = {
+        "/storage-lifecycle-retention": "retention",
+        "/storage-lifecycle-cleanup-preview": "cleanup-preview",
+        "/storage-lifecycle-handoff": "handoff",
+    }
+    if command_name not in mapping or len(parts) > 2 or (len(parts) == 2 and parts[1] != "--summary"):
+        return f"Usage: {command_name} [--summary]"
+    return render_retention_cleanup_handoff(
+        mapping[command_name], workspace_root=workspace_root, summary_only=(len(parts) == 2)
+    )
+
+
 def handle_execution_profiles() -> str:
     lines = ["Execution profiles:"]
     for profile in list_execution_profiles():
@@ -499,7 +517,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -550,6 +568,13 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_memory_rollback_plan(workspace_root=workspace_root)
     if command == "/storage-lifecycle" or command.startswith("/storage-lifecycle "):
         return handle_storage_lifecycle(command, workspace_root=workspace_root)
+    if (
+        command in {"/storage-lifecycle-retention", "/storage-lifecycle-cleanup-preview", "/storage-lifecycle-handoff"}
+        or command.startswith("/storage-lifecycle-retention ")
+        or command.startswith("/storage-lifecycle-cleanup-preview ")
+        or command.startswith("/storage-lifecycle-handoff ")
+    ):
+        return handle_storage_lifecycle_slice_h(command, workspace_root=workspace_root)
     if command == "/clients":
         return handle_clients()
     if command == "/plugins":

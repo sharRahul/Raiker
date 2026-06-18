@@ -884,3 +884,7 @@ Tests must prove:
 - channel connector wizard reads `config/channel-connectors.json`;
 - model launch panel reads `config/model-profiles.json`;
 - every enabled primary interface can create equivalent prompt, side-question, approval, task-control, model, channel, memory, graph, diagnostics, and checkpoint actions through shared contracts.
+
+## Phase 3 read-only workspace parity foundation
+
+Before a desktop app, web server, or dashboard runtime is activated, those clients must use the same read-only workspace inspection contract as terminal inspection commands. No UI client may receive a privileged path to tools, approvals, plugin execution, semantic-memory writes, channels, or remote/container execution.

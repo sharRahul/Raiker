@@ -43,3 +43,32 @@ The current implementation completes the Phase 3 safe foundation layer without a
 - `/capabilities` and `/semantic-memory` provide terminal inspection parity through the existing CLI command surface.
 
 These foundations intentionally stop before desktop/web/mobile runtimes, plugin execution, graph indexing, embeddings, or durable semantic writes. Those features still require task-specific policy, storage, event, lifecycle, and acceptance-test work before activation.
+
+## Phase 3 rollout slice A — implemented verified
+
+This slice starts the real Phase 3 rollout without marking full Phase 3 complete.
+
+Implemented:
+
+- RAIKER-3101 now has a shared read-only workspace inspection service for terminal, desktop, web, and dashboard clients. The service returns runtime status, events, checkpoints, tasks, approvals, model profiles, channel connectors, capability gates, semantic-memory status, execution profiles, and plugin registration plan summaries through one contract path.
+- RAIKER-3201 now has plugin policy evaluation and registration planning after manifest validation. Plans can be `planned`, `pending_approval`, or `denied`, but `execution_enabled` remains `false`.
+- Phase 3 capability state tracking now represents disabled, planned, readiness gates, read-only enablement, policy-gated enablement, and runtime enablement. Runtime enablement cannot be reached from disabled/planned without readiness gates.
+- Read-only terminal inspection commands were added for `/workspace`, `/clients`, `/plugins`, and `/plugin-plan <manifest_path>`.
+
+Still disabled:
+
+- plugin code execution;
+- graph/codemap runtime indexing;
+- semantic/vector memory writes;
+- external channel activation;
+- subagents and multi-agent teams;
+- remote/container execution;
+- desktop app packaging and web/dashboard server runtime.
+
+Evidence:
+
+- `tests/test_phase_3_capability_states.py`
+- `tests/test_phase_3_workspace_inspection.py`
+- `tests/test_phase_3_equal_workspace_clients.py`
+- `tests/test_phase_3_plugin_policy.py`
+- `tests/test_phase_3_terminal_commands.py`

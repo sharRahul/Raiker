@@ -172,3 +172,7 @@ Tests must prove:
 8. plugin tool adapter routes through Tool Broker;
 9. plugin hook cannot override managed deny;
 10. plugin channel requires pairing and sender trust.
+
+## Phase 3 rollout slice A validation boundary
+
+The implementation accepts the legacy compact test shape (`id`, `name`, `version`, `permissions`) and the canonical `plugin_id` field for validation/planning compatibility. Entrypoints are metadata only. Unknown trust levels, missing required fields, unsupported permission prefixes, and unsafe permission strings are denied during planning. Runtime execution remains disabled.

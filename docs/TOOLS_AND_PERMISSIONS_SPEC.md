@@ -121,6 +121,8 @@ Approvals must be bound to exact `action_id`. Reusing approval for a changed com
 
 ## Tool Catalogue
 
+This section defines the core Raiker tool families. The expanded phase-by-phase Raiker-native inventory is maintained in [`docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md`](RAIKER_TOOL_AND_PLUGIN_CATALOG.md). Future builders must update both this canonical permission spec and that catalog when adding, renaming, activating, or removing a tool.
+
 ### Filesystem Tools
 
 | Tool | Purpose | Default policy | First build phase |
@@ -135,6 +137,7 @@ Approvals must be bound to exact `action_id`. Reusing approval for a changed com
 | `move_path` | Rename/move | needs approval | Phase 2 |
 | `diff_files` | Compare files | allow inside workspace | Phase 2 |
 | `apply_patch` | Apply unified patch | needs approval and snapshot | Phase 2 |
+| `notebook_edit` | Modify notebook cells without treating the notebook as plain text | needs approval and notebook validation | Phase 3 |
 
 ### Search Tools
 
@@ -148,6 +151,16 @@ Approvals must be bound to exact `action_id`. Reusing approval for a changed com
 | `web_search` | Search internet | disabled until egress policy enabled | Phase 3 |
 | `web_fetch` | Fetch URL | disabled until egress policy enabled | Phase 3 |
 
+### Code Intelligence Tools
+
+| Tool | Purpose | Default policy | First build phase |
+|---|---|---|---:|
+| `lsp_diagnostics` | Read language-server diagnostics | allow only after workspace/plugin trust | Phase 3 |
+| `lsp_definition` | Resolve symbol definition | read-only, workspace scoped | Phase 3 |
+| `lsp_references` | Find references | read-only, workspace scoped | Phase 3 |
+| `lsp_type_info` | Read type information | read-only, workspace scoped | Phase 3 |
+| `lsp_call_hierarchy` | Trace call hierarchy | read-only, bounded output | Phase 3 |
+
 ### Execution Tools
 
 | Tool | Purpose | Default policy | First build phase |
@@ -156,20 +169,48 @@ Approvals must be bound to exact `action_id`. Reusing approval for a changed com
 | `powershell` | Run PowerShell command | needs approval | Phase 2 |
 | `python_exec` | Run isolated Python snippet | needs approval | Phase 2 |
 | `git` | Git operation wrapper | scoped policy by subcommand | Phase 2 |
+| `monitor` | Watch background command/log/status stream and emit events | disabled until background lifecycle policy exists | Phase 4 |
 | `docker` | Container command wrapper | disabled until execution profile configured | Phase 4 |
 | `ssh` | Remote command | disabled until execution profile configured | Phase 4 |
 | `modal_job` | Cloud/GPU job | disabled until budget and egress policy configured | Phase 5 |
 
-### Agent Tools
+### Agent and Task Tools
 
 | Tool | Purpose | Default policy | First build phase |
 |---|---|---|---:|
 | `ask_user` | Ask clarification | allow | Phase 1 |
 | `side_question` | Ask non-blocking clarification while work continues | allow with task binding | Phase 2 |
+| `enter_plan_mode` | Switch to planning-only mode | allow, no execution | Phase 2 |
+| `exit_plan_mode` | Present plan for approval | approval required for risky plan | Phase 2 |
 | `spawn_subagent` | Start subagent | needs approval until configured | Phase 4 |
-| `create_task` | Create background task | needs approval for long-running work | Phase 2 |
+| `send_agent_message` | Send or resume message to subagent/team member | needs approval and parent/child event linkage | Phase 4 |
+| `create_task` | Create background task metadata | needs approval for long-running work | Phase 2 |
+| `get_task` | Retrieve one task | allow for task owner | Phase 2 |
+| `list_tasks` | List tasks | allow for workspace/session scope | Phase 2 |
+| `update_task` | Update task state/details/dependencies | allow for task owner, event logged | Phase 2 |
 | `cancel_task` | Cancel background task | allow for task owner | Phase 2 |
 | `handoff_task` | Delegate to other agent/channel | needs approval | Phase 4 |
+| `workflow_run` | Run coordinated multi-agent workflow | disabled until team/budget/audit controls exist | Phase 4 to Phase 5 |
+
+### Automation and Notification Tools
+
+| Tool | Purpose | Default policy | First build phase |
+|---|---|---|---:|
+| `schedule_create` | Create one-shot or recurring local scheduled task/prompt | needs approval for recurrence | Phase 3 |
+| `schedule_list` | List scheduled tasks | read-only | Phase 3 |
+| `schedule_delete` | Cancel scheduled task | owner/session scoped | Phase 3 |
+| `schedule_wakeup` | Internal self-paced loop wakeup | bounded and cancellable | Phase 3 to Phase 4 |
+| `notify_user` | Local notification or mobile/channel notification | local-only first; hosted push disabled | Phase 4 to Phase 5 |
+| `routine_remote_trigger` | Hosted routine create/update/run/list | disabled until hosted privacy/auth/billing controls exist | Phase 5 |
+
+### MCP and External Resource Tools
+
+| Tool | Purpose | Default policy | First build phase |
+|---|---|---|---:|
+| `mcp_list_resources` | List resources exposed by trusted MCP servers | disabled until MCP trust policy exists | Phase 3 |
+| `mcp_read_resource` | Read one MCP resource URI | disabled until MCP trust policy exists | Phase 3 |
+| `mcp_wait_for_server` | Wait for MCP server readiness | bounded and cancellable | Phase 3 to Phase 4 |
+| `tool_search` | Discover/load deferred tool definitions | discovery only, no permission grant | Phase 3 to Phase 5 |
 
 ### Memory Tools
 
@@ -228,6 +269,8 @@ Required events:
 - `tool_cancelled`
 - `tool_result_truncated`
 
+Additional phase-scheduled tool families must define event names before implementation. This includes notebook edits, LSP/code-intelligence calls, monitors, schedules, MCP resource reads, deferred tool discovery, notifications, team/workflow tools, hosted routines, and marketplace-backed plugin operations.
+
 ---
 
 ## Tool Testing Requirements
@@ -243,4 +286,8 @@ Tests must prove:
 - output truncation works;
 - timeout/cancellation is logged;
 - plugin tools cannot bypass broker;
-- hooks cannot silently approve disallowed actions unless policy permits hook decision authority.
+- hooks cannot silently approve disallowed actions unless policy permits hook decision authority;
+- scheduled tasks are bounded, cancellable, and cannot create hidden infinite loops;
+- monitors are cancellable and rate-limited;
+- LSP/MCP/plugin-server tools require explicit trust and cannot start from an untrusted project;
+- hosted routines, hosted push, marketplace installs, and cloud jobs are denied until Phase 5 policy exists.

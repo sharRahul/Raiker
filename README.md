@@ -413,3 +413,10 @@ Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfac
 ## Phase 3 next slice definition audit
 
 Slice J adds metadata-only/read-only graph/codemap readiness contracts, optional SQLite metadata persistence, workspace inspection/view summaries, and `/graph-readiness [--summary|--json]`. Slice J does not enable graph/codemap indexing, graph writes, codemap writes, indexing jobs, runtime execution, workers, schedulers, file watchers, daemons, semantic/vector memory writes, embeddings, approval relay runtime, plugin execution, MCP/LSP/plugin server startup, cleanup execution, rollback execution, remote/container/cloud execution, hosted routines, marketplace installs, push notifications, or share links. Phase 3 remains incomplete, and Phase 4 remains blocked from starting as a substitute.
+
+
+## Phase 3 Slice K — Semantic Memory Write Readiness — Metadata Only
+- Adds deterministic metadata-only semantic memory readiness contracts, registry, optional SQLite metadata table, CLI, and workspace surfaces.
+- Semantic memory writes, vector writes, embeddings, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled.
+- Reserved Slice K metadata-only events: `phase3.semantic_memory_readiness.metadata_created`, `phase3.semantic_memory_readiness.summary_viewed`, `phase3.semantic_memory_readiness.exported`. No runtime memory write events are enabled.
+- Phase 3 remains incomplete and Phase 4 remains blocked.

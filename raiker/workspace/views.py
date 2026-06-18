@@ -152,6 +152,40 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
                 "blocker_count": 0,
             },
         ),
+        "remote_container_cloud_readiness": safe.get(
+            "remote_container_cloud_readiness",
+            {
+                "remote_container_cloud_readiness_contract_available": True,
+                "remote_container_cloud_readiness_record_count": 0,
+                "latest_readiness_id": None,
+                "metadata_only": True,
+                "ready_for_remote_execution": False,
+                "ready_for_container_execution": False,
+                "ready_for_cloud_execution": False,
+                "remote_execution_enabled": False,
+                "container_execution_enabled": False,
+                "cloud_execution_enabled": False,
+                "hosted_routines_enabled": False,
+                "runtime_jobs_enabled": False,
+                "job_dispatch_enabled": False,
+                "worker_queues_enabled": False,
+                "workers_enabled": False,
+                "schedulers_enabled": False,
+                "file_watchers_enabled": False,
+                "daemons_enabled": False,
+                "client_transport_enabled": False,
+                "external_dispatch_enabled": False,
+                "credential_materialization_enabled": False,
+                "secret_injection_enabled": False,
+                "provider_integrations_enabled": False,
+                "sandbox_runtime_enabled": False,
+                "process_execution_enabled": False,
+                "shell_execution_enabled": False,
+                "network_execution_enabled": False,
+                "runtime_execution_enabled": False,
+                "blocker_count": 0,
+            },
+        ),
         "approval_preview_persistence_readiness": safe.get(
             "approval_preview_persistence_readiness",
             {
@@ -343,6 +377,24 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
     lines.append(f"webhook_dispatch_enabled: {view['external_channels_notifications_readiness']['webhook_dispatch_enabled']}")
     lines.append(f"channel_relay_runtime_enabled: {view['external_channels_notifications_readiness']['channel_relay_runtime_enabled']}")
     lines.append(f"channel_workers_enabled: {view['external_channels_notifications_readiness']['channel_workers_enabled']}")
+    lines.append(f"remote_readiness_metadata_only: {view['remote_container_cloud_readiness']['metadata_only']}")
+    lines.append(f"remote_ready_for_remote_execution: {view['remote_container_cloud_readiness']['ready_for_remote_execution']}")
+    lines.append(f"remote_ready_for_container_execution: {view['remote_container_cloud_readiness']['ready_for_container_execution']}")
+    lines.append(f"remote_ready_for_cloud_execution: {view['remote_container_cloud_readiness']['ready_for_cloud_execution']}")
+    lines.append(f"remote_readiness_latest_id: {view['remote_container_cloud_readiness']['latest_readiness_id']}")
+    lines.append(f"remote_readiness_blockers: {view['remote_container_cloud_readiness']['blocker_count']}")
+    lines.append(f"remote_execution_enabled: {view['remote_container_cloud_readiness']['remote_execution_enabled']}")
+    lines.append(f"container_execution_enabled: {view['remote_container_cloud_readiness']['container_execution_enabled']}")
+    lines.append(f"cloud_execution_enabled: {view['remote_container_cloud_readiness']['cloud_execution_enabled']}")
+    lines.append(f"runtime_jobs_enabled: {view['remote_container_cloud_readiness']['runtime_jobs_enabled']}")
+    lines.append(f"job_dispatch_enabled: {view['remote_container_cloud_readiness']['job_dispatch_enabled']}")
+    lines.append(f"credential_materialization_enabled: {view['remote_container_cloud_readiness']['credential_materialization_enabled']}")
+    lines.append(f"secret_injection_enabled: {view['remote_container_cloud_readiness']['secret_injection_enabled']}")
+    lines.append(f"provider_integrations_enabled: {view['remote_container_cloud_readiness']['provider_integrations_enabled']}")
+    lines.append(f"sandbox_runtime_enabled: {view['remote_container_cloud_readiness']['sandbox_runtime_enabled']}")
+    lines.append(f"process_execution_enabled: {view['remote_container_cloud_readiness']['process_execution_enabled']}")
+    lines.append(f"shell_execution_enabled: {view['remote_container_cloud_readiness']['shell_execution_enabled']}")
+    lines.append(f"network_execution_enabled: {view['remote_container_cloud_readiness']['network_execution_enabled']}")
     lines.append(
         f"approval_preview_only_mode: {view['approval_preview_summary']['preview_only_mode']}"
     )
@@ -425,6 +477,7 @@ def render_workspace_dashboard_summary(inspection: Mapping[str, Any]) -> dict[st
         "storage_cleanup_execution_readiness": view["storage_cleanup_execution_readiness"],
         "storage_lifecycle_evidence_summary": view["storage_lifecycle_evidence_summary"],
         "external_channels_notifications_readiness": view["external_channels_notifications_readiness"],
+        "remote_container_cloud_readiness": view["remote_container_cloud_readiness"],
     }
 
 

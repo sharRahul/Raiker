@@ -363,3 +363,7 @@ Slice N reserves metadata-only readiness surfaces and events for future plugin/s
 ## Phase 3 Slice O channel readiness surface
 
 - `/channel-readiness [--summary|--json]`: read-only metadata surface for future external channels and notifications. It exposes disabled runtime flags and blockers only; it does not activate external channels, send notifications, create push notifications or share links, dispatch webhooks, start relays, create hosted channels/routines, create workers/schedulers/watchers/daemons, or enable runtime execution.
+
+## Phase 3 Slice P — Remote/Container/Cloud Execution Readiness — Metadata Only
+
+Slice P adds deterministic metadata-only readiness contracts, registry, optional SQLite metadata table, `/remote-readiness [--summary|--json]`, workspace summaries, and reserved metadata-only events for future remote/container/cloud execution. No remote execution, container execution, cloud execution, hosted routines, runtime jobs, job dispatch, worker queues, workers, schedulers, file watchers, daemons, client transport, external dispatch, credential materialization, secret injection, provider integrations, sandbox runtime, process execution, shell execution, network execution, or runtime execution are enabled. Phase 3 remains incomplete. Phase 4 remains blocked.

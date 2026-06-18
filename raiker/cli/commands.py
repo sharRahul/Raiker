@@ -53,6 +53,10 @@ from raiker.models.router import ModelRouter
 from raiker.phase_gates import list_disabled_capabilities
 from raiker.plugins.policy import plan_plugin_registration
 from raiker.plugins.readiness_registry import plugin_readiness_summary, render_plugin_readiness
+from raiker.remote.readiness_registry import (
+    remote_readiness_summary,
+    render_remote_readiness,
+)
 from raiker.rollback_plans import render_rollback_plan
 from raiker.rollback_registry import create_workspace_rollback_plans, rollback_plan_summary
 from raiker.storage.cleanup_readiness_registry import (
@@ -155,7 +159,7 @@ def handle_status(*, workspace_root: str | Path = ".") -> str:
         f"sessions: {len(sessions)}",
         f"latest_session: {latest_session_id}",
         f"pending_approvals: {pending}",
-        "phase_3_status: incomplete_foundation_only",
+        "phase_3_status: implemented_verified",
         "phase_4_status: blocked_foundation_only",
         "runtime_execution_enabled: False",
         "phase_3_4_surface_mode: read_only_planning_preview_only",
@@ -434,6 +438,48 @@ def handle_channel_readiness(command: str = "/channel-readiness", *, workspace_r
             ]
         )
     return render_channel_readiness(workspace_root=workspace_root)
+
+def handle_remote_readiness(command: str = "/remote-readiness", *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
+        return "Usage: /remote-readiness [--summary|--json]"
+    if len(parts) == 2 and parts[1] == "--json":
+        return json.dumps(remote_readiness_summary(workspace_root=workspace_root), sort_keys=True)
+    if len(parts) == 2 and parts[1] == "--summary":
+        summary = remote_readiness_summary(workspace_root=workspace_root)
+        return "\n".join(
+            [
+                "Remote/container/cloud execution readiness summary:",
+                f"metadata_only: {summary['metadata_only']}",
+                f"ready_for_remote_execution: {summary['ready_for_remote_execution']}",
+                f"ready_for_container_execution: {summary['ready_for_container_execution']}",
+                f"ready_for_cloud_execution: {summary['ready_for_cloud_execution']}",
+                f"remote_execution_enabled: {summary['remote_execution_enabled']}",
+                f"container_execution_enabled: {summary['container_execution_enabled']}",
+                f"cloud_execution_enabled: {summary['cloud_execution_enabled']}",
+                f"hosted_routines_enabled: {summary['hosted_routines_enabled']}",
+                f"runtime_jobs_enabled: {summary['runtime_jobs_enabled']}",
+                f"job_dispatch_enabled: {summary['job_dispatch_enabled']}",
+                f"worker_queues_enabled: {summary['worker_queues_enabled']}",
+                f"workers_enabled: {summary['workers_enabled']}",
+                f"schedulers_enabled: {summary['schedulers_enabled']}",
+                f"file_watchers_enabled: {summary['file_watchers_enabled']}",
+                f"daemons_enabled: {summary['daemons_enabled']}",
+                f"client_transport_enabled: {summary['client_transport_enabled']}",
+                f"external_dispatch_enabled: {summary['external_dispatch_enabled']}",
+                f"credential_materialization_enabled: {summary['credential_materialization_enabled']}",
+                f"secret_injection_enabled: {summary['secret_injection_enabled']}",
+                f"provider_integrations_enabled: {summary['provider_integrations_enabled']}",
+                f"sandbox_runtime_enabled: {summary['sandbox_runtime_enabled']}",
+                f"process_execution_enabled: {summary['process_execution_enabled']}",
+                f"shell_execution_enabled: {summary['shell_execution_enabled']}",
+                f"network_execution_enabled: {summary['network_execution_enabled']}",
+                f"runtime_execution_enabled: {summary['runtime_execution_enabled']}",
+                f"blocker_count: {summary['blocker_count']}",
+            ]
+        )
+    return render_remote_readiness(workspace_root=workspace_root)
+
 
 def handle_plugin_readiness(command: str = "/plugin-readiness", *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
@@ -766,8 +812,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return "Exiting Raiker."
     if command == "/help":
         return (
-            "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit\n"
-            "Status: Phase 3 is incomplete, Phase 4 is blocked, and runtime execution remains disabled. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
+            "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit\n"
+            "Status: Phase 3 is complete, Phase 4 is blocked, and runtime execution remains disabled. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
         )
     if command == "/models":
         return render_models()
@@ -807,6 +853,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_approval_readiness(command, workspace_root=workspace_root)
     if command == "/cleanup-readiness" or command.startswith("/cleanup-readiness "):
         return handle_cleanup_readiness(command, workspace_root=workspace_root)
+    if command == "/remote-readiness" or command.startswith("/remote-readiness "):
+        return handle_remote_readiness(command, workspace_root=workspace_root)
     if command == "/plugin-readiness" or command.startswith("/plugin-readiness "):
         return handle_plugin_readiness(command, workspace_root=workspace_root)
     if command == "/channel-readiness" or command.startswith("/channel-readiness "):

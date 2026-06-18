@@ -137,6 +137,33 @@ def test_cli_evidence_and_policy_simulation_outputs_are_json_safe(tmp_path) -> N
     assert simulation_json["execution_enabled"] is False
 
 
+def test_cli_slice_i_filters_limits_and_help_are_exposed(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    evidence = handle_slash_command(
+        "/storage-lifecycle-evidence --status runtime_blocked --target graph --limit 1",
+        workspace_root=tmp_path,
+    )
+    assert "status_filter: runtime_blocked" in evidence
+    assert "target_filter: graph" in evidence
+    assert evidence.count("- sleb_") == 1
+
+    simulation = handle_slash_command(
+        "/storage-lifecycle-policy-simulation --status runtime_blocked --target graph --limit 1",
+        workspace_root=tmp_path,
+    )
+    assert "status_filter: runtime_blocked" in simulation
+    assert "target_filter: graph" in simulation
+    assert simulation.count("- slps_") == 1
+
+    assert "Usage:" in handle_slash_command(
+        "/storage-lifecycle-evidence --limit 0", workspace_root=tmp_path
+    )
+    help_output = handle_slash_command("/help", workspace_root=tmp_path)
+    assert "/storage-lifecycle-evidence [--summary] [--json] [--status <status>]" in help_output
+    assert "/storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>]" in help_output
+    assert "[--target <graph|memory|rollback|storage|plugin|channel|remote>]" in help_output
+    assert "[--limit <number>]" in help_output
+
+
 def test_sqlite_slice_i_tables_exist_and_forbidden_runtime_tables_do_not(tmp_path) -> None:  # type: ignore[no-untyped-def]
     store = SQLiteStore(tmp_path)
     store.bootstrap()

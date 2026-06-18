@@ -31,6 +31,9 @@ class TestTerminalCommands:
         assert "events:" in result
         assert "checkpoints:" in result
         assert "pending_approvals:" in result
+        assert "phase_3_status: incomplete_foundation_only" in result
+        assert "phase_4_status: blocked_foundation_only" in result
+        assert "runtime_execution_enabled: False" in result
         assert "0" in result
 
     def test_handle_status_with_sessions(self, store: SQLiteStore) -> None:
@@ -92,6 +95,9 @@ class TestTerminalCommands:
         assert "/tasks" in result
         assert "/events" in result
         assert "/checkpoints" in result
+        assert "Phase 3 is incomplete" in result
+        assert "Phase 4 is blocked" in result
+        assert "runtime execution remains disabled" in result
 
     def test_slash_unknown(self, tmp_path: Path) -> None:
         result = handle_slash_command("/bogus", workspace_root=str(tmp_path))
@@ -101,6 +107,8 @@ class TestTerminalCommands:
         result = handle_slash_command("/status", workspace_root=str(tmp_path))
         assert "workspace:" in result
         assert "pending_approvals:" in result
+        assert "phase_3_status: incomplete_foundation_only" in result
+        assert "phase_4_status: blocked_foundation_only" in result
 
     def test_slash_tasks(self, tmp_path: Path) -> None:
         result = handle_slash_command("/tasks", workspace_root=str(tmp_path))

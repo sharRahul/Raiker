@@ -888,3 +888,8 @@ Tests must prove:
 ## Phase 3 read-only workspace parity foundation
 
 Before a desktop app, web server, or dashboard runtime is activated, those clients must use the same read-only workspace inspection contract as terminal inspection commands. No UI client may receive a privileged path to tools, approvals, plugin execution, semantic-memory writes, channels, or remote/container execution.
+
+
+## Phase 3 rollout slice B read-only workspace views
+
+Future terminal, desktop, web, and dashboard clients consume the same read-only workspace inspection contract. The current implementation provides deterministic local renderers only: JSON-safe workspace data, terminal text, dashboard summary, client capability summary, and plugin-plan summary. This is not a full desktop application, a web server, or a privileged dashboard runtime.

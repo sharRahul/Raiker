@@ -363,3 +363,8 @@ Tests must prove:
 ## Phase 3 plugin registration plan contract
 
 `PluginRegistrationPlan` contains `plugin_id`, `status`, `reasons`, `permissions`, `trust_level`, `execution_enabled`, `entrypoints`, and `events`. `execution_enabled` is always `false` in this slice.
+
+
+## Phase 3 rollout slice B workspace view contract
+
+Workspace view renderers consume the existing `workspace_inspection` output and expose derived read-only shapes for future clients. Renderers must be deterministic, JSON-safe, secret-redacting, and non-mutating. They must not read storage directly when the shared inspection output already provides data, execute tools, create approvals, call models, write memory, execute plugins, activate channels, or start remote/container execution.

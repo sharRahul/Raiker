@@ -72,3 +72,16 @@ Evidence:
 - `tests/test_phase_3_equal_workspace_clients.py`
 - `tests/test_phase_3_plugin_policy.py`
 - `tests/test_phase_3_terminal_commands.py`
+
+
+## Phase 3 rollout slice B — workspace view/API foundation
+
+Status: `implemented_verified` for the safe read-only view layer only. This slice fixes CI compatibility for Python 3.11, keeps Python 3.13 compatibility where possible, and adds deterministic workspace rendering for future terminal, desktop, web, and dashboard clients through the shared workspace inspection contract.
+
+Implemented scope:
+
+- `raiker/workspace/views.py` renders JSON-safe workspace, text/terminal, dashboard summary, client capability summary, and plugin plan summary views.
+- `/workspace-view` renders a stable read-only terminal snapshot from `inspect_workspace(...)`.
+- Acceptance tests prove equivalent read-only data for terminal, desktop, web, and dashboard clients and prove view rendering does not mutate tasks, approvals, memory candidates, plugin state, channel state, or execution gates.
+
+Out of scope and still disabled: full desktop/web/dashboard runtime, web server, privileged UI path, plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution. Full Phase 3 is not complete.

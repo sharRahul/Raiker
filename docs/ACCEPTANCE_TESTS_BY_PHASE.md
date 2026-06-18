@@ -213,3 +213,8 @@ Expected results:
 | `tests/test_phase_3_equal_workspace_clients.py` | Future clients share `UIActionEnvelope` metadata and no client is privileged or allowed direct tool calls. |
 | `tests/test_phase_3_plugin_policy.py` | Plugin registration planning validates manifests, denies unsafe prefixes, approval-gates risky permissions, treats entrypoints as metadata, and never enables execution. |
 | `tests/test_phase_3_terminal_commands.py` | `/workspace`, `/clients`, `/plugins`, and `/plugin-plan <manifest_path>` are inspection-only and return helpful output. |
+
+
+### Phase 3 rollout slice B acceptance evidence
+
+Slice B acceptance tests cover the read-only workspace view/API foundation: views are generated from the shared inspection contract, text output is deterministic, JSON/dashboard views are JSON-serialisable, terminal/desktop/web/dashboard clients receive equivalent read-only data, secret-like fields are redacted, unknown fields are handled safely, and rendering does not mutate tasks, approvals, semantic memory candidates, plugins, channels, or remote/container execution gates. Evidence: `tests/test_phase_3_workspace_views.py` and `/workspace-view` assertions in `tests/test_phase_3_terminal_commands.py`.

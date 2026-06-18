@@ -359,3 +359,7 @@ Slice L does not enable approval preview persistence, approval execution, approv
 ## Phase 3 Slice N: Plugin/Server Startup Readiness — Metadata Only
 
 Slice N reserves metadata-only readiness surfaces and events for future plugin/server startup. Reserved metadata-only events: `phase3.plugin_server_readiness.metadata_created`, `phase3.plugin_server_readiness.summary_viewed`, `phase3.plugin_server_readiness.exported`. No plugin execution, plugin installation, plugin activation, MCP/LSP/plugin server startup, monitor daemon startup, marketplace install, hosted routine, external channel, worker, scheduler, watcher, daemon, relay, or runtime execution events are enabled. Phase 3 remains incomplete. Phase 4 remains blocked.
+
+## Phase 3 Slice O channel readiness surface
+
+- `/channel-readiness [--summary|--json]`: read-only metadata surface for future external channels and notifications. It exposes disabled runtime flags and blockers only; it does not activate external channels, send notifications, create push notifications or share links, dispatch webhooks, start relays, create hosted channels/routines, create workers/schedulers/watchers/daemons, or enable runtime execution.

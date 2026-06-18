@@ -6,6 +6,7 @@ from typing import Any
 from raiker.approval_audit_registry import approval_audit_summary
 from raiker.approval_preview_registry import approval_preview_summary
 from raiker.approvals.readiness_registry import approval_readiness_summary
+from raiker.channels.readiness_registry import channel_readiness_summary
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.models import ClientMetadata
@@ -142,6 +143,7 @@ def inspect_workspace(client_type: str, *, workspace_root: str | Path = ".") -> 
         ],
         "plugin_registration_plans": plugin_plans,
         "plugin_server_startup_readiness": plugin_readiness_summary(workspace_root=workspace_root),
+        "external_channels_notifications_readiness": channel_readiness_summary(workspace_root=workspace_root),
         "approval_preview_summary": approval_preview_summary(workspace_root=workspace_root),
         "approval_preview_persistence_readiness": approval_readiness_summary(workspace_root=workspace_root),
         "approval_audit_summary": approval_audit_summary(workspace_root=workspace_root),

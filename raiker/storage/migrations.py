@@ -343,3 +343,17 @@ CREATE TABLE IF NOT EXISTS phase3_plugin_server_startup_readiness (
   contract_json TEXT NOT NULL
 );
 """
+
+
+PHASE_3_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_MIGRATION_ID = "RAIKER-1315-phase3-external-channels-notifications-readiness-metadata"
+
+PHASE_3_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_SQL = """
+CREATE TABLE IF NOT EXISTS phase3_external_channels_notifications_readiness (
+  readiness_id TEXT PRIMARY KEY,
+  target TEXT NOT NULL,
+  status TEXT NOT NULL,
+  blockers_json TEXT NOT NULL,
+  disabled_runtime_flags_json TEXT NOT NULL,
+  contract_json TEXT NOT NULL
+);
+"""

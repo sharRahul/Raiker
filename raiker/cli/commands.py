@@ -21,6 +21,7 @@ from raiker.approvals.readiness_registry import (
     approval_readiness_summary,
     render_approval_readiness,
 )
+from raiker.channels.readiness_registry import channel_readiness_summary, render_channel_readiness
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.ids import new_id
@@ -402,6 +403,34 @@ def handle_approval_readiness(command: str = "/approval-readiness", *, workspace
     return render_approval_readiness(workspace_root=workspace_root)
 
 
+
+def handle_channel_readiness(command: str = "/channel-readiness", *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
+        return "Usage: /channel-readiness [--summary|--json]"
+    if len(parts) == 2 and parts[1] == "--json":
+        return json.dumps(channel_readiness_summary(workspace_root=workspace_root), sort_keys=True)
+    if len(parts) == 2 and parts[1] == "--summary":
+        summary = channel_readiness_summary(workspace_root=workspace_root)
+        return "\n".join(
+            [
+                "External channels/notifications readiness summary:",
+                f"metadata_only: {summary['metadata_only']}",
+                f"ready_for_external_channels: {summary['ready_for_external_channels']}",
+                f"external_channels_enabled: {summary['external_channels_enabled']}",
+                f"notifications_enabled: {summary['notifications_enabled']}",
+                f"push_notifications_enabled: {summary['push_notifications_enabled']}",
+                f"share_links_enabled: {summary['share_links_enabled']}",
+                f"webhook_dispatch_enabled: {summary['webhook_dispatch_enabled']}",
+                f"channel_relay_runtime_enabled: {summary['channel_relay_runtime_enabled']}",
+                f"workers_enabled: {summary['workers_enabled']}",
+                f"schedulers_enabled: {summary['schedulers_enabled']}",
+                f"runtime_execution_enabled: {summary['runtime_execution_enabled']}",
+                f"blocker_count: {summary['blocker_count']}",
+            ]
+        )
+    return render_channel_readiness(workspace_root=workspace_root)
+
 def handle_plugin_readiness(command: str = "/plugin-readiness", *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
@@ -732,7 +761,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /plugin-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -773,6 +802,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_cleanup_readiness(command, workspace_root=workspace_root)
     if command == "/plugin-readiness" or command.startswith("/plugin-readiness "):
         return handle_plugin_readiness(command, workspace_root=workspace_root)
+    if command == "/channel-readiness" or command.startswith("/channel-readiness "):
+        return handle_channel_readiness(command, workspace_root=workspace_root)
     if command == "/memory-review" or command.startswith("/memory-review "):
         return handle_memory_review(command, workspace_root=workspace_root)
     if command == "/approval-previews":

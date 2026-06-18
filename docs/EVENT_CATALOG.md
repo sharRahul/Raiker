@@ -215,3 +215,15 @@ Tests must prove:
 8. SQLite `events_index` points to the written JSONL record;
 9. client/interface metadata is preserved;
 10. secret-like values are redacted or omitted.
+
+## Phase 3 rollout slice A planning event names
+
+These event names are reserved for the read-only workspace inspection and plugin registration planning boundary. They are deterministic planning/inspection events only and must not imply runtime activation:
+
+| Event type | Meaning |
+|---|---|
+| `phase3.workspace.inspection.requested` | A read-only workspace inspection summary was requested through a shared client contract. |
+| `phase3.plugin.manifest.validated` | A plugin manifest was validated as data without importing or executing plugin code. |
+| `phase3.plugin.registration.planned` | A plugin registration plan was prepared with execution disabled. |
+| `phase3.plugin.registration.denied` | A plugin registration plan was denied by manifest or policy checks. |
+| `phase3.client.contract.inspected` | A future client contract parity surface was inspected. |

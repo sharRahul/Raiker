@@ -203,3 +203,13 @@ Expected results:
 - checkpoint manifest exists;
 - `/channels` and `/models` display disabled/listable profiles;
 - no hosted/network/plugin/channel/subagent runtime is active unless explicitly in phase scope.
+
+### Phase 3 rollout slice A acceptance evidence
+
+| Test file | Required assertions |
+|---|---|
+| `tests/test_phase_3_capability_states.py` | Phase 3 capability states cannot jump directly to runtime; unknown capabilities are denied; Phase 4 gates remain disabled. |
+| `tests/test_phase_3_workspace_inspection.py` | Desktop, web, and dashboard inspection requests return equivalent shared read-only data shapes and do not mutate tasks, approvals, memory, channels, plugins, or execution. |
+| `tests/test_phase_3_equal_workspace_clients.py` | Future clients share `UIActionEnvelope` metadata and no client is privileged or allowed direct tool calls. |
+| `tests/test_phase_3_plugin_policy.py` | Plugin registration planning validates manifests, denies unsafe prefixes, approval-gates risky permissions, treats entrypoints as metadata, and never enables execution. |
+| `tests/test_phase_3_terminal_commands.py` | `/workspace`, `/clients`, `/plugins`, and `/plugin-plan <manifest_path>` are inspection-only and return helpful output. |

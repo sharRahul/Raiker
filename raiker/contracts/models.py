@@ -83,6 +83,11 @@ EVENT_TYPES = {
     "task_steered",
     "checkpoint_restore_planned",
     "checkpoint_fork_planned",
+    "phase3.workspace.inspection.requested",
+    "phase3.plugin.manifest.validated",
+    "phase3.plugin.registration.planned",
+    "phase3.plugin.registration.denied",
+    "phase3.client.contract.inspected",
 }
 INTENTS = {
     "chat",

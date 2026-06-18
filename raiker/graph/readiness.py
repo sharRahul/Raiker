@@ -102,8 +102,8 @@ class GraphCodemapReadinessContract:
             "metadata_only": True,
             "ready_for_indexing": self.ready_for_indexing,
             "required_gates": list(self.required_gates),
-            "satisfied_gates": list(self.satisfied_gates),
-            "blockers": list(self.blockers),
+            "satisfied_gates": sorted(self.satisfied_gates),
+            "blockers": sorted(self.blockers),
             "disabled_reason": self.disabled_reason,
             **DISABLED_RUNTIME_FLAGS,
             "metadata": {key: self.metadata[key] for key in sorted(self.metadata)},
@@ -115,5 +115,5 @@ class GraphCodemapReadinessContract:
 
 def create_readiness_contract(**kwargs: Any) -> GraphCodemapReadinessContract:
     satisfied = tuple(sorted(kwargs.pop("satisfied_gates", ())))
-    blockers = tuple(gate for gate in REQUIRED_READINESS_GATES if gate not in set(satisfied))
+    blockers = tuple(kwargs.pop("blockers", tuple(gate for gate in REQUIRED_READINESS_GATES if gate not in set(satisfied))))
     return GraphCodemapReadinessContract(satisfied_gates=satisfied, blockers=blockers, **kwargs)

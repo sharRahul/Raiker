@@ -413,3 +413,5 @@ Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfac
 ## Phase 3 next slice definition audit
 
 The planning-only next action after Slice I stabilization is centralized in `docs/PHASE_3_NEXT_SLICE_DEFINITION_AUDIT.md`. It does not define or implement Slice J; it asks maintainers to name the next Phase 3 slice before implementation and preserves all disabled-runtime boundaries.
+
+The maintainer-facing next-slice selection proposal is now tracked in [`docs/PHASE_3_NEXT_SLICE_SELECTION_PROPOSAL.md`](docs/PHASE_3_NEXT_SLICE_SELECTION_PROPOSAL.md). It recommends a metadata-only/read-only Lifecycle Readiness Decision Records slice for maintainer consideration, confirms that no Slice J is implemented, and keeps Phase 3 incomplete with Phase 4 blocked from starting as a substitute.

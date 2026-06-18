@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass, field
 from typing import Any
 
-_JSON_SAFE_TYPES = (str, int, float, bool, type(None))
+from raiker.readiness.contracts import (
+    canonical_json,
+    deterministic_dict,
+    deterministic_hash_id,
+    sorted_tuple,
+    validate_json_safe_metadata,
+    validate_non_empty_strings,
+)
 
 GRAPH_READINESS_DISABLED_REASON = "phase3_slice_j_metadata_only_graph_codemap_indexing_not_enabled"
 REQUIRED_READINESS_GATES = (
@@ -47,32 +52,25 @@ class GraphCodemapReadinessContract:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        for field_name in ("workspace_id", "target_capability", "slice_id", "readiness_version", "disabled_reason"):
+        for field_name in (
+            "workspace_id",
+            "target_capability",
+            "slice_id",
+            "readiness_version",
+            "disabled_reason",
+        ):
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value:
                 raise ValueError(f"{field_name} must be a non-empty string")
-        for field_name in ("required_gates", "satisfied_gates", "blockers"):
-            values = getattr(self, field_name)
-            if not isinstance(values, tuple) or any(not isinstance(value, str) or not value for value in values):
-                raise ValueError(f"{field_name} must be a tuple of non-empty strings")
+        validate_non_empty_strings("required_gates", self.required_gates)
+        if not isinstance(self.satisfied_gates, tuple) or any(
+            not isinstance(value, str) or not value for value in self.satisfied_gates
+        ):
+            raise ValueError("satisfied_gates must be a tuple of non-empty strings")
         if not self.blockers:
             raise ValueError("blockers must be non-empty while graph/codemap indexing is disabled")
-        self._json_safe_metadata(self.metadata)
-
-    @classmethod
-    def _json_safe_metadata(cls, value: Any) -> None:
-        if isinstance(value, dict):
-            for key, nested in value.items():
-                if not isinstance(key, str):
-                    raise ValueError("metadata keys must be strings")
-                cls._json_safe_metadata(nested)
-            return
-        if isinstance(value, list | tuple):
-            for nested in value:
-                cls._json_safe_metadata(nested)
-            return
-        if not isinstance(value, _JSON_SAFE_TYPES):
-            raise ValueError("metadata must contain only JSON-safe values")
+        validate_non_empty_strings("blockers", self.blockers)
+        validate_json_safe_metadata(self.metadata)
 
     @property
     def readiness_id(self) -> str:
@@ -82,11 +80,10 @@ class GraphCodemapReadinessContract:
             "slice_id": self.slice_id,
             "readiness_version": self.readiness_version,
             "required_gates": list(self.required_gates),
-            "satisfied_gates": sorted(self.satisfied_gates),
-            "blockers": sorted(self.blockers),
+            "satisfied_gates": list(sorted_tuple(self.satisfied_gates)),
+            "blockers": list(sorted_tuple(self.blockers)),
         }
-        digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()[:16]
-        return f"gcr_{digest}"
+        return deterministic_hash_id("gcr", payload)
 
     @property
     def ready_for_indexing(self) -> bool:
@@ -102,18 +99,23 @@ class GraphCodemapReadinessContract:
             "metadata_only": True,
             "ready_for_indexing": self.ready_for_indexing,
             "required_gates": list(self.required_gates),
-            "satisfied_gates": sorted(self.satisfied_gates),
-            "blockers": sorted(self.blockers),
+            "satisfied_gates": list(sorted_tuple(self.satisfied_gates)),
+            "blockers": list(sorted_tuple(self.blockers)),
             "disabled_reason": self.disabled_reason,
             **DISABLED_RUNTIME_FLAGS,
-            "metadata": {key: self.metadata[key] for key in sorted(self.metadata)},
+            "metadata": deterministic_dict(self.metadata),
         }
 
     def to_json(self) -> str:
-        return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
+        return canonical_json(self.to_dict())
 
 
 def create_readiness_contract(**kwargs: Any) -> GraphCodemapReadinessContract:
     satisfied = tuple(sorted(kwargs.pop("satisfied_gates", ())))
-    blockers = tuple(kwargs.pop("blockers", tuple(gate for gate in REQUIRED_READINESS_GATES if gate not in set(satisfied))))
+    blockers = tuple(
+        kwargs.pop(
+            "blockers",
+            tuple(gate for gate in REQUIRED_READINESS_GATES if gate not in set(satisfied)),
+        )
+    )
     return GraphCodemapReadinessContract(satisfied_gates=satisfied, blockers=blockers, **kwargs)

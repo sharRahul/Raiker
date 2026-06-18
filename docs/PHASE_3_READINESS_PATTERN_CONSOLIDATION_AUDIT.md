@@ -150,3 +150,9 @@ This audit and its small validation fix do not enable any runtime behavior:
 Implement a shared internal readiness foundation before Slice P if maintainers expect more metadata-only readiness slices. The foundation should be small, incremental, and test-backed. It should centralize invariants and boilerplate while preserving all existing public behavior and slice-specific language.
 
 Do not implement Slice P until maintainers decide whether readiness consolidation should happen first.
+
+## First shared readiness foundation implementation
+
+The first shared readiness foundation has been implemented as pure internal contract helpers in `raiker/readiness/contracts.py`. This initial step centralizes only low-risk metadata-only readiness helpers for JSON-safe metadata validation, canonical JSON serialization, deterministic hash ID generation, tuple sorting, deterministic dictionary ordering, and non-empty string tuple validation.
+
+This foundation is intentionally narrow. It does not consolidate registry behavior, CLI behavior, workspace summaries, or SQLite persistence. It does not change existing readiness ID prefixes, public readiness contract names, public CLI commands, SQLite table names, JSON output shape, disabled runtime flags, or metadata-only boundaries. Runtime execution remains disabled, Slice P remains unimplemented, Phase 3 remains incomplete, and Phase 4 remains blocked.

@@ -429,3 +429,7 @@ Slice L adds deterministic metadata-only approval preview persistence readiness 
 ## Phase 3 Slice M: Storage cleanup execution readiness metadata
 
 Slice M adds metadata-only storage cleanup execution readiness surfaces. Cleanup execution, deletion, purge, tombstone, rollback, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled. Phase 3 remains incomplete. Phase 4 remains blocked.
+
+## Phase 3 Slice N: Plugin/server startup readiness metadata
+
+Slice N adds metadata-only plugin/server startup readiness contracts, registry, optional SQLite metadata table, `/plugin-readiness [--summary|--json]`, workspace summaries, and reserved metadata-only events. Plugin execution, plugin installation, plugin activation, MCP/LSP/plugin server startup, monitor daemon startup, marketplace installs, hosted routines, external channels, workers, schedulers, watchers, daemons, and runtime execution remain disabled. Phase 3 remains incomplete. Phase 4 remains blocked.

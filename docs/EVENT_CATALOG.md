@@ -386,3 +386,13 @@ Reserved only for future metadata records: `phase3.storage_cleanup_readiness.cre
 ## Phase 3 Slice N: Plugin/Server Startup Readiness — Metadata Only
 
 Slice N reserves metadata-only readiness surfaces and events for future plugin/server startup. Reserved metadata-only events: `phase3.plugin_server_readiness.metadata_created`, `phase3.plugin_server_readiness.summary_viewed`, `phase3.plugin_server_readiness.exported`. No plugin execution, plugin installation, plugin activation, MCP/LSP/plugin server startup, monitor daemon startup, marketplace install, hosted routine, external channel, worker, scheduler, watcher, daemon, relay, or runtime execution events are enabled. Phase 3 remains incomplete. Phase 4 remains blocked.
+
+## Phase 3 Slice O reserved metadata-only events
+
+Reserved event names only; no runtime dispatch events are introduced:
+
+- `phase3.external_channels_notifications.readiness.metadata_defined`
+- `phase3.external_channels_notifications.readiness.summary_rendered`
+- `phase3.external_channels_notifications.readiness.sqlite_metadata_recorded`
+
+These events are metadata-only reservations and do not represent channel dispatch, notification delivery, push notification, share-link, webhook, relay, worker, scheduler, daemon, or runtime execution events.

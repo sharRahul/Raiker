@@ -123,6 +123,35 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
                 "blocker_count": 0,
             },
         ),
+        "external_channels_notifications_readiness": safe.get(
+            "external_channels_notifications_readiness",
+            {
+                "external_channels_notifications_readiness_contract_available": True,
+                "external_channels_notifications_readiness_record_count": 0,
+                "latest_readiness_id": None,
+                "metadata_only": True,
+                "ready_for_external_channels": False,
+                "external_channels_enabled": False,
+                "notifications_enabled": False,
+                "push_notifications_enabled": False,
+                "share_links_enabled": False,
+                "webhook_dispatch_enabled": False,
+                "client_transport_enabled": False,
+                "hosted_channels_enabled": False,
+                "hosted_routines_enabled": False,
+                "approval_relay_runtime_enabled": False,
+                "channel_relay_runtime_enabled": False,
+                "notification_workers_enabled": False,
+                "channel_workers_enabled": False,
+                "worker_queues_enabled": False,
+                "workers_enabled": False,
+                "schedulers_enabled": False,
+                "file_watchers_enabled": False,
+                "daemons_enabled": False,
+                "runtime_execution_enabled": False,
+                "blocker_count": 0,
+            },
+        ),
         "approval_preview_persistence_readiness": safe.get(
             "approval_preview_persistence_readiness",
             {
@@ -303,7 +332,17 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
     lines.append(f"plugin_server_startup_enabled: {view['plugin_server_startup_readiness']['plugin_server_startup_enabled']}")
     lines.append(f"monitor_daemon_startup_enabled: {view['plugin_server_startup_readiness']['monitor_daemon_startup_enabled']}")
     lines.append(f"marketplace_installs_enabled: {view['plugin_server_startup_readiness']['marketplace_installs_enabled']}")
-    lines.append(f"external_channels_enabled: {view['plugin_server_startup_readiness']['external_channels_enabled']}")
+    lines.append(f"external_channels_enabled: {view['external_channels_notifications_readiness']['external_channels_enabled']}")
+    lines.append(f"channel_readiness_metadata_only: {view['external_channels_notifications_readiness']['metadata_only']}")
+    lines.append(f"channel_ready_for_external_channels: {view['external_channels_notifications_readiness']['ready_for_external_channels']}")
+    lines.append(f"channel_readiness_latest_id: {view['external_channels_notifications_readiness']['latest_readiness_id']}")
+    lines.append(f"channel_readiness_blockers: {view['external_channels_notifications_readiness']['blocker_count']}")
+    lines.append(f"notifications_enabled: {view['external_channels_notifications_readiness']['notifications_enabled']}")
+    lines.append(f"push_notifications_enabled: {view['external_channels_notifications_readiness']['push_notifications_enabled']}")
+    lines.append(f"share_links_enabled: {view['external_channels_notifications_readiness']['share_links_enabled']}")
+    lines.append(f"webhook_dispatch_enabled: {view['external_channels_notifications_readiness']['webhook_dispatch_enabled']}")
+    lines.append(f"channel_relay_runtime_enabled: {view['external_channels_notifications_readiness']['channel_relay_runtime_enabled']}")
+    lines.append(f"channel_workers_enabled: {view['external_channels_notifications_readiness']['channel_workers_enabled']}")
     lines.append(
         f"approval_preview_only_mode: {view['approval_preview_summary']['preview_only_mode']}"
     )
@@ -385,6 +424,7 @@ def render_workspace_dashboard_summary(inspection: Mapping[str, Any]) -> dict[st
         "storage_lifecycle_retention_summary": view["storage_lifecycle_retention_summary"],
         "storage_cleanup_execution_readiness": view["storage_cleanup_execution_readiness"],
         "storage_lifecycle_evidence_summary": view["storage_lifecycle_evidence_summary"],
+        "external_channels_notifications_readiness": view["external_channels_notifications_readiness"],
     }
 
 

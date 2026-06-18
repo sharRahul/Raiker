@@ -433,3 +433,7 @@ Slice M adds metadata-only storage cleanup execution readiness surfaces. Cleanup
 ## Phase 3 Slice N: Plugin/server startup readiness metadata
 
 Slice N adds metadata-only plugin/server startup readiness contracts, registry, optional SQLite metadata table, `/plugin-readiness [--summary|--json]`, workspace summaries, and reserved metadata-only events. Plugin execution, plugin installation, plugin activation, MCP/LSP/plugin server startup, monitor daemon startup, marketplace installs, hosted routines, external channels, workers, schedulers, watchers, daemons, and runtime execution remain disabled. Phase 3 remains incomplete. Phase 4 remains blocked.
+
+### Phase 3 Slice O: External Channels/Notifications Readiness — Metadata Only
+
+Slice O adds deterministic metadata-only readiness surfaces for future external channels and notifications. `/channel-readiness`, workspace inspection, workspace views, and optional SQLite metadata record readiness blockers and disabled runtime flags only. External channels, notifications, push notifications, share links, webhook dispatch, relay runtime, hosted channels/routines, workers, schedulers, watchers, daemons, and runtime execution remain disabled. Phase 3 remains incomplete and Phase 4 remains blocked.

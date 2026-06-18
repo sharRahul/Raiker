@@ -93,7 +93,21 @@ INTENTS = {
     "unknown",
 }
 RISK_LEVELS = {"low", "medium", "high", "blocked"}
-TOOLS = {"read_file", "list_directory", "glob", "grep", "stat_path", "diff_files", "write_file", "edit_file", "apply_patch", "git_status", "git_diff", "git_log", "shell"}
+TOOLS = {
+    "read_file",
+    "list_directory",
+    "glob",
+    "grep",
+    "stat_path",
+    "diff_files",
+    "write_file",
+    "edit_file",
+    "apply_patch",
+    "git_status",
+    "git_diff",
+    "git_log",
+    "shell",
+}
 POLICY_DECISIONS = {"allow", "deny", "needs_approval"}
 TOOL_STATUSES = {"success", "failed", "denied", "approval_required"}
 RESPONSE_STATUSES = {"completed", "needs_approval", "denied", "failed"}
@@ -184,7 +198,16 @@ class PromptEnvelope:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PromptEnvelope:
-        allowed = {"schema_version", "request_id", "session_id", "turn_id", "client", "user", "prompt", "options"}
+        allowed = {
+            "schema_version",
+            "request_id",
+            "session_id",
+            "turn_id",
+            "client",
+            "user",
+            "prompt",
+            "options",
+        }
         unknown = set(data) - allowed
         if unknown:
             raise ContractValidationError(f"unknown_fields:{sorted(unknown)}")

@@ -16,7 +16,9 @@ class Classification:
 class SimpleClassifier:
     def classify(self, prompt: str) -> Classification:
         text = prompt.strip().lower()
-        if text.startswith("!") or any(term in text for term in ("run command", "execute command", "shell", "terminal command")):
+        if text.startswith("!") or any(
+            term in text for term in ("run command", "execute command", "shell", "terminal command")
+        ):
             return Classification(
                 intent="local_action_request",
                 confidence=0.9,
@@ -34,7 +36,12 @@ class SimpleClassifier:
                 risk_level="medium",
                 notes="User asked to list files.",
             )
-        if text.startswith("read file") or text.startswith("read ") or "grep" in text or "search" in text:
+        if (
+            text.startswith("read file")
+            or text.startswith("read ")
+            or "grep" in text
+            or "search" in text
+        ):
             return Classification(
                 intent="filesystem_query",
                 confidence=0.75,

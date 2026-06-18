@@ -26,12 +26,18 @@ class PolicyEngine:
             if value is None:
                 continue
             candidate = Path(str(value))
-            resolved = candidate if candidate.is_absolute() else self.config.workspace_root / candidate
+            resolved = (
+                candidate if candidate.is_absolute() else self.config.workspace_root / candidate
+            )
             if not self._is_inside_workspace(resolved):
                 reasons.append(f"outside_workspace:{key}")
         pattern = action.arguments.get("pattern")
-        if action.tool_name == "glob" and isinstance(pattern, str) and (Path(pattern).is_absolute() or ".." in Path(pattern).parts):
-                reasons.append("outside_workspace:pattern")
+        if (
+            action.tool_name == "glob"
+            and isinstance(pattern, str)
+            and (Path(pattern).is_absolute() or ".." in Path(pattern).parts)
+        ):
+            reasons.append("outside_workspace:pattern")
         return (not reasons, reasons)
 
     def review(self, action: ToolAction) -> PolicyDecision:
@@ -63,7 +69,10 @@ class PolicyEngine:
                 decision_id=new_id("pol_"),
                 action_id=action.action_id,
                 decision="needs_approval",
-                reasons=[f"{action.tool_name}_requires_approval", "phase2_action_bound_approval_required"],
+                reasons=[
+                    f"{action.tool_name}_requires_approval",
+                    "phase2_action_bound_approval_required",
+                ],
                 requires_user_approval=True,
                 policy_version=self.config.policy_version,
                 risk_level="high",

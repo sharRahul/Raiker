@@ -23,14 +23,32 @@ class ApprovalInbox:
     def list_pending(self) -> list[dict[str, object]]:
         return self.store.list_approvals(status="pending")
 
-    def resolve(self, approval_id: str, *, approve: bool, resolved_by: str = "local_user") -> ApprovalResolution:
+    def resolve(
+        self, approval_id: str, *, approve: bool, resolved_by: str = "local_user"
+    ) -> ApprovalResolution:
         approval = self.store.load_approval(approval_id)
         if approval is None:
             raise ValueError("approval_not_found")
         if approval["status"] != "pending":
             raise ValueError("approval_already_resolved")
         status = "approved" if approve else "denied"
-        self.store.resolve_approval(approval_id, status=status, resolved_by=resolved_by, resolved_at=utc_now())
+        self.store.resolve_approval(
+            approval_id, status=status, resolved_by=resolved_by, resolved_at=utc_now()
+        )
         if self.writer is not None:
-            self.writer.append(make_event(session_id=str(approval.get("session_id", "approval_inbox")), turn_id=approval.get("turn_id"), event_type="approval_received" if approve else "approval_denied", actor="approval_inbox", payload={"approval_id": approval_id, "action_id": approval["action_id"], "status": status}))
-        return ApprovalResolution(approval_id=approval_id, action_id=str(approval["action_id"]), status=status)
+            self.writer.append(
+                make_event(
+                    session_id=str(approval.get("session_id", "approval_inbox")),
+                    turn_id=approval.get("turn_id"),
+                    event_type="approval_received" if approve else "approval_denied",
+                    actor="approval_inbox",
+                    payload={
+                        "approval_id": approval_id,
+                        "action_id": approval["action_id"],
+                        "status": status,
+                    },
+                )
+            )
+        return ApprovalResolution(
+            approval_id=approval_id, action_id=str(approval["action_id"]), status=status
+        )

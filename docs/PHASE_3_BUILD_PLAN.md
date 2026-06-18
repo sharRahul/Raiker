@@ -32,3 +32,14 @@ RAIKER-3001 phase gates and capability registry
 ## Gated until later Phase 3 work
 
 Desktop UI, web UI, dashboard runtime, plugin execution, graph/codemap indexing, and semantic memory writes remain disabled until their task-specific policy, storage, events, and acceptance tests exist.
+
+## 2026-06-18 implementation update
+
+The current implementation completes the Phase 3 safe foundation layer without activating runtime features prematurely:
+
+- plugin manifests can be validated for required fields and permission-prefix safety without importing or executing plugin code;
+- graph/codemap node and edge plans can be inspected and validated for dangling edges while runtime indexing remains disabled;
+- semantic memory status is exposed as disabled-by-default, with candidate counts available for workspace inspection;
+- `/capabilities` and `/semantic-memory` provide terminal inspection parity through the existing CLI command surface.
+
+These foundations intentionally stop before desktop/web/mobile runtimes, plugin execution, graph indexing, embeddings, or durable semantic writes. Those features still require task-specific policy, storage, event, lifecycle, and acceptance-test work before activation.

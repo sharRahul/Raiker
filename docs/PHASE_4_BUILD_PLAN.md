@@ -32,3 +32,15 @@ RAIKER-4001 Phase 4 disabled/listable gates
 ## Gated until later Phase 4 work
 
 External transports, subagent spawning, multi-agent teams, remote execution, and container execution remain disabled until policy, tests, and approval paths are implemented.
+
+## 2026-06-18 implementation update
+
+The current implementation completes the Phase 4 safe foundation layer without activating external execution or autonomous coordination:
+
+- execution profiles for local, container, SSH, and Daytona-style execution are listable for inspection;
+- remote/container execution can only produce a denied execution plan with approval requirements and a command preview;
+- subagent requests can be represented as parent-linked plans but cannot spawn workers;
+- external channel activation status reports pairing and approval-relay state while keeping transports inactive;
+- `/execution-profiles` provides terminal inspection parity through the existing CLI command surface.
+
+External transports, subagent spawning, agent teams, approval relays, and remote/container execution remain disabled until pairing, sender trust, budget, policy, approval, audit, and lifecycle controls are complete.

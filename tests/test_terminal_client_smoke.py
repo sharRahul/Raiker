@@ -14,7 +14,9 @@ def test_terminal_prompt_simple_and_list_files(tmp_path, monkeypatch) -> None:  
     (tmp_path / "config").mkdir()
     source_config = __import__("pathlib").Path(__file__).resolve().parents[1] / "config"
     for name in ["model-profiles.json", "channel-connectors.json"]:
-        (tmp_path / "config" / name).write_text((source_config / name).read_text(encoding="utf-8"), encoding="utf-8")
+        (tmp_path / "config" / name).write_text(
+            (source_config / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
     (tmp_path / "README.md").write_text("hello", encoding="utf-8")
     simple = submit_terminal_prompt("Hello Raiker", workspace_root=tmp_path)
     listing = submit_terminal_prompt("List files in this project", workspace_root=tmp_path)
@@ -29,7 +31,9 @@ def test_terminal_approval_and_registry_commands(tmp_path, monkeypatch) -> None:
     (tmp_path / "config").mkdir()
     source_config = __import__("pathlib").Path(__file__).resolve().parents[1] / "config"
     for name in ["model-profiles.json", "channel-connectors.json"]:
-        (tmp_path / "config" / name).write_text((source_config / name).read_text(encoding="utf-8"), encoding="utf-8")
+        (tmp_path / "config" / name).write_text(
+            (source_config / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
     approval = submit_terminal_prompt("!echo hi", workspace_root=tmp_path)
     assert "Approval required" in approval
     assert "No command was executed" in approval

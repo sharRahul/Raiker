@@ -53,10 +53,14 @@ class TaskManager:
     def get_task(self, task_id: str) -> TaskRecord | None:
         return self.store.load_task(task_id)
 
-    def list_tasks(self, session_id: str | None = None, status: str | None = None) -> list[TaskRecord]:
+    def list_tasks(
+        self, session_id: str | None = None, status: str | None = None
+    ) -> list[TaskRecord]:
         return self.store.list_tasks(session_id=session_id, status=status)
 
-    def update_progress(self, task_id: str, *, current_step: str, progress_percent: int) -> TaskRecord | None:
+    def update_progress(
+        self, task_id: str, *, current_step: str, progress_percent: int
+    ) -> TaskRecord | None:
         self.store.update_task_progress(task_id, current_step, progress_percent)
         task = self.get_task(task_id)
         if task is not None:

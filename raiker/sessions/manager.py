@@ -20,10 +20,14 @@ class SessionManager:
         self.store = store
         self.workspace_root = str(Path(workspace_root).resolve())
 
-    def create_session(self, session_id: str | None = None, *, title: str | None = None) -> SessionRecord:
+    def create_session(
+        self, session_id: str | None = None, *, title: str | None = None
+    ) -> SessionRecord:
         session_id = session_id or new_id("sess_")
         self.store.create_session(session_id, self.workspace_root, title=title)
-        return SessionRecord(session_id=session_id, project_root=self.workspace_root, status="open", title=title)
+        return SessionRecord(
+            session_id=session_id, project_root=self.workspace_root, status="open", title=title
+        )
 
     def get_or_create(self, session_id: str | None = None) -> SessionRecord:
         if session_id:

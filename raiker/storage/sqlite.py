@@ -54,7 +54,13 @@ class RuntimePaths:
         return self.runtime_dir / "indexes"
 
     def ensure(self) -> None:
-        for path in (self.runtime_dir, self.events_dir, self.checkpoints_dir, self.artifacts_dir, self.indexes_dir):
+        for path in (
+            self.runtime_dir,
+            self.events_dir,
+            self.checkpoints_dir,
+            self.artifacts_dir,
+            self.indexes_dir,
+        ):
             path.mkdir(parents=True, exist_ok=True)
 
 
@@ -82,7 +88,9 @@ class SQLiteStore:
             self._apply_migration(PHASE_2_MIGRATION_ID, PHASE_2_MIGRATION_SQL, connection)
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
-        row = connection.execute("SELECT applied_at FROM migrations WHERE migration_id = ?", (migration_id,)).fetchone()
+        row = connection.execute(
+            "SELECT applied_at FROM migrations WHERE migration_id = ?", (migration_id,)
+        ).fetchone()
         if row is not None:
             return
         with contextlib.suppress(sqlite3.OperationalError):
@@ -94,7 +102,9 @@ class SQLiteStore:
 
     def table_names(self) -> set[str]:
         with self.connect() as connection:
-            rows = connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+            rows = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
         return {str(row["name"]) for row in rows}
 
     def create_session(self, session_id: str, project_root: str, title: str | None = None) -> None:
@@ -111,15 +121,21 @@ class SQLiteStore:
 
     def load_session(self, session_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,)).fetchone()
+            row = connection.execute(
+                "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
+            ).fetchone()
         return dict(row) if row else None
 
     def list_sessions(self, limit: int = 10) -> list[dict[str, Any]]:
         with self.connect() as connection:
-            rows = connection.execute("SELECT * FROM sessions ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+            rows = connection.execute(
+                "SELECT * FROM sessions ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
         return [dict(row) for row in rows]
 
-    def insert_turn(self, session_id: str, turn_id: str, prompt_text: str, status: str = "running") -> None:
+    def insert_turn(
+        self, session_id: str, turn_id: str, prompt_text: str, status: str = "running"
+    ) -> None:
         with self.connect() as connection:
             connection.execute(
                 """
@@ -137,7 +153,9 @@ class SQLiteStore:
                 (status, utc_now(), summary, turn_id),
             )
 
-    def index_event(self, event: AgentEvent, jsonl_path: str, jsonl_offset: int, payload_sha256: str) -> None:
+    def index_event(
+        self, event: AgentEvent, jsonl_path: str, jsonl_offset: int, payload_sha256: str
+    ) -> None:
         with self.connect() as connection:
             connection.execute(
                 """
@@ -161,7 +179,9 @@ class SQLiteStore:
                 ),
             )
 
-    def insert_tool_action(self, action: ToolAction, session_id: str, turn_id: str | None, status: str) -> None:
+    def insert_tool_action(
+        self, action: ToolAction, session_id: str, turn_id: str | None, status: str
+    ) -> None:
         with self.connect() as connection:
             connection.execute(
                 """
@@ -180,7 +200,9 @@ class SQLiteStore:
                     status,
                     action.action_id,
                     utc_now(),
-                    utc_now() if status in {"success", "failed", "denied", "approval_required"} else None,
+                    utc_now()
+                    if status in {"success", "failed", "denied", "approval_required"}
+                    else None,
                 ),
             )
 
@@ -310,7 +332,9 @@ class SQLiteStore:
             return None
         return TaskRecord(**dict(row))
 
-    def list_tasks(self, session_id: str | None = None, status: str | None = None) -> list[TaskRecord]:
+    def list_tasks(
+        self, session_id: str | None = None, status: str | None = None
+    ) -> list[TaskRecord]:
         query = "SELECT * FROM tasks"
         params: list[Any] = []
         conditions: list[str] = []
@@ -383,7 +407,9 @@ class SQLiteStore:
 
     def load_event_index(self, event_id: str) -> dict | None:
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM events_index WHERE event_id = ?", (event_id,)).fetchone()
+            row = connection.execute(
+                "SELECT * FROM events_index WHERE event_id = ?", (event_id,)
+            ).fetchone()
         return dict(row) if row else None
 
     def list_checkpoints(self, session_id: str | None = None, limit: int = 50) -> list[dict]:
@@ -400,8 +426,11 @@ class SQLiteStore:
 
     def load_checkpoint_by_id(self, checkpoint_id: str) -> dict | None:
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM checkpoints WHERE checkpoint_id = ?", (checkpoint_id,)).fetchone()
+            row = connection.execute(
+                "SELECT * FROM checkpoints WHERE checkpoint_id = ?", (checkpoint_id,)
+            ).fetchone()
         return dict(row) if row else None
+
     def list_approvals(self, status: str | None = None) -> list[dict[str, Any]]:
         query = """
             SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id, tool_actions.tool_name, tool_actions.arguments_json, tool_actions.risk_level
@@ -419,15 +448,20 @@ class SQLiteStore:
 
     def load_approval(self, approval_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute("""
+            row = connection.execute(
+                """
                 SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id
                 FROM approvals
                 JOIN tool_actions ON approvals.action_id = tool_actions.action_id
                 WHERE approval_id = ?
-                """, (approval_id,)).fetchone()
+                """,
+                (approval_id,),
+            ).fetchone()
         return dict(row) if row else None
 
-    def resolve_approval(self, approval_id: str, *, status: str, resolved_by: str, resolved_at: str) -> None:
+    def resolve_approval(
+        self, approval_id: str, *, status: str, resolved_by: str, resolved_at: str
+    ) -> None:
         with self.connect() as connection:
             connection.execute(
                 "UPDATE approvals SET status = ?, approved_by = ?, resolved_at = ? WHERE approval_id = ? AND status = 'pending'",
@@ -445,7 +479,17 @@ class SQLiteStore:
                 (candidate_id, source_event_id, memory_type, scope, text, sensitivity, confidence, decision, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (candidate.candidate_id, candidate.source_event_id, candidate.memory_type, candidate.scope, candidate.text, candidate.sensitivity, candidate.confidence, candidate.decision, candidate.created_at),
+                (
+                    candidate.candidate_id,
+                    candidate.source_event_id,
+                    candidate.memory_type,
+                    candidate.scope,
+                    candidate.text,
+                    candidate.sensitivity,
+                    candidate.confidence,
+                    candidate.decision,
+                    candidate.created_at,
+                ),
             )
 
     def list_memory_candidates(self, decision: str | None = None) -> list[dict[str, Any]]:
@@ -458,4 +502,3 @@ class SQLiteStore:
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
-

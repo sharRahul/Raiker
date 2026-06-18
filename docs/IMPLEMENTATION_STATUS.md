@@ -80,7 +80,7 @@ The following capabilities may have config profiles, schemas, or storage boundar
 PR #12 established the Phase 2 build plan, CI baseline, task manager, event viewer, checkpoint timeline, and inspection commands. This table tracks all Phase 2 capabilities.
 
 | Area | Required status | Current repository status | Canonical docs | Required tests |
-|---|---|---|---:|---:|---|
+|---|---|---|---|---|
 | Phase 2 build plan and status ledger | `phase_2_required` | `implemented_verified` | `docs/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md`, `docs/IMPLEMENTATION_STATUS.md` | doc consistency |
 | CI baseline | `phase_2_required` | `implemented_verified` | `.github/workflows/ci.yml`, `docs/VERIFICATION_PLAN.md` | workflow syntax |
 | Task record contract and storage helpers | `phase_2_required` | `implemented_verified` | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` | `tests/test_phase_2_task_manager.py` |
@@ -110,7 +110,12 @@ PR #12 established the Phase 2 build plan, CI baseline, task manager, event view
 
 ## Phase 3 and Phase 4 Planning Status
 
-Detailed Phase 3 and Phase 4 plans are now recorded in `docs/PHASE_3_BUILD_PLAN.md` and `docs/PHASE_4_BUILD_PLAN.md`. Safe foundations are limited to disabled/listable capability gates with tests proving Phase 3/4 runtime features cannot execute prematurely.
+Detailed Phase 3 and Phase 4 plans are now recorded in `docs/PHASE_3_BUILD_PLAN.md` and `docs/PHASE_4_BUILD_PLAN.md`. Safe foundations now include disabled/listable capability gates, plugin manifest validation without code execution, graph/codemap planning schemas, semantic-memory disabled status reporting, remote/container execution profiles, subagent planning, external-channel activation status, and terminal inspection commands. Tests prove these foundations are discoverable and remain non-executable until policy, storage, approval, and lifecycle controls are complete.
+
+| Phase | Implemented foundation | Runtime state | Evidence |
+|---|---|---|---|
+| Phase 3 | Capability gates, `/capabilities`, plugin manifest validation, graph/codemap planning, semantic-memory status, `/semantic-memory` | Disabled/non-executing | `tests/test_phase_3_phase_4_implementation.py` |
+| Phase 4 | Capability gates, `/execution-profiles`, remote/container execution planning, subagent planning, external-channel activation status | Disabled/non-executing | `tests/test_phase_3_phase_4_implementation.py` |
 
 ## Status Update Rule
 

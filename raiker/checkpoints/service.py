@@ -38,7 +38,9 @@ class CheckpointService:
         )
         path = self.path_for(session_id, checkpoint.checkpoint_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(checkpoint.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        path.write_text(
+            json.dumps(checkpoint.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         self.store.insert_checkpoint(checkpoint, str(path))
         return checkpoint, path
 
@@ -56,10 +58,22 @@ class CheckpointService:
         checkpoint = self.get_checkpoint(checkpoint_id)
         if checkpoint is None:
             raise ValueError("checkpoint_not_found")
-        return {"status": "restore_plan", "checkpoint_id": checkpoint_id, "can_execute": False, "requires_approval": True, "reason": "Phase 2 plans restore only; file/state mutation remains disabled."}
+        return {
+            "status": "restore_plan",
+            "checkpoint_id": checkpoint_id,
+            "can_execute": False,
+            "requires_approval": True,
+            "reason": "Phase 2 plans restore only; file/state mutation remains disabled.",
+        }
 
     def plan_fork(self, checkpoint_id: str) -> dict[str, object]:
         checkpoint = self.get_checkpoint(checkpoint_id)
         if checkpoint is None:
             raise ValueError("checkpoint_not_found")
-        return {"status": "fork_plan", "checkpoint_id": checkpoint_id, "can_execute": False, "requires_approval": True, "reason": "Phase 2 plans fork only; execution is not active."}
+        return {
+            "status": "fork_plan",
+            "checkpoint_id": checkpoint_id,
+            "can_execute": False,
+            "requires_approval": True,
+            "reason": "Phase 2 plans fork only; execution is not active.",
+        }

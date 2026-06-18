@@ -280,3 +280,9 @@ Slice H is `implemented_verified` locally for metadata-only retention policies, 
 ## Phase 3 Slice I lifecycle evidence reference
 
 Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/PHASE_3_SLICE_I_LIFECYCLE_EVIDENCE_SPEC.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.
+
+## Phase 3 Slice J — Graph/Codemap Indexing Readiness Metadata
+
+Slice J is `implemented_verified` for metadata-only readiness surfaces: deterministic contract, registry create/list/get/summary, read-only CLI, optional SQLite metadata table, workspace inspection/view fields, docs, and tests.
+
+Phase 3 remains incomplete. Phase 4 remains blocked. Graph/codemap runtime indexing, graph writes, workers, schedulers, file watchers, daemons, and runtime jobs remain disabled.

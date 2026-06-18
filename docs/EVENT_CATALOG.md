@@ -350,3 +350,13 @@ These events are metadata-only. They are read-only/export-only/simulation-only a
 | `phase3.storage.lifecycle.policy_simulation.listed` | Policy simulations were listed. | Read-only; no execution. |
 | `phase3.storage.lifecycle.policy_simulation.rendered` | Simulation output was rendered. | Simulation-only; no execution. |
 | `phase3.storage.lifecycle.policy_simulation.execution_denied` | Runtime execution remained denied during simulation. | No cleanup, graph, memory, vector, embedding, rollback, plugin, channel, subagent, remote, container, or cloud execution. |
+
+## Phase 3 Slice J Metadata-Only Graph/Codemap Readiness Events
+
+These event names are reserved for future append-only metadata reporting only. Slice J does not emit runtime graph indexing events and does not start workers, schedulers, file watchers, daemons, graph writes, or indexing jobs.
+
+| Event | Actor | Required payload fields | Notes |
+|---|---|---|---|
+| `graph_codemap_readiness_metadata_created` | `graph_readiness_registry` | `readiness_id`, `metadata_only`, `ready_for_indexing`, `blockers` | Metadata-only readiness contract creation. |
+| `graph_codemap_readiness_metadata_viewed` | `terminal_client` or `workspace_inspection` | `readiness_id`, `client_type`, `read_only` | Optional future view event; must remain read-only. |
+| `graph_codemap_readiness_summary_viewed` | `workspace_inspection` | `metadata_only`, `ready_for_indexing`, `runtime_jobs_enabled` | Optional summary view; must not imply runtime enablement. |

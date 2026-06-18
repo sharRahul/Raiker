@@ -64,6 +64,18 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
         "graph_codemap": safe.get(
             "graph_codemap", {"graph_indexing_enabled": False, "planning_available": True}
         ),
+        "graph_codemap_readiness": safe.get(
+            "graph_codemap_readiness",
+            {
+                "graph_readiness_contract_available": True,
+                "graph_readiness_record_count": 0,
+                "metadata_only": True,
+                "ready_for_indexing": False,
+                "graph_indexing_enabled": False,
+                "graph_writes_enabled": False,
+                "runtime_jobs_enabled": False,
+            },
+        ),
         "execution_profiles": safe["execution_profiles"],
         "plugin_registration_plans": safe["plugin_registration_plans"],
         "approval_audit_summary": safe.get(
@@ -175,6 +187,12 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
     )
     lines.append(f"graph_indexing_enabled: {view['graph_codemap']['graph_indexing_enabled']}")
     lines.append(f"graph_planning_available: {view['graph_codemap']['planning_available']}")
+    lines.append(
+        f"graph_readiness_metadata_only: {view['graph_codemap_readiness']['metadata_only']}"
+    )
+    lines.append(
+        f"graph_readiness_ready_for_indexing: {view['graph_codemap_readiness']['ready_for_indexing']}"
+    )
     lines.append(f"semantic_writes_enabled: {view['semantic_memory']['semantic_writes_enabled']}")
     lines.append(
         f"approval_preview_only_mode: {view['approval_preview_summary']['preview_only_mode']}"

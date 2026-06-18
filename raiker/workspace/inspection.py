@@ -11,6 +11,7 @@ from raiker.contracts.models import ClientMetadata
 from raiker.events.query import EventViewer
 from raiker.execution.profiles import list_execution_profiles
 from raiker.graph.governance import graph_governance_status
+from raiker.graph.readiness_registry import graph_readiness_summary
 from raiker.memory.governance import memory_governance_summary
 from raiker.memory.semantic import semantic_memory_status
 from raiker.models.registry import ModelProfileRegistry
@@ -124,6 +125,7 @@ def inspect_workspace(client_type: str, *, workspace_root: str | Path = ".") -> 
         "semantic_memory": semantic_memory_status(len(memory_candidates))
         | memory_governance_summary(workspace_root),
         "graph_codemap": graph_governance_status(),
+        "graph_codemap_readiness": graph_readiness_summary(workspace_root=workspace_root),
         "execution_profiles": [
             {
                 "profile_id": p.profile_id,

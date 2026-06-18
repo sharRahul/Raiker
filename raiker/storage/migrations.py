@@ -272,3 +272,18 @@ CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_evidence_events (
   payload_json TEXT NOT NULL
 );
 """
+
+PHASE_3_GRAPH_CODEMAP_READINESS_MIGRATION_ID = "RAIKER-1310-phase3-graph-codemap-readiness-metadata"
+
+PHASE_3_GRAPH_CODEMAP_READINESS_SQL = """
+CREATE TABLE IF NOT EXISTS phase3_graph_codemap_readiness (
+  readiness_id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  target_capability TEXT NOT NULL,
+  metadata_only INTEGER NOT NULL,
+  ready_for_indexing INTEGER NOT NULL,
+  runtime_flags_json TEXT NOT NULL,
+  blockers_json TEXT NOT NULL,
+  contract_json TEXT NOT NULL
+);
+"""

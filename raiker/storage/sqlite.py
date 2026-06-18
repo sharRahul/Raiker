@@ -22,6 +22,8 @@ from raiker.storage.migrations import (
     PHASE_1_SQL,
     PHASE_2_MIGRATION_ID,
     PHASE_2_MIGRATION_SQL,
+    PHASE_3_GRAPH_CODEMAP_READINESS_MIGRATION_ID,
+    PHASE_3_GRAPH_CODEMAP_READINESS_SQL,
     PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_MIGRATION_ID,
     PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_SQL,
     PHASE_3_STORAGE_LIFECYCLE_MIGRATION_ID,
@@ -103,6 +105,11 @@ class SQLiteStore:
             self._apply_migration(
                 PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_MIGRATION_ID,
                 PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_3_GRAPH_CODEMAP_READINESS_MIGRATION_ID,
+                PHASE_3_GRAPH_CODEMAP_READINESS_SQL,
                 connection,
             )
 

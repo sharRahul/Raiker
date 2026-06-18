@@ -325,3 +325,9 @@ Until the relevant phase gates are fully implemented and verified:
 | `/storage-lifecycle-policy-simulation` | List metadata-only policy simulations. | `storage_lifecycle:read`, `storage_lifecycle:plan` | Yes — Phase 3 Slice I |
 | `/storage-lifecycle-policy-simulation --summary` | Render simulation summary and disabled runtime flags. | `storage_lifecycle:read`, `storage_lifecycle:plan` | Yes — Phase 3 Slice I |
 | `/storage-lifecycle-policy-simulation --json` | Export deterministic redacted policy simulation JSON. | `storage_lifecycle:read`, `storage_lifecycle:plan`, `audit:export` | Yes — Phase 3 Slice I |
+
+## Phase 3 Slice J Graph/Codemap Readiness Command
+
+| Command | Mode | Runtime effects | Notes |
+|---|---|---|---|
+| `/graph-readiness` | Read-only metadata | None | Shows metadata-only readiness blockers. Does not enable graph indexing, graph writes, workers, schedulers, file watchers, daemons, or runtime jobs. |

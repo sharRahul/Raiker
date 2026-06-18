@@ -72,3 +72,30 @@ Evidence:
 - `tests/test_phase_3_equal_workspace_clients.py`
 - `tests/test_phase_3_plugin_policy.py`
 - `tests/test_phase_3_terminal_commands.py`
+
+## Phase 3 rollout slice B — RAIKER-3501 read-only rich workspace view/API foundation
+
+Slice B continues Phase 3 without marking full Phase 3 complete. It adds a read-only view layer over the existing shared workspace inspection contract for future terminal, desktop, web, and dashboard clients.
+
+Implemented scope:
+
+- deterministic text workspace summary;
+- JSON-safe workspace summary;
+- dashboard summary;
+- client capability summary;
+- plugin plan summary;
+- `/workspace-view` CLI command for deterministic read-only terminal inspection.
+
+Safety boundaries:
+
+- views consume the shared inspection output instead of bypassing policy, storage, or event boundaries;
+- views do not execute tools;
+- views do not create approvals;
+- views do not call models;
+- views do not write semantic/vector memory;
+- views do not execute plugin code;
+- views do not activate external channels;
+- views do not start remote/container execution;
+- views redact secret-like keys before returning summaries.
+
+GitHub Actions are temporarily paused only due quota exhaustion. Local validation evidence from `docs/LOCAL_VALIDATION_GATE.md` is required while Actions are paused. Unsafe runtime capabilities remain disabled.

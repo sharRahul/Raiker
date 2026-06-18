@@ -180,3 +180,23 @@ Phase 3 is **not complete**. The first rollout slice is `implemented_verified` a
 | Read-only CLI inspection commands | `implemented_verified` | `/workspace`, `/clients`, `/plugins`, `/plugin-plan <manifest_path>`, `tests/test_phase_3_terminal_commands.py` |
 
 Preserved disabled gates: plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution remain non-executing.
+
+## Temporary CI Pause — GitHub Actions quota exhausted
+
+- GitHub Actions are temporarily paused or unavailable due run-limit/quota exhaustion.
+- Local validation is mandatory while Actions are paused; use `docs/LOCAL_VALIDATION_GATE.md` as the source of truth for required commands and evidence.
+- Full CI must be re-enabled before future release tagging or when quota becomes available.
+- This is not a waiver of validation requirements.
+
+## Phase 3 rollout slice B status — 2026-06-18
+
+Phase 3 is **not complete**. Slice B adds the RAIKER-3501 read-only rich workspace view/API foundation while preserving all disabled runtime gates.
+
+| Slice | Status | Evidence |
+|---|---:|---|
+| RAIKER-3501 read-only rich workspace view/API foundation | `implemented_verified` after local validation evidence is recorded | `raiker/workspace/views.py`, `tests/test_phase_3_workspace_views.py` |
+| `/workspace-view` read-only CLI summary | `implemented_verified` after local validation evidence is recorded | `raiker/cli/commands.py`, `tests/test_phase_3_workspace_views.py` |
+
+The view layer consumes the shared workspace inspection contract and renders deterministic text, JSON-safe, dashboard, client capability, and plugin plan summaries. It does not execute tools, create approvals, call models, write memory, execute plugin code, activate channels, start remote/container execution, or expose secret-like values.
+
+Preserved disabled gates: plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution remain non-executing.

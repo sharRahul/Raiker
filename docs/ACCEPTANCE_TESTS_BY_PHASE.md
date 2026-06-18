@@ -213,3 +213,12 @@ Expected results:
 | `tests/test_phase_3_equal_workspace_clients.py` | Future clients share `UIActionEnvelope` metadata and no client is privileged or allowed direct tool calls. |
 | `tests/test_phase_3_plugin_policy.py` | Plugin registration planning validates manifests, denies unsafe prefixes, approval-gates risky permissions, treats entrypoints as metadata, and never enables execution. |
 | `tests/test_phase_3_terminal_commands.py` | `/workspace`, `/clients`, `/plugins`, and `/plugin-plan <manifest_path>` are inspection-only and return helpful output. |
+
+### Phase 3 rollout slice B acceptance evidence
+
+| Test file | Required assertions |
+|---|---|
+| `tests/test_phase_3_workspace_views.py` | Workspace view summaries are generated from shared inspection output, deterministic, JSON-serialisable, equivalent across terminal/desktop/web/dashboard, read-only, and redact secret-like values. |
+| `tests/test_phase_3_workspace_views.py` | `/workspace-view` appears in `/help`, renders a deterministic read-only workspace summary, and leaves tasks and approvals unchanged. |
+
+GitHub Actions are temporarily paused only because the Actions run limit/quota is exhausted. While paused, local validation evidence from `docs/LOCAL_VALIDATION_GATE.md` is mandatory and full CI must be re-enabled before release tagging or when quota is available again. Full Phase 3 remains incomplete, and plugin execution, graph/codemap runtime indexing, semantic/vector writes, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.

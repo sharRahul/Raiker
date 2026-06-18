@@ -82,6 +82,17 @@ class ToolBroker:
                 )
             )
 
+
+    def _approval_preview(self, action: ToolAction) -> dict[str, Any] | None:
+        if action.tool_name in {"write_file", "edit_file"}:
+            try:
+                return proposed_write_snapshot(self.workspace_root, str(action.arguments.get("path", ".")), str(action.arguments.get("text", "")))
+            except FilesystemSafetyError as exc:
+                return {"status": "failed", "error": {"type": str(exc)}}
+        if action.tool_name == "apply_patch":
+            return {"status": "proposal", "patch": str(action.arguments.get("patch", "")), "requires_approval": True}
+        return None
+
     def execute(
         self,
         action: ToolAction,
@@ -137,6 +148,7 @@ class ToolBroker:
             )
         if decision.decision == "needs_approval":
             approval_id = new_id("appr_")
+            proposal_preview = self._approval_preview(action)
             self._event(
                 session_id=session_id,
                 turn_id=turn_id,
@@ -147,6 +159,7 @@ class ToolBroker:
                     "action_id": action.action_id,
                     "tool_name": action.tool_name,
                     "arguments_preview": action.arguments,
+                    "proposal_preview": proposal_preview,
                     "risk_level": "high",
                     "policy_reasons": decision.reasons,
                     "expected_effect": "Records an action-bound approval request and does not execute until resolved.",
@@ -161,7 +174,7 @@ class ToolBroker:
                     action_id=action.action_id,
                     tool_name=action.tool_name,
                     status="approval_required",
-                    output={"approval_id": approval_id, "reasons": decision.reasons},
+                    output={"approval_id": approval_id, "reasons": decision.reasons, "proposal_preview": proposal_preview},
                     error=None,
                     started_at=now,
                     completed_at=utc_now(),

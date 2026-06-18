@@ -104,3 +104,25 @@ def test_phase_3_and_phase_4_gates_are_listable_and_disabled() -> None:
     assert "subagents" in disabled["phase_4"]
     with pytest.raises(PermissionError):
         assert_capability_disabled("remote_execution")
+
+
+def test_write_approval_includes_before_snapshot_and_resolution_event(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("before", encoding="utf-8")
+    store = SQLiteStore(tmp_path)
+    writer = EventLogWriter(store)
+    broker = ToolBroker(workspace_root=tmp_path, policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)), store=store, writer=writer)
+    result, decision = broker.execute(ToolAction(new_id("act_"), "write_file", {"path": "a.txt", "text": "after"}, "high", True), session_id="sess", turn_id="turn")
+    assert decision.reasons == ["write_file_requires_approval", "phase2_action_bound_approval_required"]
+    preview = result.output["proposal_preview"]  # type: ignore[index]
+    assert preview["before_snapshot"] == "before"
+    approval_id = str(result.output["approval_id"])  # type: ignore[index]
+    ApprovalInbox(store, writer).resolve(approval_id, approve=False)
+    assert store.list_event_index(session_id="sess", event_type="approval_denied")
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "before"
+
+
+def test_memory_and_doctor_terminal_commands(tmp_path: Path) -> None:
+    assert "durable_writes_enabled: False" in handle_slash_command("/memory", workspace_root=tmp_path)
+    doctor = handle_slash_command("/doctor", workspace_root=tmp_path)
+    assert "ollama_runtime_enabled: False" in doctor
+    assert "phase_4_disabled:" in doctor

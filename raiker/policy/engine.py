@@ -63,7 +63,7 @@ class PolicyEngine:
                 decision_id=new_id("pol_"),
                 action_id=action.action_id,
                 decision="needs_approval",
-                reasons=["shell_requires_approval", "phase1_never_auto_executes_local_actions"],
+                reasons=[f"{action.tool_name}_requires_approval", "phase2_action_bound_approval_required"],
                 requires_user_approval=True,
                 policy_version=self.config.policy_version,
                 risk_level="high",

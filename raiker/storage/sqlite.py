@@ -404,7 +404,7 @@ class SQLiteStore:
         return dict(row) if row else None
     def list_approvals(self, status: str | None = None) -> list[dict[str, Any]]:
         query = """
-            SELECT approvals.*, tool_actions.tool_name, tool_actions.arguments_json, tool_actions.risk_level
+            SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id, tool_actions.tool_name, tool_actions.arguments_json, tool_actions.risk_level
             FROM approvals
             JOIN tool_actions ON approvals.action_id = tool_actions.action_id
         """
@@ -419,7 +419,12 @@ class SQLiteStore:
 
     def load_approval(self, approval_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM approvals WHERE approval_id = ?", (approval_id,)).fetchone()
+            row = connection.execute("""
+                SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id
+                FROM approvals
+                JOIN tool_actions ON approvals.action_id = tool_actions.action_id
+                WHERE approval_id = ?
+                """, (approval_id,)).fetchone()
         return dict(row) if row else None
 
     def resolve_approval(self, approval_id: str, *, status: str, resolved_by: str, resolved_at: str) -> None:

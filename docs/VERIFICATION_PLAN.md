@@ -35,7 +35,7 @@ python -m ruff check .
 python -m mypy raiker apps tests
 ```
 
-CI runs on `ubuntu-latest` with Python 3.11. See `.github/workflows/ci.yml`.
+CI runs on `ubuntu-latest` with Python 3.11. See `.github/workflows/ci.yml`. Phase/status ledger validation runs separately in `.github/workflows/phase-status.yml` with `python scripts/validate_phase_status.py`.
 
 ## Required Validation Commands
 

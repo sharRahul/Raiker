@@ -389,3 +389,34 @@ New planning/review-only surfaces:
 - `/graph-status` reports graph/codemap indexing disabled and dry-run planning available.
 - `/graph-plan` renders a dry-run plan with `can_index: false` and `runtime_indexing_enabled: false`.
 - `/memory-review` and `/memory-review --summary` inspect governed memory candidates without semantic writes.
+
+## ApprovalPreview Contract — Phase 3 Slice E
+
+`ApprovalPreview` is a preview-only contract. It is not an approval grant and cannot execute an action.
+
+Required fields:
+
+```json
+{
+  "preview_id": "aprev_graph_... or aprev_memory_...",
+  "action_type": "graph_indexing_preview | semantic_memory_write_preview",
+  "target_capability": "graph_codemap_indexing | semantic_memory_writes",
+  "title": "Human-readable preview title",
+  "summary": "Redacted deterministic summary",
+  "risk_level": "low | medium | high",
+  "requested_by": "local_user",
+  "created_at": "UTC ISO timestamp",
+  "requires_user_approval": true,
+  "can_execute_now": false,
+  "execution_enabled": false,
+  "reasons": [],
+  "policy_decision": "denied_or_preview_only",
+  "expected_events": [],
+  "reversible": false,
+  "affected_paths": [],
+  "affected_records": [],
+  "safety_notes": []
+}
+```
+
+Graph previews must target `graph_codemap_indexing`, include `graph_runtime_indexing_disabled`, and never write graph records. Semantic memory previews must target `semantic_memory_writes`, include `semantic_vector_writes_disabled`, redact secret-like values, and never create embeddings, vectors, or durable semantic memory records.

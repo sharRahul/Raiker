@@ -61,9 +61,22 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
         },
         "capability_gates": safe["capability_gates"],
         "semantic_memory": safe["semantic_memory"],
-        "graph_codemap": safe.get("graph_codemap", {"graph_indexing_enabled": False, "planning_available": True}),
+        "graph_codemap": safe.get(
+            "graph_codemap", {"graph_indexing_enabled": False, "planning_available": True}
+        ),
         "execution_profiles": safe["execution_profiles"],
         "plugin_registration_plans": safe["plugin_registration_plans"],
+        "approval_preview_summary": safe.get(
+            "approval_preview_summary",
+            {
+                "graph_indexing_preview_available": True,
+                "semantic_memory_write_preview_available": True,
+                "pending_preview_count": 0,
+                "denied_preview_count": 0,
+                "preview_only_mode": True,
+                "runtime_execution_enabled": False,
+            },
+        ),
     }
 
 
@@ -84,11 +97,21 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
         name for name, gate in view["capability_gates"].items() if gate["runtime_enabled"] is False
     )
     lines.append(f"runtime_disabled: {', '.join(disabled_runtime)}")
-    lines.append(f"plugin_execution_enabled: {view['capability_gates']['plugin_execution']['runtime_enabled']}")
+    lines.append(
+        f"plugin_execution_enabled: {view['capability_gates']['plugin_execution']['runtime_enabled']}"
+    )
     lines.append(f"graph_indexing_enabled: {view['graph_codemap']['graph_indexing_enabled']}")
     lines.append(f"graph_planning_available: {view['graph_codemap']['planning_available']}")
     lines.append(f"semantic_writes_enabled: {view['semantic_memory']['semantic_writes_enabled']}")
-    lines.append(f"memory_governance_mode: {view['semantic_memory'].get('memory_governance_mode', 'review_queue_only_no_semantic_writes')}")
+    lines.append(
+        f"approval_preview_only_mode: {view['approval_preview_summary']['preview_only_mode']}"
+    )
+    lines.append(
+        f"approval_preview_runtime_execution_enabled: {view['approval_preview_summary']['runtime_execution_enabled']}"
+    )
+    lines.append(
+        f"memory_governance_mode: {view['semantic_memory'].get('memory_governance_mode', 'review_queue_only_no_semantic_writes')}"
+    )
     return "\n".join(lines)
 
 
@@ -104,6 +127,7 @@ def render_workspace_dashboard_summary(inspection: Mapping[str, Any]) -> dict[st
         "capabilities": view["capability_gates"],
         "semantic_memory": view["semantic_memory"],
         "graph_codemap": view["graph_codemap"],
+        "approval_preview_summary": view["approval_preview_summary"],
     }
 
 

@@ -258,3 +258,17 @@ New planning/review-only surfaces:
 - `phase3.memory.candidate.classified` — deterministic local candidate classification occurred; no model call.
 - `phase3.memory.candidate.reviewed` — review decision state changed; no semantic write performed.
 - `phase3.memory.semantic_write.denied` — semantic/vector write denied by Phase 3 policy.
+
+## Phase 3 Slice E Preview-planning Event Names
+
+The following event names are reserved for approval-preview planning only. They must not be emitted to imply graph indexing, semantic memory writing, embeddings, vector writes, plugin execution, or remote/container execution occurred.
+
+```text
+phase3.approval.preview.created
+phase3.approval.preview.rendered
+phase3.graph.approval_preview.created
+phase3.memory.approval_preview.created
+phase3.approval.preview.execution_denied
+```
+
+Preview events describe contracts and UI rendering only. Execution remains disabled until a later phase adds policy, audit, rollback, retention, and full CI coverage.

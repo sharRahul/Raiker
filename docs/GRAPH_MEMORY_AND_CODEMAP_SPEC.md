@@ -237,3 +237,19 @@ New planning/review-only surfaces:
 - `/graph-status` reports graph/codemap indexing disabled and dry-run planning available.
 - `/graph-plan` renders a dry-run plan with `can_index: false` and `runtime_indexing_enabled: false`.
 - `/memory-review` and `/memory-review --summary` inspect governed memory candidates without semantic writes.
+
+## Phase 3 Slice E Graph Approval Preview
+
+Graph/codemap approval previews wrap dry-run `GraphCodemapIndexPlan` output to show what a future indexer would need approval to process. They are not executable approvals.
+
+Rules:
+
+- `target_capability` is `graph_codemap_indexing`.
+- `can_execute_now` is `false`.
+- `execution_enabled` is `false`.
+- `policy_decision` is `denied_or_preview_only`.
+- `graph_runtime_indexing_disabled` is included in reasons.
+- Unsafe graph plans, including symlink escapes or outside-workspace paths, produce denied high-risk previews.
+- Preview creation writes no graph indexes and starts no background indexers, watchers, or daemons.
+
+Full graph indexing remains disabled and full Phase 3 is not complete.

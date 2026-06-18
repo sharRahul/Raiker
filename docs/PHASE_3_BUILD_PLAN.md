@@ -120,3 +120,27 @@ New planning/review-only surfaces:
 - `/graph-status` reports graph/codemap indexing disabled and dry-run planning available.
 - `/graph-plan` renders a dry-run plan with `can_index: false` and `runtime_indexing_enabled: false`.
 - `/memory-review` and `/memory-review --summary` inspect governed memory candidates without semantic writes.
+
+## Phase 3 rollout slice E — policy-gated approval preview UX
+
+Slice E continues the graph and semantic-memory governance rollout by adding approval-preview contracts and CLI/workspace affordances before any runtime write path can be activated.
+
+Implemented scope:
+
+- `ApprovalPreview` contract for preview-only approval surfaces.
+- Graph indexing approval previews over dry-run `GraphCodemapIndexPlan` values.
+- Semantic memory write approval previews over `MemoryReviewItem` values.
+- In-memory/non-persistent preview helpers and deterministic rendering.
+- CLI commands: `/approval-previews`, `/graph-approval-preview`, `/memory-approval-preview [--summary]`, and `/approval-preview <preview_id>`.
+- Workspace inspection/view `approval_preview_summary`.
+
+Still disabled:
+
+- graph/codemap runtime indexing;
+- semantic/vector memory writes;
+- embeddings and vector creation;
+- plugin execution;
+- external channel activation;
+- subagents, multi-agent teams, remote execution, and container execution.
+
+Full Phase 3 is not complete. GitHub Actions remain paused due quota exhaustion, so local validation is mandatory until full CI is re-enabled when quota is available.

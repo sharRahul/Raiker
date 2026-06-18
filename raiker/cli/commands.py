@@ -6,6 +6,15 @@ import shlex
 from pathlib import Path
 from typing import cast
 
+from raiker.approval_preview_registry import (
+    approval_preview_summary,
+    create_fresh_graph_preview_for_workspace,
+    create_fresh_memory_preview_for_workspace,
+)
+from raiker.approval_preview_registry import (
+    render_approval_preview as render_stored_approval_preview,
+)
+from raiker.approval_previews import render_approval_preview
 from raiker.approvals import ApprovalInbox
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
@@ -213,8 +222,6 @@ def handle_workspace(*, workspace_root: str | Path = ".") -> str:
     )
 
 
-
-
 def handle_clients() -> str:
     client_types = [
         "terminal",
@@ -263,7 +270,9 @@ def handle_plugin_plan(command: str) -> str:
     )
 
 
-def handle_workspace_view(command: str = "/workspace-view", *, workspace_root: str | Path = ".") -> str:
+def handle_workspace_view(
+    command: str = "/workspace-view", *, workspace_root: str | Path = "."
+) -> str:
     parts = shlex.split(command)
     if len(parts) != 1:
         return "Usage: /workspace-view"
@@ -272,7 +281,9 @@ def handle_workspace_view(command: str = "/workspace-view", *, workspace_root: s
 
 def handle_graph_status() -> str:
     status = graph_governance_status()
-    return "\n".join(["Graph/codemap status:"] + [f"{key}: {value}" for key, value in status.items()])
+    return "\n".join(
+        ["Graph/codemap status:"] + [f"{key}: {value}" for key, value in status.items()]
+    )
 
 
 def handle_graph_plan(*, workspace_root: str | Path = ".") -> str:
@@ -296,21 +307,73 @@ def handle_graph_plan(*, workspace_root: str | Path = ".") -> str:
     )
 
 
-def handle_memory_review(command: str = "/memory-review", *, workspace_root: str | Path = ".") -> str:
+def handle_memory_review(
+    command: str = "/memory-review", *, workspace_root: str | Path = "."
+) -> str:
     parts = shlex.split(command)
     if len(parts) > 2 or (len(parts) == 2 and parts[1] != "--summary"):
         return "Usage: /memory-review [--summary]"
     queue = MemoryReviewQueue(workspace_root)
     if len(parts) == 2:
         summary = queue.export_summary()
-        return "\n".join(["Memory review summary:"] + [f"{key}: {value}" for key, value in summary.items()])
+        return "\n".join(
+            ["Memory review summary:"] + [f"{key}: {value}" for key, value in summary.items()]
+        )
     items = queue.list_candidates()
-    lines = ["Memory review queue:", f"semantic_writes_enabled: {memory_governance_summary(workspace_root)['semantic_writes_enabled']}"]
+    lines = [
+        "Memory review queue:",
+        f"semantic_writes_enabled: {memory_governance_summary(workspace_root)['semantic_writes_enabled']}",
+    ]
     if not items:
         lines.append("No memory candidates.")
     for item in items[:10]:
-        lines.append(f"- {item.candidate_id} decision={item.decision} sensitivity={item.sensitivity} can_write_semantic_memory={item.can_write_semantic_memory}")
+        lines.append(
+            f"- {item.candidate_id} decision={item.decision} sensitivity={item.sensitivity} can_write_semantic_memory={item.can_write_semantic_memory}"
+        )
     return "\n".join(lines)
+
+
+def handle_approval_previews(*, workspace_root: str | Path = ".") -> str:
+    summary = approval_preview_summary(workspace_root=workspace_root)
+    lines = ["Approval previews:", "persistence: in_memory_only_not_persisted"]
+    lines.extend(f"{key}: {value}" for key, value in summary.items())
+    lines.append(
+        "available_commands: /graph-approval-preview, /memory-approval-preview, /approval-preview <preview_id>"
+    )
+    return "\n".join(lines)
+
+
+def handle_graph_approval_preview(*, workspace_root: str | Path = ".") -> str:
+    try:
+        preview = create_fresh_graph_preview_for_workspace(workspace_root)
+    except (OSError, ValueError) as exc:
+        return f"Graph approval preview failed: {exc}"
+    return render_approval_preview(preview)
+
+
+def handle_memory_approval_preview(
+    command: str = "/memory-approval-preview", *, workspace_root: str | Path = "."
+) -> str:
+    parts = shlex.split(command)
+    if len(parts) > 2 or (len(parts) == 2 and parts[1] != "--summary"):
+        return "Usage: /memory-approval-preview [--summary]"
+    if len(parts) == 2:
+        summary = approval_preview_summary(workspace_root=workspace_root)
+        return "\n".join(
+            ["Memory approval preview summary:"]
+            + [f"{key}: {value}" for key, value in summary.items()]
+        )
+    preview = create_fresh_memory_preview_for_workspace(workspace_root)
+    if preview is None:
+        return "Memory approval preview: no memory review candidates available; add/review candidates without semantic writes first."
+    return render_approval_preview(preview)
+
+
+def handle_approval_preview_lookup(command: str) -> str:
+    parts = shlex.split(command)
+    if len(parts) != 2:
+        return "Usage: /approval-preview <preview_id>"
+    return render_stored_approval_preview(parts[1])
 
 
 def handle_execution_profiles() -> str:
@@ -360,7 +423,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /memory-review [--summary], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -393,6 +456,14 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_graph_plan(workspace_root=workspace_root)
     if command == "/memory-review" or command.startswith("/memory-review "):
         return handle_memory_review(command, workspace_root=workspace_root)
+    if command == "/approval-previews":
+        return handle_approval_previews(workspace_root=workspace_root)
+    if command == "/graph-approval-preview":
+        return handle_graph_approval_preview(workspace_root=workspace_root)
+    if command == "/memory-approval-preview" or command.startswith("/memory-approval-preview "):
+        return handle_memory_approval_preview(command, workspace_root=workspace_root)
+    if command == "/approval-preview" or command.startswith("/approval-preview "):
+        return handle_approval_preview_lookup(command)
     if command == "/clients":
         return handle_clients()
     if command == "/plugins":

@@ -4,6 +4,8 @@ This handoff tells local or cloud coding agents how to interpret the current Rai
 
 Canonical detailed spec: `docs/PHASE_3_SLICE_G_STORAGE_LIFECYCLE_SPEC.md`.
 
+Canonical tool/plugin inventory: `docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md`.
+
 ---
 
 ## Current state
@@ -23,6 +25,19 @@ Phase 3 remains incomplete. Current implemented Phase 3 slices are safe foundati
 Phase 4 remains incomplete and disabled except for safe planning/inspection surfaces.
 
 Phase 5 now has a dedicated build-plan document: `docs/PHASE_5_BUILD_PLAN.md`.
+
+---
+
+## Tool and plugin source of truth
+
+Before adding, changing, or enabling any tool, command, plugin component, permission, lifecycle action, channel, subagent, remote runner, model/provider action, memory action, graph action, MCP/LSP adapter, monitor, schedule, notification, marketplace flow, or audit/export feature, a builder must update and reconcile `docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md`.
+
+That catalog must answer four questions for each tool/plugin component:
+
+| Tool Name | Descriptions | Permissions | Implemented |
+|---|---|---|---|
+
+No tool or plugin component is considered documented unless those four fields exist.
 
 ---
 
@@ -84,6 +99,7 @@ A builder must read these docs in order:
 README.md
   -> docs/IMPLEMENTATION_STATUS.md
   -> docs/BUILD_ORDER.md
+  -> docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md
   -> docs/PHASE_3_SLICE_G_STORAGE_LIFECYCLE_SPEC.md
   -> docs/PHASE_1_TO_5_SLICE_G_ALIGNMENT.md
   -> docs/PHASE_3_BUILD_PLAN.md
@@ -150,6 +166,7 @@ The next PR must explicitly confirm:
 - no remote/container/cloud execution was enabled;
 - lifecycle status changes remain metadata-only;
 - lifecycle records store redacted summaries/counts only;
+- `docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md` was updated if any tool/plugin status, permission, or description changed;
 - local/cloud validation evidence is included.
 
 ---

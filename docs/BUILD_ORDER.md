@@ -1,6 +1,6 @@
 # Build Order
 
-This document defines the dependency-safe order for implementing Raiker. It complements `docs/PHASE_1_MVP_BUILD_PLAN.md` by making the build sequence explicit enough that a builder agent does not implement UI, tools, memory, plugins, or channels before the contracts and safety rails exist.
+This document defines the dependency-safe order for implementing Raiker. It complements `docs/PHASE_1_MVP_BUILD_PLAN.md` by making the build sequence explicit enough that a builder agent does not implement UI, tools, memory, plugins, channels, or storage lifecycles before the contracts and safety rails exist.
 
 Phase order controls implementation sequencing only. It does not create an interface hierarchy.
 
@@ -26,6 +26,13 @@ README.md
   -> docs/THREAT_MODEL.md
   -> docs/NON_GOALS_AND_BOUNDARIES.md
   -> docs/PHASE_1_MVP_BUILD_PLAN.md
+  -> docs/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md
+  -> docs/PHASE_3_BUILD_PLAN.md
+  -> docs/PHASE_3_SLICE_G_STORAGE_LIFECYCLE_SPEC.md
+  -> docs/PHASE_1_TO_5_SLICE_G_ALIGNMENT.md
+  -> docs/SLICE_G_CODING_AGENT_HANDOFF.md
+  -> docs/PHASE_4_BUILD_PLAN.md
+  -> docs/PHASE_5_BUILD_PLAN.md
   -> docs/RUNTIME_ORCHESTRATION_SPEC.md
   -> docs/TOOLS_AND_PERMISSIONS_SPEC.md
   -> docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md
@@ -37,9 +44,11 @@ README.md
   -> docs/MEMORY_GOVERNANCE_RULES.md
   -> docs/PLUGIN_SYSTEM_SPEC.md
   -> docs/PLUGIN_MANIFEST_SCHEMA.md
+  -> docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md
   -> docs/ACCEPTANCE_TESTS_BY_PHASE.md
   -> docs/REFERENCE_REQUIREMENTS_MATRIX.md
   -> docs/VERIFICATION_PLAN.md
+  -> docs/LOCAL_VALIDATION_GATE.md
   -> config/model-profiles.json
   -> config/channel-connectors.json
 ```
@@ -96,6 +105,10 @@ RAIKER-0001 scaffold
 8. Agent gateway before any client-specific prompt path.
 9. Checkpoint stub before terminal end-to-end completion criteria.
 10. Equal-interface metadata before first terminal-specific implementation.
+11. Lifecycle metadata contracts before lifecycle metadata storage.
+12. Lifecycle metadata storage before lifecycle summaries.
+13. Lifecycle summaries before any future lifecycle approval handoff.
+14. Lifecycle approval handoff before any future runtime graph/memory/rollback execution work.
 
 If a builder needs to violate this order for bootstrap reasons, it must document the temporary exception in the PR and add a follow-up task that restores the canonical order.
 
@@ -167,6 +180,23 @@ RAIKER-1001 Phase 2 plan
 
 ---
 
+## Phase 3 Storage Lifecycle Build Order
+
+Slice G is the current deepest Phase 3 storage lifecycle preparation slice. Future agents must follow this sequence:
+
+```text
+Slice C graph/codemap dry-run planning
+  -> Slice D semantic-memory review queue
+    -> Slice E approval preview contracts
+      -> Slice F approval audit + rollback planning
+        -> Slice G storage lifecycle metadata
+          -> Slice H retention/cleanup planning OR lifecycle approval handoff contracts OR metadata-only query/read hardening
+```
+
+Slice G may create and inspect metadata records only. It must not be used as a trigger for graph indexing, semantic/vector memory writes, embeddings, rollback execution, plugin execution, channels, subagents, or remote/container/cloud execution.
+
+---
+
 ## Builder Stop Conditions
 
 A builder must stop and update documentation before coding if:
@@ -177,6 +207,7 @@ A builder must stop and update documentation before coding if:
 - a storage table or column is missing from the storage spec;
 - a tool lacks policy, failure modes, or output limits;
 - an approval flow is not action-bound;
+- a lifecycle metadata record would imply runtime execution;
 - a later-phase feature would need active runtime wiring;
 - a client would bypass the Agent Gateway;
 - a change would make terminal/TUI canonical over another enabled primary interface.
@@ -205,6 +236,7 @@ Every implementation PR must include:
 - [ ] python -m pytest
 - [ ] python -m ruff check .
 - [ ] python -m mypy raiker apps tests
+- [ ] python scripts/validate_phase_status.py
 - [ ] raiker smoke test, if terminal path affected
 
 ## Invariants
@@ -212,4 +244,5 @@ Every implementation PR must include:
 - [ ] No tool executes without policy decision
 - [ ] Equal primary-interface invariant preserved
 - [ ] Phase-scheduled features remain disabled unless this task explicitly enables them
+- [ ] Slice G lifecycle metadata remains metadata-only unless a later approved task explicitly changes that with docs, tests, policy, rollback, and CI evidence
 ```

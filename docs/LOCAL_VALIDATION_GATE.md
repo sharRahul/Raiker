@@ -38,8 +38,48 @@ For Phase 3 rollout branches, also run manual or scripted smoke coverage for:
 /clients
 /plugins
 /plugin-plan
+/graph-status
+/graph-plan
+/memory-review
+/memory-review --summary
+/approval-previews
+/graph-approval-preview
+/memory-approval-preview --summary
+/approval-audit
+/approval-audit --summary
+/rollback-plan
+/graph-rollback-plan
+/memory-rollback-plan
+/storage-lifecycle
+/storage-lifecycle --summary
+/storage-lifecycle --graph
+/storage-lifecycle --memory
 /doctor
 ```
+
+## Phase 3 Slice G validation additions
+
+For any branch that changes storage lifecycle metadata, lifecycle registry behavior, lifecycle workspace summaries, storage migrations, lifecycle CLI rendering, graph/memory/audit/rollback conversions, or related docs, validation evidence must include:
+
+```bash
+python -m pytest tests/test_phase_3_storage_lifecycle.py
+python -m pytest
+python -m ruff check .
+python -m mypy raiker apps tests
+python scripts/validate_phase_status.py
+```
+
+Required Slice G smoke assertions:
+
+- `/storage-lifecycle` renders read-only lifecycle metadata.
+- `/storage-lifecycle --summary` renders aggregate counts and disabled runtime write flags.
+- `/storage-lifecycle --graph` states graph/codemap runtime indexing remains disabled.
+- `/storage-lifecycle --memory` states semantic/vector writes and embeddings remain disabled.
+- SQLite migrations create only metadata lifecycle tables and lifecycle metadata event tables.
+- No graph node/edge tables are introduced by Slice G.
+- No vector/embedding tables are introduced by Slice G.
+- Lifecycle expire/supersede operations are metadata status changes only.
+- Workspace inspection and workspace views include lifecycle summaries without activating runtime writes.
 
 ## Required evidence format
 
@@ -55,12 +95,16 @@ Record this evidence in the PR body or `docs/IMPLEMENTATION_STATUS.md`:
 8. Confirmation that the following remain disabled:
    - plugin execution
    - graph/codemap runtime indexing
+   - graph node/edge writes
    - semantic/vector memory writes
+   - embedding generation/storage
+   - rollback execution
    - external channels
    - subagents
    - multi-agent teams
    - remote execution
    - container execution
+   - hosted routines and marketplace installs
 9. Files changed
 10. Commit SHA
 11. Remaining risks

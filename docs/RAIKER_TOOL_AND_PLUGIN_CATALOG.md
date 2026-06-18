@@ -1,165 +1,277 @@
 # Raiker Tool and Plugin Catalog
 
-This catalog is the Raiker-native inventory of tool and plugin capabilities that must be tracked across future implementation stages.
+This catalog is the Raiker-native inventory of tools and plugin components that must be tracked across implementation stages.
 
-It was created after reviewing Raiker's current docs and comparing them against contemporary coding-agent reference surfaces, including the public Claude Code tools and plugins references. The purpose is not to clone another product. The purpose is to ensure Raiker has its own explicit, phase-scheduled tool and plugin catalogue so future builders do not miss major capability classes.
-
-A row in this file is **not** runtime activation approval. Every tool and plugin component must still pass Raiker's contracts, policy, storage, event logging, approval, UI parity, security, and acceptance-test gates before it can execute.
+It is intentionally written in Raiker terminology. A row in this file is **not** runtime activation approval. Every tool and plugin component must still pass Raiker contracts, policy, storage, event logging, approval, UI parity, security, and acceptance-test gates before it can execute.
 
 ---
 
-## Phase status legend
+## Implementation status legend
 
-| Phase | Meaning in this catalog |
+| Implemented value | Meaning |
 |---|---|
-| Phase 1 | Core local runtime and safe read-only workspace tools. |
-| Phase 2 | Rich local workspace, mutation proposals, task/checkpoint/event UX, local provider discovery, and governed local command/file operations. |
-| Phase 3 | Local rich workspace foundations, plugin validation/planning, graph and memory governance, code intelligence, notebook-aware editing, scheduled/local automation planning, and web/network policy gates. |
-| Phase 4 | External channels, subagents, multi-agent teams, monitor/watch surfaces, isolated worktrees, remote/container execution planning. |
-| Phase 5 | Managed/enterprise controls, hosted/cloud routines, billing/budget policy, marketplace governance, cloud/GPU jobs, organization-wide policy. |
+| `Yes — Phase N` | Implemented and verified for the named phase scope. |
+| `Partial — Phase N` | Some safe/read-only/planning behavior exists, but runtime capability is incomplete or disabled. |
+| `No — Phase N planned` | Specified and phase-scheduled, but not implemented. |
+| `No — disabled until Phase N` | Must remain disabled until the named phase gates are complete. |
+| `Never direct` | Not a direct runtime tool; only available through another brokered contract or manifest boundary. |
 
 ---
 
-## Raiker core tool catalogue
+## Permission vocabulary
 
-### Conversation, planning, and user-interaction tools
+These permission labels are used in the inventory below so coding agents know what policy gates are required.
 
-| Raiker tool | Purpose | Status / phase | Required notes |
-|---|---|---|---|
-| `ask_user` | Ask blocking clarification questions. | Phase 1 | Must not mutate runtime state except conversation events. |
-| `side_question` | Ask non-blocking side questions while a task continues. | Phase 2 | Must be bound to task/session and preserve deterministic event order. |
-| `enter_plan_mode` | Switch a turn into explicit planning mode. | Phase 2 | Planning output only; no tool execution. |
-| `exit_plan_mode` | Present plan for approval and leave plan mode. | Phase 2 | Requires approval if plan enables risky actions. |
-| `create_task` | Create task metadata for tracked work. | Phase 2 | No hidden background execution. |
-| `update_task` | Update task status, details, dependencies, or progress. | Phase 2 | Must emit task events. |
-| `list_tasks` | List task records. | Phase 2 | Read-only. |
-| `get_task` | Read full details for one task. | Phase 2 | Read-only. |
-| `stop_task` | Cancel/stop a tracked task or background process. | Phase 2 to Phase 4 | Local metadata cancellation in Phase 2; process cancellation requires policy. |
-| `notify_user` | Send local desktop/mobile/channel notification. | Phase 4 to Phase 5 | Local notification can be Phase 4; hosted push needs Phase 5 policy and privacy review. |
-
-### File and workspace tools
-
-| Raiker tool | Purpose | Status / phase | Required notes |
-|---|---|---|---|
-| `read_file` | Read workspace text files. | Phase 1 implemented/verified | Workspace/path policy required. |
-| `list_directory` | List workspace directories. | Phase 1 implemented/verified | Stable ordering and path safety required. |
-| `glob` | Find files by pattern. | Phase 1 implemented/verified | Must document ignore rules, caps, and truncation. |
-| `grep` | Search file contents. | Phase 1 implemented/verified | Must document regex mode, ignored files, caps, and truncation. |
-| `stat_path` | Read path metadata. | Phase 2 implemented/verified | Read-only. |
-| `diff_files` | Compare files or snapshots. | Phase 2 implemented/verified | Read-only; bounded output. |
-| `write_file` | Create or replace a file. | Phase 2 implemented as approval-gated proposal path | Must snapshot and require approval before mutation. |
-| `edit_file` | Targeted file edit. | Phase 2 implemented as approval-gated proposal path | Must require read-before-edit or current-content validation. |
-| `apply_patch` | Apply unified patch. | Phase 2 implemented as approval-gated proposal path | Must snapshot and provide rollback planning. |
-| `delete_file` | Delete a file. | Phase 2 scheduled / deny by default | High-risk; scoped approval only. |
-| `copy_path` | Copy a file or directory. | Phase 2 scheduled | Approval required for writes. |
-| `move_path` | Rename or move a file/directory. | Phase 2 scheduled | Approval required; rollback note required. |
-| `notebook_edit` | Modify Jupyter notebook cells by cell ID or index. | Phase 3 missing explicit mapping before this catalog | Must be separate from plain text edit; approval and notebook structure validation required. |
-
-### Code intelligence and search tools
-
-| Raiker tool | Purpose | Status / phase | Required notes |
-|---|---|---|---|
-| `symbol_search` | Search workspace symbols. | Phase 3 partially covered | Must use language-server/code-index boundary. |
-| `lsp_diagnostics` | Read language-server diagnostics. | Phase 3 missing explicit mapping before this catalog | Read-only by default; activation depends on trusted workspace/plugin. |
-| `lsp_definition` | Jump to definition. | Phase 3 missing explicit mapping before this catalog | Read-only. |
-| `lsp_references` | Find references. | Phase 3 missing explicit mapping before this catalog | Read-only. |
-| `lsp_type_info` | Read type info at symbol/position. | Phase 3 missing explicit mapping before this catalog | Read-only. |
-| `lsp_call_hierarchy` | Trace call hierarchy. | Phase 3 missing explicit mapping before this catalog | Read-only; bounded result size. |
-| `semantic_search` | Search semantic/vector index. | Phase 3 specified but runtime writes disabled | Must not create embeddings unless semantic write gate is enabled. |
-| `graph_query` | Query graph/codemap. | Phase 3 specified but indexing disabled | Dry-run/planning only until graph runtime gate is enabled. |
-| `web_search` | Search public web. | Phase 3 scheduled, disabled until egress policy | Network egress, privacy, and source-citation policy required. |
-| `web_fetch` | Fetch URL contents. | Phase 3 scheduled, disabled until egress policy | Domain allowlist, content-size, and prompt-injection controls required. |
-
-### Local execution and shell tools
-
-| Raiker tool | Purpose | Status / phase | Required notes |
-|---|---|---|---|
-| `shell` | Run local shell command. | Phase 1 approval-gated path; Phase 2 richer policy | Must never run without policy decision and approval where required. |
-| `powershell` | Run native PowerShell command. | Phase 2 listed; needs explicit implementation/validation | Windows-first shell path; must respect enterprise execution policy. |
-| `python_exec` | Run isolated Python snippet. | Phase 2 scheduled | Requires sandboxing, timeout, output limit, no secret/env dump by default. |
-| `git_status` | Inspect Git status. | Phase 2 implemented/verified wrapper class | Read-only. |
-| `git_diff` | Inspect Git diff. | Phase 2 implemented/verified wrapper class | Read-only; bounded output. |
-| `git_log` | Inspect Git history. | Phase 2 implemented/verified wrapper class | Read-only. |
-| `git_mutation` | Branch/commit/merge/push operations. | Phase 3 to Phase 4 scheduled | Must be approval-gated and never bypass PR workflow. |
-| `monitor` | Run/watch background command or log stream and surface new lines/events. | Phase 4 missing explicit mapping before this catalog | Same risk class as shell plus background lifecycle, cancellation, and event rate limits. |
-
-### Automation and scheduling tools
-
-| Raiker tool | Purpose | Status / phase | Required notes |
-|---|---|---|---|
-| `schedule_create` | Create one-shot or recurring local scheduled prompt/task. | Phase 3 partially covered as scheduled automations | Must be local-first by default and session/workspace scoped unless Phase 5 hosted mode is enabled. |
-| `schedule_list` | List scheduled tasks. | Phase 3 missing explicit tool mapping before this catalog | Read-only. |
-| `schedule_delete` | Cancel scheduled task. | Phase 3 missing explicit tool mapping before this catalog | Requires owner/session/workspace validation. |
-| `schedule_wakeup` | Internal self-paced loop wakeup scheduling. | Phase 3 to Phase 4 missing explicit mapping before this catalog | Must have max cadence, cancellation, and no hidden infinite loop. |
-| `routine_remote_trigger` | Hosted/cloud routine create/update/run/list. | Phase 5 | Hosted execution, billing, privacy, and auth required; not local default. |
-
-### MCP and external resource tools
-
-| Raiker tool | Purpose | Status / phase | Required notes |
-|---|---|---|---|
-| `mcp_list_resources` | List resources exposed by connected MCP servers. | Phase 3 plugin/MCP planning; runtime disabled | Must require server trust and resource visibility policy. |
-| `mcp_read_resource` | Read a specific MCP resource URI. | Phase 3 plugin/MCP planning; runtime disabled | Treat connector content as untrusted input. |
-| `mcp_wait_for_server` | Wait for configured MCP server readiness. | Phase 3 to Phase 4 missing explicit mapping before this catalog | Must be cancellable and bounded. |
-| `tool_search` | Discover/load deferred tools or plugin/MCP tools. | Phase 3 to Phase 5 missing explicit mapping before this catalog | Discovery does not equal permission grant. |
-
-### Subagent, team, and workflow tools
-
-| Raiker tool | Purpose | Status / phase | Required notes |
-|---|---|---|---|
-| `spawn_subagent` | Start a bounded subagent. | Phase 4 safe planning only | Runtime spawning disabled until lifecycle and approval controls exist. |
-| `send_agent_message` | Send/resume message to a teammate/subagent. | Phase 4 missing explicit mapping before this catalog | Requires parent/child event linkage and bounded roles. |
-| `workflow_run` | Run a dynamic workflow that coordinates multiple agents/tasks. | Phase 4 to Phase 5 missing explicit mapping before this catalog | High-risk orchestration; requires budget, audit, cancellation, and verification. |
-| `team_onboarding_export` | Generate/share onboarding guide for collaborators. | Phase 5 missing explicit mapping before this catalog | If share link or hosted upload is used, requires hosted privacy/auth policy. |
-
-### Memory, graph, and approval-preview tools
-
-| Raiker tool | Purpose | Status / phase | Required notes |
-|---|---|---|---|
-| `memory_candidate` | Propose a memory candidate. | Phase 1/2 implemented as governed candidate flow | Does not imply durable semantic write. |
-| `memory_search` | Search governed memory. | Phase 2 scheduled/partially implemented by candidate listing | Scope and sensitivity filters required. |
-| `memory_write` | Persist governed memory. | Phase 2 for non-semantic; Phase 3 semantic writes disabled | Semantic/vector writes remain disabled until full governance/backend gates pass. |
-| `memory_update` | Update governed memory. | Phase 2 scheduled | Audit and approval required. |
-| `memory_forget` | Delete/forget memory. | Phase 2 scheduled | Audit and retention policy required. |
-| `memory_export` | Export memory. | Phase 2 scheduled high-risk | Approval required. |
-| `graph_plan` | Dry-run graph/codemap indexing plan. | Phase 3 implemented/verified planning only | Must not write graph records. |
-| `graph_approval_preview` | Preview future graph indexing approval. | Phase 3 Slice E implemented preview-only | Not executable approval. |
-| `memory_approval_preview` | Preview future semantic memory write approval. | Phase 3 Slice E implemented preview-only | Must redact secret-like values. |
-| `approval_audit` | Preview/render approval audit records. | Phase 3 Slice F in PR #24 | Preview-only until merged and validated. |
-| `rollback_plan` | Preview rollback plans for graph/memory actions. | Phase 3 Slice F in PR #24 | Preview-only; rollback execution disabled. |
+| Permission | Meaning |
+|---|---|
+| `none` | No additional tool permission; metadata-only/read-only command. |
+| `workspace:read` | Read files/directories inside the approved workspace. |
+| `workspace:search` | Search filenames or file content inside the approved workspace. |
+| `workspace:write` | Create/update/delete/move/copy files; approval required unless a later policy explicitly scopes it. |
+| `git:read` | Read Git status/diff/log metadata. |
+| `git:write` | Branch/commit/merge/push or other Git mutation; approval required. |
+| `command:propose` | Propose a command for approval; does not execute directly. |
+| `command:execute` | Execute a command after policy and approval. |
+| `process:monitor` | Start/watch/cancel bounded background monitors. |
+| `model:read` | Read model/provider/profile status. |
+| `model:launch` | Start or switch a local/hosted model provider. |
+| `memory:read` | Read governed memory candidates/status. |
+| `memory:write` | Persist/update/delete governed memory; approval and governance required. |
+| `semantic_memory:write` | Persist semantic/vector memory; disabled until Phase 3 gates complete. |
+| `graph:read` | Read graph/codemap status or query existing graph metadata. |
+| `graph:plan` | Prepare dry-run graph/codemap plans. |
+| `graph:write` | Write graph nodes/edges; disabled until a later explicit gate. |
+| `approval:read` | Read approval, approval-preview, audit, or handoff metadata. |
+| `approval:resolve` | Approve/deny/defer exact action-bound approvals. |
+| `rollback:plan` | Prepare rollback plans; no execution. |
+| `rollback:execute` | Execute rollback; disabled until a later explicit gate. |
+| `storage_lifecycle:read` | Read Slice G lifecycle metadata. |
+| `storage_lifecycle:plan` | Create metadata-only lifecycle/retention/cleanup/handoff plans. |
+| `storage_lifecycle:write_metadata` | Write lifecycle metadata tables only; no graph/vector/memory runtime writes. |
+| `network:egress` | Access public/private network resources. |
+| `mcp:read` | Read MCP resources from trusted configured servers. |
+| `mcp:server_start` | Start/wait for MCP servers; disabled until trust and approval gates. |
+| `lsp:read` | Read language-server diagnostics/symbol/code intelligence. |
+| `lsp:server_start` | Start language servers; disabled until workspace/plugin trust gates. |
+| `plugin:validate` | Validate plugin metadata without executing code. |
+| `plugin:register` | Register plugin metadata/plans; no code execution. |
+| `plugin:execute` | Execute plugin code/entrypoints; disabled until explicit gates. |
+| `channel:read` | Read/list configured channel profiles/status. |
+| `channel:activate` | Activate external transports; disabled until Phase 4 pairing and trust. |
+| `agent:plan` | Plan subagent/team work without spawning. |
+| `agent:execute` | Spawn subagents/team workflows; disabled until Phase 4 gates. |
+| `remote:plan` | Produce denied/planned remote/container execution profiles. |
+| `remote:execute` | Execute remote/container/cloud jobs; disabled until Phase 4/5 gates. |
+| `notify:local` | Send local notification. |
+| `notify:hosted` | Hosted push/share-link notification; disabled until Phase 5. |
+| `config:read` | Read configuration/profile metadata. |
+| `config:write` | Write scoped settings/config; approval required. |
+| `audit:export` | Export audit/session/security records; approval/redaction required. |
+| `marketplace:read` | Discover plugin packages/registry metadata. |
+| `marketplace:install` | Install/update marketplace plugins; disabled until Phase 5 supply-chain controls. |
 
 ---
 
-## Raiker plugin component catalogue
+## Raiker core tool inventory
 
-| Raiker plugin component | Purpose | Status / phase | Required notes |
+| Tool Name | Descriptions | Permissions | Implemented |
 |---|---|---|---|
-| `plugin_manifest` | Declares metadata, compatibility, entrypoints, permissions, trust, supply-chain data. | Phase 3 validation/planning implemented | Runtime entrypoints are inert metadata until execution gates pass. |
-| `plugin_commands` | Add slash commands or prompt shortcuts. | Phase 3 specified/planning | Commands must expand into Raiker action contracts, not arbitrary execution. |
-| `plugin_skills` | Package reusable procedural workflows. | Phase 2 to Phase 3 specified | Skills propose tools through broker and must include verification criteria. |
-| `plugin_agents` | Package subagent profiles. | Phase 4 scheduled | Spawning remains disabled until subagent lifecycle controls exist. |
-| `plugin_hooks` | Add lifecycle/event handlers. | Phase 3 specified/planning | Hooks cannot override managed denies or bypass policy. |
-| `plugin_mcp_servers` | Bundle MCP server definitions. | Phase 3 to Phase 4 missing explicit mapping before this catalog | Server activation requires trust, approval, egress policy, and resource controls. |
-| `plugin_lsp_servers` | Bundle LSP/code-intelligence server definitions. | Phase 3 missing explicit mapping before this catalog | Starts only after workspace/plugin trust. |
-| `plugin_monitors` | Start plugin-declared background monitors/watchers. | Phase 4 missing explicit mapping before this catalog | Disabled by default; high-risk shell/background lifecycle. |
-| `plugin_tool_adapters` | Register tool adapters through Tool Broker. | Phase 3 specified | Never execute directly from plugin code. |
-| `plugin_channels` | Add external channel connectors. | Phase 4 scheduled | Pairing, sender allowlist, prompt-injection controls required. |
-| `plugin_tui_panels` | Add terminal panels. | Phase 3 specified | Display-only unless action permissions granted. |
-| `plugin_web_panels` | Add web/dashboard panels. | Phase 3 missing explicit mapping before this catalog | Same shared workspace view/action contracts as other UI clients. |
-| `plugin_mobile_panels` | Add mobile UI panels/cards. | Phase 4 missing explicit mapping before this catalog | Approval UX must remain action-bound and secure. |
-| `plugin_output_styles` | Provide output style/personality rendering rules. | Phase 3 missing explicit mapping before this catalog | Must not alter policy, hide warnings, or suppress citations/events. |
-| `plugin_themes` | Provide color/theme definitions. | Phase 3 missing explicit mapping before this catalog | Visual-only; no runtime authority. |
-| `plugin_user_config` | Prompt/store user-configurable plugin values. | Phase 3 to Phase 5 missing explicit mapping before this catalog | Sensitive config must be classified, redacted, and scoped. |
-| `plugin_dependencies` | Declare plugin dependencies. | Phase 3 to Phase 5 missing explicit mapping before this catalog | Dependency enablement must show permission diff. |
-| `plugin_marketplace` | Discover/install/update plugins from registries. | Phase 5 missing explicit mapping before this catalog | Supply-chain signing, checksum, review, and managed policy required. |
-| `plugin_reload` | Reload changed plugin metadata/components. | Phase 3 to Phase 4 missing explicit mapping before this catalog | Reload must not auto-enable runtime code. |
-| `plugin_details` | Show component inventory, permissions, risk, and token/context cost. | Phase 3 missing explicit mapping before this catalog | Read-only inspection command. |
-| `plugin_validate` | Validate plugin package and manifest. | Phase 3 implemented for manifest planning; full package validation scheduled | Must report warnings/errors without executing plugin code. |
+| `normal_prompt` | Submit a standard user prompt into the Agent Gateway. | `none` | Yes — Phase 1 |
+| `ask_user` | Ask a blocking clarification question. | `none` | Partial — Phase 1 runtime conversation path |
+| `side_question` | Ask a non-blocking side question while a task continues. | `none` | Yes — Phase 2 contract/runtime path |
+| `enter_plan_mode` | Switch a turn into explicit planning mode. | `none` | Partial — Phase 2 planning/status behavior |
+| `exit_plan_mode` | Present a plan for review/approval and leave planning mode. | `approval:read` | Partial — Phase 2 planning/status behavior |
+| `create_task` | Create tracked task metadata. | `none` | Yes — Phase 2 |
+| `update_task` | Update task status, detail, dependencies, or progress. | `none` | Yes — Phase 2 |
+| `list_tasks` | List task records. | `none` | Yes — Phase 2 |
+| `get_task` | Read details for one task. | `none` | Yes — Phase 2 |
+| `stop_task` | Stop/cancel a tracked task at a safe boundary. | `none`; later `process:monitor` if cancelling processes | Partial — Phase 2 metadata only; process cancellation not active |
+| `read_file` | Read workspace text files. | `workspace:read` | Yes — Phase 1 |
+| `list_directory` | List workspace directories. | `workspace:read` | Yes — Phase 1 |
+| `glob` | Find files by workspace-scoped pattern. | `workspace:search` | Yes — Phase 1 |
+| `grep` | Search file contents in workspace. | `workspace:search` | Yes — Phase 1 |
+| `stat_path` | Read file/directory metadata. | `workspace:read` | Yes — Phase 2 |
+| `diff_files` | Compare files or snapshots. | `workspace:read` | Yes — Phase 2 |
+| `write_file` | Create or replace a file after approval. | `workspace:write`, `approval:resolve` | Yes — Phase 2 approval-gated proposal path |
+| `edit_file` | Targeted file edit after approval. | `workspace:write`, `approval:resolve` | Yes — Phase 2 approval-gated proposal path |
+| `apply_patch` | Apply a patch after approval and snapshot. | `workspace:write`, `approval:resolve` | Yes — Phase 2 approval-gated proposal path |
+| `delete_file` | Delete a file. | `workspace:write`, `approval:resolve` | No — Phase 2 planned / deny by default |
+| `copy_path` | Copy a file or directory. | `workspace:write`, `approval:resolve` | No — Phase 2 planned |
+| `move_path` | Rename or move a file/directory. | `workspace:write`, `approval:resolve` | No — Phase 2 planned |
+| `notebook_edit` | Modify Jupyter notebook cells by cell ID/index. | `workspace:write`, `approval:resolve` | No — Phase 3 planned |
+| `symbol_search` | Search workspace code symbols. | `workspace:search`, later `lsp:read` or `graph:read` | Partial — Phase 3 specified/planning |
+| `lsp_diagnostics` | Read language-server diagnostics. | `lsp:read`; server startup needs `lsp:server_start` | No — Phase 3 planned |
+| `lsp_definition` | Jump to symbol definition. | `lsp:read` | No — Phase 3 planned |
+| `lsp_references` | Find symbol references. | `lsp:read` | No — Phase 3 planned |
+| `lsp_type_info` | Read type information for code at position. | `lsp:read` | No — Phase 3 planned |
+| `lsp_call_hierarchy` | Trace caller/callee relationships. | `lsp:read` | No — Phase 3 planned |
+| `semantic_search` | Search semantic/vector memory index. | `memory:read`; vector backend needs `semantic_memory:write` for index creation | Partial — Phase 3 specified; runtime writes disabled |
+| `graph_query` | Query graph/codemap metadata. | `graph:read` | Partial — Phase 3 specified; indexing disabled |
+| `graph_plan` | Produce dry-run graph/codemap indexing plan. | `graph:plan` | Yes — Phase 3 Slice C planning only |
+| `graph_status` | Show graph/codemap disabled/runtime status. | `graph:read` | Yes — Phase 3 Slice C |
+| `web_search` | Search public web. | `network:egress` | No — Phase 3 planned; disabled until egress policy |
+| `web_fetch` | Fetch URL contents. | `network:egress` | No — Phase 3 planned; disabled until egress policy |
+| `shell` | Propose or execute local shell command through policy. | `command:propose`; later `command:execute` | Partial — Phase 1 approval-gated proposal path; direct execution gated |
+| `powershell` | Run native PowerShell command through policy. | `command:propose`, `command:execute` | No — Phase 2 planned/needs validation |
+| `python_exec` | Run isolated Python snippet. | `command:execute` | No — Phase 2 planned; sandbox/timeout required |
+| `git_status` | Inspect Git status. | `git:read` | Yes — Phase 2 |
+| `git_diff` | Inspect Git diff. | `git:read` | Yes — Phase 2 |
+| `git_log` | Inspect Git history. | `git:read` | Yes — Phase 2 |
+| `git_mutation` | Branch/commit/merge/push Git operations. | `git:write`, `approval:resolve` | No — Phase 3/4 planned |
+| `monitor` | Watch a background command/log/process and surface output. | `process:monitor`, `command:execute` | No — disabled until Phase 4 |
+| `schedule_create` | Create one-shot or recurring local scheduled prompt/task. | `storage_lifecycle:plan` or future `schedule:write`, `approval:resolve` | No — Phase 3 planned |
+| `schedule_list` | List scheduled tasks. | `none` or future `schedule:read` | No — Phase 3 planned |
+| `schedule_delete` | Cancel scheduled task. | future `schedule:write`, `approval:resolve` | No — Phase 3 planned |
+| `schedule_wakeup` | Internal bounded wakeup scheduling loop. | future `schedule:write` | No — Phase 3/4 planned |
+| `routine_remote_trigger` | Hosted/cloud routine create/update/run/list. | `notify:hosted`, `remote:execute` | No — disabled until Phase 5 |
+| `mcp_list_resources` | List resources exposed by configured MCP servers. | `mcp:read` | No — Phase 3/4 planned; server startup disabled |
+| `mcp_read_resource` | Read an MCP resource URI. | `mcp:read` | No — Phase 3/4 planned; content untrusted |
+| `mcp_wait_for_server` | Wait for configured MCP server readiness. | `mcp:server_start` | No — disabled until Phase 3/4 trust gates |
+| `tool_search` | Discover/load deferred tools or plugin/MCP tools. | `plugin:validate`, `mcp:read`, `marketplace:read` depending source | No — Phase 3/5 planned |
+| `spawn_subagent` | Start a bounded subagent. | `agent:execute` | No — Phase 4 safe planning only; spawning disabled |
+| `send_agent_message` | Send/resume message to a teammate/subagent. | `agent:execute` | No — disabled until Phase 4 |
+| `workflow_run` | Run a dynamic workflow coordinating tasks/agents. | `agent:execute`, `remote:execute` when remote | No — Phase 4/5 planned |
+| `team_onboarding_export` | Generate/share onboarding guide for collaborators. | `audit:export`; hosted share needs `notify:hosted` | No — Phase 5 planned |
+| `memory_candidate` | Propose governed memory candidate. | `memory:read` | Yes — Phase 1/2 candidate flow |
+| `memory_status` | Show governed memory/semantic-memory disabled status. | `memory:read` | Yes — Phase 2/3 |
+| `memory_review` | Inspect governed memory review queue. | `memory:read` | Yes — Phase 3 Slice D review-only |
+| `memory_search` | Search governed memory. | `memory:read` | Partial — Phase 2/3 candidate/status search only |
+| `memory_write` | Persist governed non-semantic memory. | `memory:write`, `approval:resolve` | No — planned/governed; semantic writes disabled |
+| `semantic_memory_write` | Persist semantic/vector memory and embeddings. | `semantic_memory:write`, `approval:resolve` | No — disabled until later Phase 3 gates |
+| `memory_update` | Update governed memory. | `memory:write`, `approval:resolve` | No — Phase 2/3 planned |
+| `memory_forget` | Delete/forget memory. | `memory:write`, `approval:resolve` | No — Phase 2/3 planned |
+| `memory_export` | Export memory records. | `audit:export`, `memory:read`, `approval:resolve` | No — Phase 2/5 planned high-risk |
+| `graph_approval_preview` | Preview future graph indexing approval. | `approval:read`, `graph:plan` | Yes — Phase 3 Slice E preview-only |
+| `memory_approval_preview` | Preview future semantic memory write approval. | `approval:read`, `memory:read` | Yes — Phase 3 Slice E preview-only |
+| `approval_previews` | List approval previews. | `approval:read` | Yes — Phase 3 Slice E preview-only |
+| `approval_preview_lookup` | Render one stored/known approval preview by ID. | `approval:read` | Yes — Phase 3 Slice E preview-only |
+| `approval_audit` | Preview/render approval audit records. | `approval:read` | Yes — Phase 3 Slice F preview-only |
+| `rollback_plan` | Preview rollback plans for graph/memory actions. | `rollback:plan` | Yes — Phase 3 Slice F preview-only |
+| `storage_lifecycle` | List/read metadata-only storage lifecycle records. | `storage_lifecycle:read` | Yes — Phase 3 Slice G metadata-only |
+| `storage_lifecycle_summary` | Render aggregate lifecycle counts and disabled write flags. | `storage_lifecycle:read` | Yes — Phase 3 Slice G metadata-only |
+| `storage_lifecycle_graph` | Render graph/codemap lifecycle metadata only. | `storage_lifecycle:read`, `graph:read` | Yes — Phase 3 Slice G metadata-only |
+| `storage_lifecycle_memory` | Render semantic-memory lifecycle metadata only. | `storage_lifecycle:read`, `memory:read` | Yes — Phase 3 Slice G metadata-only |
+| `storage_lifecycle_create` | Create lifecycle metadata records. | `storage_lifecycle:write_metadata` | Yes — Phase 3 Slice G internal service; metadata-only |
+| `storage_lifecycle_expire` | Mark lifecycle metadata expired. | `storage_lifecycle:write_metadata` | Yes — Phase 3 Slice G internal service; no execution |
+| `storage_lifecycle_supersede` | Mark lifecycle metadata superseded. | `storage_lifecycle:write_metadata` | Yes — Phase 3 Slice G internal service; no execution |
+| `storage_lifecycle_retention_policy` | Define retention policy metadata for lifecycle records. | `storage_lifecycle:plan` | No — recommended Phase 3 Slice H |
+| `storage_lifecycle_cleanup_preview` | Preview cleanup candidates without deletion/execution. | `storage_lifecycle:plan` | No — recommended Phase 3 Slice H |
+| `storage_lifecycle_approval_handoff` | Plan future approval handoff for lifecycle records. | `storage_lifecycle:plan`, `approval:read` | No — recommended Phase 3 Slice H |
+| `approvals_list` | List pending action-bound approvals. | `approval:read` | Yes — Phase 2 |
+| `approve_action` | Approve exact pending action ID. | `approval:resolve` | Yes — Phase 2 for supported approval records |
+| `deny_action` | Deny exact pending action ID. | `approval:resolve` | Yes — Phase 2 |
+| `checkpoint_list` | List checkpoint timeline entries. | `none` | Yes — Phase 2 |
+| `checkpoint_restore` | Restore checkpoint. | `workspace:write`, `approval:resolve` | No — planned/approval required |
+| `checkpoint_fork` | Fork from checkpoint. | `workspace:write`, `approval:resolve` | No — planned/approval required |
+| `event_list` | List indexed events. | `none` | Yes — Phase 2 |
+| `event_read` | Read event payload/details. | `none` | Partial — Phase 2 event viewer behavior |
+| `workspace_inspect` | Inspect shared workspace summary. | `none` | Yes — Phase 3 Slice A/B read-only |
+| `workspace_view` | Render deterministic workspace views. | `none` | Yes — Phase 3 Slice B read-only |
+| `client_capabilities` | Show equal client capability summaries. | `none` | Yes — Phase 3 Slice A/B read-only |
+| `capability_list` | List phase-gated capabilities. | `none` | Yes — Phase 3/4 safe foundation |
+| `execution_profiles` | List execution profiles and denied plans. | `remote:plan` | Yes — Phase 4 safe foundation; execution disabled |
+| `remote_execution_plan` | Produce denied remote/container execution plan. | `remote:plan` | Yes — Phase 4 safe foundation; execution disabled |
+| `channel_status` | List disabled channel connector profiles/status. | `channel:read` | Yes — Phase 1 registry / Phase 4 status foundation |
+| `channel_activate` | Activate external transport. | `channel:activate`, `approval:resolve` | No — disabled until Phase 4 |
+| `model_profiles` | List model profiles. | `model:read` | Yes — Phase 1 |
+| `model_launch` | Launch/switch configured model profile. | `model:launch`, possibly `network:egress` for hosted | Partial — mock/local profile path; hosted disabled |
+| `doctor` | Run local diagnostics/status inspection. | `config:read`, `model:read`, `channel:read` | Yes — Phase 2/3 inspection |
+| `config_read` | Inspect Raiker config/profile metadata. | `config:read` | Partial — profile/registry status surfaces |
+| `config_write` | Modify scoped Raiker config. | `config:write`, `approval:resolve` | No — planned |
+| `notify_user_local` | Send local user notification. | `notify:local` | No — Phase 4 planned |
+| `notify_user_hosted` | Send hosted/mobile push/share notification. | `notify:hosted` | No — disabled until Phase 5 |
+| `audit_export` | Export audit/session/event/security records. | `audit:export`, `approval:resolve` | No — Phase 5 planned |
+| `marketplace_search` | Discover plugin packages from registry. | `marketplace:read`, `network:egress` | No — Phase 5 planned |
+| `marketplace_install` | Install/update marketplace plugin. | `marketplace:install`, `plugin:validate`, `approval:resolve` | No — disabled until Phase 5 |
+
+---
+
+## Raiker plugin component inventory
+
+| Tool Name | Descriptions | Permissions | Implemented |
+|---|---|---|---|
+| `plugin_manifest` | Declares plugin metadata, compatibility, entrypoints, permissions, trust, supply-chain details. | `plugin:validate` | Yes — Phase 3 validation/planning |
+| `plugin_validate` | Validate plugin manifest/package without executing code. | `plugin:validate` | Partial — manifest validation implemented; full package validation planned |
+| `plugin_registration_plan` | Produce plugin registration plan and permission diff. | `plugin:register`, `approval:read` | Yes — Phase 3 planning only |
+| `plugin_details` | Show component inventory, permissions, risk, and status. | `plugin:validate`, `plugin:register` | Partial — Phase 3 inspection/planning |
+| `plugin_commands` | Add slash commands or prompt shortcuts. | `plugin:register`; execution depends on target tool permissions | No — Phase 3 planned; inert metadata currently |
+| `plugin_skills` | Package reusable workflows/procedures. | `plugin:register`; tool-specific permissions at runtime | No — Phase 2/3 planned |
+| `plugin_agents` | Package subagent profiles. | `plugin:register`, later `agent:execute` | No — disabled until Phase 4 |
+| `plugin_hooks` | Add lifecycle/event handlers. | `plugin:register`; no bypass of policy | No — Phase 3 planned |
+| `plugin_mcp_servers` | Bundle MCP server definitions. | `plugin:register`, `mcp:server_start`, `network:egress` | No — disabled until Phase 3/4 trust gates |
+| `plugin_lsp_servers` | Bundle LSP/code-intelligence server definitions. | `plugin:register`, `lsp:server_start`, `lsp:read` | No — Phase 3 planned |
+| `plugin_monitors` | Declare background monitors/watchers. | `plugin:register`, `process:monitor`, `command:execute` | No — disabled until Phase 4 |
+| `plugin_tool_adapters` | Register tool adapters through Tool Broker. | `plugin:register`; target tool permissions required | No — Phase 3 planned; must never execute directly |
+| `plugin_channels` | Add external channel connectors. | `plugin:register`, `channel:activate` | No — disabled until Phase 4 |
+| `plugin_tui_panels` | Add terminal UI panels. | `plugin:register`; `none` if display-only | No — Phase 3 planned |
+| `plugin_web_panels` | Add web/dashboard panels. | `plugin:register`; action-specific permissions | No — Phase 3 planned |
+| `plugin_mobile_panels` | Add mobile UI panels/cards. | `plugin:register`; action-specific permissions | No — Phase 4 planned |
+| `plugin_output_styles` | Provide output style/rendering rules. | `plugin:register`; no runtime authority | No — Phase 3 planned |
+| `plugin_themes` | Provide color/theme definitions. | `plugin:register`; no runtime authority | No — Phase 3 planned |
+| `plugin_user_config` | Declare/persist user-configurable plugin values. | `plugin:register`, `config:read`, `config:write` | No — Phase 3/5 planned |
+| `plugin_dependencies` | Declare dependent plugins/components. | `plugin:register`, `plugin:validate` | No — Phase 3/5 planned |
+| `plugin_permission_diff` | Show permission changes from install/update/dependency expansion. | `plugin:validate`, `approval:read` | Partial — Phase 3 planning |
+| `plugin_trust_policy` | Track trust level: unknown/local/project/user/managed/bundled. | `plugin:validate`, `config:read` | Partial — Phase 3 planning |
+| `plugin_supply_chain_metadata` | Track source URL, commit, checksum, signature. | `plugin:validate`, `marketplace:read` | Partial — schema documented; full verification Phase 5 |
+| `plugin_marketplace` | Discover/install/update plugins from registries. | `marketplace:read`, `marketplace:install`, `network:egress` | No — disabled until Phase 5 |
+| `plugin_reload` | Reload changed plugin metadata/components. | `plugin:register` | No — Phase 3/4 planned; must not auto-enable code |
+| `plugin_enable` | Enable plugin components after policy/trust approval. | `plugin:register`, `approval:resolve`; later `plugin:execute` if runtime code | No — runtime execution disabled |
+| `plugin_disable` | Disable plugin components. | `plugin:register` | No — Phase 3 planned |
+| `plugin_remove` | Remove plugin metadata/package. | `plugin:register`, `workspace:write`, `approval:resolve` | No — Phase 3/5 planned |
+| `plugin_execute` | Execute plugin code/entrypoint. | `plugin:execute` plus target permissions | No — disabled until explicit Phase 3+ execution gates |
+
+---
+
+## Commands mapped to implemented/planned tools
+
+| Tool Name | Descriptions | Permissions | Implemented |
+|---|---|---|---|
+| `/help` | Show command/action help. | `none` | Yes |
+| `/status` | Show workspace/session/task/approval/lifecycle count summary. | `none` | Yes |
+| `/tasks` | List task records. | `none` | Yes |
+| `/events` | List indexed events. | `none` | Yes |
+| `/checkpoints` | List checkpoint timeline. | `none` | Yes |
+| `/approvals` | List pending approvals. | `approval:read` | Yes |
+| `/approve <id>` | Approve exact pending action ID. | `approval:resolve` | Yes |
+| `/deny <id>` | Deny exact pending action ID. | `approval:resolve` | Yes |
+| `/memory` | Show governed memory status/candidates. | `memory:read` | Yes |
+| `/semantic-memory` | Show semantic-memory disabled status. | `memory:read` | Yes |
+| `/memory-review` | Show memory review queue. | `memory:read` | Yes |
+| `/memory-review --summary` | Show memory review counts. | `memory:read` | Yes |
+| `/capabilities` | List disabled/planned/enabled capability gates. | `none` | Yes |
+| `/execution-profiles` | List execution profiles and disabled execution state. | `remote:plan` | Yes — execution disabled |
+| `/workspace` | Show workspace inspection summary. | `none` | Yes |
+| `/workspace-view` | Render deterministic workspace view. | `none` | Yes |
+| `/clients` | Show equal-client capability summary. | `none` | Yes |
+| `/plugins` | Show plugin registry/planning status. | `plugin:validate`, `plugin:register` | Yes — planning/inspection only |
+| `/plugin-plan <manifest_path>` | Validate/plan plugin registration. | `plugin:validate`, `workspace:read` | Yes — no plugin execution |
+| `/graph-status` | Show graph/codemap disabled status. | `graph:read` | Yes |
+| `/graph-plan` | Render dry-run graph/codemap plan. | `graph:plan` | Yes — no graph writes |
+| `/approval-previews` | List approval previews. | `approval:read` | Yes — preview-only |
+| `/graph-approval-preview` | Preview graph indexing approval. | `approval:read`, `graph:plan` | Yes — preview-only |
+| `/memory-approval-preview` | Preview semantic-memory write approval. | `approval:read`, `memory:read` | Yes — preview-only |
+| `/memory-approval-preview --summary` | Preview semantic-memory write summary. | `approval:read`, `memory:read` | Yes — preview-only |
+| `/approval-preview <id>` | Render one approval preview. | `approval:read` | Yes — preview-only |
+| `/approval-audit` | Render approval audit records. | `approval:read` | Yes — preview-only |
+| `/approval-audit --summary` | Render approval audit summary. | `approval:read` | Yes — preview-only |
+| `/rollback-plan` | Render rollback plans. | `rollback:plan` | Yes — preview-only |
+| `/graph-rollback-plan` | Render graph rollback plan. | `rollback:plan`, `graph:read` | Yes — preview-only |
+| `/memory-rollback-plan` | Render memory rollback plan. | `rollback:plan`, `memory:read` | Yes — preview-only |
+| `/storage-lifecycle` | Render storage lifecycle records. | `storage_lifecycle:read` | Yes — metadata-only |
+| `/storage-lifecycle --summary` | Render lifecycle aggregate summary. | `storage_lifecycle:read` | Yes — metadata-only |
+| `/storage-lifecycle --graph` | Render graph lifecycle metadata. | `storage_lifecycle:read`, `graph:read` | Yes — metadata-only |
+| `/storage-lifecycle --memory` | Render memory lifecycle metadata. | `storage_lifecycle:read`, `memory:read` | Yes — metadata-only |
+| `/doctor` | Show diagnostics and disabled gates. | `config:read`, `model:read`, `channel:read` | Yes |
+| `/channels` | List channel connector profiles. | `channel:read` | Yes — activation disabled |
+| `/models` | List model profiles. | `model:read` | Yes |
+| `/launch --provider mock --model mock-deterministic` | Launch/switch mock model profile. | `model:launch` | Yes — mock/local safe path |
+| `/quit` | Exit terminal session safely. | `none` | Yes |
 
 ---
 
 ## Required additions to future phase work
 
-The following items were not explicit enough in the existing Raiker docs before this catalog and should be picked up by later implementation plans:
+The following items must be picked up by later implementation plans:
 
 1. Add `notebook_edit` as a distinct Phase 3 tool, separate from plain text `edit_file`.
 2. Add LSP tools as first-class Phase 3 read-only code-intelligence tools: diagnostics, definition, references, type info, symbols, implementations, and call hierarchy.
@@ -169,6 +281,7 @@ The following items were not explicit enough in the existing Raiker docs before 
 6. Add explicit plugin components for LSP servers, monitors, output styles, themes, user config, dependencies, details, reload, marketplace, and validation.
 7. Add dynamic workflow/team tools to Phase 4/5 with parent/child event linkage, budgets, cancellation, and audit.
 8. Add local vs hosted notification semantics: local notifications may be Phase 4; hosted push/share links require Phase 5 privacy/auth controls.
+9. Add Slice H lifecycle retention, cleanup-preview, and approval-handoff tools as metadata-only Phase 3 follow-up work.
 
 ---
 
@@ -178,7 +291,10 @@ Until the relevant phase gates are fully implemented and verified:
 
 - plugin code execution remains disabled;
 - graph/codemap runtime indexing remains disabled;
+- graph node/edge writes remain disabled;
 - semantic/vector memory writes remain disabled;
+- embedding creation/storage remains disabled;
+- rollback execution remains disabled;
 - external channels remain disabled;
 - MCP/LSP/plugin server startup remains disabled unless explicitly trusted and approved;
 - monitors/watchers remain disabled;

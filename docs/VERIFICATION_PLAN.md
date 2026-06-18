@@ -343,3 +343,19 @@ raiker --prompt "Hello Raiker"
 ```
 
 Additional terminal inspection smoke coverage should include `/workspace`, `/clients`, `/plugins`, and `/plugin-plan <safe manifest path>` when running the interactive terminal.
+
+
+## Phase 3 rollout slice B validation
+
+Required CI parity commands for this slice, especially on Python 3.11, are:
+
+```bash
+python -m ruff check .
+python -m mypy raiker apps tests
+python -m pytest
+python scripts/validate_phase_status.py
+raiker --help
+raiker --prompt "Hello Raiker"
+```
+
+The slice is ready only when CI and Phase Status Validation pass. The validation must confirm `/workspace-view` is read-only and that plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.

@@ -180,3 +180,18 @@ Phase 3 is **not complete**. The first rollout slice is `implemented_verified` a
 | Read-only CLI inspection commands | `implemented_verified` | `/workspace`, `/clients`, `/plugins`, `/plugin-plan <manifest_path>`, `tests/test_phase_3_terminal_commands.py` |
 
 Preserved disabled gates: plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution remain non-executing.
+
+
+## Phase 3 rollout slice B status — 2026-06-18
+
+Phase 3 is **not complete**. Slice B is `implemented_verified` for the safe read-only workspace view/API foundation after restoring CI compatibility for Python 3.11 and preserving the disabled runtime gates.
+
+| Slice | Status | Evidence |
+|---|---:|---|
+| RAIKER-3501 read-only rich workspace view/API foundation | `implemented_verified` | `raiker/workspace/views.py`, `tests/test_phase_3_workspace_views.py` |
+| `/workspace-view` safe terminal snapshot command | `implemented_verified` | `raiker/cli/commands.py`, `tests/test_phase_3_terminal_commands.py` |
+| Python 3.11 CI compatibility | `implemented_verified` | `pyproject.toml`, CI parity commands in `docs/VERIFICATION_PLAN.md` |
+
+Slice B adds deterministic JSON-safe, text, dashboard, client capability, and plugin-plan summaries that consume only the shared read-only workspace inspection contract. It does not add a full desktop app, web server, dashboard runtime, privileged UI path, plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, or container execution.
+
+Preserved disabled gates: plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution remain non-executing.

@@ -22,6 +22,14 @@ REQUIRED_DOCS = [
     Path("docs/PHASE_4_BUILD_PLAN.md"),
 ]
 
+REQUIRED_STATUS_MARKERS = [
+    "Phase 3 rollout slice A status",
+    "RAIKER-3501 read-only rich workspace view/API foundation | `implemented_verified`",
+    "`/workspace-view` safe terminal snapshot command | `implemented_verified`",
+    "Phase 3 is **not complete**",
+    "Preserved disabled gates: plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, external channels, subagents, multi-agent teams, remote execution, and container execution",
+]
+
 
 def main() -> int:
     status = Path("docs/IMPLEMENTATION_STATUS.md").read_text(encoding="utf-8")
@@ -30,6 +38,9 @@ def main() -> int:
         marker = f"| {row} | `phase_2_required` | `implemented_verified`"
         if marker not in status:
             missing.append(row)
+    for marker in REQUIRED_STATUS_MARKERS:
+        if marker not in status:
+            missing.append(marker)
     for doc in REQUIRED_DOCS:
         if not doc.exists():
             missing.append(str(doc))

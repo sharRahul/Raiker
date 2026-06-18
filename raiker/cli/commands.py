@@ -260,6 +260,14 @@ def handle_plugin_plan(command: str) -> str:
     )
 
 
+def handle_workspace_view(command: str = "/workspace-view", *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) != 1:
+        return "Usage: /workspace-view"
+    summary = inspect_workspace("terminal", workspace_root=workspace_root)
+    return render_workspace_text_view(summary)
+
+
 def handle_execution_profiles() -> str:
     lines = ["Execution profiles:"]
     for profile in list_execution_profiles():

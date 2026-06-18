@@ -149,6 +149,31 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
                 "approval_handoff_execution_enabled": False,
             },
         ),
+
+        "storage_cleanup_execution_readiness": safe.get(
+            "storage_cleanup_execution_readiness",
+            {
+                "storage_cleanup_readiness_contract_available": True,
+                "storage_cleanup_readiness_record_count": 0,
+                "latest_readiness_id": None,
+                "metadata_only": True,
+                "ready_for_cleanup_execution": False,
+                "cleanup_execution_enabled": False,
+                "deletion_execution_enabled": False,
+                "purge_execution_enabled": False,
+                "tombstone_execution_enabled": False,
+                "rollback_execution_enabled": False,
+                "cleanup_jobs_enabled": False,
+                "deletion_jobs_enabled": False,
+                "worker_queues_enabled": False,
+                "workers_enabled": False,
+                "schedulers_enabled": False,
+                "file_watchers_enabled": False,
+                "daemons_enabled": False,
+                "runtime_execution_enabled": False,
+                "blocker_count": 0,
+            },
+        ),
         "storage_lifecycle_evidence_summary": safe.get(
             "storage_lifecycle_evidence_summary",
             {
@@ -274,6 +299,16 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
     lines.append(
         f"storage_lifecycle_approval_handoffs: {view['storage_lifecycle_retention_summary']['approval_handoff_count']}"
     )
+    lines.append(f"storage_cleanup_readiness_metadata_only: {view['storage_cleanup_execution_readiness']['metadata_only']}")
+    lines.append(f"storage_cleanup_ready_for_execution: {view['storage_cleanup_execution_readiness']['ready_for_cleanup_execution']}")
+    lines.append(f"storage_cleanup_readiness_latest_id: {view['storage_cleanup_execution_readiness']['latest_readiness_id']}")
+    lines.append(f"storage_cleanup_readiness_blockers: {view['storage_cleanup_execution_readiness']['blocker_count']}")
+    lines.append(f"storage_cleanup_execution_enabled: {view['storage_cleanup_execution_readiness']['cleanup_execution_enabled']}")
+    lines.append(f"storage_deletion_execution_enabled: {view['storage_cleanup_execution_readiness']['deletion_execution_enabled']}")
+    lines.append(f"storage_purge_execution_enabled: {view['storage_cleanup_execution_readiness']['purge_execution_enabled']}")
+    lines.append(f"storage_tombstone_execution_enabled: {view['storage_cleanup_execution_readiness']['tombstone_execution_enabled']}")
+    lines.append(f"storage_cleanup_jobs_enabled: {view['storage_cleanup_execution_readiness']['cleanup_jobs_enabled']}")
+    lines.append(f"storage_cleanup_workers_enabled: {view['storage_cleanup_execution_readiness']['workers_enabled']}")
     lines.append(
         f"storage_lifecycle_evidence_bundles: {view['storage_lifecycle_evidence_summary']['lifecycle_evidence_bundle_count']}"
     )
@@ -308,6 +343,7 @@ def render_workspace_dashboard_summary(inspection: Mapping[str, Any]) -> dict[st
         "rollback_plan_summary": view["rollback_plan_summary"],
         "storage_lifecycle_summary": view["storage_lifecycle_summary"],
         "storage_lifecycle_retention_summary": view["storage_lifecycle_retention_summary"],
+        "storage_cleanup_execution_readiness": view["storage_cleanup_execution_readiness"],
         "storage_lifecycle_evidence_summary": view["storage_lifecycle_evidence_summary"],
     }
 

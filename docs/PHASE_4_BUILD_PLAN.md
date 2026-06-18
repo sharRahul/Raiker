@@ -44,3 +44,38 @@ The current implementation completes the Phase 4 safe foundation layer without a
 - `/execution-profiles` provides terminal inspection parity through the existing CLI command surface.
 
 External transports, subagent spawning, agent teams, approval relays, and remote/container execution remain disabled until pairing, sender trust, budget, policy, approval, audit, and lifecycle controls are complete.
+
+---
+
+## Phase 3 Slice G dependency boundary for Phase 4 builders
+
+Phase 4 builders must treat `docs/PHASE_3_SLICE_G_STORAGE_LIFECYCLE_SPEC.md` as a prerequisite when work touches channels, subagents, teams, remote execution, container execution, or monitor/watch-style surfaces.
+
+Slice G lifecycle records may be read as metadata, but Phase 4 work must not reinterpret them as executable jobs, remote work items, rollback commands, channel tasks, or subagent assignments.
+
+Phase 4 work remains blocked from activating:
+
+- external channels;
+- approval relay over channels;
+- subagent spawning;
+- multi-agent teams;
+- monitor/watch daemons;
+- remote execution;
+- container execution;
+- cloud execution.
+
+Allowed Phase 4 interactions with Slice G metadata:
+
+- display read-only lifecycle summaries in future dashboard/channel/admin views;
+- include lifecycle counts in audit reports;
+- link Phase 4 denied execution plans to lifecycle metadata only when the link is non-executing and redacted;
+- show lifecycle readiness warnings before any later channel/subagent/remote action can be considered.
+
+Forbidden Phase 4 interactions with Slice G metadata:
+
+- automatically starting graph indexing from a lifecycle record;
+- writing semantic memory from a lifecycle record;
+- generating or storing embeddings from a lifecycle record;
+- executing rollback from a lifecycle record;
+- creating channel messages that approve lifecycle execution;
+- assigning lifecycle execution to a subagent or remote/container runner.

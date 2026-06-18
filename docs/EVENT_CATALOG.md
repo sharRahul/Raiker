@@ -377,3 +377,8 @@ Reserved metadata-only events only:
 - `phase3.approval_readiness.exported`
 
 No runtime approval execution, approval relay, durable approval queue, worker, scheduler, daemon, external channel, runtime execution, or approval action dispatch events are enabled. Phase 3 remains incomplete. Phase 4 remains blocked.
+
+
+## Phase 3 Slice M reserved metadata-only events
+
+Reserved only for future metadata records: `phase3.storage_cleanup_readiness.created`, `phase3.storage_cleanup_readiness.summary_rendered`, and `phase3.storage_cleanup_readiness.exported`. These are not runtime cleanup, deletion, purge, tombstone, rollback, worker, scheduler, daemon, dispatch, or execution events. Phase 3 remains incomplete. Phase 4 remains blocked.

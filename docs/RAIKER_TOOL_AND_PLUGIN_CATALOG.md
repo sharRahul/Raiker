@@ -350,3 +350,8 @@ Until the relevant phase gates are fully implemented and verified:
 | `/approval-readiness --json` | Read-only metadata export | None | Emits deterministic JSON-safe readiness summary only. |
 
 Slice L does not enable approval preview persistence, approval execution, approval relay runtime, durable approval queues, workers, schedulers, watchers, daemons, or runtime execution. Phase 3 remains incomplete. Phase 4 remains blocked.
+
+
+## Phase 3 Slice M cleanup readiness surface
+
+`/cleanup-readiness [--summary|--json]` is a read-only, metadata-only CLI surface. It does not execute cleanup, deletion, purge, tombstone, rollback, jobs, workers, schedulers, watchers, daemons, plugins, or runtime execution. Phase 3 remains incomplete. Phase 4 remains blocked.

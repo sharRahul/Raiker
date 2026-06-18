@@ -297,3 +297,8 @@ Phase 3 remains incomplete. Phase 4 remains blocked. Graph/codemap runtime index
 ## Phase 3 Slice L — Approval Preview Persistence Readiness — Metadata Only
 
 Slice L is implemented as metadata-only readiness for future durable approval preview persistence. It adds `/approval-readiness [--summary|--json]`, deterministic `appr_` readiness contracts, optional `phase3_approval_preview_persistence_readiness` SQLite metadata storage, and workspace inspection/view fields. Approval execution, approval relay runtime, durable approval queues, approval workers, schedulers, watchers, daemons, and runtime execution remain disabled. Phase 3 remains incomplete. Phase 4 remains blocked.
+
+
+## Phase 3 Slice M — Storage Cleanup Execution Readiness — Metadata Only
+
+Implemented deterministic metadata-only readiness contracts, registry, optional SQLite metadata table, CLI surface, and workspace summaries for storage cleanup execution readiness. Cleanup execution, deletion, purge, tombstone, rollback, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled. Phase 3 remains incomplete. Phase 4 remains blocked.

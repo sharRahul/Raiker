@@ -424,3 +424,8 @@ Slice J adds metadata-only/read-only graph/codemap readiness contracts, optional
 ## Phase 3 Slice L — Approval Preview Persistence Readiness — Metadata Only
 
 Slice L adds deterministic metadata-only approval preview persistence readiness contracts, registry, optional SQLite metadata table, `/approval-readiness [--summary|--json]`, workspace summaries, and reserved metadata-only events. Approval execution, approval relay runtime, durable approval queues, workers, schedulers, watchers, daemons, and runtime execution remain disabled. Reserved Slice L metadata-only events: `phase3.approval_readiness.metadata_created`, `phase3.approval_readiness.summary_viewed`, `phase3.approval_readiness.exported`. Phase 3 remains incomplete and Phase 4 remains blocked.
+
+
+## Phase 3 Slice M: Storage cleanup execution readiness metadata
+
+Slice M adds metadata-only storage cleanup execution readiness surfaces. Cleanup execution, deletion, purge, tombstone, rollback, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled. Phase 3 remains incomplete. Phase 4 remains blocked.

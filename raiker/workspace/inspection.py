@@ -20,6 +20,7 @@ from raiker.models.registry import ModelProfileRegistry
 from raiker.phase_gates import list_capability_states
 from raiker.plugins.registry import PluginPlanRegistry
 from raiker.rollback_registry import rollback_plan_summary
+from raiker.storage.cleanup_readiness_registry import cleanup_readiness_summary
 from raiker.storage.lifecycle_registry import (
     lifecycle_evidence_summary,
     retention_cleanup_handoff_summary,
@@ -145,5 +146,6 @@ def inspect_workspace(client_type: str, *, workspace_root: str | Path = ".") -> 
         "rollback_plan_summary": rollback_plan_summary(workspace_root=workspace_root),
         "storage_lifecycle_summary": storage_lifecycle_summary(workspace_root=workspace_root),
         "storage_lifecycle_retention_summary": retention_cleanup_handoff_summary(workspace_root=workspace_root),
+        "storage_cleanup_execution_readiness": cleanup_readiness_summary(workspace_root=workspace_root),
         "storage_lifecycle_evidence_summary": lifecycle_evidence_summary(workspace_root=workspace_root),
     }

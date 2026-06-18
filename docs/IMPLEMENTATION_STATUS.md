@@ -117,6 +117,26 @@ Detailed Phase 3 and Phase 4 plans are now recorded in `docs/PHASE_3_BUILD_PLAN.
 | Phase 3 | Capability gates, `/capabilities`, plugin manifest validation, graph/codemap planning, semantic-memory status, `/semantic-memory` | Disabled/non-executing | `tests/test_phase_3_phase_4_implementation.py` |
 | Phase 4 | Capability gates, `/execution-profiles`, remote/container execution planning, subagent planning, external-channel activation status | Disabled/non-executing | `tests/test_phase_3_phase_4_implementation.py` |
 
+## Validation Evidence (2026-06-18)
+
+**Local validation** was performed on `main` (no fixes needed — all checks passed):
+
+| Aspect | Detail |
+|---|---|
+| **Date/time** | 2026-06-18 07:51 UTC |
+| **OS** | Windows (PowerShell) |
+| **Python version** | 3.13.5 |
+| **Virtual environment** | `.venv` |
+| **Commands run** | `ruff check .`, `mypy raiker apps tests`, `pytest`, `scripts/validate_phase_status.py`, `raiker --help`, `raiker --prompt "Hello Raiker"`, comprehensive smoke script |
+| **Test result** | 93/93 passed |
+| **Ruff** | All checks passed |
+| **Mypy** | No issues (87 files) |
+| **Phase status validation** | Passed |
+| **Fixes made** | None — all checks passed on first run |
+| **Phase 3 runtime disabled** | plugin_execution, graph_codemap_indexing, semantic_memory_writes all confirmed disabled |
+| **Phase 4 runtime disabled** | external_channels, subagents, multi_agent_teams, remote_execution, container_execution all confirmed disabled |
+| **Assessments** | Phase 1 and Phase 2 remain `implemented_verified`. Phase 3/4 safe foundations are correct, discoverable, tested, and non-executing. No runtime features were activated.|
+
 ## Status Update Rule
 
 A builder may change a row to `implemented_verified` only when all of these are true:

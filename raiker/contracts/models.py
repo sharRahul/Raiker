@@ -81,6 +81,8 @@ EVENT_TYPES = {
     "interrupt_received",
     "safe_boundary_reached",
     "task_steered",
+    "checkpoint_restore_planned",
+    "checkpoint_fork_planned",
 }
 INTENTS = {
     "chat",
@@ -91,7 +93,7 @@ INTENTS = {
     "unknown",
 }
 RISK_LEVELS = {"low", "medium", "high", "blocked"}
-TOOLS = {"read_file", "list_directory", "glob", "grep", "shell"}
+TOOLS = {"read_file", "list_directory", "glob", "grep", "stat_path", "diff_files", "write_file", "edit_file", "apply_patch", "git_status", "git_diff", "git_log", "shell"}
 POLICY_DECISIONS = {"allow", "deny", "needs_approval"}
 TOOL_STATUSES = {"success", "failed", "denied", "approval_required"}
 RESPONSE_STATUSES = {"completed", "needs_approval", "denied", "failed"}
@@ -461,3 +463,57 @@ class TaskRecord:
         _require(self.title, "title")
         _require(self.objective, "objective")
         _one_of(self.status, TASK_STATUSES, "task_status")
+
+
+SIDE_QUESTION_STATUSES = {"answered"}
+INTERRUPT_ACTION_TYPES = {"pause", "cancel", "steer", "resume"}
+
+
+@dataclass(frozen=True)
+class SideQuestionTurn:
+    child_turn_id: str
+    parent_turn_id: str
+    session_id: str
+    question: str
+    answer: str
+    status: str = "answered"
+    read_only: bool = True
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.child_turn_id, "child_turn_id")
+        _require(self.parent_turn_id, "parent_turn_id")
+        _require(self.session_id, "session_id")
+        _require(self.question, "question")
+        _require(self.answer, "answer")
+        _one_of(self.status, SIDE_QUESTION_STATUSES, "side_question_status")
+        if not self.read_only:
+            raise ContractValidationError("side_question_must_be_read_only")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class InterruptAction:
+    action_id: str
+    task_id: str
+    session_id: str
+    action_type: str
+    reason: str
+    steer_text: str | None = None
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.action_id, "action_id")
+        _require(self.task_id, "task_id")
+        _require(self.session_id, "session_id")
+        _one_of(self.action_type, INTERRUPT_ACTION_TYPES, "interrupt_action_type")
+        _require(self.reason, "reason")
+        if self.action_type == "steer" and not self.steer_text:
+            raise ContractValidationError("missing_steer_text")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)

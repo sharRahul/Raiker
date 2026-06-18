@@ -30,3 +30,7 @@ def create_deferred_candidate(source_event_id: str, text: str, scope: str = "pro
         decision="deferred",
         created_at=utc_now(),
     )
+
+
+def governed_memory_status(candidates: list[dict[str, object]]) -> dict[str, object]:
+    return {"durable_writes_enabled": False, "candidate_count": len(candidates), "mode": "read_only_review"}

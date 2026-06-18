@@ -106,3 +106,35 @@ def grep_files(
                 if len(results) >= max_results:
                     return {"status": "success", "matches": results, "truncated": True}
     return {"status": "success", "matches": results, "truncated": False}
+
+
+def stat_path(workspace_root: str | Path, path: str | Path) -> dict[str, Any]:
+    resolved = resolve_workspace_path(workspace_root, path)
+    if not resolved.exists():
+        return {"status": "failed", "error": {"type": "not_found", "path": str(path)}}
+    return {
+        "status": "success",
+        "path": str(resolved.relative_to(Path(workspace_root).resolve())),
+        "is_file": resolved.is_file(),
+        "is_dir": resolved.is_dir(),
+        "size_bytes": resolved.stat().st_size,
+    }
+
+
+def diff_files(workspace_root: str | Path, before_path: str | Path, after_path: str | Path, *, max_lines: int = 200) -> dict[str, Any]:
+    import difflib
+
+    before = read_file(workspace_root, before_path)
+    after = read_file(workspace_root, after_path)
+    if before["status"] != "success":
+        return {"status": "failed", "error": before.get("error")}
+    if after["status"] != "success":
+        return {"status": "failed", "error": after.get("error")}
+    lines = list(difflib.unified_diff(str(before["text"]).splitlines(), str(after["text"]).splitlines(), fromfile=str(before_path), tofile=str(after_path), lineterm=""))
+    return {"status": "success", "diff": lines[:max_lines], "truncated": len(lines) > max_lines}
+
+
+def proposed_write_snapshot(workspace_root: str | Path, path: str | Path, new_text: str) -> dict[str, Any]:
+    resolved = resolve_workspace_path(workspace_root, path)
+    before = resolved.read_text(encoding="utf-8") if resolved.exists() and resolved.is_file() and is_text_file(resolved) else None
+    return {"status": "proposal", "path": str(resolved.relative_to(Path(workspace_root).resolve())), "before_snapshot": before, "proposed_text": new_text, "requires_approval": True}

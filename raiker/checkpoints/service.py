@@ -51,3 +51,15 @@ class CheckpointService:
 
     def get_checkpoint(self, checkpoint_id: str) -> dict | None:
         return self.store.load_checkpoint_by_id(checkpoint_id)
+
+    def plan_restore(self, checkpoint_id: str) -> dict[str, object]:
+        checkpoint = self.get_checkpoint(checkpoint_id)
+        if checkpoint is None:
+            raise ValueError("checkpoint_not_found")
+        return {"status": "restore_plan", "checkpoint_id": checkpoint_id, "can_execute": False, "requires_approval": True, "reason": "Phase 2 plans restore only; file/state mutation remains disabled."}
+
+    def plan_fork(self, checkpoint_id: str) -> dict[str, object]:
+        checkpoint = self.get_checkpoint(checkpoint_id)
+        if checkpoint is None:
+            raise ValueError("checkpoint_not_found")
+        return {"status": "fork_plan", "checkpoint_id": checkpoint_id, "can_execute": False, "requires_approval": True, "reason": "Phase 2 plans fork only; execution is not active."}

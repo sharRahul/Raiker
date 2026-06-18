@@ -360,3 +360,22 @@ Tests must prove:
 - TUI can render with no colour/limited terminal;
 - background task progress updates without corrupting transcript;
 - every enabled primary interface uses the same gateway, contracts, policy, event log, and session state.
+
+
+## Phase 2 Implemented Terminal Inspection Commands
+
+The current Phase 2 terminal client exposes these inspection and control commands through shared services rather than terminal-only privileged paths:
+
+| Command | Status | Behaviour |
+|---|---|---|
+| `/status` | implemented | Shows workspace paths, session count, and pending approval count. |
+| `/tasks` | implemented | Lists task records from shared task storage. |
+| `/events` | implemented | Lists recent indexed events. |
+| `/checkpoints` | implemented | Lists checkpoint timeline entries. |
+| `/approvals` | implemented | Lists pending action-bound approvals. |
+| `/approve <approval_id>` | implemented | Resolves one exact pending approval as approved. |
+| `/deny <approval_id>` | implemented | Resolves one exact pending approval as denied. |
+| `/memory` | implemented | Shows read-only governed memory candidate status; durable writes remain disabled. |
+| `/doctor` | implemented | Shows local diagnostics, provider health detection, and disabled Phase 3/4 gates. |
+
+Commands described elsewhere in this document for future rich UI panels remain requirements unless listed here as implemented.

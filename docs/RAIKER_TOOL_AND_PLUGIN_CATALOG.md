@@ -340,3 +340,13 @@ Until the relevant phase gates are fully implemented and verified:
 - Semantic memory writes, vector writes, embeddings, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled.
 - Reserved Slice K metadata-only events: `phase3.semantic_memory_readiness.metadata_created`, `phase3.semantic_memory_readiness.summary_viewed`, `phase3.semantic_memory_readiness.exported`. No runtime memory write events are enabled.
 - Phase 3 remains incomplete and Phase 4 remains blocked.
+
+## Phase 3 Slice L — approval preview persistence readiness
+
+| Command | Mode | Execution authority | Notes |
+| --- | --- | --- | --- |
+| `/approval-readiness` | Read-only metadata | None | Shows metadata-only approval preview persistence readiness blockers and disabled runtime flags. |
+| `/approval-readiness --summary` | Read-only metadata | None | Shows deterministic readiness counts and disabled approval execution, relay, queue, worker, scheduler, watcher, daemon, and runtime flags. |
+| `/approval-readiness --json` | Read-only metadata export | None | Emits deterministic JSON-safe readiness summary only. |
+
+Slice L does not enable approval preview persistence, approval execution, approval relay runtime, durable approval queues, workers, schedulers, watchers, daemons, or runtime execution. Phase 3 remains incomplete. Phase 4 remains blocked.

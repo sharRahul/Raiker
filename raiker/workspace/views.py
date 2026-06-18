@@ -95,6 +95,27 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
         ),
         "execution_profiles": safe["execution_profiles"],
         "plugin_registration_plans": safe["plugin_registration_plans"],
+        "approval_preview_persistence_readiness": safe.get(
+            "approval_preview_persistence_readiness",
+            {
+                "approval_readiness_contract_available": True,
+                "approval_readiness_record_count": 0,
+                "latest_readiness_id": None,
+                "metadata_only": True,
+                "ready_for_persistence": False,
+                "approval_preview_persistence_enabled": False,
+                "approval_execution_enabled": False,
+                "approval_relay_runtime_enabled": False,
+                "approval_preview_execution_enabled": False,
+                "durable_approval_queues_enabled": False,
+                "approval_workers_enabled": False,
+                "schedulers_enabled": False,
+                "file_watchers_enabled": False,
+                "daemons_enabled": False,
+                "runtime_execution_enabled": False,
+                "blocker_count": 0,
+            },
+        ),
         "approval_audit_summary": safe.get(
             "approval_audit_summary",
             {
@@ -224,6 +245,14 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
     lines.append(
         f"approval_preview_runtime_execution_enabled: {view['approval_preview_summary']['runtime_execution_enabled']}"
     )
+    lines.append(f"approval_readiness_metadata_only: {view['approval_preview_persistence_readiness']['metadata_only']}")
+    lines.append(f"approval_readiness_ready_for_persistence: {view['approval_preview_persistence_readiness']['ready_for_persistence']}")
+    lines.append(f"approval_readiness_latest_id: {view['approval_preview_persistence_readiness']['latest_readiness_id']}")
+    lines.append(f"approval_readiness_blockers: {view['approval_preview_persistence_readiness']['blocker_count']}")
+    lines.append(f"approval_execution_enabled: {view['approval_preview_persistence_readiness']['approval_execution_enabled']}")
+    lines.append(f"approval_relay_runtime_enabled: {view['approval_preview_persistence_readiness']['approval_relay_runtime_enabled']}")
+    lines.append(f"durable_approval_queues_enabled: {view['approval_preview_persistence_readiness']['durable_approval_queues_enabled']}")
+    lines.append(f"approval_workers_enabled: {view['approval_preview_persistence_readiness']['approval_workers_enabled']}")
     lines.append(
         f"approval_audit_execution_enabled: {view['approval_audit_summary']['execution_enabled']}"
     )
@@ -274,6 +303,7 @@ def render_workspace_dashboard_summary(inspection: Mapping[str, Any]) -> dict[st
         "graph_codemap": view["graph_codemap"],
         "semantic_memory_readiness": view["semantic_memory_readiness"],
         "approval_preview_summary": view["approval_preview_summary"],
+        "approval_preview_persistence_readiness": view["approval_preview_persistence_readiness"],
         "approval_audit_summary": view["approval_audit_summary"],
         "rollback_plan_summary": view["rollback_plan_summary"],
         "storage_lifecycle_summary": view["storage_lifecycle_summary"],

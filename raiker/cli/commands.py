@@ -17,6 +17,10 @@ from raiker.approval_preview_registry import (
 )
 from raiker.approval_previews import render_approval_preview
 from raiker.approvals import ApprovalInbox
+from raiker.approvals.readiness_registry import (
+    approval_readiness_summary,
+    render_approval_readiness,
+)
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.ids import new_id
@@ -367,6 +371,31 @@ def handle_memory_readiness(command: str = "/memory-readiness", *, workspace_roo
         )
     return render_semantic_memory_readiness(workspace_root=workspace_root)
 
+
+def handle_approval_readiness(command: str = "/approval-readiness", *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
+        return "Usage: /approval-readiness [--summary|--json]"
+    if len(parts) == 2 and parts[1] == "--json":
+        return json.dumps(approval_readiness_summary(workspace_root=workspace_root), sort_keys=True)
+    if len(parts) == 2 and parts[1] == "--summary":
+        summary = approval_readiness_summary(workspace_root=workspace_root)
+        return "\n".join(
+            [
+                "Approval preview persistence readiness summary:",
+                f"metadata_only: {summary['metadata_only']}",
+                f"ready_for_persistence: {summary['ready_for_persistence']}",
+                f"approval_preview_persistence_enabled: {summary['approval_preview_persistence_enabled']}",
+                f"approval_execution_enabled: {summary['approval_execution_enabled']}",
+                f"approval_relay_runtime_enabled: {summary['approval_relay_runtime_enabled']}",
+                f"durable_approval_queues_enabled: {summary['durable_approval_queues_enabled']}",
+                f"approval_workers_enabled: {summary['approval_workers_enabled']}",
+                f"runtime_execution_enabled: {summary['runtime_execution_enabled']}",
+                f"blocker_count: {summary['blocker_count']}",
+            ]
+        )
+    return render_approval_readiness(workspace_root=workspace_root)
+
 def handle_memory_review(
     command: str = "/memory-review", *, workspace_root: str | Path = "."
 ) -> str:
@@ -639,7 +668,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
-        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
+        return "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit"
     if command == "/models":
         return render_models()
     if command == "/channels":
@@ -674,6 +703,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_graph_readiness(command, workspace_root=workspace_root)
     if command == "/memory-readiness" or command.startswith("/memory-readiness "):
         return handle_memory_readiness(command, workspace_root=workspace_root)
+    if command == "/approval-readiness" or command.startswith("/approval-readiness "):
+        return handle_approval_readiness(command, workspace_root=workspace_root)
     if command == "/memory-review" or command.startswith("/memory-review "):
         return handle_memory_review(command, workspace_root=workspace_root)
     if command == "/approval-previews":

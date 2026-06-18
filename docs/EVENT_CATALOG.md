@@ -367,3 +367,13 @@ These event names are reserved for future append-only metadata reporting only. S
 - Semantic memory writes, vector writes, embeddings, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled.
 - Reserved Slice K metadata-only events: `phase3.semantic_memory_readiness.metadata_created`, `phase3.semantic_memory_readiness.summary_viewed`, `phase3.semantic_memory_readiness.exported`. No runtime memory write events are enabled.
 - Phase 3 remains incomplete and Phase 4 remains blocked.
+
+## Phase 3 Slice L — approval preview persistence readiness
+
+Reserved metadata-only events only:
+
+- `phase3.approval_readiness.metadata_created`
+- `phase3.approval_readiness.summary_viewed`
+- `phase3.approval_readiness.exported`
+
+No runtime approval execution, approval relay, durable approval queue, worker, scheduler, daemon, external channel, runtime execution, or approval action dispatch events are enabled. Phase 3 remains incomplete. Phase 4 remains blocked.

@@ -57,7 +57,9 @@ def validate_plugin_manifest(manifest: dict[str, Any]) -> PluginManifestValidati
             errors.append("invalid_permissions")
         else:
             permissions = [item for item in parsed if item is not None]
-            invalid = [item for item in permissions if not item.startswith(ALLOWED_PERMISSION_PREFIXES)]
+            invalid = [
+                item for item in permissions if not item.startswith(ALLOWED_PERMISSION_PREFIXES)
+            ]
             if invalid:
                 errors.append(f"unsupported_permissions:{','.join(sorted(invalid))}")
 

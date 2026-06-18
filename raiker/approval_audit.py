@@ -17,6 +17,7 @@ DECISION_STATES = {
     "execution_blocked",
 }
 
+
 @dataclass(frozen=True)
 class ApprovalAuditRecord:
     audit_id: str
@@ -66,7 +67,9 @@ class ApprovalAuditRecord:
 
 
 def _stable_id(prefix: str, payload: dict[str, object]) -> str:
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode(
+        "utf-8"
+    )
     return f"{prefix}{hashlib.sha256(encoded).hexdigest()[:24]}"
 
 
@@ -80,10 +83,17 @@ def create_approval_audit_record(
 ) -> ApprovalAuditRecord:
     if decision not in DECISION_STATES:
         raise ValueError(f"invalid_approval_audit_decision:{decision}")
-    execution_blocked = preview.target_capability in {"graph_codemap_indexing", "semantic_memory_writes"}
-    status = "execution_blocked" if execution_blocked and decision == "approved_for_later" else decision
+    execution_blocked = preview.target_capability in {
+        "graph_codemap_indexing",
+        "semantic_memory_writes",
+    }
+    status = (
+        "execution_blocked" if execution_blocked and decision == "approved_for_later" else decision
+    )
     return ApprovalAuditRecord(
-        audit_id=_stable_id("audit_", {"preview_id": preview.preview_id, "decision": decision, "reviewer": reviewer}),
+        audit_id=_stable_id(
+            "audit_", {"preview_id": preview.preview_id, "decision": decision, "reviewer": reviewer}
+        ),
         preview_id=preview.preview_id,
         action_type=preview.action_type,
         target_capability=preview.target_capability,

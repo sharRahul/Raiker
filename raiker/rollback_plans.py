@@ -8,7 +8,9 @@ from raiker.approval_previews import ApprovalPreview
 
 
 def _stable_id(prefix: str, payload: dict[str, object]) -> str:
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode(
+        "utf-8"
+    )
     return f"{prefix}{hashlib.sha256(encoded).hexdigest()[:24]}"
 
 
@@ -50,7 +52,9 @@ class RollbackPlan:
 
 def create_graph_rollback_plan(preview: ApprovalPreview) -> RollbackPlan:
     return RollbackPlan(
-        rollback_plan_id=_stable_id("rb_graph_", {"preview_id": preview.preview_id, "target": preview.target_capability}),
+        rollback_plan_id=_stable_id(
+            "rb_graph_", {"preview_id": preview.preview_id, "target": preview.target_capability}
+        ),
         target_capability="graph_codemap_indexing",
         source_preview_id=preview.preview_id,
         action_type="graph_index_rollback_preview",
@@ -76,7 +80,9 @@ def create_graph_rollback_plan(preview: ApprovalPreview) -> RollbackPlan:
 
 def create_memory_rollback_plan(preview: ApprovalPreview) -> RollbackPlan:
     return RollbackPlan(
-        rollback_plan_id=_stable_id("rb_memory_", {"preview_id": preview.preview_id, "target": preview.target_capability}),
+        rollback_plan_id=_stable_id(
+            "rb_memory_", {"preview_id": preview.preview_id, "target": preview.target_capability}
+        ),
         target_capability="semantic_memory_writes",
         source_preview_id=preview.preview_id,
         action_type="semantic_memory_rollback_preview",

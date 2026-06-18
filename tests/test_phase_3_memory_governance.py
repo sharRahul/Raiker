@@ -30,7 +30,9 @@ def test_memory_candidates_can_be_listed_and_reviewed_without_writes(tmp_path) -
 
 
 def test_secret_like_candidates_are_denied_or_blocked(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    item = MemoryReviewQueue(tmp_path).add_candidate("api_key = 'sk_test_1234567890abcdef1234567890'")
+    item = MemoryReviewQueue(tmp_path).add_candidate(
+        "api_key = 'sk_test_1234567890abcdef1234567890'"
+    )
     assert item.sensitivity in {"secret_like", "credential_like"}
     assert item.decision == "denied"
     assert item.can_write_semantic_memory is False
@@ -53,5 +55,9 @@ def test_memory_review_cli_is_read_only_and_workspace_summary_includes_governanc
     assert "Memory review summary:" in summary
     assert after["semantic_memory"]["semantic_writes_enabled"] is False
     assert after["semantic_memory"]["candidate_count"] == 1
-    assert after["semantic_memory"]["memory_governance_mode"] == "review_queue_only_no_semantic_writes"
-    assert before["semantic_memory"]["candidate_count"] == after["semantic_memory"]["candidate_count"]
+    assert (
+        after["semantic_memory"]["memory_governance_mode"] == "review_queue_only_no_semantic_writes"
+    )
+    assert (
+        before["semantic_memory"]["candidate_count"] == after["semantic_memory"]["candidate_count"]
+    )

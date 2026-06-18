@@ -549,3 +549,18 @@ Tests must prove:
 - migrations are idempotent;
 - dashboard metrics read from database;
 - backup includes all required storage components.
+
+## Phase 3 Slice G — Storage lifecycle preparation
+
+Slice G adds policy-gated storage lifecycle preparation only. Full Phase 3 is not complete. Lifecycle records are metadata-only planning records for graph/codemap indexing, semantic memory review/write previews, approval audit metadata, and rollback plan metadata.
+
+Safety status:
+
+- Lifecycle records do not execute graph indexing.
+- Lifecycle records do not write semantic memory.
+- Lifecycle records do not create embeddings or vectors.
+- Graph indexing remains disabled.
+- Semantic/vector memory writes remain disabled.
+- Rollback execution remains disabled.
+- Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
+- GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.

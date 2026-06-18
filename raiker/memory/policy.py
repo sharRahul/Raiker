@@ -51,6 +51,9 @@ def classify_memory_sensitivity(text: str) -> MemorySensitivity:
 
 def semantic_write_policy_decision(sensitivity: str) -> tuple[bool, list[str]]:
     reasons = ["phase3_semantic_vector_writes_disabled", "no_embeddings_created"]
-    if sensitivity in {MemorySensitivity.SECRET_LIKE.value, MemorySensitivity.CREDENTIAL_LIKE.value}:
+    if sensitivity in {
+        MemorySensitivity.SECRET_LIKE.value,
+        MemorySensitivity.CREDENTIAL_LIKE.value,
+    }:
         reasons.append("secret_or_credential_like_candidate_blocked")
     return False, reasons

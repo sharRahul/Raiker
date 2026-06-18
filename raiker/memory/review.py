@@ -52,7 +52,10 @@ def review_item_from_candidate(candidate: dict[str, Any]) -> MemoryReviewItem:
     sensitivity = classify_memory_sensitivity(str(candidate["text"])).value
     can_write, reasons = semantic_write_policy_decision(sensitivity)
     decision = str(candidate.get("decision") or "needs_user_review")
-    if sensitivity in {MemorySensitivity.SECRET_LIKE.value, MemorySensitivity.CREDENTIAL_LIKE.value}:
+    if sensitivity in {
+        MemorySensitivity.SECRET_LIKE.value,
+        MemorySensitivity.CREDENTIAL_LIKE.value,
+    }:
         decision = "denied" if decision in {"deferred", "needs_user_review"} else decision
     return MemoryReviewItem(
         candidate_id=str(candidate["candidate_id"]),
@@ -74,9 +77,13 @@ class MemoryReviewQueue:
     def __init__(self, workspace_root: str | Path = ".") -> None:
         self.store = SQLiteStore(workspace_root)
 
-    def add_candidate(self, text: str, *, source_event_id: str | None = None, scope: str = "project") -> MemoryReviewItem:
+    def add_candidate(
+        self, text: str, *, source_event_id: str | None = None, scope: str = "project"
+    ) -> MemoryReviewItem:
         sensitivity = classify_memory_sensitivity(text).value
-        decision = "denied" if sensitivity in {"secret_like", "credential_like"} else "needs_user_review"
+        decision = (
+            "denied" if sensitivity in {"secret_like", "credential_like"} else "needs_user_review"
+        )
         candidate = MemoryCandidate(
             candidate_id=new_id("memcand_"),
             source_event_id=source_event_id or new_id("evt_"),
@@ -100,7 +107,9 @@ class MemoryReviewQueue:
                 return item
         return None
 
-    def mark(self, candidate_id: str, decision: str, *, reviewer: str = "local_user") -> MemoryReviewItem:
+    def mark(
+        self, candidate_id: str, decision: str, *, reviewer: str = "local_user"
+    ) -> MemoryReviewItem:
         if decision not in VALID_DECISIONS:
             raise ValueError(f"invalid_memory_review_decision:{decision}")
         with self.store.connect() as connection:
@@ -118,9 +127,18 @@ class MemoryReviewQueue:
         return {
             "semantic_writes_enabled": False,
             "candidate_count": len(items),
-            "needs_review_count": sum(1 for item in items if item.decision in {"deferred", "needs_user_review"}),
-            "denied_secret_like_count": sum(1 for item in items if item.decision == "denied" and item.sensitivity in {"secret_like", "credential_like"}),
-            "approved_for_later_count": sum(1 for item in items if item.decision == "approved_for_later"),
+            "needs_review_count": sum(
+                1 for item in items if item.decision in {"deferred", "needs_user_review"}
+            ),
+            "denied_secret_like_count": sum(
+                1
+                for item in items
+                if item.decision == "denied"
+                and item.sensitivity in {"secret_like", "credential_like"}
+            ),
+            "approved_for_later_count": sum(
+                1 for item in items if item.decision == "approved_for_later"
+            ),
             "memory_governance_mode": "review_queue_only_no_semantic_writes",
             "embedding_records_written": 0,
             "vector_records_written": 0,

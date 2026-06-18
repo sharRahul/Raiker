@@ -43,7 +43,16 @@ def test_graph_path_policy_denies_unsafe_paths(tmp_path) -> None:  # type: ignor
 
 
 def test_graph_plan_excludes_default_ignored_dirs_and_symlink_escape(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    for dirname in (".git", ".venv", "node_modules", "__pycache__", "build", "dist", "target", "vendor"):
+    for dirname in (
+        ".git",
+        ".venv",
+        "node_modules",
+        "__pycache__",
+        "build",
+        "dist",
+        "target",
+        "vendor",
+    ):
         ignored = tmp_path / dirname
         ignored.mkdir()
         (ignored / "ignored.py").write_text("x=1", encoding="utf-8")
@@ -54,7 +63,19 @@ def test_graph_plan_excludes_default_ignored_dirs_and_symlink_escape(tmp_path) -
     excluded_paths = cast(list[dict[str, object]], plan["excluded_paths"])
     reasons = {item["reason"] for item in excluded_paths}
     assert "symlink_escape" in reasons
-    assert {f"excluded_directory:{name}" for name in (".git", ".venv", "node_modules", "__pycache__", "build", "dist", "target", "vendor")} <= reasons
+    assert {
+        f"excluded_directory:{name}"
+        for name in (
+            ".git",
+            ".venv",
+            "node_modules",
+            "__pycache__",
+            "build",
+            "dist",
+            "target",
+            "vendor",
+        )
+    } <= reasons
 
 
 def test_graph_cli_and_workspace_view_are_read_only(tmp_path) -> None:  # type: ignore[no-untyped-def]

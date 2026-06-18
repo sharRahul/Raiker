@@ -114,7 +114,11 @@ class GraphCodemapPlanner:
     def create_plan(self) -> GraphCodemapIndexPlan:
         included: list[str] = []
         excluded: list[dict[str, object]] = []
-        reasons = [GRAPH_RUNTIME_DISABLED_REASON, "no_graph_records_written", "no_background_indexing"]
+        reasons = [
+            GRAPH_RUNTIME_DISABLED_REASON,
+            "no_graph_records_written",
+            "no_background_indexing",
+        ]
         for current_root, dirnames, filenames in os.walk(self.workspace_root):
             root_path = Path(current_root)
             kept_dirs: list[str] = []

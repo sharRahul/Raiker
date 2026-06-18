@@ -66,8 +66,40 @@ def workspace_view_summary(inspection: Mapping[str, Any]) -> dict[str, Any]:
         ),
         "execution_profiles": safe["execution_profiles"],
         "plugin_registration_plans": safe["plugin_registration_plans"],
-        "approval_audit_summary": safe.get("approval_audit_summary", {"audit_preview_available": True, "audit_record_count": 0, "denied_count": 0, "approved_for_later_count": 0, "execution_blocked_count": 0, "execution_enabled": False}),
-        "rollback_plan_summary": safe.get("rollback_plan_summary", {"graph_rollback_plan_available": True, "memory_rollback_plan_available": True, "rollback_execution_enabled": False, "preview_only_mode": True}),
+        "approval_audit_summary": safe.get(
+            "approval_audit_summary",
+            {
+                "audit_preview_available": True,
+                "audit_record_count": 0,
+                "denied_count": 0,
+                "approved_for_later_count": 0,
+                "execution_blocked_count": 0,
+                "execution_enabled": False,
+            },
+        ),
+        "rollback_plan_summary": safe.get(
+            "rollback_plan_summary",
+            {
+                "graph_rollback_plan_available": True,
+                "memory_rollback_plan_available": True,
+                "rollback_execution_enabled": False,
+                "preview_only_mode": True,
+            },
+        ),
+        "storage_lifecycle_summary": safe.get(
+            "storage_lifecycle_summary",
+            {
+                "lifecycle_planning_available": True,
+                "lifecycle_record_count": 0,
+                "graph_lifecycle_records": 0,
+                "memory_lifecycle_records": 0,
+                "preview_only_count": 0,
+                "runtime_blocked_count": 0,
+                "runtime_writes_enabled": False,
+                "graph_runtime_writes_enabled": False,
+                "semantic_runtime_writes_enabled": False,
+            },
+        ),
         "approval_preview_summary": safe.get(
             "approval_preview_summary",
             {
@@ -111,8 +143,18 @@ def render_workspace_text_summary(inspection: Mapping[str, Any]) -> str:
     lines.append(
         f"approval_preview_runtime_execution_enabled: {view['approval_preview_summary']['runtime_execution_enabled']}"
     )
-    lines.append(f"approval_audit_execution_enabled: {view['approval_audit_summary']['execution_enabled']}")
-    lines.append(f"rollback_execution_enabled: {view['rollback_plan_summary']['rollback_execution_enabled']}")
+    lines.append(
+        f"approval_audit_execution_enabled: {view['approval_audit_summary']['execution_enabled']}"
+    )
+    lines.append(
+        f"rollback_execution_enabled: {view['rollback_plan_summary']['rollback_execution_enabled']}"
+    )
+    lines.append(
+        f"storage_lifecycle_records: {view['storage_lifecycle_summary']['lifecycle_record_count']}"
+    )
+    lines.append(
+        f"storage_lifecycle_runtime_writes_enabled: {view['storage_lifecycle_summary']['runtime_writes_enabled']}"
+    )
     lines.append(
         f"memory_governance_mode: {view['semantic_memory'].get('memory_governance_mode', 'review_queue_only_no_semantic_writes')}"
     )
@@ -134,6 +176,7 @@ def render_workspace_dashboard_summary(inspection: Mapping[str, Any]) -> dict[st
         "approval_preview_summary": view["approval_preview_summary"],
         "approval_audit_summary": view["approval_audit_summary"],
         "rollback_plan_summary": view["rollback_plan_summary"],
+        "storage_lifecycle_summary": view["storage_lifecycle_summary"],
     }
 
 

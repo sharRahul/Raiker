@@ -29,11 +29,25 @@ class ApprovalAuditRegistry:
 def create_workspace_audit_records(workspace_root: str | Path = ".") -> list[ApprovalAuditRecord]:
     records: list[ApprovalAuditRecord] = []
     graph_preview = create_fresh_graph_preview_for_workspace(workspace_root)
-    records.append(create_approval_audit_record(graph_preview, rollback_plan=create_graph_rollback_plan(graph_preview)))
+    records.append(
+        create_approval_audit_record(
+            graph_preview, rollback_plan=create_graph_rollback_plan(graph_preview)
+        )
+    )
     memory_preview = create_fresh_memory_preview_for_workspace(workspace_root)
     if memory_preview is not None:
-        decision = "denied" if "secret_or_credential_like_candidate_blocked" in memory_preview.reasons else "approval_requested"
-        records.append(create_approval_audit_record(memory_preview, decision=decision, rollback_plan=create_memory_rollback_plan(memory_preview)))
+        decision = (
+            "denied"
+            if "secret_or_credential_like_candidate_blocked" in memory_preview.reasons
+            else "approval_requested"
+        )
+        records.append(
+            create_approval_audit_record(
+                memory_preview,
+                decision=decision,
+                rollback_plan=create_memory_rollback_plan(memory_preview),
+            )
+        )
     return records
 
 

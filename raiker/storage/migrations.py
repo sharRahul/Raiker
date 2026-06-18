@@ -162,3 +162,34 @@ PHASE_2_MIGRATION_ID = "RAIKER-1101-phase2-task-summary"
 PHASE_2_MIGRATION_SQL = """
 ALTER TABLE tasks ADD COLUMN summary TEXT;
 """
+
+
+PHASE_3_STORAGE_LIFECYCLE_MIGRATION_ID = "RAIKER-1307-phase3-storage-lifecycle-metadata"
+
+PHASE_3_STORAGE_LIFECYCLE_SQL = """
+CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle (
+  lifecycle_id TEXT PRIMARY KEY,
+  target_capability TEXT NOT NULL,
+  record_type TEXT NOT NULL,
+  source_preview_id TEXT,
+  source_audit_id TEXT,
+  rollback_plan_id TEXT,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  retention_policy TEXT NOT NULL,
+  redaction_policy TEXT NOT NULL,
+  can_write_runtime_data INTEGER NOT NULL,
+  runtime_writes_enabled INTEGER NOT NULL,
+  reasons_json TEXT NOT NULL,
+  metadata_json TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_events (
+  event_id TEXT PRIMARY KEY,
+  lifecycle_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  payload_json TEXT NOT NULL
+);
+"""

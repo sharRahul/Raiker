@@ -17,6 +17,7 @@ from raiker.models.registry import ModelProfileRegistry
 from raiker.phase_gates import list_capability_states
 from raiker.plugins.registry import PluginPlanRegistry
 from raiker.rollback_registry import rollback_plan_summary
+from raiker.storage.lifecycle_registry import storage_lifecycle_summary
 from raiker.storage.sqlite import SQLiteStore
 
 INSPECTION_CLIENT_TYPES = {"terminal", "desktop", "web", "dashboard"}
@@ -132,4 +133,5 @@ def inspect_workspace(client_type: str, *, workspace_root: str | Path = ".") -> 
         "approval_preview_summary": approval_preview_summary(workspace_root=workspace_root),
         "approval_audit_summary": approval_audit_summary(workspace_root=workspace_root),
         "rollback_plan_summary": rollback_plan_summary(workspace_root=workspace_root),
+        "storage_lifecycle_summary": storage_lifecycle_summary(workspace_root=workspace_root),
     }

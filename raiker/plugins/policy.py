@@ -5,8 +5,23 @@ from typing import Any
 
 from raiker.plugins.manifest import PluginManifestValidation, validate_plugin_manifest
 
-SAFE_READ_ONLY = {"tool:read_file", "tool:list_directory", "tool:glob", "tool:grep", "event:read", "ui:panel", "memory:read"}
-RISKY_APPROVAL_PREFIXES = ("tool:shell", "tool:write_file", "tool:edit_file", "tool:apply_patch", "network:", "filesystem:write")
+SAFE_READ_ONLY = {
+    "tool:read_file",
+    "tool:list_directory",
+    "tool:glob",
+    "tool:grep",
+    "event:read",
+    "ui:panel",
+    "memory:read",
+}
+RISKY_APPROVAL_PREFIXES = (
+    "tool:shell",
+    "tool:write_file",
+    "tool:edit_file",
+    "tool:apply_patch",
+    "network:",
+    "filesystem:write",
+)
 DENIED_PREFIXES = ("subprocess:", "import:", "eval:", "exec:", "path:", "../", "/")
 KNOWN_TRUST_LEVELS = {"untrusted", "local_dev", "project", "managed", "bundled"}
 
@@ -44,7 +59,9 @@ def plan_plugin_registration(manifest: dict[str, Any]) -> PluginRegistrationPlan
         reasons.append(f"unknown_trust_level:{trust_level}")
     permissions = validation.permissions
     for permission in permissions:
-        if permission.startswith(DENIED_PREFIXES) or any(token in permission for token in ("..", "$(", "`;", "__import__")):
+        if permission.startswith(DENIED_PREFIXES) or any(
+            token in permission for token in ("..", "$(", "`;", "__import__")
+        ):
             reasons.append(f"unsafe_permission:{permission}")
     status = "planned"
     if reasons:
@@ -57,7 +74,11 @@ def plan_plugin_registration(manifest: dict[str, Any]) -> PluginRegistrationPlan
     else:
         status = "pending_approval"
         reasons.append("unknown_permission_requires_policy")
-    event_type = "phase3.plugin.registration.denied" if status == "denied" else "phase3.plugin.registration.planned"
+    event_type = (
+        "phase3.plugin.registration.denied"
+        if status == "denied"
+        else "phase3.plugin.registration.planned"
+    )
     return PluginRegistrationPlan(
         plugin_id=validation.plugin_id,
         status=status,
@@ -65,9 +86,21 @@ def plan_plugin_registration(manifest: dict[str, Any]) -> PluginRegistrationPlan
         permissions=permissions,
         trust_level=trust_level,
         execution_enabled=False,
-        entrypoints=manifest.get("entrypoints", {}) if isinstance(manifest.get("entrypoints", {}), dict) else {},
+        entrypoints=manifest.get("entrypoints", {})
+        if isinstance(manifest.get("entrypoints", {}), dict)
+        else {},
         events=[
-            {"event_type": "phase3.plugin.manifest.validated", "payload": {"plugin_id": validation.plugin_id, "valid": validation.valid}},
-            {"event_type": event_type, "payload": {"plugin_id": validation.plugin_id, "status": status, "execution_enabled": False}},
+            {
+                "event_type": "phase3.plugin.manifest.validated",
+                "payload": {"plugin_id": validation.plugin_id, "valid": validation.valid},
+            },
+            {
+                "event_type": event_type,
+                "payload": {
+                    "plugin_id": validation.plugin_id,
+                    "status": status,
+                    "execution_enabled": False,
+                },
+            },
         ],
     )

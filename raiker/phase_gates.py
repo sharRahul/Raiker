@@ -69,12 +69,27 @@ class CapabilityGate:
 
 def default_capability_gates() -> dict[str, CapabilityGate]:
     gates: dict[str, CapabilityGate] = {
-        name: CapabilityGate(name, 3, CapabilityState.DISABLED) for name in PHASE_3_DISABLED_CAPABILITIES
+        name: CapabilityGate(name, 3, CapabilityState.DISABLED)
+        for name in PHASE_3_DISABLED_CAPABILITIES
     }
     for name in READ_ONLY_CONTRACT_CAPABILITIES:
-        gates[name] = CapabilityGate(name, 3, CapabilityState.CONTRACT_READY, routed_through_shared_contracts=True, contract_ready=True)
+        gates[name] = CapabilityGate(
+            name,
+            3,
+            CapabilityState.CONTRACT_READY,
+            routed_through_shared_contracts=True,
+            contract_ready=True,
+        )
     for name in PHASE_3_POLICY_READY_CAPABILITIES:
-        gates[name] = CapabilityGate(name, 3, CapabilityState.POLICY_READY, policy_ready=True, contract_ready=True, event_ready=True, test_ready=True)
+        gates[name] = CapabilityGate(
+            name,
+            3,
+            CapabilityState.POLICY_READY,
+            policy_ready=True,
+            contract_ready=True,
+            event_ready=True,
+            test_ready=True,
+        )
     for name in PHASE_4_DISABLED_CAPABILITIES:
         gates[name] = CapabilityGate(name, 4, CapabilityState.DISABLED)
     return gates
@@ -84,7 +99,10 @@ def transition_capability(gate: CapabilityGate, target: CapabilityState) -> Capa
     if gate.capability not in PHASE_3_CAPABILITIES | PHASE_4_DISABLED_CAPABILITIES:
         raise PermissionError(f"unknown_capability:{gate.capability}")
     if target == CapabilityState.ENABLED_READ_ONLY:
-        if gate.capability not in READ_ONLY_CONTRACT_CAPABILITIES or not gate.routed_through_shared_contracts:
+        if (
+            gate.capability not in READ_ONLY_CONTRACT_CAPABILITIES
+            or not gate.routed_through_shared_contracts
+        ):
             raise PermissionError(f"read_only_requires_shared_contract:{gate.capability}")
         return CapabilityGate(**{**gate.__dict__, "state": target})
     if target == CapabilityState.ENABLED_POLICY_GATED:
@@ -92,7 +110,14 @@ def transition_capability(gate: CapabilityGate, target: CapabilityState) -> Capa
             raise PermissionError(f"policy_gated_requires_readiness:{gate.capability}")
         return CapabilityGate(**{**gate.__dict__, "state": target})
     if target == CapabilityState.ENABLED_RUNTIME:
-        if not (gate.policy_ready and gate.contract_ready and gate.storage_ready and gate.event_ready and gate.test_ready and gate.state == CapabilityState.ENABLED_POLICY_GATED):
+        if not (
+            gate.policy_ready
+            and gate.contract_ready
+            and gate.storage_ready
+            and gate.event_ready
+            and gate.test_ready
+            and gate.state == CapabilityState.ENABLED_POLICY_GATED
+        ):
             raise PermissionError(f"runtime_requires_all_readiness_gates:{gate.capability}")
         return CapabilityGate(**{**gate.__dict__, "state": target})
     return CapabilityGate(**{**gate.__dict__, "state": target})

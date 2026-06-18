@@ -293,3 +293,7 @@ Phase 3 remains incomplete. Phase 4 remains blocked. Graph/codemap runtime index
 - Semantic memory writes, vector writes, embeddings, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled.
 - Reserved Slice K metadata-only events: `phase3.semantic_memory_readiness.metadata_created`, `phase3.semantic_memory_readiness.summary_viewed`, `phase3.semantic_memory_readiness.exported`. No runtime memory write events are enabled.
 - Phase 3 remains incomplete and Phase 4 remains blocked.
+
+## Phase 3 Slice L — Approval Preview Persistence Readiness — Metadata Only
+
+Slice L is implemented as metadata-only readiness for future durable approval preview persistence. It adds `/approval-readiness [--summary|--json]`, deterministic `appr_` readiness contracts, optional `phase3_approval_preview_persistence_readiness` SQLite metadata storage, and workspace inspection/view fields. Approval execution, approval relay runtime, durable approval queues, approval workers, schedulers, watchers, daemons, and runtime execution remain disabled. Phase 3 remains incomplete. Phase 4 remains blocked.

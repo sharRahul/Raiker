@@ -301,3 +301,17 @@ CREATE TABLE IF NOT EXISTS phase3_semantic_memory_readiness (
   contract_json TEXT NOT NULL
 );
 """
+
+
+PHASE_3_APPROVAL_PREVIEW_PERSISTENCE_READINESS_MIGRATION_ID = "RAIKER-1312-phase3-approval-preview-persistence-readiness-metadata"
+
+PHASE_3_APPROVAL_PREVIEW_PERSISTENCE_READINESS_SQL = """
+CREATE TABLE IF NOT EXISTS phase3_approval_preview_persistence_readiness (
+  readiness_id TEXT PRIMARY KEY,
+  target TEXT NOT NULL,
+  status TEXT NOT NULL,
+  blockers_json TEXT NOT NULL,
+  disabled_runtime_flags_json TEXT NOT NULL,
+  contract_json TEXT NOT NULL
+);
+"""

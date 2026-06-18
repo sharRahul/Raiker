@@ -420,3 +420,7 @@ Slice J adds metadata-only/read-only graph/codemap readiness contracts, optional
 - Semantic memory writes, vector writes, embeddings, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled.
 - Reserved Slice K metadata-only events: `phase3.semantic_memory_readiness.metadata_created`, `phase3.semantic_memory_readiness.summary_viewed`, `phase3.semantic_memory_readiness.exported`. No runtime memory write events are enabled.
 - Phase 3 remains incomplete and Phase 4 remains blocked.
+
+## Phase 3 Slice L — Approval Preview Persistence Readiness — Metadata Only
+
+Slice L adds deterministic metadata-only approval preview persistence readiness contracts, registry, optional SQLite metadata table, `/approval-readiness [--summary|--json]`, workspace summaries, and reserved metadata-only events. Approval execution, approval relay runtime, durable approval queues, workers, schedulers, watchers, daemons, and runtime execution remain disabled. Reserved Slice L metadata-only events: `phase3.approval_readiness.metadata_created`, `phase3.approval_readiness.summary_viewed`, `phase3.approval_readiness.exported`. Phase 3 remains incomplete and Phase 4 remains blocked.

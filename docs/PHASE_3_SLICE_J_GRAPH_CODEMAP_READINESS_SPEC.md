@@ -8,14 +8,14 @@ Implemented surfaces are metadata-only:
 
 - deterministic readiness contract/model;
 - in-process registry create/list/get/summary operations;
-- read-only `/graph-readiness` terminal command;
+- read-only `/graph-readiness`, `/graph-readiness --summary`, and `/graph-readiness --json` terminal command surfaces;
 - optional SQLite table `phase3_graph_codemap_readiness` for metadata contracts only;
 - workspace inspection and workspace view summary fields;
 - documentation and event catalog entries for future event names.
 
 ## Hard Runtime Boundary
 
-Slice J must not enable graph indexing, graph writes, workers, schedulers, file watchers, daemons, or runtime jobs.
+Slice J must not enable graph indexing, codemap indexing, graph writes, workers, schedulers, file watchers, daemons, indexing jobs, or runtime execution/jobs.
 
 The readiness contract always reports:
 
@@ -23,11 +23,14 @@ The readiness contract always reports:
 - `ready_for_indexing: false`
 - `graph_indexing_enabled: false`
 - `graph_writes_enabled: false`
+- `codemap_indexing_enabled: false`
+- `indexing_jobs_enabled: false`
 - `runtime_jobs_enabled: false`
 - `workers_enabled: false`
 - `schedulers_enabled: false`
 - `file_watchers_enabled: false`
 - `daemons_enabled: false`
+- `runtime_execution_enabled: false`
 
 ## Required Gates Before Future Enablement
 

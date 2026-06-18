@@ -353,10 +353,10 @@ These events are metadata-only. They are read-only/export-only/simulation-only a
 
 ## Phase 3 Slice J Metadata-Only Graph/Codemap Readiness Events
 
-These event names are reserved for future append-only metadata reporting only. Slice J does not emit runtime graph indexing events and does not start workers, schedulers, file watchers, daemons, graph writes, or indexing jobs.
+These event names are reserved for future append-only metadata reporting only. Slice J does not emit runtime graph indexing events and does not start workers, schedulers, file watchers, daemons, graph writes, codemap writes, runtime execution, or indexing jobs.
 
 | Event | Actor | Required payload fields | Notes |
 |---|---|---|---|
 | `graph_codemap_readiness_metadata_created` | `graph_readiness_registry` | `readiness_id`, `metadata_only`, `ready_for_indexing`, `blockers` | Metadata-only readiness contract creation. |
 | `graph_codemap_readiness_metadata_viewed` | `terminal_client` or `workspace_inspection` | `readiness_id`, `client_type`, `read_only` | Optional future view event; must remain read-only. |
-| `graph_codemap_readiness_summary_viewed` | `workspace_inspection` | `metadata_only`, `ready_for_indexing`, `runtime_jobs_enabled` | Optional summary view; must not imply runtime enablement. |
+| `graph_codemap_readiness_summary_viewed` | `workspace_inspection` | `metadata_only`, `ready_for_indexing`, `indexing_jobs_enabled`, `runtime_execution_enabled` | Optional summary view; must not imply runtime enablement. |

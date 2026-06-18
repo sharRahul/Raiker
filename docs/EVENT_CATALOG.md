@@ -272,3 +272,30 @@ phase3.approval.preview.execution_denied
 ```
 
 Preview events describe contracts and UI rendering only. Execution remains disabled until a later phase adds policy, audit, rollback, retention, and full CI coverage.
+
+## Phase 3 Slice F — Approval Audit and Rollback Planning
+
+Slice F adds preview-only approval audit and rollback planning contracts for future graph indexing and semantic memory writes. Full Phase 3 is not complete.
+
+Safety invariants for this slice:
+
+- Approval audit records do not execute actions.
+- Rollback plans do not execute rollback.
+- Graph/codemap runtime indexing remains disabled.
+- Semantic/vector memory writes remain disabled; no embeddings or vectors are created.
+- Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
+- GitHub Actions remain paused due quota exhaustion; local/cloud validation evidence is mandatory.
+- CI must be re-enabled later when quota is available and must not be claimed as passed while Actions are paused.
+
+New preview-only CLI surfaces: `/approval-audit`, `/approval-audit --summary`, `/rollback-plan`, `/graph-rollback-plan`, and `/memory-rollback-plan`.
+
+### Phase 3 Slice F planning/audit events
+
+The following event names are reserved for future audit logging and rollback planning. They indicate preview, planning, or denial only and do not imply execution occurred:
+
+- `phase3.approval.audit.recorded`
+- `phase3.approval.audit.rendered`
+- `phase3.rollback.plan.created`
+- `phase3.graph.rollback_plan.created`
+- `phase3.memory.rollback_plan.created`
+- `phase3.rollback.execution_denied`

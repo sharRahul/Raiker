@@ -420,3 +420,19 @@ Required fields:
 ```
 
 Graph previews must target `graph_codemap_indexing`, include `graph_runtime_indexing_disabled`, and never write graph records. Semantic memory previews must target `semantic_memory_writes`, include `semantic_vector_writes_disabled`, redact secret-like values, and never create embeddings, vectors, or durable semantic memory records.
+
+## Phase 3 Slice F — Approval Audit and Rollback Planning
+
+Slice F adds preview-only approval audit and rollback planning contracts for future graph indexing and semantic memory writes. Full Phase 3 is not complete.
+
+Safety invariants for this slice:
+
+- Approval audit records do not execute actions.
+- Rollback plans do not execute rollback.
+- Graph/codemap runtime indexing remains disabled.
+- Semantic/vector memory writes remain disabled; no embeddings or vectors are created.
+- Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
+- GitHub Actions remain paused due quota exhaustion; local/cloud validation evidence is mandatory.
+- CI must be re-enabled later when quota is available and must not be claimed as passed while Actions are paused.
+
+New preview-only CLI surfaces: `/approval-audit`, `/approval-audit --summary`, `/rollback-plan`, `/graph-rollback-plan`, and `/memory-rollback-plan`.

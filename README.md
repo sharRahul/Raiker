@@ -12,7 +12,7 @@ Raiker installs one human-facing global command named `raiker` as the local term
 raiker
 ```
 
-Running `raiker` launches the configured local terminal client, which may be a Rich TUI, plain terminal client, or another configured terminal renderer. This command is one primary interface, not the canonical or exclusive interface.
+Running `raiker` currently launches a simple terminal/CLI shell. Rich TUI panels and other renderers remain specified/deferred unless an implementation is explicitly added and tested. This command is one primary interface, not the canonical or exclusive interface.
 
 Raiker does **not** have one privileged human interface. CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and other governed clients are equal-status primary interfaces when implemented and enabled.
 
@@ -43,13 +43,17 @@ Raiker exists to provide:
 
 As of the current `main` state:
 
+All Phase 3 slices A through P are implemented, tested, and documented. Runtime execution remains disabled.
+
+The current launchable UI is a simple terminal/CLI shell plus read-only shared view contracts. Desktop/Web/Dashboard/Mobile apps, Rich TUI panels, REST/API, IDE, Voice, Browser Extension, and external channel clients are specified/deferred, not implemented as launchable apps. Runtime execution remains disabled and Phase 4 remains blocked. Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+
 | Area | Status | Notes |
 |---|---|---|
 | Phase 1 MVP runtime core | `implemented_verified` | Package scaffold, global `raiker` command, contracts, event log, SQLite bootstrap, static policy, tool broker, safe filesystem/search tools, approval-gated local actions, mock model provider, runtime state machine, terminal shell, and checkpoint stubs are present and covered by tests. |
 | Phase 2 rich local workspace | `implemented_verified` | Task management, event viewer, checkpoint timeline, status/task/event/checkpoint/approval commands, side-question and interrupt contracts, approval inbox, governed file/git wrappers, local provider health-check, and memory candidate views are present and covered by tests. |
-| Phase 3 local rich workspace/extensibility foundations | `implemented_verified` | All Phase 3 slices A through P are implemented, tested, and documented. Runtime execution remains disabled. Phase 3 does not enable any Phase 4 behavior. See per-slice detail in the Phase 3 Slice specs under `docs/`. |
+| Phase 3 safe foundation/readiness slices A-P | `implemented_verified` | Implemented verified for safe local rich workspace/extensibility foundations, CLI functional-test surfaces, read-only shared workspace contracts, planning-only plugin validation, approval-preview surfaces, readiness metadata, storage lifecycle metadata, and disabled-runtime validation. Full Desktop/Web/Dashboard/Mobile apps, REST API, plugin execution, semantic search runtime, graph indexing runtime, MCP/LSP runtime, scheduled automations, and external channels are specified/deferred, not implemented. |
 | Phase 4 external channel / multi-agent / governed execution foundations | **Foundation only; Phase 4 is not complete** | Execution profiles, remote/container execution planning, subagent planning, external-channel activation status, and inspection commands are present. External transports, subagent spawning, multi-agent teams, remote execution, and container execution remain disabled. |
-| GitHub Actions | Temporarily paused | Workflows are currently `workflow_dispatch` only because GitHub Actions quota is exhausted. Use [`docs/LOCAL_VALIDATION_GATE.md`](docs/LOCAL_VALIDATION_GATE.md) until CI triggers are restored. |
+| GitHub Actions | Active CI plus manual phase validation | `.github/workflows/ci.yml` runs on `pull_request` and `push` to `main`. `.github/workflows/phase-status.yml` remains manual `workflow_dispatch`. Local validation remains required when Actions quota prevents actual runs; do not claim all workflows are `workflow_dispatch`-only while CI is active. |
 
 > **Review note (2026-06-19):** A full repository review is recorded in
 > [`docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md`](docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md).
@@ -202,17 +206,26 @@ The terminal client currently exposes these inspection and controlled-action com
 
 ```text
 /help
+/providers
+/models
+/model current
+/model use <profile_id>
+/model use --provider <provider> --model <model>
+/model health
+/model capabilities
+/reasoning
+/reasoning status
+/reasoning set <mode-or-effort>
+/reasoning off
 /status
 /tasks
 /events
 /checkpoints
 /approvals
-/approve <approval_id>
-/deny <approval_id>
+/approve <id>
+/deny <id>
 /memory
 /semantic-memory
-/memory-review
-/memory-review --summary
 /capabilities
 /execution-profiles
 /workspace
@@ -232,8 +245,7 @@ The terminal client currently exposes these inspection and controlled-action com
 /memory-review [--summary]
 /approval-previews
 /graph-approval-preview
-/memory-approval-preview
-/memory-approval-preview --summary
+/memory-approval-preview [--summary]
 /approval-preview <preview_id>
 /approval-audit [--summary]
 /rollback-plan
@@ -243,11 +255,10 @@ The terminal client currently exposes these inspection and controlled-action com
 /storage-lifecycle-retention [--summary]
 /storage-lifecycle-cleanup-preview [--summary]
 /storage-lifecycle-handoff [--summary]
-/storage-lifecycle-evidence [--summary] [--json]
-/storage-lifecycle-policy-simulation [--summary] [--json]
+/storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]
+/storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]
 /doctor
 /channels
-/models
 /launch --provider mock --model mock-deterministic
 /quit
 ```
@@ -256,9 +267,27 @@ Phase 3 and Phase 4 commands are inspection/planning/governance/preview surfaces
 
 ---
 
+## Current UI/UX Implementation Truth Table
+
+Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P: CLI functional-test surfaces, read-only shared workspace/view contracts, plugin manifest planning/validation, approval-preview surfaces, readiness metadata, storage lifecycle metadata, and disabled-runtime validation. Full rich UI apps and runtime features remain specified/deferred unless explicitly listed as implemented below. No UI surface may execute tools directly; all future execution must go through the Agent Gateway, ToolBroker, PolicyEngine, approvals, and disabled runtime gates.
+
+| Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
+|---|---|---:|---|---|
+| CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
+| Rich TUI panels | Minimal terminal shell/status rendering only; rich panels are specified, not implemented as a full app. | Partial/minimal | None. | Build panel framework only in a future approved slice. |
+| Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
+| Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
+| Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
+| IDE extension | Specified/deferred; no extension runtime. | No | None. | Define extension transport and auth. |
+| Mobile apps | Specified/deferred; no Apple/Android apps. | No | None. | Build mobile clients after explicit activation scope. |
+| Voice UI | Specified/deferred. | No | None. | Define voice contracts after explicit activation scope. |
+| Browser extension | Specified/deferred. | No | None. | Define extension boundary after explicit activation scope. |
+| External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
+| REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
+
 ## Developer Validation
 
-GitHub Actions are temporarily paused because the Actions run limit/quota is exhausted. Until pull-request and push triggers are restored, local validation is mandatory before merge or direct main changes.
+GitHub Actions CI is configured for `pull_request` and `push` to `main`; the separate phase-status workflow is manual `workflow_dispatch`. Local validation is mandatory before merge or direct main changes, especially when Actions quota or environment limits prevent actual hosted runs.
 
 Run the documented local validation gate:
 
@@ -284,7 +313,7 @@ Validation evidence should record:
 - confirmation that unsafe runtime gates remain disabled;
 - files changed;
 - remaining risks;
-- statement that GitHub Actions are paused and must be re-enabled later.
+- statement of whether hosted GitHub Actions actually ran; local validation evidence remains required when quota or environment limits apply.
 
 ---
 

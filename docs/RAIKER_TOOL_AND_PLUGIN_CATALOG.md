@@ -98,19 +98,19 @@ These permission labels are used in the inventory below so coding agents know wh
 | `delete_file` | Delete a file. | `workspace:write`, `approval:resolve` | No — Phase 2 planned / deny by default |
 | `copy_path` | Copy a file or directory. | `workspace:write`, `approval:resolve` | No — Phase 2 planned |
 | `move_path` | Rename or move a file/directory. | `workspace:write`, `approval:resolve` | No — Phase 2 planned |
-| `notebook_edit` | Modify Jupyter notebook cells by cell ID/index. | `workspace:write`, `approval:resolve` | No — Phase 3 planned |
+| `notebook_edit` | Modify Jupyter notebook cells by cell ID/index. | `workspace:write`, `approval:resolve` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
 | `symbol_search` | Search workspace code symbols. | `workspace:search`, later `lsp:read` or `graph:read` | Partial — Phase 3 specified/planning |
-| `lsp_diagnostics` | Read language-server diagnostics. | `lsp:read`; server startup needs `lsp:server_start` | No — Phase 3 planned |
-| `lsp_definition` | Jump to symbol definition. | `lsp:read` | No — Phase 3 planned |
-| `lsp_references` | Find symbol references. | `lsp:read` | No — Phase 3 planned |
-| `lsp_type_info` | Read type information for code at position. | `lsp:read` | No — Phase 3 planned |
-| `lsp_call_hierarchy` | Trace caller/callee relationships. | `lsp:read` | No — Phase 3 planned |
+| `lsp_diagnostics` | Read language-server diagnostics. | `lsp:read`; server startup needs `lsp:server_start` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
+| `lsp_definition` | Jump to symbol definition. | `lsp:read` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
+| `lsp_references` | Find symbol references. | `lsp:read` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
+| `lsp_type_info` | Read type information for code at position. | `lsp:read` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
+| `lsp_call_hierarchy` | Trace caller/callee relationships. | `lsp:read` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
 | `semantic_search` | Search semantic/vector memory index. | `memory:read`; vector backend needs `semantic_memory:write` for index creation | Partial — Phase 3 specified; runtime writes disabled |
 | `graph_query` | Query graph/codemap metadata. | `graph:read` | Partial — Phase 3 specified; indexing disabled |
 | `graph_plan` | Produce dry-run graph/codemap indexing plan. | `graph:plan` | Yes — Phase 3 Slice C planning only |
 | `graph_status` | Show graph/codemap disabled/runtime status. | `graph:read` | Yes — Phase 3 Slice C |
-| `web_search` | Search public web. | `network:egress` | No — Phase 3 planned; disabled until egress policy |
-| `web_fetch` | Fetch URL contents. | `network:egress` | No — Phase 3 planned; disabled until egress policy |
+| `web_search` | Search public web. | `network:egress` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P; disabled until egress policy |
+| `web_fetch` | Fetch URL contents. | `network:egress` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P; disabled until egress policy |
 | `shell` | Propose or execute local shell command through policy. | `command:propose`; later `command:execute` | Partial — Phase 1 approval-gated proposal path; direct execution gated |
 | `powershell` | Run native PowerShell command through policy. | `command:propose`, `command:execute` | No — Phase 2 planned/needs validation |
 | `python_exec` | Run isolated Python snippet. | `command:execute` | No — Phase 2 planned; sandbox/timeout required |
@@ -119,9 +119,9 @@ These permission labels are used in the inventory below so coding agents know wh
 | `git_log` | Inspect Git history. | `git:read` | Yes — Phase 2 |
 | `git_mutation` | Branch/commit/merge/push Git operations. | `git:write`, `approval:resolve` | No — Phase 3/4 planned |
 | `monitor` | Watch a background command/log/process and surface output. | `process:monitor`, `command:execute` | No — disabled until Phase 4 |
-| `schedule_create` | Create one-shot or recurring local scheduled prompt/task. | `storage_lifecycle:plan` or future `schedule:write`, `approval:resolve` | No — Phase 3 planned |
-| `schedule_list` | List scheduled tasks. | `none` or future `schedule:read` | No — Phase 3 planned |
-| `schedule_delete` | Cancel scheduled task. | future `schedule:write`, `approval:resolve` | No — Phase 3 planned |
+| `schedule_create` | Create one-shot or recurring local scheduled prompt/task. | `storage_lifecycle:plan` or future `schedule:write`, `approval:resolve` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
+| `schedule_list` | List scheduled tasks. | `none` or future `schedule:read` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
+| `schedule_delete` | Cancel scheduled task. | future `schedule:write`, `approval:resolve` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
 | `schedule_wakeup` | Internal bounded wakeup scheduling loop. | future `schedule:write` | No — Phase 3/4 planned |
 | `routine_remote_trigger` | Hosted/cloud routine create/update/run/list. | `notify:hosted`, `remote:execute` | No — disabled until Phase 5 |
 | `mcp_list_resources` | List resources exposed by configured MCP servers. | `mcp:read` | No — Phase 3/4 planned; server startup disabled |
@@ -194,20 +194,20 @@ These permission labels are used in the inventory below so coding agents know wh
 | `plugin_validate` | Validate plugin manifest/package without executing code. | `plugin:validate` | Partial — manifest validation implemented; full package validation planned |
 | `plugin_registration_plan` | Produce plugin registration plan and permission diff. | `plugin:register`, `approval:read` | Yes — Phase 3 planning only |
 | `plugin_details` | Show component inventory, permissions, risk, and status. | `plugin:validate`, `plugin:register` | Partial — Phase 3 inspection/planning |
-| `plugin_commands` | Add slash commands or prompt shortcuts. | `plugin:register`; execution depends on target tool permissions | No — Phase 3 planned; inert metadata currently |
+| `plugin_commands` | Add slash commands or prompt shortcuts. | `plugin:register`; execution depends on target tool permissions | `deferred_after_phase_3` — outside completed Phase 3 slices A-P; inert metadata currently |
 | `plugin_skills` | Package reusable workflows/procedures. | `plugin:register`; tool-specific permissions at runtime | No — Phase 2/3 planned |
 | `plugin_agents` | Package subagent profiles. | `plugin:register`, later `agent:execute` | No — disabled until Phase 4 |
-| `plugin_hooks` | Add lifecycle/event handlers. | `plugin:register`; no bypass of policy | No — Phase 3 planned |
+| `plugin_hooks` | Add lifecycle/event handlers. | `plugin:register`; no bypass of policy | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
 | `plugin_mcp_servers` | Bundle MCP server definitions. | `plugin:register`, `mcp:server_start`, `network:egress` | No — disabled until Phase 3/4 trust gates |
-| `plugin_lsp_servers` | Bundle LSP/code-intelligence server definitions. | `plugin:register`, `lsp:server_start`, `lsp:read` | No — Phase 3 planned |
+| `plugin_lsp_servers` | Bundle LSP/code-intelligence server definitions. | `plugin:register`, `lsp:server_start`, `lsp:read` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
 | `plugin_monitors` | Declare background monitors/watchers. | `plugin:register`, `process:monitor`, `command:execute` | No — disabled until Phase 4 |
-| `plugin_tool_adapters` | Register tool adapters through Tool Broker. | `plugin:register`; target tool permissions required | No — Phase 3 planned; must never execute directly |
+| `plugin_tool_adapters` | Register tool adapters through Tool Broker. | `plugin:register`; target tool permissions required | `deferred_after_phase_3` — outside completed Phase 3 slices A-P; must never execute directly |
 | `plugin_channels` | Add external channel connectors. | `plugin:register`, `channel:activate` | No — disabled until Phase 4 |
-| `plugin_tui_panels` | Add terminal UI panels. | `plugin:register`; `none` if display-only | No — Phase 3 planned |
-| `plugin_web_panels` | Add web/dashboard panels. | `plugin:register`; action-specific permissions | No — Phase 3 planned |
+| `plugin_tui_panels` | Add terminal UI panels. | `plugin:register`; `none` if display-only | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
+| `plugin_web_panels` | Add web/dashboard panels. | `plugin:register`; action-specific permissions | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
 | `plugin_mobile_panels` | Add mobile UI panels/cards. | `plugin:register`; action-specific permissions | No — Phase 4 planned |
-| `plugin_output_styles` | Provide output style/rendering rules. | `plugin:register`; no runtime authority | No — Phase 3 planned |
-| `plugin_themes` | Provide color/theme definitions. | `plugin:register`; no runtime authority | No — Phase 3 planned |
+| `plugin_output_styles` | Provide output style/rendering rules. | `plugin:register`; no runtime authority | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
+| `plugin_themes` | Provide color/theme definitions. | `plugin:register`; no runtime authority | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
 | `plugin_user_config` | Declare/persist user-configurable plugin values. | `plugin:register`, `config:read`, `config:write` | No — Phase 3/5 planned |
 | `plugin_dependencies` | Declare dependent plugins/components. | `plugin:register`, `plugin:validate` | No — Phase 3/5 planned |
 | `plugin_permission_diff` | Show permission changes from install/update/dependency expansion. | `plugin:validate`, `approval:read` | Partial — Phase 3 planning |
@@ -216,7 +216,7 @@ These permission labels are used in the inventory below so coding agents know wh
 | `plugin_marketplace` | Discover/install/update plugins from registries. | `marketplace:read`, `marketplace:install`, `network:egress` | No — disabled until Phase 5 |
 | `plugin_reload` | Reload changed plugin metadata/components. | `plugin:register` | No — Phase 3/4 planned; must not auto-enable code |
 | `plugin_enable` | Enable plugin components after policy/trust approval. | `plugin:register`, `approval:resolve`; later `plugin:execute` if runtime code | No — runtime execution disabled |
-| `plugin_disable` | Disable plugin components. | `plugin:register` | No — Phase 3 planned |
+| `plugin_disable` | Disable plugin components. | `plugin:register` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
 | `plugin_remove` | Remove plugin metadata/package. | `plugin:register`, `workspace:write`, `approval:resolve` | No — Phase 3/5 planned |
 | `plugin_execute` | Execute plugin code/entrypoint. | `plugin:execute` plus target permissions | No — disabled until explicit Phase 3+ execution gates |
 
@@ -367,3 +367,65 @@ Slice N reserves metadata-only readiness surfaces and events for future plugin/s
 ## Phase 3 Slice P — Remote/Container/Cloud Execution Readiness — Metadata Only
 
 Slice P adds deterministic metadata-only readiness contracts, registry, optional SQLite metadata table, `/remote-readiness [--summary|--json]`, workspace summaries, and reserved metadata-only events for future remote/container/cloud execution. No remote execution, container execution, cloud execution, hosted routines, runtime jobs, job dispatch, worker queues, workers, schedulers, file watchers, daemons, client transport, external dispatch, credential materialization, secret injection, provider integrations, sandbox runtime, process execution, shell execution, network execution, or runtime execution are enabled. Slice P did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
+
+
+## Implemented slash command catalog (Phase 3 truthfulness)
+
+| Command | Purpose | Permissions | Implementation status | Runtime effect | Safety boundary |
+|---|---|---|---|---|---|
+| `/help` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/providers` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/models` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/model current` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/model use <profile_id>` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | session metadata only | No private chain-of-thought exposed. |
+| `/model use --provider <provider> --model <model>` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | session metadata only | No private chain-of-thought exposed. |
+| `/model health` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/model capabilities` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/reasoning` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | session metadata only | No private chain-of-thought exposed. |
+| `/reasoning status` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | session metadata only | No private chain-of-thought exposed. |
+| `/reasoning set <mode-or-effort>` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | session metadata only | No private chain-of-thought exposed. |
+| `/reasoning off` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | session metadata only | No private chain-of-thought exposed. |
+| `/status` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/tasks` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/events` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/checkpoints` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/approvals` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/approve <id>` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | approval metadata status update only | Does not execute approved action. |
+| `/deny <id>` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | approval metadata status update only | Does not execute approved action. |
+| `/memory` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/semantic-memory` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/capabilities` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/execution-profiles` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/workspace` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/workspace-view` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/clients` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/plugins` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/plugin-plan <manifest_path>` | Inspection/control command exposed by terminal CLI. | local_terminal | `planning_only_implemented_verified` | planning/simulation only | No direct tool execution; unsafe runtime disabled. |
+| `/graph-status` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/graph-plan` | Inspection/control command exposed by terminal CLI. | local_terminal | `planning_only_implemented_verified` | planning/simulation only | No direct tool execution; unsafe runtime disabled. |
+| `/graph-readiness [--summary|--json]` | Inspection/control command exposed by terminal CLI. | local_terminal | `metadata_only_implemented_verified` | metadata summary/export only | No direct tool execution; unsafe runtime disabled. |
+| `/memory-readiness [--summary|--json]` | Inspection/control command exposed by terminal CLI. | local_terminal | `metadata_only_implemented_verified` | metadata summary/export only | No direct tool execution; unsafe runtime disabled. |
+| `/approval-readiness [--summary|--json]` | Inspection/control command exposed by terminal CLI. | local_terminal | `metadata_only_implemented_verified` | metadata summary/export only | No direct tool execution; unsafe runtime disabled. |
+| `/cleanup-readiness [--summary|--json]` | Inspection/control command exposed by terminal CLI. | local_terminal | `metadata_only_implemented_verified` | metadata summary/export only | No direct tool execution; unsafe runtime disabled. |
+| `/remote-readiness [--summary|--json]` | Inspection/control command exposed by terminal CLI. | local_terminal | `metadata_only_implemented_verified` | metadata summary/export only | No direct tool execution; unsafe runtime disabled. |
+| `/plugin-readiness [--summary|--json]` | Inspection/control command exposed by terminal CLI. | local_terminal | `metadata_only_implemented_verified` | metadata summary/export only | No direct tool execution; unsafe runtime disabled. |
+| `/channel-readiness [--summary|--json]` | Inspection/control command exposed by terminal CLI. | local_terminal | `metadata_only_implemented_verified` | metadata summary/export only | No direct tool execution; unsafe runtime disabled. |
+| `/memory-review [--summary]` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/approval-previews` | Inspection/control command exposed by terminal CLI. | local_terminal | `preview_only_implemented_verified` | approval card/preview output only | No direct tool execution; unsafe runtime disabled. |
+| `/graph-approval-preview` | Inspection/control command exposed by terminal CLI. | local_terminal | `preview_only_implemented_verified` | approval card/preview output only | No direct tool execution; unsafe runtime disabled. |
+| `/memory-approval-preview [--summary]` | Inspection/control command exposed by terminal CLI. | local_terminal | `preview_only_implemented_verified` | approval card/preview output only | No direct tool execution; unsafe runtime disabled. |
+| `/approval-preview <preview_id>` | Inspection/control command exposed by terminal CLI. | local_terminal | `preview_only_implemented_verified` | approval card/preview output only | No direct tool execution; unsafe runtime disabled. |
+| `/approval-audit [--summary]` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/rollback-plan` | Inspection/control command exposed by terminal CLI. | local_terminal | `planning_only_implemented_verified` | planning/simulation only | No direct tool execution; unsafe runtime disabled. |
+| `/graph-rollback-plan` | Inspection/control command exposed by terminal CLI. | local_terminal | `planning_only_implemented_verified` | planning/simulation only | No direct tool execution; unsafe runtime disabled. |
+| `/memory-rollback-plan` | Inspection/control command exposed by terminal CLI. | local_terminal | `planning_only_implemented_verified` | planning/simulation only | No direct tool execution; unsafe runtime disabled. |
+| `/storage-lifecycle [--summary|--graph|--memory]` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/storage-lifecycle-retention [--summary]` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/storage-lifecycle-cleanup-preview [--summary]` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/storage-lifecycle-handoff [--summary]` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]` | Inspection/control command exposed by terminal CLI. | local_terminal | `planning_only_implemented_verified` | planning/simulation only | No direct tool execution; unsafe runtime disabled. |
+| `/doctor` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/channels` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/launch --provider mock --model mock-deterministic` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | mock provider launch smoke only | Only documented mock deterministic launch; no unsafe runtime. |
+| `/quit` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |

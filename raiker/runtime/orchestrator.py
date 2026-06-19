@@ -7,7 +7,7 @@ from raiker.contracts.models import AgentResponse, PromptEnvelope, ToolAction, T
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.models.contracts import ModelMessage, ModelResponse
-from raiker.models.providers import ProviderConnectionError
+from raiker.models.exceptions import ModelProviderError
 from raiker.models.router import ModelRouter
 from raiker.models.tool_call_validation import (
     ToolCallRejected,
@@ -75,7 +75,7 @@ class RuntimeOrchestrator:
             )
         )
 
-    def _call_model(
+    async def _acall_model(
         self, envelope: PromptEnvelope, messages: list[ModelMessage]
     ) -> ModelResponse:
         provider, model = self.default_provider
@@ -85,12 +85,12 @@ class RuntimeOrchestrator:
             {"provider": provider, "model": model, "message_count": len(messages)},
         )
         try:
-            response = self.model_router.chat(provider, model, messages, self.tool_specs)
-        except ProviderConnectionError as exc:
+            response = await self.model_router.achat(provider, model, messages, self.tool_specs)
+        except ModelProviderError as exc:
             self._event(
                 envelope,
-                "model_request_completed",
-                {"provider": provider, "finish_reason": "error", "error": str(exc)},
+                "model_request_failed",
+                {"provider": provider, "finish_reason": "error", "error_class": type(exc).__name__, "safe_error_code": "provider_connection_failed"},
             )
             return ModelResponse(text=f"model_unavailable: {exc}", finish_reason="error")
         self._event(
@@ -99,7 +99,7 @@ class RuntimeOrchestrator:
             {
                 "provider": provider,
                 "finish_reason": response.finish_reason,
-                "tool_calls": len(response.tool_calls),
+                "tool_call_count": len(response.tool_calls),
                 "text_length": len(response.text),
             },
         )
@@ -120,7 +120,7 @@ class RuntimeOrchestrator:
             return str(output)
         return "Tool completed."
 
-    def handle(self, envelope: PromptEnvelope) -> AgentResponse:
+    async def ahandle(self, envelope: PromptEnvelope) -> AgentResponse:
         machine = RuntimeStateMachine()
         self._state(machine, envelope, "NORMALISED")
         self._event(envelope, "prompt_normalised", {"text_length": len(envelope.prompt.text)})
@@ -168,7 +168,7 @@ class RuntimeOrchestrator:
         last_result: ToolResult | None = None
 
         while True:
-            response = self._call_model(envelope, messages)
+            response = await self._acall_model(envelope, messages)
             if not response.tool_calls:
                 final_text = response.text
                 break
@@ -253,3 +253,13 @@ class RuntimeOrchestrator:
             approval=approval,
             last_event_id=self.writer.last_event_id,
         )
+
+
+    def handle(self, envelope: PromptEnvelope) -> AgentResponse:
+        import asyncio
+
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.ahandle(envelope))
+        raise RuntimeError("handle cannot be called from a running event loop; use ahandle")

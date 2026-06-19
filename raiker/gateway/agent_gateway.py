@@ -44,8 +44,8 @@ class AgentGateway:
         self.connector_registry = ConnectorRegistry.load()
         self.store.upsert_model_profiles(self.model_registry.list_profiles())
         self.store.upsert_connector_profiles(self.connector_registry.list_profiles())
-        self.model_router = ModelRouter(self.model_registry, self.writer, allow_test_provider=True)
-        # Native default backend: a reachable llama.cpp server, else the deterministic mock.
+        self.model_router = ModelRouter(self.model_registry, self.writer, allow_test_provider=False)
+        # Native default backend: configured llama.cpp profile only; production never falls back to deterministic test providers.
         self.default_provider = self.model_router.default_provider()
         self.runtime = RuntimeOrchestrator(
             workspace_root=self.workspace_root,
@@ -71,7 +71,7 @@ class AgentGateway:
             client=envelope.client,
         )
 
-    def submit_prompt(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
+    async def submit_prompt_async(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
         try:
             prompt_envelope = (
                 envelope
@@ -110,7 +110,7 @@ class AgentGateway:
             if existing_session is None:
                 self._dispatch_lifecycle_hook("SessionStart", prompt_envelope)
             self._dispatch_lifecycle_hook("UserPromptSubmit", prompt_envelope)
-        response = self.runtime.handle(prompt_envelope)
+        response = await self.runtime.ahandle(prompt_envelope)
         checkpoint, checkpoint_path = self.checkpoints.write_turn_checkpoint(
             session_id=prompt_envelope.session_id,
             turn_id=prompt_envelope.turn_id,
@@ -156,3 +156,13 @@ class AgentGateway:
             approval=response.approval,
             last_event_id=self.writer.last_event_id,
         )
+
+
+    def submit_prompt(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
+        import asyncio
+
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.submit_prompt_async(envelope))
+        raise RuntimeError("submit_prompt cannot be called from a running event loop; use submit_prompt_async")

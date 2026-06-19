@@ -6,9 +6,9 @@ import tomllib
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
+import httpx
 import pytest
 
-import httpx
 from raiker.models.contracts import (
     EmbeddingRequest,
     ModelCapabilities,
@@ -69,10 +69,13 @@ def test_factory_test_provider_gate_and_openai_profiles() -> None:
     with pytest.raises(ProviderPolicyError):
         ModelProviderFactory().create(test_profile)
     assert ModelProviderFactory(allow_test_provider=True).create(test_profile).profile_id == "deterministic-test"
-    for profile_id in ["raiker-local-llama-cpp", "ollama-local-openai-compatible", "lm-studio-local-openai-compatible", "vllm-homelab-openai-compatible", "generic-openai-compatible", "openrouter-policy-gated"]:
+    for profile_id in ["raiker-local-llama-cpp", "ollama-local-openai-compatible", "lm-studio-local-openai-compatible"]:
         provider = ModelProviderFactory().create(r.resolve_profile_id(profile_id))
         assert isinstance(provider, AsyncOpenAICompatibleProvider)
         run(provider.aclose())
+    for profile_id in ["vllm-homelab-openai-compatible", "generic-openai-compatible", "openrouter-policy-gated"]:
+        with pytest.raises((ProviderPolicyError, Exception)):
+            ModelProviderFactory().create(r.resolve_profile_id(profile_id))
 
 
 def _provider(handler: Callable[[httpx.Request], httpx.Response], caps: ModelCapabilities | None = None) -> AsyncOpenAICompatibleProvider:

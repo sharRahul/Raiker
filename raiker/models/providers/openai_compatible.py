@@ -5,9 +5,10 @@ import json
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
+
 from raiker.models.contracts import (
     EmbeddingRequest,
     EmbeddingResponse,
@@ -32,11 +33,13 @@ from raiker.models.providers.llama_cpp_server import _parse_text_json_tool_calls
 
 
 def _join(base: str, path: str) -> str:
-    base = base.rstrip("/") + "/"
-    clean = path.lstrip("/")
-    if base.rstrip("/").endswith("/v1") and clean.startswith("v1/"):
-        clean = clean[3:]
-    return urljoin(base, clean)
+    parts = urlsplit(base)
+    base_parts = [p for p in parts.path.split("/") if p]
+    path_parts = [p for p in path.split("/") if p]
+    if base_parts and path_parts and base_parts[-1] == "v1" and path_parts[0] == "v1":
+        path_parts = path_parts[1:]
+    joined = "/" + "/".join([*base_parts, *path_parts])
+    return urlunsplit((parts.scheme, parts.netloc, joined, "", ""))
 
 
 def _map_status(status: int, *, model: str) -> Exception:
@@ -199,8 +202,8 @@ class AsyncOpenAICompatibleProvider:
                         yield ModelStreamEvent(event_type="text_delta", text_delta=text)
                     if finish:
                         yield ModelStreamEvent(event_type="finish", finish_reason=finish)
-        except asyncio.CancelledError as exc:
-            raise ProviderStreamError("stream_cancelled") from exc
+        except asyncio.CancelledError:
+            raise
         except ProviderStreamError:
             raise
         except Exception as exc:

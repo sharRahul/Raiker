@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
+
 from raiker.contracts.models import ModelProfile
 from raiker.models.contracts import ModelCapabilities
 from raiker.models.endpoint_policy import EndpointPolicy, validate_endpoint_policy
@@ -31,22 +33,57 @@ def capabilities_from_profile(profile: ModelProfile) -> ModelCapabilities:
 
 
 @dataclass(frozen=True)
+class ProviderRuntimePolicy:
+    allow_test_provider: bool = False
+    allow_policy_gated_provider: bool = False
+    allow_hosted_provider: bool = False
+    allow_private_network_provider: bool = False
+    require_api_key_for_hosted: bool = True
+    test_mode: bool = False
+
+
+@dataclass(frozen=True)
 class ModelProviderFactory:
     allow_test_provider: bool = False
+    allow_policy_gated_provider: bool = False
+    allow_hosted_provider: bool = False
+    allow_private_network_provider: bool = False
+    require_api_key_for_hosted: bool = True
+    test_mode: bool = False
     client: httpx.AsyncClient | None = None
+
+    def __init__(self, allow_test_provider: bool = False, client: httpx.AsyncClient | None = None, policy: ProviderRuntimePolicy | None = None, **kwargs: Any) -> None:
+        object.__setattr__(self, "client", client)
+        if policy is None:
+            policy = ProviderRuntimePolicy(allow_test_provider=allow_test_provider, **kwargs)
+        object.__setattr__(self, "allow_test_provider", policy.allow_test_provider)
+        object.__setattr__(self, "allow_policy_gated_provider", policy.allow_policy_gated_provider)
+        object.__setattr__(self, "allow_hosted_provider", policy.allow_hosted_provider)
+        object.__setattr__(self, "allow_private_network_provider", policy.allow_private_network_provider)
+        object.__setattr__(self, "require_api_key_for_hosted", policy.require_api_key_for_hosted)
+        object.__setattr__(self, "test_mode", policy.test_mode)
 
     def create(self, profile: ModelProfile) -> Any:
         provider = profile.provider.replace("_", "-").lower()
         raw = profile.raw
         is_test = provider in {"mock", "test", "deterministic-test"} or bool(raw.get("test_only"))
         if is_test:
-            if not (self.allow_test_provider or os.environ.get("RAIKER_TEST_MODE") == "1"):
+            if not (self.allow_test_provider or self.test_mode or os.environ.get("RAIKER_TEST_MODE") == "1"):
                 raise ProviderPolicyError("deterministic_test_provider_requires_test_mode")
             return DeterministicTestProvider(provider="test", model=profile.model, profile_id=profile.profile_id)
         aliases = {"llama-cpp", "llama.cpp", "llama-cpp-server", "ollama", "lm-studio", "vllm", "openai-compatible", "openrouter"}
         if provider not in aliases:
             raise ProviderConfigurationError(f"unknown_provider:{profile.provider}")
+        state = str(raw.get("default_state", ""))
+        if state == "enabled_for_tests_only" and not (self.allow_test_provider or self.test_mode or os.environ.get("RAIKER_TEST_MODE") == "1"):
+            raise ProviderPolicyError("test_only_profile_requires_test_mode")
+        if state == "disabled_until_policy_approved" and not self.allow_policy_gated_provider:
+            raise ProviderPolicyError("provider_requires_explicit_policy_approval")
         endpoint = str(raw.get("endpoint") or raw.get("base_url") or "")
+        if not endpoint or "<" in endpoint:
+            raise ProviderConfigurationError("missing_endpoint")
+        if state == "disabled_until_endpoint_configured" and "<" in str(profile.model):
+            raise ProviderPolicyError("provider_endpoint_or_model_not_configured")
         if not endpoint:
             raise ProviderConfigurationError("missing_endpoint")
         policy = EndpointPolicy(
@@ -57,11 +94,22 @@ class ModelProviderFactory:
             provider=provider,
             allow_remote_http=bool(raw.get("allow_remote_http", False)),
         )
-        validate_endpoint_policy(endpoint, policy)
+        endpoint_kind = validate_endpoint_policy(endpoint, policy)
+        if endpoint_kind == "private_network" and not self.allow_private_network_provider:
+            raise ProviderPolicyError("private_network_provider_requires_explicit_policy")
+        if endpoint_kind == "remote_hosted" and not self.allow_hosted_provider:
+            raise ProviderPolicyError("hosted_provider_requires_explicit_policy")
         if provider == "openrouter" and raw.get("default_state") == "enabled":
             raise ProviderPolicyError("openrouter_must_not_be_enabled_by_default")
         headers: dict[str, str] = {}
         api_key_env = raw.get("api_key_env")
+        if provider == "openrouter":
+            if not (raw.get("requires_network") and raw.get("requires_egress_policy") and raw.get("requires_budget_policy")):
+                raise ProviderPolicyError("openrouter_requires_hosted_egress_budget_policy")
+            if urlparse(endpoint).scheme != "https":
+                raise ProviderPolicyError("openrouter_requires_https")
+            if not isinstance(api_key_env, str) or not os.environ.get(api_key_env):
+                raise ProviderConfigurationError("openrouter_api_key_missing")
         if isinstance(api_key_env, str) and os.environ.get(api_key_env):
             headers["Authorization"] = f"Bearer {os.environ[api_key_env]}"
         raw_extra = raw.get("extra_headers")

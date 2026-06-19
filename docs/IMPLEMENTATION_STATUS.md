@@ -29,7 +29,7 @@ none of them change the validator-required Phase 1/2/3 markers below.
 | Area | Documented as | Verified code reality | Honest status |
 |---|---|---|---|
 | Hooks | Full lifecycle spec (`docs/HOOKS_SPEC.md`) | `raiker/hooks/` implements `builtin`+`command` handlers, scoped config, decision authority, and dispatch wired through the broker/gateway; `http`/`mcp_tool`/`prompt`/`agent` deferred | `implemented_verified` (core); remaining handler types `specified_not_implemented` |
-| Local model providers | llama.cpp server (native default) + mock; LM Studio/openai-compatible/vllm/hosted gated | `raiker/models/providers/llama_cpp_server.py` wired; router routes `mock`+`llama.cpp`, others raise `provider_not_wired` | `implemented_verified` (llama.cpp + mock) |
+| Local model providers | llama.cpp native default through async OpenAI-compatible adapter; Ollama/LM Studio/vLLM/generic/OpenRouter profile-compatible and policy-gated; deterministic test-only | `raiker/models/providers/openai_compatible.py` uses `httpx.AsyncClient`; production gateway selects llama.cpp and never falls back to deterministic; OpenRouter/private/hosted profiles require explicit policy | `implemented_verified` (async adapter + policy gates) |
 | Local provider health-check | Phase 2 `implemented_verified` | `raiker/models/health.py` probes the llama.cpp `/health` endpoint over HTTP | accurate |
 | Model-driven tool calls | "gather→act→verify" loop | `raiker/runtime/orchestrator.py` runs a bounded model-driven loop; model tool calls validated by `raiker/models/tool_call_validation.py` (OWASP LLM05) | `implemented_verified` |
 | Verifier / verification step | "verify results" loop phase | `raiker/runtime/verifier.py` is a pass-through stub | `stub` |

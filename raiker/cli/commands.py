@@ -36,6 +36,7 @@ from raiker.contracts.models import (
 )
 from raiker.diagnostics import render_doctor
 from raiker.events.query import EventViewer
+from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.execution.profiles import list_execution_profiles
 from raiker.gateway.agent_gateway import AgentGateway
@@ -50,6 +51,8 @@ from raiker.memory.readiness_registry import (
 )
 from raiker.memory.review import MemoryReviewQueue
 from raiker.memory.semantic import semantic_memory_status
+from raiker.models.exceptions import ModelProviderError, ProviderPolicyError, safe_error
+from raiker.models.factory import capabilities_from_profile
 from raiker.models.registry import ModelProfileRegistry, RegistryError
 from raiker.models.router import ModelRouter
 from raiker.models.session_state import ModelSessionState
@@ -105,7 +108,9 @@ def _model_session_id() -> str:
     return "terminal-local"
 
 
-def _selected_profile(registry: ModelProfileRegistry, workspace_root: str | Path = ".") -> ModelProfile:
+def _selected_profile(
+    registry: ModelProfileRegistry, workspace_root: str | Path = "."
+) -> ModelProfile:
     store = SQLiteStore(workspace_root)
     state = store.load_model_session_state(_model_session_id())
     if state is not None:
@@ -119,15 +124,59 @@ def _selected_profile(registry: ModelProfileRegistry, workspace_root: str | Path
     return registry.list_profiles()[0]
 
 
-def render_models(path: str | Path = "config/model-profiles.json", *, workspace_root: str | Path = ".") -> str:
+async def render_models_async(
+    path: str | Path = "config/model-profiles.json",
+    *,
+    workspace_root: str | Path = ".",
+    router: ModelRouter | None = None,
+) -> str:
     registry = ModelProfileRegistry.load(path)
     selected = _selected_profile(registry, workspace_root)
     lines = ["Model profiles:"]
     for profile in registry.list_profiles():
         marker = " (selected)" if profile.profile_id == selected.profile_id else ""
-        lines.append(f"- {profile.profile_id}{marker} [{profile.default_state}] provider={profile.provider} model={profile.model} phase={profile.build_phase}")
-    lines.append("Live models: not queried by default in sync command; use router.alist_models for selected provider when policy permits.")
+        lines.append(
+            f"- {profile.profile_id}{marker} [{profile.default_state}] provider={profile.provider} model={profile.model} phase={profile.build_phase}"
+        )
+    lines.extend(["Live models for selected provider:"])
+    live_router = router or ModelRouter(registry)
+    try:
+        models = await live_router.alist_models(selected.provider, selected.model)
+    except ProviderPolicyError as exc:
+        lines.extend(["status: policy_denied", f"reason: {safe_error(str(exc))}"])
+    except ModelProviderError as exc:
+        reason = (
+            "model_listing_unsupported" if "unsupported" in str(exc) else "provider_unreachable"
+        )
+        lines.extend(
+            [
+                f"status: {'unsupported' if reason == 'model_listing_unsupported' else 'unavailable'}",
+                f"reason: {reason}",
+            ]
+        )
+    except Exception as exc:
+        lines.extend(["status: unavailable", f"reason: {safe_error(type(exc).__name__)}"])
+    else:
+        lines.extend(
+            [
+                "status: available",
+                f"provider: {selected.provider}",
+                f"profile_id: {selected.profile_id}",
+                "models:",
+            ]
+        )
+        lines.extend(f"- {model.id}" for model in models)
     return "\n".join(lines)
+
+
+def render_models(
+    path: str | Path = "config/model-profiles.json", *, workspace_root: str | Path = "."
+) -> str:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(render_models_async(path, workspace_root=workspace_root))
+    return "Live model listing requires async command path; use render_models_async."
 
 
 def render_channels(path: str | Path = "config/channel-connectors.json") -> str:
@@ -362,7 +411,9 @@ def handle_graph_plan(*, workspace_root: str | Path = ".") -> str:
     )
 
 
-def handle_graph_readiness(command: str = "/graph-readiness", *, workspace_root: str | Path = ".") -> str:
+def handle_graph_readiness(
+    command: str = "/graph-readiness", *, workspace_root: str | Path = "."
+) -> str:
     parts = shlex.split(command)
     if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
         return "Usage: /graph-readiness [--summary|--json]"
@@ -383,13 +434,16 @@ def handle_graph_readiness(command: str = "/graph-readiness", *, workspace_root:
     return render_graph_readiness(workspace_root=workspace_root)
 
 
-
-def handle_memory_readiness(command: str = "/memory-readiness", *, workspace_root: str | Path = ".") -> str:
+def handle_memory_readiness(
+    command: str = "/memory-readiness", *, workspace_root: str | Path = "."
+) -> str:
     parts = shlex.split(command)
     if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
         return "Usage: /memory-readiness [--summary|--json]"
     if len(parts) == 2 and parts[1] == "--json":
-        return json.dumps(semantic_memory_readiness_summary(workspace_root=workspace_root), sort_keys=True)
+        return json.dumps(
+            semantic_memory_readiness_summary(workspace_root=workspace_root), sort_keys=True
+        )
     if len(parts) == 2 and parts[1] == "--summary":
         summary = semantic_memory_readiness_summary(workspace_root=workspace_root)
         return "\n".join(
@@ -408,7 +462,9 @@ def handle_memory_readiness(command: str = "/memory-readiness", *, workspace_roo
     return render_semantic_memory_readiness(workspace_root=workspace_root)
 
 
-def handle_approval_readiness(command: str = "/approval-readiness", *, workspace_root: str | Path = ".") -> str:
+def handle_approval_readiness(
+    command: str = "/approval-readiness", *, workspace_root: str | Path = "."
+) -> str:
     parts = shlex.split(command)
     if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
         return "Usage: /approval-readiness [--summary|--json]"
@@ -433,8 +489,9 @@ def handle_approval_readiness(command: str = "/approval-readiness", *, workspace
     return render_approval_readiness(workspace_root=workspace_root)
 
 
-
-def handle_channel_readiness(command: str = "/channel-readiness", *, workspace_root: str | Path = ".") -> str:
+def handle_channel_readiness(
+    command: str = "/channel-readiness", *, workspace_root: str | Path = "."
+) -> str:
     parts = shlex.split(command)
     if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
         return "Usage: /channel-readiness [--summary|--json]"
@@ -461,7 +518,10 @@ def handle_channel_readiness(command: str = "/channel-readiness", *, workspace_r
         )
     return render_channel_readiness(workspace_root=workspace_root)
 
-def handle_remote_readiness(command: str = "/remote-readiness", *, workspace_root: str | Path = ".") -> str:
+
+def handle_remote_readiness(
+    command: str = "/remote-readiness", *, workspace_root: str | Path = "."
+) -> str:
     parts = shlex.split(command)
     if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
         return "Usage: /remote-readiness [--summary|--json]"
@@ -503,7 +563,9 @@ def handle_remote_readiness(command: str = "/remote-readiness", *, workspace_roo
     return render_remote_readiness(workspace_root=workspace_root)
 
 
-def handle_plugin_readiness(command: str = "/plugin-readiness", *, workspace_root: str | Path = ".") -> str:
+def handle_plugin_readiness(
+    command: str = "/plugin-readiness", *, workspace_root: str | Path = "."
+) -> str:
     parts = shlex.split(command)
     if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
         return "Usage: /plugin-readiness [--summary|--json]"
@@ -533,7 +595,10 @@ def handle_plugin_readiness(command: str = "/plugin-readiness", *, workspace_roo
         )
     return render_plugin_readiness(workspace_root=workspace_root)
 
-def handle_cleanup_readiness(command: str = "/cleanup-readiness", *, workspace_root: str | Path = ".") -> str:
+
+def handle_cleanup_readiness(
+    command: str = "/cleanup-readiness", *, workspace_root: str | Path = "."
+) -> str:
     parts = shlex.split(command)
     if len(parts) > 2 or (len(parts) == 2 and parts[1] not in {"--summary", "--json"}):
         return "Usage: /cleanup-readiness [--summary|--json]"
@@ -709,14 +774,20 @@ def handle_storage_lifecycle_slice_h(command: str, *, workspace_root: str | Path
         "/storage-lifecycle-cleanup-preview": "cleanup-preview",
         "/storage-lifecycle-handoff": "handoff",
     }
-    if command_name not in mapping or len(parts) > 2 or (len(parts) == 2 and parts[1] != "--summary"):
+    if (
+        command_name not in mapping
+        or len(parts) > 2
+        or (len(parts) == 2 and parts[1] != "--summary")
+    ):
         return f"Usage: {command_name} [--summary]"
     return render_retention_cleanup_handoff(
         mapping[command_name], workspace_root=workspace_root, summary_only=(len(parts) == 2)
     )
 
 
-def _parse_lifecycle_slice_i(command: str, usage: str) -> tuple[bool, bool, str | None, str | None, int] | str:
+def _parse_lifecycle_slice_i(
+    command: str, usage: str
+) -> tuple[bool, bool, str | None, str | None, int] | str:
     parts = shlex.split(command)
     summary_only = False
     as_json = False
@@ -770,7 +841,9 @@ def handle_storage_lifecycle_evidence(command: str, *, workspace_root: str | Pat
     )
 
 
-def handle_storage_lifecycle_policy_simulation(command: str, *, workspace_root: str | Path = ".") -> str:
+def handle_storage_lifecycle_policy_simulation(
+    command: str, *, workspace_root: str | Path = "."
+) -> str:
     usage = "Usage: /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]"
     parsed = _parse_lifecycle_slice_i(command, usage)
     if isinstance(parsed, str):
@@ -828,7 +901,6 @@ def handle_approval_resolution(command: str, *, workspace_root: str | Path = "."
     )
 
 
-
 def _profile_status(profile: ModelProfile) -> str:
     raw = profile.raw
     if raw.get("test_only"):
@@ -842,13 +914,36 @@ def handle_providers(path: str | Path = "config/model-profiles.json") -> str:
     registry = ModelProfileRegistry.load(path)
     lines = ["Configured model provider profiles:"]
     from raiker.models.endpoint_policy import classify_endpoint
+
     for profile in registry.list_profiles():
         raw = profile.raw
         endpoint_kind = classify_endpoint(str(raw.get("endpoint") or raw.get("base_url") or ""))
         lines.append(
-            f"- {profile.profile_id} provider={profile.provider} backend={raw.get('backend','unknown')} model={profile.model} state={_profile_status(profile)} endpoint_kind={endpoint_kind} health=unknown streaming={bool(raw.get('supports_streaming'))} embeddings={bool(raw.get('supports_embeddings'))} tool_calls={bool(raw.get('supports_tool_calls'))} reasoning={bool(raw.get('supports_reasoning'))}"
+            f"- {profile.profile_id} provider={profile.provider} backend={raw.get('backend', 'unknown')} model={profile.model} state={_profile_status(profile)} endpoint_kind={endpoint_kind} health=unknown streaming={bool(raw.get('supports_streaming'))} embeddings={bool(raw.get('supports_embeddings'))} tool_calls={bool(raw.get('supports_tool_calls'))} reasoning={bool(raw.get('supports_reasoning'))}"
         )
     return "\n".join(lines)
+
+
+def _append_model_event(store: SQLiteStore, event_type: str, payload: dict[str, object]) -> None:
+    EventLogWriter(store).append(
+        make_event(
+            session_id=_model_session_id(),
+            turn_id=None,
+            event_type=event_type,
+            actor="cli",
+            payload=payload,
+            client=terminal_client(),
+        )
+    )
+
+
+def _profile_event_payload(profile: ModelProfile) -> dict[str, object]:
+    return {
+        "profile_id": profile.profile_id,
+        "provider": profile.provider,
+        "model": profile.model,
+        "endpoint_kind": profile.raw.get("endpoint_kind", "unknown"),
+    }
 
 
 def handle_model_command(command: str, *, workspace_root: str | Path = ".") -> str:
@@ -860,13 +955,43 @@ def handle_model_command(command: str, *, workspace_root: str | Path = ".") -> s
     if len(parts) == 1 or parts[1] == "current":
         return _render_profile_current(selected)
     if parts[1] == "capabilities":
+        caps = capabilities_from_profile(selected)
+        _append_model_event(
+            store,
+            "model_capabilities_inspected",
+            {
+                **_profile_event_payload(selected),
+                "supports_streaming": caps.supports_streaming,
+                "supports_embeddings": caps.supports_embeddings,
+                "supports_tool_calls": caps.supports_tool_calls,
+                "supports_json_schema": caps.supports_json_schema,
+                "supports_reasoning": caps.supports_reasoning,
+                "reasoning_trace_visible": caps.reasoning_trace_visible,
+            },
+        )
         return _render_capabilities(selected)
     if parts[1] == "health":
+        _append_model_event(store, "model_health_check_started", _profile_event_payload(selected))
         try:
             health = asyncio.run(router.ahealth(selected.provider, selected.model))
-            return f"Model health: available={health.available} enabled={health.enabled_for_runtime} detail={health.detail} endpoint_kind={selected.raw.get('endpoint_kind','unknown')}"
+            payload = {
+                **_profile_event_payload(selected),
+                "available": health.available,
+                "enabled_for_runtime": health.enabled_for_runtime,
+                "detail": health.detail,
+            }
+            _append_model_event(store, "model_health_check_completed", payload)
+            return f"Model health: available={health.available} enabled={health.enabled_for_runtime} detail={health.detail} endpoint_kind={selected.raw.get('endpoint_kind', 'unknown')}"
         except Exception as exc:
-            return f"Model health: unreachable error_class={type(exc).__name__} endpoint_kind={selected.raw.get('endpoint_kind','unknown')}"
+            payload = {
+                **_profile_event_payload(selected),
+                "available": False,
+                "enabled_for_runtime": False,
+                "detail": "unreachable",
+                "error_class": type(exc).__name__,
+            }
+            _append_model_event(store, "model_health_check_completed", payload)
+            return f"Model health: unreachable error_class={type(exc).__name__} endpoint_kind={selected.raw.get('endpoint_kind', 'unknown')}"
     if parts[1] == "use":
         try:
             if len(parts) >= 3 and not parts[2].startswith("--"):
@@ -880,20 +1005,52 @@ def handle_model_command(command: str, *, workspace_root: str | Path = ".") -> s
                 if len(matches) != 1:
                     return "Model selection is ambiguous or unavailable; specify a profile_id."
                 profile = router.select_profile(matches[0].profile_id)
-            store.save_model_session_state(ModelSessionState(session_id=_model_session_id(), profile_id=profile.profile_id))
+            store.save_model_session_state(
+                ModelSessionState(session_id=_model_session_id(), profile_id=profile.profile_id)
+            )
+            _append_model_event(store, "model_profile_selected", _profile_event_payload(profile))
             return f"Selected model profile {profile.profile_id} for this session."
         except Exception as exc:
-            return f"Model selection failed: {type(exc).__name__}:{exc}"
+            payload = {"error_class": type(exc).__name__, "safe_error_code": safe_error(str(exc))}
+            if len(parts) >= 3:
+                payload["profile_id"] = parts[2]
+            _append_model_event(store, "model_provider_rejected_by_policy", payload)
+            return f"Model selection failed: {type(exc).__name__}:{safe_error(str(exc))}"
     return "Usage: /model [current|use <profile_id>|use --provider <provider> --model <model>|health|capabilities]"
 
 
 def _render_profile_current(profile: ModelProfile) -> str:
-    return "\n".join(["Current model profile:", f"profile_id: {profile.profile_id}", f"provider: {profile.provider}", f"model: {profile.model}", f"endpoint_kind: {profile.raw.get('endpoint_kind','unknown')}", f"policy_status: {_profile_status(profile)}", f"reasoning: {'supported' if profile.raw.get('supports_reasoning') else 'unsupported'}", f"streaming: {bool(profile.raw.get('supports_streaming'))}", f"embeddings: {bool(profile.raw.get('supports_embeddings'))}"])
+    return "\n".join(
+        [
+            "Current model profile:",
+            f"profile_id: {profile.profile_id}",
+            f"provider: {profile.provider}",
+            f"model: {profile.model}",
+            f"endpoint_kind: {profile.raw.get('endpoint_kind', 'unknown')}",
+            f"policy_status: {_profile_status(profile)}",
+            f"reasoning: {'supported' if profile.raw.get('supports_reasoning') else 'unsupported'}",
+            f"streaming: {bool(profile.raw.get('supports_streaming'))}",
+            f"embeddings: {bool(profile.raw.get('supports_embeddings'))}",
+        ]
+    )
 
 
 def _render_capabilities(profile: ModelProfile) -> str:
     raw = profile.raw
-    return "\n".join(["Model capabilities:", f"streaming: {bool(raw.get('supports_streaming'))}", f"embeddings: {bool(raw.get('supports_embeddings'))}", f"tool calls: {bool(raw.get('supports_tool_calls'))}", f"json schema: {bool(raw.get('supports_json_schema'))}", f"reasoning: {bool(raw.get('supports_reasoning'))}", f"reasoning effort: {bool(raw.get('supports_reasoning_effort'))}", f"reasoning budget tokens: {bool(raw.get('supports_reasoning_budget_tokens'))}", f"reasoning summary: {bool(raw.get('supports_reasoning_summary'))}", "private chain-of-thought exposure: never"])
+    return "\n".join(
+        [
+            "Model capabilities:",
+            f"streaming: {bool(raw.get('supports_streaming'))}",
+            f"embeddings: {bool(raw.get('supports_embeddings'))}",
+            f"tool calls: {bool(raw.get('supports_tool_calls'))}",
+            f"json schema: {bool(raw.get('supports_json_schema'))}",
+            f"reasoning: {bool(raw.get('supports_reasoning'))}",
+            f"reasoning effort: {bool(raw.get('supports_reasoning_effort'))}",
+            f"reasoning budget tokens: {bool(raw.get('supports_reasoning_budget_tokens'))}",
+            f"reasoning summary: {bool(raw.get('supports_reasoning_summary'))}",
+            "private chain-of-thought exposure: never",
+        ]
+    )
 
 
 def handle_reasoning_command(command: str, *, workspace_root: str | Path = ".") -> str:
@@ -906,19 +1063,76 @@ def handle_reasoning_command(command: str, *, workspace_root: str | Path = ".") 
             return "Reasoning controls are not available for the selected model/profile. Private chain-of-thought exposure: never."
         return "Reasoning controls available. Private chain-of-thought exposure: never."
     if parts[1] == "off":
-        store.save_model_session_state(ModelSessionState(session_id=_model_session_id(), profile_id=profile.profile_id, reasoning_enabled=False))
+        store.save_model_session_state(
+            ModelSessionState(
+                session_id=_model_session_id(),
+                profile_id=profile.profile_id,
+                reasoning_enabled=False,
+            )
+        )
+        _append_model_event(
+            store,
+            "reasoning_setting_changed",
+            {
+                **_profile_event_payload(profile),
+                "reasoning_enabled": False,
+                "reasoning_effort": None,
+                "reasoning_mode": None,
+            },
+        )
         return "Reasoning controls disabled."
     if parts[1] == "set" and len(parts) == 3:
         value = parts[2]
         if not profile.raw.get("supports_reasoning"):
+            _append_model_event(
+                store,
+                "reasoning_setting_rejected",
+                {
+                    **_profile_event_payload(profile),
+                    "attempted_value": value,
+                    "reason": "reasoning_not_supported",
+                },
+            )
             return "Reasoning setting rejected: selected model/profile does not support reasoning controls."
-        allowed = set(profile.raw.get("reasoning_effort_values", [])) | set(profile.raw.get("reasoning_modes", [])) | {"off"}
+        allowed = (
+            set(profile.raw.get("reasoning_effort_values", []))
+            | set(profile.raw.get("reasoning_modes", []))
+            | {"off"}
+        )
         if value not in allowed:
+            _append_model_event(
+                store,
+                "reasoning_setting_rejected",
+                {
+                    **_profile_event_payload(profile),
+                    "attempted_value": value,
+                    "reason": "unsupported_value",
+                },
+            )
             return "Reasoning setting rejected: unsupported value for selected profile."
-        state = ModelSessionState(session_id=_model_session_id(), profile_id=profile.profile_id, reasoning_enabled=True, reasoning_effort=value if value in set(profile.raw.get("reasoning_effort_values", [])) else None, reasoning_mode=value if value in set(profile.raw.get("reasoning_modes", [])) else None)
+        state = ModelSessionState(
+            session_id=_model_session_id(),
+            profile_id=profile.profile_id,
+            reasoning_enabled=True,
+            reasoning_effort=value
+            if value in set(profile.raw.get("reasoning_effort_values", []))
+            else None,
+            reasoning_mode=value if value in set(profile.raw.get("reasoning_modes", [])) else None,
+        )
         store.save_model_session_state(state)
+        _append_model_event(
+            store,
+            "reasoning_setting_changed",
+            {
+                **_profile_event_payload(profile),
+                "reasoning_enabled": True,
+                "reasoning_effort": state.reasoning_effort,
+                "reasoning_mode": state.reasoning_mode,
+            },
+        )
         return f"Reasoning setting changed: {value}."
     return "Usage: /reasoning [status|set <mode-or-effort>|off]"
+
 
 def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> str:
     command = command.strip()
@@ -1000,15 +1214,24 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command == "/storage-lifecycle" or command.startswith("/storage-lifecycle "):
         return handle_storage_lifecycle(command, workspace_root=workspace_root)
     if (
-        command in {"/storage-lifecycle-retention", "/storage-lifecycle-cleanup-preview", "/storage-lifecycle-handoff"}
+        command
+        in {
+            "/storage-lifecycle-retention",
+            "/storage-lifecycle-cleanup-preview",
+            "/storage-lifecycle-handoff",
+        }
         or command.startswith("/storage-lifecycle-retention ")
         or command.startswith("/storage-lifecycle-cleanup-preview ")
         or command.startswith("/storage-lifecycle-handoff ")
     ):
         return handle_storage_lifecycle_slice_h(command, workspace_root=workspace_root)
-    if command == "/storage-lifecycle-evidence" or command.startswith("/storage-lifecycle-evidence "):
+    if command == "/storage-lifecycle-evidence" or command.startswith(
+        "/storage-lifecycle-evidence "
+    ):
         return handle_storage_lifecycle_evidence(command, workspace_root=workspace_root)
-    if command == "/storage-lifecycle-policy-simulation" or command.startswith("/storage-lifecycle-policy-simulation "):
+    if command == "/storage-lifecycle-policy-simulation" or command.startswith(
+        "/storage-lifecycle-policy-simulation "
+    ):
         return handle_storage_lifecycle_policy_simulation(command, workspace_root=workspace_root)
     if command == "/clients":
         return handle_clients()

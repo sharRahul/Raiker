@@ -1,23 +1,19 @@
 # Model Runtime And Local Inference Specification
 
-> **Code status: implemented — llama.cpp server is the native default backend.**
-> `raiker/models/providers/llama_cpp_server.py` is a real provider that talks to a running
-> `llama-server` over its OpenAI-compatible HTTP API using only the Python standard library
-> (`http.client`), so Raiker keeps zero_runtime_dependencies. `raiker/models/router.py` routes
-> the `mock` and `llama.cpp` providers; other providers (`lm-studio`, `openai-compatible`,
-> `vllm`, `hosted`) remain gated and raise `provider_not_wired`. At startup the router probes
-> the llama.cpp `/health` endpoint (`ModelRouter.default_provider`): if a server is reachable it
-> becomes the default backend; otherwise Raiker falls back to the deterministic `mock` provider,
-> which keeps tests and offline runs hermetic. Model output (text and tool calls) is validated by
-> `raiker/models/tool_call_validation.py` before any tool runs (OWASP LLM05).
->
-> **Not Ollama.** Raiker's native local backend is the llama.cpp server. Ollama is intentionally
-> not supported. The later high-throughput option is **vLLM** (see "Provider Types"), enabled only
-> after the llama.cpp path is solid and egress/budget policy is configured.
+> **Code status: implemented — async OpenAI-compatible runtime.**
+> `httpx>=0.27` is Raiker's runtime async HTTP transport. The OpenAI SDK and Pydantic are not used.
+> FastAPI, LangChain, and LlamaIndex remain deferred unless governed API-server, adapter, or retrieval
+> integrations are added. llama.cpp is the native local-first backend through the shared async
+> OpenAI-compatible provider. Ollama, LM Studio, vLLM, generic OpenAI-compatible endpoints, and
+> OpenRouter are profile-compatible through that same adapter. OpenRouter is hosted and policy-gated.
+> The deterministic provider is test-only; production never silently falls back to deterministic or hosted
+> providers. Live model listing is available for the selected provider when policy permits, model/reasoning
+> state is persisted for the terminal session, reasoning controls are capability-gated, and private
+> chain-of-thought is never exposed.
 
 Raiker is local-first. It must support local inference runtimes while allowing policy-controlled hosted providers.
 
-The model router abstracts model providers, context limits, streaming, tool-call formats, safety constraints, cost controls, and fallback behaviour.
+The model router abstracts model providers, context limits, streaming, tool-call formats, safety constraints, cost controls, and explicit policy-denied fallback behaviour. Silent local-to-hosted fallback is forbidden.
 
 ### llama.cpp specifics (reference: `ggml-org/llama.cpp`)
 
@@ -48,7 +44,7 @@ Raiker must support:
 7. streaming responses;
 8. tool-call proposal parsing;
 9. structured output validation;
-10. fallback and retry;
+10. explicit failure/fallback denial and retry;
 11. privacy and egress policy;
 12. cost and budget controls;
 13. TUI-driven model launch and provider binding from the global `raiker` session.
@@ -59,16 +55,16 @@ Raiker must support:
 
 | Provider | Mode | Build phase | Status / default policy |
 |---|---|---:|---|
-| `mock` | deterministic local test/offline provider | Phase 1 | **implemented**; default fallback when no server is reachable |
-| `llama.cpp` | local `llama-server` (OpenAI-compatible HTTP) | Phase 2 | **implemented — native default** when `/health` is reachable; local allowed |
-| `lm-studio` | local OpenAI-compatible API | Phase 2 | profile only; `provider_not_wired` |
+| `mock` | deterministic test provider | Phase 1 | **implemented for tests only**; never a production fallback |
+| `llama.cpp` | local `llama-server` (OpenAI-compatible HTTP) | Phase 2 | **implemented — native default** through async `httpx` OpenAI-compatible adapter; local allowed |
+| `lm-studio` | local OpenAI-compatible API | Phase 2 | profile-compatible through shared adapter; disabled until provider detected/configured |
 | `openai-compatible` | generic OpenAI-compatible endpoint | Phase 2/3 | profile only; local endpoint allowed, remote policy-gated |
 | `vllm` | high-throughput GPU server (home lab / VPS) | Phase 5 | disabled until high-throughput serving + egress/budget policy approved |
 | `hosted` | hosted API | Phase 3-5 | disabled until egress/budget policy configured |
 | `custom_plugin` | plugin-provided provider | Phase 3 | disabled until plugin and permission review |
 
 vLLM is positioned **after** the llama.cpp native path: same OpenAI-compatible tool-call shape,
-but built for high-throughput GPU serving on a home lab or VPS. It is not wired today.
+but built for high-throughput GPU serving on a home lab or VPS. It is profile-compatible through the shared adapter and remains policy-gated for private-network/hosted use.
 
 No provider is unspecified. A provider that is not enabled must still have a profile schema, validation path, privacy rule, event model, and failure behaviour.
 

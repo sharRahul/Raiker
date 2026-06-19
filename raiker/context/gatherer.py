@@ -19,19 +19,24 @@ from raiker.storage.sqlite import SQLiteStore
 # Disabled runtime capability flags surfaced as Phase 1/2-safe context. These must all stay
 # False; the gatherer reports them so the model and event log can see the runtime is gated.
 CAPABILITY_FLAGS = (
-    "runtime_execution_enabled",
     "plugin_execution_enabled",
     "graph_indexing_enabled",
     "semantic_memory_writes_enabled",
     "vector_writes_enabled",
     "embedding_creation_enabled",
+    "approval_execution_enabled",
+    "approval_relay_runtime_enabled",
+    "cleanup_execution_enabled",
+    "rollback_execution_enabled",
     "external_channels_enabled",
+    "notifications_enabled",
     "remote_execution_enabled",
     "container_execution_enabled",
     "cloud_execution_enabled",
     "process_execution_enabled",
     "shell_execution_enabled",
     "network_execution_enabled",
+    "runtime_execution_enabled",
 )
 
 

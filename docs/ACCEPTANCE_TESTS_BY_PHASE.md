@@ -129,17 +129,27 @@ Acceptance tests must prove:
 
 ## Phase 3: Desktop, Web, Mobile, Plugins, Graph, Semantic Memory
 
-Acceptance tests must prove:
+### Completed Phase 3 A-P safe foundation/readiness acceptance
 
-- Desktop, Web, Dashboard, Apple mobile, Android mobile, IDE, and API clients use the same Agent Gateway.
-- Mobile approval rejects stale action state.
-- Web/Dashboard event stream reads append-only events and SQLite state.
-- Plugin manifests validate before install/enable.
-- Disabled plugins cannot contribute tools, hooks, commands, channels, or panels.
-- Plugin permission diff detects expanded permissions.
-- Semantic search enforces provenance, sensitivity, and trust filters.
-- Graph/codemap recursive CTE impact analysis works.
-- Checkpoint restore/fork has interface-equivalent actions across enabled clients.
+Completed Phase 3 A-P acceptance is limited to the non-runtime foundation that is implemented and locally testable now. Tests must prove:
+
+- CLI functional testing covers the implemented terminal/slash-command surfaces.
+- Desktop, Web, Dashboard, and future client workspace views are read-only shared contract views and do not mutate state.
+- Plugin manifest planning validates manifests, permission diffs, and unsafe metadata without installing, enabling, or executing plugins.
+- Approval previews and approval-audit/rollback-plan surfaces are preview-only and cannot execute deferred graph, memory, cleanup, rollback, plugin, channel, remote, or hosted runtime work.
+- Readiness metadata is deterministic and JSON-renderable for graph, memory, approval, cleanup, remote, plugin, and channel readiness.
+- Storage lifecycle metadata, retention metadata, cleanup previews, handoff records, evidence bundles, and policy simulations remain metadata-only.
+- Disabled-runtime validation proves plugin execution, graph/codemap runtime indexing, semantic/vector writes, embeddings, approval execution, cleanup execution, rollback execution, external channels, subagents, remote/container/cloud execution, and hosted routines remain false.
+
+### Deferred platform acceptance after Phase 3 A-P
+
+The following acceptance criteria are specified for later app/runtime work and are **not required** to claim the current Phase 3 A-P safe foundation/readiness completion:
+
+- Mobile stale approval rejection in launchable Apple/Android clients.
+- Web/Dashboard event stream UI reading append-only events and SQLite state in a launchable app.
+- Semantic search runtime enforcing provenance, sensitivity, and trust filters.
+- Graph/codemap recursive CTE runtime impact analysis and query execution.
+- Checkpoint restore/fork UI parity across launchable Desktop/Web/Dashboard/Mobile/IDE/API clients.
 
 ---
 
@@ -188,7 +198,7 @@ Manual terminal actions:
 ```text
 Hello Raiker
 List files in this project
-/launch --provider mock --model mock-deterministic
+/launch --provider mock --model mock-deterministic  # test-only; normal CLI should report deterministic_test_provider_requires_test_mode
 /channels
 /models
 ```

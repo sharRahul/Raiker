@@ -264,7 +264,7 @@ These permission labels are used in the inventory below so coding agents know wh
 | `/doctor` | Show diagnostics and disabled gates. | `config:read`, `model:read`, `channel:read` | Yes |
 | `/channels` | List channel connector profiles. | `channel:read` | Yes — activation disabled |
 | `/models` | List model profiles. | `model:read` | Yes |
-| `/launch --provider mock --model mock-deterministic` | Launch/switch mock model profile. | `model:launch` | Yes — mock/local safe path |
+| `/launch --provider mock --model mock-deterministic` | Test-only deterministic profile launch; normal production CLI policy blocks it with `deterministic_test_provider_requires_test_mode`. | `model:launch` | Test-only/deferred; not a production CLI runtime |
 | `/quit` | Exit terminal session safely. | `none` | Yes |
 
 ---
@@ -427,5 +427,5 @@ Slice P adds deterministic metadata-only readiness contracts, registry, optional
 | `/storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]` | Inspection/control command exposed by terminal CLI. | local_terminal | `planning_only_implemented_verified` | planning/simulation only | No direct tool execution; unsafe runtime disabled. |
 | `/doctor` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/channels` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
-| `/launch --provider mock --model mock-deterministic` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | mock provider launch smoke only | Only documented mock deterministic launch; no unsafe runtime. |
+| `/launch --provider mock --model mock-deterministic` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | test-only policy-block smoke | Deterministic mock provider is test-only; normal CLI must not imply production launch support. |
 | `/quit` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |

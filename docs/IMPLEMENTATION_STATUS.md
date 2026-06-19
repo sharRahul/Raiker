@@ -148,15 +148,60 @@ Scope and boundaries (same as MVP — no expansion):
 Evidence: `tests/test_phase_2_5_code_review_hardening.py`, `tests/test_phase_2_5_code_review_cli.py`,
 `tests/test_phase_2_5_code_review_workflow.py`, `tests/test_phase_2_5_code_review_safety.py`.
 
+---
+
+## Phase 2.6 Review-to-Action Proposal Workflow Status
+
+Phase 2.6 review-to-action proposal workflow: `implemented_verified` for local CLI-only proposal
+generation from deterministic review findings.
+
+| Capability | Phase | Status | Source | Tests |
+|---|---|---|---|---|
+| `ReviewActionProposal` model + deterministic `generate_action_proposals()` | `phase_2_6` | `implemented_verified` | `raiker/review/models.py`, `raiker/review/proposals.py` | `tests/test_phase_2_6_review_action_proposals.py` |
+| `/review --propose-fixes` / `--proposals-only` CLI surface | `phase_2_6` | `implemented_verified` | `raiker/cli/commands.py`, `raiker/review/render.py` | `tests/test_phase_2_6_review_action_proposal_cli.py` |
+| Proposal text/JSON rendering + metadata-only `review_proposals_created` event | `phase_2_6` | `implemented_verified` | `raiker/review/render.py`, `raiker/review/workflow.py` | `tests/test_phase_2_6_review_action_proposal_safety.py` |
+
+Scope and boundaries:
+
+- Phase 2.6 is proposal-only. No fixes are applied. No files are modified. No tests are run.
+  No shell/process/network execution is used. No GitHub PR automation is implemented. No
+  UI/API/IDE/dashboard/mobile surface is implemented. No model-assisted/semantic review is
+  implemented. No Phase 3/4 runtime capability is enabled.
+- Proposals are generated in memory from the (filtered) review findings and returned in
+  `ReviewResult.action_proposals`. `--severity`/`--limit` filtering applies before proposal
+  generation so proposals align with visible findings.
+- No proposal contains raw diff, raw file contents, raw secrets, prompt text, private
+  reasoning, chain-of-thought, or raw tool output.
+- Every proposal that could change files has `requires_approval=True` and
+  `would_modify_files=True`; info-only/no-action proposals have both false.
+- `raiker/review/` (including `raiker/review/proposals.py`) does not import `subprocess`,
+  `socket`, `requests`, `httpx`, `urllib`, or `asyncio`.
+- No Phase 3/4 runtime capability is enabled by this change. All disabled runtime flags remain
+  false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled,
+  vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled,
+  approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled,
+  external_channels_enabled, notifications_enabled, remote_execution_enabled,
+  container_execution_enabled, cloud_execution_enabled, process_execution_enabled,
+  shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+
+Evidence: `tests/test_phase_2_6_review_action_proposals.py`,
+`tests/test_phase_2_6_review_action_proposal_cli.py`,
+`tests/test_phase_2_6_review_action_proposal_safety.py`,
+`tests/test_pre_phase_3_readiness.py`.
+
+Pre-Phase-3 readiness audit: `docs/PRE_PHASE_3_READINESS_AUDIT.md` records that Phase 1, Phase 2,
+Phase 2.5, and Phase 2.6 are complete and that it is safe to start Phase 3 planning next. It does
+not mark Phase 3 runtime activation complete; Phase 4 remains blocked.
+
 ### Local validation baseline (2026-06-19)
 
-After Phase 2.5 hardening and httpx dependency metadata fix:
+After Phase 2.6 review-to-action proposal workflow closure:
 
 | Check | Result |
 |---|---|
 | ruff | All checks passed |
-| mypy | Success, 197 source files |
-| pytest | 369 passed, 2 skipped |
+| mypy | Success, 198 source files |
+| pytest | all tests passed, expected skips only |
 | validate_phase_status.py | passed |
 | validate_repo_truthfulness.py | passed |
 

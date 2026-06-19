@@ -22,6 +22,22 @@ CATEGORIES = frozenset(
 )
 CONFIDENCES = frozenset({"low", "medium", "high"})
 
+# Phase 2.6 review-to-action proposal enumerations. Proposals are safe, in-memory
+# descriptions of what *could* be done; they never apply fixes or mutate files.
+PROPOSAL_ACTION_TYPES = frozenset(
+    {
+        "manual_patch_proposal",
+        "test_addition_proposal",
+        "docs_update_proposal",
+        "scope_reduction_proposal",
+        "secret_removal_proposal",
+        "runtime_safety_refactor_proposal",
+        "review_scope_adjustment_proposal",
+        "no_action_required",
+    }
+)
+PROPOSAL_RISK_LEVELS = frozenset({"low", "medium", "high"})
+
 
 class ReviewModelError(ValueError):
     """Raised when a review model is constructed with an invalid enumeration value."""
@@ -106,6 +122,53 @@ class ReviewFinding:
 
 
 @dataclass(frozen=True)
+class ReviewActionProposal:
+    """A safe, in-memory proposed action derived from a review finding.
+
+    Proposals are proposal-only. They never apply fixes, mutate files, run tests, or
+    execute shell/process/network calls. ``would_modify_files`` describes what an
+    approval-gated future action *would* do, not anything this proposal does.
+    """
+
+    proposal_id: str
+    finding_id: str
+    title: str
+    action_type: str
+    risk_level: str
+    requires_approval: bool
+    would_modify_files: bool
+    files: list[str]
+    summary: str
+    rationale: str
+    safety_notes: list[str]
+
+    def __post_init__(self) -> None:
+        if self.action_type not in PROPOSAL_ACTION_TYPES:
+            raise ReviewModelError(f"invalid_action_type:{self.action_type}")
+        if self.risk_level not in PROPOSAL_RISK_LEVELS:
+            raise ReviewModelError(f"invalid_risk_level:{self.risk_level}")
+        if self.would_modify_files and not self.requires_approval:
+            raise ReviewModelError("would_modify_files requires requires_approval")
+        if not self.proposal_id.startswith("rap_"):
+            raise ReviewModelError("proposal_id must use rap_ prefix")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "proposal_id": self.proposal_id,
+            "finding_id": self.finding_id,
+            "title": self.title,
+            "action_type": self.action_type,
+            "risk_level": self.risk_level,
+            "requires_approval": self.requires_approval,
+            "would_modify_files": self.would_modify_files,
+            "files": list(self.files),
+            "summary": self.summary,
+            "rationale": self.rationale,
+            "safety_notes": list(self.safety_notes),
+        }
+
+
+@dataclass(frozen=True)
 class ReviewSummary:
     files_reviewed: int
     findings_count: int
@@ -113,6 +176,7 @@ class ReviewSummary:
     categories: dict[str, int]
     truncated: bool
     redaction_applied: bool
+    proposal_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -122,6 +186,7 @@ class ReviewSummary:
             "categories": dict(self.categories),
             "truncated": self.truncated,
             "redaction_applied": self.redaction_applied,
+            "proposal_count": self.proposal_count,
         }
 
 
@@ -131,6 +196,7 @@ class ReviewResult:
     scope: ReviewScope
     summary: ReviewSummary
     findings: list[ReviewFinding] = field(default_factory=list)
+    action_proposals: list[ReviewActionProposal] = field(default_factory=list)
     safety_notes: list[str] = field(default_factory=list)
     event_metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -140,6 +206,7 @@ class ReviewResult:
             "scope": self.scope.to_dict(),
             "summary": self.summary.to_dict(),
             "findings": [finding.to_dict() for finding in self.findings],
+            "action_proposals": [proposal.to_dict() for proposal in self.action_proposals],
             "safety_notes": list(self.safety_notes),
             "event_metadata": dict(self.event_metadata),
         }

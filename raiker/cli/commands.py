@@ -862,7 +862,8 @@ def handle_storage_lifecycle_policy_simulation(
 def _parse_review_command(command: str) -> dict[str, object] | str:
     usage = (
         "Usage: /review [--summary] [--staged] [--path <path>] [--json] "
-        "[--limit <number>] [--severity <info|low|medium|high>]"
+        "[--limit <number>] [--severity <info|low|medium|high>] "
+        "[--propose-fixes] [--proposals-only]"
     )
     parts = shlex.split(command)
     summary_only = False
@@ -871,6 +872,8 @@ def _parse_review_command(command: str) -> dict[str, object] | str:
     path: str | None = None
     limit: int | None = None
     severity: str | None = None
+    propose_fixes = False
+    proposals_only = False
     i = 1
     while i < len(parts):
         arg = parts[i]
@@ -882,6 +885,13 @@ def _parse_review_command(command: str) -> dict[str, object] | str:
             i += 1
         elif arg == "--staged":
             staged = True
+            i += 1
+        elif arg == "--propose-fixes":
+            propose_fixes = True
+            i += 1
+        elif arg == "--proposals-only":
+            proposals_only = True
+            propose_fixes = True
             i += 1
         elif arg == "--path" and i + 1 < len(parts):
             path = parts[i + 1]
@@ -908,6 +918,8 @@ def _parse_review_command(command: str) -> dict[str, object] | str:
         "path": path,
         "limit": limit,
         "severity": severity,
+        "propose_fixes": propose_fixes,
+        "proposals_only": proposals_only,
     }
 
 
@@ -922,12 +934,15 @@ def handle_review(command: str = "/review", *, workspace_root: str | Path = ".")
     path_arg = parsed["path"]
     severity = parsed["severity"]
     limit = parsed["limit"]
+    propose_fixes = bool(parsed["propose_fixes"])
+    proposals_only = bool(parsed["proposals_only"])
     try:
         result = CodeReviewWorkflow().review(
             workspace_root=workspace_root,
             staged=bool(parsed["staged"]),
             path=path_arg if isinstance(path_arg, str) else None,
             summary_only=bool(parsed["summary_only"]),
+            propose_fixes=propose_fixes,
         )
     except ReviewPathError:
         return "Review failed: path is outside the workspace."
@@ -940,12 +955,18 @@ def handle_review(command: str = "/review", *, workspace_root: str | Path = ".")
         findings = [f for f in findings if SEVERITY_RANK[f.severity] >= threshold]
     if isinstance(limit, int):
         findings = findings[:limit]
-    if findings != list(result.findings):
-        result = rebuild_review_result_with_findings(result, findings)
+    if findings != list(result.findings) or propose_fixes:
+        result = rebuild_review_result_with_findings(
+            result, findings, propose_fixes=propose_fixes
+        )
 
     if parsed["as_json"]:
         return render_json(result)
-    return render_text(result, summary_only=bool(parsed["summary_only"]))
+    return render_text(
+        result,
+        summary_only=bool(parsed["summary_only"]),
+        proposals_only=proposals_only,
+    )
 
 
 def handle_execution_profiles() -> str:
@@ -1238,7 +1259,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return "Exiting Raiker."
     if command == "/help":
         return (
-            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>], /doctor, /channels, /launch --provider mock --model mock-deterministic (test-only; policy-blocked in normal CLI), /quit\n"
+            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only], /doctor, /channels, /launch --provider mock --model mock-deterministic (test-only; policy-blocked in normal CLI), /quit\n"
             "Status: Phase 3 is complete for safe foundation/readiness slices A-P; Phase 3 safe foundation/readiness slices A-P are complete; Phase 4 is blocked; runtime execution remains disabled. Current launchable UI is a simple terminal/CLI shell. Desktop/Web/Dashboard/Mobile/REST/Rich TUI panels are contract-only or specified/deferred unless explicitly implemented. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
         )
     if command == "/providers":

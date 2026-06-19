@@ -107,6 +107,7 @@ EVENT_TYPES = {
     "review_started",
     "review_completed",
     "review_failed",
+    "review_proposals_created",
 }
 INTENTS = {
     "chat",

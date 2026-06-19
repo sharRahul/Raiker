@@ -463,3 +463,20 @@ raw tool output. Allowed payload fields: `review_id`, `mode`, `files_reviewed`, 
 Review is local CLI-only and read-only. It does not enable plugin execution, graph/codemap indexing,
 semantic/vector memory writes, external channels, notifications, remote/container/cloud execution,
 process/shell/network execution, or any runtime execution; those flags remain false.
+
+## Phase 2.6 review-to-action proposal events
+
+The Phase 2.6 proposal-only workflow (`/review --propose-fixes`) emits an additional metadata-only
+event when proposals are generated. Payloads never contain raw diffs, raw file contents, secrets,
+prompt text, private reasoning, chain-of-thought, raw tool output, or full proposal text that could
+contain file content. Allowed payload fields: `review_id`, `proposal_count`,
+`requires_approval_count`, `would_modify_files_count`, `risk_counts`.
+
+| Event | When | Payload |
+|---|---|---|
+| `review_proposals_created` | `/review --propose-fixes` generates proposals from findings. | `review_id`, `proposal_count`, `requires_approval_count`, `would_modify_files_count`, `risk_counts` |
+
+Phase 2.6 is proposal-only. No fixes are applied, no files are modified, no tests are run, and no
+shell/process/network execution is used. No GitHub PR automation, UI/API/IDE/dashboard/mobile
+surface, or model-assisted/semantic review is implemented. No Phase 3/4 runtime capability is
+enabled; all disabled runtime flags remain false.

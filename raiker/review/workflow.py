@@ -18,12 +18,14 @@ from raiker.review.models import (
     SEVERITIES as _SEVERITIES,
 )
 from raiker.review.models import (
+    ReviewActionProposal,
     ReviewFinding,
     ReviewInput,
     ReviewResult,
     ReviewScope,
     ReviewSummary,
 )
+from raiker.review.proposals import generate_action_proposals, proposal_risk_counts
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.broker import ToolBroker
 from raiker.tools.filesystem import FilesystemSafetyError, resolve_workspace_path
@@ -72,6 +74,7 @@ class CodeReviewWorkflow:
         summary_only: bool = False,
         max_files: int = 20,
         max_diff_chars: int = 20000,
+        propose_fixes: bool = False,
     ) -> ReviewResult:
         root = Path(workspace_root).resolve()
         path_filter = self._resolve_path_filter(root, path)
@@ -140,6 +143,7 @@ class CodeReviewWorkflow:
                 findings=findings,
                 truncated=truncated,
                 redaction_applied=redaction_applied,
+                proposals=generate_action_proposals(findings) if propose_fixes else [],
             )
             event_payload = {
                 "review_id": review_id,
@@ -156,11 +160,31 @@ class CodeReviewWorkflow:
             result_metadata["categories"] = dict(summary.categories)
             result_metadata["staged_changes_present"] = staged_present
             result_metadata["untracked_files"] = untracked_files
+            action_proposals = generate_action_proposals(findings) if propose_fixes else []
+            if propose_fixes:
+                risk_counts = proposal_risk_counts(action_proposals)
+                proposal_event_payload = {
+                    "review_id": review_id,
+                    "proposal_count": len(action_proposals),
+                    "requires_approval_count": sum(
+                        1 for p in action_proposals if p.requires_approval
+                    ),
+                    "would_modify_files_count": sum(
+                        1 for p in action_proposals if p.would_modify_files
+                    ),
+                    "risk_counts": risk_counts,
+                }
+                self._emit(
+                    writer, session_id, "review_proposals_created", proposal_event_payload
+                )
+                result_metadata["proposal_count"] = len(action_proposals)
+                result_metadata["proposal_risk_counts"] = risk_counts
             return ReviewResult(
                 review_id=review_id,
                 scope=scope,
                 summary=summary,
                 findings=findings,
+                action_proposals=action_proposals,
                 safety_notes=list(_SAFETY_NOTES_CLEAN if not files else _SAFETY_NOTES_REVIEW),
                 event_metadata=result_metadata,
             )
@@ -298,6 +322,7 @@ class CodeReviewWorkflow:
         findings: list[ReviewFinding],
         truncated: bool,
         redaction_applied: bool,
+        proposals: list[ReviewActionProposal] | None = None,
     ) -> ReviewSummary:
         severity_counts = {severity: 0 for severity in _SEVERITIES}
         categories: dict[str, int] = {}
@@ -311,6 +336,7 @@ class CodeReviewWorkflow:
             categories=dict(sorted(categories.items())),
             truncated=truncated,
             redaction_applied=redaction_applied,
+            proposal_count=len(proposals) if proposals else 0,
         )
 
     def _emit(

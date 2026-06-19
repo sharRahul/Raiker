@@ -257,7 +257,7 @@ The terminal client currently exposes these inspection and controlled-action com
 /storage-lifecycle-handoff [--summary]
 /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]
 /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]
-/review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>]
+/review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only]
 /doctor
 /channels
 /launch --provider mock --model mock-deterministic
@@ -272,7 +272,13 @@ The deterministic mock launch command is test-only: normal production CLI policy
 
 Phase 2.5 hardening is complete: `--severity` and `--limit` summaries are rebuilt from filtered findings, and untracked files are detected as metadata-only (contents never read or leaked).
 
-`/review` is local CLI code review only. It is not a review UI, web/dashboard review surface, IDE review surface, REST/API review server, or GitHub PR review automation, and it does not apply fixes, run tests, mutate files, or touch the Git index. Raw diffs and secrets are never written into findings or event payloads.
+### Phase 2.6 review-to-action proposal workflow
+
+Phase 2.6 review-to-action proposal workflow: `implemented_verified` for local CLI-only proposal generation from deterministic review findings. `/review --propose-fixes` converts review findings into safe, in-memory proposed actions (`ReviewActionProposal`) using a deterministic generator (`raiker/review/proposals.py`). Proposals are included in text/JSON output and a metadata-only `review_proposals_created` event records proposal/risk counts. `--severity`/`--limit` filtering applies before proposal generation so proposals align with visible findings. `--proposals-only` shows proposals with finding references but omits detailed finding text.
+
+Phase 2.6 is proposal-only. No fixes are applied. No files are modified. No tests are run. No shell/process/network execution is used. No GitHub PR automation is implemented. No UI/API/IDE/dashboard/mobile surface is implemented. No model-assisted/semantic review is implemented. No Phase 3/4 runtime capability is enabled.
+
+`/review` is local CLI code review only. It is not a review UI, web/dashboard review surface, IDE review surface, REST/API review server, or GitHub PR review automation, and it does not apply fixes, run tests, mutate files, or touch the Git index. Raw diffs and secrets are never written into findings, proposals, or event payloads.
 
 Phase 3 and Phase 4 commands are inspection/planning/governance/preview surfaces unless explicitly documented otherwise. They must not execute plugins, activate channels, write semantic/vector memory, create embeddings, start graph indexing, persist executable approvals, spawn agents, or run remote/container commands.
 

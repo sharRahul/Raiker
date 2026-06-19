@@ -466,6 +466,8 @@ Forms:
 /review --json
 /review --limit <number>
 /review --severity <info|low|medium|high>
+/review --propose-fixes
+/review --proposals-only
 ```
 
 Behavior:
@@ -480,6 +482,11 @@ Behavior:
 - `/review --limit <number>` and `/review --severity <info|low|medium|high>` filter findings
   after review, and rebuild the user-visible summary (`findings_count`, `severity_counts`,
   `categories`) from the filtered findings only.
+- `/review --propose-fixes` additionally generates safe, in-memory `ReviewActionProposal`
+  records from the (filtered) findings and renders them in text/JSON output. Filtering applies
+  before proposal generation, so proposals align with visible findings.
+- `/review --proposals-only` implies `--propose-fixes` and shows proposals with finding
+  references while omitting detailed finding text.
 - Unknown flags fail safely with usage text.
 
 Untracked-file detection:
@@ -487,18 +494,36 @@ Untracked-file detection:
 - `/review` detects untracked files through `git status` (via `ToolBroker`/`PolicyEngine`) and
   emits an `untracked-files` info finding.
 - Untracked file contents are never read or leaked. Event payloads include a safe
-  `untracked_count` integer; file contents are never in findings, events, or rendered output.
+  `untracked_count` integer; file contents are never in findings, proposals, events, or rendered
+  output.
 - If only untracked files exist (no tracked diff), `/review` reports the untracked finding
   and does not say "No local changes found."
+
+Proposal generation (Phase 2.6):
+
+- Proposals are generated deterministically by `raiker/review/proposals.py` from finding ids
+  (`missing-tests`, `secret-introduced`, `scope-expansion`, `unsafe-runtime`, `docs-only`,
+  `test-only`, `review-truncated`, `untracked-files`). Unknown findings produce no proposal.
+- Each proposal carries `proposal_id` (prefix `rap_`), `finding_id`, `title`, `action_type`,
+  `risk_level`, `requires_approval`, `would_modify_files`, `files`, `summary`, `rationale`,
+  and `safety_notes`.
+- Proposals that could change files have `requires_approval=True` and `would_modify_files=True`;
+  info-only/no-action proposals have both false.
+- A metadata-only `review_proposals_created` event records `proposal_count`,
+  `requires_approval_count`, `would_modify_files_count`, and `risk_counts`. No raw diff, file
+  contents, secrets, prompt text, private reasoning, chain-of-thought, or raw tool output is
+  placed in proposals or event payloads.
 
 Safety guarantees:
 
 - `/review` never modifies files, stages/unstages the Git index, commits, runs tests, applies
   fixes, executes shell/process/network calls, or enables any disabled runtime flag.
-- Raw diffs and secrets are never placed in findings or event payloads; secret-like content is
-  redacted before findings/events.
+- `/review --propose-fixes` is proposal-only: it never applies fixes, mutates files, runs tests,
+  or executes shell/process/network calls.
+- Raw diffs and secrets are never placed in findings, proposals, or event payloads; secret-like
+  content is redacted before findings/events.
 
 Boundaries: local CLI code review only. Not a review UI/web/dashboard/IDE/REST/API surface and not
 GitHub PR review automation. Review never mutates files, stages/unstages, commits, runs tests, applies
 fixes, executes shell/process/network calls, or enables any disabled runtime flag. Raw diffs and
-secrets are never placed in findings or event payloads.
+secrets are never placed in findings, proposals, or event payloads.

@@ -47,10 +47,17 @@ As of the current `main` state:
 |---|---|---|
 | Phase 1 MVP runtime core | `implemented_verified` | Package scaffold, global `raiker` command, contracts, event log, SQLite bootstrap, static policy, tool broker, safe filesystem/search tools, approval-gated local actions, mock model provider, runtime state machine, terminal shell, and checkpoint stubs are present and covered by tests. |
 | Phase 2 rich local workspace | `implemented_verified` | Task management, event viewer, checkpoint timeline, status/task/event/checkpoint/approval commands, side-question and interrupt contracts, approval inbox, governed file/git wrappers, local provider health-check, and memory candidate views are present and covered by tests. |
-| Phase 3 local rich workspace/extensibility foundations | `implemented_verified` | All Phase 3 slices A through P are implemented, tested, and documented. Runtime execution remains disabled. Phase 3 does not enable any Phase 4 behavior. |
-| Phase 3 local rich workspace/extensibility foundations | **implemented_verified** | All Phase 3 slices A through P are implemented, tested, and documented: read-only workspace inspection/view surfaces, equal client contract parity, plugin manifest/registration planning, capability gates, graph/codemap dry-run planning, semantic memory review governance, approval-preview UX/contracts, approval audit/rollback planning, storage lifecycle metadata, lifecycle retention/cleanup-preview/approval-handoff, lifecycle evidence/simulation, graph/codemap readiness metadata, semantic memory readiness metadata, approval-preview persistence readiness metadata, storage cleanup execution readiness metadata, plugin/server startup readiness metadata, external channels/notifications readiness metadata, and remote/container/cloud execution readiness metadata. All runtime execution remains disabled. Phase 3 does not enable any Phase 4 behavior. |
+| Phase 3 local rich workspace/extensibility foundations | `implemented_verified` | All Phase 3 slices A through P are implemented, tested, and documented. Runtime execution remains disabled. Phase 3 does not enable any Phase 4 behavior. See per-slice detail in the Phase 3 Slice specs under `docs/`. |
 | Phase 4 external channel / multi-agent / governed execution foundations | **Foundation only; Phase 4 is not complete** | Execution profiles, remote/container execution planning, subagent planning, external-channel activation status, and inspection commands are present. External transports, subagent spawning, multi-agent teams, remote execution, and container execution remain disabled. |
 | GitHub Actions | Temporarily paused | Workflows are currently `workflow_dispatch` only because GitHub Actions quota is exhausted. Use [`docs/LOCAL_VALIDATION_GATE.md`](docs/LOCAL_VALIDATION_GATE.md) until CI triggers are restored. |
+
+> **Review note (2026-06-19):** A full repository review is recorded in
+> [`docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md`](docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md).
+> It verified that some capabilities are documented ahead of code — notably **hooks**
+> (no `raiker/hooks/` module), **local model providers** (only the `mock` provider is wired;
+> the router rejects others), and the **verifier**/**context gatherer** (stubs). These are
+> tracked honestly in [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) under
+> "Known Documentation/Code Gaps" and must not be treated as `implemented_verified`.
 
 Do **not** mark any capability `implemented_verified` unless:
 
@@ -335,6 +342,7 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 | Document | Purpose |
 |---|---|
 | [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) | Status ledger for specified, implemented, disabled, blocked, and out-of-scope capabilities. |
+| [`docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md`](docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md) | Critical review vs reference platforms: capability coverage, doc/code gap analysis, OWASP status, and engineering backlog. |
  | [`docs/PHASE_3_COMPLETION_AUDIT.md`](docs/PHASE_3_COMPLETION_AUDIT.md) | Phase 3 completion audit confirming all slices A-P are implemented, tested, and documented with runtime execution disabled. |
 | [`docs/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md`](docs/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md) | Audit of repeated Phase 3 readiness patterns across Slices J-O and the recommended shared internal foundation before Slice P. |
 | [`docs/LOCAL_VALIDATION_GATE.md`](docs/LOCAL_VALIDATION_GATE.md) | Required local validation while GitHub Actions are paused. |
@@ -392,6 +400,8 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 | [`docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`](docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md) | Eidetic-style raw observations, gist memory, retention, exact replay, skill learning, and self-improvement controls. |
 | [`docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`](docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md) | Graph entities, relationships, codemap indexing, graph queries, staleness, graph-context retrieval, and approval previews. |
 | [`docs/HOOKS_SPEC.md`](docs/HOOKS_SPEC.md) | Hook lifecycle events, handlers, matchers, async hooks, decision authority, and hook security. |
+| [`docs/EXTENSIBILITY_MODEL.md`](docs/EXTENSIBILITY_MODEL.md) | Unified model of the five extension surfaces (tools, hooks, skills, plugins, channels), shared trust/scope/lifecycle rules, and current code state. |
+| [`docs/SELF_IMPROVEMENT_MODEL.md`](docs/SELF_IMPROVEMENT_MODEL.md) | First-class self-improvement/skill-learning spec: closed loop, distillation contract, safety boundaries, and tests. |
 | [`docs/PLUGIN_SYSTEM_SPEC.md`](docs/PLUGIN_SYSTEM_SPEC.md) | Plugin manifests, components, permissions, trust levels, lifecycle, skills, channels, and supply-chain controls. |
 | [`docs/PLUGIN_MANIFEST_SCHEMA.md`](docs/PLUGIN_MANIFEST_SCHEMA.md) | Strict plugin manifest schema, required fields, permission declaration rules, trust rules, events, and tests. |
 | [`docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md`](docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md) | Subagents, multi-agent teams, bounded delegation, side questions, and parent verification. |

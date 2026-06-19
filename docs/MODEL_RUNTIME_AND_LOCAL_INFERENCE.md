@@ -1,8 +1,36 @@
 # Model Runtime And Local Inference Specification
 
+> **Code status: partial — mock provider only.** The provider *contract* and the model-profile
+> registry exist, but `raiker/models/router.py` raises `provider_not_wired_in_phase_1` for every
+> provider except `mock`. **No local-inference client (llama.cpp/Ollama/LM Studio) is wired**;
+> `raiker/models/health.py` only *detects* a local binary, it does not run inference. The
+> implemented `mock` provider returns deterministic placeholder text. Note: the IMPLEMENTATION
+> ledger lists "Local provider health-check" as Phase 2 `implemented_verified` — that refers to
+> the **health-check only**, not to working inference. Until a real adapter lands, treat local
+> inference as `specified_not_implemented`.
+>
+> **First implementation target (recommended):** a `raiker/models/providers/` package with one
+> real adapter — `llama_cpp_server` (HTTP `/completion` + `/v1/chat/completions`, GGUF model,
+> streaming) or `ollama` (`/api/chat`) — behind the existing provider contract, selected by
+> profile, and still routed through policy/egress gates.
+
 Raiker is local-first. It must support local inference runtimes while allowing policy-controlled hosted providers.
 
 The model router abstracts model providers, context limits, streaming, tool-call formats, safety constraints, cost controls, and fallback behaviour.
+
+### llama.cpp specifics (reference: `ggml-org/llama.cpp`)
+
+- **Model format:** GGUF; quantization levels (e.g. `Q4_K_M`, `Q5_K_M`, `Q8_0`) trade memory/VRAM
+  for quality. Profiles in `config/model-profiles.json` should record the quant + context length.
+- **Server mode:** `llama-server` exposes an OpenAI-compatible `/v1/chat/completions` plus native
+  `/completion`, `/embedding`, and `/health`. Raiker's `llama_cpp_server` adapter should target
+  the OpenAI-compatible surface for chat and `/embedding` for future semantic memory.
+- **Hardware/context:** context window (`n_ctx`), GPU offload layers, and thread count are
+  launch-time settings; the launch contract must surface them and the health-check must read
+  `/health` before binding a session.
+- **Tool calls:** local models vary in native tool-call support; the router must support both
+  native function-calling and a prompt-based tool-call mode, parsing either as **untrusted**
+  structured proposals (see `docs/API_AND_CONTRACT_SCHEMAS.md`).
 
 ---
 

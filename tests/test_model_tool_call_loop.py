@@ -39,6 +39,15 @@ class FakeRouter:
         self.calls += 1
         return self.responses[index]
 
+    async def achat(
+        self,
+        provider: str,
+        model: str,
+        messages: Sequence[ModelMessage],
+        tools: Sequence[ToolSpec] | None = None,
+    ) -> ModelResponse:
+        return self.chat(provider, model, messages, tools)
+
 
 def _orchestrator(tmp_path: Path, router: FakeRouter) -> RuntimeOrchestrator:
     store = SQLiteStore(tmp_path)

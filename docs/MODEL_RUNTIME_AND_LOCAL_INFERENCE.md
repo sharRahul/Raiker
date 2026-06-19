@@ -92,10 +92,11 @@ Required TUI examples:
 /launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
 ```
 
-The native default backend needs no explicit launch: run a llama.cpp server
-(`llama-server -m <model.gguf> --port 8080 --jinja`) and Raiker binds to it automatically when
-its `/health` endpoint is reachable. `/launch` is for switching profiles or pointing at a
-different local endpoint.
+The native default profile is the configured llama.cpp OpenAI-compatible profile. Run a llama.cpp server
+(`llama-server -m <model.gguf> --port 8080 --jinja`) at the configured endpoint before using
+that profile for runtime calls. Raiker does not automatically bind based on health probing; health is
+checked only through explicit health paths such as `/model health` or provider health APIs. `/launch`
+is for switching profiles or pointing at a different local endpoint.
 
 The canonical human-facing Raiker command is `raiker` and it must not depend on provider-specific shortcuts.
 
@@ -137,10 +138,14 @@ The canonical human-facing Raiker command is `raiker` and it must not depend on 
 }
 ```
 
-The runtime maps these fields to `raiker/models/providers/llama_cpp_server.LlamaCppServerProvider`
-(`endpoint`, `served_model_name`, `n_ctx`, `temperature`, `max_tokens`, `timeout_seconds`,
-`tool_call_protocol`). A non-local `endpoint` is rejected unless the profile is explicitly not
-`local_only` — model egress is a deliberate policy decision.
+The active runtime path is `ModelProfileRegistry -> ModelRouter -> ModelProviderFactory ->
+AsyncOpenAICompatibleProvider` for llama.cpp and other OpenAI-compatible profiles. The provider
+uses `httpx>=0.27` as the async HTTP transport and maps profile fields such as `endpoint`,
+`served_model_name`, `temperature`, `max_tokens`, `timeout_seconds`, and `tool_call_protocol`
+into OpenAI-compatible requests. A non-local `endpoint` is rejected unless the profile is explicitly
+not `local_only` — model egress is a deliberate policy decision. The OpenAI SDK and Pydantic are
+not used; FastAPI, LangChain, and LlamaIndex remain deferred. The deterministic provider is
+test-only, and production does not fall back to it.
 
 ---
 

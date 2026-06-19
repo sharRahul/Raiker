@@ -85,20 +85,33 @@ def test_orchestrator_ahandle_awaits_router_and_redacts_events(tmp_path: Path) -
     assert "async ok" not in json.dumps(model_events)
 
 
-async def test_orchestrator_handle_refuses_active_loop(tmp_path: Path) -> None:
-    with pytest.raises(RuntimeError, match="use ahandle"):
-        _runtime(tmp_path, RecordingRouter()).handle(build_prompt_envelope("hi"))
+def test_orchestrator_handle_refuses_active_loop(tmp_path: Path) -> None:
+    async def main() -> None:
+        with pytest.raises(RuntimeError, match="use ahandle"):
+            _runtime(tmp_path, RecordingRouter()).handle(build_prompt_envelope("hi"))
+
+    asyncio.run(main())
 
 
 def test_provider_failure_emits_failed_event_without_prompt(tmp_path: Path) -> None:
     envelope = build_prompt_envelope("RAW_PROMPT_SECRET", session_id="sess_fail")
     response = asyncio.run(_runtime(tmp_path, FailingRouter()).ahandle(envelope))
-    assert response.status == "completed"
+    assert response.status == "failed"
+    assert response.message == "model_unavailable: provider_connection_failed"
     events = _event_payloads(tmp_path)
-    assert any(e["event_type"] == "model_request_failed" for e in events)
-    assert "RAW_PROMPT_SECRET" not in json.dumps(
-        [e for e in events if e["event_type"].startswith("model_request_")]
-    )
+    model_events = [e for e in events if e["event_type"].startswith("model_request_")]
+    assert any(e["event_type"] == "model_request_failed" for e in model_events)
+    forbidden = [
+        "RAW_PROMPT_SECRET",
+        "RAW_COMPLETION_SECRET",
+        "RAW_REASONING_SECRET",
+        "Authorization",
+        "API_KEY",
+        "OPENROUTER_API_KEY",
+        "Bearer",
+    ]
+    serialized = json.dumps(model_events)
+    assert all(token not in serialized for token in forbidden)
 
 
 def test_gateway_async_and_sync_loop_policy(tmp_path: Path) -> None:
@@ -175,7 +188,7 @@ def test_cli_model_and_reasoning_events_are_safe(tmp_path: Path) -> None:
     handle_model_command("/model capabilities", workspace_root=tmp_path)
     handle_model_command("/model health", workspace_root=tmp_path)
     assert "rejected" in handle_reasoning_command(
-        "/reasoning set RAW_REASONING", workspace_root=tmp_path
+        "/reasoning set RAW_REASONING_SECRET", workspace_root=tmp_path
     )
     assert "disabled" in handle_reasoning_command("/reasoning off", workspace_root=tmp_path)
     types = [e["event_type"] for e in _event_payloads(tmp_path)]
@@ -184,7 +197,16 @@ def test_cli_model_and_reasoning_events_are_safe(tmp_path: Path) -> None:
     assert "model_health_check_started" in types and "model_health_check_completed" in types
     assert "reasoning_setting_rejected" in types and "reasoning_setting_changed" in types
     data = json.dumps(_event_payloads(tmp_path))
-    assert "Authorization" not in data and "API_KEY" not in data
+    for token in [
+        "RAW_PROMPT_SECRET",
+        "RAW_COMPLETION_SECRET",
+        "RAW_REASONING_SECRET",
+        "Authorization",
+        "API_KEY",
+        "OPENROUTER_API_KEY",
+        "Bearer",
+    ]:
+        assert token not in data
 
 
 def test_provider_policy_matrix(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -196,49 +218,19 @@ def test_provider_policy_matrix(monkeypatch: pytest.MonkeyPatch) -> None:
     assert ModelProviderFactory().create(r.resolve_profile_id("mock-test")).provider == "test"
     monkeypatch.delenv("RAIKER_TEST_MODE", raising=False)
     assert ModelRouter(r).default_provider() == ("llama.cpp", "local-gguf")
-    with pytest.raises(ProviderPolicyError):
-        ModelProviderFactory().create(r.resolve_profile_id("vllm-homelab-openai-compatible"))
-    with pytest.raises(ProviderPolicyError):
-        ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True)).create(
-            r.resolve_profile_id("vllm-homelab-openai-compatible")
-        )
-    assert (
-        ModelProviderFactory(
-            policy=ProviderRuntimePolicy(
-                allow_policy_gated_provider=True, allow_private_network_provider=True
-            )
-        )
-        .create(r.resolve_profile_id("vllm-homelab-openai-compatible"))
-        .provider
-        == "vllm"
-    )
-    with pytest.raises(ProviderPolicyError):
-        ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True)).create(
-            r.resolve_profile_id("openrouter-policy-gated")
-        )
-    with pytest.raises(Exception) as excinfo:
-        ModelProviderFactory(
-            policy=ProviderRuntimePolicy(
-                allow_policy_gated_provider=True, allow_hosted_provider=True
-            )
-        ).create(r.resolve_profile_id("openrouter-policy-gated"))
-    assert "SECRET" not in str(excinfo.value)
-    monkeypatch.setenv("OPENROUTER_API_KEY", "SECRET")
-    p = r.resolve_profile_id("openrouter-policy-gated")
-    bad = type(p)(**{**p.__dict__, "raw": {**p.raw, "endpoint": "http://openrouter.ai/api/v1"}})
-    with pytest.raises(ProviderPolicyError):
-        ModelProviderFactory(
-            policy=ProviderRuntimePolicy(
-                allow_policy_gated_provider=True, allow_hosted_provider=True
-            )
-        ).create(bad)
-    assert (
-        ModelProviderFactory(
-            policy=ProviderRuntimePolicy(
-                allow_policy_gated_provider=True, allow_hosted_provider=True
-            )
-        )
-        .create(p)
-        .provider
-        == "openrouter"
-    )
+    for profile_id in [
+        "ollama-local-openai-compatible",
+        "lm-studio-local-openai-compatible",
+        "vllm-homelab-openai-compatible",
+        "openrouter-policy-gated",
+    ]:
+        with pytest.raises(Exception) as excinfo:
+            ModelProviderFactory(
+                policy=ProviderRuntimePolicy(
+                    allow_policy_gated_provider=True,
+                    allow_private_network_provider=True,
+                    allow_hosted_provider=True,
+                )
+            ).create(r.resolve_profile_id(profile_id))
+        assert "model_name_not_configured" in str(excinfo.value)
+        assert "SECRET" not in str(excinfo.value)

@@ -24,11 +24,12 @@ from raiker.models.endpoint_policy import (
 )
 from raiker.models.exceptions import (
     ProviderAuthenticationError,
+    ProviderConfigurationError,
     ProviderPolicyError,
     ProviderResponseValidationError,
     ProviderUnsupportedCapabilityError,
 )
-from raiker.models.factory import ModelProviderFactory
+from raiker.models.factory import ModelProviderFactory, ProviderRuntimePolicy
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
 from raiker.models.registry import ModelProfileRegistry
 
@@ -69,13 +70,24 @@ def test_factory_test_provider_gate_and_openai_profiles() -> None:
     with pytest.raises(ProviderPolicyError):
         ModelProviderFactory().create(test_profile)
     assert ModelProviderFactory(allow_test_provider=True).create(test_profile).profile_id == "deterministic-test"
-    for profile_id in ["raiker-local-llama-cpp", "ollama-local-openai-compatible", "lm-studio-local-openai-compatible"]:
-        provider = ModelProviderFactory().create(r.resolve_profile_id(profile_id))
-        assert isinstance(provider, AsyncOpenAICompatibleProvider)
-        run(provider.aclose())
-    for profile_id in ["vllm-homelab-openai-compatible", "generic-openai-compatible", "openrouter-policy-gated"]:
-        with pytest.raises((ProviderPolicyError, Exception)):
-            ModelProviderFactory().create(r.resolve_profile_id(profile_id))
+    provider = ModelProviderFactory().create(r.resolve_profile_id("raiker-local-llama-cpp"))
+    assert isinstance(provider, AsyncOpenAICompatibleProvider)
+    run(provider.aclose())
+    for profile_id in [
+        "ollama-local-openai-compatible",
+        "lm-studio-local-openai-compatible",
+        "vllm-homelab-openai-compatible",
+        "generic-openai-compatible",
+        "openrouter-policy-gated",
+    ]:
+        with pytest.raises(ProviderConfigurationError, match="model_name_not_configured"):
+            ModelProviderFactory(
+                policy=ProviderRuntimePolicy(
+                    allow_policy_gated_provider=True,
+                    allow_hosted_provider=True,
+                    allow_private_network_provider=True,
+                )
+            ).create(r.resolve_profile_id(profile_id))
 
 
 def _provider(handler: Callable[[httpx.Request], httpx.Response], caps: ModelCapabilities | None = None) -> AsyncOpenAICompatibleProvider:
@@ -107,7 +119,7 @@ def test_streaming_embeddings_and_models() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.method == "GET":
             return httpx.Response(200, json={"data":[{"id":"m","owned_by":"local"}]})
-        if request.url.endswith("embeddings"):
+        if str(request.url).endswith("embeddings"):
             return httpx.Response(200, json={"data":[{"embedding":[1,2.0]}],"usage":{"prompt_tokens":1}})
         return httpx.Response(200, text='data: {"choices":[{"delta":{"content":"he"}}]}\n\ndata: {"choices":[{"delta":{"content":"llo"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n')
     p = _provider(handler)

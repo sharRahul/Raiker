@@ -946,7 +946,7 @@ def _profile_event_payload(profile: ModelProfile) -> dict[str, object]:
     }
 
 
-def handle_model_command(command: str, *, workspace_root: str | Path = ".") -> str:
+async def handle_model_command_async(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     registry = ModelProfileRegistry.load()
     router = ModelRouter(registry)
@@ -973,7 +973,7 @@ def handle_model_command(command: str, *, workspace_root: str | Path = ".") -> s
     if parts[1] == "health":
         _append_model_event(store, "model_health_check_started", _profile_event_payload(selected))
         try:
-            health = asyncio.run(router.ahealth(selected.provider, selected.model))
+            health = await router.ahealth(selected.provider, selected.model)
             payload = {
                 **_profile_event_payload(selected),
                 "available": health.available,
@@ -1018,6 +1018,13 @@ def handle_model_command(command: str, *, workspace_root: str | Path = ".") -> s
             return f"Model selection failed: {type(exc).__name__}:{safe_error(str(exc))}"
     return "Usage: /model [current|use <profile_id>|use --provider <provider> --model <model>|health|capabilities]"
 
+
+def handle_model_command(command: str, *, workspace_root: str | Path = ".") -> str:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(handle_model_command_async(command, workspace_root=workspace_root))
+    return "Model command requires async command path; use handle_model_command_async."
 
 def _render_profile_current(profile: ModelProfile) -> str:
     return "\n".join(
@@ -1089,7 +1096,8 @@ def handle_reasoning_command(command: str, *, workspace_root: str | Path = ".") 
                 "reasoning_setting_rejected",
                 {
                     **_profile_event_payload(profile),
-                    "attempted_value": value,
+                    "attempted_value_length": len(value),
+                    "attempted_value_class": "unsupported_token",
                     "reason": "reasoning_not_supported",
                 },
             )
@@ -1105,7 +1113,8 @@ def handle_reasoning_command(command: str, *, workspace_root: str | Path = ".") 
                 "reasoning_setting_rejected",
                 {
                     **_profile_event_payload(profile),
-                    "attempted_value": value,
+                    "attempted_value_length": len(value),
+                    "attempted_value_class": "unsupported_token",
                     "reason": "unsupported_value",
                 },
             )

@@ -92,7 +92,7 @@ class RuntimeOrchestrator:
                 "model_request_failed",
                 {"provider": provider, "finish_reason": "error", "error_class": type(exc).__name__, "safe_error_code": "provider_connection_failed"},
             )
-            return ModelResponse(text=f"model_unavailable: {exc}", finish_reason="error")
+            return ModelResponse(text="model_unavailable: provider_connection_failed", finish_reason="error")
         self._event(
             envelope,
             "model_request_completed",
@@ -169,6 +169,10 @@ class RuntimeOrchestrator:
 
         while True:
             response = await self._acall_model(envelope, messages)
+            if response.finish_reason == "error":
+                status = "failed"
+                message = response.text or "model_unavailable: provider_connection_failed"
+                break
             if not response.tool_calls:
                 final_text = response.text
                 break

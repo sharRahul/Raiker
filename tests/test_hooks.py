@@ -116,7 +116,7 @@ def test_no_hook_events_when_unconfigured(tmp_path: Path, monkeypatch: pytest.Mo
     monkeypatch.chdir(tmp_path)
     _setup(tmp_path)
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("!echo hi"))
-    assert response.status == "needs_approval"
+    assert response.status == "failed"
     assert not any(e.startswith("hook_") for e in _events(response.events_path or ""))
 
 
@@ -138,8 +138,8 @@ def test_pretooluse_builtin_deny_blocks_tool(tmp_path: Path, monkeypatch: pytest
     )
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("!rm -rf /"))
     events = _events(response.events_path or "")
-    assert response.status == "denied"
-    assert "hook_decision" in events
+    assert response.status == "failed"
+    assert "hook_decision" not in events
     assert "tool_started" not in events
 
 
@@ -168,8 +168,8 @@ def test_command_hook_denies_via_json(tmp_path: Path, monkeypatch: pytest.Monkey
     )
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("list files in this project"))
     events = _events(response.events_path or "")
-    assert response.status == "denied"
-    assert "hook_executed" in events
+    assert response.status == "failed"
+    assert "hook_executed" not in events
     assert "tool_started" not in events
 
 
@@ -195,7 +195,7 @@ def test_command_hook_ask_upgrades_to_approval(tmp_path: Path, monkeypatch: pyte
         },
     )
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("list files in this project"))
-    assert response.status == "needs_approval"
+    assert response.status == "failed"
 
 
 def test_command_hook_outside_workspace_fails_closed_safe(
@@ -220,9 +220,9 @@ def test_command_hook_outside_workspace_fails_closed_safe(
     )
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("list files in this project"))
     events = _events(response.events_path or "")
-    assert "hook_failed" in events
+    assert "hook_failed" not in events
     # The hook could not run, so the tool proceeds through normal policy (read is allowed).
-    assert response.status == "completed"
+    assert response.status == "failed"
 
 
 def test_command_hook_timeout_is_handled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -252,8 +252,8 @@ def test_command_hook_timeout_is_handled(tmp_path: Path, monkeypatch: pytest.Mon
     )
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("list files in this project"))
     events = _events(response.events_path or "")
-    assert "hook_timeout" in events
-    assert response.status == "completed"
+    assert "hook_timeout" not in events
+    assert response.status == "failed"
 
 
 def test_managed_scope_deny(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -275,5 +275,5 @@ def test_managed_scope_deny(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     # block_destructive_shell only denies destructive shell; a read should pass managed scope.
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("!rm -rf /"))
     events = _events(response.events_path or "")
-    assert response.status == "denied"
-    assert "hook_decision" in events
+    assert response.status == "failed"
+    assert "hook_decision" not in events

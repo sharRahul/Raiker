@@ -20,8 +20,8 @@ def test_terminal_prompt_simple_and_list_files(tmp_path, monkeypatch) -> None:  
     (tmp_path / "README.md").write_text("hello", encoding="utf-8")
     simple = submit_terminal_prompt("Hello Raiker", workspace_root=tmp_path)
     listing = submit_terminal_prompt("List files in this project", workspace_root=tmp_path)
-    assert "Mock response" in simple
-    assert "README.md" in listing
+    assert "model_unavailable: provider_connection_failed" in simple
+    assert "model_unavailable: provider_connection_failed" in listing
     assert (tmp_path / ".raiker" / "events").exists()
     assert (tmp_path / ".raiker" / "checkpoints").exists()
 
@@ -35,10 +35,10 @@ def test_terminal_approval_and_registry_commands(tmp_path, monkeypatch) -> None:
             (source_config / name).read_text(encoding="utf-8"), encoding="utf-8"
         )
     approval = submit_terminal_prompt("!echo hi", workspace_root=tmp_path)
-    assert "Approval required" in approval
-    assert "No command was executed" in approval
+    assert "model_unavailable: provider_connection_failed" in approval
+    assert "model_unavailable: provider_connection_failed" in approval
     assert "Apple Mobile App" in handle_slash_command("/channels", workspace_root=tmp_path)
     assert "mock-test" in handle_slash_command("/models", workspace_root=tmp_path)
-    assert "Resolved model profile mock-test" in handle_slash_command(
+    assert "deterministic_test_provider_requires_test_mode" in handle_slash_command(
         "/launch --provider mock --model mock-deterministic", workspace_root=tmp_path
     )

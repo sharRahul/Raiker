@@ -19,12 +19,15 @@ REQUIRED_DOCS = [
 STALE_CLAIMS = [
     "zero runtime dependencies",
     "zero_runtime_dependencies",
+    "http.client",
+    "LlamaCppServerProvider",
     "provider_not_wired",
     "mock fallback",
     "Ollama is intentionally not supported",
     "other providers raise",
     "default fallback when no server is reachable",
     "falls back to the deterministic",
+    "binds to it automatically when",
 ]
 
 

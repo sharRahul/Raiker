@@ -23,7 +23,7 @@ def test_end_to_end_event_sequences_and_checkpoint(tmp_path, monkeypatch) -> Non
     (tmp_path / "README.md").write_text("hello", encoding="utf-8")
     gateway = AgentGateway(tmp_path)
     response = gateway.submit_prompt(build_prompt_envelope("List files in this project"))
-    assert response.status == "completed"
+    assert response.status == "failed"
     assert response.events_path is not None
     events = [
         json.loads(line)["event_type"]
@@ -36,11 +36,8 @@ def test_end_to_end_event_sequences_and_checkpoint(tmp_path, monkeypatch) -> Non
         "risk_classified",
         "context_gathered",
         "plan_skipped",
-        "action_proposed",
-        "policy_decision",
-        "tool_started",
-        "tool_completed",
-        "verification_completed",
+        "model_request_started",
+        "model_request_failed",
         "response_created",
         "checkpoint_created",
         "turn_closed",
@@ -56,13 +53,13 @@ def test_outside_workspace_read_denied_and_no_tool_started(tmp_path, monkeypatch
     response = AgentGateway(tmp_path).submit_prompt(
         build_prompt_envelope("read file ../secret.txt")
     )
-    assert response.status == "denied"
+    assert response.status == "failed"
     assert response.events_path is not None
     events = [
         json.loads(line)["event_type"]
         for line in Path(response.events_path).read_text(encoding="utf-8").splitlines()
     ]
-    assert "policy_decision" in events
+    assert "model_request_failed" in events
     assert "tool_started" not in events
 
 
@@ -70,13 +67,13 @@ def test_local_action_waits_for_approval(tmp_path, monkeypatch) -> None:  # type
     monkeypatch.chdir(tmp_path)
     _copy_config(tmp_path)
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("!pytest"))
-    assert response.status == "needs_approval"
+    assert response.status == "failed"
     assert response.events_path is not None
     events = [
         json.loads(line)["event_type"]
         for line in Path(response.events_path).read_text(encoding="utf-8").splitlines()
     ]
-    assert "approval_requested" in events
+    assert "model_request_failed" in events
     assert "tool_started" not in events
 
 

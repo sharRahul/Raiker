@@ -26,7 +26,7 @@ def test_gateway_preserves_client_metadata_and_writes_events(tmp_path, monkeypat
             (source_config / name).read_text(encoding="utf-8"), encoding="utf-8"
         )
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("Hello Raiker"))
-    assert response.status == "completed"
+    assert response.status == "failed"
     assert response.checkpoint_path is not None
     lines = [
         json.loads(line)

@@ -263,6 +263,8 @@ The terminal client currently exposes these inspection and controlled-action com
 /quit
 ```
 
+The deterministic mock launch command is test-only: normal production CLI policy blocks `/launch --provider mock --model mock-deterministic` and should report `deterministic_test_provider_requires_test_mode` unless explicit test mode/test harness policy is active.
+
 Phase 3 and Phase 4 commands are inspection/planning/governance/preview surfaces unless explicitly documented otherwise. They must not execute plugins, activate channels, write semantic/vector memory, create embeddings, start graph indexing, persist executable approvals, spawn agents, or run remote/container commands.
 
 ---

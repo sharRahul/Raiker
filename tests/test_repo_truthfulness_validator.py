@@ -63,17 +63,18 @@ def test_model_and_reasoning_commands_do_not_expose_private_cot(tmp_path: Path) 
 
 
 def test_disabled_runtime_flags_remain_false(tmp_path: Path) -> None:
-    combined: dict[str, object] = {}
-    combined.update(plugin_readiness_summary(workspace_root=tmp_path))
-    combined.update(graph_governance_status())
-    combined["graph_indexing_enabled"] = graph_governance_status()["runtime_indexing_enabled"]
-    combined.update(semantic_memory_status())
-    combined.update(semantic_memory_readiness_summary(workspace_root=tmp_path))
-    combined["semantic_memory_writes_enabled"] = semantic_memory_status()["semantic_writes_enabled"]
-    combined.update(approval_readiness_summary(workspace_root=tmp_path))
-    combined.update(cleanup_readiness_summary(workspace_root=tmp_path))
-    combined.update(channel_readiness_summary(workspace_root=tmp_path))
-    combined.update(remote_readiness_summary(workspace_root=tmp_path))
+    snapshots = [
+        plugin_readiness_summary(workspace_root=tmp_path),
+        graph_governance_status(),
+        {"graph_indexing_enabled": graph_governance_status()["runtime_indexing_enabled"]},
+        semantic_memory_status(),
+        semantic_memory_readiness_summary(workspace_root=tmp_path),
+        {"semantic_memory_writes_enabled": semantic_memory_status()["semantic_writes_enabled"]},
+        approval_readiness_summary(workspace_root=tmp_path),
+        cleanup_readiness_summary(workspace_root=tmp_path),
+        channel_readiness_summary(workspace_root=tmp_path),
+        remote_readiness_summary(workspace_root=tmp_path),
+    ]
     for name in [
         "plugin_execution_enabled",
         "graph_indexing_enabled",
@@ -94,4 +95,61 @@ def test_disabled_runtime_flags_remain_false(tmp_path: Path) -> None:
         "network_execution_enabled",
         "runtime_execution_enabled",
     ]:
-        assert combined[name] is False
+        values = [snapshot[name] for snapshot in snapshots if name in snapshot]
+        assert values, f"missing disabled-runtime flag {name}"
+        assert all(value is False for value in values), (name, values)
+
+
+def test_architecture_phase_3_row_is_truthful() -> None:
+    text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    row = next(line for line in text.splitlines() if line.startswith("| Phase 3 |"))
+    assert "target platform architecture" in row
+    assert "safe foundation/readiness" in row
+    assert "Deferred after Phase 3" in row
+    assert "runtime semantic/vector search" in row
+
+
+def test_feature_coverage_matrix_separates_spec_from_implementation() -> None:
+    text = Path("docs/FEATURE_COVERAGE_MATRIX.md").read_text(encoding="utf-8")
+    assert "Current implementation status" in text
+    for row_name, qualifier in {
+        "Desktop UI": "contract-only",
+        "Web UI": "contract-only",
+        "Dashboard": "metadata-only",
+        "IDE extension": "deferred",
+        "Apple mobile app": "deferred",
+        "Android mobile app": "deferred",
+        "Semantic/vector memory": "readiness-only",
+        "Graph memory/code map": "readiness-only",
+        "Recursive CTE graph queries": "specified only",
+        "Scheduled automations": "deferred",
+        "Hosted/cloud inference": "policy-gated",
+        "OpenClaw-style gateway and channels": "metadata/readiness-only",
+    }.items():
+        row = next(line for line in text.splitlines() if line.startswith(f"| {row_name} |"))
+        assert qualifier in row
+
+
+def test_acceptance_and_local_validation_wording_are_truthful() -> None:
+    acceptance = Path("docs/ACCEPTANCE_TESTS_BY_PHASE.md").read_text(encoding="utf-8")
+    assert "Completed Phase 3 A-P safe foundation/readiness acceptance" in acceptance
+    assert "Deferred platform acceptance after Phase 3 A-P" in acceptance
+    assert "not required" in acceptance
+
+    local_gate = Path("docs/LOCAL_VALIDATION_GATE.md").read_text(encoding="utf-8")
+    assert "CI triggers are configured" in local_gate
+    assert "hosted CI may stay red or unavailable" in local_gate
+    assert "Local validation evidence is required" in local_gate
+    assert "raiker --prompt \"/model current\"" in local_gate
+    assert "raiker --prompt \"/graph-readiness --json\"" in local_gate
+
+
+def test_mock_launch_command_is_test_only_truthful(tmp_path: Path) -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    catalog = Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
+    for text in (readme, catalog):
+        assert "/launch --provider mock --model mock-deterministic" in text
+        assert "test-only" in text.lower()
+        assert "deterministic_test_provider_requires_test_mode" in text
+    output = handle_slash_command("/launch --provider mock --model mock-deterministic", workspace_root=tmp_path)
+    assert "deterministic_test_provider_requires_test_mode" in output

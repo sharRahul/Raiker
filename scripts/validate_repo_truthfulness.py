@@ -110,6 +110,16 @@ def _literal_command_prefixes() -> set[str]:
     return {p for p in prefixes if p not in {"/exit"}}
 
 
+def _ci_has_active_triggers() -> bool:
+    ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    return "pull_request:" in ci and "push:" in ci
+
+
+def _has_test_only_launch_wording(text: str) -> bool:
+    lowered = text.lower()
+    return "/launch --provider mock --model mock-deterministic" in text and "test-only" in lowered and "deterministic_test_provider_requires_test_mode" in text
+
+
 def main() -> int:
     errors: list[str] = []
     readme_commands = _readme_commands()
@@ -157,6 +167,49 @@ def main() -> int:
         errors.append("README/workflow mismatch: phase-status.yml is expected to remain workflow_dispatch")
     if "Workflows are currently `workflow_dispatch` only" in readme_text:
         errors.append("README incorrectly says all workflows are workflow_dispatch-only")
+
+
+
+    architecture = (ROOT / "docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    phase3_line = next((line for line in architecture.splitlines() if line.startswith("| Phase 3 |")), "")
+    if not phase3_line:
+        errors.append("ARCHITECTURE missing Phase 3 row")
+    elif not all(marker in phase3_line for marker in ["target platform architecture", "safe foundation/readiness", "Deferred after Phase 3"]):
+        errors.append("ARCHITECTURE Phase 3 row must separate target platform architecture, completed A-P readiness scope, and deferred runtime/app work")
+    overclaim_terms = ["Desktop UI, Web UI, Dashboard, Apple mobile app, Android mobile app, plugin manager, semantic search, graph/codemap, REST API, worktree isolation."]
+    if any(term in phase3_line and "safe foundation/readiness" not in phase3_line for term in overclaim_terms):
+        errors.append("ARCHITECTURE Phase 3 row overclaims full app/runtime features")
+
+    matrix = (ROOT / "docs/FEATURE_COVERAGE_MATRIX.md").read_text(encoding="utf-8")
+    if "Current implementation status" not in matrix:
+        errors.append("FEATURE_COVERAGE_MATRIX must separate specification status from current implementation status")
+    deferred_rows = [
+        "Desktop UI", "Web UI", "Dashboard", "IDE extension", "Apple mobile app", "Android mobile app",
+        "Semantic/vector memory", "Graph memory/code map", "Recursive CTE graph queries",
+        "Hosted/cloud inference", "Scheduled automations", "OpenClaw-style gateway and channels",
+    ]
+    qualifiers = ("contract-only", "readiness-only", "metadata-only", "deferred", "specified only", "policy-gated")
+    for row_name in deferred_rows:
+        row = next((line for line in matrix.splitlines() if line.startswith(f"| {row_name} |")), "")
+        if "phase-3" in row and not any(q in row.lower() for q in qualifiers):
+            errors.append(f"FEATURE_COVERAGE_MATRIX row lacks deferred/current implementation qualifier: {row_name}")
+
+    acceptance = (ROOT / "docs/ACCEPTANCE_TESTS_BY_PHASE.md").read_text(encoding="utf-8")
+    if "Completed Phase 3 A-P safe foundation/readiness acceptance" not in acceptance or "Deferred platform acceptance after Phase 3 A-P" not in acceptance:
+        errors.append("ACCEPTANCE_TESTS_BY_PHASE must split completed Phase 3 A-P acceptance from deferred platform acceptance")
+    if "not required" not in acceptance.lower():
+        errors.append("ACCEPTANCE_TESTS_BY_PHASE must state deferred platform acceptance is not required for current Phase 3 A-P completion")
+
+    local_gate = (ROOT / "docs/LOCAL_VALIDATION_GATE.md").read_text(encoding="utf-8")
+    if _ci_has_active_triggers() and "GitHub Actions are temporarily paused" in local_gate:
+        errors.append("LOCAL_VALIDATION_GATE incorrectly claims all Actions/CI are paused while ci.yml has active triggers")
+    for marker in ["CI triggers are configured", "hosted CI may stay red or unavailable", "Local validation evidence is required", "phase-status.yml` remains manual"]:
+        if marker not in local_gate:
+            errors.append(f"LOCAL_VALIDATION_GATE missing CI quota truth marker: {marker}")
+
+    launch_docs = readme_text + "\n" + catalog
+    if "/launch --provider mock --model mock-deterministic" in launch_docs and not (_has_test_only_launch_wording(readme_text) and _has_test_only_launch_wording(catalog)):
+        errors.append("README/catalog must mark /launch --provider mock --model mock-deterministic as test-only/policy-blocked, not normal production CLI")
 
     status_text = (ROOT / "docs/IMPLEMENTATION_STATUS.md").read_text(encoding="utf-8")
     for marker in RUNTIME_DISABLED_MARKERS:

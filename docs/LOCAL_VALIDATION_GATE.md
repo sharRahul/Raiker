@@ -1,13 +1,13 @@
-# Local Validation Gate while GitHub Actions are paused
+# Local Validation Gate while hosted CI quota is unreliable
 
 ## Reason
 
-GitHub Actions are temporarily paused because the Actions run limit/quota is exhausted.
+CI triggers are configured, but hosted CI may stay red or unavailable because the Actions run limit/quota is exhausted.
 
 During this period:
 
-- GitHub CI is not the source of truth.
-- No PR or branch should be considered validated unless local validation evidence is recorded.
+- Hosted GitHub CI is not the sole source of truth while quota prevents reliable hosted runs.
+- Local validation evidence is required while quota prevents reliable hosted runs.
 - Developers must run the full validation set locally before merge or main push.
 - The validation evidence must be copied into the PR body or `docs/IMPLEMENTATION_STATUS.md`.
 
@@ -24,6 +24,18 @@ python -m pytest
 python scripts/validate_phase_status.py
 raiker --help
 raiker --prompt "Hello Raiker"
+raiker --prompt "/providers"
+raiker --prompt "/models"
+raiker --prompt "/model current"
+raiker --prompt "/model capabilities"
+raiker --prompt "/reasoning status"
+raiker --prompt "/graph-readiness --json"
+raiker --prompt "/memory-readiness --json"
+raiker --prompt "/approval-readiness --json"
+raiker --prompt "/cleanup-readiness --json"
+raiker --prompt "/remote-readiness --json"
+raiker --prompt "/plugin-readiness --json"
+raiker --prompt "/channel-readiness --json"
 ```
 
 For Phase 3 rollout branches, also run manual or scripted smoke coverage for:
@@ -108,11 +120,11 @@ Record this evidence in the PR body or `docs/IMPLEMENTATION_STATUS.md`:
 9. Files changed
 10. Commit SHA
 11. Remaining risks
-12. Statement that GitHub Actions are paused due quota and must be re-enabled later
+12. Statement that CI triggers are configured, hosted CI may be red/unavailable due quota, local validation evidence is required, and `phase-status.yml` remains manual if still true
 
 ## Re-enable requirement
 
-Restore `pull_request` and `push` triggers for the CI and Phase Status Validation workflows when Actions quota is available again. Full CI must be re-enabled before future release tagging.
+Keep `pull_request` and `push` triggers for CI configured. If `phase-status.yml` remains `workflow_dispatch`-only, keep that manual status explicit. Hosted CI must be made reliable again before future release tagging when Actions quota is available.
 
 ## Phase 3 Slice H lifecycle retention reference
 

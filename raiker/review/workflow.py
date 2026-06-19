@@ -92,7 +92,16 @@ class CodeReviewWorkflow:
                 files = files[:max_files]
                 truncated = True
             redacted_diff, redaction_applied = redact_text(bounded_diff)
-            mode = mode_base if files else "clean"
+            untracked_files: list[str] = []
+            if not staged:
+                untracked_broker = ToolBroker(
+                    workspace_root=root,
+                    policy_engine=PolicyEngine(StaticPolicyConfig(root)),
+                )
+                untracked_files = self._collect_untracked_files(
+                    untracked_broker, path_filter=path_filter
+                )
+            mode = mode_base if (files or untracked_files) else "clean"
             scope = ReviewScope(
                 mode=mode,
                 workspace_root=str(root),
@@ -115,6 +124,17 @@ class CodeReviewWorkflow:
                 redaction_applied=redaction_applied,
             )
             findings = generate_findings(review_input)
+            if untracked_files:
+                findings.append(ReviewFinding(
+                    finding_id="untracked-files",
+                    severity="info",
+                    category="maintainability",
+                    title="Untracked files present",
+                    description="Untracked files exist and are not included in normal git diff review.",
+                    evidence=f"{len(untracked_files)} untracked file(s) detected.",
+                    recommendation="Stage the files or review a specific path after adding it to the index.",
+                    confidence="high",
+                ))
             summary = self._build_summary(
                 files_reviewed=len(files),
                 findings=findings,
@@ -129,11 +149,13 @@ class CodeReviewWorkflow:
                 "severity_counts": dict(summary.severity_counts),
                 "truncated": truncated,
                 "redaction_applied": redaction_applied,
+                "untracked_count": len(untracked_files),
             }
             self._emit(writer, session_id, "review_completed", dict(event_payload))
             result_metadata = dict(event_payload)
             result_metadata["categories"] = dict(summary.categories)
             result_metadata["staged_changes_present"] = staged_present
+            result_metadata["untracked_files"] = untracked_files
             return ReviewResult(
                 review_id=review_id,
                 scope=scope,
@@ -210,6 +232,45 @@ class CodeReviewWorkflow:
         if result.status == "success" and isinstance(result.output, dict):
             return str(result.output.get("output", ""))
         return ""
+
+    def _collect_untracked_files(
+        self, broker: ToolBroker, *, path_filter: str | None
+    ) -> list[str]:
+        action = ToolAction(
+            action_id=new_id("act_"),
+            tool_name="git_status",
+            arguments={},
+            risk_level="low",
+            requires_approval=False,
+            proposed_by="code_review_workflow",
+        )
+        result, _decision = broker.execute(
+            action,
+            session_id=new_id("sess_"),
+            turn_id=new_id("turn_"),
+            client=_review_client(),
+        )
+        if result.status != "success" or not isinstance(result.output, dict):
+            return []
+        output = str(result.output.get("output", ""))
+        untracked: list[str] = []
+        for line in output.splitlines():
+            line = line.rstrip("\n")
+            if line.startswith("?? "):
+                rel = line[3:].strip()
+                if rel:
+                    untracked.append(rel)
+        if path_filter is not None and path_filter != ".":
+            stripped = path_filter.rstrip("/")
+            untracked = [
+                p
+                for p in untracked
+                if p == stripped
+                or p.startswith(stripped + "/")
+                or stripped.startswith(p.rstrip("/") + "/")
+                or stripped == p.rstrip("/")
+            ]
+        return untracked[:20]
 
     def _context_summary(self, root: Path, session_id: str) -> str:
         try:

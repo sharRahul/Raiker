@@ -17,6 +17,7 @@ _ALLOWED_EVENT_KEYS = {
     "severity_counts",
     "truncated",
     "redaction_applied",
+    "untracked_count",
     "client",
 }
 _FORBIDDEN_IMPORTS = {"subprocess", "socket", "requests", "httpx", "urllib", "asyncio"}
@@ -25,6 +26,8 @@ _FORBIDDEN_IMPORTS = {"subprocess", "socket", "requests", "httpx", "urllib", "as
 def _init_repo(root: Path) -> None:
     subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
     (root / ".gitignore").write_text(".raiker/\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", ".gitignore"], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-m", "init", "--allow-empty"], check=True, capture_output=True)
 
 
 def _stage(root: Path, rel: str, content: str) -> None:

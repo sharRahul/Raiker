@@ -1,8 +1,37 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
-from raiker.review.models import SEVERITIES, ReviewResult
+from raiker.review.models import SEVERITIES, ReviewFinding, ReviewResult, ReviewSummary
+
+
+def rebuild_review_result_with_findings(
+    result: ReviewResult, findings: list[ReviewFinding]
+) -> ReviewResult:
+    severity_counts: dict[str, int] = {s: 0 for s in SEVERITIES}
+    categories: dict[str, int] = {}
+    for finding in findings:
+        severity_counts[finding.severity] = severity_counts.get(finding.severity, 0) + 1
+        categories[finding.category] = categories.get(finding.category, 0) + 1
+    summary = ReviewSummary(
+        files_reviewed=result.summary.files_reviewed,
+        findings_count=len(findings),
+        severity_counts=severity_counts,
+        categories=dict(sorted(categories.items())),
+        truncated=result.summary.truncated,
+        redaction_applied=result.summary.redaction_applied,
+    )
+    event_metadata = dict(result.event_metadata)
+    event_metadata["findings_count"] = len(findings)
+    event_metadata["severity_counts"] = severity_counts
+    event_metadata["categories"] = dict(sorted(categories.items()))
+    return replace(
+        result,
+        findings=findings,
+        summary=summary,
+        event_metadata=event_metadata,
+    )
 
 
 def render_json(result: ReviewResult) -> str:
@@ -15,7 +44,7 @@ def render_text(result: ReviewResult, *, summary_only: bool = False) -> str:
     scope = result.scope
     summary = result.summary
 
-    if summary.files_reviewed == 0:
+    if summary.files_reviewed == 0 and not result.findings:
         return _render_empty(result)
 
     lines = [

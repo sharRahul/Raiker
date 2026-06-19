@@ -912,10 +912,8 @@ def _parse_review_command(command: str) -> dict[str, object] | str:
 
 
 def handle_review(command: str = "/review", *, workspace_root: str | Path = ".") -> str:
-    from dataclasses import replace as _replace
-
     from raiker.review.models import SEVERITY_RANK
-    from raiker.review.render import render_json, render_text
+    from raiker.review.render import rebuild_review_result_with_findings, render_json, render_text
     from raiker.review.workflow import CodeReviewWorkflow, ReviewPathError
 
     parsed = _parse_review_command(command)
@@ -943,7 +941,7 @@ def handle_review(command: str = "/review", *, workspace_root: str | Path = ".")
     if isinstance(limit, int):
         findings = findings[:limit]
     if findings != list(result.findings):
-        result = _replace(result, findings=findings)
+        result = rebuild_review_result_with_findings(result, findings)
 
     if parsed["as_json"]:
         return render_json(result)

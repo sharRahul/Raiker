@@ -8,7 +8,7 @@ from raiker.review.models import (
     ReviewScope,
     ReviewSummary,
 )
-from raiker.review.render import render_json, render_text
+from raiker.review.render import rebuild_review_result_with_findings, render_json, render_text
 from raiker.review.workflow import (
     CodeReviewWorkflow,
     ReviewError,
@@ -25,6 +25,7 @@ __all__ = [
     "ReviewScope",
     "ReviewSummary",
     "generate_findings",
+    "rebuild_review_result_with_findings",
     "render_json",
     "render_text",
 ]

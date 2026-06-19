@@ -10,6 +10,8 @@ from raiker.cli.commands import handle_slash_command
 def _repo_with_change(root: Path) -> None:
     subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
     (root / ".gitignore").write_text(".raiker/\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", ".gitignore"], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-m", "init", "--allow-empty"], check=True, capture_output=True)
     (root / "raiker").mkdir()
     (root / "raiker" / "example.py").write_text("def f():\n    return 1\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(root), "add", "raiker/example.py"], check=True)
@@ -34,6 +36,8 @@ def test_review_summary_omits_finding_detail(tmp_path: Path) -> None:
 def test_review_staged_runs(tmp_path: Path) -> None:
     subprocess.run(["git", "-C", str(tmp_path), "init", "-q"], check=True)
     (tmp_path / ".gitignore").write_text(".raiker/\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", ".gitignore"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-m", "init", "--allow-empty"], check=True, capture_output=True)
     (tmp_path / "a.py").write_text("a = 1\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(tmp_path), "add", "a.py"], check=True)
     out = handle_slash_command("/review --staged", workspace_root=tmp_path)
@@ -83,6 +87,8 @@ def test_empty_workspace_does_not_crash(tmp_path: Path) -> None:
 def test_review_severity_filter(tmp_path: Path) -> None:
     subprocess.run(["git", "-C", str(tmp_path), "init", "-q"], check=True)
     (tmp_path / ".gitignore").write_text(".raiker/\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", ".gitignore"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-m", "init", "--allow-empty"], check=True, capture_output=True)
     (tmp_path / "flags.yaml").write_text("feature: off\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(tmp_path), "add", "flags.yaml"], check=True)
     (tmp_path / "flags.yaml").write_text(

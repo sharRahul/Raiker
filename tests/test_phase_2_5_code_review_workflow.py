@@ -11,6 +11,8 @@ from raiker.review.workflow import CodeReviewWorkflow, ReviewPathError
 def _init_repo(root: Path) -> None:
     subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
     (root / ".gitignore").write_text(".raiker/\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", ".gitignore"], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-m", "init", "--allow-empty"], check=True, capture_output=True)
 
 
 def _stage(root: Path, rel: str, content: str) -> None:

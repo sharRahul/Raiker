@@ -58,12 +58,12 @@ mitigation is not a real one. Status: ✅ implemented · 🟡 partial · 🔒 di
 | LLM02 | Sensitive information disclosure | yes | 🟡 | `redact_secret_like_text()` exists for approval previews; apply one redaction pass to **all** persisted text and model egress; add egress classifier. |
 | LLM03 | Supply chain | yes | 🔒 | Manifest validation real; add signing/checksums + trusted-publisher allowlist + dependency policy. |
 | LLM04 | Data & model poisoning | yes | 🔒 | Memory writes disabled; enforce provenance + contradiction checks when enabled. |
-| LLM05 | Improper output handling | yes | 🟡 | Enum/contract validation exists; add **tool-call JSON schema validation** at the model boundary with reject/retry. |
-| LLM06 | Excessive agency | yes | 🟡 | Broker + approvals are the strongest control; add per-turn max-tool-calls, budget, timeout, subagent depth. |
+| LLM05 | Improper output handling | yes | ✅ | Model tool calls are schema-validated at the boundary (`raiker/models/tool_call_validation.py`); unknown tools / missing args are rejected (`model_tool_call_rejected`) before execution. |
+| LLM06 | Excessive agency | yes | ✅ | Broker + approvals + per-turn max-tool-calls budget (`PromptOptions.max_tool_calls`, enforced in the orchestrator loop). Add time/token budgets next. |
 | LLM07 | System prompt leakage | yes | 📘 | Separate system/security prompt from user-visible context; implement with first real provider. |
 | LLM08 | Vector & embedding weaknesses | yes | 🔒 | Vector writes disabled; apply sensitivity/provenance filters on retrieval when enabled. |
 | LLM09 | Misinformation | yes | 🟡 | Verifier is a stub (`raiker/runtime/verifier.py`); implement verification + citation/provenance gating. |
-| LLM10 | Unbounded consumption | yes | 📘 | Enforce token/tool/time budgets and rate limits in the orchestrator. |
+| LLM10 | Unbounded consumption | yes | 🟡 | Per-turn tool-call budget enforced; add token/time budgets and rate limits next. |
 
 **Implemented strengths today:** workspace path-safety (symlink/traversal rejection), policy-gated
 tool execution with approvals, append-only event log, and disabled-by-default for high-risk

@@ -29,7 +29,7 @@ manifest, pairing, or managed policy.
 | Surface | What it extends | Registration | Execution path | Code state | Spec |
 |---|---|---|---|---|---|
 | **Tools** | New actions the agent can take | Tool broker registry | Broker → policy → (approval) → execute | ✅ built-in tools real; plugin tools planned | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
-| **Hooks** | Logic at lifecycle points (pre/post tool, session, prompt, task) | Hook config (scoped) | Hook dispatcher with bounded decision authority | 📘 spec only, **no code** | `docs/HOOKS_SPEC.md` |
+| **Hooks** | Logic at lifecycle points (pre/post tool, session, prompt) | Hook config (scoped) | Hook dispatcher with bounded decision authority | ✅ implemented (`builtin`+`command`); `http`/`mcp_tool`/`prompt`/`agent` deferred | `docs/HOOKS_SPEC.md`, `raiker/hooks/` |
 | **Skills** | Reusable prompt-driven procedures (`/name`) | Skill manifest / frontmatter | Run through the agent loop, not a new tool | 📘 spec (tied to self-improvement) | `docs/SELF_IMPROVEMENT_MODEL.md`, `docs/PLUGIN_SYSTEM_SPEC.md` |
 | **Plugins** | Bundles of tools + hooks + skills + channels + servers | Plugin manifest + permission diff | Components register through their own surfaces; nothing auto-executes | 🔒 manifest validation only | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` |
 | **Channels** | New interfaces/transports (chat, webhook, voice) | Connector profile + pairing | Inbound normalises to `ChannelMessageEnvelope` → gateway → same runtime | 🔒 registry only, no transport | `docs/CHANNELS_SPEC.md` |
@@ -106,8 +106,10 @@ plan with execution disabled).
   through the same broker.
 - **Plugins / Channels:** registry + manifest/profile validation only; **no execution/transport**
   (`raiker/plugins/`, `raiker/channels/`).
-- **Hooks:** **no module exists** — highest-priority extensibility gap.
+- **Hooks:** **implemented** (`raiker/hooks/`) — `builtin` + `command` handlers, scoped config,
+  decision authority, and lifecycle dispatch wired through the broker and gateway. `http`,
+  `mcp_tool`, `prompt`, and `agent` handlers are deferred until their gated surfaces exist.
 - **Skills:** specified via `docs/SELF_IMPROVEMENT_MODEL.md`; no runtime yet.
 
-To realize this model, the missing pieces are a `raiker/hooks/` dispatcher and a skills runtime;
-both must register through, and be gated by, the existing broker/policy/event infrastructure.
+The remaining piece to complete this model is a skills runtime; like hooks, it must register
+through — and be gated by — the existing broker/policy/event infrastructure.

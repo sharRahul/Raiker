@@ -101,8 +101,8 @@ def test_git_wrappers_allow_read_only_and_deny_destructive(tmp_path: Path) -> No
 
 
 def test_local_provider_health_check_is_detection_only() -> None:
-    health = check_local_provider("ollama")
-    assert health.provider == "ollama"
+    health = check_local_provider("llama.cpp")
+    assert health.provider == "llama.cpp"
     assert health.enabled_for_runtime is False
 
 
@@ -155,5 +155,5 @@ def test_memory_and_doctor_terminal_commands(tmp_path: Path) -> None:
         "/memory", workspace_root=tmp_path
     )
     doctor = handle_slash_command("/doctor", workspace_root=tmp_path)
-    assert "ollama_runtime_enabled: False" in doctor
+    assert "llama_cpp_runtime_enabled: False" in doctor
     assert "phase_4_disabled:" in doctor

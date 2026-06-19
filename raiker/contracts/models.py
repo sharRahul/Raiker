@@ -68,6 +68,7 @@ EVENT_TYPES = {
     "model_launch_failed",
     "model_request_started",
     "model_request_completed",
+    "model_tool_call_rejected",
     "runtime_error_recorded",
     "task_created",
     "task_started",
@@ -88,6 +89,11 @@ EVENT_TYPES = {
     "phase3.plugin.registration.planned",
     "phase3.plugin.registration.denied",
     "phase3.client.contract.inspected",
+    "hook_matched",
+    "hook_executed",
+    "hook_decision",
+    "hook_failed",
+    "hook_timeout",
 }
 INTENTS = {
     "chat",

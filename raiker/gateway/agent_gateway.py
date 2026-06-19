@@ -7,6 +7,9 @@ from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.models import AgentResponse, ContractValidationError, PromptEnvelope
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
+from raiker.hooks.contracts import HookInput
+from raiker.hooks.dispatcher import HookDispatcher
+from raiker.hooks.registry import HooksRegistry
 from raiker.models.registry import ModelProfileRegistry
 from raiker.models.router import ModelRouter
 from raiker.policy.config import StaticPolicyConfig
@@ -25,22 +28,47 @@ class AgentGateway:
         self.sessions = SessionManager(self.store, self.workspace_root)
         self.checkpoints = CheckpointService(self.store)
         policy_engine = PolicyEngine(StaticPolicyConfig(self.workspace_root))
+        self.hook_dispatcher = HookDispatcher(
+            HooksRegistry.load(self.workspace_root),
+            workspace_root=self.workspace_root,
+            writer=self.writer,
+        )
         self.tool_broker = ToolBroker(
             workspace_root=self.workspace_root,
             policy_engine=policy_engine,
             store=self.store,
             writer=self.writer,
+            hook_dispatcher=self.hook_dispatcher,
         )
         self.model_registry = ModelProfileRegistry.load()
         self.connector_registry = ConnectorRegistry.load()
         self.store.upsert_model_profiles(self.model_registry.list_profiles())
         self.store.upsert_connector_profiles(self.connector_registry.list_profiles())
         self.model_router = ModelRouter(self.model_registry, self.writer)
+        # Native default backend: a reachable llama.cpp server, else the deterministic mock.
+        self.default_provider = self.model_router.default_provider()
         self.runtime = RuntimeOrchestrator(
             workspace_root=self.workspace_root,
             writer=self.writer,
             tool_broker=self.tool_broker,
             model_router=self.model_router,
+            default_provider=self.default_provider,
+        )
+
+    def _dispatch_lifecycle_hook(self, event_name: str, envelope: PromptEnvelope) -> None:
+        self.hook_dispatcher.dispatch(
+            HookInput(
+                event_name=event_name,
+                tool_name=None,
+                tool_input={},
+                context={"prompt_length": len(envelope.prompt.text)},
+                session_id=envelope.session_id,
+                turn_id=envelope.turn_id,
+                cwd=str(self.workspace_root),
+            ),
+            session_id=envelope.session_id,
+            turn_id=envelope.turn_id,
+            client=envelope.client,
         )
 
     def submit_prompt(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
@@ -58,6 +86,7 @@ class AgentGateway:
                 status="failed",
                 message=f"Invalid prompt envelope: {exc}",
             )
+        existing_session = self.sessions.load_session(prompt_envelope.session_id)
         self.sessions.get_or_create(prompt_envelope.session_id)
         self.sessions.track_turn(
             prompt_envelope.session_id,
@@ -77,6 +106,10 @@ class AgentGateway:
                 client=prompt_envelope.client,
             )
         )
+        if self.hook_dispatcher.is_active():
+            if existing_session is None:
+                self._dispatch_lifecycle_hook("SessionStart", prompt_envelope)
+            self._dispatch_lifecycle_hook("UserPromptSubmit", prompt_envelope)
         response = self.runtime.handle(prompt_envelope)
         checkpoint, checkpoint_path = self.checkpoints.write_turn_checkpoint(
             session_id=prompt_envelope.session_id,

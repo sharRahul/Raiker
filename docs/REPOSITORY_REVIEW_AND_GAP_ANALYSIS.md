@@ -60,7 +60,7 @@ Legend: ✅ implemented_verified · 🟡 partial/stub · 📘 specified_not_impl
 | CLI behaviour | Strong | ✅ | `apps/cli/main.py`, `raiker/cli/main.py`, `raiker/tui/app.py` |
 | Interactive mode (REPL) | Strong | ✅ (basic) | `raiker/tui/app.py` |
 | Commands (slash) | Strong (50+) | ✅ (inspection/planning surfaces) | `raiker/cli/commands.py` |
-| Hooks | Strong on paper | 📘 **no code** | `docs/HOOKS_SPEC.md` exists; `find raiker -iname '*hook*'` → empty |
+| Hooks | Strong | ✅ implemented (`builtin`+`command`) | `raiker/hooks/`; `tests/test_hooks.py`; `http`/`mcp_tool`/`prompt`/`agent` deferred |
 | Plugins | Strong | 🔒 (manifest validation only, no exec) | `raiker/plugins/policy.py`, `manifest.py` |
 | Channels | Strong | 🔒 (registry only, no transport) | `raiker/channels/registry.py`; `config/channel-connectors.json` |
 | Checkpointing / rollback | Strong | 🟡 (write real; restore is plan-only) | `raiker/checkpoints/service.py` (`plan_restore` → `can_execute=False`) |
@@ -71,8 +71,8 @@ Legend: ✅ implemented_verified · 🟡 partial/stub · 📘 specified_not_impl
 | Task planning / execution | Good | ✅ (tasks) / 🟡 (planner minimal) | `raiker/tasks/manager.py`; `raiker/runtime/planner.py` |
 | Security controls | Strong | ✅ (path safety, policy, approvals) | `raiker/policy/engine.py`, `tools/filesystem.py` |
 | OWASP GenAI/LLM coverage | Strong doc, partial code | 🟡 | `docs/OWASP_GENAI_SECURITY_MAPPING.md`; controls partial (Section 5) |
-| Local model support | Documented | 🟡 **mock only** | `config/model-profiles.json`; `raiker/models/router.py` raises `provider_not_wired_in_phase_1` |
-| llama.cpp / local inference | Documented | 📘 not wired | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`; no client code |
+| Local model support | Documented | ✅ llama.cpp native default + mock fallback | `raiker/models/providers/llama_cpp_server.py`, `raiker/models/router.py` |
+| llama.cpp / local inference | Documented | ✅ implemented (stdlib HTTP) | `raiker/models/providers/llama_cpp_server.py`; `tests/test_llama_cpp_provider.py` |
 | Agent-framework integration (LangChain/LangGraph) | Light | 📘 concept-only | `docs/REFERENCE_PLATFORM_COMPATIBILITY.md:155-165` |
 | Extensibility model | Scattered | 📘 (see new `docs/EXTENSIBILITY_MODEL.md`) | plugins+hooks+skills+channels not unified |
 | Self-improvement model | Scattered | 📘 (see new `docs/SELF_IMPROVEMENT_MODEL.md`) | folded into `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md` |
@@ -131,8 +131,6 @@ map to the architecture and leave clear seams for future modules.
 
 | Claim in docs | Reality in code | Evidence |
 |---|---|---|
-| Hooks lifecycle/handlers/decision authority | No hooks module at all | `docs/HOOKS_SPEC.md` vs empty `find raiker -iname '*hook*'` |
-| Local model providers (Ollama/llama.cpp/LM Studio) | Router rejects non-mock providers | `raiker/models/router.py` → `provider_not_wired_in_phase_1` |
 | Verification/reflection step in the loop | Pass-through stub, no checks | `raiker/runtime/verifier.py` |
 | Context gathering / repository understanding feeding the model | Fixed single source | orchestrator `context_gathered` with `sources=["current_prompt"]` |
 | Coding-agent / code-review workflow | No module | absent |
@@ -159,12 +157,12 @@ control**. Per-risk status:
 | LLM02 Sensitive Information Disclosure | Yes | 🟡 partial | `redact_secret_like_text()` exists for approval previews; not applied uniformly to event logs/model egress. Add a single redaction pass on all persisted text + egress classifier. |
 | LLM03 Supply Chain | Yes | 🔒 | Plugin manifest validation real, but no signature/checksum verification. Add manifest signing + dependency policy (currently zero deps — keep an allowlist gate). |
 | LLM04 Data/Model Poisoning | Yes | 🔒 | Memory writes disabled; governance documented. When enabled, enforce provenance + contradiction checks already specified. |
-| LLM05 Improper Output Handling | Yes | 🟡 partial | Enum/contract validation exists (`raiker/contracts/models.py`); model *tool-call* JSON is not yet schema-validated at the boundary. Add structured tool-call schema validation + reject/retry. |
-| LLM06 Excessive Agency | Yes | 🟡 partial | Tool broker + approvals are the strongest implemented control. Missing: per-turn max-tool-calls, budget/timeout, subagent depth (subagents disabled). Add explicit per-turn limits. |
+| LLM05 Improper Output Handling | Yes | ✅ improved | Model tool calls are now schema-validated at the boundary (`raiker/models/tool_call_validation.py`): unknown tools/missing args are rejected (`model_tool_call_rejected`) before becoming a `ToolAction`. |
+| LLM06 Excessive Agency | Yes | ✅ improved | Tool broker + approvals + a per-turn **max-tool-calls budget** in the orchestrator (`PromptOptions.max_tool_calls`). Subagent depth N/A (subagents disabled). Time/token budgets still to add. |
 | LLM07 System Prompt Leakage | Yes | 📘 | Documented; no system-prompt separation in code yet (mock provider). Implement with first real provider. |
 | LLM08 Vector/Embedding Weaknesses | Yes | 🔒 | Vector writes disabled. Apply sensitivity filters + provenance when enabled. |
 | LLM09 Misinformation | Yes | 🟡 | Verifier is a stub. Implement verification/citation gating to make this real. |
-| LLM10 Unbounded Consumption | Yes | 📘 | Budgets/timeouts/rate-limits documented, not enforced. Add token/tool/time budgets in the orchestrator. |
+| LLM10 Unbounded Consumption | Yes | 🟡 partial | Per-turn tool-call budget now enforced in the orchestrator; token/time/rate budgets still to add. |
 
 **Strongest implemented safeguards today:** workspace path-safety (symlink/traversal rejection,
 `raiker/tools/filesystem.py`), policy-gated tool execution with approvals, append-only event
@@ -181,8 +179,8 @@ persistence/egress (LLM02), (3) tool-call schema validation (LLM05), (4) per-tur
 
 | Capability / area | Current status | Missing / weak | Risk / impact | Recommended fix | Priority |
 |---|---|---|---|---|---|
-| Hooks | 📘 doc only, no code | No `raiker/hooks/` module, dispatcher, or tests | Docs claim a core extensibility pillar that does not exist → erodes ledger trust | Add "code status" banner now (done); build `raiker/hooks/` dispatcher + `command/builtin` handlers + decision-authority tests | High |
-| Local model providers / llama.cpp | 🟡 mock only | Router rejects real providers; Phase 2 marked verified | Misleads users that local inference works | Reclassify in ledger (done as note); implement one real adapter (Ollama or llama.cpp server) behind the existing provider contract | High |
+| Hooks | ✅ implemented (core) | `http`/`mcp_tool`/`prompt`/`agent` handlers deferred | — | Done: `raiker/hooks/` dispatcher + `builtin`/`command` handlers, scoped config, decision authority, broker/gateway wiring, tests (`tests/test_hooks.py`) | Resolved |
+| Local model providers / llama.cpp | ✅ implemented | — | — | Done: `raiker/models/providers/llama_cpp_server.py` is the native default backend (stdlib HTTP, OpenAI-compatible), wired through the router with mock fallback; model-driven tool-call loop + validation added | Resolved |
 | Verifier | 🟡 stub | Pass-through; no checks | LLM09 misinformation; "verify" phase is hollow | Implement minimal verification (test-run / diff sanity) with events | High |
 | Context gathering | 🟡 stub | Fixed single source | No real repository understanding feeding the model | Implement a context-gatherer using existing safe tools (grep/glob/read) + budget | High |
 | Code review workflow | ❌ missing | No module despite "coding platform" framing | Headline use case absent | Specify + build a review workflow (diff in → findings out) reusing tool broker | Medium |
@@ -237,12 +235,15 @@ Documentation-only (no runtime code changed; no disabled capability enabled):
 **What was updated** — see Section 7 (documentation only).
 
 **What still needs implementation (engineering backlog, in priority order)**
-1. `raiker/hooks/` dispatcher + handler adapters + decision-authority tests.
-2. One real `ModelProvider` adapter (Ollama or llama.cpp server) behind the existing contract.
-3. Real context-gatherer (`raiker/context/`) using existing safe tools + budget.
-4. Real verifier (test-run/diff sanity) wired into the loop.
-5. OWASP hardening: provenance tags, uniform redaction, tool-call schema validation, per-turn
-   budgets.
+1. ~~`raiker/hooks/` dispatcher + handler adapters + decision-authority tests.~~ Done — see
+   `raiker/hooks/` and `docs/HOOKS_SPEC.md`.
+2. ~~One real `ModelProvider` adapter behind the existing contract.~~ Done — the llama.cpp
+   server is the native default backend (`raiker/models/providers/llama_cpp_server.py`), with a
+   model-driven tool-call loop and tool-call validation (OWASP LLM05).
+3. Real context-gatherer (`raiker/context/`) using existing safe tools + budget (still a stub).
+4. Real verifier (test-run/diff sanity) wired into the loop (still a stub).
+5. OWASP hardening: provenance tags, uniform redaction, per-turn budgets (tool-call schema
+   validation now done; per-turn tool-call budget now enforced).
 6. Code-review workflow module.
 
 **Recommended next steps**

@@ -53,11 +53,13 @@ As of the current `main` state:
 
 > **Review note (2026-06-19):** A full repository review is recorded in
 > [`docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md`](docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md).
-> It verified that some capabilities are documented ahead of code — notably **hooks**
-> (no `raiker/hooks/` module), **local model providers** (only the `mock` provider is wired;
-> the router rejects others), and the **verifier**/**context gatherer** (stubs). These are
-> tracked honestly in [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) under
-> "Known Documentation/Code Gaps" and must not be treated as `implemented_verified`.
+> Since that review, two of its top gaps were closed: the **llama.cpp server** is now the native
+> default backend with a model-driven tool-calling loop (`raiker/models/providers/`,
+> `raiker/runtime/orchestrator.py`), and **hooks** are implemented (`raiker/hooks/`, `builtin`+
+> `command` handlers). Remaining stubs tracked in
+> [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) under "Known Documentation/Code
+> Gaps": the **verifier** and **context gatherer** are still placeholders, and the deferred hook
+> handler types (`http`/`mcp_tool`/`prompt`/`agent`) are not wired.
 
 Do **not** mark any capability `implemented_verified` unless:
 
@@ -387,7 +389,7 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 | [`docs/UI_UX_DESIGN_SPEC.md`](docs/UI_UX_DESIGN_SPEC.md) | Shared UX, Rich TUI, configurable status bar, optional panels, Desktop UI, Web UI, Dashboard, IDE, Voice UI, Apple/Android mobile apps, approval-preview UI, and channel clients. |
 | [`docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`](docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md) | Model profiles, local providers, hosted policy gates, launch contract, streaming, tool-call modes. |
 | [`docs/MODEL_PROVIDER_CONTRACT.md`](docs/MODEL_PROVIDER_CONTRACT.md) | Provider adapter interface, model request/response schema, provider policy, events, and mock-provider acceptance. |
-| [`config/model-profiles.json`](config/model-profiles.json) | Built-in model launch profile registry for mock, Ollama, llama.cpp, LM Studio, OpenAI-compatible, and hosted providers. |
+| [`config/model-profiles.json`](config/model-profiles.json) | Built-in model launch profile registry for mock, the llama.cpp server (native default), LM Studio, OpenAI-compatible, vLLM (later), and hosted providers. |
 | [`docs/CHANNELS_SPEC.md`](docs/CHANNELS_SPEC.md) | Channel connector profiles, pairing, sender trust, routing, side questions, approval relay, link/unlink lifecycle. |
 | [`config/channel-connectors.json`](config/channel-connectors.json) | Built-in connector profile registry used by UI listing/linking flows before implementation wiring. |
 

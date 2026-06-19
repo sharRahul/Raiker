@@ -56,7 +56,7 @@ If any field is missing, the requirement is not builder-proof.
 | Reference capability | Raiker requirement | Phase | Canonical docs | Acceptance proof |
 |---|---|---:|---|---|
 | Deterministic test model | `mock` model provider for offline tests | Phase 1 | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` | Mock provider deterministic tests |
-| Local model providers | Ollama, llama.cpp, LM Studio, OpenAI-compatible local endpoints | Phase 2 | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `config/model-profiles.json` | Provider profile and launch tests |
+| Local model providers | llama.cpp server (native default), LM Studio, OpenAI-compatible local endpoints | Phase 2 | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `config/model-profiles.json` | Provider profile and chat/tool-call tests |
 | Hosted provider controls | Hosted providers disabled until privacy/egress/budget policy allows | Phase 3-5 | `docs/SECURITY_AND_POLICY.md`, `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` | Hosted fallback denied tests |
 | Tool-call parsing | Model output parsed as untrusted structured proposal | Phase 1-2 | `docs/API_AND_CONTRACT_SCHEMAS.md` | Invalid model tool call tests |
 | Context limits | Context budget and source priority before model calls | Phase 2 | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` | Truncation priority tests |

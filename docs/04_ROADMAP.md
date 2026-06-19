@@ -43,8 +43,7 @@ Verification:
 ## Phase 2 — Model Providers
 
 Outputs:
-- llama.cpp provider.
-- Ollama provider.
+- llama.cpp server provider (native default backend).
 - LM Studio/OpenAI-compatible provider.
 - Hosted API provider stub.
 - Provider capability registry.

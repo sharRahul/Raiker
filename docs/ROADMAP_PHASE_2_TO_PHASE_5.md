@@ -59,7 +59,7 @@ Features:
 - pause/cancel/steer;
 - full checkpoint/rewind/fork;
 - file write/edit/apply_patch with approval;
-- local model providers: Ollama, llama.cpp server, LM Studio;
+- local model providers: llama.cpp server (native default), LM Studio;
 - model profiles and launch/switch UI;
 - project/user/local configs;
 - permission rules;

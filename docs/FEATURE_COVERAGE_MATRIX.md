@@ -116,7 +116,7 @@ A feature must never be marked as merely "future" without a full specification.
 | Memory | Memory must support profile, project, episodic, procedural, semantic, graph, scratchpad, eidetic observation, and gist memory with governance. |
 | Learning loop | Verified task trajectories may become skills only through proposal, tests, and approval. |
 | Storage | SQLite must store state/metadata; JSONL stores append-only events; SQLite FTS5/vector metadata/recursive CTEs support search and graph traversal. |
-| Local models | Model runtime must support llama.cpp, Ollama, LM Studio, OpenAI-compatible providers, context limits, streaming, tool call formats, and quantisation profiles. |
+| Local models | Model runtime must support the llama.cpp server (native default), LM Studio, OpenAI-compatible providers, context limits, streaming, tool call formats, and quantisation profiles. vLLM is a later high-throughput GPU option. |
 
 ---
 

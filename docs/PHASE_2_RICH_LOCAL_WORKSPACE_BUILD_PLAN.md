@@ -68,7 +68,7 @@ Every implementation PR must pass CI before merging. See `.github/workflows/ci.y
 | RAIKER-1802 | write_file/edit_file/apply_patch proposal path with snapshot and approval | File tools |
 | RAIKER-1901 | git status/diff/log wrappers with policy | Git wrappers |
 | RAIKER-2001 | Local provider health-check abstraction | Model providers |
-| RAIKER-2002 | Ollama profile detection, disabled unless provider is available | Model providers |
+| RAIKER-2002 | llama.cpp server profile detection, disabled unless server is reachable | Model providers |
 | RAIKER-2101 | Memory candidate listing and governed memory status view | Memory |
 | RAIKER-2201 | Phase 2 integration validation and status update | Validation |
 
@@ -97,7 +97,7 @@ RAIKER-1001 Phase 2 plan
     -> RAIKER-1802 write/edit/patch with snapshots
   -> RAIKER-1901 git wrappers
   -> RAIKER-2001 local provider health check
-    -> RAIKER-2002 Ollama detection
+    -> RAIKER-2002 llama.cpp server detection
   -> RAIKER-2101 memory candidate listing
     -> RAIKER-2201 integration validation
 ```
@@ -117,7 +117,7 @@ RAIKER-1001 Phase 2 plan
 | Approvals | RAIKER-1401 to RAIKER-1402 | Approval inbox service and commands | No auto-approval. |
 | File tools | RAIKER-1801 to RAIKER-1802 | stat_path, diff_files, write/patch proposal | No unrestricted file mutation. |
 | Git wrappers | RAIKER-1901 | Git status/diff/log with policy | No git push/merge without approval. |
-| Model providers | RAIKER-2001 to RAIKER-2002 | Health check, Ollama detection | No hosted model calls. |
+| Model providers | RAIKER-2001 to RAIKER-2002 | Health check, llama.cpp server detection | No hosted model calls. |
 | Memory | RAIKER-2101 | Memory candidate listing | No durable memory writes. |
 | Validation | RAIKER-2201 | Integration tests and status update | No unverified completion claim. |
 
@@ -630,9 +630,9 @@ RAIKER-1001 Phase 2 plan
 
 **Must not do:** Do not add network calls in health checks.
 
-### RAIKER-2002: Ollama profile detection
+### RAIKER-2002: llama.cpp server profile detection
 
-**Objective:** Add profile detection for Ollama (disabled unless provider is available).
+**Objective:** Add profile detection for the llama.cpp server (the native default backend), disabled unless the server is reachable.
 
 **Canonical docs:** `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `config/model-profiles.json`
 
@@ -644,16 +644,16 @@ RAIKER-1001 Phase 2 plan
 
 **Storage affected:** None
 
-**Policy/security impact:** Must not send prompts.
+**Policy/security impact:** Must not send prompts; health probe hits only the local `/health` endpoint.
 
-**Tests required:** Ollama detection tests (use mock HTTP)
+**Tests required:** llama.cpp server detection tests (stub HTTP)
 
 **Acceptance criteria:**
-- Ollama profile can be detected via health check;
-- If Ollama is not available, profile remains disabled;
+- The llama.cpp server profile can be detected via the `/health` check;
+- If the server is not reachable, Raiker falls back to the mock provider;
 - Detection does not leak prompts.
 
-**Must not do:** Do not enable Ollama runtime in Phase 2.
+**Must not do:** Do not auto-start a server; do not send prompts during detection.
 
 ### RAIKER-2101: Memory candidate listing and governed memory status view
 

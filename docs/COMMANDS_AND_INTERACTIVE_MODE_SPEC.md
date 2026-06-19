@@ -30,7 +30,7 @@ The user can act through any enabled primary interface. Each interface may use i
 | Side question input | `? What is it doing now?` | Creates read-only side turn bound to active task. |
 | Slash command or action | `/models` | Opens a panel or creates a structured action. |
 | Approval card/control | Approve / deny / defer | Resolves exact pending action ID. |
-| Model panel/action | `/launch --provider ollama --model qwen3.5-coder:9b` | Launches or switches model profile. |
+| Model panel/action | `/launch --provider llama.cpp --model local-gguf` | Launches or switches model profile. |
 | Channel panel/action | `/channels` | Lists, links, unlinks, and inspects connectors. |
 | Memory panel/action | `/memory` | Searches and manages governed memory. |
 | Graph panel/action | `/graph query --symbol ToolBroker` | Runs graph/codemap query through policy. |
@@ -47,25 +47,14 @@ Model launch is an interface-neutral Raiker action, not a TUI-only action.
 Terminal launch examples:
 
 ```text
-/launch --provider ollama --model qwen3.5-coder:9b
-/launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
+/launch --provider llama.cpp --model local-gguf
 /launch --provider lm-studio --model local-model
 /launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
 ```
 
+The llama.cpp server is the native default backend and binds automatically when reachable; `/launch` switches profiles or points at a different local endpoint.
+
 Desktop, Web, IDE, mobile, voice, channel, and API clients must map the same launch operation into the same model-launch action contract.
-
-External provider adapters may expose convenience forms. For example, if a platform supports extension-style commands, an adapter may accept a shape such as:
-
-```bash
-ollama launch raiker --model <model>
-```
-
-That adapter must delegate into a Raiker model-launch action and record the equivalent interface action in the event log:
-
-```text
-/launch --provider ollama --model <model>
-```
 
 The global local terminal command remains:
 

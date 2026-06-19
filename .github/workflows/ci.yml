@@ -1,31 +1,45 @@
 name: CI
 
-# TEMPORARILY PAUSED:
-# GitHub Actions run limit/quota is exhausted.
-# Use local validation gate documented in docs/LOCAL_VALIDATION_GATE.md.
-# Restore pull_request/push triggers when Actions quota is available again.
 on:
-  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
 
 jobs:
-  validate:
+  python:
+    name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.11"]
+        python-version:
+          - "3.11"
+          - "3.12"
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
+          cache: "pip"
+      - name: Install package and dev dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           python -m pip install -e ".[dev]"
-      - name: Lint
-        run: python -m ruff check .
-      - name: Type check
-        run: python -m mypy raiker apps tests
-      - name: Test
-        run: python -m pytest
+      - name: Verify real httpx import
+        run: |
+          python -c "import httpx; print(httpx.__file__)"
+      - name: Run tests
+        run: |
+          python -m pytest
+      - name: Run ruff
+        run: |
+          python -m ruff check .
+      - name: Run mypy
+        run: |
+          python -m mypy raiker apps tests
+      - name: Compile sources
+        run: |
+          python -m compileall -q raiker apps tests

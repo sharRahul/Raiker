@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+import asyncio
+import importlib.metadata
+from pathlib import Path
+
+import httpx
+import pytest
+
+from raiker.cli.commands import handle_model_command, handle_reasoning_command, render_models
+from raiker.models.contracts import ModelCapabilities, ModelMessage, ModelRequest
+from raiker.models.exceptions import ProviderConfigurationError, ProviderPolicyError
+from raiker.models.factory import ModelProviderFactory, ProviderRuntimePolicy
+from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider, _join
+from raiker.models.registry import ModelProfileRegistry
+from raiker.models.router import ModelRouter
+
+
+def test_real_httpx_and_dependencies() -> None:
+    assert not Path("httpx.py").exists()
+    assert "Raiker/httpx.py" not in str(httpx.__file__)
+    deps = importlib.metadata.requires("raiker") or []
+    assert any(d.startswith("httpx") for d in deps)
+    assert not any(d.startswith(("fastapi", "langchain", "llama-index")) for d in deps)
+
+
+@pytest.mark.parametrize(("base", "path", "expected"), [
+    ("http://127.0.0.1:8080", "/v1/chat/completions", "http://127.0.0.1:8080/v1/chat/completions"),
+    ("http://127.0.0.1:8080/", "/v1/chat/completions", "http://127.0.0.1:8080/v1/chat/completions"),
+    ("http://127.0.0.1:8080/v1", "/v1/chat/completions", "http://127.0.0.1:8080/v1/chat/completions"),
+    ("http://127.0.0.1:8080/v1/", "chat/completions", "http://127.0.0.1:8080/v1/chat/completions"),
+    ("http://127.0.0.1:11434/v1", "/v1/models", "http://127.0.0.1:11434/v1/models"),
+    ("https://openrouter.ai/api/v1", "/v1/chat/completions", "https://openrouter.ai/api/v1/chat/completions"),
+])
+def test_join(base: str, path: str, expected: str) -> None:
+    assert _join(base, path) == expected
+
+
+def test_production_router_rejects_test_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RAIKER_TEST_MODE", raising=False)
+    router = ModelRouter(ModelProfileRegistry.load())
+    assert router.default_provider()[0] == "llama.cpp"
+    with pytest.raises(ProviderPolicyError):
+        router.select_profile("mock-test")
+
+
+def test_test_mode_allows_test_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RAIKER_TEST_MODE", "1")
+    router = ModelRouter(ModelProfileRegistry.load())
+    profile = router.select_profile("mock-test")
+    assert profile.profile_id == "mock-test"
+
+
+def test_factory_policy_openrouter(monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = ModelProfileRegistry.load()
+    profile = registry.resolve_profile_id("openrouter-policy-gated")
+    with pytest.raises(ProviderPolicyError):
+        ModelProviderFactory().create(profile)
+    with pytest.raises(ProviderConfigurationError):
+        ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True)).create(profile)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "secret")
+    provider = ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True)).create(profile)
+    assert provider.provider == "openrouter"
+
+
+def test_factory_rejects_vllm_without_private_network_policy() -> None:
+    profile = ModelProfileRegistry.load().resolve_profile_id("vllm-homelab-openai-compatible")
+    with pytest.raises(ProviderPolicyError):
+        ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True)).create(profile)
+
+
+def test_async_openai_success_and_live_urls() -> None:
+    seen = []
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        if request.url.path.endswith("/models"):
+            return httpx.Response(200, json={"data": [{"id": "m", "owned_by": "local"}]})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}], "usage": {"total_tokens": 2}})
+    p = AsyncOpenAICompatibleProvider("p", "llama.cpp", "m", "http://127.0.0.1:8080/v1", ModelCapabilities(supports_embeddings=True), client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    async def main() -> None:
+        resp = await p.chat(ModelRequest("p", "llama.cpp", "m", [ModelMessage("user", "secret")]))
+        assert resp.text == "ok"
+        models = await p.list_models()
+        assert models[0].id == "m"
+    asyncio.run(main())
+    assert seen == ["http://127.0.0.1:8080/v1/chat/completions", "http://127.0.0.1:8080/v1/models"]
+
+
+def test_stream_cancellation_preserves_cancelled_error() -> None:
+    async def main() -> None:
+        async def handler(request: httpx.Request) -> httpx.Response:
+            raise asyncio.CancelledError()
+        p = AsyncOpenAICompatibleProvider("p", "llama.cpp", "m", "http://127.0.0.1:8080", ModelCapabilities(), client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+        with pytest.raises(asyncio.CancelledError):
+            async for _ in p.stream_chat(ModelRequest("p", "llama.cpp", "m", [ModelMessage("user", "x")])):
+                pass
+    asyncio.run(main())
+
+
+def test_cli_persists_model_state(tmp_path: Path) -> None:
+    assert "raiker-local-llama-cpp" in handle_model_command("/model current", workspace_root=tmp_path)
+    out = handle_model_command("/model use ollama-local-openai-compatible", workspace_root=tmp_path)
+    assert "Selected model profile ollama-local-openai-compatible" in out
+    assert "ollama-local-openai-compatible" in handle_model_command("/model current", workspace_root=tmp_path)
+    assert "(selected)" in render_models(workspace_root=tmp_path)
+    assert "does not support reasoning" in handle_reasoning_command("/reasoning set high", workspace_root=tmp_path)

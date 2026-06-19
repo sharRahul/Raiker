@@ -3,7 +3,7 @@
 > **Code status: implemented — llama.cpp server is the native default backend.**
 > `raiker/models/providers/llama_cpp_server.py` is a real provider that talks to a running
 > `llama-server` over its OpenAI-compatible HTTP API using only the Python standard library
-> (`http.client`), so Raiker keeps zero runtime dependencies. `raiker/models/router.py` routes
+> (`http.client`), so Raiker keeps zero_runtime_dependencies. `raiker/models/router.py` routes
 > the `mock` and `llama.cpp` providers; other providers (`lm-studio`, `openai-compatible`,
 > `vllm`, `hosted`) remain gated and raise `provider_not_wired`. At startup the router probes
 > the llama.cpp `/health` endpoint (`ModelRouter.default_provider`): if a server is reachable it
@@ -333,3 +333,16 @@ UI commands now include `/providers`, `/models`, `/model current`, `/model use <
 Security rules: `local_only=true` allows only local-machine endpoints. Private home-lab endpoints require `local_only=false`, network permission, and egress policy. Hosted/VPS endpoints require network and egress policy; paid hosted providers also require budget policy. OpenRouter always requires egress and budget policy and is disabled by default. There is no silent fallback from local to hosted or from production to deterministic test provider. Events and errors must not include raw prompts, completions, streamed chunks, API keys, Authorization headers, sensitive extra headers, file contents, or tool output contents.
 
 Validation commands: `python -m pytest`, `python -m ruff check .`, and `python -m mypy raiker apps tests`.
+
+
+## Async model runtime status (verified)
+
+Status labels used by Raiker are `implemented_verified`, `implemented_unverified`, `offline_mock_verified`, `profile_defined_only`, `policy_gated_disabled`, `test_only`, and `specified_not_implemented`. Raiker now uses the real `httpx` package (`httpx.AsyncClient`) for async OpenAI-compatible provider transport. The repository-local `httpx.py` shim was removed and must not be restored. The OpenAI SDK and Pydantic are not used by this runtime.
+
+Dependency decision: `httpx` is required and used. `fastapi` is deferred because this change does not implement a Raiker API/server surface. `langchain` is deferred because no governed adapter is implemented and it must not bypass Raiker tool, policy, approval, or event contracts. `llama-index` is deferred because no governed retrieval/indexing adapter is implemented and it must not bypass Raiker memory or provenance policy.
+
+llama.cpp, Ollama, LM Studio, vLLM, generic OpenAI-compatible endpoints, and OpenRouter are represented through Raiker-owned async model-provider contracts. llama.cpp is the local-first native profile via the async OpenAI-compatible path. OpenRouter is hosted and policy-gated: it requires explicit hosted policy, egress and budget policy metadata, HTTPS, and a non-empty API key environment variable.
+
+The deterministic provider is `test_only`; production gateways and normal CLI runtime do not fall back to it. If no real provider is configured or usable, runtime fails safely with a `no_real_model_provider_available`/provider-policy style error instead of silently switching to a mock or hosted backend. No silent local-to-hosted fallback is implemented. Provider support is offline-tested with `httpx.MockTransport`; real provider validation requires an operator-provided server or API key and was not performed here.
+
+UI model selection is session-scoped and persisted in the workspace SQLite store. `/model use` writes the selected profile, `/model current` reads it, `/models` marks it, and reasoning controls are capability-gated. Private chain-of-thought is never exposed; any reasoning summary must be labeled as a summary, not raw reasoning. Model events use safe metadata only and must not include prompts, completions, stream chunks, Authorization headers, API keys, file contents, or tool outputs.

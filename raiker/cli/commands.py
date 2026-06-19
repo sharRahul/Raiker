@@ -52,6 +52,7 @@ from raiker.memory.review import MemoryReviewQueue
 from raiker.memory.semantic import semantic_memory_status
 from raiker.models.registry import ModelProfileRegistry, RegistryError
 from raiker.models.router import ModelRouter
+from raiker.models.session_state import ModelSessionState
 from raiker.phase_gates import list_disabled_capabilities
 from raiker.plugins.policy import plan_plugin_registration
 from raiker.plugins.readiness_registry import plugin_readiness_summary, render_plugin_readiness
@@ -100,13 +101,32 @@ def build_prompt_envelope(
     )
 
 
-def render_models(path: str | Path = "config/model-profiles.json") -> str:
+def _model_session_id() -> str:
+    return "terminal-local"
+
+
+def _selected_profile(registry: ModelProfileRegistry, workspace_root: str | Path = ".") -> ModelProfile:
+    store = SQLiteStore(workspace_root)
+    state = store.load_model_session_state(_model_session_id())
+    if state is not None:
+        try:
+            return registry.resolve_profile_id(state.profile_id)
+        except RegistryError:
+            pass
+    for profile in registry.list_profiles():
+        if profile.raw.get("is_native_default"):
+            return profile
+    return registry.list_profiles()[0]
+
+
+def render_models(path: str | Path = "config/model-profiles.json", *, workspace_root: str | Path = ".") -> str:
     registry = ModelProfileRegistry.load(path)
+    selected = _selected_profile(registry, workspace_root)
     lines = ["Model profiles:"]
     for profile in registry.list_profiles():
-        lines.append(
-            f"- {profile.profile_id} [{profile.default_state}] provider={profile.provider} model={profile.model} phase={profile.build_phase}"
-        )
+        marker = " (selected)" if profile.profile_id == selected.profile_id else ""
+        lines.append(f"- {profile.profile_id}{marker} [{profile.default_state}] provider={profile.provider} model={profile.model} phase={profile.build_phase}")
+    lines.append("Live models: not queried by default in sync command; use router.alist_models for selected provider when policy permits.")
     return "\n".join(lines)
 
 
@@ -835,7 +855,8 @@ def handle_model_command(command: str, *, workspace_root: str | Path = ".") -> s
     parts = shlex.split(command)
     registry = ModelProfileRegistry.load()
     router = ModelRouter(registry)
-    selected = registry.list_profiles()[1] if len(registry.list_profiles()) > 1 else registry.list_profiles()[0]
+    store = SQLiteStore(workspace_root)
+    selected = _selected_profile(registry, workspace_root)
     if len(parts) == 1 or parts[1] == "current":
         return _render_profile_current(selected)
     if parts[1] == "capabilities":
@@ -859,6 +880,7 @@ def handle_model_command(command: str, *, workspace_root: str | Path = ".") -> s
                 if len(matches) != 1:
                     return "Model selection is ambiguous or unavailable; specify a profile_id."
                 profile = router.select_profile(matches[0].profile_id)
+            store.save_model_session_state(ModelSessionState(session_id=_model_session_id(), profile_id=profile.profile_id))
             return f"Selected model profile {profile.profile_id} for this session."
         except Exception as exc:
             return f"Model selection failed: {type(exc).__name__}:{exc}"
@@ -874,15 +896,17 @@ def _render_capabilities(profile: ModelProfile) -> str:
     return "\n".join(["Model capabilities:", f"streaming: {bool(raw.get('supports_streaming'))}", f"embeddings: {bool(raw.get('supports_embeddings'))}", f"tool calls: {bool(raw.get('supports_tool_calls'))}", f"json schema: {bool(raw.get('supports_json_schema'))}", f"reasoning: {bool(raw.get('supports_reasoning'))}", f"reasoning effort: {bool(raw.get('supports_reasoning_effort'))}", f"reasoning budget tokens: {bool(raw.get('supports_reasoning_budget_tokens'))}", f"reasoning summary: {bool(raw.get('supports_reasoning_summary'))}", "private chain-of-thought exposure: never"])
 
 
-def handle_reasoning_command(command: str) -> str:
+def handle_reasoning_command(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     registry = ModelProfileRegistry.load()
-    profile = registry.list_profiles()[1] if len(registry.list_profiles()) > 1 else registry.list_profiles()[0]
+    store = SQLiteStore(workspace_root)
+    profile = _selected_profile(registry, workspace_root)
     if len(parts) == 1 or parts[1] == "status":
         if not profile.raw.get("supports_reasoning"):
             return "Reasoning controls are not available for the selected model/profile. Private chain-of-thought exposure: never."
         return "Reasoning controls available. Private chain-of-thought exposure: never."
     if parts[1] == "off":
+        store.save_model_session_state(ModelSessionState(session_id=_model_session_id(), profile_id=profile.profile_id, reasoning_enabled=False))
         return "Reasoning controls disabled."
     if parts[1] == "set" and len(parts) == 3:
         value = parts[2]
@@ -891,6 +915,8 @@ def handle_reasoning_command(command: str) -> str:
         allowed = set(profile.raw.get("reasoning_effort_values", [])) | set(profile.raw.get("reasoning_modes", [])) | {"off"}
         if value not in allowed:
             return "Reasoning setting rejected: unsupported value for selected profile."
+        state = ModelSessionState(session_id=_model_session_id(), profile_id=profile.profile_id, reasoning_enabled=True, reasoning_effort=value if value in set(profile.raw.get("reasoning_effort_values", [])) else None, reasoning_mode=value if value in set(profile.raw.get("reasoning_modes", [])) else None)
+        store.save_model_session_state(state)
         return f"Reasoning setting changed: {value}."
     return "Usage: /reasoning [status|set <mode-or-effort>|off]"
 
@@ -906,11 +932,11 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command == "/providers":
         return handle_providers()
     if command == "/models":
-        return render_models()
+        return render_models(workspace_root=workspace_root)
     if command == "/model" or command.startswith("/model "):
         return handle_model_command(command, workspace_root=workspace_root)
     if command == "/reasoning" or command.startswith("/reasoning "):
-        return handle_reasoning_command(command)
+        return handle_reasoning_command(command, workspace_root=workspace_root)
     if command == "/channels":
         return render_channels()
     if command == "/status":

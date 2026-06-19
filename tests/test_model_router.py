@@ -9,7 +9,7 @@ from raiker.models.router import ModelRouter
 
 
 def test_mock_model_provider_deterministic() -> None:
-    router = ModelRouter(ModelProfileRegistry.load())
+    router = ModelRouter(ModelProfileRegistry.load(), allow_test_provider=True)
     assert router.generate("mock", "mock-deterministic", "Hello") == router.generate(
         "mock", "mock-deterministic", "Hello"
     )

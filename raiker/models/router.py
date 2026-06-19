@@ -22,7 +22,11 @@ from raiker.models.exceptions import (
     ModelProviderError,
     ProviderPolicyError,
 )
-from raiker.models.factory import ModelProviderFactory, capabilities_from_profile
+from raiker.models.factory import (
+    ModelProviderFactory,
+    ProviderRuntimePolicy,
+    capabilities_from_profile,
+)
 from raiker.models.health import ProviderHealth
 from raiker.models.registry import ModelProfileRegistry, RegistryError
 
@@ -35,15 +39,16 @@ class ModelLaunchResult:
 
 
 class ModelRouter:
-    def __init__(self, registry: ModelProfileRegistry, writer: EventLogWriter | None = None, *, allow_test_provider: bool = True) -> None:
+    def __init__(self, registry: ModelProfileRegistry, writer: EventLogWriter | None = None, *, allow_test_provider: bool = False, runtime_policy: ProviderRuntimePolicy | None = None) -> None:
         self.registry = registry
         self.writer = writer
         self.allow_test_provider = allow_test_provider
+        self.runtime_policy = runtime_policy or ProviderRuntimePolicy(allow_test_provider=allow_test_provider)
         self.active_profile_id: str | None = None
         self.reasoning: ReasoningOptions | None = None
 
     def _factory(self) -> ModelProviderFactory:
-        return ModelProviderFactory(allow_test_provider=self.allow_test_provider)
+        return ModelProviderFactory(policy=self.runtime_policy)
 
     def _profile(self, provider: str, model: str) -> ModelProfile:
         return self.registry.resolve(provider, model)
@@ -102,12 +107,10 @@ class ModelRouter:
         return self.chat(provider, model, [ModelMessage(role="user", content=prompt)]).text
 
     def default_provider(self, *, health_timeout: float = 1.0) -> tuple[str, str]:
-        if self.allow_test_provider:
-            return ("mock", "mock-deterministic")
         for profile in self.registry.list_profiles():
             if profile.provider == "llama.cpp":
                 return profile.provider, profile.model
-        raise RegistryError("no_real_default_provider_configured")
+        raise RegistryError("no_real_model_provider_available")
 
     def select_profile(self, profile_id: str) -> ModelProfile:
         profile = self.registry.resolve_profile_id(profile_id)
@@ -136,7 +139,8 @@ class ModelRouter:
             self.writer.append(make_event(session_id=session_id, turn_id=turn_id, event_type="model_launch_requested", actor="model_router", payload={"provider": provider, "model": model}, client=client))
         try:
             profile = self.registry.resolve(provider, model)
-            ModelProviderFactory(allow_test_provider=self.allow_test_provider or client.type == "test_harness").create(profile)
+            policy = ProviderRuntimePolicy(allow_test_provider=self.allow_test_provider or client.type == "test_harness")
+            ModelProviderFactory(policy=policy).create(profile)
         except (RegistryError, ModelProviderError) as exc:
             if self.writer is not None:
                 self.writer.append(make_event(session_id=session_id, turn_id=turn_id, event_type="model_launch_failed", actor="model_router", payload={"provider": provider, "model": model, "error_class": type(exc).__name__}, client=client))

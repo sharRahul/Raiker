@@ -17,6 +17,7 @@ from raiker.contracts.models import (
     TaskRecord,
     ToolAction,
 )
+from raiker.models.session_state import ModelSessionState
 from raiker.storage.migrations import (
     PHASE_1_MIGRATION_ID,
     PHASE_1_SQL,
@@ -101,6 +102,17 @@ class SQLiteStore:
         self.paths.ensure()
         with sqlite3.connect(self.db_path) as connection:
             connection.executescript(PHASE_1_SQL)
+            connection.executescript("""
+CREATE TABLE IF NOT EXISTS model_session_state (
+  session_id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL,
+  reasoning_enabled INTEGER NOT NULL DEFAULT 0,
+  reasoning_effort TEXT,
+  reasoning_mode TEXT,
+  reasoning_budget_tokens INTEGER,
+  updated_at TEXT NOT NULL
+);
+""")
             connection.execute(
                 "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
                 (PHASE_1_MIGRATION_ID, utc_now()),
@@ -570,3 +582,29 @@ class SQLiteStore:
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
+
+
+    def save_model_session_state(self, state: ModelSessionState) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO model_session_state
+                (session_id, profile_id, reasoning_enabled, reasoning_effort, reasoning_mode, reasoning_budget_tokens, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (state.session_id, state.profile_id, int(state.reasoning_enabled), state.reasoning_effort, state.reasoning_mode, state.reasoning_budget_tokens, utc_now()),
+            )
+
+    def load_model_session_state(self, session_id: str) -> ModelSessionState | None:
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM model_session_state WHERE session_id = ?", (session_id,)).fetchone()
+        if row is None:
+            return None
+        return ModelSessionState(
+            session_id=str(row["session_id"]),
+            profile_id=str(row["profile_id"]),
+            reasoning_enabled=bool(row["reasoning_enabled"]),
+            reasoning_effort=row["reasoning_effort"],
+            reasoning_mode=row["reasoning_mode"],
+            reasoning_budget_tokens=row["reasoning_budget_tokens"],
+        )

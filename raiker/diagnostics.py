@@ -9,13 +9,13 @@ from raiker.storage.sqlite import SQLiteStore
 
 def render_doctor(workspace_root: str | Path) -> str:
     store = SQLiteStore(workspace_root)
-    health = check_local_provider("ollama")
+    health = check_local_provider("llama.cpp")
     disabled = list_disabled_capabilities()
     lines = [
         "Raiker doctor:",
         f"database: {store.db_path}",
-        f"ollama_available: {health.available}",
-        f"ollama_runtime_enabled: {health.enabled_for_runtime}",
+        f"llama_cpp_available: {health.available}",
+        f"llama_cpp_runtime_enabled: {health.enabled_for_runtime}",
         f"phase_3_disabled: {', '.join(disabled['phase_3'])}",
         f"phase_4_disabled: {', '.join(disabled['phase_4'])}",
     ]

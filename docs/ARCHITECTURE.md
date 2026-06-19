@@ -153,7 +153,7 @@ Responsible for connector profile registry, channel linking, pairing, sender tru
 
 ### Model Router
 
-Responsible for abstracting model providers. Phase 1 uses the deterministic `mock` provider. Phase 2 wires Ollama, llama.cpp server, LM Studio, and OpenAI-compatible local endpoints. Hosted providers are policy-controlled and documented in `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`.
+Responsible for abstracting model providers. The deterministic `mock` provider is the offline/test fallback; the **llama.cpp server is the native default local backend** (`raiker/models/providers/llama_cpp_server.py`), selected automatically when its `/health` endpoint is reachable. LM Studio and OpenAI-compatible local endpoints have profiles but are not yet wired; vLLM is a later high-throughput GPU option. Hosted providers are policy-controlled and documented in `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`.
 
 ### Event Log
 
@@ -213,8 +213,7 @@ Required terminal actions:
 ```text
 normal prompt: "List files in this project"
 side question: ? What is it doing now?
-model launch: /launch --provider ollama --model qwen3.5-coder:9b
-model launch: /launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
+model launch: /launch --provider llama.cpp --model local-gguf
 model launch: /launch --provider lm-studio --model local-model
 model launch: /launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
 models: /models
@@ -226,7 +225,7 @@ doctor: /doctor
 
 Every terminal action above must have an equivalent action contract available to Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, chat channels, Email, Browser Extension, Apple mobile app, Android mobile app, and Mobile Companion when those interfaces are implemented and enabled.
 
-Provider-specific convenience launchers, including a platform adapter that accepts a command shaped like `ollama launch raiker --model <model>`, may delegate into a Raiker model-launch request when that platform supports such extension behaviour. Documentation and tests must keep the equal-interface invariant intact.
+Provider-specific convenience launchers may delegate into a Raiker model-launch request when that platform supports such extension behaviour. Documentation and tests must keep the equal-interface invariant intact.
 
 ---
 

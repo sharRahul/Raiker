@@ -8,6 +8,8 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ClientMetadata, PolicyDecision, ToolAction, ToolResult
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
+from raiker.hooks.contracts import HookInput, HookOutcome
+from raiker.hooks.dispatcher import HookDispatcher
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.filesystem import (
@@ -30,11 +32,13 @@ class ToolBroker:
         policy_engine: PolicyEngine,
         store: SQLiteStore | None = None,
         writer: EventLogWriter | None = None,
+        hook_dispatcher: HookDispatcher | None = None,
     ) -> None:
         self.workspace_root = Path(workspace_root).resolve()
         self.policy_engine = policy_engine
         self.store = store
         self.writer = writer
+        self.hook_dispatcher = hook_dispatcher
         self.executors: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
             "read_file": lambda args: read_file(self.workspace_root, str(args.get("path", "."))),
             "list_directory": lambda args: list_directory(
@@ -118,6 +122,74 @@ class ToolBroker:
             }
         return None
 
+    def _pre_tool_use(
+        self,
+        action: ToolAction,
+        *,
+        session_id: str,
+        turn_id: str | None,
+        client: ClientMetadata | None,
+    ) -> HookOutcome | None:
+        if self.hook_dispatcher is None or not self.hook_dispatcher.is_active():
+            return None
+        return self.hook_dispatcher.dispatch(
+            HookInput(
+                event_name="PreToolUse",
+                tool_name=action.tool_name,
+                tool_input=action.arguments,
+                context={"risk_level": action.risk_level, "policy_state": "pending"},
+            ),
+            session_id=session_id,
+            turn_id=turn_id,
+            client=client,
+        )
+
+    def _notify_hook(
+        self,
+        event_name: str,
+        action: ToolAction,
+        *,
+        session_id: str,
+        turn_id: str | None,
+        client: ClientMetadata | None,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        if self.hook_dispatcher is None or not self.hook_dispatcher.is_active():
+            return
+        self.hook_dispatcher.dispatch(
+            HookInput(
+                event_name=event_name,
+                tool_name=action.tool_name,
+                tool_input=action.arguments,
+                context=context or {},
+            ),
+            session_id=session_id,
+            turn_id=turn_id,
+            client=client,
+        )
+
+    def _hook_deny_decision(self, action: ToolAction, reasons: list[str]) -> PolicyDecision:
+        return PolicyDecision(
+            decision_id=new_id("pol_"),
+            action_id=action.action_id,
+            decision="deny",
+            reasons=["hook_denied", *reasons],
+            requires_user_approval=False,
+            risk_level="blocked",
+            timestamp=utc_now(),
+        )
+
+    def _hook_ask_decision(self, action: ToolAction, base: PolicyDecision) -> PolicyDecision:
+        return PolicyDecision(
+            decision_id=new_id("pol_"),
+            action_id=action.action_id,
+            decision="needs_approval",
+            reasons=["hook_requested_approval", *base.reasons],
+            requires_user_approval=True,
+            risk_level="high",
+            timestamp=utc_now(),
+        )
+
     def execute(
         self,
         action: ToolAction,
@@ -148,7 +220,19 @@ class ToolBroker:
             },
             client=client,
         )
-        decision = self.policy_engine.review(action)
+        hook_outcome = self._pre_tool_use(
+            action, session_id=session_id, turn_id=turn_id, client=client
+        )
+        if hook_outcome is not None and hook_outcome.decision == "deny":
+            decision = self._hook_deny_decision(action, hook_outcome.reasons)
+        else:
+            decision = self.policy_engine.review(action)
+            if (
+                hook_outcome is not None
+                and hook_outcome.decision == "ask"
+                and decision.decision == "allow"
+            ):
+                decision = self._hook_ask_decision(action, decision)
         self._event(
             session_id=session_id,
             turn_id=turn_id,
@@ -163,6 +247,14 @@ class ToolBroker:
         if decision.decision == "deny":
             if self.store is not None:
                 self.store.insert_tool_action(action, session_id, turn_id, "denied")
+            self._notify_hook(
+                "PermissionDenied",
+                action,
+                session_id=session_id,
+                turn_id=turn_id,
+                client=client,
+                context={"reasons": decision.reasons},
+            )
             return (
                 ToolResult(
                     action_id=action.action_id,
@@ -198,6 +290,14 @@ class ToolBroker:
             if self.store is not None:
                 self.store.insert_approval(approval_id, action.action_id)
                 self.store.insert_tool_action(action, session_id, turn_id, "approval_required")
+            self._notify_hook(
+                "PermissionRequest",
+                action,
+                session_id=session_id,
+                turn_id=turn_id,
+                client=client,
+                context={"approval_id": approval_id, "reasons": decision.reasons},
+            )
             return (
                 ToolResult(
                     action_id=action.action_id,
@@ -273,5 +373,13 @@ class ToolBroker:
             actor="tool_broker",
             payload=result.to_dict(),
             client=client,
+        )
+        self._notify_hook(
+            "PostToolUse" if result.status == "success" else "PostToolUseFailure",
+            action,
+            session_id=session_id,
+            turn_id=turn_id,
+            client=client,
+            context={"status": result.status},
         )
         return result, decision

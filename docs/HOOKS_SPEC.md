@@ -1,17 +1,36 @@
 # Hooks Specification
 
-> **Code status: specified_not_implemented.** This is a complete design spec, but there is
-> **no hooks module in the codebase** (`find raiker -iname '*hook*'` returns nothing). Nothing
-> below is wired into the runtime yet. To realize it, add a `raiker/hooks/` dispatcher that
-> registers through — and is gated by — the existing tool broker, policy engine, and event log
-> (see `docs/EXTENSIBILITY_MODEL.md`). Until then, do not mark any hook behaviour
-> `implemented_verified`.
+> **Code status: implemented (core).** `raiker/hooks/` is a working dispatcher wired through the
+> tool broker and gateway. Implemented now:
+> - **Handler types:** `builtin` (in-process, trusted) and `command` (subprocess). `http`,
+>   `mcp_tool`, `prompt`, and `agent` handlers remain specified-not-implemented (they need
+>   network/model/subagent surfaces that are still gated).
+> - **Wired events:** `SessionStart`, `UserPromptSubmit` (gateway), and `PreToolUse`,
+>   `PermissionRequest`, `PermissionDenied`, `PostToolUse`, `PostToolUseFailure` (tool broker).
+>   Other events in this spec are not dispatched yet.
+> - **Decision authority:** `PreToolUse` can make an action stricter only — a hook `deny`
+>   short-circuits to a denied `PolicyDecision`; a hook `ask` upgrades an otherwise-allowed action
+>   to `needs_approval`. Hooks never allow a denied action; managed-scope deny wins
+>   (`raiker/hooks/decision.py`).
+> - **Config sources & scope:** `config/managed-hooks.json` (managed) > `config/hooks.json`
+>   (project) > `.raiker/hooks.json` (local), loaded by `raiker/hooks/registry.py`.
+> - **Command-hook safety:** argv list only (no shell), program must resolve **inside the
+>   workspace** (reuses `raiker/tools/filesystem.resolve_workspace_path`), bounded `timeout_ms`,
+>   truncated output, minimal environment. Non-zero exit blocks by convention; JSON stdout
+>   `{"decision": ...}` is honored. Timeouts/errors emit `hook_timeout`/`hook_failed` and fail
+>   open (the action falls through to normal policy).
+> - **Events:** `hook_matched`, `hook_executed`, `hook_decision`, `hook_failed`, `hook_timeout`.
+> - **No hooks configured → no-op:** the dispatcher is inactive and the runtime is unchanged.
+>
+> See `tests/test_hooks.py` for the acceptance tests and `docs/EXTENSIBILITY_MODEL.md` for how
+> hooks sit alongside the other extension surfaces. Sections below are the full design target;
+> not every event/handler is wired yet (see the list above).
 >
 > **Reference alignment (Claude Code `hooks`):** the reference documents ~31 events and 5
 > handler types (`command`, `http`, `mcp_tool`, `prompt`, `agent`) using a three-level
 > `EventName → matcher → hooks[]` config with an optional `if` condition (e.g. `Bash(git *)`).
-> Raiker's event list and handler types below are intentionally a superset; when implementing,
-> keep the matcher/`if`/decision-authority semantics consistent with that reference.
+> Raiker's event list and handler types are intentionally a superset; the matcher/`if`/
+> decision-authority semantics follow that reference.
 
 Hooks let users, projects, plugins, administrators, and skills run controlled logic at lifecycle points in Raiker.
 

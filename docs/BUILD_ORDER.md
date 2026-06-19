@@ -154,7 +154,7 @@ RAIKER-1001 Phase 2 plan
     -> RAIKER-1802 write/edit/patch with snapshots
   -> RAIKER-1901 git wrappers
   -> RAIKER-2001 provider health check
-    -> RAIKER-2002 Ollama detection
+    -> RAIKER-2002 llama.cpp server detection
   -> RAIKER-2101 memory candidate listing
     -> RAIKER-2201 integration validation
 ```
@@ -174,7 +174,7 @@ RAIKER-1001 Phase 2 plan
 | Approvals | RAIKER-1401 to RAIKER-1402 | Approval inbox and commands | No auto-approval. |
 | File tools | RAIKER-1801 to RAIKER-1802 | stat_path, diff_files, write/patch proposal | No unrestricted file mutation. |
 | Git wrappers | RAIKER-1901 | Git status/diff/log with policy | No git push/merge without approval. |
-| Model providers | RAIKER-2001 to RAIKER-2002 | Health check, Ollama detection | No hosted model calls. |
+| Model providers | RAIKER-2001 to RAIKER-2002 | Health check, llama.cpp server detection | No hosted model calls. |
 | Memory | RAIKER-2101 | Memory candidate listing | No durable memory writes. |
 | Validation | RAIKER-2201 | Integration tests and status update | No unverified completion claim. |
 

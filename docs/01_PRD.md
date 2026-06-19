@@ -81,12 +81,11 @@ Required phases:
 
 ### PR-003 Model Router
 The system must support:
-- Local llama.cpp.
-- Ollama.
+- Local llama.cpp server (the native default backend).
 - LM Studio.
 - OpenRouter or other OpenAI-compatible endpoints.
 - Anthropic/OpenAI-style hosted APIs.
-- Modal-hosted inference.
+- vLLM for high-throughput GPU serving (later; home lab / VPS).
 - Custom model provider plugins.
 
 The router must track context length, tool-calling support, JSON/structured output support, embedding support, vision support, privacy classification, latency, and estimated cost.

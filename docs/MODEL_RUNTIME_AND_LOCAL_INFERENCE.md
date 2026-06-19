@@ -1,18 +1,19 @@
 # Model Runtime And Local Inference Specification
 
-> **Code status: partial — mock provider only.** The provider *contract* and the model-profile
-> registry exist, but `raiker/models/router.py` raises `provider_not_wired_in_phase_1` for every
-> provider except `mock`. **No local-inference client (llama.cpp/Ollama/LM Studio) is wired**;
-> `raiker/models/health.py` only *detects* a local binary, it does not run inference. The
-> implemented `mock` provider returns deterministic placeholder text. Note: the IMPLEMENTATION
-> ledger lists "Local provider health-check" as Phase 2 `implemented_verified` — that refers to
-> the **health-check only**, not to working inference. Until a real adapter lands, treat local
-> inference as `specified_not_implemented`.
+> **Code status: implemented — llama.cpp server is the native default backend.**
+> `raiker/models/providers/llama_cpp_server.py` is a real provider that talks to a running
+> `llama-server` over its OpenAI-compatible HTTP API using only the Python standard library
+> (`http.client`), so Raiker keeps zero runtime dependencies. `raiker/models/router.py` routes
+> the `mock` and `llama.cpp` providers; other providers (`lm-studio`, `openai-compatible`,
+> `vllm`, `hosted`) remain gated and raise `provider_not_wired`. At startup the router probes
+> the llama.cpp `/health` endpoint (`ModelRouter.default_provider`): if a server is reachable it
+> becomes the default backend; otherwise Raiker falls back to the deterministic `mock` provider,
+> which keeps tests and offline runs hermetic. Model output (text and tool calls) is validated by
+> `raiker/models/tool_call_validation.py` before any tool runs (OWASP LLM05).
 >
-> **First implementation target (recommended):** a `raiker/models/providers/` package with one
-> real adapter — `llama_cpp_server` (HTTP `/completion` + `/v1/chat/completions`, GGUF model,
-> streaming) or `ollama` (`/api/chat`) — behind the existing provider contract, selected by
-> profile, and still routed through policy/egress gates.
+> **Not Ollama.** Raiker's native local backend is the llama.cpp server. Ollama is intentionally
+> not supported. The later high-throughput option is **vLLM** (see "Provider Types"), enabled only
+> after the llama.cpp path is solid and egress/budget policy is configured.
 
 Raiker is local-first. It must support local inference runtimes while allowing policy-controlled hosted providers.
 
@@ -39,7 +40,7 @@ The model router abstracts model providers, context limits, streaming, tool-call
 Raiker must support:
 
 1. mock provider for deterministic tests;
-2. local providers such as llama.cpp, Ollama, and LM Studio;
+2. the llama.cpp server as the native default local backend, plus LM Studio;
 3. OpenAI-compatible providers;
 4. hosted providers when policy allows;
 5. model profiles;
@@ -56,17 +57,18 @@ Raiker must support:
 
 ## Provider Types
 
-| Provider | Mode | Build phase | Default policy |
+| Provider | Mode | Build phase | Status / default policy |
 |---|---|---:|---|
-| `mock` | deterministic local test provider | Phase 1 | enabled for tests |
-| `llama_cpp_server` | local llama.cpp HTTP server | Phase 2 | local allowed |
-| `ollama` | local Ollama API | Phase 2 | local allowed |
-| `lm_studio` | local OpenAI-compatible API | Phase 2 | local allowed |
-| `openai_compatible` | generic OpenAI-compatible endpoint | Phase 2/3 | local endpoint allowed, remote endpoint policy-gated |
-| `openrouter` | hosted router | Phase 3 | disabled until user/provider policy configured |
-| `anthropic` | hosted API | Phase 3 | disabled until user/provider policy configured |
-| `modal` | hosted GPU inference | Phase 5 | disabled until budget and data policy configured |
+| `mock` | deterministic local test/offline provider | Phase 1 | **implemented**; default fallback when no server is reachable |
+| `llama.cpp` | local `llama-server` (OpenAI-compatible HTTP) | Phase 2 | **implemented — native default** when `/health` is reachable; local allowed |
+| `lm-studio` | local OpenAI-compatible API | Phase 2 | profile only; `provider_not_wired` |
+| `openai-compatible` | generic OpenAI-compatible endpoint | Phase 2/3 | profile only; local endpoint allowed, remote policy-gated |
+| `vllm` | high-throughput GPU server (home lab / VPS) | Phase 5 | disabled until high-throughput serving + egress/budget policy approved |
+| `hosted` | hosted API | Phase 3-5 | disabled until egress/budget policy configured |
 | `custom_plugin` | plugin-provided provider | Phase 3 | disabled until plugin and permission review |
+
+vLLM is positioned **after** the llama.cpp native path: same OpenAI-compatible tool-call shape,
+but built for high-throughput GPU serving on a home lab or VPS. It is not wired today.
 
 No provider is unspecified. A provider that is not enabled must still have a profile schema, validation path, privacy rule, event model, and failure behaviour.
 
@@ -89,23 +91,15 @@ Running `raiker` opens the TUI. Model launch happens inside the TUI with `/launc
 Required TUI examples:
 
 ```text
-/launch --provider ollama --model qwen3.5-coder:9b
-/launch --provider llama.cpp --model /models/qwen.gguf --ctx 32768
+/launch --provider llama.cpp --model local-gguf
 /launch --provider lm-studio --model local-model
 /launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
 ```
 
-Provider-specific shortcut commands may exist when a provider supports extension commands. A shortcut shaped like this:
-
-```bash
-ollama launch raiker --model <model>
-```
-
-must resolve to the equivalent Raiker TUI launch action:
-
-```text
-/launch --provider ollama --model <model>
-```
+The native default backend needs no explicit launch: run a llama.cpp server
+(`llama-server -m <model.gguf> --port 8080 --jinja`) and Raiker binds to it automatically when
+its `/health` endpoint is reachable. `/launch` is for switching profiles or pointing at a
+different local endpoint.
 
 The canonical human-facing Raiker command is `raiker` and it must not depend on provider-specific shortcuts.
 
@@ -116,16 +110,16 @@ The canonical human-facing Raiker command is `raiker` and it must not depend on 
 ```json
 {
   "schema_version": "1.0",
-  "profile_id": "qwen-local-coder",
-  "provider": "ollama",
-  "model": "qwen3.5-coder:9b",
-  "endpoint": "http://localhost:11434",
-  "context_window_tokens": 32768,
-  "max_output_tokens": 4096,
+  "profile_id": "llama-cpp-local-gguf",
+  "provider": "llama.cpp",
+  "model": "local-gguf",
+  "endpoint": "http://127.0.0.1:8080",
+  "served_model_name": "local-gguf",
+  "n_ctx": 8192,
+  "max_tokens": 1024,
   "supports_streaming": true,
-  "supports_tool_calls": false,
-  "supports_json_schema": false,
-  "tool_call_mode": "text_json",
+  "supports_tool_calls": true,
+  "tool_call_protocol": "openai",
   "privacy": {
     "local_only": true,
     "allow_prompt_egress": false
@@ -140,12 +134,17 @@ The canonical human-facing Raiker command is `raiker` and it must not depend on 
     "top_p": 0.9
   },
   "launch": {
-    "canonical_tui_action": "/launch --provider ollama --model qwen3.5-coder:9b",
-    "startup_check": "provider_health_check",
+    "canonical_tui_action": "/launch --provider llama.cpp --model local-gguf",
+    "startup_check": "llama_server_health_check",
     "auto_start_provider": false
   }
 }
 ```
+
+The runtime maps these fields to `raiker/models/providers/llama_cpp_server.LlamaCppServerProvider`
+(`endpoint`, `served_model_name`, `n_ctx`, `temperature`, `max_tokens`, `timeout_seconds`,
+`tool_call_protocol`). A non-local `endpoint` is rejected unless the profile is explicitly not
+`local_only` — model egress is a deliberate policy decision.
 
 ---
 

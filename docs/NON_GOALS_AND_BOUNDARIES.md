@@ -131,10 +131,9 @@ Later phases may add optional adapters, but SQLite/JSONL local-first operation m
 
 ## Model Provider Boundaries
 
-Phase 1 uses the deterministic mock provider. It must not require:
+The deterministic mock provider is the offline/test fallback. Raiker must not *require*:
 
-- Ollama installed;
-- llama.cpp running;
+- a llama.cpp server running;
 - LM Studio running;
 - OpenAI-compatible endpoint;
 - OpenRouter/Anthropic/OpenAI keys;

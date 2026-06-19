@@ -14,13 +14,12 @@ from raiker.models.contracts import (
     ToolSpec,
     new_call_id,
 )
+from raiker.models.exceptions import ProviderConnectionError
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
 DEFAULT_ENDPOINT = "http://127.0.0.1:8080"
 
 
-class ProviderConnectionError(RuntimeError):
-    """Raised when the llama.cpp server cannot be reached or returns an unusable response."""
 
 
 def _split_endpoint(endpoint: str) -> tuple[str, int]:

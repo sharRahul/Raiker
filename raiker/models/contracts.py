@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import uuid4
@@ -88,3 +89,73 @@ class ModelResponse:
     def __post_init__(self) -> None:
         if self.finish_reason not in FINISH_REASONS:
             raise ModelContractError(f"invalid_finish_reason:{self.finish_reason}")
+
+@dataclass(frozen=True)
+class ProviderModelInfo:
+    id: str
+    owned_by: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ModelCapabilities:
+    supports_streaming: bool = False
+    supports_embeddings: bool = False
+    supports_tool_calls: bool = False
+    supports_json_schema: bool = False
+    supports_reasoning: bool = False
+    supports_reasoning_effort: bool = False
+    supports_reasoning_budget_tokens: bool = False
+    supports_reasoning_summary: bool = False
+    reasoning_effort_values: tuple[str, ...] = ()
+    reasoning_modes: tuple[str, ...] = ()
+    reasoning_trace_visible: bool = False
+
+
+@dataclass(frozen=True)
+class ReasoningOptions:
+    enabled: bool = False
+    effort: str | None = None
+    budget_tokens: int | None = None
+    summary: str | None = None
+
+
+@dataclass(frozen=True)
+class ModelRequest:
+    profile_id: str
+    provider: str
+    model: str
+    messages: Sequence[ModelMessage]
+    tools: Sequence[ToolSpec] | None = None
+    temperature: float = 0.2
+    max_tokens: int = 1024
+    stream: bool = False
+    tool_call_mode: str = "text_json"
+    context_window_tokens: int | None = None
+    reasoning: ReasoningOptions | None = None
+    session_id: str | None = None
+    turn_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ModelStreamEvent:
+    event_type: str
+    text_delta: str = ""
+    finish_reason: str | None = None
+    tool_call_delta: dict[str, object] | None = None
+    metadata: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class EmbeddingRequest:
+    profile_id: str
+    provider: str
+    model: str
+    text: str
+
+
+@dataclass(frozen=True)
+class EmbeddingResponse:
+    vector: list[float]
+    model: str
+    usage: dict[str, object] | None = None

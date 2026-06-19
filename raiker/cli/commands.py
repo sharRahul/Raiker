@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import shlex
 from pathlib import Path
@@ -27,6 +28,7 @@ from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import (
     ClientMetadata,
+    ModelProfile,
     PromptEnvelope,
     PromptOptions,
     PromptPayload,
@@ -806,17 +808,109 @@ def handle_approval_resolution(command: str, *, workspace_root: str | Path = "."
     )
 
 
+
+def _profile_status(profile: ModelProfile) -> str:
+    raw = profile.raw
+    if raw.get("test_only"):
+        return "test-only"
+    if raw.get("requires_egress_policy") or raw.get("requires_budget_policy"):
+        return "policy-gated"
+    return str(raw.get("default_state", "unknown"))
+
+
+def handle_providers(path: str | Path = "config/model-profiles.json") -> str:
+    registry = ModelProfileRegistry.load(path)
+    lines = ["Configured model provider profiles:"]
+    from raiker.models.endpoint_policy import classify_endpoint
+    for profile in registry.list_profiles():
+        raw = profile.raw
+        endpoint_kind = classify_endpoint(str(raw.get("endpoint") or raw.get("base_url") or ""))
+        lines.append(
+            f"- {profile.profile_id} provider={profile.provider} backend={raw.get('backend','unknown')} model={profile.model} state={_profile_status(profile)} endpoint_kind={endpoint_kind} health=unknown streaming={bool(raw.get('supports_streaming'))} embeddings={bool(raw.get('supports_embeddings'))} tool_calls={bool(raw.get('supports_tool_calls'))} reasoning={bool(raw.get('supports_reasoning'))}"
+        )
+    return "\n".join(lines)
+
+
+def handle_model_command(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    registry = ModelProfileRegistry.load()
+    router = ModelRouter(registry)
+    selected = registry.list_profiles()[1] if len(registry.list_profiles()) > 1 else registry.list_profiles()[0]
+    if len(parts) == 1 or parts[1] == "current":
+        return _render_profile_current(selected)
+    if parts[1] == "capabilities":
+        return _render_capabilities(selected)
+    if parts[1] == "health":
+        try:
+            health = asyncio.run(router.ahealth(selected.provider, selected.model))
+            return f"Model health: available={health.available} enabled={health.enabled_for_runtime} detail={health.detail} endpoint_kind={selected.raw.get('endpoint_kind','unknown')}"
+        except Exception as exc:
+            return f"Model health: unreachable error_class={type(exc).__name__} endpoint_kind={selected.raw.get('endpoint_kind','unknown')}"
+    if parts[1] == "use":
+        try:
+            if len(parts) >= 3 and not parts[2].startswith("--"):
+                profile = router.select_profile(parts[2])
+            else:
+                parser = argparse.ArgumentParser(prog="/model use", add_help=False)
+                parser.add_argument("--provider", required=True)
+                parser.add_argument("--model", required=True)
+                args = parser.parse_args(parts[2:])
+                matches = registry.find(args.provider, args.model)
+                if len(matches) != 1:
+                    return "Model selection is ambiguous or unavailable; specify a profile_id."
+                profile = router.select_profile(matches[0].profile_id)
+            return f"Selected model profile {profile.profile_id} for this session."
+        except Exception as exc:
+            return f"Model selection failed: {type(exc).__name__}:{exc}"
+    return "Usage: /model [current|use <profile_id>|use --provider <provider> --model <model>|health|capabilities]"
+
+
+def _render_profile_current(profile: ModelProfile) -> str:
+    return "\n".join(["Current model profile:", f"profile_id: {profile.profile_id}", f"provider: {profile.provider}", f"model: {profile.model}", f"endpoint_kind: {profile.raw.get('endpoint_kind','unknown')}", f"policy_status: {_profile_status(profile)}", f"reasoning: {'supported' if profile.raw.get('supports_reasoning') else 'unsupported'}", f"streaming: {bool(profile.raw.get('supports_streaming'))}", f"embeddings: {bool(profile.raw.get('supports_embeddings'))}"])
+
+
+def _render_capabilities(profile: ModelProfile) -> str:
+    raw = profile.raw
+    return "\n".join(["Model capabilities:", f"streaming: {bool(raw.get('supports_streaming'))}", f"embeddings: {bool(raw.get('supports_embeddings'))}", f"tool calls: {bool(raw.get('supports_tool_calls'))}", f"json schema: {bool(raw.get('supports_json_schema'))}", f"reasoning: {bool(raw.get('supports_reasoning'))}", f"reasoning effort: {bool(raw.get('supports_reasoning_effort'))}", f"reasoning budget tokens: {bool(raw.get('supports_reasoning_budget_tokens'))}", f"reasoning summary: {bool(raw.get('supports_reasoning_summary'))}", "private chain-of-thought exposure: never"])
+
+
+def handle_reasoning_command(command: str) -> str:
+    parts = shlex.split(command)
+    registry = ModelProfileRegistry.load()
+    profile = registry.list_profiles()[1] if len(registry.list_profiles()) > 1 else registry.list_profiles()[0]
+    if len(parts) == 1 or parts[1] == "status":
+        if not profile.raw.get("supports_reasoning"):
+            return "Reasoning controls are not available for the selected model/profile. Private chain-of-thought exposure: never."
+        return "Reasoning controls available. Private chain-of-thought exposure: never."
+    if parts[1] == "off":
+        return "Reasoning controls disabled."
+    if parts[1] == "set" and len(parts) == 3:
+        value = parts[2]
+        if not profile.raw.get("supports_reasoning"):
+            return "Reasoning setting rejected: selected model/profile does not support reasoning controls."
+        allowed = set(profile.raw.get("reasoning_effort_values", [])) | set(profile.raw.get("reasoning_modes", [])) | {"off"}
+        if value not in allowed:
+            return "Reasoning setting rejected: unsupported value for selected profile."
+        return f"Reasoning setting changed: {value}."
+    return "Usage: /reasoning [status|set <mode-or-effort>|off]"
+
 def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> str:
     command = command.strip()
     if command in {"/quit", "/exit"}:
         return "Exiting Raiker."
     if command == "/help":
         return (
-            "Commands: /help, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit\n"
+            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model health, /model capabilities, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /models, /launch --provider mock --model mock-deterministic, /quit\n"
             "Status: Phase 3 is complete, Phase 4 is blocked, and runtime execution remains disabled. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
         )
+    if command == "/providers":
+        return handle_providers()
     if command == "/models":
         return render_models()
+    if command == "/model" or command.startswith("/model "):
+        return handle_model_command(command, workspace_root=workspace_root)
+    if command == "/reasoning" or command.startswith("/reasoning "):
+        return handle_reasoning_command(command)
     if command == "/channels":
         return render_channels()
     if command == "/status":

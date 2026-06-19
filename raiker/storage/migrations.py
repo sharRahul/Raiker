@@ -395,3 +395,31 @@ CREATE TABLE IF NOT EXISTS proposal_lifecycle_records (
 CREATE INDEX IF NOT EXISTS idx_proposal_lifecycle_status ON proposal_lifecycle_records(status);
 CREATE INDEX IF NOT EXISTS idx_proposal_lifecycle_updated ON proposal_lifecycle_records(updated_at);
 """
+
+PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_MIGRATION_ID = "RAIKER-1402-phase3-slice-b-approval-planning-preview"
+
+PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SQL = """
+CREATE TABLE IF NOT EXISTS proposal_approval_previews (
+  preview_id TEXT PRIMARY KEY,
+  proposal_id TEXT NOT NULL,
+  review_id TEXT NOT NULL,
+  finding_id TEXT NOT NULL,
+  proposal_status TEXT NOT NULL,
+  action_type TEXT NOT NULL,
+  risk_level TEXT NOT NULL,
+  requires_approval INTEGER NOT NULL,
+  would_modify_files INTEGER NOT NULL,
+  files_json TEXT NOT NULL,
+  required_human_decision TEXT NOT NULL,
+  required_safety_checks_json TEXT NOT NULL,
+  blocking_conditions_json TEXT NOT NULL,
+  recommended_next_action TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  source TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_approval_preview_proposal_id ON proposal_approval_previews(proposal_id);
+CREATE INDEX IF NOT EXISTS idx_approval_preview_status ON proposal_approval_previews(status);
+CREATE INDEX IF NOT EXISTS idx_approval_preview_created ON proposal_approval_previews(created_at);
+"""

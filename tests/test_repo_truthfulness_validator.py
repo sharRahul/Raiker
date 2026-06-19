@@ -29,7 +29,7 @@ def test_truthfulness_validator_passes() -> None:
 
 def test_help_and_status_are_honest_about_phase_3_and_ui_scope(tmp_path: Path) -> None:
     help_output = handle_slash_command("/help", workspace_root=tmp_path)
-    assert "Phase 3 safe foundation/readiness slices A-P are complete" in help_output
+    assert "Phase 3 Slice B approval planning preview is implemented" in help_output
     assert "Current launchable UI is a simple terminal/CLI shell" in help_output
     assert "contract-only or specified/deferred" in help_output
 

@@ -67,6 +67,12 @@ For Phase 3 rollout branches, also run manual or scripted smoke coverage for:
 /storage-lifecycle --graph
 /storage-lifecycle --memory
 /doctor
+/proposal <known_proposal_id> --approval-preview
+/approval-previews --json
+/approval-previews --status needs_human_review
+/approval-previews --limit 1
+/approval-preview <known_preview_id>
+/approval-preview <known_preview_id> --json
 ```
 
 ## Phase 3 Slice G validation additions
@@ -166,15 +172,37 @@ python -m pip install -e .
 Do not commit generated metadata/cache files, including `*.egg-info/`, `build/`, `dist/`,
 `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, or virtual environments.
 
+## Phase 3 Slice B validation additions
+
+For any branch that changes approval planning preview behavior, storage, CLI, events, or related
+docs, validation evidence must include:
+
+```bash
+python -m pytest tests/test_phase_3_slice_b_approval_preview_models.py tests/test_phase_3_slice_b_approval_preview_storage.py tests/test_phase_3_slice_b_approval_preview_cli.py tests/test_phase_3_slice_b_approval_preview_safety.py tests/test_phase_3_slice_b_docs_truthfulness.py
+python -m pytest
+python -m ruff check .
+python -m mypy raiker apps tests
+python scripts/validate_phase_status.py
+```
+
+Required Slice B smoke assertions:
+
+- `/proposal <proposal_id> --approval-preview` renders an approval planning preview.
+- `/approval-previews --json` returns parseable JSON.
+- `/approval-preview <preview_id>` shows one preview.
+- Approval preview records are metadata-only; no raw diff, file contents, or secrets.
+- `approval_execution_enabled: False`, `runtime_execution_enabled: False`.
+- All disabled runtime flags remain false.
+
 ## Latest confirmed local green baseline (2026-06-19)
 
-After Phase 3 Slice A proposal lifecycle foundation:
+After Phase 3 Slice B approval planning preview:
 
 | Check | Result |
 |---|---|
 | ruff | All checks passed |
-| mypy | Success, 208 source files |
-| pytest | 477 passed, 2 skipped |
+| mypy | Success, 209 source files |
+| pytest | TBD |
 | validate_phase_status.py | passed |
 | validate_repo_truthfulness.py | passed |
 

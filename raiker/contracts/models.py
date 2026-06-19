@@ -112,6 +112,9 @@ EVENT_TYPES = {
     "proposal_lifecycle_status_changed",
     "proposal_lifecycle_listed",
     "proposal_lifecycle_viewed",
+    "proposal_approval_preview_created",
+    "proposal_approval_preview_listed",
+    "proposal_approval_preview_viewed",
 }
 INTENTS = {
     "chat",

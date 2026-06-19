@@ -23,6 +23,7 @@ _PREFIXES = {
     "vres_",
     "vchk_",
     "rap_",
+    "apv_",
 }
 
 

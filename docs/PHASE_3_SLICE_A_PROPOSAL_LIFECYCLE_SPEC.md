@@ -16,6 +16,11 @@ application; no file mutation; no staging/unstaging; no test execution; no GitHu
 no UI/API/IDE/dashboard/mobile; no approval execution; no Phase 4. `approval_execution_enabled`
 remains false. Disabled runtime flags remain false.
 
+## Follow-on
+
+Phase 3 Slice B approval planning preview is now implemented_verified. See
+`docs/PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SPEC.md`.
+
 ## Commands
 
 ```text

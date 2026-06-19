@@ -51,6 +51,18 @@ PROPOSAL_LIFECYCLE_STATUSES = frozenset(
     }
 )
 
+# Phase 3 Slice B approval planning preview statuses. These are preview/planning
+# labels only and never imply execution approval.
+APPROVAL_PREVIEW_STATUSES = frozenset(
+    {
+        "preview_created",
+        "needs_human_review",
+        "blocked",
+        "ready_for_planning",
+        "superseded",
+    }
+)
+
 
 class ReviewModelError(ValueError):
     """Raised when a review model is constructed with an invalid enumeration value."""
@@ -233,6 +245,64 @@ class ProposalLifecycleRecord:
             "summary": self.summary,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "source": self.source,
+        }
+
+
+@dataclass(frozen=True)
+class ProposalApprovalPreview:
+    """Metadata-only approval planning preview derived from a saved proposal lifecycle record.
+
+    This is a preview/planning record only. It never approves execution, executes
+    proposals, applies patches, modifies files, stages/unstages, runs tests, or
+    calls shell/process/network. ``ready_for_planning`` does not imply execution
+    approval. ``requires_approval`` does not mean approval has been granted.
+    """
+
+    preview_id: str
+    proposal_id: str
+    review_id: str
+    finding_id: str
+    proposal_status: str
+    action_type: str
+    risk_level: str
+    requires_approval: bool
+    would_modify_files: bool
+    files: list[str]
+    required_human_decision: str
+    required_safety_checks: list[str]
+    blocking_conditions: list[str]
+    recommended_next_action: str
+    status: str
+    created_at: str
+    source: str
+
+    def __post_init__(self) -> None:
+        if not self.preview_id.startswith("apv_"):
+            raise ReviewModelError("preview_id must use apv_ prefix")
+        if not self.proposal_id.startswith("rap_"):
+            raise ReviewModelError("proposal_id must use rap_ prefix")
+        if self.status not in APPROVAL_PREVIEW_STATUSES:
+            raise ReviewModelError(f"invalid_approval_preview_status:{self.status}")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "preview_id": self.preview_id,
+            "proposal_id": self.proposal_id,
+            "review_id": self.review_id,
+            "finding_id": self.finding_id,
+            "proposal_status": self.proposal_status,
+            "action_type": self.action_type,
+            "risk_level": self.risk_level,
+            "requires_approval": self.requires_approval,
+            "would_modify_files": self.would_modify_files,
+            "files": list(self.files),
+            "required_human_decision": self.required_human_decision,
+            "required_safety_checks": list(self.required_safety_checks),
+            "blocking_conditions": list(self.blocking_conditions),
+            "recommended_next_action": self.recommended_next_action,
+            "status": self.status,
+            "created_at": self.created_at,
             "source": self.source,
         }
 

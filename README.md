@@ -43,7 +43,7 @@ Raiker exists to provide:
 
 As of the current `main` state:
 
-All Phase 3 slices A through P are implemented, tested, and documented. Runtime execution remains disabled.
+All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 Slice B approval planning preview is implemented. Runtime execution remains disabled.
 
 The current launchable UI is a simple terminal/CLI shell plus read-only shared view contracts. Desktop/Web/Dashboard/Mobile apps, Rich TUI panels, REST/API, IDE, Voice, Browser Extension, and external channel clients are specified/deferred, not implemented as launchable apps. Runtime execution remains disabled and Phase 4 remains blocked. Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
 
@@ -51,7 +51,9 @@ The current launchable UI is a simple terminal/CLI shell plus read-only shared v
 |---|---|---|
 | Phase 1 MVP runtime core | `implemented_verified` | Package scaffold, global `raiker` command, contracts, event log, SQLite bootstrap, static policy, tool broker, safe filesystem/search tools, approval-gated local actions, mock model provider, runtime state machine, terminal shell, and checkpoint stubs are present and covered by tests. |
 | Phase 2 rich local workspace | `implemented_verified` | Task management, event viewer, checkpoint timeline, status/task/event/checkpoint/approval commands, side-question and interrupt contracts, approval inbox, governed file/git wrappers, local provider health-check, and memory candidate views are present and covered by tests. |
-| Phase 3 safe foundation/readiness slices A-P | `implemented_verified` | Implemented verified for safe local rich workspace/extensibility foundations, CLI functional-test surfaces, read-only shared workspace contracts, planning-only plugin validation, approval-preview surfaces, readiness metadata, storage lifecycle metadata, and disabled-runtime validation. Full Desktop/Web/Dashboard/Mobile apps, REST API, plugin execution, semantic search runtime, graph indexing runtime, MCP/LSP runtime, scheduled automations, and external channels are specified/deferred, not implemented. |
+| Phase 3 Slice A proposal lifecycle | `implemented_verified` | Proposal lifecycle foundation: `/review --propose-fixes --save-proposals`, `/proposals`, `/proposal <proposal_id>`, metadata-only lifecycle records and events. |
+| Phase 3 Slice B approval planning preview | `implemented_verified` | Approval planning previews from saved proposals: `/proposal <proposal_id> --approval-preview`, `/approval-previews`, `/approval-preview <preview_id>`. Preview-only, no execution. |
+| Phase 3 safe foundation/readiness slices C-P | `implemented_verified` | Implemented verified for safe local rich workspace/extensibility foundations, CLI functional-test surfaces, read-only shared workspace contracts, planning-only plugin validation, approval-preview surfaces, readiness metadata, storage lifecycle metadata, and disabled-runtime validation. Full Desktop/Web/Dashboard/Mobile apps, REST API, plugin execution, semantic search runtime, graph indexing runtime, MCP/LSP runtime, scheduled automations, and external channels are specified/deferred, not implemented. |
 | Phase 4 external channel / multi-agent / governed execution foundations | **Foundation only; Phase 4 is not complete** | Execution profiles, remote/container execution planning, subagent planning, external-channel activation status, and inspection commands are present. External transports, subagent spawning, multi-agent teams, remote execution, and container execution remain disabled. |
 | GitHub Actions | Active CI plus manual phase validation | `.github/workflows/ci.yml` runs on `pull_request` and `push` to `main`. `.github/workflows/phase-status.yml` remains manual `workflow_dispatch`. Local validation remains required when Actions quota prevents actual runs; do not claim all workflows are `workflow_dispatch`-only while CI is active. |
 
@@ -243,10 +245,10 @@ The terminal client currently exposes these inspection and controlled-action com
 /plugin-readiness [--summary|--json]
 /channel-readiness [--summary|--json]
 /memory-review [--summary]
-/approval-previews
+/approval-previews [--json] [--status <status>] [--limit <n>]
 /graph-approval-preview
 /memory-approval-preview [--summary]
-/approval-preview <preview_id>
+/approval-preview <preview_id> [--json]
 /approval-audit [--summary]
 /rollback-plan
 /graph-rollback-plan
@@ -259,7 +261,7 @@ The terminal client currently exposes these inspection and controlled-action com
 /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]
 /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only] [--save-proposals]
 /proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] [--limit <number>]
-/proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>]
+/proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>] [--approval-preview]
 /doctor
 /channels
 /launch --provider mock --model mock-deterministic

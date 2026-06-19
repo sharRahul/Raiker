@@ -652,14 +652,74 @@ def handle_memory_review(
     return "\n".join(lines)
 
 
-def handle_approval_previews(*, workspace_root: str | Path = ".") -> str:
-    summary = approval_preview_summary(workspace_root=workspace_root)
-    lines = ["Approval previews:", "persistence: in_memory_only_not_persisted"]
-    lines.extend(f"{key}: {value}" for key, value in summary.items())
-    lines.append(
-        "available_commands: /graph-approval-preview, /memory-approval-preview, /approval-preview <preview_id>"
+_APPROVAL_PREVIEWS_USAGE = (
+    "Usage: /approval-previews [--json] "
+    "[--status <preview_created|needs_human_review|blocked|ready_for_planning|superseded>] "
+    "[--limit <number>]"
+)
+
+
+def _parse_approval_previews_command(command: str) -> dict[str, object] | str:
+    from raiker.review.models import APPROVAL_PREVIEW_STATUSES
+
+    parts = shlex.split(command)
+    as_json = False
+    status: str | None = None
+    limit = 20
+    i = 1
+    while i < len(parts):
+        arg = parts[i]
+        if arg == "--json":
+            as_json = True
+            i += 1
+        elif arg == "--status" and i + 1 < len(parts):
+            status = parts[i + 1]
+            if status not in APPROVAL_PREVIEW_STATUSES:
+                return _APPROVAL_PREVIEWS_USAGE
+            i += 2
+        elif arg == "--limit" and i + 1 < len(parts):
+            try:
+                limit = int(parts[i + 1])
+            except ValueError:
+                return _APPROVAL_PREVIEWS_USAGE
+            if limit < 0:
+                return _APPROVAL_PREVIEWS_USAGE
+            i += 2
+        else:
+            return _APPROVAL_PREVIEWS_USAGE
+    return {"as_json": as_json, "status": status, "limit": limit}
+
+
+def handle_approval_previews(command: str = "/approval-previews", *, workspace_root: str | Path = ".") -> str:
+    from raiker.review.approval_preview import (
+        ProposalApprovalPreviewStore,
+        previews_to_json,
+        render_previews_text,
     )
-    return "\n".join(lines)
+
+    parts = shlex.split(command)
+    if len(parts) == 1:
+        summary = approval_preview_summary(workspace_root=workspace_root)
+        lines = ["Approval previews:", "persistence: in_memory_only_not_persisted"]
+        lines.extend(f"{key}: {value}" for key, value in summary.items())
+        lines.append(
+            "available_commands: /graph-approval-preview, /memory-approval-preview, /approval-preview <preview_id>, /proposal <proposal_id> --approval-preview"
+        )
+        return "\n".join(lines)
+
+    parsed = _parse_approval_previews_command(command)
+    if isinstance(parsed, str):
+        return parsed
+    preview_store = ProposalApprovalPreviewStore(SQLiteStore(workspace_root))
+    status_arg = parsed["status"]
+    limit_val = parsed["limit"]
+    previews = preview_store.list_previews(
+        status=status_arg if isinstance(status_arg, str) else None,
+        limit=int(limit_val) if isinstance(limit_val, int) else 20,
+    )
+    if parsed["as_json"]:
+        return previews_to_json(previews)
+    return render_previews_text(previews)
 
 
 def handle_graph_approval_preview(*, workspace_root: str | Path = ".") -> str:
@@ -688,11 +748,52 @@ def handle_memory_approval_preview(
     return render_approval_preview(preview)
 
 
-def handle_approval_preview_lookup(command: str) -> str:
+_APPROVAL_PREVIEW_DETAIL_USAGE = (
+    "Usage: /approval-preview <preview_id> [--json]"
+)
+
+
+def _parse_approval_preview_detail_command(command: str) -> dict[str, object] | str:
     parts = shlex.split(command)
-    if len(parts) != 2:
-        return "Usage: /approval-preview <preview_id>"
-    return render_stored_approval_preview(parts[1])
+    if len(parts) < 2:
+        return _APPROVAL_PREVIEW_DETAIL_USAGE
+    preview_id = parts[1]
+    if preview_id.startswith("--"):
+        return _APPROVAL_PREVIEW_DETAIL_USAGE
+    as_json = False
+    i = 2
+    while i < len(parts):
+        arg = parts[i]
+        if arg == "--json":
+            as_json = True
+            i += 1
+        else:
+            return _APPROVAL_PREVIEW_DETAIL_USAGE
+    return {"preview_id": preview_id, "as_json": as_json}
+
+
+def handle_approval_preview_lookup(command: str, *, workspace_root: str | Path = ".") -> str:
+    from raiker.review.approval_preview import (
+        ProposalApprovalPreviewStore,
+        preview_to_json,
+        render_preview_text,
+    )
+
+    parts = shlex.split(command)
+    if len(parts) >= 2 and parts[1].startswith("apv_"):
+        parsed = _parse_approval_preview_detail_command(command)
+        if isinstance(parsed, str):
+            return parsed
+        preview_store = ProposalApprovalPreviewStore(SQLiteStore(workspace_root))
+        preview = preview_store.get_preview(str(parsed["preview_id"]))
+        if preview is None:
+            return "Approval planning preview not found."
+        if parsed["as_json"]:
+            return preview_to_json(preview)
+        return render_preview_text(preview)
+    if len(parts) >= 2:
+        return render_stored_approval_preview(parts[1])
+    return _APPROVAL_PREVIEW_DETAIL_USAGE
 
 
 def handle_approval_audit(
@@ -995,7 +1096,8 @@ _PROPOSAL_USAGE = (
 )
 _PROPOSAL_DETAIL_USAGE = (
     "Usage: /proposal <proposal_id> [--json] "
-    "[--mark <proposed|acknowledged|deferred|rejected|superseded>]"
+    "[--mark <proposed|acknowledged|deferred|rejected|superseded>] "
+    "[--approval-preview]"
 )
 _PROPOSAL_STATUSES = {"proposed", "acknowledged", "deferred", "rejected", "superseded"}
 
@@ -1060,6 +1162,7 @@ def _parse_proposal_detail_command(command: str) -> dict[str, object] | str:
         return _PROPOSAL_DETAIL_USAGE
     as_json = False
     mark: str | None = None
+    approval_preview = False
     i = 2
     while i < len(parts):
         arg = parts[i]
@@ -1071,12 +1174,25 @@ def _parse_proposal_detail_command(command: str) -> dict[str, object] | str:
             if mark not in _PROPOSAL_STATUSES:
                 return _PROPOSAL_DETAIL_USAGE
             i += 2
+        elif arg == "--approval-preview":
+            approval_preview = True
+            i += 1
         else:
             return _PROPOSAL_DETAIL_USAGE
-    return {"proposal_id": proposal_id, "as_json": as_json, "mark": mark}
+    return {
+        "proposal_id": proposal_id,
+        "as_json": as_json,
+        "mark": mark,
+        "approval_preview": approval_preview,
+    }
 
 
 def handle_proposal_detail(command: str, *, workspace_root: str | Path = ".") -> str:
+    from raiker.review.approval_preview import (
+        ProposalApprovalPreviewStore,
+        preview_to_json,
+        render_preview_text,
+    )
     from raiker.review.lifecycle import (
         ProposalLifecycleError,
         ProposalLifecycleStore,
@@ -1090,6 +1206,7 @@ def handle_proposal_detail(command: str, *, workspace_root: str | Path = ".") ->
     proposal_id = str(parsed["proposal_id"])
     if not proposal_id.startswith("rap_"):
         return "Proposal not found."
+    approval_preview = bool(parsed.get("approval_preview", False))
     store = ProposalLifecycleStore(SQLiteStore(workspace_root))
     mark = parsed["mark"]
     record = None
@@ -1103,6 +1220,14 @@ def handle_proposal_detail(command: str, *, workspace_root: str | Path = ".") ->
         if record is None:
             return "Proposal not found."
     assert record is not None
+
+    if approval_preview:
+        preview_store = ProposalApprovalPreviewStore(SQLiteStore(workspace_root))
+        preview = preview_store.create_from_record(record)
+        if parsed["as_json"]:
+            return preview_to_json(preview)
+        return render_preview_text(preview)
+
     if parsed["as_json"]:
         return record_to_json(record)
     return render_record_text(record)
@@ -1398,8 +1523,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return "Exiting Raiker."
     if command == "/help":
         return (
-            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only] [--save-proposals], /proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] [--limit <number>], /proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>], /doctor, /channels, /launch --provider mock --model mock-deterministic (test-only; policy-blocked in normal CLI), /quit\n"
-            "Status: Phase 3 is complete for safe foundation/readiness slices A-P; Phase 3 safe foundation/readiness slices A-P are complete; Phase 4 is blocked; runtime execution remains disabled. Current launchable UI is a simple terminal/CLI shell. Desktop/Web/Dashboard/Mobile/REST/Rich TUI panels are contract-only or specified/deferred unless explicitly implemented. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
+            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /approval-previews [--json] [--status <status>] [--limit <n>], /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-preview <preview_id> [--json], /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only] [--save-proposals], /proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] [--limit <number>], /proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>] [--approval-preview], /doctor, /channels, /launch --provider mock --model mock-deterministic (test-only; policy-blocked in normal CLI), /quit\n"
+            "Status: Phase 3 Slice B approval planning preview is implemented. Phase 3 is complete for safe foundation/readiness slices A-P; Phase 4 is blocked; runtime execution remains disabled. Current launchable UI is a simple terminal/CLI shell. Desktop/Web/Dashboard/Mobile/REST/Rich TUI panels are contract-only or specified/deferred unless explicitly implemented. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
         )
     if command == "/providers":
         return handle_providers()
@@ -1453,14 +1578,14 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_channel_readiness(command, workspace_root=workspace_root)
     if command == "/memory-review" or command.startswith("/memory-review "):
         return handle_memory_review(command, workspace_root=workspace_root)
-    if command == "/approval-previews":
-        return handle_approval_previews(workspace_root=workspace_root)
+    if command == "/approval-previews" or command.startswith("/approval-previews "):
+        return handle_approval_previews(command, workspace_root=workspace_root)
     if command == "/graph-approval-preview":
         return handle_graph_approval_preview(workspace_root=workspace_root)
     if command == "/memory-approval-preview" or command.startswith("/memory-approval-preview "):
         return handle_memory_approval_preview(command, workspace_root=workspace_root)
     if command == "/approval-preview" or command.startswith("/approval-preview "):
-        return handle_approval_preview_lookup(command)
+        return handle_approval_preview_lookup(command, workspace_root=workspace_root)
     if command == "/approval-audit" or command.startswith("/approval-audit "):
         return handle_approval_audit(command, workspace_root=workspace_root)
     if command == "/rollback-plan":

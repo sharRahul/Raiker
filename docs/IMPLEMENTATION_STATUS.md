@@ -239,15 +239,57 @@ Evidence: `tests/test_phase_3_slice_a_proposal_lifecycle_models.py`,
 
 Spec: `docs/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md`.
 
+## Phase 3 Slice B Approval Planning Preview Status
+
+Phase 3 Slice B approval planning preview: `implemented_verified` for metadata-only approval
+planning previews derived from saved proposal lifecycle records.
+
+| Capability | Phase | Status | Source | Tests |
+|---|---|---|---|---|
+| `ProposalApprovalPreview` model + `approval_preview_from_lifecycle_record()` | `phase_3_slice_b` | `implemented_verified` | `raiker/review/models.py`, `raiker/review/approval_preview.py` | `tests/test_phase_3_slice_b_approval_preview_models.py` |
+| `ProposalApprovalPreviewStore` + `proposal_approval_previews` table | `phase_3_slice_b` | `implemented_verified` | `raiker/review/approval_preview.py`, `raiker/storage/migrations.py` | `tests/test_phase_3_slice_b_approval_preview_storage.py` |
+| `/proposal <proposal_id> --approval-preview` CLI surface | `phase_3_slice_b` | `implemented_verified` | `raiker/cli/commands.py` | `tests/test_phase_3_slice_b_approval_preview_cli.py` |
+| `/approval-previews` and `/approval-preview <preview_id>` CLI surfaces | `phase_3_slice_b` | `implemented_verified` | `raiker/cli/commands.py` | `tests/test_phase_3_slice_b_approval_preview_cli.py` |
+| Metadata-only approval preview events | `phase_3_slice_b` | `implemented_verified` | `raiker/review/approval_preview.py`, `raiker/contracts/models.py` | `tests/test_phase_3_slice_b_approval_preview_safety.py` |
+
+Scope and boundaries:
+
+- Phase 3 Slice B is preview-only; no approval execution; no proposal execution; no auto-fix; no
+  patch application; no file mutation; no staging/unstaging; no test execution; no GitHub PR
+  automation; no UI/API/IDE/dashboard/mobile; no Phase 4.
+- `approval_execution_enabled` remains false. `runtime_execution_enabled` remains false. All
+  disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled,
+  semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled,
+  approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled,
+  rollback_execution_enabled, external_channels_enabled, notifications_enabled,
+  remote_execution_enabled, container_execution_enabled, cloud_execution_enabled,
+  process_execution_enabled, shell_execution_enabled, network_execution_enabled,
+  runtime_execution_enabled.
+- Preview statuses are planning labels only: `preview_created`, `needs_human_review`, `blocked`,
+  `ready_for_planning`, `superseded`. No status implies execution approval.
+- No raw diff, raw file contents, secrets, prompt text, private reasoning, chain-of-thought, raw
+  tool output, or patch content is stored in preview records or event payloads.
+- `raiker/review/approval_preview.py` does not import `subprocess`, `socket`, `requests`, `httpx`,
+  `urllib`, or `asyncio`. Preview operations never mutate files, stage/unstage the Git index,
+  commit, run tests, apply fixes, or execute shell/process/network calls.
+
+Evidence: `tests/test_phase_3_slice_b_approval_preview_models.py`,
+`tests/test_phase_3_slice_b_approval_preview_storage.py`,
+`tests/test_phase_3_slice_b_approval_preview_cli.py`,
+`tests/test_phase_3_slice_b_approval_preview_safety.py`,
+`tests/test_phase_3_slice_b_docs_truthfulness.py`.
+
+Spec: `docs/PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SPEC.md`.
+
 ### Local validation baseline (2026-06-19)
 
-After Phase 3 Slice A proposal lifecycle foundation:
+After Phase 3 Slice B approval planning preview:
 
 | Check | Result |
 |---|---|
 | ruff | All checks passed |
-| mypy | Success, 208 source files |
-| pytest | 477 passed, 2 skipped |
+| mypy | Success, 209 source files |
+| pytest | TBD |
 | validate_phase_status.py | passed |
 | validate_repo_truthfulness.py | passed |
 

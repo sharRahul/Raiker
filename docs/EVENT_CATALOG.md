@@ -481,6 +481,27 @@ shell/process/network execution is used. No GitHub PR automation, UI/API/IDE/das
 surface, or model-assisted/semantic review is implemented. No Phase 3/4 runtime capability is
 enabled; all disabled runtime flags remain false.
 
+## Phase 3 Slice B proposal approval planning preview events
+
+The Phase 3 Slice B approval planning preview workflow emits metadata-only events when previews
+are created, listed, and viewed. Payloads never contain raw diffs, raw file contents, secrets,
+prompt text, private reasoning, chain-of-thought, raw tool output, patch content, or executable
+commands. Allowed payload fields: `preview_id`, `proposal_id`, `proposal_status`, `action_type`,
+`risk_level`, `requires_approval`, `would_modify_files`, `status`, `blocking_condition_count`,
+`safety_check_count`, `status_filter`, `limit`, `result_count`.
+
+| Event | When | Payload |
+|---|---|---|
+| `proposal_approval_preview_created` | `/proposal <proposal_id> --approval-preview` generates a preview. | `preview_id`, `proposal_id`, `proposal_status`, `action_type`, `risk_level`, `requires_approval`, `would_modify_files`, `status`, `blocking_condition_count`, `safety_check_count` |
+| `proposal_approval_preview_listed` | `/approval-previews` lists previews. | `status_filter`, `limit`, `result_count` |
+| `proposal_approval_preview_viewed` | `/approval-preview <preview_id>` views one preview. | `preview_id`, `status` |
+
+Phase 3 Slice B is preview-only. No approval execution, no proposal execution, no auto-fix, no
+patch application, no file mutation, no staging/unstaging, no test execution, no GitHub PR
+automation, no UI/API/IDE/dashboard/mobile, and no Phase 4. `approval_execution_enabled` remains
+false. No Phase 3 runtime execution is implemented by this slice; all disabled runtime flags
+remain false.
+
 ## Phase 3 Slice A proposal lifecycle events
 
 The Phase 3 Slice A metadata-only proposal lifecycle workflow emits metadata-only events when

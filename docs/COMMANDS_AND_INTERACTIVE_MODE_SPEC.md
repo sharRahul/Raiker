@@ -579,3 +579,48 @@ Boundaries: metadata-only and proposal-only. Not a proposal execution surface, n
 patch application, not GitHub PR automation, not a UI/API/IDE/dashboard/mobile surface, and not
 approval execution. `approval_execution_enabled` remains false. No Phase 3 runtime execution is
 implemented by this slice. No Phase 4. Disabled runtime flags remain false.
+
+## Phase 3 Slice B approval planning preview commands (`/proposal --approval-preview`, `/approval-previews`, `/approval-preview`)
+
+Phase 3 Slice B adds metadata-only approval planning previews for saved proposal lifecycle records.
+This is a preview/planning feature only. It does not execute approvals, execute proposals, apply
+fixes, modify files, stage/unstage, run tests, or call shell/process/network.
+
+Forms:
+
+```text
+/proposal <proposal_id> --approval-preview
+/proposal <proposal_id> --approval-preview --json
+/approval-previews [--json]
+/approval-previews --status <preview_created|needs_human_review|blocked|ready_for_planning|superseded>
+/approval-previews --limit <number>
+/approval-preview <preview_id> [--json]
+```
+
+Behavior:
+
+- `/proposal <proposal_id> --approval-preview` loads a saved proposal lifecycle record, generates or
+  updates a metadata-only approval planning preview, persists it, and renders the preview. `--json`
+  returns a parseable JSON object.
+- `/approval-previews` with no flags shows the existing graph/memory approval preview summary.
+  With `--json`, `--status`, or `--limit`, it lists proposal approval planning previews.
+- `/approval-preview <preview_id>` shows one proposal approval planning preview. `--json` returns
+  a parseable JSON object. Unknown preview IDs fail safely with "Approval planning preview not found."
+- Allowed preview statuses: `preview_created`, `needs_human_review`, `blocked`, `ready_for_planning`,
+  `superseded`. Execution-approval statuses (`approved`, `approved_for_execution`, `ready_to_apply`,
+  `ready_to_execute`, `execute`, `executed`, `applied`, `merged`) are rejected.
+- Unknown flags (`--approve`, `--execute`, `--apply`, `--run-tests`) fail safely with usage text.
+
+Safety guarantees:
+
+- Preview commands never execute approvals, execute proposals, apply fixes, mutate files,
+  stage/unstage the Git index, commit, run tests, execute shell/process/network calls, or enable
+  any disabled runtime flag.
+- Previews are advisory planning records only. `ready_for_planning` does not imply execution approval.
+- No raw diff, raw file contents, secrets, prompt text, private reasoning, chain-of-thought, raw
+  tool output, or patch content is stored in preview records or event payloads.
+
+Boundaries: preview-only. Not an approval execution surface, not a proposal execution surface, not
+auto-fix, not patch application, not GitHub PR automation, not a UI/API/IDE/dashboard/mobile surface.
+`approval_execution_enabled` remains false. `runtime_execution_enabled` remains false. No Phase 4.
+Disabled runtime flags remain false.

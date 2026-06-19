@@ -12,6 +12,18 @@ These events are reserved for metadata-only readiness surfaces. They are not app
 
 Slice L did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
 
+## Phase 3 Slice B — Proposal approval planning preview events
+
+Phase 3 Slice B adds metadata-only approval planning preview events for saved proposal lifecycle records:
+
+| Event | Payload |
+|---|---|
+| `proposal_approval_preview_created` | `preview_id`, `proposal_id`, `proposal_status`, `action_type`, `risk_level`, `requires_approval`, `would_modify_files`, `status`, `blocking_condition_count`, `safety_check_count` |
+| `proposal_approval_preview_listed` | `status_filter`, `limit`, `result_count` |
+| `proposal_approval_preview_viewed` | `preview_id`, `status` |
+
+No approval execution, no proposal execution, no auto-fix, no patch application, no file mutation, no test execution, no GitHub PR automation, no UI/API/IDE/dashboard/mobile, and no Phase 4. Disabled runtime flags remain false.
+
 
 ## Phase 3 Slice M reserved metadata-only events
 

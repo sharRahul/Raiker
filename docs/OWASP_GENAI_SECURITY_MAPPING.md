@@ -46,6 +46,32 @@ Raiker must prevent or mitigate:
 
 ---
 
+## OWASP LLM Top 10 (2025) — Documented vs Implemented
+
+This table tracks each OWASP LLM Top-10 (2025) risk against what is **documented** and what is
+**actually enforced in code today**. Honesty here is a security control in itself: a documented
+mitigation is not a real one. Status: ✅ implemented · 🟡 partial · 🔒 disabled-by-default · 📘 doc only.
+
+| ID | Risk | Doc | Code | Highest-value control to add |
+|---|---|---|---|---|
+| LLM01 | Prompt injection | yes | 🟡 | Tag every context item with source + trust; never grant instruction authority to file/tool/channel content. |
+| LLM02 | Sensitive information disclosure | yes | 🟡 | `redact_secret_like_text()` exists for approval previews; apply one redaction pass to **all** persisted text and model egress; add egress classifier. |
+| LLM03 | Supply chain | yes | 🔒 | Manifest validation real; add signing/checksums + trusted-publisher allowlist + dependency policy. |
+| LLM04 | Data & model poisoning | yes | 🔒 | Memory writes disabled; enforce provenance + contradiction checks when enabled. |
+| LLM05 | Improper output handling | yes | 🟡 | Enum/contract validation exists; add **tool-call JSON schema validation** at the model boundary with reject/retry. |
+| LLM06 | Excessive agency | yes | 🟡 | Broker + approvals are the strongest control; add per-turn max-tool-calls, budget, timeout, subagent depth. |
+| LLM07 | System prompt leakage | yes | 📘 | Separate system/security prompt from user-visible context; implement with first real provider. |
+| LLM08 | Vector & embedding weaknesses | yes | 🔒 | Vector writes disabled; apply sensitivity/provenance filters on retrieval when enabled. |
+| LLM09 | Misinformation | yes | 🟡 | Verifier is a stub (`raiker/runtime/verifier.py`); implement verification + citation/provenance gating. |
+| LLM10 | Unbounded consumption | yes | 📘 | Enforce token/tool/time budgets and rate limits in the orchestrator. |
+
+**Implemented strengths today:** workspace path-safety (symlink/traversal rejection), policy-gated
+tool execution with approvals, append-only event log, and disabled-by-default for high-risk
+capabilities. **Four controls (LLM01, LLM05, LLM06, LLM10)** are small, local orchestrator/broker
+changes that would convert documented-only mitigations into enforced ones — do these first.
+
+---
+
 ## Prompt Injection Requirements
 
 Raiker must label every context source by trust level, never treat retrieved content as system instruction, block external content from granting permissions, preserve source provenance in context bundles, support prompt-injection scanning hooks, and verify model tool calls against policy.

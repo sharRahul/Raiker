@@ -27,6 +27,33 @@ Raiker is not a clone of any one system. It combines local-first agent runtime, 
 | Worktrees/execution | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
 | Context compaction | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 
+### Claude Code documentation — per-page mapping
+
+Each reference page named in the review brief maps to a Raiker spec and a current code status.
+Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled · 📘 specified_not_implemented.
+
+| Reference page | Raiker spec | Code status |
+|---|---|---|
+| `how-claude-code-works` (gather→act→verify loop, harness) | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/RUNTIME_STATE_MACHINE.md` | ✅ loop real; 🟡 verify/context stubs |
+| `tools-reference` (built-in tools + permission per tool) | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` | ✅ read tools; write/shell approval-gated |
+| `interactive-mode` (REPL, shortcuts, steer/interrupt) | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | ✅ basic REPL |
+| `commands` / slash commands (built-in + custom) | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | ✅ 50+ inspection commands |
+| `cli-reference` (flags: `--prompt`, `--workspace`, resume/fork) | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `README.md` | 🟡 `--prompt`/`--workspace` only |
+| `checkpointing` (snapshot before edit, rewind, restore code/convo) | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` | 🟡 write real; restore plan-only |
+| `hooks` (31 events; `command|http|mcp_tool|prompt|agent`; matchers; `if`) | `docs/HOOKS_SPEC.md` | 📘 spec only, no code |
+| `plugins-reference` (`plugin.json`; skills/agents/hooks/MCP/LSP/monitors; marketplace) | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` | 🔒 manifest validation only |
+| `channels-reference` (MCP `claude/channel` capability; `notifications/claude/channel`; sender gating; permission relay) | `docs/CHANNELS_SPEC.md`, `config/channel-connectors.json` | 🔒 registry only |
+
+> Alignment notes: the Claude Code hooks reference documents **31 events** (incl.
+> `SessionStart`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, `PreCompact`, `PostCompact`,
+> `SubagentStart/Stop`, `TaskCreated/Completed`) and **5 handler types**
+> (`command`, `http`, `mcp_tool`, `prompt`, `agent`) with a three-level
+> `EventName → matcher → hooks[]` config and an optional `if` condition. The channels reference
+> models a channel as a **local MCP server** that declares `claude/channel`, emits
+> `notifications/claude/channel`, gates inbound by **sender identity** (not room), and can opt
+> into **permission relay** via `claude/channel/permission`. Raiker's specs should converge on
+> these shapes; see `docs/HOOKS_SPEC.md` and `docs/CHANNELS_SPEC.md`.
+
 ---
 
 ## OpenClaw-Style Personal Agent Coverage
@@ -179,6 +206,61 @@ Raiker is not a clone of any one system. It combines local-first agent runtime, 
 | Vector/embedding weaknesses | `docs/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/OWASP_GENAI_SECURITY_MAPPING.md` |
 | Misinformation | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/VERIFICATION_PLAN.md` |
 | Unbounded consumption | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |
+
+---
+
+## Superpowers-Style Skills / Self-Improvement Coverage
+
+Reference: `obra/Superpowers` — an agent accrues composable, reusable skills and invokes them on
+demand. Mapped to Raiker's skills + self-improvement surfaces.
+
+| Concept | Raiker specification |
+|---|---|
+| Reusable named skill unit | `docs/EXTENSIBILITY_MODEL.md`, `docs/PLUGIN_SYSTEM_SPEC.md` |
+| Skill distilled from a successful trajectory | `docs/SELF_IMPROVEMENT_MODEL.md` |
+| On-demand skill load (cheap until used) | `docs/EXTENSIBILITY_MODEL.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
+| Skill activation gated by review | `docs/SELF_IMPROVEMENT_MODEL.md`, `docs/PLUGIN_SYSTEM_SPEC.md` |
+| Skill safety/verification before reuse | `docs/SELF_IMPROVEMENT_MODEL.md`, `docs/VERIFICATION_PLAN.md` |
+| Confidence/decay/forgetting of skills | `docs/SELF_IMPROVEMENT_MODEL.md` |
+
+---
+
+## mem0-Style Memory Coverage
+
+Reference: `mem0ai/mem0` — a universal memory layer with `add`/`search`/`retrieve` over user,
+session, and agent scopes, using hybrid retrieval (semantic embeddings + keyword/BM25 + entity
+linking) and provenance.
+
+| mem0 concept | Raiker specification |
+|---|---|
+| `add` memory from interactions (candidate-first) | `docs/MEMORY_GOVERNANCE_RULES.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
+| `search` (semantic + keyword hybrid) | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS5 + vector metadata) |
+| `retrieve` filtered by scope/metadata | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
+| User / session / agent memory scopes | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
+| Provenance + confidence scoring | `docs/MEMORY_GOVERNANCE_RULES.md` |
+| Update / correct / forget | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
+| Self-hosted/local-first deployment | `docs/ARCHITECTURE.md` (local-first, SQLite-backed) |
+
+Raiker difference: memory writes are **candidate-first and governance-gated**, and durable
+semantic/vector writes are currently disabled (`raiker/memory/readiness.py`).
+
+---
+
+## memsearch-Style Semantic Search Coverage
+
+Reference: `zilliztech/memsearch` — embedding-backed semantic memory/search over an agent's
+history with a vector index.
+
+| Concept | Raiker specification |
+|---|---|
+| Embedding-backed memory index | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (vector metadata tables) |
+| Semantic retrieval over session history | `docs/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md` |
+| Hybrid lexical + vector ranking | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS5 + vector) |
+| Sensitivity/provenance filters on retrieval | `docs/MEMORY_GOVERNANCE_RULES.md`, `docs/OWASP_GENAI_SECURITY_MAPPING.md` |
+| Vector store backend abstraction | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
+
+Raiker difference: vector writes, embedding creation, and background indexing are
+phase-scheduled and **disabled** until governance, approval-preview, and retention controls land.
 
 ---
 

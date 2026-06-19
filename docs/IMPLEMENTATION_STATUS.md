@@ -20,6 +20,26 @@ A feature marked as specified is not automatically implemented. A feature marked
 
 ---
 
+## Known Documentation/Code Gaps (Review 2026-06-19)
+
+A repository review (`docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md`) verified the following gaps
+where documentation runs ahead of code. These are recorded here so the ledger stays trustworthy;
+none of them change the validator-required Phase 1/2/3 markers below.
+
+| Area | Documented as | Verified code reality | Honest status |
+|---|---|---|---|
+| Hooks | Full lifecycle spec (`docs/HOOKS_SPEC.md`) | No `raiker/hooks/` module exists at all | `specified_not_implemented` |
+| Local model providers | Ollama/llama.cpp/LM Studio profiles | `raiker/models/router.py` raises `provider_not_wired_in_phase_1`; only `mock` runs | `specified_not_implemented` (mock only) |
+| Local provider health-check | Phase 2 `implemented_verified` | True — but it only **detects** a binary; it does not run inference | accurate, scope-clarified |
+| Verifier / verification step | "verify results" loop phase | `raiker/runtime/verifier.py` is a pass-through stub | `stub` |
+| Context gathering | repository understanding feeding the model | orchestrator records fixed `sources=["current_prompt"]` | `stub` |
+| Code review workflow | implied by "coding platform" | no review module present | `specified_not_implemented` |
+
+These do not activate or disable any runtime capability; they correct the *claimed* maturity only.
+Close them via named phase tasks with tests before marking any `implemented_verified`.
+
+---
+
 ## Phase 1 MVP Status
 
 Post-restore audit note: the long-form Phase 1 build plan is restored and remains the detailed scope source for implemented/verified Phase 1 behavior. Later Slice G/H lifecycle metadata does not change Phase 1 runtime scope.

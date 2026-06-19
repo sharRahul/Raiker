@@ -1,5 +1,18 @@
 # Hooks Specification
 
+> **Code status: specified_not_implemented.** This is a complete design spec, but there is
+> **no hooks module in the codebase** (`find raiker -iname '*hook*'` returns nothing). Nothing
+> below is wired into the runtime yet. To realize it, add a `raiker/hooks/` dispatcher that
+> registers through — and is gated by — the existing tool broker, policy engine, and event log
+> (see `docs/EXTENSIBILITY_MODEL.md`). Until then, do not mark any hook behaviour
+> `implemented_verified`.
+>
+> **Reference alignment (Claude Code `hooks`):** the reference documents ~31 events and 5
+> handler types (`command`, `http`, `mcp_tool`, `prompt`, `agent`) using a three-level
+> `EventName → matcher → hooks[]` config with an optional `if` condition (e.g. `Bash(git *)`).
+> Raiker's event list and handler types below are intentionally a superset; when implementing,
+> keep the matcher/`if`/decision-authority semantics consistent with that reference.
+
 Hooks let users, projects, plugins, administrators, and skills run controlled logic at lifecycle points in Raiker.
 
 Hooks are powerful and dangerous. They must be explicit, scoped, policy-aware, event-logged, timeout-bounded, and testable.

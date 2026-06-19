@@ -1168,3 +1168,15 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
 | REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
 
+
+
+## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell (implemented)
+
+The documented default layout above (Primary / Main Panel, Activity Panel, Input Panel, and
+Status Bar Panel) is implemented as Raiker's default access shell in
+`raiker/tui/`. Q1 implements the documented default layout only; the optional/advanced panel
+catalogue, dockable drawers, and dashboard-style multi-pane views remain specified and
+deferred. The shell adapts to standard, narrow, and no-colour/ASCII terminals and falls back
+to a plain terminal loop when rich is unavailable, the terminal is non-interactive, or
+`RAIKER_TUI=plain` is set. It creates no new runtime authority and adds no new events or
+storage. See `docs/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md`.

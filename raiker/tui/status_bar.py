@@ -1,7 +1,19 @@
+"""Configurable status bar for the Rich TUI default access shell.
+
+The status bar is rendered from a list of named status items (not one hard-coded
+string), so user/project/policy/terminal configuration can reorder or hide non-safety
+fields. Required safety items (``state``, ``approvals``, ``network``) are pinned and can
+never be dropped, including in compact/narrow rendering. The clock can be injected for
+deterministic tests. This module performs no runtime execution.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+
+# Items always kept first in compact rendering, in priority order.
+_COMPACT_KEEP = ("state", "task", "approvals", "model", "network", "clock")
 
 
 @dataclass(frozen=True)
@@ -34,7 +46,12 @@ class StatusBarConfig:
             "clock",
         ]
     )
+    # Safety-critical items that must never be hidden, even during risky work.
+    pinned_fields: list[str] = field(
+        default_factory=lambda: ["state", "approvals", "network"]
+    )
     use_blocks: bool = True
+    compact_below: int = 100
 
 
 class StatusBarRenderer:
@@ -49,10 +66,10 @@ class StatusBarRenderer:
     def _bar(self, percent: int) -> str:
         filled = round(percent / 100 * 14)
         if self.config.use_blocks:
-            return "#" * filled + "-" * (14 - filled)
+            return "█" * filled + "░" * (14 - filled)
         return "#" * filled + "-" * (14 - filled)
 
-    def render_item(self, item: str, context: StatusContext) -> str:
+    def render_item(self, item: str, context: StatusContext, *, clock: str | None = None) -> str:
         percent = self._context_percent(context)
         if item == "state":
             return context.state
@@ -77,9 +94,34 @@ class StatusBarRenderer:
         if item == "cost":
             return f"cost:{context.cost}"
         if item == "clock":
-            return datetime.now().strftime("%H:%M")
+            return clock if clock is not None else datetime.now().strftime("%H:%M")
         return f"{item}:unknown"
 
-    def render(self, context: StatusContext | None = None) -> str:
+    def _compact_fields(self) -> list[str]:
+        pinned = set(self.config.pinned_fields)
+        keep = set(_COMPACT_KEEP) | pinned
+        kept = [item for item in self.config.fields if item in keep]
+        # Guarantee every pinned safety field survives even if absent from `fields`.
+        for safety in self.config.pinned_fields:
+            if safety not in kept:
+                kept.append(safety)
+        return kept
+
+    def render(
+        self,
+        context: StatusContext | None = None,
+        *,
+        clock: str | None = None,
+        compact: bool = False,
+        width: int | None = None,
+    ) -> str:
         ctx = context or StatusContext()
-        return " | ".join(self.render_item(item, ctx) for item in self.config.fields)
+        is_compact = compact or (width is not None and width < self.config.compact_below)
+        if is_compact:
+            kept = self._compact_fields()
+            dropped = [item for item in self.config.fields if item not in kept]
+            rendered = [self.render_item(item, ctx, clock=clock) for item in kept]
+            if dropped:
+                rendered.append(f"+{len(dropped)}")
+            return " | ".join(rendered)
+        return " | ".join(self.render_item(item, ctx, clock=clock) for item in self.config.fields)

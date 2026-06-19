@@ -638,7 +638,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Rich TUI panels | Minimal terminal shell/status rendering only; rich panels are specified, not implemented as a full app. | Partial/minimal | None. | Build panel framework only in a future approved slice. |
+| Rich TUI panels | Phase 3 Slice Q1 documented default access shell (Primary/Main, Activity, Input, Status Bar) is implemented; advanced/optional/plugin panels remain specified, not implemented as a full app. | Partial (default access shell) | None. | Build advanced/optional panel framework only in a future approved slice. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
@@ -652,3 +652,19 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 
 Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+
+
+## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell
+
+Phase 3 Slice Q1 default access shell: `implemented_verified` for the documented default
+Rich TUI layout only — Primary/Main panel, Activity panel, Input panel, and Status Bar
+panel — with existing prompt and slash-command access rendered through the default
+layout. This is not a full Rich TUI: the optional/plugin panel catalogue is deferred, and
+Q1 does not claim a finished advanced Rich TUI or finished advanced panel surfaces.
+
+The shell adds no runtime authority: prompts route through `submit_terminal_prompt()` and
+the Agent Gateway, slash commands route through `handle_slash_command()`, and TUI panel
+modules call no tools, models, plugins, channels, shell, subprocess, sockets, or network
+APIs directly. No new events and no new storage are added. See
+`docs/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md`. All disabled runtime flags
+remain false.

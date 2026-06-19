@@ -35,6 +35,8 @@ from raiker.storage.migrations import (
     PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_SQL,
     PHASE_3_SEMANTIC_MEMORY_READINESS_MIGRATION_ID,
     PHASE_3_SEMANTIC_MEMORY_READINESS_SQL,
+    PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_MIGRATION_ID,
+    PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SQL,
     PHASE_3_STORAGE_CLEANUP_EXECUTION_READINESS_MIGRATION_ID,
     PHASE_3_STORAGE_CLEANUP_EXECUTION_READINESS_SQL,
     PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_MIGRATION_ID,
@@ -93,9 +95,10 @@ class SQLiteStore:
         self.bootstrap()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
+        connection = sqlite3.connect(self.db_path, timeout=5.0)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA busy_timeout = 5000")
         return connection
 
     def bootstrap(self) -> None:
@@ -164,6 +167,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_MIGRATION_ID,
                 PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_MIGRATION_ID,
+                PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SQL,
                 connection,
             )
 

@@ -480,3 +480,25 @@ Phase 2.6 is proposal-only. No fixes are applied, no files are modified, no test
 shell/process/network execution is used. No GitHub PR automation, UI/API/IDE/dashboard/mobile
 surface, or model-assisted/semantic review is implemented. No Phase 3/4 runtime capability is
 enabled; all disabled runtime flags remain false.
+
+## Phase 3 Slice A proposal lifecycle events
+
+The Phase 3 Slice A metadata-only proposal lifecycle workflow emits metadata-only events when
+proposals are saved, listed, viewed, and status-transitioned. Payloads never contain raw diffs,
+raw file contents, secrets, prompt text, private reasoning, chain-of-thought, raw tool output,
+patch content, or executable commands. Allowed payload fields: `proposal_id`, `review_id`,
+`finding_id`, `action_type`, `risk_level`, `requires_approval`, `would_modify_files`, `status`,
+`previous_status`, `new_status`, `status_filter`, `limit`, `result_count`.
+
+| Event | When | Payload |
+|---|---|---|
+| `proposal_lifecycle_created` | `/review --propose-fixes --save-proposals` persists a proposal as a lifecycle record. | `proposal_id`, `review_id`, `finding_id`, `action_type`, `risk_level`, `requires_approval`, `would_modify_files`, `status` |
+| `proposal_lifecycle_status_changed` | `/proposal <proposal_id> --mark <status>` transitions a record's status (metadata only). | `proposal_id`, `previous_status`, `new_status` |
+| `proposal_lifecycle_listed` | `/proposals` lists records. | `status_filter`, `limit`, `result_count` |
+| `proposal_lifecycle_viewed` | `/proposal <proposal_id>` views one record. | `proposal_id`, `status` |
+
+Phase 3 Slice A is metadata-only and proposal-only. No proposal execution, no auto-fix, no patch
+application, no file mutation, no staging/unstaging, no test execution, no GitHub PR automation,
+no UI/API/IDE/dashboard/mobile, no approval execution, and no Phase 4. `approval_execution_enabled`
+remains false. No Phase 3 runtime execution is implemented by this slice; all disabled runtime
+flags remain false.

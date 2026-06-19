@@ -79,7 +79,9 @@ REQUIRED_COMMANDS = {
     "/storage-lifecycle-handoff [--summary]",
     "/storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]",
     "/storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]",
-    "/review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only]",
+    "/review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only] [--save-proposals]",
+    "/proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] [--limit <number>]",
+    "/proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>]",
     "/doctor",
     "/channels",
     "/launch --provider mock --model mock-deterministic",
@@ -95,6 +97,21 @@ REVIEW_FORBIDDEN_OVERCLAIMS = (
     "ide review ui",
     "github pr review automation is complete",
     "semantic review intelligence is complete",
+)
+
+# Phase 3 Slice A proposal lifecycle must stay metadata-only/proposal-only and must never
+# claim execution/apply/approval/PR/UI/runtime capabilities.
+PROPOSAL_LIFECYCLE_FORBIDDEN_OVERCLAIMS = (
+    "proposal execution is complete",
+    "proposal execution is implemented",
+    "auto-fix is complete",
+    "auto-fix is implemented",
+    "patch application is complete",
+    "patch application is implemented",
+    "approval execution is complete",
+    "github pr automation is complete",
+    "proposal apply is implemented",
+    "apply-fixes is implemented",
 )
 
 
@@ -236,6 +253,27 @@ def main() -> int:
     for overclaim in REVIEW_FORBIDDEN_OVERCLAIMS:
         if overclaim in lowered_review_docs:
             errors.append(f"Review docs overclaim deferred surface: {overclaim}")
+
+    proposal_docs = (
+        readme_text
+        + "\n"
+        + (ROOT / "docs/IMPLEMENTATION_STATUS.md").read_text(encoding="utf-8")
+        + "\n"
+        + catalog
+        + "\n"
+        + (ROOT / "docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md").read_text(encoding="utf-8")
+    )
+    if (ROOT / "docs/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md").exists():
+        proposal_docs += "\n" + (
+            ROOT / "docs/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md"
+        ).read_text(encoding="utf-8")
+    lowered_proposal_docs = proposal_docs.lower()
+    for overclaim in PROPOSAL_LIFECYCLE_FORBIDDEN_OVERCLAIMS:
+        if overclaim in lowered_proposal_docs:
+            errors.append(f"Proposal lifecycle docs overclaim deferred capability: {overclaim}")
+    if "proposal lifecycle foundation: implemented_verified" not in proposal_docs:
+        errors.append("Proposal lifecycle docs missing implemented_verified marker")
+
     if errors:
         print("Repository truthfulness validation failed:")
         for error in errors:

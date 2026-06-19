@@ -38,6 +38,19 @@ PROPOSAL_ACTION_TYPES = frozenset(
 )
 PROPOSAL_RISK_LEVELS = frozenset({"low", "medium", "high"})
 
+# Phase 3 Slice A proposal lifecycle statuses. None of these imply execution
+# approval; ``approved``/``approved_for_execution``/``ready_to_apply``/``execute``
+# are deliberately excluded and must never be added.
+PROPOSAL_LIFECYCLE_STATUSES = frozenset(
+    {
+        "proposed",
+        "acknowledged",
+        "deferred",
+        "rejected",
+        "superseded",
+    }
+)
+
 
 class ReviewModelError(ValueError):
     """Raised when a review model is constructed with an invalid enumeration value."""
@@ -165,6 +178,62 @@ class ReviewActionProposal:
             "summary": self.summary,
             "rationale": self.rationale,
             "safety_notes": list(self.safety_notes),
+        }
+
+
+@dataclass(frozen=True)
+class ProposalLifecycleRecord:
+    """Metadata-only lifecycle record for a saved review action proposal.
+
+    This is proposal-only and metadata-only. It never contains raw diff, raw file
+    contents, secrets, prompt text, private reasoning, chain-of-thought, raw tool
+    output, or patch content. It never executes, applies, mutates files, or stages
+    changes. Status is a planning label only; no status implies execution approval.
+    """
+
+    proposal_id: str
+    review_id: str
+    finding_id: str
+    title: str
+    action_type: str
+    risk_level: str
+    requires_approval: bool
+    would_modify_files: bool
+    status: str
+    files: list[str]
+    summary: str
+    created_at: str
+    updated_at: str
+    source: str
+
+    def __post_init__(self) -> None:
+        if self.action_type not in PROPOSAL_ACTION_TYPES:
+            raise ReviewModelError(f"invalid_action_type:{self.action_type}")
+        if self.risk_level not in PROPOSAL_RISK_LEVELS:
+            raise ReviewModelError(f"invalid_risk_level:{self.risk_level}")
+        if self.status not in PROPOSAL_LIFECYCLE_STATUSES:
+            raise ReviewModelError(f"invalid_lifecycle_status:{self.status}")
+        if self.would_modify_files and not self.requires_approval:
+            raise ReviewModelError("would_modify_files requires requires_approval")
+        if not self.proposal_id.startswith("rap_"):
+            raise ReviewModelError("proposal_id must use rap_ prefix")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "proposal_id": self.proposal_id,
+            "review_id": self.review_id,
+            "finding_id": self.finding_id,
+            "title": self.title,
+            "action_type": self.action_type,
+            "risk_level": self.risk_level,
+            "requires_approval": self.requires_approval,
+            "would_modify_files": self.would_modify_files,
+            "status": self.status,
+            "files": list(self.files),
+            "summary": self.summary,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "source": self.source,
         }
 
 

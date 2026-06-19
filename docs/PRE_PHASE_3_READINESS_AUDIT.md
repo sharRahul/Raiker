@@ -15,11 +15,13 @@ claim that Phase 3 is implemented or that any deferred runtime capability is act
 | Phase 2 | `implemented_verified` | `docs/IMPLEMENTATION_STATUS.md` Phase 2 rows; context gatherer, verifier, approval inbox, checkpoint planning, git/filesystem wrappers, memory candidate listing. |
 | Phase 2.5 | `implemented_verified` | `docs/IMPLEMENTATION_STATUS.md` Phase 2.5 status; `tests/test_phase_2_5_code_review_workflow.py`, `tests/test_phase_2_5_code_review_cli.py`, `tests/test_phase_2_5_code_review_safety.py`, `tests/test_phase_2_5_code_review_hardening.py`. |
 | Phase 2.6 | `implemented_verified` | Phase 2.6 review-to-action proposal workflow: implemented_verified for local CLI-only proposal generation from deterministic review findings. `tests/test_phase_2_6_review_action_proposals.py`, `tests/test_phase_2_6_review_action_proposal_cli.py`, `tests/test_phase_2_6_review_action_proposal_safety.py`, `tests/test_pre_phase_3_readiness.py`. |
+| Phase 3 Slice A | `implemented_verified` | Phase 3 Slice A proposal lifecycle foundation: implemented_verified for local metadata-only proposal lifecycle tracking. `tests/test_phase_3_slice_a_proposal_lifecycle_models.py`, `tests/test_phase_3_slice_a_proposal_lifecycle_storage.py`, `tests/test_phase_3_slice_a_proposal_lifecycle_cli.py`, `tests/test_phase_3_slice_a_proposal_lifecycle_safety.py`, `tests/test_phase_3_slice_a_docs_truthfulness.py`. |
 
 Phase 3 is **not** complete or implemented by this audit. Phase 3 already has safe
 foundation/readiness slices A-P complete (recorded separately in
-`docs/PHASE_3_COMPLETION_AUDIT.md`), but this audit does not mark Phase 3 runtime activation
-complete. Phase 4 remains blocked.
+`docs/PHASE_3_COMPLETION_AUDIT.md`), and Phase 3 Slice A (proposal lifecycle foundation) is
+complete as a metadata-only/proposal-only slice, but this audit does not mark Phase 3 runtime
+activation complete. Phase 4 remains blocked.
 
 ---
 

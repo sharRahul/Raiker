@@ -193,15 +193,61 @@ Pre-Phase-3 readiness audit: `docs/PRE_PHASE_3_READINESS_AUDIT.md` records that 
 Phase 2.5, and Phase 2.6 are complete and that it is safe to start Phase 3 planning next. It does
 not mark Phase 3 runtime activation complete; Phase 4 remains blocked.
 
+---
+
+## Phase 3 Slice A Proposal Lifecycle Foundation Status
+
+Phase 3 Slice A proposal lifecycle foundation: implemented_verified for local metadata-only
+proposal lifecycle tracking of review action proposals.
+
+| Capability | Phase | Status | Source | Tests |
+|---|---|---|---|---|
+| `ProposalLifecycleRecord` model + `ProposalLifecycleStore` | `phase_3_slice_a` | `implemented_verified` | `raiker/review/lifecycle.py`, `raiker/review/models.py` | `tests/test_phase_3_slice_a_proposal_lifecycle_models.py`, `tests/test_phase_3_slice_a_proposal_lifecycle_storage.py` |
+| `/review --propose-fixes --save-proposals` persists proposals | `phase_3_slice_a` | `implemented_verified` | `raiker/cli/commands.py`, `raiker/review/lifecycle.py` | `tests/test_phase_3_slice_a_proposal_lifecycle_cli.py` |
+| `/proposals` and `/proposal <proposal_id>` CLI surfaces | `phase_3_slice_a` | `implemented_verified` | `raiker/cli/commands.py` | `tests/test_phase_3_slice_a_proposal_lifecycle_cli.py` |
+| Metadata-only proposal lifecycle events | `phase_3_slice_a` | `implemented_verified` | `raiker/review/lifecycle.py`, `raiker/contracts/models.py` | `tests/test_phase_3_slice_a_proposal_lifecycle_safety.py` |
+
+Scope and boundaries:
+
+- Phase 3 Slice A is metadata-only; proposal-only; no proposal execution; no auto-fix; no patch
+  application; no file mutation; no staging/unstaging; no test execution; no GitHub PR automation;
+  no UI/API/IDE/dashboard/mobile; no approval execution; no Phase 4.
+- `approval_execution_enabled` remains false. All disabled runtime flags remain false:
+  plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled,
+  vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled,
+  approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled,
+  external_channels_enabled, notifications_enabled, remote_execution_enabled,
+  container_execution_enabled, cloud_execution_enabled, process_execution_enabled,
+  shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+- Lifecycle statuses are planning labels only: `proposed`, `acknowledged`, `deferred`,
+  `rejected`, `superseded`. No status implies execution approval (`approved`,
+  `approved_for_execution`, `ready_to_apply`, `execute` are deliberately excluded).
+- No raw diff, raw file contents, secrets, prompt text, private reasoning, chain-of-thought, raw
+  tool output, or patch content is stored in records or event payloads.
+- `raiker/review/` (including `raiker/review/lifecycle.py`) does not import `subprocess`,
+  `socket`, `requests`, `httpx`, `urllib`, or `asyncio`. Lifecycle operations never mutate files,
+  stages/unstages the Git index, commits, runs tests, applies fixes, or executes
+  shell/process/network calls.
+- This slice does not implement Phase 3 runtime execution, Phase 4, or any disabled runtime
+  capability.
+
+Evidence: `tests/test_phase_3_slice_a_proposal_lifecycle_models.py`,
+`tests/test_phase_3_slice_a_proposal_lifecycle_storage.py`,
+`tests/test_phase_3_slice_a_proposal_lifecycle_cli.py`,
+`tests/test_phase_3_slice_a_proposal_lifecycle_safety.py`,
+`tests/test_phase_3_slice_a_docs_truthfulness.py`.
+
+Spec: `docs/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md`.
+
 ### Local validation baseline (2026-06-19)
 
-After Phase 2.6 review-to-action proposal workflow closure:
+After Phase 3 Slice A proposal lifecycle foundation:
 
 | Check | Result |
 |---|---|
 | ruff | All checks passed |
-| mypy | Success, 202 source files |
-| pytest | 413 passed, 2 skipped |
+| mypy | Success, 208 source files |
+| pytest | 477 passed, 2 skipped |
 | validate_phase_status.py | passed |
 | validate_repo_truthfulness.py | passed |
 

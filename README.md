@@ -257,7 +257,9 @@ The terminal client currently exposes these inspection and controlled-action com
 /storage-lifecycle-handoff [--summary]
 /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]
 /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]
-/review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only]
+/review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only] [--save-proposals]
+/proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] [--limit <number>]
+/proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>]
 /doctor
 /channels
 /launch --provider mock --model mock-deterministic
@@ -279,6 +281,12 @@ Phase 2.6 review-to-action proposal workflow: `implemented_verified` for local C
 Phase 2.6 is proposal-only. No fixes are applied. No files are modified. No tests are run. No shell/process/network execution is used. No GitHub PR automation is implemented. No UI/API/IDE/dashboard/mobile surface is implemented. No model-assisted/semantic review is implemented. No Phase 3/4 runtime capability is enabled.
 
 `/review` is local CLI code review only. It is not a review UI, web/dashboard review surface, IDE review surface, REST/API review server, or GitHub PR review automation, and it does not apply fixes, run tests, mutate files, or touch the Git index. Raw diffs and secrets are never written into findings, proposals, or event payloads.
+
+### Phase 3 Slice A proposal lifecycle foundation
+
+Phase 3 Slice A proposal lifecycle foundation: `implemented_verified` for local metadata-only proposal lifecycle tracking. `/review --propose-fixes --save-proposals` persists generated `ReviewActionProposal` records as metadata-only `ProposalLifecycleRecord` rows in the local SQLite `proposal_lifecycle_records` table. `/proposals` lists saved records (newest first, default limit 20) with `--json`, `--status <proposed|acknowledged|deferred|rejected|superseded>`, and `--limit <number>`. `/proposal <proposal_id>` shows one record with `--json` and `--mark <status>` transitions (metadata only).
+
+Phase 3 Slice A is metadata-only; proposal-only; no proposal execution; no auto-fix; no patch application; no file mutation; no staging/unstaging; no test execution; no GitHub PR automation; no UI/API/IDE/dashboard/mobile; no approval execution; no Phase 4. `approval_execution_enabled` remains false. Disabled runtime flags remain false. No raw diff, raw file contents, secrets, prompt text, private reasoning, chain-of-thought, raw tool output, or patch content is stored in records or event payloads. Metadata-only `proposal_lifecycle_created`, `proposal_lifecycle_status_changed`, `proposal_lifecycle_listed`, and `proposal_lifecycle_viewed` events are emitted.
 
 Phase 3 and Phase 4 commands are inspection/planning/governance/preview surfaces unless explicitly documented otherwise. They must not execute plugins, activate channels, write semantic/vector memory, create embeddings, start graph indexing, persist executable approvals, spawn agents, or run remote/container commands.
 

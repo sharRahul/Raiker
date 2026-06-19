@@ -108,6 +108,10 @@ EVENT_TYPES = {
     "review_completed",
     "review_failed",
     "review_proposals_created",
+    "proposal_lifecycle_created",
+    "proposal_lifecycle_status_changed",
+    "proposal_lifecycle_listed",
+    "proposal_lifecycle_viewed",
 }
 INTENTS = {
     "chat",

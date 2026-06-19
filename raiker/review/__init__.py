@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from raiker.review.classifier import generate_findings
+from raiker.review.lifecycle import (
+    ProposalLifecycleError,
+    ProposalLifecycleRecord,
+    ProposalLifecycleStore,
+)
 from raiker.review.models import (
     ReviewActionProposal,
     ReviewFinding,
@@ -19,6 +24,9 @@ from raiker.review.workflow import (
 
 __all__ = [
     "CodeReviewWorkflow",
+    "ProposalLifecycleError",
+    "ProposalLifecycleRecord",
+    "ProposalLifecycleStore",
     "ReviewActionProposal",
     "ReviewError",
     "ReviewPathError",

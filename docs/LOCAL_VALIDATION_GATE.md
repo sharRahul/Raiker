@@ -168,13 +168,13 @@ Do not commit generated metadata/cache files, including `*.egg-info/`, `build/`,
 
 ## Latest confirmed local green baseline (2026-06-19)
 
-After Phase 2.6 review-to-action proposal workflow closure:
+After Phase 3 Slice A proposal lifecycle foundation:
 
 | Check | Result |
 |---|---|
 | ruff | All checks passed |
-| mypy | Success, 202 source files |
-| pytest | 413 passed, 2 skipped |
+| mypy | Success, 208 source files |
+| pytest | 477 passed, 2 skipped |
 | validate_phase_status.py | passed |
 | validate_repo_truthfulness.py | passed |
 

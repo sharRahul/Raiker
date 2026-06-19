@@ -371,3 +371,27 @@ CREATE TABLE IF NOT EXISTS phase3_remote_container_cloud_readiness (
   contract_json TEXT NOT NULL
 );
 """
+
+PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_MIGRATION_ID = "RAIKER-1401-phase3-slice-a-proposal-lifecycle"
+
+PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SQL = """
+CREATE TABLE IF NOT EXISTS proposal_lifecycle_records (
+  proposal_id TEXT PRIMARY KEY,
+  review_id TEXT NOT NULL,
+  finding_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  action_type TEXT NOT NULL,
+  risk_level TEXT NOT NULL,
+  requires_approval INTEGER NOT NULL,
+  would_modify_files INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  files_json TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  source TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_proposal_lifecycle_status ON proposal_lifecycle_records(status);
+CREATE INDEX IF NOT EXISTS idx_proposal_lifecycle_updated ON proposal_lifecycle_records(updated_at);
+"""

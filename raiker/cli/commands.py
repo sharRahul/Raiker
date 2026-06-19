@@ -863,7 +863,7 @@ def _parse_review_command(command: str) -> dict[str, object] | str:
     usage = (
         "Usage: /review [--summary] [--staged] [--path <path>] [--json] "
         "[--limit <number>] [--severity <info|low|medium|high>] "
-        "[--propose-fixes] [--proposals-only]"
+        "[--propose-fixes] [--proposals-only] [--save-proposals]"
     )
     parts = shlex.split(command)
     summary_only = False
@@ -874,6 +874,7 @@ def _parse_review_command(command: str) -> dict[str, object] | str:
     severity: str | None = None
     propose_fixes = False
     proposals_only = False
+    save_proposals = False
     i = 1
     while i < len(parts):
         arg = parts[i]
@@ -891,6 +892,10 @@ def _parse_review_command(command: str) -> dict[str, object] | str:
             i += 1
         elif arg == "--proposals-only":
             proposals_only = True
+            propose_fixes = True
+            i += 1
+        elif arg == "--save-proposals":
+            save_proposals = True
             propose_fixes = True
             i += 1
         elif arg == "--path" and i + 1 < len(parts):
@@ -920,10 +925,12 @@ def _parse_review_command(command: str) -> dict[str, object] | str:
         "severity": severity,
         "propose_fixes": propose_fixes,
         "proposals_only": proposals_only,
+        "save_proposals": save_proposals,
     }
 
 
 def handle_review(command: str = "/review", *, workspace_root: str | Path = ".") -> str:
+    from raiker.review.lifecycle import ProposalLifecycleStore
     from raiker.review.models import SEVERITY_RANK
     from raiker.review.render import rebuild_review_result_with_findings, render_json, render_text
     from raiker.review.workflow import CodeReviewWorkflow, ReviewPathError
@@ -936,6 +943,7 @@ def handle_review(command: str = "/review", *, workspace_root: str | Path = ".")
     limit = parsed["limit"]
     propose_fixes = bool(parsed["propose_fixes"])
     proposals_only = bool(parsed["proposals_only"])
+    save_proposals = bool(parsed["save_proposals"])
     try:
         result = CodeReviewWorkflow().review(
             workspace_root=workspace_root,
@@ -960,6 +968,18 @@ def handle_review(command: str = "/review", *, workspace_root: str | Path = ".")
             result, findings, propose_fixes=propose_fixes
         )
 
+    if save_proposals and result.action_proposals:
+        store = ProposalLifecycleStore(SQLiteStore(workspace_root))
+        saved = store.save_proposals(
+            result.action_proposals, review_id=result.review_id
+        )
+        result_metadata = dict(result.event_metadata)
+        result_metadata["saved_proposal_count"] = len(saved)
+        result_metadata["saved_proposal_ids"] = [r.proposal_id for r in saved]
+        from dataclasses import replace as _replace
+
+        result = _replace(result, event_metadata=result_metadata)
+
     if parsed["as_json"]:
         return render_json(result)
     return render_text(
@@ -967,6 +987,125 @@ def handle_review(command: str = "/review", *, workspace_root: str | Path = ".")
         summary_only=bool(parsed["summary_only"]),
         proposals_only=proposals_only,
     )
+
+
+_PROPOSAL_USAGE = (
+    "Usage: /proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] "
+    "[--limit <number>]"
+)
+_PROPOSAL_DETAIL_USAGE = (
+    "Usage: /proposal <proposal_id> [--json] "
+    "[--mark <proposed|acknowledged|deferred|rejected|superseded>]"
+)
+_PROPOSAL_STATUSES = {"proposed", "acknowledged", "deferred", "rejected", "superseded"}
+
+
+def _parse_proposals_command(command: str) -> dict[str, object] | str:
+    parts = shlex.split(command)
+    as_json = False
+    status: str | None = None
+    limit = 20
+    i = 1
+    while i < len(parts):
+        arg = parts[i]
+        if arg == "--json":
+            as_json = True
+            i += 1
+        elif arg == "--status" and i + 1 < len(parts):
+            status = parts[i + 1]
+            if status not in _PROPOSAL_STATUSES:
+                return _PROPOSAL_USAGE
+            i += 2
+        elif arg == "--limit" and i + 1 < len(parts):
+            try:
+                limit = int(parts[i + 1])
+            except ValueError:
+                return _PROPOSAL_USAGE
+            if limit < 0:
+                return _PROPOSAL_USAGE
+            i += 2
+        else:
+            return _PROPOSAL_USAGE
+    return {"as_json": as_json, "status": status, "limit": limit}
+
+
+def handle_proposals(command: str = "/proposals", *, workspace_root: str | Path = ".") -> str:
+    from raiker.review.lifecycle import (
+        ProposalLifecycleStore,
+        records_to_json,
+        render_records_text,
+    )
+
+    parsed = _parse_proposals_command(command)
+    if isinstance(parsed, str):
+        return parsed
+    store = ProposalLifecycleStore(SQLiteStore(workspace_root))
+    status_arg = parsed["status"]
+    limit_val = parsed["limit"]
+    records = store.list_records(
+        status=status_arg if isinstance(status_arg, str) else None,
+        limit=int(limit_val) if isinstance(limit_val, int) else 20,
+    )
+    if parsed["as_json"]:
+        return records_to_json(records)
+    return render_records_text(records)
+
+
+def _parse_proposal_detail_command(command: str) -> dict[str, object] | str:
+    parts = shlex.split(command)
+    if len(parts) < 2:
+        return _PROPOSAL_DETAIL_USAGE
+    proposal_id = parts[1]
+    if proposal_id.startswith("--"):
+        return _PROPOSAL_DETAIL_USAGE
+    as_json = False
+    mark: str | None = None
+    i = 2
+    while i < len(parts):
+        arg = parts[i]
+        if arg == "--json":
+            as_json = True
+            i += 1
+        elif arg == "--mark" and i + 1 < len(parts):
+            mark = parts[i + 1]
+            if mark not in _PROPOSAL_STATUSES:
+                return _PROPOSAL_DETAIL_USAGE
+            i += 2
+        else:
+            return _PROPOSAL_DETAIL_USAGE
+    return {"proposal_id": proposal_id, "as_json": as_json, "mark": mark}
+
+
+def handle_proposal_detail(command: str, *, workspace_root: str | Path = ".") -> str:
+    from raiker.review.lifecycle import (
+        ProposalLifecycleError,
+        ProposalLifecycleStore,
+        record_to_json,
+        render_record_text,
+    )
+
+    parsed = _parse_proposal_detail_command(command)
+    if isinstance(parsed, str):
+        return parsed
+    proposal_id = str(parsed["proposal_id"])
+    if not proposal_id.startswith("rap_"):
+        return "Proposal not found."
+    store = ProposalLifecycleStore(SQLiteStore(workspace_root))
+    mark = parsed["mark"]
+    record = None
+    if isinstance(mark, str):
+        try:
+            record = store.mark_status(proposal_id, new_status=mark)
+        except ProposalLifecycleError:
+            return "Proposal not found."
+    else:
+        record = store.get_record(proposal_id)
+        if record is None:
+            return "Proposal not found."
+    assert record is not None
+    if parsed["as_json"]:
+        return record_to_json(record)
+    return render_record_text(record)
 
 
 def handle_execution_profiles() -> str:
@@ -1259,7 +1398,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return "Exiting Raiker."
     if command == "/help":
         return (
-            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only], /doctor, /channels, /launch --provider mock --model mock-deterministic (test-only; policy-blocked in normal CLI), /quit\n"
+            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only] [--save-proposals], /proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] [--limit <number>], /proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>], /doctor, /channels, /launch --provider mock --model mock-deterministic (test-only; policy-blocked in normal CLI), /quit\n"
             "Status: Phase 3 is complete for safe foundation/readiness slices A-P; Phase 3 safe foundation/readiness slices A-P are complete; Phase 4 is blocked; runtime execution remains disabled. Current launchable UI is a simple terminal/CLI shell. Desktop/Web/Dashboard/Mobile/REST/Rich TUI panels are contract-only or specified/deferred unless explicitly implemented. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
         )
     if command == "/providers":
@@ -1360,6 +1499,10 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_plugin_plan(command)
     if command == "/review" or command.startswith("/review "):
         return handle_review(command, workspace_root=workspace_root)
+    if command == "/proposals" or command.startswith("/proposals "):
+        return handle_proposals(command, workspace_root=workspace_root)
+    if command == "/proposal" or command.startswith("/proposal "):
+        return handle_proposal_detail(command, workspace_root=workspace_root)
     if command == "/doctor":
         return render_doctor(workspace_root=workspace_root)
     if (

@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import importlib.metadata
+import tomllib
 from pathlib import Path
 
 import httpx
 import pytest
 
-from raiker.cli.commands import handle_model_command, handle_reasoning_command, render_models
+from raiker.cli.commands import (
+    handle_model_command,
+    handle_model_command_async,
+    handle_providers,
+    handle_reasoning_command,
+    render_models,
+)
 from raiker.models.contracts import ModelCapabilities, ModelMessage, ModelRequest
 from raiker.models.exceptions import ProviderConfigurationError, ProviderPolicyError
 from raiker.models.factory import ModelProviderFactory, ProviderRuntimePolicy
@@ -19,7 +26,11 @@ from raiker.models.router import ModelRouter
 def test_real_httpx_and_dependencies() -> None:
     assert not Path("httpx.py").exists()
     assert "Raiker/httpx.py" not in str(httpx.__file__)
-    deps = importlib.metadata.requires("raiker") or []
+    try:
+        deps = importlib.metadata.requires("raiker") or []
+    except importlib.metadata.PackageNotFoundError:
+        with open("pyproject.toml", "rb") as handle:
+            deps = tomllib.loads(handle.read().decode())["project"]["dependencies"]
     assert any(d.startswith("httpx") for d in deps)
     assert not any(d.startswith(("fastapi", "langchain", "llama-index")) for d in deps)
 
@@ -59,14 +70,16 @@ def test_factory_policy_openrouter(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(ProviderConfigurationError):
         ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True)).create(profile)
     monkeypatch.setenv("OPENROUTER_API_KEY", "secret")
-    provider = ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True)).create(profile)
+    configured = type(profile)(**{**profile.__dict__, "model": "openrouter-model"})
+    provider = ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True)).create(configured)
     assert provider.provider == "openrouter"
 
 
 def test_factory_rejects_vllm_without_private_network_policy() -> None:
     profile = ModelProfileRegistry.load().resolve_profile_id("vllm-homelab-openai-compatible")
+    configured = type(profile)(**{**profile.__dict__, "model": "vllm-model"})
     with pytest.raises(ProviderPolicyError):
-        ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True)).create(profile)
+        ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True)).create(configured)
 
 
 def test_async_openai_success_and_live_urls() -> None:
@@ -100,7 +113,27 @@ def test_stream_cancellation_preserves_cancelled_error() -> None:
 def test_cli_persists_model_state(tmp_path: Path) -> None:
     assert "raiker-local-llama-cpp" in handle_model_command("/model current", workspace_root=tmp_path)
     out = handle_model_command("/model use ollama-local-openai-compatible", workspace_root=tmp_path)
-    assert "Selected model profile ollama-local-openai-compatible" in out
-    assert "ollama-local-openai-compatible" in handle_model_command("/model current", workspace_root=tmp_path)
+    assert "Model selection failed" in out
+    assert "model_name_not_configured" in out
+    assert "raiker-local-llama-cpp" in handle_model_command("/model current", workspace_root=tmp_path)
     assert "(selected)" in render_models(workspace_root=tmp_path)
     assert "does not support reasoning" in handle_reasoning_command("/reasoning set high", workspace_root=tmp_path)
+
+
+def test_model_health_active_loop_uses_async_path(tmp_path: Path) -> None:
+    async def main() -> None:
+        sync_out = handle_model_command("/model health", workspace_root=tmp_path)
+        assert "Model command requires async command path" in sync_out
+        async_out = await handle_model_command_async("/model health", workspace_root=tmp_path)
+        assert "Model health:" in async_out
+
+    asyncio.run(main())
+
+
+def test_placeholder_profiles_remain_listable() -> None:
+    providers = handle_providers()
+    models = render_models()
+    assert "ollama-local-openai-compatible" in providers
+    assert "lm-studio-local-openai-compatible" in providers
+    assert "ollama-local-openai-compatible" in models
+    assert "lm-studio-local-openai-compatible" in models

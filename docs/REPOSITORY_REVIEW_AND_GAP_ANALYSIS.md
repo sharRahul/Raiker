@@ -71,8 +71,8 @@ Legend: ✅ implemented_verified · 🟡 partial/stub · 📘 specified_not_impl
 | Task planning / execution | Good | ✅ (tasks) / 🟡 (planner minimal) | `raiker/tasks/manager.py`; `raiker/runtime/planner.py` |
 | Security controls | Strong | ✅ (path safety, policy, approvals) | `raiker/policy/engine.py`, `tools/filesystem.py` |
 | OWASP GenAI/LLM coverage | Strong doc, partial code | 🟡 | `docs/OWASP_GENAI_SECURITY_MAPPING.md`; controls partial (Section 5) |
-| Local model support | Documented | ✅ llama.cpp native default + mock fallback | `raiker/models/providers/llama_cpp_server.py`, `raiker/models/router.py` |
-| llama.cpp / local inference | Documented | ✅ implemented (stdlib HTTP) | `raiker/models/providers/llama_cpp_server.py`; `tests/test_llama_cpp_provider.py` |
+| Local model support | Documented | ✅ llama.cpp native default + deterministic test provider | `raiker/models/providers/openai_compatible.py`, `raiker/models/router.py` |
+| llama.cpp / local inference | Documented | ✅ implemented (async httpx OpenAI-compatible path) | `raiker/models/providers/openai_compatible.py`; async runtime tests |
 | Agent-framework integration (LangChain/LangGraph) | Light | 📘 concept-only | `docs/REFERENCE_PLATFORM_COMPATIBILITY.md:155-165` |
 | Extensibility model | Scattered | 📘 (see new `docs/EXTENSIBILITY_MODEL.md`) | plugins+hooks+skills+channels not unified |
 | Self-improvement model | Scattered | 📘 (see new `docs/SELF_IMPROVEMENT_MODEL.md`) | folded into `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md` |
@@ -180,7 +180,7 @@ persistence/egress (LLM02), (3) tool-call schema validation (LLM05), (4) per-tur
 | Capability / area | Current status | Missing / weak | Risk / impact | Recommended fix | Priority |
 |---|---|---|---|---|---|
 | Hooks | ✅ implemented (core) | `http`/`mcp_tool`/`prompt`/`agent` handlers deferred | — | Done: `raiker/hooks/` dispatcher + `builtin`/`command` handlers, scoped config, decision authority, broker/gateway wiring, tests (`tests/test_hooks.py`) | Resolved |
-| Local model providers / llama.cpp | ✅ implemented | — | — | Done: `raiker/models/providers/llama_cpp_server.py` is the native default backend (stdlib HTTP, OpenAI-compatible), wired through the router with mock fallback; model-driven tool-call loop + validation added | Resolved |
+| Local model providers / llama.cpp | ✅ implemented | — | — | Done: `raiker/models/providers/openai_compatible.py` is the async OpenAI-compatible backend for llama.cpp and similar profiles using httpx; deterministic provider remains test-only; model-driven tool-call loop + validation added | Resolved |
 | Verifier | 🟡 stub | Pass-through; no checks | LLM09 misinformation; "verify" phase is hollow | Implement minimal verification (test-run / diff sanity) with events | High |
 | Context gathering | 🟡 stub | Fixed single source | No real repository understanding feeding the model | Implement a context-gatherer using existing safe tools (grep/glob/read) + budget | High |
 | Code review workflow | ❌ missing | No module despite "coding platform" framing | Headline use case absent | Specify + build a review workflow (diff in → findings out) reusing tool broker | Medium |

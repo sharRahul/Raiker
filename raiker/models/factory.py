@@ -79,12 +79,11 @@ class ModelProviderFactory:
             raise ProviderPolicyError("test_only_profile_requires_test_mode")
         if state == "disabled_until_policy_approved" and not self.allow_policy_gated_provider:
             raise ProviderPolicyError("provider_requires_explicit_policy_approval")
+        model_name = str(profile.model or "")
+        if not model_name or "<" in model_name or ">" in model_name:
+            raise ProviderConfigurationError("model_name_not_configured")
         endpoint = str(raw.get("endpoint") or raw.get("base_url") or "")
         if not endpoint or "<" in endpoint:
-            raise ProviderConfigurationError("missing_endpoint")
-        if state == "disabled_until_endpoint_configured" and "<" in str(profile.model):
-            raise ProviderPolicyError("provider_endpoint_or_model_not_configured")
-        if not endpoint:
             raise ProviderConfigurationError("missing_endpoint")
         policy = EndpointPolicy(
             local_only=profile.local_only,

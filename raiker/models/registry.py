@@ -5,6 +5,11 @@ from pathlib import Path
 from typing import Any
 
 from raiker.contracts.models import ModelProfile
+from raiker.models.endpoint_policy import (
+    EndpointPolicy,
+    classify_endpoint,
+    validate_endpoint_policy,
+)
 
 
 class RegistryError(ValueError):
@@ -44,6 +49,18 @@ class ModelProfileRegistry:
             missing = required - set(entry)
             if missing:
                 raise RegistryError(f"model_profile_missing_fields:{sorted(missing)}", entry=entry)
+            if not str(entry.get("model", "")):
+                raise RegistryError("model_profile_missing_model", entry=entry)
+            if bool(entry.get("reasoning_trace_visible", False)) and not bool(entry.get("supports_reasoning", False)):
+                entry["reasoning_trace_visible"] = False
+            endpoint = entry.get("endpoint") or entry.get("base_url")
+            if endpoint:
+                try:
+                    validate_endpoint_policy(str(endpoint), EndpointPolicy(local_only=bool(entry["local_only"]), requires_network=bool(entry["requires_network"]), requires_egress_policy=bool(entry.get("requires_egress_policy", False)), requires_budget_policy=bool(entry.get("requires_budget_policy", False)), provider=str(entry["provider"]), allow_remote_http=bool(entry.get("allow_remote_http", False))))
+                except Exception as exc:
+                    raise RegistryError(str(exc), entry=entry) from exc
+                entry.setdefault("endpoint_kind", classify_endpoint(str(endpoint)))
+            entry.setdefault("reasoning_trace_visible", False)
             profiles.append(
                 ModelProfile(
                     profile_id=entry["profile_id"],
@@ -70,3 +87,13 @@ class ModelProfileRegistry:
             if profile.provider == normal_provider and profile.model == model:
                 return profile
         raise RegistryError(f"unknown_model_profile:{provider}:{model}")
+
+    def resolve_profile_id(self, profile_id: str) -> ModelProfile:
+        for profile in self.profiles:
+            if profile.profile_id == profile_id:
+                return profile
+        raise RegistryError(f"unknown_model_profile_id:{profile_id}")
+
+    def find(self, provider: str, model: str) -> list[ModelProfile]:
+        normal_provider = provider.replace("_", "-")
+        return [p for p in self.profiles if p.provider == normal_provider and p.model == model]

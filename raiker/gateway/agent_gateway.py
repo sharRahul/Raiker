@@ -44,7 +44,7 @@ class AgentGateway:
         self.connector_registry = ConnectorRegistry.load()
         self.store.upsert_model_profiles(self.model_registry.list_profiles())
         self.store.upsert_connector_profiles(self.connector_registry.list_profiles())
-        self.model_router = ModelRouter(self.model_registry, self.writer)
+        self.model_router = ModelRouter(self.model_registry, self.writer, allow_test_provider=True)
         # Native default backend: a reachable llama.cpp server, else the deterministic mock.
         self.default_provider = self.model_router.default_provider()
         self.runtime = RuntimeOrchestrator(

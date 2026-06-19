@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-# The deterministic verifier lives in ``raiker.verification``. This module re-exports it so
-# existing imports from ``raiker.runtime.verifier`` keep working. The previous pass-through
-# ``VerificationStub`` has been replaced by the real :class:`Verifier`.
 from raiker.verification.models import VerificationCheck, VerificationResult
 from raiker.verification.verifier import MUTATION_TOOLS, READ_ONLY_TOOLS, Verifier
 

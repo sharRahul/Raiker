@@ -197,6 +197,33 @@ Verification must produce:
 }
 ```
 
+### Phase 1/2 context gathering and verification (implemented)
+
+Context gathering and verification are no longer pass-through stubs. Both are
+`implemented_verified` for the Phase 1/2-safe scope and are wired into the normal runtime turn.
+
+Context gathering (`raiker/context/`): before the model loop, the runtime calls
+`ContextGatherer.gather(...)`, which builds a bounded, deterministic `ContextBundle` from safe
+local metadata sources only — `current_prompt`, `workspace_summary`, `recent_events`, `tasks`,
+`checkpoints`, `approvals`, `memory_status`, `memory_candidates`, `model_profile`, and
+`capability_status`. Every item records source type, trust level, provenance, sensitivity, and a
+redaction flag. Secrets/tokens/emails/private keys are masked with deterministic placeholders,
+budgeting is applied by item count and characters, and a metadata-only summary is emitted on the
+`context_gathered` event (`context_bundle_id`, `source_types`, counts, `truncated`,
+`redaction_applied`). The fixed `sources=["current_prompt"]` placeholder is removed. This is
+bounded local-metadata context, not full repository intelligence, and it never enables graph
+runtime, semantic search, vector memory, plugin execution, external channels, or
+remote/container/cloud context.
+
+Verification (`raiker/verification/`): a deterministic `Verifier` runs safety/result-shape checks
+inside the loop and emits `verification_started`/`verification_completed`. It validates tool-call
+schemas (unknown/invalid calls fail and never execute), confirms denied actions did not execute,
+confirms approval-required actions stopped before execution with an approval record, validates
+safe read-tool result shape, and confirms mutation proposals remain approval-gated. The verifier
+result carries `safe_to_continue`; its output never exposes hidden reasoning, chain-of-thought,
+scratchpads, or system prompts. This is safety/result-shape verification, not a
+semantic-correctness proof. No disabled runtime flag is enabled by these steps.
+
 ---
 
 ## Error Handling

@@ -131,9 +131,9 @@ map to the architecture and leave clear seams for future modules.
 
 | Claim in docs | Reality in code | Evidence |
 |---|---|---|
-| Verification/reflection step in the loop | Pass-through stub, no checks | `raiker/runtime/verifier.py` |
-| Context gathering / repository understanding feeding the model | Fixed single source | orchestrator `context_gathered` with `sources=["current_prompt"]` |
-| Coding-agent / code-review workflow | No module | absent |
+| Verification/reflection step in the loop | Resolved (Phase 1/2): deterministic safety/result-shape verifier integrated into the loop | `raiker/verification/`, `raiker/runtime/orchestrator.py`, `tests/test_phase_1_2_verifier.py` |
+| Context gathering / repository understanding feeding the model | Resolved (Phase 1/2-safe bounded local metadata only): bounded `ContextBundle` with provenance/redaction/budgeting; fixed single source removed | `raiker/context/`, `tests/test_phase_1_2_context_gatherer.py` |
+| Coding-agent / code-review workflow | Still absent — separate follow-up, not required by Phase 1/2 acceptance | absent |
 
 **Code-without-docs (functionality not documented):** minimal — the repo is doc-heavy. The
 `raiker/readiness/` and `rollback_*` planning surfaces are documented in the Slice specs. No

@@ -485,6 +485,43 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
+    def count_events(self, session_id: str | None = None) -> int:
+        query = "SELECT COUNT(*) AS cnt FROM events_index"
+        params: list[Any] = []
+        if session_id is not None:
+            query += " WHERE session_id = ?"
+            params.append(session_id)
+        with self.connect() as connection:
+            row = connection.execute(query, params).fetchone()
+        return int(row["cnt"]) if row else 0
+
+    def count_checkpoints(self, session_id: str | None = None) -> int:
+        query = "SELECT COUNT(*) AS cnt FROM checkpoints"
+        params: list[Any] = []
+        if session_id is not None:
+            query += " WHERE session_id = ?"
+            params.append(session_id)
+        with self.connect() as connection:
+            row = connection.execute(query, params).fetchone()
+        return int(row["cnt"]) if row else 0
+
+    def count_tasks(self, session_id: str | None = None) -> int:
+        query = "SELECT COUNT(*) AS cnt FROM tasks"
+        params: list[Any] = []
+        if session_id is not None:
+            query += " WHERE session_id = ?"
+            params.append(session_id)
+        with self.connect() as connection:
+            row = connection.execute(query, params).fetchone()
+        return int(row["cnt"]) if row else 0
+
+    def count_pending_approvals(self) -> int:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT COUNT(*) AS cnt FROM approvals WHERE status = 'pending'"
+            ).fetchone()
+        return int(row["cnt"]) if row else 0
+
     def load_event_index(self, event_id: str) -> dict | None:
         with self.connect() as connection:
             row = connection.execute(

@@ -490,3 +490,39 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
 | REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
 
+
+## Phase 1/2 context gathering and verifier (implemented_verified)
+
+The Phase 1/2 gather→act→verify loop is no longer hollow. Two previously stubbed runtime pieces
+are now `implemented_verified` for their Phase 1/2-safe scope and are covered by tests.
+
+Context gathering (`raiker/context/`) is `implemented_verified` for Phase 1/2-safe bounded local
+metadata context. It produces a deterministic `ContextBundle` from safe sources only, tags every
+item with source type/trust level/provenance/sensitivity/redaction, applies item and character
+budgets, and redacts secrets/tokens/emails/private keys with deterministic placeholders. It is
+bounded local-metadata context, not full repository intelligence.
+
+Verifier (`raiker/verification/`) is `implemented_verified` for deterministic safety/result-shape
+verification: tool-call schema validation, denied-action non-execution, approval-required
+non-execution with an approval record, safe read-result shape, and approval-gated mutation
+proposals. It is not a semantic-correctness proof, and its output never exposes private
+chain-of-thought, scratchpads, or system prompts.
+
+Code review workflow remains a separate `specified_not_implemented` follow-up and is not required
+by Phase 1/2 acceptance.
+
+Required verification tests for this scope:
+
+```text
+tests/test_phase_1_2_context_gatherer.py
+tests/test_phase_1_2_verifier.py
+tests/test_phase_1_2_runtime_gather_act_verify.py
+```
+
+No Phase 3/4 runtime capability is enabled by these steps. All disabled runtime flags remain
+false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled,
+vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled,
+approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled,
+external_channels_enabled, notifications_enabled, remote_execution_enabled,
+container_execution_enabled, cloud_execution_enabled, process_execution_enabled,
+shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.

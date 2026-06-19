@@ -17,6 +17,11 @@ _PREFIXES = {
     "memcand_",
     "ver_",
     "graphplan_",
+    "ctxb_",
+    "ctxi_",
+    "ctxs_",
+    "vres_",
+    "vchk_",
 }
 
 

@@ -32,12 +32,46 @@ none of them change the validator-required Phase 1/2/3 markers below.
 | Local model providers | llama.cpp native default through async OpenAI-compatible adapter; Ollama/LM Studio/vLLM/generic/OpenRouter profile-compatible and policy-gated; deterministic test-only | `raiker/models/providers/openai_compatible.py` uses `httpx.AsyncClient`; production gateway selects llama.cpp and never falls back to deterministic; OpenRouter/private/hosted profiles require explicit policy | `implemented_verified` (async adapter + policy gates) |
 | Local provider health-check | Phase 2 `implemented_verified` | `raiker/models/health.py` probes the llama.cpp `/health` endpoint over HTTP | accurate |
 | Model-driven tool calls | "gather→act→verify" loop | `raiker/runtime/orchestrator.py` runs a bounded model-driven loop; model tool calls validated by `raiker/models/tool_call_validation.py` (OWASP LLM05) | `implemented_verified` |
-| Verifier / verification step | "verify results" loop phase | `raiker/runtime/verifier.py` is a pass-through stub | `stub` |
-| Context gathering | repository understanding feeding the model | orchestrator records fixed `sources=["current_prompt"]` | `stub` |
-| Code review workflow | implied by "coding platform" | no review module present | `specified_not_implemented` |
+| Verifier / verification step | "verify results" loop phase | `raiker/verification/` + `raiker/runtime/verifier.py` run deterministic safety/result-shape checks (tool-call schema, denied/approval non-execution, read result shape, mutation gating); integrated into the runtime loop | `implemented_verified` (deterministic safety/result-shape verification; not a semantic-correctness proof) |
+| Context gathering | repository understanding feeding the model | `raiker/context/` builds a bounded `ContextBundle` of safe Phase 1/2 local metadata with provenance, trust level, sensitivity, redaction, and budgeting; the fixed `sources=["current_prompt"]` stub is removed from the runtime path | `implemented_verified` (Phase 1/2-safe bounded local-metadata context; not full repository intelligence) |
+| Code review workflow | implied by "coding platform" | no review module present | `specified_not_implemented` (remains a separate follow-up; not required by Phase 1/2 acceptance) |
 
 These do not activate or disable any runtime capability; they correct the *claimed* maturity only.
 Close them via named phase tasks with tests before marking any `implemented_verified`.
+
+### Phase 1/2 runtime maturity update (context gathering + verifier)
+
+The two long-standing Phase 1/2 runtime stubs are now closed:
+
+- **Context gathering** is now `implemented_verified` for Phase 1/2-safe bounded local-metadata
+  context. `raiker/context/` produces a deterministic `ContextBundle` from safe sources only
+  (current prompt, workspace summary, recent events, tasks, checkpoints, approvals, memory
+  status/candidates, model profile, capability status). Every item carries source type, trust
+  level, provenance, sensitivity, and redaction metadata; the bundle is budgeted by item count
+  and characters; secrets/tokens/emails/private keys are redacted with deterministic
+  placeholders. The runtime no longer records the fixed `sources=["current_prompt"]` stub.
+  This is bounded metadata/local-summary context only, not full repository intelligence, and it
+  does not enable semantic search, vector memory, graph runtime, plugin execution, external
+  channels, or remote/container/cloud execution.
+- **Verifier** is now `implemented_verified` for deterministic safety/result-shape verification.
+  `raiker/verification/` checks tool-call schemas (unknown/invalid calls fail and are not
+  executed), confirms denied actions did not execute, confirms approval-required actions stopped
+  before execution with an approval record, validates safe read-tool result shape, and confirms
+  mutation proposals stay approval-gated. Verifier output never exposes hidden reasoning,
+  chain-of-thought, scratchpads, or system prompts. This is safety/result-shape verification, not
+  a semantic-correctness proof.
+- **Code review workflow** remains a separate `specified_not_implemented` follow-up; it is not
+  required by Phase 1/2 acceptance and is not implemented in this change.
+- No Phase 3/4 runtime capability is enabled by this change. All disabled runtime flags remain
+  false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled,
+  vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled,
+  approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled,
+  external_channels_enabled, notifications_enabled, remote_execution_enabled,
+  container_execution_enabled, cloud_execution_enabled, process_execution_enabled,
+  shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+
+Evidence: `tests/test_phase_1_2_context_gatherer.py`, `tests/test_phase_1_2_verifier.py`,
+`tests/test_phase_1_2_runtime_gather_act_verify.py`.
 
 ---
 

@@ -477,7 +477,26 @@ Behavior:
   escape is rejected safely.
 - `/review --summary` returns summary, severity counts, and finding titles only.
 - `/review --json` returns a parseable, secret-free `ReviewResult`.
+- `/review --limit <number>` and `/review --severity <info|low|medium|high>` filter findings
+  after review, and rebuild the user-visible summary (`findings_count`, `severity_counts`,
+  `categories`) from the filtered findings only.
 - Unknown flags fail safely with usage text.
+
+Untracked-file detection:
+
+- `/review` detects untracked files through `git status` (via `ToolBroker`/`PolicyEngine`) and
+  emits an `untracked-files` info finding.
+- Untracked file contents are never read or leaked. Event payloads include a safe
+  `untracked_count` integer; file contents are never in findings, events, or rendered output.
+- If only untracked files exist (no tracked diff), `/review` reports the untracked finding
+  and does not say "No local changes found."
+
+Safety guarantees:
+
+- `/review` never modifies files, stages/unstages the Git index, commits, runs tests, applies
+  fixes, executes shell/process/network calls, or enables any disabled runtime flag.
+- Raw diffs and secrets are never placed in findings or event payloads; secret-like content is
+  redacted before findings/events.
 
 Boundaries: local CLI code review only. Not a review UI/web/dashboard/IDE/REST/API surface and not
 GitHub PR review automation. Review never mutates files, stages/unstages, commits, runs tests, applies

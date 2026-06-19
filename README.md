@@ -268,7 +268,9 @@ The deterministic mock launch command is test-only: normal production CLI policy
 
 ### Phase 2.5 local code-review workflow
 
-`/review` is a Phase 2.5 local CLI code-review workflow MVP: `implemented_verified` for CLI-only, read-only, bounded local diff review using deterministic rule-based findings and metadata-only events. It inspects local Git status/diff through the existing policy-mediated `ToolBroker`/`PolicyEngine` git wrappers and the Phase 1/2-safe context gatherer, then returns deterministic findings (missing tests, secret-like additions, Phase 3/4 scope expansion, risky runtime activation, docs-only/test-only changes, and large-diff truncation).
+`/review` is a Phase 2.5 local CLI code-review workflow MVP: `implemented_verified` for CLI-only, read-only, bounded local diff review using deterministic rule-based findings and metadata-only events. It inspects local Git status/diff through the existing policy-mediated `ToolBroker`/`PolicyEngine` git wrappers and the Phase 1/2-safe context gatherer, then returns deterministic findings (missing tests, secret-like additions, Phase 3/4 scope expansion, risky runtime activation, docs-only/test-only changes, large-diff truncation, and metadata-only untracked-file presence).
+
+Phase 2.5 hardening is complete: `--severity` and `--limit` summaries are rebuilt from filtered findings, and untracked files are detected as metadata-only (contents never read or leaked).
 
 `/review` is local CLI code review only. It is not a review UI, web/dashboard review surface, IDE review surface, REST/API review server, or GitHub PR review automation, and it does not apply fixes, run tests, mutate files, or touch the Git index. Raw diffs and secrets are never written into findings or event payloads.
 

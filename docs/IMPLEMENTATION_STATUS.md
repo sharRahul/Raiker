@@ -110,6 +110,66 @@ Scope and boundaries:
 Evidence: `tests/test_phase_2_5_code_review_workflow.py`, `tests/test_phase_2_5_code_review_cli.py`,
 `tests/test_phase_2_5_code_review_safety.py`.
 
+Phase 2.5 review hardening: `implemented_verified` for filtered-summary consistency and
+metadata-only untracked-file detection.
+
+| Capability | Phase | Status | Source | Tests |
+|---|---|---|---|---|
+| `--severity`/`--limit` summary rebuilt from filtered findings | `phase_2_5` | `implemented_verified` | `raiker/review/render.py`, `raiker/cli/commands.py` | `tests/test_phase_2_5_code_review_hardening.py` |
+| Metadata-only untracked-file detection in `/review` | `phase_2_5` | `implemented_verified` | `raiker/review/workflow.py` | `tests/test_phase_2_5_code_review_hardening.py` |
+
+Hardening details:
+- `rebuild_review_result_with_findings()` rebuilds `ReviewSummary.findings_count`,
+  `severity_counts`, `categories`, and `event_metadata` from filtered findings.
+- Filtering order is severity threshold first, limit second, summary rebuild third.
+- `_collect_untracked_files()` uses `git_status` through `ToolBroker`/`PolicyEngine`.
+- Untracked files are detected as metadata only; their contents are not read or leaked.
+- Event payloads include safe `untracked_count` but not file contents or raw diffs.
+
+Scope and boundaries (same as MVP — no expansion):
+- Review collects local Git status/diff through the existing policy-mediated `ToolBroker`/
+  `PolicyEngine` git wrappers and the Phase 1/2-safe context gatherer. It does not call
+  `subprocess`, shell, process, or network directly from `raiker/review/`.
+- Review is read-only: it never mutates files, stages/unstages the Git index, commits, runs tests,
+  applies fixes, or starts watchers/workers/daemons.
+- Raw diffs, file contents, and secrets are never placed into findings or event payloads; secret-like
+  content is redacted before findings/events.
+- This hardening is deterministic/rule-based local CLI review only. It is **not** model-assisted
+  review, GitHub PR review automation, a web/dashboard review UI, an IDE review UI, external-channel
+  review delivery, plugin-based review, or semantic/graph review intelligence. Those remain deferred.
+- No Phase 3/4 runtime capability is enabled by this change. All disabled runtime flags remain
+  false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled,
+  vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled,
+  approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled,
+  external_channels_enabled, notifications_enabled, remote_execution_enabled,
+  container_execution_enabled, cloud_execution_enabled, process_execution_enabled,
+  shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+
+Evidence: `tests/test_phase_2_5_code_review_hardening.py`, `tests/test_phase_2_5_code_review_cli.py`,
+`tests/test_phase_2_5_code_review_workflow.py`, `tests/test_phase_2_5_code_review_safety.py`.
+
+### Local validation baseline (2026-06-19)
+
+After Phase 2.5 hardening and httpx dependency metadata fix:
+
+| Check | Result |
+|---|---|
+| ruff | All checks passed |
+| mypy | Success, 197 source files |
+| pytest | 369 passed, 2 skipped |
+| validate_phase_status.py | passed |
+| validate_repo_truthfulness.py | passed |
+
+If dependency metadata tests fail after dependency changes, branch switching, or local environment
+rebuilds, refresh local editable-install metadata with:
+
+```bash
+python -m pip install -e .
+```
+
+Do not commit generated metadata/cache files including `*.egg-info/`, `build/`, `dist/`,
+`__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, or virtual environments.
+
 ---
 
 ## Phase 1 MVP Status

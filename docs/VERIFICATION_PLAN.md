@@ -526,3 +526,23 @@ approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_en
 external_channels_enabled, notifications_enabled, remote_execution_enabled,
 container_execution_enabled, cloud_execution_enabled, process_execution_enabled,
 shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+
+
+## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell
+
+Verify the default Rich TUI access shell with:
+
+```text
+python -m ruff check .
+python -m mypy raiker apps tests
+python -m pytest
+raiker --help
+raiker --prompt "Hello Raiker"
+raiker --prompt "/help"
+RAIKER_TUI=plain raiker --prompt "/help"
+RAIKER_TUI=rich raiker --prompt "/help"
+```
+
+Q1 implements the documented default layout only (Primary/Main, Activity, Input, Status
+Bar). It adds no new events, no new storage, and no new runtime authority; all disabled
+runtime flags remain false.

@@ -127,3 +127,12 @@ application, no file mutation, no staging/unstaging, no test execution, no GitHu
 no UI/API/IDE/dashboard/mobile, no approval execution, and no Phase 4. `approval_execution_enabled`
 remains false. No Phase 3 runtime execution is implemented by this slice; all disabled runtime
 flags remain false.
+
+
+## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell
+
+Phase 3 Slice Q1 adds no new events. The documented default Rich TUI access shell renders
+the default layout (Primary/Main, Activity, Input, Status Bar) and routes prompts/commands
+through existing handlers, so it uses existing command/runtime events only. No raw prompt
+text, file contents, diffs, secrets, tool output, private reasoning, or chain-of-thought is
+introduced. All disabled runtime flags remain false.

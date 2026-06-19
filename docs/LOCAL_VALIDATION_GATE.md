@@ -206,3 +206,18 @@ After Phase 3 Slice B approval planning preview:
 | validate_phase_status.py | passed |
 | validate_repo_truthfulness.py | passed |
 
+
+
+## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell smoke
+
+Run the default-shell smoke commands locally (hosted Actions may stay red/unavailable):
+
+```text
+raiker --prompt "Hello Raiker"
+raiker --prompt "/help"
+RAIKER_TUI=plain raiker --prompt "/help"
+RAIKER_TUI=rich raiker --prompt "/help"
+```
+
+Q1 ships the documented default layout only. `approval_execution_enabled: False` and
+`runtime_execution_enabled: False` remain unchanged; all disabled runtime flags remain false.

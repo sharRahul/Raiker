@@ -43,7 +43,8 @@ def test_dependency_baseline() -> None:
     with open("pyproject.toml", "rb") as handle:
         data = tomllib.loads(handle.read().decode())
     deps = data["project"]["dependencies"]
-    assert deps == ["httpx>=0.27"]
+    # rich>=13 added for the Phase 3 Slice Q1 documented default Rich TUI access shell.
+    assert deps == ["httpx>=0.27", "rich>=13"]
     assert not any("openai" in d or "pydantic" in d or "requests" in d or "aiohttp" in d for d in deps)
 
 

@@ -318,7 +318,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Rich TUI panels | Minimal terminal shell/status rendering only; rich panels are specified, not implemented as a full app. | Partial/minimal | None. | Build panel framework only in a future approved slice. |
+| Rich TUI panels | Phase 3 Slice Q1 documented default access shell (Primary/Main, Activity, Input, Status Bar) is implemented; advanced/optional/plugin panels remain specified, not implemented as a full app. | Partial (default access shell) | None. | Build advanced/optional panel framework only in a future approved slice. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
@@ -329,3 +329,21 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
 | REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
 
+
+
+## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell
+
+Q1 acceptance (default layout only): the default layout renders the Primary/Main,
+Activity, Input, and Status Bar panels; `raiker --prompt "Hello Raiker"` and
+`raiker --prompt "/help"` still work; `/models`, `/model current`, `/model capabilities`,
+`/status`, `/events`, `/approvals`, and `/review --summary` route through existing command
+handlers; unsupported commands show a safe error; the plain fallback (`RAIKER_TUI=plain`)
+remains available; accessibility safety labels (state, network, approvals, disabled
+runtime) remain present in no-colour/ASCII/narrow modes; and TUI panel modules introduce no
+tool/model/shell/process/network execution. Covered by
+`tests/test_phase_3_slice_q1_rich_tui_default_layout.py`,
+`tests/test_phase_3_slice_q1_rich_tui_accessibility.py`,
+`tests/test_phase_3_slice_q1_rich_tui_command_access.py`,
+`tests/test_phase_3_slice_q1_rich_tui_safety.py`, and
+`tests/test_phase_3_slice_q1_docs_truthfulness.py`. Advanced/optional panels and
+desktop/web/mobile/dashboard apps remain deferred and are not required for Q1 completion.

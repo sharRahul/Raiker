@@ -60,8 +60,9 @@ The two long-standing Phase 1/2 runtime stubs are now closed:
   mutation proposals stay approval-gated. Verifier output never exposes hidden reasoning,
   chain-of-thought, scratchpads, or system prompts. This is safety/result-shape verification, not
   a semantic-correctness proof.
-- **Code review workflow** remains a separate `specified_not_implemented` follow-up; it is not
-  required by Phase 1/2 acceptance and is not implemented in this change.
+- **Code review workflow** is now delivered as the Phase 2.5 local code-review workflow MVP
+  (`implemented_verified` for CLI-only, read-only, bounded local diff review using deterministic
+  rule-based findings and metadata-only events). See the Phase 2.5 status section below.
 - No Phase 3/4 runtime capability is enabled by this change. All disabled runtime flags remain
   false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled,
   vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled,
@@ -72,6 +73,42 @@ The two long-standing Phase 1/2 runtime stubs are now closed:
 
 Evidence: `tests/test_phase_1_2_context_gatherer.py`, `tests/test_phase_1_2_verifier.py`,
 `tests/test_phase_1_2_runtime_gather_act_verify.py`.
+
+---
+
+## Phase 2.5 Local Code-Review Workflow Status
+
+Phase 2.5 local code-review workflow MVP: `implemented_verified` for CLI-only, read-only, bounded
+local diff review using deterministic rule-based findings and metadata-only events.
+
+| Capability | Phase | Status | Source | Tests |
+|---|---|---|---|---|
+| `raiker/review/` review engine (models, workflow, classifier, diff parser, render) | `phase_2_5` | `implemented_verified` | `raiker/review/` | `tests/test_phase_2_5_code_review_workflow.py` |
+| `/review` CLI command surface (`--summary`, `--staged`, `--path`, `--json`, `--limit`, `--severity`) | `phase_2_5` | `implemented_verified` | `raiker/cli/commands.py` | `tests/test_phase_2_5_code_review_cli.py` |
+| Deterministic rule-based findings + metadata-only review events | `phase_2_5` | `implemented_verified` | `raiker/review/classifier.py`, `raiker/review/workflow.py` | `tests/test_phase_2_5_code_review_safety.py` |
+
+Scope and boundaries:
+
+- Review collects local Git status/diff through the existing policy-mediated `ToolBroker`/
+  `PolicyEngine` git wrappers and the Phase 1/2-safe context gatherer. It does not call
+  `subprocess`, shell, process, or network directly from `raiker/review/`.
+- Review is read-only: it never mutates files, stages/unstages the Git index, commits, runs tests,
+  applies fixes, or starts watchers/workers/daemons.
+- Raw diffs, file contents, and secrets are never placed into findings or event payloads; secret-like
+  content is redacted before findings/events.
+- This MVP is deterministic/rule-based local CLI review only. It is **not** model-assisted review,
+  GitHub PR review automation, a web/dashboard review UI, an IDE review UI, external-channel review
+  delivery, plugin-based review, or semantic/graph review intelligence. Those remain deferred.
+- No Phase 3/4 runtime capability is enabled by this change. All disabled runtime flags remain
+  false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled,
+  vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled,
+  approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled,
+  external_channels_enabled, notifications_enabled, remote_execution_enabled,
+  container_execution_enabled, cloud_execution_enabled, process_execution_enabled,
+  shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+
+Evidence: `tests/test_phase_2_5_code_review_workflow.py`, `tests/test_phase_2_5_code_review_cli.py`,
+`tests/test_phase_2_5_code_review_safety.py`.
 
 ---
 

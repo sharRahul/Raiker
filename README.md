@@ -257,6 +257,7 @@ The terminal client currently exposes these inspection and controlled-action com
 /storage-lifecycle-handoff [--summary]
 /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]
 /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]
+/review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>]
 /doctor
 /channels
 /launch --provider mock --model mock-deterministic
@@ -264,6 +265,12 @@ The terminal client currently exposes these inspection and controlled-action com
 ```
 
 The deterministic mock launch command is test-only: normal production CLI policy blocks `/launch --provider mock --model mock-deterministic` and should report `deterministic_test_provider_requires_test_mode` unless explicit test mode/test harness policy is active.
+
+### Phase 2.5 local code-review workflow
+
+`/review` is a Phase 2.5 local CLI code-review workflow MVP: `implemented_verified` for CLI-only, read-only, bounded local diff review using deterministic rule-based findings and metadata-only events. It inspects local Git status/diff through the existing policy-mediated `ToolBroker`/`PolicyEngine` git wrappers and the Phase 1/2-safe context gatherer, then returns deterministic findings (missing tests, secret-like additions, Phase 3/4 scope expansion, risky runtime activation, docs-only/test-only changes, and large-diff truncation).
+
+`/review` is local CLI code review only. It is not a review UI, web/dashboard review surface, IDE review surface, REST/API review server, or GitHub PR review automation, and it does not apply fixes, run tests, mutate files, or touch the Git index. Raw diffs and secrets are never written into findings or event payloads.
 
 Phase 3 and Phase 4 commands are inspection/planning/governance/preview surfaces unless explicitly documented otherwise. They must not execute plugins, activate channels, write semantic/vector memory, create embeddings, start graph indexing, persist executable approvals, spawn agents, or run remote/container commands.
 

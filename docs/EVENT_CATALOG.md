@@ -446,3 +446,20 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
 | REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
 
+
+## Phase 2.5 local code-review workflow events
+
+The Phase 2.5 local code-review workflow (`/review`) emits metadata-only events. Payloads never
+contain raw diffs, raw file contents, secrets, prompt text, private reasoning, chain-of-thought, or
+raw tool output. Allowed payload fields: `review_id`, `mode`, `files_reviewed`, `findings_count`,
+`severity_counts`, `truncated`, `redaction_applied`.
+
+| Event | When | Payload |
+|---|---|---|
+| `review_started` | A local review begins. | `review_id`, `mode` |
+| `review_completed` | A local review finishes successfully. | `review_id`, `mode`, `files_reviewed`, `findings_count`, `severity_counts`, `truncated`, `redaction_applied` |
+| `review_failed` | A local review raises an error. | `mode`, `error_class` |
+
+Review is local CLI-only and read-only. It does not enable plugin execution, graph/codemap indexing,
+semantic/vector memory writes, external channels, notifications, remote/container/cloud execution,
+process/shell/network execution, or any runtime execution; those flags remain false.

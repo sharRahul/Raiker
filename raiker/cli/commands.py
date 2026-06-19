@@ -859,6 +859,97 @@ def handle_storage_lifecycle_policy_simulation(
     )
 
 
+def _parse_review_command(command: str) -> dict[str, object] | str:
+    usage = (
+        "Usage: /review [--summary] [--staged] [--path <path>] [--json] "
+        "[--limit <number>] [--severity <info|low|medium|high>]"
+    )
+    parts = shlex.split(command)
+    summary_only = False
+    as_json = False
+    staged = False
+    path: str | None = None
+    limit: int | None = None
+    severity: str | None = None
+    i = 1
+    while i < len(parts):
+        arg = parts[i]
+        if arg == "--summary":
+            summary_only = True
+            i += 1
+        elif arg == "--json":
+            as_json = True
+            i += 1
+        elif arg == "--staged":
+            staged = True
+            i += 1
+        elif arg == "--path" and i + 1 < len(parts):
+            path = parts[i + 1]
+            i += 2
+        elif arg == "--limit" and i + 1 < len(parts):
+            try:
+                limit = int(parts[i + 1])
+            except ValueError:
+                return usage
+            if limit < 0:
+                return usage
+            i += 2
+        elif arg == "--severity" and i + 1 < len(parts):
+            severity = parts[i + 1]
+            if severity not in {"info", "low", "medium", "high"}:
+                return usage
+            i += 2
+        else:
+            return usage
+    return {
+        "summary_only": summary_only,
+        "as_json": as_json,
+        "staged": staged,
+        "path": path,
+        "limit": limit,
+        "severity": severity,
+    }
+
+
+def handle_review(command: str = "/review", *, workspace_root: str | Path = ".") -> str:
+    from dataclasses import replace as _replace
+
+    from raiker.review.models import SEVERITY_RANK
+    from raiker.review.render import render_json, render_text
+    from raiker.review.workflow import CodeReviewWorkflow, ReviewPathError
+
+    parsed = _parse_review_command(command)
+    if isinstance(parsed, str):
+        return parsed
+    path_arg = parsed["path"]
+    severity = parsed["severity"]
+    limit = parsed["limit"]
+    try:
+        result = CodeReviewWorkflow().review(
+            workspace_root=workspace_root,
+            staged=bool(parsed["staged"]),
+            path=path_arg if isinstance(path_arg, str) else None,
+            summary_only=bool(parsed["summary_only"]),
+        )
+    except ReviewPathError:
+        return "Review failed: path is outside the workspace."
+    except (OSError, ValueError) as exc:
+        return f"Review failed: {type(exc).__name__}"
+
+    findings = list(result.findings)
+    if isinstance(severity, str):
+        threshold = SEVERITY_RANK[severity]
+        findings = [f for f in findings if SEVERITY_RANK[f.severity] >= threshold]
+    if isinstance(limit, int):
+        findings = findings[:limit]
+    if findings != list(result.findings):
+        result = _replace(result, findings=findings)
+
+    if parsed["as_json"]:
+        return render_json(result)
+    return render_text(result, summary_only=bool(parsed["summary_only"]))
+
+
 def handle_execution_profiles() -> str:
     lines = ["Execution profiles:"]
     for profile in list_execution_profiles():
@@ -1149,7 +1240,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return "Exiting Raiker."
     if command == "/help":
         return (
-            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /doctor, /channels, /launch --provider mock --model mock-deterministic (test-only; policy-blocked in normal CLI), /quit\n"
+            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>], /doctor, /channels, /launch --provider mock --model mock-deterministic (test-only; policy-blocked in normal CLI), /quit\n"
             "Status: Phase 3 is complete for safe foundation/readiness slices A-P; Phase 3 safe foundation/readiness slices A-P are complete; Phase 4 is blocked; runtime execution remains disabled. Current launchable UI is a simple terminal/CLI shell. Desktop/Web/Dashboard/Mobile/REST/Rich TUI panels are contract-only or specified/deferred unless explicitly implemented. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
         )
     if command == "/providers":
@@ -1248,6 +1339,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_plugins()
     if command == "/plugin-plan" or command.startswith("/plugin-plan "):
         return handle_plugin_plan(command)
+    if command == "/review" or command.startswith("/review "):
+        return handle_review(command, workspace_root=workspace_root)
     if command == "/doctor":
         return render_doctor(workspace_root=workspace_root)
     if (

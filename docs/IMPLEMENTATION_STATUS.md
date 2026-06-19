@@ -200,8 +200,8 @@ After Phase 2.6 review-to-action proposal workflow closure:
 | Check | Result |
 |---|---|
 | ruff | All checks passed |
-| mypy | Success, 198 source files |
-| pytest | all tests passed, expected skips only |
+| mypy | Success, 202 source files |
+| pytest | 413 passed, 2 skipped |
 | validate_phase_status.py | passed |
 | validate_repo_truthfulness.py | passed |
 

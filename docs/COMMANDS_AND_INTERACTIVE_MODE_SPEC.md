@@ -450,3 +450,36 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
 | REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
 
+
+## Phase 2.5 local code-review command (`/review`)
+
+`/review` is the Phase 2.5 local code-review workflow MVP: a CLI-only, read-only, bounded local
+diff reviewer using deterministic rule-based findings and metadata-only events.
+
+Forms:
+
+```text
+/review
+/review --summary
+/review --staged
+/review --path <path>
+/review --json
+/review --limit <number>
+/review --severity <info|low|medium|high>
+```
+
+Behavior:
+
+- Default `/review` reviews unstaged changes. If there are no unstaged changes but staged changes
+  exist, it reports that and suggests `/review --staged`. With no changes it returns a clean result.
+- `/review --staged` reviews staged changes only; it never mutates the Git index or commits.
+- `/review --path <path>` reviews only changes under a workspace-scoped path; traversal/absolute
+  escape is rejected safely.
+- `/review --summary` returns summary, severity counts, and finding titles only.
+- `/review --json` returns a parseable, secret-free `ReviewResult`.
+- Unknown flags fail safely with usage text.
+
+Boundaries: local CLI code review only. Not a review UI/web/dashboard/IDE/REST/API surface and not
+GitHub PR review automation. Review never mutates files, stages/unstages, commits, runs tests, applies
+fixes, executes shell/process/network calls, or enables any disabled runtime flag. Raw diffs and
+secrets are never placed in findings or event payloads.

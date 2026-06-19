@@ -79,11 +79,23 @@ REQUIRED_COMMANDS = {
     "/storage-lifecycle-handoff [--summary]",
     "/storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]",
     "/storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]",
+    "/review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>]",
     "/doctor",
     "/channels",
     "/launch --provider mock --model mock-deterministic",
     "/quit",
 }
+
+# Phase 2.5 review must stay documented as local CLI-only and never claim deferred surfaces.
+REVIEW_LOCAL_CLI_MARKERS = ("local CLI code review",)
+REVIEW_FORBIDDEN_OVERCLAIMS = (
+    "review dashboard",
+    "review web ui",
+    "review desktop ui",
+    "ide review ui",
+    "github pr review automation is complete",
+    "semantic review intelligence is complete",
+)
 
 
 def _slash_prefix(command: str) -> str:
@@ -215,6 +227,15 @@ def main() -> int:
     for marker in RUNTIME_DISABLED_MARKERS:
         if marker not in readme_text + status_text + catalog:
             errors.append(f"Missing runtime-disabled marker: {marker}")
+
+    review_docs = readme_text + "\n" + catalog
+    for marker in REVIEW_LOCAL_CLI_MARKERS:
+        if marker not in review_docs:
+            errors.append(f"Review docs missing local-CLI-only marker: {marker}")
+    lowered_review_docs = review_docs.lower()
+    for overclaim in REVIEW_FORBIDDEN_OVERCLAIMS:
+        if overclaim in lowered_review_docs:
+            errors.append(f"Review docs overclaim deferred surface: {overclaim}")
     if errors:
         print("Repository truthfulness validation failed:")
         for error in errors:

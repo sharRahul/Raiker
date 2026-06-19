@@ -104,6 +104,9 @@ EVENT_TYPES = {
     "hook_decision",
     "hook_failed",
     "hook_timeout",
+    "review_started",
+    "review_completed",
+    "review_failed",
 }
 INTENTS = {
     "chat",

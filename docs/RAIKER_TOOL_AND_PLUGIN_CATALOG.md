@@ -261,6 +261,7 @@ These permission labels are used in the inventory below so coding agents know wh
 | `/storage-lifecycle --summary` | Render lifecycle aggregate summary. | `storage_lifecycle:read` | Yes — metadata-only |
 | `/storage-lifecycle --graph` | Render graph lifecycle metadata. | `storage_lifecycle:read`, `graph:read` | Yes — metadata-only |
 | `/storage-lifecycle --memory` | Render memory lifecycle metadata. | `storage_lifecycle:read`, `memory:read` | Yes — metadata-only |
+| `/review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>]` | Phase 2.5 local CLI code review: deterministic rule-based findings over bounded local Git diff. Local CLI-only; not a review UI/web/dashboard/IDE/REST/API surface and not GitHub PR review automation. Read-only; no file/index mutation, no fixes, no test runs. | `git:read`, `workspace:read` | Yes — read-only local review |
 | `/doctor` | Show diagnostics and disabled gates. | `config:read`, `model:read`, `channel:read` | Yes |
 | `/channels` | List channel connector profiles. | `channel:read` | Yes — activation disabled |
 | `/models` | List model profiles. | `model:read` | Yes |

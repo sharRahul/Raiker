@@ -10,7 +10,7 @@ Implementation is phased, but the user experience is fully specified now. No bui
 
 1. Every interface is a client of the same agent gateway.
 2. No interface executes tools directly.
-3. No interface is primary over another; every implemented and enabled interface can be the user's primary way to operate Raiker.
+3. No interface is conceptually primary; every implemented and enabled interface can be the user's primary way to operate Raiker.
 4. All interfaces expose the same core concepts: session, task, plan, tools, approvals, events, checkpoints, memory, context, models, channels, diagnostics, and policy.
 5. All actions available in one primary interface must have an equivalent action path in every other primary interface that supports the relevant capability.
 6. Long-running work is visible, interruptible, and cancellable.
@@ -19,6 +19,79 @@ Implementation is phased, but the user experience is fully specified now. No bui
 9. Risk, cost, model, memory, network, and execution environment must be visible.
 10. UI actions map to explicit runtime commands/events.
 11. Connector and model registries must be visible before their implementations are wired.
+12. Implementations may prioritize specific interfaces (e.g., Desktop, Web) for usability and adoption while maintaining capability parity across all interfaces.
+
+---
+
+## Experience Levels And Progressive Disclosure
+
+Raiker must support multiple user experience levels to reduce cognitive overload while preserving full system power.
+
+### Objectives
+- Prevent overwhelming new users
+- Preserve expert-level control
+- Enable gradual learning of system concepts
+
+### Experience Levels
+
+#### Beginner Mode (Default for new users)
+- Shows: session, prompt, active task, approvals
+- Hides: graph, memory internals, event stream, execution details
+- Uses simplified language (e.g., "Running task" instead of "execution profile")
+- Collapses advanced panels by default
+
+#### Intermediate Mode
+- Shows: tasks, plans, approvals, basic event visibility, context usage
+- Introduces: tool activity summaries, checkpoint awareness
+- Enables limited panel customization
+
+#### Expert Mode
+- Full UI exposure
+- All panels available (graph, memory, diagnostics, event stream, policy)
+- Full status bar fields
+- Raw event visibility
+
+### Rules
+- Mode affects visibility, not capability
+- All actions remain accessible via command or API
+- Users may switch modes at any time
+- Managed policy may enforce minimum visibility level
+
+### Behaviour
+- Progressive disclosure applies to:
+  - Panels
+  - Status bar fields
+  - Event stream verbosity
+  - Approval detail level
+``
+## Interface Parity Model
+
+Raiker enforces capability parity across interfaces, not UI parity.
+
+### Definitions
+
+Capability parity:
+- Every core action (task control, approvals, memory inspection, etc.) is available on all primary interfaces.
+
+UI parity:
+- Identical layouts and visual structures across interfaces (not required).
+
+### Rules
+
+- Interfaces may adapt presentation to their form factor:
+  - Mobile uses cards and flows instead of panels
+  - CLI uses structured text instead of visual grids
+  - Voice uses summaries and confirmation flows
+
+- Missing capabilities must:
+  - Be explicitly disabled, or
+  - Provide a handoff to a capable interface
+
+- No interface may introduce unique capabilities unavailable elsewhere
+
+### Principle
+
+"Same system power, different interaction models"
 
 ---
 
@@ -54,6 +127,25 @@ Small-screen, voice, chat, and API clients may expose these through navigation f
 ## Rich TUI Design
 
 The Rich TUI is one equal-status primary interface. It is not the primary human interface over Desktop, Web, IDE, Voice, Hotkeys, REST, Webhooks, channel clients, Browser Extension, Apple mobile app, Android mobile app, or Mobile Companion.
+
+### Default Mode Variants
+
+The TUI must support preset complexity levels:
+
+#### Minimal (default for small terminals)
+- Single main panel (transcript)
+- Input panel
+- Compact status bar (state, task, approvals, model, clock)
+
+#### Standard (developer default)
+- Main panel + activity panel
+- Input panel
+- Full status bar (developer_compact preset)
+
+#### Advanced
+- Full panel system enabled
+- Optional panels accessible
+- Event stream expanded
 
 ### Default Layout
 
@@ -615,6 +707,40 @@ ctx:18k/32k
 5. **Traceability** — full audit trail in transcript
 6. **Consistency** — all tools follow same event model
 
+## Cognitive Load Constraints
+
+The UI must actively prevent overload during normal operation.
+
+### Constraints
+
+- No more than:
+  - 2 primary panels visible by default
+  - 1 active high-attention task at a time
+  - 1 approval card in focus at a time
+
+- Large outputs must always:
+  - Be collapsed by default
+  - Include summary metadata
+
+- Status bar:
+  - Must not exceed terminal width without overflow handling
+  - Must prioritize safety-critical fields
+
+### Progressive Reveal
+
+Complex elements are introduced only when:
+- User interacts with them
+- A task requires them
+- User switches to higher experience mode
+
+### Anti-Patterns (must be avoided)
+
+- Full system state shown at startup
+- Inline approvals buried in text
+- Simultaneous panel overload
+- Hidden system actions
+
+
 ---
 
 ## TUI Keyboard Shortcuts
@@ -755,6 +881,36 @@ Mobile-specific requirements:
 - offline or stale mobile state must not approve actions until refreshed against the gateway;
 - attachments, photos, files, shared links, and selected text are untrusted inputs and must pass normal attachment/context policy;
 - Apple and Android implementations must use the same contracts and event types.
+
+### Mobile Adaptation Model
+
+Mobile UI is not a compressed desktop UI. It is a flow-based interface.
+
+### Design Rules
+
+- Replace panels with:
+  - Cards
+  - Drill-down views
+  - Swipe navigation
+
+- Use navigation hierarchy:
+  - Home → Session → Task → Detail View
+
+- High-risk actions:
+  - Must require explicit confirmation
+  - Must display full context before approval
+
+- Event stream:
+  - Summarized by default
+  - Expandable per event
+
+- Graph, diagnostics, and large datasets:
+  - Must use summarized views or deep-link handoff
+
+### Principle
+
+"Focus over density — one decision per screen"
+
 
 ---
 
@@ -939,3 +1095,36 @@ Safety status:
 - Rollback execution remains disabled.
 - Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
 - GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.
+
+## Implementation Phases (UX Scope)
+
+### Phase 1 — Core Usability (Must Ship)
+- Prompt input + transcript
+- Task execution visibility
+- Approval system (explicit and safe)
+- Basic status bar (state, task, approvals, model)
+- Minimal TUI and basic desktop/web UI
+
+### Phase 2 — Observability And Control
+- Event stream (structured)
+- Checkpoints and restore
+- Context usage visibility
+- Basic panels (approvals, task progress)
+
+### Phase 3 — Advanced System Features
+- Memory + graph UI
+- Plugin panels
+- Diagnostics and storage views
+- Dashboard
+
+### Phase 4 — Power User Ecosystem
+- Custom panels
+- Full panel manifests
+- Advanced debugging and audit tools
+
+### Rule
+
+No phase may introduce UI that:
+- Bypasses the gateway
+- Hides system actions
+- Breaks consistency across interfaces

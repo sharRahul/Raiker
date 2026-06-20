@@ -175,7 +175,7 @@ def test_disabled_runtime_flags_remain_false(tmp_path: Path) -> None:
 
 def test_approval_execution_enabled_false(tmp_path: Path) -> None:
     out = handle_slash_command("/status", workspace_root=tmp_path)
-    assert "phase_4_status: blocked_foundation_only" in out
+    assert "phase_4_status: memory_mvp_implemented" in out
 
 
 def test_no_approve_execute_apply_run_tests_commands(tmp_path: Path) -> None:

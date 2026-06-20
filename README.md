@@ -45,7 +45,7 @@ As of the current `main` state:
 
 All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 Slice B approval planning preview is implemented. Runtime execution remains disabled.
 
-The current launchable UI is a simple terminal/CLI shell plus read-only shared view contracts. Desktop/Web/Dashboard/Mobile apps, Rich TUI panels, REST/API, IDE, Voice, Browser Extension, and external channel clients are specified/deferred, not implemented as launchable apps. Runtime execution remains disabled and Phase 4 remains blocked. Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+The current launchable UI is a simple terminal/CLI shell plus read-only shared view contracts. Desktop/Web/Dashboard/Mobile apps, Rich TUI panels, REST/API, IDE, Voice, Browser Extension, and external channel clients are specified/deferred, not implemented as launchable apps. Runtime execution remains disabled and Phase 4 memory MVP is implemented. Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
 
 | Area | Status | Notes |
 |---|---|---|
@@ -227,6 +227,10 @@ The terminal client currently exposes these inspection and controlled-action com
 /approve <id>
 /deny <id>
 /memory
+/memory-store <text>
+/memory-search <query>
+/memory-forget <memory_id>
+/memory-list
 /semantic-memory
 /capabilities
 /execution-profiles

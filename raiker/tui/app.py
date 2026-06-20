@@ -59,19 +59,6 @@ def _approval_count(workspace_root: str | Path) -> int:
     return _safe(_count, 0)
 
 
-def _last_event(workspace_root: str | Path) -> str:
-    def _latest() -> str:
-        from raiker.events.query import EventViewer
-        from raiker.storage.sqlite import SQLiteStore
-
-        events = EventViewer(SQLiteStore(workspace_root)).list_events(limit=1)
-        if not events:
-            return "none"
-        return str(events[0]["event_type"])
-
-    return _safe(_latest, "none")
-
-
 def _status_context(workspace_root: str | Path) -> StatusContext:
     return StatusContext(
         state="READY",
@@ -79,7 +66,8 @@ def _status_context(workspace_root: str | Path) -> StatusContext:
         approvals=_approval_count(workspace_root),
         model=_selected_model(workspace_root),
         network="blocked",
-        last_event=_last_event(workspace_root),
+        cwd_label=str(workspace_root),
+        git_branch="",
     )
 
 
@@ -104,7 +92,9 @@ def _print_header(workspace_root: str | Path, profile: TerminalProfile) -> None:
     status = _status_context(workspace_root)
     renderer = StatusBarRenderer(_status_config(profile))
     print(_plain(WELCOME, profile))
-    print(_plain(renderer.render(status, compact=profile.narrow, width=profile.width), profile))
+    rendered_text = renderer.render_status_line(status, compact=profile.narrow, width=profile.width)
+    rendered_str = rendered_text.plain if hasattr(rendered_text, "plain") else str(rendered_text)
+    print(_plain(rendered_str, profile))
 
 
 def _run_prompt_mode(

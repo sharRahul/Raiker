@@ -32,14 +32,14 @@ REQUIRED_IMPLEMENTATION_STATUS_MARKERS = [
     "`/workspace-view` safe terminal snapshot command | `implemented_verified`",
     "All Phase 3 slices A through P are implemented, tested, and documented.",
     "Phase 3 is now marked `implemented_verified` per the completion audit",
-    "All runtime execution remains disabled. Phase 4 remains blocked.",
+    "All runtime execution remains disabled. Phase 4 memory MVP is implemented.",
 ]
 
 REQUIRED_STATUS_FILES = {
     Path("README.md"): [
         "All Phase 3 slices A through P are implemented, tested, and documented.",
         "Runtime execution remains disabled.",
-        "Phase 4 is not complete",
+        "Phase 4 memory MVP is implemented",
     ],
     Path("docs/PHASE_3_COMPLETION_AUDIT.md"): [
         "**Phase 3 can be marked complete.**",
@@ -48,11 +48,11 @@ REQUIRED_STATUS_FILES = {
     ],
     Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"): [
         "Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`.",
-        "Phase 4 remains blocked.",
+        "Phase 4 memory MVP",
     ],
     Path("docs/EVENT_CATALOG.md"): [
         "Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`.",
-        "Phase 4 remains blocked.",
+        "Phase 4 memory MVP",
     ],
 }
 

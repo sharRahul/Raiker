@@ -423,3 +423,22 @@ CREATE INDEX IF NOT EXISTS idx_approval_preview_proposal_id ON proposal_approval
 CREATE INDEX IF NOT EXISTS idx_approval_preview_status ON proposal_approval_previews(status);
 CREATE INDEX IF NOT EXISTS idx_approval_preview_created ON proposal_approval_previews(created_at);
 """
+
+PHASE_4_MEMORY_MVP_MIGRATION_ID = "RAIKER-2001-phase4-memory-mvp-approved-memory"
+
+PHASE_4_MEMORY_MVP_SQL = """
+CREATE TABLE IF NOT EXISTS approved_memory (
+  memory_id TEXT PRIMARY KEY,
+  text TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  sensitivity TEXT NOT NULL,
+  source_event_id TEXT NOT NULL,
+  memory_type TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  tags_json TEXT NOT NULL,
+  source TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_approved_memory_scope ON approved_memory(scope);
+CREATE INDEX IF NOT EXISTS idx_approved_memory_created ON approved_memory(created_at);
+"""

@@ -31,7 +31,7 @@ from raiker.contracts.streaming import FINAL, TEXT_DELTA
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.models.registry import ModelProfileRegistry
 from raiker.tui.accessibility import TerminalProfile
-from raiker.tui.textual_app import RaikerTextualApp, _Transcript
+from raiker.tui.textual_app import RaikerTextualApp, Transcript as _Transcript
 
 _REQUIRED_ENV = (
     "RAIKER_INTEGRATION_PROVIDER",

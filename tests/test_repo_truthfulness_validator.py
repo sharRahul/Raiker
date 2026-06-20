@@ -35,7 +35,7 @@ def test_help_and_status_are_honest_about_phase_3_and_ui_scope(tmp_path: Path) -
 
     status_output = handle_slash_command("/status", workspace_root=tmp_path)
     assert "phase_3_status: implemented_verified" in status_output
-    assert "phase_4_status: blocked_foundation_only" in status_output
+    assert "phase_4_status: memory_mvp_implemented" in status_output
     assert "runtime_execution_enabled: False" in status_output
 
 

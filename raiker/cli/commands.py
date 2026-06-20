@@ -231,8 +231,9 @@ def handle_status(*, workspace_root: str | Path = ".") -> str:
         f"latest_session: {latest_session_id}",
         f"pending_approvals: {pending}",
         "phase_3_status: implemented_verified",
-        "phase_4_status: blocked_foundation_only",
+        "phase_4_status: memory_mvp_implemented",
         "runtime_execution_enabled: False",
+        "approved_memory_count: 0",
         "phase_3_4_surface_mode: read_only_planning_preview_only",
     ]
     return "\n".join(lines)
@@ -1248,6 +1249,100 @@ def handle_semantic_memory(*, workspace_root: str | Path = ".") -> str:
     return "\n".join([f"{key}: {value}" for key, value in status.items()])
 
 
+def _memory_tool_result(title: str, result: dict[str, object]) -> str:
+    lines = [f"{title}:"]
+    for key, value in result.items():
+        lines.append(f"  {key}: {value}")
+    return "\n".join(lines)
+
+
+def handle_memory_store(command: str, *, workspace_root: str | Path = ".") -> str:
+    import shlex
+    from raiker.tools.memory_tools import memory_write
+
+    parts = shlex.split(command)
+    if len(parts) < 2:
+        return "Usage: /memory-store <text> [--scope <scope>] [--tag <tag>]"
+    text = parts[1]
+    scope = "project"
+    tags: list[str] = []
+    i = 2
+    while i < len(parts):
+        if parts[i] == "--scope" and i + 1 < len(parts):
+            scope = parts[i + 1]
+            i += 2
+        elif parts[i] == "--tag" and i + 1 < len(parts):
+            tags.append(parts[i + 1])
+            i += 2
+        else:
+            text += " " + parts[i]
+            i += 1
+    result = memory_write(workspace_root, text, scope=scope, tags=tuple(tags))
+    return _memory_tool_result("Memory store", result)
+
+
+def handle_memory_search(command: str, *, workspace_root: str | Path = ".") -> str:
+    import shlex
+    from raiker.tools.memory_tools import memory_search
+
+    parts = shlex.split(command)
+    if len(parts) < 2:
+        return "Usage: /memory-search <query> [--scope <scope>] [--max-results <n>]"
+    query = parts[1]
+    scope: str | None = None
+    max_results = 20
+    i = 2
+    while i < len(parts):
+        if parts[i] == "--scope" and i + 1 < len(parts):
+            scope = parts[i + 1]
+            i += 2
+        elif parts[i] == "--max-results" and i + 1 < len(parts):
+            try:
+                max_results = int(parts[i + 1])
+            except ValueError:
+                return "Invalid --max-results value."
+            i += 2
+        else:
+            i += 1
+    result = memory_search(workspace_root, query, scope=scope, max_results=max_results)
+    return _memory_tool_result("Memory search", result)
+
+
+def handle_memory_forget(command: str, *, workspace_root: str | Path = ".") -> str:
+    import shlex
+    from raiker.tools.memory_tools import memory_forget
+
+    parts = shlex.split(command)
+    if len(parts) != 2:
+        return "Usage: /memory-forget <memory_id>"
+    result = memory_forget(workspace_root, parts[1])
+    return _memory_tool_result("Memory forget", result)
+
+
+def handle_memory_list_command(command: str, *, workspace_root: str | Path = ".") -> str:
+    import shlex
+    from raiker.tools.memory_tools import memory_list
+
+    parts = shlex.split(command)
+    scope: str | None = None
+    limit = 50
+    i = 1
+    while i < len(parts):
+        if parts[i] == "--scope" and i + 1 < len(parts):
+            scope = parts[i + 1]
+            i += 2
+        elif parts[i] == "--limit" and i + 1 < len(parts):
+            try:
+                limit = int(parts[i + 1])
+            except ValueError:
+                return "Invalid --limit value."
+            i += 2
+        else:
+            i += 1
+    result = memory_list(workspace_root, scope=scope, limit=limit)
+    return _memory_tool_result("Memory list", result)
+
+
 def handle_approvals(*, workspace_root: str | Path = ".") -> str:
     inbox = ApprovalInbox(SQLiteStore(workspace_root))
     approvals = inbox.list_pending()
@@ -1548,6 +1643,14 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_approvals(workspace_root=workspace_root)
     if command == "/memory":
         return handle_memory(workspace_root=workspace_root)
+    if command == "/memory-store" or command.startswith("/memory-store "):
+        return handle_memory_store(command, workspace_root=workspace_root)
+    if command == "/memory-search" or command.startswith("/memory-search "):
+        return handle_memory_search(command, workspace_root=workspace_root)
+    if command == "/memory-forget" or command.startswith("/memory-forget "):
+        return handle_memory_forget(command, workspace_root=workspace_root)
+    if command == "/memory-list" or command.startswith("/memory-list "):
+        return handle_memory_list_command(command, workspace_root=workspace_root)
     if command == "/semantic-memory":
         return handle_semantic_memory(workspace_root=workspace_root)
     if command == "/capabilities":

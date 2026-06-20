@@ -47,6 +47,10 @@ REQUIRED_COMMANDS = {
     "/approve <id>",
     "/deny <id>",
     "/memory",
+    "/memory-store <text>",
+    "/memory-search <query>",
+    "/memory-forget <memory_id>",
+    "/memory-list",
     "/semantic-memory",
     "/capabilities",
     "/execution-profiles",
@@ -180,7 +184,7 @@ def main() -> int:
         "Desktop/Web/Dashboard/Mobile apps",
         "specified/deferred, not implemented",
         "safe foundation/readiness slices A-P",
-        "Phase 4 remains blocked",
+        "Phase 4 memory MVP is implemented",
         "runtime execution remains disabled",
     ]
     readme_text = (ROOT / "README.md").read_text(encoding="utf-8")

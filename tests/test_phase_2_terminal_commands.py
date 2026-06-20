@@ -32,7 +32,7 @@ class TestTerminalCommands:
         assert "checkpoints:" in result
         assert "pending_approvals:" in result
         assert "phase_3_status: implemented_verified" in result
-        assert "phase_4_status: blocked_foundation_only" in result
+        assert "phase_4_status: memory_mvp_implemented" in result
         assert "runtime_execution_enabled: False" in result
         assert "0" in result
 
@@ -108,7 +108,7 @@ class TestTerminalCommands:
         assert "workspace:" in result
         assert "pending_approvals:" in result
         assert "phase_3_status: implemented_verified" in result
-        assert "phase_4_status: blocked_foundation_only" in result
+        assert "phase_4_status: memory_mvp_implemented" in result
 
     def test_slash_tasks(self, tmp_path: Path) -> None:
         result = handle_slash_command("/tasks", workspace_root=str(tmp_path))

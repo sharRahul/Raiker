@@ -235,6 +235,10 @@ These permission labels are used in the inventory below so coding agents know wh
 | `/approve <id>` | Approve exact pending action ID. | `approval:resolve` | Yes |
 | `/deny <id>` | Deny exact pending action ID. | `approval:resolve` | Yes |
 | `/memory` | Show governed memory status/candidates. | `memory:read` | Yes |
+| `/memory-store <text>` | Write approved memory (governed). | `memory:write` | Yes — policy-gated |
+| `/memory-search <query>` | Search approved memory by keyword. | `memory:read` | Yes |
+| `/memory-forget <memory_id>` | Remove approved memory. | `memory:write` | Yes — policy-gated |
+| `/memory-list` | List all approved memory entries. | `memory:read` | Yes |
 | `/semantic-memory` | Show semantic-memory disabled status. | `memory:read` | Yes |
 | `/memory-review` | Show memory review queue. | `memory:read` | Yes |
 | `/memory-review --summary` | Show memory review counts. | `memory:read` | Yes |
@@ -344,7 +348,7 @@ Until the relevant phase gates are fully implemented and verified:
 - Adds deterministic metadata-only semantic memory readiness contracts, registry, optional SQLite metadata table, CLI, and workspace surfaces.
 - Semantic memory writes, vector writes, embeddings, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled.
 - Reserved Slice K metadata-only events: `phase3.semantic_memory_readiness.metadata_created`, `phase3.semantic_memory_readiness.summary_viewed`, `phase3.semantic_memory_readiness.exported`. No runtime memory write events are enabled.
-- Slice K did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
+- Slice K did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 memory MVP is implemented. Remaining Phase 4 capabilities (external channels, subagents, multi-agent, remote/container execution) remain blocked.
 
 ## Phase 3 Slice L — approval preview persistence readiness
 
@@ -398,6 +402,10 @@ Slice P adds deterministic metadata-only readiness contracts, registry, optional
 | `/approve <id>` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | approval metadata status update only | Does not execute approved action. |
 | `/deny <id>` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | approval metadata status update only | Does not execute approved action. |
 | `/memory` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/memory-store <text>` | Governed memory write command exposed by terminal CLI. | local_terminal | `implemented_verified` | policy-gated write | Requires approval; secret/credential content blocked. |
+| `/memory-search <query>` | Memory search command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/memory-forget <memory_id>` | Governed memory forget command exposed by terminal CLI. | local_terminal | `implemented_verified` | policy-gated write | Requires approval. |
+| `/memory-list` | Memory list command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/semantic-memory` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/capabilities` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/execution-profiles` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |

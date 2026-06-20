@@ -24,6 +24,7 @@ _PREFIXES = {
     "vchk_",
     "rap_",
     "apv_",
+    "mem_",
 }
 
 

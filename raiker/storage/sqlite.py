@@ -47,6 +47,8 @@ from raiker.storage.migrations import (
     PHASE_3_STORAGE_LIFECYCLE_RETENTION_MIGRATION_ID,
     PHASE_3_STORAGE_LIFECYCLE_RETENTION_SQL,
     PHASE_3_STORAGE_LIFECYCLE_SQL,
+    PHASE_4_MEMORY_MVP_MIGRATION_ID,
+    PHASE_4_MEMORY_MVP_SQL,
 )
 
 
@@ -179,6 +181,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_MIGRATION_ID,
                 PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_4_MEMORY_MVP_MIGRATION_ID,
+                PHASE_4_MEMORY_MVP_SQL,
                 connection,
             )
 
@@ -635,6 +642,44 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
+    def insert_approved_memory(self, entry: Any) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO approved_memory
+                (memory_id, text, scope, sensitivity, source_event_id, memory_type, created_at, tags_json, source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    entry.memory_id,
+                    entry.text,
+                    entry.scope,
+                    entry.sensitivity,
+                    entry.source_event_id,
+                    entry.memory_type,
+                    entry.created_at,
+                    json.dumps(list(entry.tags)),
+                    entry.source,
+                ),
+            )
+
+    def delete_approved_memory(self, memory_id: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM approved_memory WHERE memory_id = ?", (memory_id,)
+            )
+
+    def list_approved_memory(self, scope: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        query = "SELECT * FROM approved_memory"
+        params: list[Any] = []
+        if scope is not None:
+            query += " WHERE scope = ?"
+            params.append(scope)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
 
     def save_model_session_state(self, state: ModelSessionState) -> None:
         with self.connect() as connection:

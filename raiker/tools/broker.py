@@ -21,6 +21,7 @@ from raiker.tools.filesystem import (
     stat_path,
 )
 from raiker.tools.git import run_git
+from raiker.tools.memory_tools import memory_forget, memory_get, memory_list, memory_search, memory_write
 from raiker.tools.search import glob, grep
 
 
@@ -80,6 +81,32 @@ class ToolBroker:
                 "patch": str(args.get("patch", "")),
                 "requires_approval": True,
             },
+            "memory_write": lambda args: memory_write(
+                self.workspace_root,
+                str(args.get("text", "")),
+                scope=str(args.get("scope", "project")),
+                tags=tuple(args.get("tags", [])),
+                source=str(args.get("source", "agent")),
+            ),
+            "memory_search": lambda args: memory_search(
+                self.workspace_root,
+                str(args.get("query", "")),
+                scope=args.get("scope"),
+                max_results=int(args.get("max_results", 20)),
+            ),
+            "memory_forget": lambda args: memory_forget(
+                self.workspace_root,
+                str(args.get("memory_id", "")),
+            ),
+            "memory_list": lambda args: memory_list(
+                self.workspace_root,
+                scope=args.get("scope"),
+                limit=int(args.get("limit", 50)),
+            ),
+            "memory_get": lambda args: memory_get(
+                self.workspace_root,
+                str(args.get("memory_id", "")),
+            ),
         }
 
     def _event(

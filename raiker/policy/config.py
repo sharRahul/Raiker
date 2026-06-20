@@ -21,11 +21,14 @@ class StaticPolicyConfig:
                 "git_status",
                 "git_diff",
                 "git_log",
+                "memory_search",
+                "memory_list",
+                "memory_get",
             }
         )
     )
     approval_required_actions: frozenset[str] = field(
-        default_factory=lambda: frozenset({"shell", "write_file", "edit_file", "apply_patch"})
+        default_factory=lambda: frozenset({"shell", "write_file", "edit_file", "apply_patch", "memory_write", "memory_forget"})
     )
     denied_actions: frozenset[str] = field(
         default_factory=lambda: frozenset(
@@ -37,7 +40,6 @@ class StaticPolicyConfig:
                 "web_fetch",
                 "plugin_execute",
                 "remote_execute",
-                "memory_write",
             }
         )
     )

@@ -602,7 +602,7 @@ Added metadata-only readiness contracts, registry operations, optional SQLite pe
 
 ## Phase 3 Completion Status
 
-All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` per the completion audit in `docs/PHASE_3_COMPLETION_AUDIT.md`. All runtime execution remains disabled. Phase 4 remains blocked.
+All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` per the completion audit in `docs/PHASE_3_COMPLETION_AUDIT.md`. All runtime execution remains disabled. Phase 4 memory MVP is implemented.
 
 ## Async model-provider runtime update
 

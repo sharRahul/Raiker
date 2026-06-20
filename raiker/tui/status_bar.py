@@ -1,127 +1,147 @@
-"""Configurable status bar for the Rich TUI default access shell.
-
-The status bar is rendered from a list of named status items (not one hard-coded
-string), so user/project/policy/terminal configuration can reorder or hide non-safety
-fields. Required safety items (``state``, ``approvals``, ``network``) are pinned and can
-never be dropped, including in compact/narrow rendering. The clock can be injected for
-deterministic tests. This module performs no runtime execution.
-"""
-
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
+from typing import ClassVar
 
-# Items always kept first in compact rendering, in priority order.
-_COMPACT_KEEP = ("state", "task", "approvals", "model", "network", "clock")
+from rich.style import Style
+from rich.text import Text
+
+from raiker.tui.theme import ROSE_PINE, RaikerTheme
+
+_VERBS: tuple[str, ...] = (
+    "thinking",
+    "writing",
+    "coding",
+    "searching",
+    "reading",
+    "analyzing",
+    "planning",
+    "reviewing",
+)
+_SPINNER_FRAMES: tuple[str, ...] = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
 
 
-@dataclass(frozen=True)
+@dataclass
 class StatusContext:
     state: str = "READY"
-    task: str = "idle"
-    approvals: int = 0
-    model: str = "mock-test"
+    task: str = ""
+    model: str = ""
     context_used: int = 0
-    context_max: int = 32000
-    memory: str = "project"
-    network: str = "blocked"
-    execution: str = "local"
-    last_event: str = "none"
-    cost: str = "$0.00"
+    context_max: int = 0
+    turn_elapsed: float = 0.0
+    session_elapsed: float = 0.0
+    last_turn_ended: float = 0.0
+    cwd_label: str = ""
+    git_branch: str = ""
+    approvals: int = 0
+    compressions: int = 0
+    network: str = ""
 
 
-@dataclass(frozen=True)
+@dataclass
 class StatusBarConfig:
-    fields: list[str] = field(
-        default_factory=lambda: [
-            "state",
-            "task",
-            "approvals",
-            "model",
-            "context_percent_bar",
-            "context",
-            "network",
-            "last_event",
-            "clock",
-        ]
-    )
-    # Safety-critical items that must never be hidden, even during risky work.
-    pinned_fields: list[str] = field(
-        default_factory=lambda: ["state", "approvals", "network"]
-    )
     use_blocks: bool = True
     compact_below: int = 100
 
 
 class StatusBarRenderer:
-    def __init__(self, config: StatusBarConfig | None = None) -> None:
+    VERB_PAD_LEN: ClassVar[int] = max(len(v) for v in _VERBS) + 1
+
+    def __init__(
+        self, config: StatusBarConfig | None = None, theme: RaikerTheme | None = None
+    ) -> None:
         self.config = config or StatusBarConfig()
+        self.theme = theme or ROSE_PINE
 
-    def _context_percent(self, context: StatusContext) -> int:
-        if context.context_max <= 0:
-            return 0
-        return max(0, min(100, round(context.context_used / context.context_max * 100)))
+    def _fmt_duration(self, seconds: float) -> str:
+        mins, secs = divmod(int(seconds), 60)
+        hours, mins = divmod(mins, 60)
+        if hours:
+            return f"{hours}h {mins:02d}m"
+        if mins:
+            return f"{mins}m {secs:02d}s"
+        return f"{secs}s"
 
-    def _bar(self, percent: int) -> str:
-        filled = round(percent / 100 * 14)
+    def _context_bar(self, percent: int) -> str:
+        filled = round(percent / 100 * 10)
         if self.config.use_blocks:
-            return "█" * filled + "░" * (14 - filled)
-        return "#" * filled + "-" * (14 - filled)
+            return "█" * filled + "░" * (10 - filled)
+        return "#" * filled + "-" * (10 - filled)
 
-    def render_item(self, item: str, context: StatusContext, *, clock: str | None = None) -> str:
-        percent = self._context_percent(context)
-        if item == "state":
-            return context.state
-        if item == "task":
-            return f"task:{context.task}"
-        if item == "approvals":
-            return f"approvals:{context.approvals}"
-        if item == "model":
-            return f"model:{context.model}"
-        if item == "context_percent_bar":
-            return f"ctx_bar: {self._bar(percent)} {percent}%"
-        if item == "context":
-            return f"ctx:{context.context_used // 1000}k/{context.context_max // 1000}k"
-        if item == "memory":
-            return f"mem:{context.memory}"
-        if item == "network":
-            return f"net:{context.network}"
-        if item == "execution":
-            return f"exec:{context.execution}"
-        if item == "last_event":
-            return f"last:{context.last_event}"
-        if item == "cost":
-            return f"cost:{context.cost}"
-        if item == "clock":
-            return clock if clock is not None else datetime.now().strftime("%H:%M")
-        return f"{item}:unknown"
-
-    def _compact_fields(self) -> list[str]:
-        pinned = set(self.config.pinned_fields)
-        keep = set(_COMPACT_KEEP) | pinned
-        kept = [item for item in self.config.fields if item in keep]
-        # Guarantee every pinned safety field survives even if absent from `fields`.
-        for safety in self.config.pinned_fields:
-            if safety not in kept:
-                kept.append(safety)
-        return kept
-
-    def render(
+    def render_status_line(
         self,
-        context: StatusContext | None = None,
-        *,
+        ctx: StatusContext,
+        tick: int = 0,
         clock: str | None = None,
         compact: bool = False,
         width: int | None = None,
-    ) -> str:
-        ctx = context or StatusContext()
-        is_compact = compact or (width is not None and width < self.config.compact_below)
-        if is_compact:
-            kept = self._compact_fields()
-            dropped = [item for item in self.config.fields if item not in kept]
-            rendered = [self.render_item(item, ctx, clock=clock) for item in kept]
-            if dropped:
-                rendered.append(f"+{len(dropped)}")
-            return " | ".join(rendered)
-        return " | ".join(self.render_item(item, ctx, clock=clock) for item in self.config.fields)
+    ) -> Text:
+        w = width or 120
+        is_compact = compact or w < self.config.compact_below
+        t = self.theme
+        segments: list[tuple[str, str]] = []
+        busy = ctx.state == "RUNNING"
+
+        if busy:
+            spinner = _SPINNER_FRAMES[tick % len(_SPINNER_FRAMES)]
+            verb = _VERBS[tick % len(_VERBS)]
+            indicator = f"{spinner} {verb}…"
+            elapsed = self._fmt_duration(ctx.turn_elapsed)
+            segments.append((f"{indicator} {elapsed}", t.primary))
+        elif ctx.state == "READY":
+            segments.append(("─ READY", t.success))
+        else:
+            segments.append((ctx.state, t.warn))
+
+        if ctx.model:
+            short = ctx.model.split("/")[-1]
+            short = short.replace("claude-", "").replace("anthropic-", "")
+            short = short.replace("-", " ").replace("  ", ".").strip()
+            segments.append((f" {short}", t.muted))
+
+        if ctx.context_max > 0 and ctx.context_used > 0:
+            pct = min(100, round(ctx.context_used / ctx.context_max * 100))
+            bar = self._context_bar(pct)
+            if pct >= 95:
+                pct_color = t.status_critical
+            elif pct >= 80:
+                pct_color = t.status_warn
+            else:
+                pct_color = t.status_good
+            segments.append((f" [{bar}] {pct}%", pct_color))
+
+        if ctx.approvals > 0:
+            segments.append((f" approvals:{ctx.approvals}", t.warn))
+
+        if not is_compact:
+            if ctx.compressions > 0:
+                c = ctx.compressions
+                col = t.status_critical if c >= 10 else t.status_warn if c >= 5 else t.muted
+                segments.append((f" cmp {c}", col))
+            clock_str = clock or datetime.now().strftime("%H:%M")
+            segments.append((f" {clock_str}", t.muted))
+
+        left = Text("")
+        for text, color in segments:
+            left.append(text, style=Style(color=color))
+
+        right_parts: list[str] = []
+        if ctx.cwd_label:
+            right_parts.append(ctx.cwd_label)
+        if ctx.git_branch:
+            right_parts.append(ctx.git_branch)
+        right_str = " │ ".join(right_parts) if right_parts else ""
+
+        if right_str and not is_compact:
+            right_text = Text(f" {right_str}", style=Style(color=t.label))
+            total_len = len(left.plain) + len(right_text.plain) + 3
+            if total_len < w:
+                gap = w - len(left.plain) - len(right_text.plain)
+                left.append(" " * gap)
+                left.append(right_text)
+            else:
+                left.append(" ", style=Style(color=t.border))
+                left.append(right_text, style=Style(color=t.label))
+
+        return left

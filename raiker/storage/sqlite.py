@@ -12,6 +12,7 @@ from raiker.contracts.models import (
     AgentEvent,
     Checkpoint,
     ConnectorProfile,
+    ManagedPolicyRule,
     ModelProfile,
     PolicyDecision,
     TaskRecord,
@@ -49,6 +50,8 @@ from raiker.storage.migrations import (
     PHASE_3_STORAGE_LIFECYCLE_SQL,
     PHASE_4_MEMORY_MVP_MIGRATION_ID,
     PHASE_4_MEMORY_MVP_SQL,
+    PHASE_5_MANAGED_POLICY_MIGRATION_ID,
+    PHASE_5_MANAGED_POLICY_SQL,
 )
 
 
@@ -186,6 +189,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PHASE_4_MEMORY_MVP_MIGRATION_ID,
                 PHASE_4_MEMORY_MVP_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_5_MANAGED_POLICY_MIGRATION_ID,
+                PHASE_5_MANAGED_POLICY_SQL,
                 connection,
             )
 
@@ -691,6 +699,45 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """,
                 (state.session_id, state.profile_id, int(state.reasoning_enabled), state.reasoning_effort, state.reasoning_mode, state.reasoning_budget_tokens, utc_now()),
             )
+
+    def insert_managed_policy(self, rule: ManagedPolicyRule) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO managed_policies
+                (rule_id, effect, tool_pattern, arguments_json, priority, enabled, reason, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    rule.rule_id,
+                    rule.effect,
+                    rule.tool_pattern,
+                    rule.arguments_json,
+                    rule.priority,
+                    int(rule.enabled),
+                    rule.reason,
+                    rule.created_by,
+                    rule.created_at,
+                    rule.updated_at,
+                ),
+            )
+
+    def list_managed_policies(self, enabled_only: bool = True) -> list[dict[str, Any]]:
+        query = "SELECT * FROM managed_policies"
+        params: list[Any] = []
+        if enabled_only:
+            query += " WHERE enabled = 1"
+        query += " ORDER BY priority ASC, created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_managed_policy(self, rule_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM managed_policies WHERE rule_id = ?", (rule_id,)
+            )
+        return cursor.rowcount > 0
 
     def load_model_session_state(self, session_id: str) -> ModelSessionState | None:
         with self.connect() as connection:

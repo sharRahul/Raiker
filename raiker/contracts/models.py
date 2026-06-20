@@ -115,6 +115,8 @@ EVENT_TYPES = {
     "proposal_approval_preview_created",
     "proposal_approval_preview_listed",
     "proposal_approval_preview_viewed",
+    "managed_policy_applied",
+    "managed_policy_override",
 }
 INTENTS = {
     "chat",
@@ -140,7 +142,8 @@ TOOLS = {
     "git_log",
     "shell",
 }
-POLICY_DECISIONS = {"allow", "deny", "needs_approval"}
+POLICY_DECISIONS = {"allow", "deny", "needs_approval", "allow_managed"}
+MANAGED_POLICY_EFFECTS = {"allow", "deny"}
 TOOL_STATUSES = {"success", "failed", "denied", "approval_required"}
 RESPONSE_STATUSES = {"completed", "needs_approval", "denied", "failed"}
 INTERFACE_STATUS = {"equal_primary_when_enabled"}
@@ -569,6 +572,32 @@ class InterruptAction:
         _require(self.reason, "reason")
         if self.action_type == "steer" and not self.steer_text:
             raise ContractValidationError("missing_steer_text")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ManagedPolicyRule:
+    rule_id: str
+    effect: str
+    tool_pattern: str
+    arguments_json: str | None
+    priority: int
+    enabled: bool
+    reason: str
+    created_by: str
+    created_at: str
+    updated_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.rule_id, "rule_id")
+        _one_of(self.effect, MANAGED_POLICY_EFFECTS, "managed_policy_effect")
+        _require(self.tool_pattern, "tool_pattern")
+        _require(self.reason, "reason")
+        _require(self.created_by, "created_by")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -442,3 +442,23 @@ CREATE TABLE IF NOT EXISTS approved_memory (
 CREATE INDEX IF NOT EXISTS idx_approved_memory_scope ON approved_memory(scope);
 CREATE INDEX IF NOT EXISTS idx_approved_memory_created ON approved_memory(created_at);
 """
+
+PHASE_5_MANAGED_POLICY_MIGRATION_ID = "RAIKER-5001-phase5-managed-policy"
+
+PHASE_5_MANAGED_POLICY_SQL = """
+CREATE TABLE IF NOT EXISTS managed_policies (
+  rule_id TEXT PRIMARY KEY,
+  effect TEXT NOT NULL,
+  tool_pattern TEXT NOT NULL,
+  arguments_json TEXT,
+  priority INTEGER NOT NULL DEFAULT 100,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  reason TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_managed_policies_enabled ON managed_policies(enabled);
+CREATE INDEX IF NOT EXISTS idx_managed_policies_priority ON managed_policies(priority);
+"""

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import fnmatch
 from pathlib import Path
+from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import PolicyDecision, ToolAction
@@ -8,8 +10,9 @@ from raiker.policy.config import StaticPolicyConfig
 
 
 class PolicyEngine:
-    def __init__(self, config: StaticPolicyConfig) -> None:
+    def __init__(self, config: StaticPolicyConfig, store: Any = None) -> None:
         self.config = config
+        self.store = store
 
     def _is_inside_workspace(self, path: Path) -> bool:
         try:
@@ -40,7 +43,35 @@ class PolicyEngine:
             reasons.append("outside_workspace:pattern")
         return (not reasons, reasons)
 
+    def _check_managed_policy(self, action: ToolAction) -> PolicyDecision | None:
+        if self.store is None:
+            return None
+        try:
+            rules = self.store.list_managed_policies(enabled_only=True)
+        except Exception:
+            return None
+        for rule in rules:
+            if not fnmatch.fnmatch(action.tool_name, str(rule.get("tool_pattern", "*"))):
+                continue
+            effect = str(rule.get("effect", "deny"))
+            if effect != "deny":
+                continue
+            return PolicyDecision(
+                decision_id=new_id("mng_"),
+                action_id=action.action_id,
+                decision="deny",
+                reasons=["managed_policy_denied", str(rule.get("reason", ""))],
+                requires_user_approval=False,
+                policy_version="phase5-managed-v1",
+                risk_level="blocked",
+                timestamp=utc_now(),
+            )
+        return None
+
     def review(self, action: ToolAction) -> PolicyDecision:
+        managed = self._check_managed_policy(action)
+        if managed is not None:
+            return managed
         if action.tool_name in self.config.allowed_read_actions:
             inside, reasons = self._path_arguments_inside_workspace(action)
             if not inside:

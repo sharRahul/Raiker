@@ -23,10 +23,11 @@ class EventLogWriter:
         path = self.path_for_session(event.session_id)
         serialised = json.dumps(event.to_dict(), sort_keys=True, separators=(",", ":"))
         digest = hashlib.sha256(serialised.encode("utf-8")).hexdigest()
+        prev_hash = self.store.get_last_event_sha256(event.session_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as handle:
             offset = handle.tell()
             handle.write(serialised + "\n")
-        self.store.index_event(event, str(path), offset, digest)
+        self.store.index_event(event, str(path), offset, digest, prev_event_sha256=prev_hash)
         self.last_event_id = event.event_id
         return path, offset

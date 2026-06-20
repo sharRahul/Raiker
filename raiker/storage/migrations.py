@@ -494,3 +494,22 @@ CREATE TABLE IF NOT EXISTS user_role_assignments (
 CREATE INDEX IF NOT EXISTS idx_user_role_user ON user_role_assignments(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_role_role ON user_role_assignments(role_id);
 """
+
+PHASE_5_AUDIT_EXPORT_MIGRATION_ID = "RAIKER-5201-phase5-audit-export"
+
+PHASE_5_AUDIT_EXPORT_SQL = """
+CREATE TABLE IF NOT EXISTS audit_exports (
+  export_id TEXT PRIMARY KEY,
+  manifest_hash TEXT NOT NULL,
+  scope_json TEXT NOT NULL,
+  redacted INTEGER NOT NULL DEFAULT 1,
+  event_count INTEGER NOT NULL,
+  first_event_id TEXT,
+  last_event_id TEXT,
+  first_timestamp TEXT,
+  last_timestamp TEXT,
+  export_path TEXT,
+  exported_by TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+"""

@@ -57,6 +57,8 @@ from raiker.storage.migrations import (
     PHASE_5_MANAGED_POLICY_SQL,
     PHASE_5_ORG_ROLES_MIGRATION_ID,
     PHASE_5_ORG_ROLES_SQL,
+    PHASE_5_AUDIT_EXPORT_MIGRATION_ID,
+    PHASE_5_AUDIT_EXPORT_SQL,
 )
 
 
@@ -206,6 +208,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 PHASE_5_ORG_ROLES_SQL,
                 connection,
             )
+            self._apply_migration(
+                PHASE_5_AUDIT_EXPORT_MIGRATION_ID,
+                PHASE_5_AUDIT_EXPORT_SQL,
+                connection,
+            )
+            with contextlib.suppress(sqlite3.OperationalError):
+                connection.execute("ALTER TABLE events_index ADD COLUMN prev_event_sha256 TEXT")
             with contextlib.suppress(sqlite3.OperationalError):
                 connection.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)")
 
@@ -276,14 +285,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
 
     def index_event(
-        self, event: AgentEvent, jsonl_path: str, jsonl_offset: int, payload_sha256: str
+        self, event: AgentEvent, jsonl_path: str, jsonl_offset: int, payload_sha256: str,
+        prev_event_sha256: str | None = None,
     ) -> None:
         with self.connect() as connection:
             connection.execute(
                 """
                 INSERT INTO events_index
-                (event_id, session_id, turn_id, task_id, event_type, actor, timestamp, jsonl_path, jsonl_offset, payload_sha256, risk_level, summary)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (event_id, session_id, turn_id, task_id, event_type, actor, timestamp, jsonl_path, jsonl_offset, payload_sha256, prev_event_sha256, risk_level, summary)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     event.event_id,
@@ -296,6 +306,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     jsonl_path,
                     jsonl_offset,
                     payload_sha256,
+                    prev_event_sha256,
                     event.payload.get("risk_level"),
                     event.payload.get("summary"),
                 ),
@@ -864,6 +875,62 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (assignment_id,),
             )
         return cursor.rowcount > 0
+
+    def insert_audit_export(self, manifest: ExportManifest) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO audit_exports
+                (export_id, manifest_hash, scope_json, redacted, event_count, first_event_id, last_event_id, first_timestamp, last_timestamp, export_path, exported_by, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    manifest.export_id,
+                    manifest.manifest_hash,
+                    manifest.scope_json,
+                    int(manifest.redacted),
+                    manifest.event_count,
+                    manifest.first_event_id,
+                    manifest.last_event_id,
+                    manifest.first_timestamp,
+                    manifest.last_timestamp,
+                    manifest.export_path,
+                    manifest.exported_by,
+                    manifest.created_at,
+                ),
+            )
+
+    def list_audit_exports(self, limit: int = 20) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM audit_exports ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_audit_export(self, export_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM audit_exports WHERE export_id = ?", (export_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def get_last_event_sha256(self, session_id: str) -> str | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT payload_sha256 FROM events_index WHERE session_id = ? ORDER BY timestamp DESC LIMIT 1",
+                (session_id,),
+            ).fetchone()
+        return str(row["payload_sha256"]) if row else None
+
+    def list_session_events_for_integrity(
+        self, session_id: str
+    ) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT event_id, payload_sha256, prev_event_sha256, jsonl_path, jsonl_offset FROM events_index WHERE session_id = ? ORDER BY jsonl_offset ASC",
+                (session_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def delete_managed_policy(self, rule_id: str) -> bool:
         with self.connect() as connection:

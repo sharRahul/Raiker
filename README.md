@@ -239,6 +239,8 @@ The terminal client currently exposes these inspection and controlled-action com
 /role grant <role_id> <user_id>
 /role revoke <role_id> <user_id>
 /semantic-memory
+/export [--session <session_id>] [--no-redact]
+/export --verify --session <session_id>
 /capabilities
 /execution-profiles
 /workspace

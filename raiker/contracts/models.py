@@ -124,6 +124,8 @@ EVENT_TYPES = {
     "user_role_granted",
     "user_role_revoked",
     "session_user_bound",
+    "audit_export_created",
+    "event_integrity_verified",
 }
 INTENTS = {
     "chat",
@@ -634,6 +636,31 @@ class UserRoleAssignment:
         _require(self.assignment_id, "assignment_id")
         _require(self.user_id, "user_id")
         _require(self.role_id, "role_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ExportManifest:
+    export_id: str
+    manifest_hash: str
+    scope_json: str
+    redacted: bool
+    event_count: int
+    first_event_id: str | None
+    last_event_id: str | None
+    first_timestamp: str | None
+    last_timestamp: str | None
+    export_path: str | None
+    exported_by: str
+    created_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.export_id, "export_id")
+        _require(self.manifest_hash, "manifest_hash")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

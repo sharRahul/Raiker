@@ -1733,6 +1733,55 @@ def handle_role_revoke(command: str, *, workspace_root: str | Path = ".") -> str
     return f"No assignment found for role '{role_id}' on user '{user_id}'."
 
 
+def handle_export_command(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    session_id: str | None = None
+    redact = True
+    verify = False
+    i = 1
+    while i < len(parts):
+        if parts[i] == "--session" and i + 1 < len(parts):
+            session_id = parts[i + 1]
+            i += 2
+        elif parts[i] == "--no-redact":
+            redact = False
+            i += 1
+        elif parts[i] == "--verify":
+            verify = True
+            i += 1
+        else:
+            i += 1
+    store = SQLiteStore(workspace_root)
+    if verify:
+        from raiker.events.integrity import verify_session_events
+        if not session_id:
+            return "Usage: /export --verify --session <session_id>"
+        result = verify_session_events(store, session_id)
+        lines = [
+            f"Session: {result['session_id']}",
+            f"Total events: {result['total_events']}",
+            f"Passed: {result['passed']}",
+            f"Failed: {result['failed']}",
+            f"Chain intact: {result['chain_intact']}",
+        ]
+        for d in result["details"]:
+            if d.get("hash_matches") is False or d.get("chain_gap"):
+                lines.append(f"  FAIL: event={d['event_id']} error={d.get('error', 'chain_gap')}")
+        return "\n".join(lines)
+    from raiker.events.export import generate_export
+    manifest = generate_export(store, session_id, redact=redact)
+    lines = [
+        f"Export created: {manifest.export_id}",
+        f"  Events: {manifest.event_count}",
+        f"  Redacted: {manifest.redacted}",
+        f"  Manifest hash: {manifest.manifest_hash}",
+        f"  Path: {manifest.export_path or 'N/A'}",
+    ]
+    if manifest.first_event_id:
+        lines.append(f"  Range: {manifest.first_event_id} .. {manifest.last_event_id}")
+    return "\n".join(lines)
+
+
 def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> str:
     command = command.strip()
     if command in {"/quit", "/exit"}:
@@ -1866,6 +1915,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_role_grant(command, workspace_root=workspace_root)
     if command == "/role revoke" or command.startswith("/role revoke "):
         return handle_role_revoke(command, workspace_root=workspace_root)
+    if command == "/export" or command.startswith("/export "):
+        return handle_export_command(command, workspace_root=workspace_root)
     if command == "/doctor":
         return render_doctor(workspace_root=workspace_root)
     if (

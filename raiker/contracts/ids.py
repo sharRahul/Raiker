@@ -48,6 +48,11 @@ _PREFIXES = {
     "gix_",
     "smw_",
     "ide_",
+    "vec_",
+    "sym_",
+    "dep_",
+    "pg_",
+    "skc_",
 }
 
 

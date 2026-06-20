@@ -713,3 +713,19 @@ Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_en
 ## Raiker TUI (native interactive shell)
 
 Raiker TUI is `implemented_verified` for the native Textual interactive shell: welcome screen with Raiker cloud logo, single scrolling transcript, docked input, docked status bar, command-palette overlay, and token-by-token streaming wired through `AgentGateway.astream_prompt`. The old Phase 3 Slice Q1/Q2/Q3 TUI specs are superseded. `RAIKER_TUI=plain`, `--prompt`, and non-interactive stdin keep a minimal plain fallback in `raiker/tui/app.py`. The TUI adds no runtime authority: prompts route through `submit_terminal_prompt()` / Agent Gateway and slash commands route through `handle_slash_command()`. TUI modules call no tools, models, plugins, channels, shell, subprocess, sockets, or network APIs directly. All disabled runtime flags remain false. Evidence: `tests/test_raiker_textual_tui.py` (offline FakeStreamingGateway), `tests/test_raiker_tui_real_provider_integration.py` (opt-in real-provider integration, skipped without env vars).
+
+---
+
+## Phase 9 Advanced Memory & Graph Status
+
+Phase 9 adds advanced memory and graph features: vector index, AST-based symbol extraction and dependency discovery, project-level graph extraction, and procedural-memory-to-skill-candidate conversion. All execution remains policy-gated and disabled by default.
+
+| Task | Status | Source | Tests |
+|---|---|---|---|
+| RAIKER-9001 Vector index (upsert, search, chunk, flush) | `implemented_verified` | `raiker/vector/__init__.py`, `raiker/contracts/models.py`, `raiker/storage/sqlite.py` | `tests/test_phase_9_advanced_memory_graph.py` |
+| RAIKER-9101 Graph indexer (AST symbol extraction, import deps) | `implemented_verified` | `raiker/graph/indexer.py`, `raiker/contracts/models.py`, `raiker/storage/sqlite.py` | `tests/test_phase_9_advanced_memory_graph.py` |
+| RAIKER-9201 Project graph extractor (module map, dep graph, skill suggestions) | `implemented_verified` | `raiker/graph/project_graph.py`, `raiker/contracts/models.py`, `raiker/storage/sqlite.py` | `tests/test_phase_9_advanced_memory_graph.py` |
+| RAIKER-9301 Skill candidate store (propose, review, generate) | `implemented_verified` | `raiker/skills/__init__.py`, `raiker/contracts/models.py`, `raiker/storage/sqlite.py` | `tests/test_phase_9_advanced_memory_graph.py` |
+| CLI commands (`/vector-index`, `/symbol-graph`, `/project-graph`, `/skill-candidates`) | `implemented_verified` | `raiker/cli/commands.py` | `tests/test_phase_9_advanced_memory_graph.py` |
+
+All features are in-memory runtime modules with SQLite persistence for records. No external vector DB or LLM calls are required. All disabled runtime flags remain false.

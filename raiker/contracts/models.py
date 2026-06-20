@@ -174,6 +174,17 @@ EVENT_TYPES = {
     "semantic_memory_write_denied",
     "ide_extension_connected",
     "ide_action_routed",
+    "vector_embedding_created",
+    "vector_search_performed",
+    "vector_index_flushed",
+    "graph_symbol_extracted",
+    "graph_dependency_discovered",
+    "graph_index_flushed",
+    "project_graph_built",
+    "project_graph_queried",
+    "skill_candidate_proposed",
+    "skill_candidate_reviewed",
+    "skill_candidate_recorded",
 }
 INTENTS = {
     "chat",
@@ -1096,6 +1107,104 @@ class ExecutionBudget:
     def __post_init__(self) -> None:
         _schema(self.schema_version)
         _require(self.budget_id, "budget_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class VectorRecord:
+    vector_id: str
+    content_hash: str
+    content_preview: str
+    embedding_model: str
+    dimensions: int
+    scope: str
+    sensitivity: str
+    created_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.vector_id, "vector_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class SymbolNode:
+    symbol_id: str
+    name: str
+    kind: str
+    file_path: str
+    line_number: int
+    module: str
+    parent_symbol_id: str | None
+    doc_preview: str | None
+    created_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.symbol_id, "symbol_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DependencyEdge:
+    edge_id: str
+    source_symbol_id: str
+    target_symbol_id: str
+    dep_type: str
+    file_path: str
+    line_number: int
+    created_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.edge_id, "edge_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ProjectGraph:
+    graph_id: str
+    workspace_root: str
+    module_count: int
+    dependency_count: int
+    built_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.graph_id, "graph_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class SkillCandidate:
+    candidate_id: str
+    name: str
+    description: str
+    source_workflow_json: str
+    suggested_tools_json: str
+    provenance: str
+    status: str
+    created_by: str
+    created_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.candidate_id, "candidate_id")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

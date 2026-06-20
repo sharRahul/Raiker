@@ -1881,6 +1881,50 @@ def handle_semantic_write(*, workspace_root: str | Path = ".") -> str:
     return "\n".join(lines)
 
 
+def handle_vector_index(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    records = store.list_vector_records(limit=20)
+    if not records:
+        return "No vector index records. Vector index is empty."
+    lines = ["Vector index records:"]
+    for r in records:
+        lines.append(f"- {r['vector_id']} model={r.get('embedding_model', '')} dims={r.get('dimensions', 0)} scope={r.get('scope', '')} sensitivity={r.get('sensitivity', '')}")
+    return "\n".join(lines)
+
+
+def handle_symbol_graph(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    symbols = store.list_symbol_nodes(limit=50)
+    if not symbols:
+        return "No symbol graph. Use /graph-index to index the workspace."
+    kinds: dict[str, int] = {}
+    for s in symbols:
+        kinds[s.get("kind", "unknown")] = kinds.get(s.get("kind", "unknown"), 0) + 1
+    return "Symbol graph summary:\n" + "\n".join(f"- {k}: {c}" for k, c in sorted(kinds.items()))
+
+
+def handle_project_graph(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    graphs = store.list_project_graphs()
+    if not graphs:
+        return "No project graphs. Build a project graph to see module dependencies."
+    lines = ["Project graphs:"]
+    for g in graphs:
+        lines.append(f"- {g['graph_id']} modules={g.get('module_count', 0)} dependencies={g.get('dependency_count', 0)}")
+    return "\n".join(lines)
+
+
+def handle_skill_candidates(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    candidates = store.list_skill_candidates()
+    if not candidates:
+        return "No skill candidates. Skill candidates are generated from repeated verified workflows."
+    lines = ["Skill candidates:"]
+    for c in candidates:
+        lines.append(f"- {c['candidate_id']} name={c.get('name', '')} status={c.get('status', '')} provenance={c.get('provenance', '')}")
+    return "\n".join(lines)
+
+
 def handle_export_command(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     session_id: str | None = None
@@ -2081,6 +2125,14 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_graph_index(workspace_root=workspace_root)
     if command == "/semantic-write":
         return handle_semantic_write(workspace_root=workspace_root)
+    if command == "/vector-index":
+        return handle_vector_index(workspace_root=workspace_root)
+    if command == "/symbol-graph":
+        return handle_symbol_graph(workspace_root=workspace_root)
+    if command == "/project-graph":
+        return handle_project_graph(workspace_root=workspace_root)
+    if command == "/skill-candidates":
+        return handle_skill_candidates(workspace_root=workspace_root)
     if command == "/budgets":
         return handle_budgets(workspace_root=workspace_root)
     if command == "/retention":

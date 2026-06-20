@@ -252,6 +252,10 @@ The terminal client currently exposes these inspection and controlled-action com
 /plugin-exec
 /graph-index
 /semantic-write
+/vector-index
+/symbol-graph
+/project-graph
+/skill-candidates
 /capabilities
 /execution-profiles
 /workspace

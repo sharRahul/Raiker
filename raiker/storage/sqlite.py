@@ -16,6 +16,7 @@ from raiker.contracts.models import (
     ChannelPairing,
     Checkpoint,
     ConnectorProfile,
+    DependencyEdge,
     DesktopAppSession,
     ExecutionBudget,
     GraphIndexRecord,
@@ -26,16 +27,20 @@ from raiker.contracts.models import (
     PluginExecutionRecord,
     PluginInstallRecord,
     PolicyDecision,
+    ProjectGraph,
     RemoteExecutionProfile,
     RetentionPolicy,
     Role,
     SemanticMemoryWriteRecord,
+    SkillCandidate,
     SubagentContract,
+    SymbolNode,
     TaskRecord,
     TeamLedger,
     ToolAction,
     User,
     UserRoleAssignment,
+    VectorRecord,
     WebApiSession,
 )
 from raiker.models.session_state import ModelSessionState
@@ -106,6 +111,14 @@ from raiker.storage.migrations import (
     PHASE_7_SEMANTIC_MEMORY_SQL,
     PHASE_7_IDE_SESSIONS_MIGRATION_ID,
     PHASE_7_IDE_SESSIONS_SQL,
+    PHASE_9_VECTOR_INDEX_MIGRATION_ID,
+    PHASE_9_VECTOR_INDEX_SQL,
+    PHASE_9_SYMBOL_GRAPH_MIGRATION_ID,
+    PHASE_9_SYMBOL_GRAPH_SQL,
+    PHASE_9_PROJECT_GRAPH_MIGRATION_ID,
+    PHASE_9_PROJECT_GRAPH_SQL,
+    PHASE_9_SKILL_CANDIDATES_MIGRATION_ID,
+    PHASE_9_SKILL_CANDIDATES_SQL,
 )
 
 
@@ -333,6 +346,26 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PHASE_7_IDE_SESSIONS_MIGRATION_ID,
                 PHASE_7_IDE_SESSIONS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_9_VECTOR_INDEX_MIGRATION_ID,
+                PHASE_9_VECTOR_INDEX_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_9_SYMBOL_GRAPH_MIGRATION_ID,
+                PHASE_9_SYMBOL_GRAPH_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_9_PROJECT_GRAPH_MIGRATION_ID,
+                PHASE_9_PROJECT_GRAPH_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_9_SKILL_CANDIDATES_MIGRATION_ID,
+                PHASE_9_SKILL_CANDIDATES_SQL,
                 connection,
             )
             with contextlib.suppress(sqlite3.OperationalError):
@@ -1382,6 +1415,112 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(
                 "SELECT * FROM semantic_memory_write_records ORDER BY created_at DESC LIMIT ?", (limit,)
             ).fetchall()
+        return [dict(row) for row in rows]
+
+    # ── Phase 9: Vector Records ──
+
+    def insert_vector_record(self, record: VectorRecord) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO vector_records
+                (vector_id, content_hash, content_preview, embedding_model, dimensions, scope, sensitivity, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (record.vector_id, record.content_hash, record.content_preview, record.embedding_model, record.dimensions, record.scope, record.sensitivity, record.created_at),
+            )
+
+    def list_vector_records(self, scope: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        query = "SELECT * FROM vector_records"
+        params: list[Any] = []
+        if scope:
+            query += " WHERE scope = ?"
+            params.append(scope)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    # ── Phase 9: Symbol Nodes & Dependency Edges ──
+
+    def insert_symbol_node(self, node: SymbolNode) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO symbol_nodes
+                (symbol_id, name, kind, file_path, line_number, module, parent_symbol_id, doc_preview)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (node.symbol_id, node.name, node.kind, node.file_path, node.line_number, node.module, node.parent_symbol_id, node.doc_preview),
+            )
+
+    def list_symbol_nodes(self, kind: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+        query = "SELECT * FROM symbol_nodes"
+        params: list[Any] = []
+        if kind:
+            query += " WHERE kind = ?"
+            params.append(kind)
+        query += " ORDER BY file_path, line_number LIMIT ?"
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def insert_dependency_edge(self, edge: DependencyEdge) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO dependency_edges
+                (edge_id, source_symbol_id, target_symbol_id, dep_type, file_path, line_number, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (edge.edge_id, edge.source_symbol_id, edge.target_symbol_id, edge.dep_type, edge.file_path, edge.line_number, edge.created_at),
+            )
+
+    # ── Phase 9: Project Graphs ──
+
+    def insert_project_graph(self, graph: ProjectGraph) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO project_graphs
+                (graph_id, workspace_root, module_count, dependency_count, built_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (graph.graph_id, graph.workspace_root, graph.module_count, graph.dependency_count, graph.built_at),
+            )
+
+    def list_project_graphs(self, limit: int = 10) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM project_graphs ORDER BY built_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    # ── Phase 9: Skill Candidates ──
+
+    def insert_skill_candidate(self, candidate: SkillCandidate) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO skill_candidates
+                (candidate_id, name, description, source_workflow_json, suggested_tools_json, provenance, status, created_by, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (candidate.candidate_id, candidate.name, candidate.description, candidate.source_workflow_json, candidate.suggested_tools_json, candidate.provenance, candidate.status, candidate.created_by, candidate.created_at),
+            )
+
+    def list_skill_candidates(self, status: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        query = "SELECT * FROM skill_candidates"
+        params: list[Any] = []
+        if status:
+            query += " WHERE status = ?"
+            params.append(status)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
     def load_model_session_state(self, session_id: str) -> ModelSessionState | None:

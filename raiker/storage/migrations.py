@@ -748,6 +748,74 @@ CREATE TABLE IF NOT EXISTS ide_extension_sessions (
 );
 """
 
+PHASE_9_VECTOR_INDEX_MIGRATION_ID = "RAIKER-9001-phase9-vector-index"
+
+PHASE_9_VECTOR_INDEX_SQL = """
+CREATE TABLE IF NOT EXISTS vector_records (
+  vector_id TEXT PRIMARY KEY,
+  content_hash TEXT NOT NULL,
+  content_preview TEXT NOT NULL,
+  embedding_model TEXT NOT NULL,
+  dimensions INTEGER NOT NULL,
+  scope TEXT NOT NULL DEFAULT 'default',
+  sensitivity TEXT NOT NULL DEFAULT 'public',
+  created_at TEXT NOT NULL
+);
+"""
+
+PHASE_9_SYMBOL_GRAPH_MIGRATION_ID = "RAIKER-9101-phase9-symbol-graph"
+
+PHASE_9_SYMBOL_GRAPH_SQL = """
+CREATE TABLE IF NOT EXISTS symbol_nodes (
+  symbol_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  line_number INTEGER NOT NULL,
+  module TEXT NOT NULL,
+  parent_symbol_id TEXT,
+  doc_preview TEXT
+);
+
+CREATE TABLE IF NOT EXISTS dependency_edges (
+  edge_id TEXT PRIMARY KEY,
+  source_symbol_id TEXT NOT NULL,
+  target_symbol_id TEXT NOT NULL,
+  dep_type TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  line_number INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+"""
+
+PHASE_9_PROJECT_GRAPH_MIGRATION_ID = "RAIKER-9201-phase9-project-graph"
+
+PHASE_9_PROJECT_GRAPH_SQL = """
+CREATE TABLE IF NOT EXISTS project_graphs (
+  graph_id TEXT PRIMARY KEY,
+  workspace_root TEXT NOT NULL,
+  module_count INTEGER NOT NULL DEFAULT 0,
+  dependency_count INTEGER NOT NULL DEFAULT 0,
+  built_at TEXT NOT NULL
+);
+"""
+
+PHASE_9_SKILL_CANDIDATES_MIGRATION_ID = "RAIKER-9301-phase9-skill-candidates"
+
+PHASE_9_SKILL_CANDIDATES_SQL = """
+CREATE TABLE IF NOT EXISTS skill_candidates (
+  candidate_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  source_workflow_json TEXT NOT NULL,
+  suggested_tools_json TEXT NOT NULL,
+  provenance TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'proposed',
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+"""
+
 PHASE_5_AUDIT_EXPORT_MIGRATION_ID = "RAIKER-5201-phase5-audit-export"
 
 PHASE_5_AUDIT_EXPORT_SQL = """

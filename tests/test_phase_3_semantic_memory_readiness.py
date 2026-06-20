@@ -57,7 +57,6 @@ def test_semantic_memory_readiness_registry_create_list_get_summary_and_sqlite(t
     assert "phase3_semantic_memory_readiness" in tables
     forbidden = {
         "semantic_memory_writes",
-        "vector_records",
         "embeddings",
         "embedding_jobs",
         "vector_indexes",

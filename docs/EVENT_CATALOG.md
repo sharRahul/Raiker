@@ -600,6 +600,22 @@ The following event names are reserved for Phase 5 enterprise governance, manage
 | `ide_extension_connected` | `ide_client` | `session_id`, `ide_type` | IDE extension connected. |
 | `ide_action_routed` | `ide_client` | `session_id`, `action_type` | IDE action routed through gateway. |
 
+## Phase 9 Advanced Memory and Graph Events
+
+| Event | Actor | Required payload fields | Notes |
+|---|---|---|---|
+| `vector_index_upserted` | `vector_index` | `vector_id`, `content_hash`, `dimensions`, `scope` | Vector embedding upserted into index. |
+| `vector_index_searched` | `vector_index` | `query_hash`, `top_k`, `results_count` | Vector index search performed. |
+| `vector_index_flushed` | `vector_index` | `vectors_flushed` | In-memory vector index flushed. |
+| `symbol_extracted` | `graph_indexer` | `symbol_id`, `kind`, `file_path`, `module` | Symbol extracted via AST parsing. |
+| `dependency_discovered` | `graph_indexer` | `edge_id`, `source_symbol`, `target_symbol`, `dep_type` | Import/usage dependency edge discovered. |
+| `graph_index_completed` | `graph_indexer` | `symbol_count`, `dependency_count` | Graph index pass completed. |
+| `project_module_mapped` | `project_graph` | `module_path`, `import_count`, `file_count` | Project module map extracted. |
+| `project_graph_built` | `project_graph` | `graph_id`, `module_count`, `dependency_count` | Project dependency graph built. |
+| `skill_candidate_proposed` | `skill_candidate_store` | `candidate_id`, `name`, `provenance` | Skill candidate proposed from observed workflow. |
+| `skill_candidate_reviewed` | `skill_candidate_store` | `candidate_id`, `status` | Skill candidate reviewed (approved/rejected). |
+| `skill_candidate_generated` | `skill_candidate_store` | `candidate_id`, `name`, `pattern` | Skill candidate auto-generated from pattern.
+
 ## Raiker TUI (native interactive shell)
 
 Raiker TUI adds **no new events**. The native interactive shell renders the existing command/runtime events and streams `TEXT_DELTA`/`LIFECYCLE`/`FINAL` from `AgentGateway.astream_prompt` into the transcript. No new storage is added.

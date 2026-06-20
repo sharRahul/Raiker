@@ -220,6 +220,24 @@ These permission labels are used in the inventory below so coding agents know wh
 | `plugin_remove` | Remove plugin metadata/package. | `plugin:register`, `workspace:write`, `approval:resolve` | No — Phase 3/5 planned |
 | `plugin_execute` | Execute plugin code/entrypoint. | `plugin:execute` plus target permissions | No — disabled until explicit Phase 3+ execution gates |
 
+## Phase 9 Advanced Memory and Graph Tools
+
+| Tool Name | Descriptions | Permissions | Implemented |
+|---|---|---|---|
+| `vector_upsert` | Upsert a vector embedding into the in-memory vector index. | `memory:write` | Yes — Phase 9 |
+| `vector_search` | Search the vector index by cosine similarity. | `memory:read` | Yes — Phase 9 |
+| `vector_chunk` | Split text into overlapping chunks for embedding. | `memory:read` | Yes — Phase 9 |
+| `vector_flush` | Flush and clear the in-memory vector index. | `memory:write` | Yes — Phase 9 |
+| `symbol_extract` | Extract symbols (functions, classes, variables) from Python source code via AST. | `graph:read` | Yes — Phase 9 |
+| `dependency_discover` | Discover import/usage dependency edges from Python source. | `graph:read` | Yes — Phase 9 |
+| `graph_index` | Full graph index pass over workspace Python files. | `graph:read` | Yes — Phase 9 |
+| `project_module_map` | Extract module map from workspace with import counts. | `graph:read` | Yes — Phase 9 |
+| `project_dependency_graph` | Build complete project dependency graph. | `graph:read` | Yes — Phase 9 |
+| `project_skill_suggest` | Suggest skill candidates from project module patterns. | `graph:read` | Yes — Phase 9 |
+| `skill_candidate_propose` | Propose a new skill candidate from observed workflow. | `memory:write` | Yes — Phase 9 |
+| `skill_candidate_review` | Review (approve/reject) a skill candidate. | `memory:write` | Yes — Phase 9 |
+| `skill_candidate_generate` | Auto-generate a skill candidate from a repeated pattern. | `memory:write` | Yes — Phase 9 |
+
 ---
 
 ## Commands mapped to implemented/planned tools
@@ -473,4 +491,8 @@ Slice P adds deterministic metadata-only readiness contracts, registry, optional
 | `/plugin-exec` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/graph-index` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/semantic-write` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/vector-index` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/symbol-graph` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/project-graph` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/skill-candidates` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/quit` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |

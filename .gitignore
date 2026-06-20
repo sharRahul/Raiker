@@ -10,3 +10,4 @@ cli_output.txt
 __pycache__/
 *.py[cod]
 *$py.class
+.claude

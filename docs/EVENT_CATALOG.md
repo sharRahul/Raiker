@@ -525,10 +525,6 @@ remains false. No Phase 3 runtime execution is implemented by this slice; all di
 flags remain false.
 
 
-## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell
+## Raiker TUI (native interactive shell)
 
-Phase 3 Slice Q1 adds **no new events**. The default Rich TUI access shell renders the
-documented default layout and routes prompts/commands through existing handlers, so it uses
-existing command/runtime events only. No raw prompt text, file contents, diffs, secrets,
-tool output, private reasoning, or chain-of-thought is introduced into any payload. All
-disabled runtime flags remain false.
+Raiker TUI adds **no new events**. The native interactive shell renders the existing command/runtime events and streams `TEXT_DELTA`/`LIFECYCLE`/`FINAL` from `AgentGateway.astream_prompt` into the transcript. No new storage is added.

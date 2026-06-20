@@ -638,7 +638,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Rich TUI panels | Phase 3 Slice Q1 documented default access shell (Primary/Main, Activity, Input, Status Bar) is implemented; advanced/optional/plugin panels remain specified, not implemented as a full app. | Partial (default access shell) | None. | Build advanced/optional panel framework only in a future approved slice. |
+| Raiker TUI | Native Textual interactive shell: welcome screen, single scrolling transcript with token-by-token streaming, docked input, docked status bar, command-palette overlay. `RAIKER_TUI=plain`/`--prompt`/non-interactive keep the plain fallback. | Yes | No direct tool authority; prompts stream through gateway/broker/policy. | Polish: inline tool-call blocks, optional docked panels remain deferred. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
@@ -654,17 +654,6 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
 
 
-## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell
+## Raiker TUI (native interactive shell)
 
-Phase 3 Slice Q1 default access shell: `implemented_verified` for the documented default
-Rich TUI layout only — Primary/Main panel, Activity panel, Input panel, and Status Bar
-panel — with existing prompt and slash-command access rendered through the default
-layout. This is not a full Rich TUI: the optional/plugin panel catalogue is deferred, and
-Q1 does not claim a finished advanced Rich TUI or finished advanced panel surfaces.
-
-The shell adds no runtime authority: prompts route through `submit_terminal_prompt()` and
-the Agent Gateway, slash commands route through `handle_slash_command()`, and TUI panel
-modules call no tools, models, plugins, channels, shell, subprocess, sockets, or network
-APIs directly. No new events and no new storage are added. See
-`docs/completed/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md`. All disabled runtime flags
-remain false.
+Raiker TUI is `implemented_verified` for the native Textual interactive shell: welcome screen with Raiker cloud logo, single scrolling transcript, docked input, docked status bar, command-palette overlay, and token-by-token streaming wired through `AgentGateway.astream_prompt`. The old Phase 3 Slice Q1/Q2/Q3 TUI specs are superseded. `RAIKER_TUI=plain`, `--prompt`, and non-interactive stdin keep a minimal plain fallback in `raiker/tui/app.py`. The TUI adds no runtime authority: prompts route through `submit_terminal_prompt()` / Agent Gateway and slash commands route through `handle_slash_command()`. TUI modules call no tools, models, plugins, channels, shell, subprocess, sockets, or network APIs directly. All disabled runtime flags remain false. Evidence: `tests/test_raiker_textual_tui.py` (offline FakeStreamingGateway), `tests/test_raiker_tui_real_provider_integration.py` (opt-in real-provider integration, skipped without env vars).

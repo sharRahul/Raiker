@@ -318,7 +318,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Rich TUI panels | Phase 3 Slice Q1 documented default access shell (Primary/Main, Activity, Input, Status Bar) is implemented; advanced/optional/plugin panels remain specified, not implemented as a full app. | Partial (default access shell) | None. | Build advanced/optional panel framework only in a future approved slice. |
+| Raiker TUI | Native Textual interactive shell: welcome screen, single scrolling transcript with token-by-token streaming, docked input, docked status bar, command-palette overlay. `RAIKER_TUI=plain`/`--prompt`/non-interactive keep the plain fallback. | Yes | No direct tool authority; prompts stream through gateway/broker/policy. | Polish: inline tool-call blocks, optional docked panels remain deferred. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
@@ -331,19 +331,6 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 
 
-## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell
+## Raiker TUI (native interactive shell)
 
-Q1 acceptance (default layout only): the default layout renders the Primary/Main,
-Activity, Input, and Status Bar panels; `raiker --prompt "Hello Raiker"` and
-`raiker --prompt "/help"` still work; `/models`, `/model current`, `/model capabilities`,
-`/status`, `/events`, `/approvals`, and `/review --summary` route through existing command
-handlers; unsupported commands show a safe error; the plain fallback (`RAIKER_TUI=plain`)
-remains available; accessibility safety labels (state, network, approvals, disabled
-runtime) remain present in no-colour/ASCII/narrow modes; and TUI panel modules introduce no
-tool/model/shell/process/network execution. Covered by
-`tests/test_phase_3_slice_q1_rich_tui_default_layout.py`,
-`tests/test_phase_3_slice_q1_rich_tui_accessibility.py`,
-`tests/test_phase_3_slice_q1_rich_tui_command_access.py`,
-`tests/test_phase_3_slice_q1_rich_tui_safety.py`, and
-`tests/test_phase_3_slice_q1_docs_truthfulness.py`. Advanced/optional panels and
-desktop/web/mobile/dashboard apps remain deferred and are not required for Q1 completion.
+Raiker TUI acceptance: the native Textual interactive shell launches a welcome screen with the Raiker cloud logo, replaces it with a single scrolling transcript on the first prompt, streams assistant replies token-by-token via `AgentGateway.astream_prompt`, shows a docked input box and docked status bar, and exposes a command-palette overlay via `/commands`, `/palette`, or Ctrl+P. `RAIKER_TUI=plain`, `--prompt`, and non-interactive stdin keep the minimal plain fallback. The TUI adds no runtime authority: prompts route through `submit_terminal_prompt()` / Agent Gateway and slash commands route through `handle_slash_command()`; TUI modules call no tools, models, plugins, channels, shell, subprocess, sockets, or network APIs directly. Covered by `tests/test_raiker_textual_tui.py` (offline FakeStreamingGateway) and `tests/test_raiker_tui_real_provider_integration.py` (opt-in real-provider integration, skipped without env vars).

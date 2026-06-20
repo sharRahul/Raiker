@@ -23,7 +23,7 @@ Active source-of-truth documents remain under `docs/`. When a document here is r
 | `PHASE_3_SLICE_N_PLUGIN_SERVER_STARTUP_READINESS_SPEC.md` | Phase 3 Slice N plugin/server startup readiness metadata spec. | Slice N is `implemented_verified`. | `docs/IMPLEMENTATION_STATUS.md` (Phase 3 Slice N status); `docs/PHASE_3_COMPLETION_AUDIT.md`. | 2026-06-20 |
 | `PHASE_3_SLICE_O_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_SPEC.md` | Phase 3 Slice O external channels/notifications readiness metadata spec. | Slice O is `implemented_verified`. | `docs/IMPLEMENTATION_STATUS.md` (Phase 3 Slice O status); `docs/PHASE_3_COMPLETION_AUDIT.md`. | 2026-06-20 |
 | `PHASE_3_SLICE_P_REMOTE_CONTAINER_CLOUD_READINESS_SPEC.md` | Phase 3 Slice P remote/container/cloud execution readiness metadata spec. | Slice P is `implemented_verified`. | `docs/IMPLEMENTATION_STATUS.md` (Phase 3 Slice P status); `docs/PHASE_3_COMPLETION_AUDIT.md`. | 2026-06-20 |
-| `PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md` | Phase 3 Slice Q1 documented default Rich TUI access shell spec. | Slice Q1 default access shell is `implemented_verified`. | `docs/IMPLEMENTATION_STATUS.md` (Phase 3 Slice Q1 status); `docs/UI_UX_DESIGN_SPEC.md` for the living TUI spec. | 2026-06-20 |
+| `PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md` | Phase 3 Slice Q1 documented default Rich TUI access shell spec. | Superseded by the native Raiker TUI (Textual) — old Q1 4-panel layout dropped. | `docs/UI_UX_DESIGN_SPEC.md` (Raiker TUI section); `raiker/tui/textual_app.py`. | 2026-06-20 |
 
 ## Superseded point-in-time audits / handoffs
 

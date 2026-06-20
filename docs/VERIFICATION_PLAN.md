@@ -528,21 +528,18 @@ container_execution_enabled, cloud_execution_enabled, process_execution_enabled,
 shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
 
 
-## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell
+## Raiker TUI (native interactive shell)
 
-Verify the default Rich TUI access shell with:
+Verify the native Raiker TUI with:
 
 ```text
 python -m ruff check .
 python -m mypy raiker apps tests
-python -m pytest
+python -m pytest tests/test_raiker_textual_tui.py
 raiker --help
 raiker --prompt "Hello Raiker"
 raiker --prompt "/help"
 RAIKER_TUI=plain raiker --prompt "/help"
-RAIKER_TUI=rich raiker --prompt "/help"
 ```
 
-Q1 implements the documented default layout only (Primary/Main, Activity, Input, Status
-Bar). It adds no new events, no new storage, and no new runtime authority; all disabled
-runtime flags remain false.
+The opt-in real-provider integration test (`tests/test_raiker_tui_real_provider_integration.py`) is skipped without the required env vars. The Raiker TUI adds no new events, no new storage, and no new runtime authority; all disabled runtime flags remain false.

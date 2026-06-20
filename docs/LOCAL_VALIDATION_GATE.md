@@ -208,16 +208,15 @@ After Phase 3 Slice B approval planning preview:
 
 
 
-## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell smoke
+## Raiker TUI smoke
 
-Run the default-shell smoke commands locally (hosted Actions may stay red/unavailable):
+Run the Raiker TUI smoke commands locally (hosted Actions may stay red/unavailable):
 
 ```text
+python -m pytest tests/test_raiker_textual_tui.py
 raiker --prompt "Hello Raiker"
 raiker --prompt "/help"
 RAIKER_TUI=plain raiker --prompt "/help"
-RAIKER_TUI=rich raiker --prompt "/help"
 ```
 
-Q1 ships the documented default layout only. `approval_execution_enabled: False` and
-`runtime_execution_enabled: False` remain unchanged; all disabled runtime flags remain false.
+The opt-in real-provider integration test (`tests/test_raiker_tui_real_provider_integration.py`) is skipped without the required env vars. `approval_execution_enabled: False` and `runtime_execution_enabled: False` remain unchanged; all disabled runtime flags remain false.

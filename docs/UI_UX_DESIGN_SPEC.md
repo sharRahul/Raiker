@@ -1059,7 +1059,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Rich TUI | Live single-panel Textual TUI implemented (Slice Q4): one full-width scrolling transcript, live execution indicator, live status bar, input box, and real keyboard shortcuts, with token-by-token streaming via the gateway streaming path. Claude-Code-style — no simultaneously docked side/region panels. Inspection views (approvals, tasks, events, memory/graph, …) render inline on demand and remain display-only over existing handlers. `RAIKER_TUI=rich` keeps the turn-based single-panel shell; `=plain` the plain loop. | Yes | No direct tool authority; prompts stream through gateway/broker/policy; tools still require approval. | Stream tool-call deltas once providers emit them; optional docked panels remain deferred. |
+| Rich TUI | Live native Raiker TUI built on Textual: one full-width scrolling transcript, live execution indicator, live status bar, input box, and real keyboard shortcuts, with token-by-token streaming via the gateway streaming path. No simultaneously docked side/region panels (Claude Code is a reference pattern only). Inspection views (approvals, tasks, events, memory/graph, …) render inline on demand and remain display-only over existing handlers. `RAIKER_TUI=plain` selects the plain loop; the default interactive shell is the Textual Raiker TUI. | Yes | No direct tool authority; prompts stream through gateway/broker/policy; tools still require approval. | Stream tool-call deltas once providers emit them; optional docked panels remain deferred. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
@@ -1072,85 +1072,14 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 
 
-## Phase 3 Slice Q1 — Documented Default Rich TUI Access Shell (implemented)
+## Raiker TUI (native interactive shell — implemented)
 
-The documented default layout above (Primary / Main Panel, Activity Panel, Input Panel, and
-Status Bar Panel) is implemented as Raiker's default access shell in
-`raiker/tui/`. Q1 implements the documented default layout only; the optional/advanced panel
-catalogue, dockable drawers, and dashboard-style multi-pane views remain specified and
-deferred. The shell adapts to standard, narrow, and no-colour/ASCII terminals and falls back
-to a plain terminal loop when rich is unavailable, the terminal is non-interactive, or
-`RAIKER_TUI=plain` is set. It creates no new runtime authority and adds no new events or
-storage. See `docs/completed/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md`.
+The native Raiker TUI is the single interactive terminal shell, built on Textual. It supersedes the former Phase 3 Slice Q1/Q2/Q3 TUI specs. Running `raiker` interactively launches a welcome screen with the Raiker cloud logo, then replaces it with a single scrolling transcript on the first prompt. The transcript shows user prompts, streamed assistant replies (token-by-token), and inline collapsible tool blocks. A docked input box and a thin configurable status bar are always visible. A command-palette overlay is available via `/commands`, `/palette`, or Ctrl+P. `RAIKER_TUI=plain`, `--prompt`, and non-interactive stdin keep a minimal plain fallback. See `raiker/tui/textual_app.py` and `raiker/tui/app.py`.
 
-## Phase 3 Slice Q2 — Interactive Rich TUI With Optional Panels (implemented)
+## Raiker TUI — layout and inspection views
 
-Building on Q1, the interactive Rich TUI now implements the documented region-based panel
-system in `raiker/tui/`: a window header, left/right/bottom drawers, a main workspace with
-a structured streaming transcript (event indicators `● ○ ⚠ ✖`, hierarchical tree
-rendering, collapsible large output, inline diffs), the input panel with prompt modes
-(`?` side question, `/` command, `!` command proposal, `@` file mention, default prompt),
-and the configurable status bar. The optional panel catalogue (Active Plan, Approvals,
-Task Progress, Tool/Event Stream, Context/Memory/Graph, Checkpoint Timeline, Model Picker,
-Channels, Skill/Eidetic, Security/Policy, Diff Viewer, Diagnostics, Storage) is implemented
-as **read-only display surfaces** over the existing command handlers and local store, with
-the documented optional-panel manifest shape. Mode variants (`minimal`/`standard`/
-`advanced`) and the documented keyboard shortcuts are available, each shortcut mapped to an
-equivalent typed command for capability parity.
+Raiker TUI is a single-panel transcript shell (Claude Code is a reference pattern only, not a product name): one full-width scrolling transcript, a live execution indicator, the docked input box, and a single configurable status bar. There are no simultaneously docked side/region drawers, no `minimal`/`standard`/`advanced` mode variants, and no panel focus cycling. This supersedes the former Phase 3 Slice Q1/Q2/Q3 multi-panel/drawer UX.
 
-This slice adds no new runtime authority, events, or storage. Panels never call tools,
-models, plugins, channels, memory/graph writes, or remote/container execution; every
-mutating action remains a user-issued command routed through the gateway, broker, policy,
-approvals, and disabled-runtime gates. Side questions never mutate task state, and `!`
-command proposals are surfaced for review only and never executed while runtime execution
-is disabled. Plugin-provided and user-built custom panels remain deferred. See
-`docs/PHASE_3_SLICE_Q2_RICH_TUI_FULL_SHELL_SPEC.md`.
+The optional-panel catalogue is retained as a read-only **inspection view** catalogue: each view (approvals, tasks, events, context/memory/graph, checkpoints, model picker, channels, skill/eidetic, security/policy, diff, diagnostics, storage) renders **inline into the transcript, once, on demand** via `/view <id>` (alias `/panel <id>`) or a keyboard shortcut, instead of occupying a persistent docked region. Prompt modes (`?` `/` `!` `@` + default), streaming, the structured event transcript (`● ○ ⚠ ✖`, tree rendering, collapsible output, inline diffs), command-palette, history, and approval-mode cycling are unchanged.
 
-## Phase 3 Slice Q3 — Live Streaming Textual TUI (implemented)
-
-Q3 adds the live, key-driven front-end and the streaming path the turn-based shell lacked.
-A streaming contract (`raiker/contracts/streaming.py`) and a single DRY runtime turn loop
-let `RuntimeOrchestrator.astream_handle` and `AgentGateway.astream_prompt` yield text
-deltas, mirrored lifecycle events, and a final response incrementally, while the
-synchronous `ahandle`/`submit_prompt` paths stay byte-for-byte unchanged. The new Textual
-app (`raiker/tui/textual_app.py`, dependency `textual>=0.60`) is a real repainting TUI: a
-scrollable transcript that appends streamed tokens live, drawer panels from the read-only
-optional-panel catalogue, a live status bar, and real keyboard shortcuts (Ctrl+A/T/E/M/G/K,
-Ctrl+P, Ctrl+L, Shift+Tab, etc.). `run_terminal_client` prefers Textual when available;
-`RAIKER_TUI=rich` selects the Slice Q2 turn-based shell and `=plain` the plain loop.
-
-Safety is unchanged: prompts stream through the same gateway/broker/policy/approval path,
-tool execution still requires policy and approval, `!` command proposals are surfaced but
-never executed, and offline the stream fails safe with `model_unavailable` while still
-finalising the turn (checkpoint + turn close). See
-`docs/PHASE_3_SLICE_Q3_LIVE_STREAMING_TEXTUAL_TUI_SPEC.md`.
-
-## Phase 3 Slice Q4 — Single-Panel Default Layout (implemented; supersedes Q1–Q3 multi-panel UX)
-
-Q4 removes the multi-panel/region UX from the implemented Rich TUI and reduces it to a
-single default layout, like Claude Code: one full-width scrolling transcript, a live
-execution indicator, the input box, and a single configurable status bar. There are no
-simultaneously docked side/region drawers, no `minimal`/`standard`/`advanced` mode
-variants, and no panel focus cycling. This replaces the Q1 two-column default access shell,
-the Q2 left/right/bottom drawer regions, and the Q3 right-drawer panels.
-
-All capabilities are preserved. The optional-panel catalogue is retained as a read-only
-**inspection view** catalogue: each view (approvals, tasks, events, context/memory/graph,
-checkpoints, model picker, channels, skill/eidetic, security/policy, diff, diagnostics,
-storage) renders **inline into the transcript, once, on demand** via `/view <id>` (alias
-`/panel <id>`) or a keyboard shortcut (Ctrl+A/T/E/M/G/K), instead of occupying a persistent
-docked region. Prompt modes (`?` `/` `!` `@` + default), streaming, the structured event
-transcript (`● ○ ⚠ ✖`, tree rendering, collapsible output, inline diffs), command-palette,
-history, and approval-mode cycling (Shift+Tab) are unchanged.
-
-Removed code: `raiker/tui/default_layout.py` and `raiker/tui/panels.py` (two-column
-renderers); the region/panel/focus/mode machinery in `raiker/tui/session.py`; the
-left/right/bottom drawer rendering in `raiker/tui/layout.py`; and the right drawer plus
-focus/mode-cycle actions in `raiker/tui/textual_app.py`. The `Tab` (cycle panels) and
-`/close`, `/focus`, `/mode` commands are gone; `/views` lists inline views.
-
-Safety is unchanged: no new runtime authority, events, or storage; views never call tools,
-models, plugins, channels, or memory/graph writes; every mutating action remains a
-user-issued command routed through the gateway, broker, policy, approvals, and
-disabled-runtime gates. Optional docked panels and user-built/plugin panels remain
-specified and deferred.
+Safety is unchanged: no new runtime authority, events, or storage; views never call tools, models, plugins, channels, or memory/graph writes; every mutating action remains a user-issued command routed through the gateway, broker, policy, approvals, and disabled-runtime gates. Optional docked panels and user-built/plugin panels remain specified and deferred.

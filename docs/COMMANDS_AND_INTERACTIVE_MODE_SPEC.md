@@ -626,13 +626,6 @@ auto-fix, not patch application, not GitHub PR automation, not a UI/API/IDE/dash
 Disabled runtime flags remain false.
 
 
-## Phase 3 Slice Q1 — default Rich TUI access shell command access
+## Raiker TUI — native interactive shell command access
 
-The default Rich TUI access shell renders every implemented command through the existing
-command paths. Normal prompts route through `submit_terminal_prompt()` and slash commands
-route through `handle_slash_command()`; results render in the Primary/Main panel (or, for
-the command list, a transient overlay). The shell adds two TUI-presentation keywords,
-`/commands` and `/palette`, which render a grouped, read-only command overlay without
-executing anything; they create no new command semantics and do not bypass policy or the
-existing handlers. `/q`, `/quit`, and `/exit` exit safely, and `Ctrl+C`/`Ctrl+D` exit
-without a crash.
+The native Raiker TUI routes `/commands`/`/palette` (or Ctrl+P) to the command-palette overlay, slash commands through `handle_slash_command()`, and prompts through `submit_terminal_prompt()` / Agent Gateway streaming. The TUI adds no new command semantics and does not bypass policy or the existing handlers. `/q`, `/quit`, and `/exit` exit safely, and `Ctrl+C`/`Ctrl+D` exit without a crash. `RAIKER_TUI=plain`, `--prompt`, and non-interactive stdin keep the minimal plain fallback.

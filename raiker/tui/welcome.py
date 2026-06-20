@@ -16,7 +16,14 @@ from dataclasses import dataclass
 
 from raiker import __version__
 from raiker.tui.accessibility import TerminalProfile, ascii_safe
-from raiker.tui.render_models import ActivityItem
+
+
+@dataclass(frozen=True)
+class ActivityItem:
+    """A single recent-activity row. ``marker`` is one of done/active/pending."""
+
+    marker: str
+    text: str
 
 # The logo "orb" from docs/UI_UX_DESIGN_SPEC.md (Unicode shaded blocks).
 _LOGO_UNICODE: tuple[str, ...] = (

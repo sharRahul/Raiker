@@ -274,6 +274,18 @@ These permission labels are used in the inventory below so coding agents know wh
 | `/channels` | List channel connector profiles. | `channel:read` | Yes — activation disabled |
 | `/models` | List model profiles. | `model:read` | Yes |
 | `/launch --provider mock --model mock-deterministic` | Test-only deterministic profile launch; normal production CLI policy blocks it with `deterministic_test_provider_requires_test_mode`. | `model:launch` | Test-only/deferred; not a production CLI runtime |
+| `/users` | List user/identity records. | `config:read` | Yes — Phase 5 |
+| `/user create <user_id> [--display <name>] [--email <email>]` | Create user/identity record. | `config:write` | Yes — Phase 5 |
+| `/user deactivate <user_id>` | Deactivate user; no new sessions permitted. | `config:write` | Yes — Phase 5 |
+| `/roles` | List role/group records. | `config:read` | Yes — Phase 5 |
+| `/role create <role_id> <name> [--description <text>]` | Create role/group record. | `config:write` | Yes — Phase 5 |
+| `/role grant <role_id> <user_id>` | Assign user to role. | `config:write` | Yes — Phase 5 |
+| `/role revoke <role_id> <user_id>` | Remove user from role. | `config:write` | Yes — Phase 5 |
+| `/export [--session <session_id>] [--no-redact]` | Export audit records. | `audit:export` | Yes — Phase 5 |
+| `/export --verify --session <session_id>` | Verify export integrity. | `audit:export` | Yes — Phase 5 |
+| `/routines` | List hosted routine metadata. | `storage_lifecycle:read` | Yes — Phase 5 |
+| `/budgets` | List budget records with cost tracking. | `config:read` | Yes — Phase 5 |
+| `/retention` | List retention policies and backup manifests. | `storage_lifecycle:read` | Yes — Phase 5 |
 | `/quit` | Exit terminal session safely. | `none` | Yes |
 
 ---
@@ -441,4 +453,16 @@ Slice P adds deterministic metadata-only readiness contracts, registry, optional
 | `/doctor` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/channels` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/launch --provider mock --model mock-deterministic` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | test-only policy-block smoke | Deterministic mock provider is test-only; normal CLI must not imply production launch support. |
+| `/users` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/user create <user_id> [--display <name>] [--email <email>]` | Governed user creation command. | local_terminal | `implemented_verified` | policy-gated write | Requires policy; creates user/identity record. |
+| `/user deactivate <user_id>` | Governed user deactivation command. | local_terminal | `implemented_verified` | policy-gated write | Deactivates user; no new sessions permitted. |
+| `/roles` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/role create <role_id> <name> [--description <text>]` | Governed role creation command. | local_terminal | `implemented_verified` | policy-gated write | Creates role/group record. |
+| `/role grant <role_id> <user_id>` | Governed role grant command. | local_terminal | `implemented_verified` | policy-gated write | Assigns user to role. |
+| `/role revoke <role_id> <user_id>` | Governed role revocation command. | local_terminal | `implemented_verified` | policy-gated write | Removes user from role. |
+| `/export [--session <session_id>] [--no-redact]` | Governed audit export command. | local_terminal | `implemented_verified` | export-only | Exports audit records with redaction and hash-chain verification. |
+| `/export --verify --session <session_id>` | Governed audit export verification command. | local_terminal | `implemented_verified` | export-only | Verifies export integrity against stored hash chain. |
+| `/routines` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/budgets` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/retention` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/quit` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |

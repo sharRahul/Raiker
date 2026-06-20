@@ -358,7 +358,13 @@ The following capabilities may have config profiles, schemas, or storage boundar
 | External channels | Phase 4 | Profiles disabled unless explicitly paired in later phase. |
 | Subagents and multi-agent teams | Phase 4 | Contracts/spec only; no spawning. |
 | Remote/container execution | Phase 4 | Execution profiles disabled; no command routing. |
-| Hosted model billing controls | Phase 5 | Hosted providers disabled until policy and budgets exist. |
+| Hosted model billing controls | Phase 5 | Budget records implemented; hosted providers remain policy-gated disabled. |
+| Managed policies | Phase 5 | Implemented: managed deny wins over user/project/plugin allow. |
+| Org/home-lab roles | Phase 5 | Implemented: users, roles, grants, session binding. |
+| Audit export | Phase 5 | Implemented: export manifests, redaction, hash-chain integrity. |
+| Plugin marketplace | Phase 5 | Implemented: checksum/signature verification, install records. |
+| Hosted routines | Phase 5 | Implemented: metadata-only routine records; no execution. |
+| Retention/backup | Phase 5 | Implemented: retention policies, legal hold, backup manifests. |
 
 ---
 
@@ -599,6 +605,22 @@ Implemented metadata-only readiness contracts, registry operations, optional SQL
 ## Phase 3 Slice P — Remote/Container/Cloud Execution Readiness — Metadata Only
 
 Added metadata-only readiness contracts, registry operations, optional SQLite persistence, read-only `/remote-readiness` CLI output, and workspace summary fields for future remote/container/cloud execution. No remote execution, container execution, cloud execution, hosted routines, runtime jobs, job dispatch, worker queues, workers, schedulers, file watchers, daemons, client transport, external dispatch, credential materialization, secret injection, provider integrations, sandbox runtime, process execution, shell execution, network execution, or runtime execution are enabled.
+
+## Phase 5 Governed Enterprise Status
+
+Phase 5 adds managed governance, org roles, audit export, plugin marketplace, hosted routines, budget controls, retention, and backup. All runtime execution remains disabled.
+
+| Task | Status | Source | Tests |
+|---|---|---|---|
+| RAIKER-5001 Managed policy model | `implemented_verified` | `raiker/policy/engine.py`, `raiker/contracts/models.py`, `raiker/storage/sqlite.py` | `tests/test_phase_5_managed_policy.py` |
+| RAIKER-5101 Org/home-lab roles | `implemented_verified` | `raiker/cli/commands.py`, `raiker/contracts/models.py`, `raiker/storage/sqlite.py` | `tests/test_phase_5_org_roles.py` |
+| RAIKER-5201 Audit export and event integrity | `implemented_verified` | `raiker/events/export.py`, `raiker/events/integrity.py`, `raiker/cli/commands.py` | `tests/test_phase_5_audit_export.py` |
+| RAIKER-5301 Plugin marketplace and signed trust | `implemented_verified` | `raiker/plugins/verify.py`, `raiker/plugins/policy.py`, `raiker/plugins/registry.py` | `tests/test_phase_5_plugin_marketplace.py` |
+| RAIKER-5401 Hosted routines | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_5_hosted_budget_retention.py` |
+| RAIKER-5501 Budget records | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_5_hosted_budget_retention.py` |
+| RAIKER-5601 Retention and backup | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_5_hosted_budget_retention.py` |
+
+Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
 
 ## Phase 3 Completion Status
 

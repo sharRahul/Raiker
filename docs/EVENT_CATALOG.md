@@ -525,6 +525,32 @@ remains false. No Phase 3 runtime execution is implemented by this slice; all di
 flags remain false.
 
 
+## Phase 5 Governed Enterprise Events
+
+The following event names are reserved for Phase 5 enterprise governance, managed policy, org roles, audit export, plugin marketplace, hosted routines, budget, and retention/backup operations.
+
+| Event | Actor | Required payload fields | Notes |
+|---|---|---|---|
+| `managed_policy_applied` | `policy_engine` | `rule_id`, `effect` | Managed policy deny wins over user/project/plugin allow. |
+| `managed_policy_override` | `policy_engine` | `rule_id`, `overridden_action_id`, `reason` | Emitted when a managed policy overrides a previous allow. |
+| `user_created` | `user_service` | `user_id`, `display_name` | New user/identity record created. |
+| `user_deactivated` | `user_service` | `user_id` | User deactivated; no new sessions permitted. |
+| `role_created` | `role_service` | `role_id`, `name` | Role/group record created. |
+| `role_granted` | `role_service` | `role_id`, `user_id` | User assigned to role. |
+| `role_revoked` | `role_service` | `role_id`, `user_id` | User removed from role. |
+| `audit_export_created` | `export_service` | `export_id`, `session_filter`, `event_count` | Audit export manifest created. |
+| `audit_export_verified` | `export_service` | `export_id`, `hash_valid`, `event_count` | Export integrity verified against hash chain. |
+| `plugin_marketplace_install_recorded` | `marketplace_service` | `record_id`, `plugin_id`, `version`, `status` | Marketplace plugin install/plan recorded. |
+| `hosted_routine_created` | `routine_service` | `routine_id`, `name`, `routine_type` | Hosted routine metadata recorded. |
+| `hosted_routine_triggered` | `routine_service` | `routine_id`, `trigger` | Hosted routine triggered (metadata only; no execution). |
+| `hosted_routine_completed` | `routine_service` | `routine_id`, `status` | Hosted routine completed (metadata only). |
+| `budget_recorded` | `budget_service` | `budget_id`, `max_cost`, `current_cost` | Budget record created/updated. |
+| `budget_exceeded` | `budget_service` | `budget_id`, `current_cost`, `max_cost` | Budget threshold exceeded; execution denied. |
+| `budget_reset` | `budget_service` | `budget_id`, `previous_cost` | Budget cost reset to zero. |
+| `retention_policy_applied` | `retention_service` | `policy_id`, `target_type`, `retention_days` | Retention policy applied (metadata only; no cleanup). |
+| `backup_created` | `backup_service` | `manifest_id`, `backup_type` | Backup manifest created. |
+| `backup_restored` | `backup_service` | `manifest_id`, `scope_json` | Backup restore record (metadata only). |
+
 ## Raiker TUI (native interactive shell)
 
 Raiker TUI adds **no new events**. The native interactive shell renders the existing command/runtime events and streams `TEXT_DELTA`/`LIFECYCLE`/`FINAL` from `AgentGateway.astream_prompt` into the transcript. No new storage is added.

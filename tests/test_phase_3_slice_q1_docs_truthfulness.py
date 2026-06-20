@@ -8,7 +8,7 @@ def _read(path: str) -> str:
 
 
 def test_slice_q1_spec_exists_with_required_sections() -> None:
-    spec = _read("docs/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md")
+    spec = _read("docs/completed/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md")
     for section in (
         "Objective",
         "Current truth",

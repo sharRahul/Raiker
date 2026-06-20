@@ -36,7 +36,7 @@ RAIKER-5001 managed policy model
 
 ## Phase 3 Slice G dependency boundary for Phase 5 builders
 
-Phase 5 builders must treat `docs/PHASE_3_SLICE_G_STORAGE_LIFECYCLE_SPEC.md` as a prerequisite for any work that persists lifecycle metadata, exports lifecycle metadata, links lifecycle metadata to hosted routines, or includes lifecycle records in audit reports.
+Phase 5 builders must treat `docs/completed/PHASE_3_SLICE_G_STORAGE_LIFECYCLE_SPEC.md` as a prerequisite for any work that persists lifecycle metadata, exports lifecycle metadata, links lifecycle metadata to hosted routines, or includes lifecycle records in audit reports.
 
 Slice G lifecycle records are metadata-only. Phase 5 may add managed retention, archive, export, and hosted governance around those metadata records, but it must not retroactively convert them into executable storage jobs.
 

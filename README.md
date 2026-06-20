@@ -316,7 +316,7 @@ tools, models, plugins, channels, shell, subprocess, sockets, or network APIs di
 mutate no files, and execute no approvals or proposals. Q1 adds no new events (it reuses
 existing command/runtime events) and no new storage. `approval_execution_enabled` remains
 false and Runtime execution remains disabled. Disabled runtime flags remain false. See
-`docs/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md`.
+`docs/completed/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md`.
 
 ---
 
@@ -380,7 +380,7 @@ README.md
   -> docs/LOCAL_VALIDATION_GATE.md
   -> docs/FEATURE_COVERAGE_MATRIX.md
   -> docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
-  -> docs/04_ROADMAP.md
+  -> docs/ROADMAP_PHASE_2_TO_PHASE_5.md
   -> docs/BUILD_ORDER.md
   -> docs/ARCHITECTURE.md
   -> docs/CONTRACTS.md
@@ -391,9 +391,9 @@ README.md
   -> docs/SECURITY_AND_POLICY.md
   -> docs/THREAT_MODEL.md
   -> docs/NON_GOALS_AND_BOUNDARIES.md
-  -> docs/PHASE_1_MVP_BUILD_PLAN.md
-  -> docs/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md
-  -> docs/PHASE_3_BUILD_PLAN.md
+  -> docs/completed/PHASE_1_MVP_BUILD_PLAN.md
+  -> docs/completed/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md
+  -> docs/completed/PHASE_3_BUILD_PLAN.md
   -> docs/PHASE_4_BUILD_PLAN.md
   -> docs/RUNTIME_ORCHESTRATION_SPEC.md
   -> docs/TOOLS_AND_PERMISSIONS_SPEC.md
@@ -428,7 +428,7 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 | [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) | Status ledger for specified, implemented, disabled, blocked, and out-of-scope capabilities. |
 | [`docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md`](docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md) | Critical review vs reference platforms: capability coverage, doc/code gap analysis, OWASP status, and engineering backlog. |
  | [`docs/PHASE_3_COMPLETION_AUDIT.md`](docs/PHASE_3_COMPLETION_AUDIT.md) | Phase 3 completion audit confirming all slices A-P are implemented, tested, and documented with runtime execution disabled. |
-| [`docs/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md`](docs/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md) | Audit of repeated Phase 3 readiness patterns across Slices J-O and the recommended shared internal foundation before Slice P. |
+ | [`docs/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md`](docs/completed/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md) | Audit of repeated Phase 3 readiness patterns across Slices J-O and the recommended shared internal foundation before Slice P. (Completed; archived under `docs/completed/`.) |
 | [`docs/LOCAL_VALIDATION_GATE.md`](docs/LOCAL_VALIDATION_GATE.md) | Required local validation while GitHub Actions are paused. |
 | [`docs/FEATURE_COVERAGE_MATRIX.md`](docs/FEATURE_COVERAGE_MATRIX.md) | Full platform coverage checklist, phase placement, and non-negotiable invariants. |
 | [`docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`](docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md) | Phase 1 to Phase 5 implementation blueprint and builder hand-off flow. |
@@ -447,9 +447,9 @@ Raiker is intended to be implemented by local or cloud AI coding agents. Impleme
 
 | Document | Purpose |
 |---|---|
-| [`docs/PHASE_1_MVP_BUILD_PLAN.md`](docs/PHASE_1_MVP_BUILD_PLAN.md) | Phase 1 build scope, task order, and acceptance criteria. |
-| [`docs/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md`](docs/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md) | Phase 2 task decomposition and rich local workspace acceptance criteria. |
-| [`docs/PHASE_3_BUILD_PLAN.md`](docs/PHASE_3_BUILD_PLAN.md) | Phase 3 local rich workspace, extensibility foundation, governance, and approval-preview plan. |
+| [`docs/PHASE_1_MVP_BUILD_PLAN.md`](docs/completed/PHASE_1_MVP_BUILD_PLAN.md) | Phase 1 build scope, task order, and acceptance criteria. (Phase 1 complete; archived under `docs/completed/`.) |
+| [`docs/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md`](docs/completed/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md) | Phase 2 task decomposition and rich local workspace acceptance criteria. (Phase 2 complete; archived under `docs/completed/`.) |
+| [`docs/PHASE_3_BUILD_PLAN.md`](docs/completed/PHASE_3_BUILD_PLAN.md) | Phase 3 local rich workspace, extensibility foundation, governance, and approval-preview plan. (Phase 3 complete; archived under `docs/completed/`.) |
 | [`docs/PHASE_4_BUILD_PLAN.md`](docs/PHASE_4_BUILD_PLAN.md) | Phase 4 external channels, multi-agent, and governed execution plan. |
 | [`docs/ROADMAP_PHASE_2_TO_PHASE_5.md`](docs/ROADMAP_PHASE_2_TO_PHASE_5.md) | Phase-scheduled roadmap from local MVP to governed enterprise/home-lab platform. |
 
@@ -524,7 +524,7 @@ Slice H adds metadata-only lifecycle retention policies, cleanup previews, expir
 
 ## Phase 3 Slice I lifecycle evidence reference
 
-Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/PHASE_3_SLICE_I_LIFECYCLE_EVIDENCE_SPEC.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.
+Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/completed/PHASE_3_SLICE_I_LIFECYCLE_EVIDENCE_SPEC.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.
 
 ## Phase 3 next slice definition audit
 

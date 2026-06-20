@@ -49,7 +49,7 @@ External transports, subagent spawning, agent teams, approval relays, and remote
 
 ## Phase 3 Slice G dependency boundary for Phase 4 builders
 
-Phase 4 builders must treat `docs/PHASE_3_SLICE_G_STORAGE_LIFECYCLE_SPEC.md` as a prerequisite when work touches channels, subagents, teams, remote execution, container execution, or monitor/watch-style surfaces.
+Phase 4 builders must treat `docs/completed/PHASE_3_SLICE_G_STORAGE_LIFECYCLE_SPEC.md` as a prerequisite when work touches channels, subagents, teams, remote execution, container execution, or monitor/watch-style surfaces.
 
 Slice G lifecycle records may be read as metadata, but Phase 4 work must not reinterpret them as executable jobs, remote work items, rollback commands, channel tasks, or subagent assignments.
 

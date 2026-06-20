@@ -33,6 +33,11 @@ COMMAND_GROUPS: tuple[CommandGroup, ...] = (
         (
             CommandEntry("/help", "Show command help in the main panel."),
             CommandEntry("/commands", "Show this grouped command overlay."),
+            CommandEntry("/home", "Return to the welcome/home screen."),
+            CommandEntry("/panels", "List optional panels you can open."),
+            CommandEntry("/panel <id>", "Open an optional panel in its region."),
+            CommandEntry("/mode <minimal|standard|advanced>", "Switch TUI mode variant."),
+            CommandEntry("/keys", "Show keyboard shortcuts and their commands."),
             CommandEntry("/status", "Show runtime/workspace status."),
             CommandEntry("/clients", "Show client contract parity."),
         ),

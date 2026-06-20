@@ -27,7 +27,6 @@ def test_active_phase_3_status_docs_align_on_completion_and_blocked_phase_4() ->
         Path("docs/PHASE_3_COMPLETION_AUDIT.md"),
         Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"),
         Path("docs/EVENT_CATALOG.md"),
-        Path("EVENT_CATALOG.md"),
     ]
     for path in docs:
         text = path.read_text(encoding="utf-8")

@@ -5,6 +5,7 @@ from pathlib import Path
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.models import AgentResponse, ContractValidationError, PromptEnvelope
+from raiker.contracts.streaming import FINAL, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.hooks.contracts import HookInput
@@ -71,7 +72,10 @@ class AgentGateway:
             client=envelope.client,
         )
 
-    async def submit_prompt_async(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
+    @staticmethod
+    def _coerce_envelope(
+        envelope: PromptEnvelope | dict[str, object],
+    ) -> tuple[PromptEnvelope | None, AgentResponse | None]:
         try:
             prompt_envelope = (
                 envelope
@@ -79,13 +83,16 @@ class AgentGateway:
                 else PromptEnvelope.from_dict(envelope)  # type: ignore[arg-type]
             )
         except (KeyError, TypeError, ContractValidationError, ValueError) as exc:
-            return AgentResponse(
+            return None, AgentResponse(
                 request_id="req_invalid",
                 session_id="sess_invalid",
                 turn_id="turn_invalid",
                 status="failed",
                 message=f"Invalid prompt envelope: {exc}",
             )
+        return prompt_envelope, None
+
+    def _prepare_turn(self, prompt_envelope: PromptEnvelope) -> None:
         existing_session = self.sessions.load_session(prompt_envelope.session_id)
         self.sessions.get_or_create(prompt_envelope.session_id)
         self.sessions.track_turn(
@@ -110,7 +117,10 @@ class AgentGateway:
             if existing_session is None:
                 self._dispatch_lifecycle_hook("SessionStart", prompt_envelope)
             self._dispatch_lifecycle_hook("UserPromptSubmit", prompt_envelope)
-        response = await self.runtime.ahandle(prompt_envelope)
+
+    def _finalize_turn(
+        self, prompt_envelope: PromptEnvelope, response: AgentResponse
+    ) -> AgentResponse:
         checkpoint, checkpoint_path = self.checkpoints.write_turn_checkpoint(
             session_id=prompt_envelope.session_id,
             turn_id=prompt_envelope.turn_id,
@@ -157,6 +167,38 @@ class AgentGateway:
             last_event_id=self.writer.last_event_id,
         )
 
+    async def submit_prompt_async(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
+        prompt_envelope, error = self._coerce_envelope(envelope)
+        if prompt_envelope is None:
+            assert error is not None
+            return error
+        self._prepare_turn(prompt_envelope)
+        response = await self.runtime.ahandle(prompt_envelope)
+        return self._finalize_turn(prompt_envelope, response)
+
+    async def astream_prompt(self, envelope: PromptEnvelope | dict[str, object]):  # type: ignore[no-untyped-def]
+        """Yield :class:`StreamEvent`s for one turn (text deltas, lifecycle, final).
+
+        Same authority as :meth:`submit_prompt_async`: the durable event log, checkpoint,
+        and turn close are identical; this only surfaces the turn incrementally. Tool
+        execution still flows through the broker, policy, and approvals.
+        """
+
+        prompt_envelope, error = self._coerce_envelope(envelope)
+        if prompt_envelope is None:
+            assert error is not None
+            yield StreamEvent(kind=FINAL, response=error)
+            return
+        self._prepare_turn(prompt_envelope)
+        final: AgentResponse | None = None
+        async for event in self.runtime.astream_handle(prompt_envelope):
+            if event.kind == FINAL and event.response is not None:
+                final = event.response
+                continue
+            yield event
+        assert final is not None
+        enriched = self._finalize_turn(prompt_envelope, final)
+        yield StreamEvent(kind=FINAL, response=enriched)
 
     def submit_prompt(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
         import asyncio

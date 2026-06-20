@@ -69,14 +69,10 @@ def test_docs_state_no_phase_4() -> None:
 
 
 def test_event_catalog_lists_preview_events() -> None:
-    for path in ("EVENT_CATALOG.md", "docs/EVENT_CATALOG.md"):
-        try:
-            content = _read(path)
-            assert "proposal_approval_preview_created" in content
-            assert "proposal_approval_preview_listed" in content
-            assert "proposal_approval_preview_viewed" in content
-        except FileNotFoundError:
-            pass
+    content = _read("docs/EVENT_CATALOG.md")
+    assert "proposal_approval_preview_created" in content
+    assert "proposal_approval_preview_listed" in content
+    assert "proposal_approval_preview_viewed" in content
 
 
 def test_documentation_drift_audit_exists() -> None:
@@ -85,6 +81,6 @@ def test_documentation_drift_audit_exists() -> None:
 
 
 def test_slice_b_spec_exists() -> None:
-    content = _read("docs/PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SPEC.md")
+    content = _read("docs/completed/PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SPEC.md")
     assert "implemented_verified" in content
     assert "preview" in content.lower()

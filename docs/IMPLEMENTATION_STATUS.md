@@ -189,7 +189,7 @@ Evidence: `tests/test_phase_2_6_review_action_proposals.py`,
 `tests/test_phase_2_6_review_action_proposal_safety.py`,
 `tests/test_pre_phase_3_readiness.py`.
 
-Pre-Phase-3 readiness audit: `docs/PRE_PHASE_3_READINESS_AUDIT.md` records that Phase 1, Phase 2,
+Pre-Phase-3 readiness audit: `docs/completed/PRE_PHASE_3_READINESS_AUDIT.md` records that Phase 1, Phase 2,
 Phase 2.5, and Phase 2.6 are complete and that it is safe to start Phase 3 planning next. It does
 not mark Phase 3 runtime activation complete; Phase 4 remains blocked.
 
@@ -237,7 +237,7 @@ Evidence: `tests/test_phase_3_slice_a_proposal_lifecycle_models.py`,
 `tests/test_phase_3_slice_a_proposal_lifecycle_safety.py`,
 `tests/test_phase_3_slice_a_docs_truthfulness.py`.
 
-Spec: `docs/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md`.
+Spec: `docs/completed/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md`.
 
 ## Phase 3 Slice B Approval Planning Preview Status
 
@@ -279,7 +279,7 @@ Evidence: `tests/test_phase_3_slice_b_approval_preview_models.py`,
 `tests/test_phase_3_slice_b_approval_preview_safety.py`,
 `tests/test_phase_3_slice_b_docs_truthfulness.py`.
 
-Spec: `docs/PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SPEC.md`.
+Spec: `docs/completed/PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SPEC.md`.
 
 ### Local validation baseline (2026-06-19)
 
@@ -317,7 +317,7 @@ PR #11 removed generated Python bytecode artifacts and strengthened .gitignore.
 
 | Area | Required status | Current repository status | Canonical docs | Required tests |
 |---|---:|---:|---|---|
-| Python package scaffold | `phase_1_required` | `implemented_verified` | `docs/PHASE_1_MVP_BUILD_PLAN.md`, `docs/ARCHITECTURE.md` | import/package smoke |
+| Python package scaffold | `phase_1_required` | `implemented_verified` | `docs/completed/PHASE_1_MVP_BUILD_PLAN.md`, `docs/ARCHITECTURE.md` | import/package smoke |
 | Global `raiker` command | `phase_1_required` | `implemented_verified` | `README.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | `tests/test_scaffold.py`, terminal smoke |
 | Equal-interface metadata | `phase_1_required` | `implemented_verified` | `docs/CONTRACTS.md`, `docs/FEATURE_COVERAGE_MATRIX.md` | `tests/test_equal_interface_invariant.py` or equivalent invariant coverage |
 | PromptEnvelope contract | `phase_1_required` | `implemented_verified` | `docs/CONTRACTS.md`, `docs/API_AND_CONTRACT_SCHEMAS.md` | `tests/test_contracts.py` |
@@ -370,7 +370,7 @@ PR #12 established the Phase 2 build plan, CI baseline, task manager, event view
 
 | Area | Required status | Current repository status | Canonical docs | Required tests |
 |---|---|---|---|---|
-| Phase 2 build plan and status ledger | `phase_2_required` | `implemented_verified` | `docs/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md`, `docs/IMPLEMENTATION_STATUS.md` | doc consistency |
+| Phase 2 build plan and status ledger | `phase_2_required` | `implemented_verified` | `docs/completed/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md`, `docs/IMPLEMENTATION_STATUS.md` | doc consistency |
 | CI baseline | `phase_2_required` | `implemented_verified` | `.github/workflows/ci.yml`, `docs/VERIFICATION_PLAN.md` | workflow syntax |
 | Task record contract and storage helpers | `phase_2_required` | `implemented_verified` | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` | `tests/test_phase_2_task_manager.py` |
 | Background task manager service | `phase_2_required` | `implemented_verified` | `docs/RUNTIME_ORCHESTRATION_SPEC.md` | `tests/test_phase_2_task_manager.py` |
@@ -399,7 +399,7 @@ PR #12 established the Phase 2 build plan, CI baseline, task manager, event view
 
 ## Phase 3 and Phase 4 Planning Status
 
-Detailed Phase 3 and Phase 4 plans are now recorded in `docs/PHASE_3_BUILD_PLAN.md` and `docs/PHASE_4_BUILD_PLAN.md`. Safe foundations now include disabled/listable capability gates, plugin manifest validation without code execution, graph/codemap planning schemas, semantic-memory disabled status reporting, remote/container execution profiles, subagent planning, external-channel activation status, and terminal inspection commands. Tests prove these foundations are discoverable and remain non-executable until policy, storage, approval, and lifecycle controls are complete.
+Detailed Phase 3 and Phase 4 plans are now recorded in `docs/completed/PHASE_3_BUILD_PLAN.md` and `docs/PHASE_4_BUILD_PLAN.md`. Safe foundations now include disabled/listable capability gates, plugin manifest validation without code execution, graph/codemap planning schemas, semantic-memory disabled status reporting, remote/container execution profiles, subagent planning, external-channel activation status, and terminal inspection commands. Tests prove these foundations are discoverable and remain non-executable until policy, storage, approval, and lifecycle controls are complete.
 
 | Phase | Implemented foundation | Runtime state | Evidence |
 |---|---|---|---|
@@ -560,11 +560,11 @@ Safety status:
 
 ## Phase 3 Slice H lifecycle retention status
 
-Slice H is `implemented_verified` locally for metadata-only retention policies, cleanup previews, approval-handoff planning, read-only summaries, and SQLite metadata tables. Full Phase 3 is still incomplete. Keep detailed contract and safety requirements in `docs/PHASE_3_SLICE_H_LIFECYCLE_RETENTION_SPEC.md`; this document records only the status summary. Slice H does not execute cleanup, graph/codemap indexing, semantic/vector memory writes, embeddings, rollback, plugins, channels, subagents, approval relay, or remote/container/cloud execution.
+Slice H is `implemented_verified` locally for metadata-only retention policies, cleanup previews, approval-handoff planning, read-only summaries, and SQLite metadata tables. Full Phase 3 is still incomplete. Keep detailed contract and safety requirements in `docs/completed/PHASE_3_SLICE_H_LIFECYCLE_RETENTION_SPEC.md`; this document records only the status summary. Slice H does not execute cleanup, graph/codemap indexing, semantic/vector memory writes, embeddings, rollback, plugins, channels, subagents, approval relay, or remote/container/cloud execution.
 
 ## Phase 3 Slice I lifecycle evidence reference
 
-Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/PHASE_3_SLICE_I_LIFECYCLE_EVIDENCE_SPEC.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.
+Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/completed/PHASE_3_SLICE_I_LIFECYCLE_EVIDENCE_SPEC.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.
 
 ## Phase 3 Slice J — Graph/Codemap Indexing Readiness Metadata
 
@@ -666,5 +666,5 @@ The shell adds no runtime authority: prompts route through `submit_terminal_prom
 the Agent Gateway, slash commands route through `handle_slash_command()`, and TUI panel
 modules call no tools, models, plugins, channels, shell, subprocess, sockets, or network
 APIs directly. No new events and no new storage are added. See
-`docs/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md`. All disabled runtime flags
+`docs/completed/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md`. All disabled runtime flags
 remain false.

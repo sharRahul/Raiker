@@ -149,43 +149,46 @@ The TUI must support preset complexity levels:
 
 ### Default Layout
 
-The default Rich TUI starts simple so Phase 1 can ship a small, safe terminal client without losing the future panel model. It must support a compact welcome/workspace view, recent activity, an input area, and a configurable status bar.
+The default dynamic Rich TUI starts simple so Phase 1 can ship a small, safe terminal client without losing the future panel model. It must support a compact welcome/workspace view, recent activity, an input area, and a configurable status bar.
 
 ```text
 ┌──────── Raiker v0.0.0 ────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                               │ Recent Activity:                                                                          │
+│                               │ Recent activity                                                                           │
 │                               │ ✓ Inspect specs                                                                           │
-│ Hello / Welcome back <user>   │ ▶ Update architecture                                                                     │
+│ Welcome back <user>!          │ ▶ Update architecture                                                                     │
 │                               │ • Verify docs                                                                             │
 │         .-----------.         │                                                                                           │
 |       .-░░▒▒░▒▒▒░▒▒░░-.       │───────────────────────────────────────────────────────────────────────────────────────────┤
-│      (░░▒▒▒▒▓▓▓▒▒▒▓▓░░░)      │ What's new:                                                                               │
+│      (░░▒▒▒▒▓▓▓▒▒▒▓▓░░░)      │ Tips for getting started                                                                  │
 │     (░░▒▒▒▓▓▓▓▓▓▓▓▒▒▓▓▒░)     │                                                                                           │
 │                               │                                                                                           │
 │      <model> • <effort>       │                                                                                           │
 │        <workspace>            │                                                                                           │
 │                               │                                                                                           │
-├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ > ? side question | / command | normal prompt | ! command proposal | @ file mention                                       │
-├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ RUNNING | task:docs | approvals:2 | model:qwen | ctx: ███████░░░░░░░ 50% 18k/32k | mem:project | net:block              │
-└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  > ? side question / command                                   
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 
 ```
 
-### TUI Status Bar
+### Welcome bannner
+
+Dynamic welcome banner where it can say Hello or Welcome.
+
+### Configurable TUI Status Bar
 
 The TUI status bar must be configurable by user, project, workspace, managed policy, or terminal capability. The default field order is only a preset. Builders must implement the status bar as a list of named status items, not as one hard-coded string.
 
 Default fields, left to right:
 
 ```text
-STATE | task:<status> | approvals:<n> | model:<profile> | ctx_bar: ███████░░░░░░░ <used>% | ctx:<used>/<max> | mem:<scope> | net:<policy> | exec:<profile> | last:<event> | cost:<amount> | clock
+STATE | task:<status> | model:<profile> | ctx_bar: ███████░░░░░░░ <used>% | ctx:<used>/<max> | mem:<scope> | net:<policy> | exec:<profile> | last:<event> | cost:<amount> | clock
 ```
 
 Example:
 
 ```text
-RUNNING | task:docs-expansion | approvals:1 | model:qwen9b | ctx_bar: ███████░░░░░░░ 50% | ctx:18k/32k | mem:project | net:blocked | exec:local | last:tool_completed | cost:£0.00 | 13:42
+RUNNING | task:docs-expansion | model:qwen9b | ctx_bar: ███████░░░░░░░ 50% | ctx:18k/32k | cost:£0.00 | mem:project | net:blocked | exec:local | last:tool_completed | 13:42
 ```
 
 Status labels:
@@ -243,7 +246,6 @@ Example configuration shape:
     "fields": [
       "state",
       "task",
-      "approvals",
       "model",
       "context_percent_bar",
       "context",
@@ -263,9 +265,9 @@ Preset examples:
 
 | Preset | Purpose | Fields |
 |---|---|---|
-| `minimal` | Small terminals and low-noise use | `state`, `task`, `approvals`, `model`, `clock` |
-| `developer_compact` | Default local development | `state`, `task`, `approvals`, `model`, `context_percent_bar`, `context`, `network`, `last_event`, `clock` |
-| `security_audit` | Security-heavy work | `state`, `task`, `approvals`, `policy`, `network`, `execution`, `last_event`, `checkpoint`, `cost`, `clock` |
+| `minimal` | Small terminals and low-noise use | `state`, `task`, `model`, `clock` |
+| `developer_compact` | Default local development | `state`, `task`, `model`, `context_percent_bar`, `context`, `cost`, `network`, `last_event`, `clock` |
+| `security_audit` | Security-heavy work | `state`, `task`, `policy`, `network`, `execution`, `last_event`, `checkpoint`, `cost`, `clock` |
 | `model_debug` | Model/runtime debugging | `state`, `model`, `context_percent_bar`, `context`, `tokens_in_out`, `tool_calls`, `last_event`, `cost`, `clock` |
 
 If terminal does not support colours, use text labels only. If terminal width is limited, prefer exact safety labels over decorative bars.
@@ -277,7 +279,7 @@ Required panels:
 - Primary / Main Panel (Left);
 - Activity Panel (Right);
 - Input Panel;
-- Status Bar Panel.
+- Status Bar Panel  () .
 
 The required panels form the minimum bootable TUI. Optional panels must be addable without creating a second runtime path, bypassing the gateway, or duplicating contracts.
 
@@ -329,106 +331,6 @@ Optional panel manifest shape:
   "fallback_rendering": "text_table"
 }
 ```
-
-Supported panel regions:
-
-```text
-┌────────────────────────────── Raiker Session ──────────────────────────────┐
-│ top_banner / notification strip                                            │
-├───────────────┬──────────────────────────────────────────┬────────────────┤
-│ left_drawer   │ main_workspace                           │ right_drawer   │
-│ panels        │ transcript / selected panel / split view │ panels         │
-├───────────────┴──────────────────────────────────────────┴────────────────┤
-│ bottom_drawer / timeline / tool output / diff viewer                       │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ input_panel                                                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│ status_bar                                                                   │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-Optional panel catalogue:
-
-| Panel | Purpose | Default region | Primary sources | Allowed actions |
-|---|---|---|---|---|
-| Active Plan | Show plan steps, status, blockers, next action. | `left_drawer` | runtime state, plan events | inspect step, ask side question |
-| Approvals | Show pending approvals as cards, never inline-only text. | `right_drawer` | approval queue, policy events | approve, deny, defer, inspect |
-| Task Progress | Show task status, elapsed time, safe boundaries, cancel/steer state. | `right_drawer` | tasks table, task events | pause, cancel, steer, side question |
-| Tool/Event Stream | Show brokered tool calls and event timeline. | `bottom_drawer` | JSONL event log, events index | inspect event, copy event ID |
-| Context/Memory/Graph | Show context sources, memory hits, graph references, trust labels. | `right_drawer` | context bundle, memory, graph | inspect provenance, request correction |
-| Checkpoint Timeline | Show checkpoints, summaries, changed files, restore/fork options. | `bottom_drawer` | checkpoint service, event log | inspect, compare, restore, fork |
-| Model/Profile Picker | Show model profiles, active model, local/hosted policy state. | `right_drawer` | model profile registry | launch/switch model via gateway action |
-| Channel Connector List | Show connector profiles, enabled state, pairing status. | `right_drawer` | connector registry | link, unlink, inspect risk |
-| Skill/Eidetic Memory Inspector | Show skill candidates, gist memory, raw observations, retention. | `right_drawer` | memory/eidetic tables | inspect, approve candidate, delete/request correction |
-| Security/Policy Panel | Show policy decisions, denied actions, egress state, redactions. | `right_drawer` | policy engine, security events | inspect rule, open approval card |
-| Diff Viewer | Show file diffs and snapshots for proposed edits. | `main_workspace` or `bottom_drawer` | checkpoint/file snapshot events | inspect diff, request explanation |
-| Diagnostics Panel | Show health checks, registry errors, missing providers, DB state. | `main_workspace` | diagnostics actions, storage metrics | run approved diagnostic checks |
-| Storage Panel | Show SQLite/event/checkpoint/artifact sizes. | `right_drawer` | storage metrics | inspect, export with approval |
-| Custom User Panel | User-described panel generated from a panel manifest. | user choice | declared manifest sources | declared manifest actions |
-
-Optional panel layout examples:
-
-Active plan panel:
-
-```text
-┌─ Active Plan ─────────────────────┐
-│ Objective: Update docs            │
-│ ✓ Read README/docs map            │
-│ ✓ Align architecture hand-off     │
-│ ▶ Expand TUI optional panels      │
-│ • Verify changed docs             │
-│ Blockers: none                    │
-└───────────────────────────────────┘
-```
-
-Approvals panel:
-
-```text
-┌─ Approvals ───────────────────────────────────────────┐
-│ RISK: shell                                           │
-│ Action: act_01H...                                    │
-│ Command: pytest tests/test_policy_engine.py           │
-│ Reason: shell_requires_approval                       │
-│ Choices: [approve once] [deny] [defer] [inspect]      │
-└───────────────────────────────────────────────────────┘
-```
-
-Tool/event stream panel:
-
-```text
-┌─ Tool / Event Stream ─────────────────────────────────┐
-│ prompt_received       tui        13:41:02             │
-│ action_proposed       grep       docs/**              │
-│ policy_decision       allow      workspace_read       │
-│ tool_completed        grep       18 matches           │
-│ checkpoint_created    ckpt_01H   after turn           │
-└───────────────────────────────────────────────────────┘
-```
-
-Context/memory/graph panel:
-
-```text
-┌─ Context / Memory / Graph ────────────────────────────┐
-│ Context: 18.2k / 32k                                  │
-│ Sources: prompt, docs/ARCHITECTURE.md, event_log      │
-│ Trust: user_input, project_file, tool_result          │
-│ Memory: 3 candidates, 0 durable writes pending        │
-│ Graph: 12 nodes, 18 edges, 2 stale                    │
-└───────────────────────────────────────────────────────┘
-```
-
-Panel rules:
-
-1. A panel that only displays state may read from the event log, SQLite state, or gateway snapshots according to policy.
-2. A panel that can mutate state must emit a `UIActionEnvelope` or approved action through the gateway.
-3. A panel must not call tools, models, memory writes, plugin code, channel connectors, or execution environments directly.
-4. Every panel open, close, focus, action, and error must be event-loggable.
-5. Every panel must define a fallback text rendering for plain terminal and low-colour terminals.
-6. User-built panels must be disabled by default until trusted or explicitly enabled.
-7. Plugin-provided panels must follow plugin manifest, permission diff, and trust rules.
-8. Panels must support keyboard navigation and must not trap focus during risky approval flows.
-9. Panels must declare whether they can display sensitive data and whether export requires approval.
-10. Panel state must be restorable from session/event/checkpoint state, not hidden UI memory only.
 
 Side questions must be visually separated from the main task and must not overwrite streamed task progress.
 
@@ -1157,7 +1059,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Rich TUI panels | Minimal terminal shell/status rendering only; rich panels are specified, not implemented as a full app. | Partial/minimal | None. | Build panel framework only in a future approved slice. |
+| Rich TUI | Live single-panel Textual TUI implemented (Slice Q4): one full-width scrolling transcript, live execution indicator, live status bar, input box, and real keyboard shortcuts, with token-by-token streaming via the gateway streaming path. Claude-Code-style — no simultaneously docked side/region panels. Inspection views (approvals, tasks, events, memory/graph, …) render inline on demand and remain display-only over existing handlers. `RAIKER_TUI=rich` keeps the turn-based single-panel shell; `=plain` the plain loop. | Yes | No direct tool authority; prompts stream through gateway/broker/policy; tools still require approval. | Stream tool-call deltas once providers emit them; optional docked panels remain deferred. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
@@ -1179,4 +1081,76 @@ catalogue, dockable drawers, and dashboard-style multi-pane views remain specifi
 deferred. The shell adapts to standard, narrow, and no-colour/ASCII terminals and falls back
 to a plain terminal loop when rich is unavailable, the terminal is non-interactive, or
 `RAIKER_TUI=plain` is set. It creates no new runtime authority and adds no new events or
-storage. See `docs/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md`.
+storage. See `docs/completed/PHASE_3_SLICE_Q1_RICH_TUI_DEFAULT_ACCESS_SHELL_SPEC.md`.
+
+## Phase 3 Slice Q2 — Interactive Rich TUI With Optional Panels (implemented)
+
+Building on Q1, the interactive Rich TUI now implements the documented region-based panel
+system in `raiker/tui/`: a window header, left/right/bottom drawers, a main workspace with
+a structured streaming transcript (event indicators `● ○ ⚠ ✖`, hierarchical tree
+rendering, collapsible large output, inline diffs), the input panel with prompt modes
+(`?` side question, `/` command, `!` command proposal, `@` file mention, default prompt),
+and the configurable status bar. The optional panel catalogue (Active Plan, Approvals,
+Task Progress, Tool/Event Stream, Context/Memory/Graph, Checkpoint Timeline, Model Picker,
+Channels, Skill/Eidetic, Security/Policy, Diff Viewer, Diagnostics, Storage) is implemented
+as **read-only display surfaces** over the existing command handlers and local store, with
+the documented optional-panel manifest shape. Mode variants (`minimal`/`standard`/
+`advanced`) and the documented keyboard shortcuts are available, each shortcut mapped to an
+equivalent typed command for capability parity.
+
+This slice adds no new runtime authority, events, or storage. Panels never call tools,
+models, plugins, channels, memory/graph writes, or remote/container execution; every
+mutating action remains a user-issued command routed through the gateway, broker, policy,
+approvals, and disabled-runtime gates. Side questions never mutate task state, and `!`
+command proposals are surfaced for review only and never executed while runtime execution
+is disabled. Plugin-provided and user-built custom panels remain deferred. See
+`docs/PHASE_3_SLICE_Q2_RICH_TUI_FULL_SHELL_SPEC.md`.
+
+## Phase 3 Slice Q3 — Live Streaming Textual TUI (implemented)
+
+Q3 adds the live, key-driven front-end and the streaming path the turn-based shell lacked.
+A streaming contract (`raiker/contracts/streaming.py`) and a single DRY runtime turn loop
+let `RuntimeOrchestrator.astream_handle` and `AgentGateway.astream_prompt` yield text
+deltas, mirrored lifecycle events, and a final response incrementally, while the
+synchronous `ahandle`/`submit_prompt` paths stay byte-for-byte unchanged. The new Textual
+app (`raiker/tui/textual_app.py`, dependency `textual>=0.60`) is a real repainting TUI: a
+scrollable transcript that appends streamed tokens live, drawer panels from the read-only
+optional-panel catalogue, a live status bar, and real keyboard shortcuts (Ctrl+A/T/E/M/G/K,
+Ctrl+P, Ctrl+L, Shift+Tab, etc.). `run_terminal_client` prefers Textual when available;
+`RAIKER_TUI=rich` selects the Slice Q2 turn-based shell and `=plain` the plain loop.
+
+Safety is unchanged: prompts stream through the same gateway/broker/policy/approval path,
+tool execution still requires policy and approval, `!` command proposals are surfaced but
+never executed, and offline the stream fails safe with `model_unavailable` while still
+finalising the turn (checkpoint + turn close). See
+`docs/PHASE_3_SLICE_Q3_LIVE_STREAMING_TEXTUAL_TUI_SPEC.md`.
+
+## Phase 3 Slice Q4 — Single-Panel Default Layout (implemented; supersedes Q1–Q3 multi-panel UX)
+
+Q4 removes the multi-panel/region UX from the implemented Rich TUI and reduces it to a
+single default layout, like Claude Code: one full-width scrolling transcript, a live
+execution indicator, the input box, and a single configurable status bar. There are no
+simultaneously docked side/region drawers, no `minimal`/`standard`/`advanced` mode
+variants, and no panel focus cycling. This replaces the Q1 two-column default access shell,
+the Q2 left/right/bottom drawer regions, and the Q3 right-drawer panels.
+
+All capabilities are preserved. The optional-panel catalogue is retained as a read-only
+**inspection view** catalogue: each view (approvals, tasks, events, context/memory/graph,
+checkpoints, model picker, channels, skill/eidetic, security/policy, diff, diagnostics,
+storage) renders **inline into the transcript, once, on demand** via `/view <id>` (alias
+`/panel <id>`) or a keyboard shortcut (Ctrl+A/T/E/M/G/K), instead of occupying a persistent
+docked region. Prompt modes (`?` `/` `!` `@` + default), streaming, the structured event
+transcript (`● ○ ⚠ ✖`, tree rendering, collapsible output, inline diffs), command-palette,
+history, and approval-mode cycling (Shift+Tab) are unchanged.
+
+Removed code: `raiker/tui/default_layout.py` and `raiker/tui/panels.py` (two-column
+renderers); the region/panel/focus/mode machinery in `raiker/tui/session.py`; the
+left/right/bottom drawer rendering in `raiker/tui/layout.py`; and the right drawer plus
+focus/mode-cycle actions in `raiker/tui/textual_app.py`. The `Tab` (cycle panels) and
+`/close`, `/focus`, `/mode` commands are gone; `/views` lists inline views.
+
+Safety is unchanged: no new runtime authority, events, or storage; views never call tools,
+models, plugins, channels, or memory/graph writes; every mutating action remains a
+user-issued command routed through the gateway, broker, policy, approvals, and
+disabled-runtime gates. Optional docked panels and user-built/plugin panels remain
+specified and deferred.

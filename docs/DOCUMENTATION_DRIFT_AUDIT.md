@@ -16,15 +16,19 @@ Repository state: after Phase 3 Slice B approval planning preview
 ## Documentation files reviewed
 
 - README.md
-- EVENT_CATALOG.md
+- ~~EVENT_CATALOG.md~~ (removed 2026-06-20; stale root-level stub, `docs/EVENT_CATALOG.md` is canonical)
 - docs/EVENT_CATALOG.md
 - docs/IMPLEMENTATION_STATUS.md
 - docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md
 - docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md
 - docs/LOCAL_VALIDATION_GATE.md
-- docs/PRE_PHASE_3_READINESS_AUDIT.md
-- docs/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md
-- docs/PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SPEC.md
+- docs/completed/PRE_PHASE_3_READINESS_AUDIT.md
+- docs/completed/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md
+- docs/completed/PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SPEC.md
+
+> Update (2026-06-20): the slice specs and audits listed above have been archived under
+> `docs/completed/` once their slices reached `implemented_verified`. The canonical event
+> catalog is `docs/EVENT_CATALOG.md`; the stale root-level `EVENT_CATALOG.md` stub was removed.
 
 ## Truthfulness boundaries
 

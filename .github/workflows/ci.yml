@@ -31,6 +31,9 @@ jobs:
       - name: Verify real httpx import
         run: |
           python -c "import httpx; print(httpx.__file__)"
+      - name: Verify test collection (fail fast on broken imports)
+        run: |
+          python -m pytest --collect-only -q
       - name: Run tests
         run: |
           python -m pytest

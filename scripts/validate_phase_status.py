@@ -19,12 +19,11 @@ REQUIRED_PHASE_2_ROWS = [
 
 REQUIRED_DOCS = [
     Path("README.md"),
-    Path("docs/PHASE_3_BUILD_PLAN.md"),
+    Path("docs/completed/PHASE_3_BUILD_PLAN.md"),
     Path("docs/PHASE_3_COMPLETION_AUDIT.md"),
     Path("docs/PHASE_4_BUILD_PLAN.md"),
     Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"),
     Path("docs/EVENT_CATALOG.md"),
-    Path("EVENT_CATALOG.md"),
 ]
 
 REQUIRED_IMPLEMENTATION_STATUS_MARKERS = [
@@ -52,10 +51,6 @@ REQUIRED_STATUS_FILES = {
         "Phase 4 remains blocked.",
     ],
     Path("docs/EVENT_CATALOG.md"): [
-        "Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`.",
-        "Phase 4 remains blocked.",
-    ],
-    Path("EVENT_CATALOG.md"): [
         "Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`.",
         "Phase 4 remains blocked.",
     ],

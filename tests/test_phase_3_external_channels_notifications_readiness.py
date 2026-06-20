@@ -129,9 +129,8 @@ def test_docs_catalog_event_consistency() -> None:
         "README.md",
         "docs/IMPLEMENTATION_STATUS.md",
         "docs/EVENT_CATALOG.md",
-        "EVENT_CATALOG.md",
         "docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md",
-        "docs/PHASE_3_SLICE_O_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_SPEC.md",
+        "docs/completed/PHASE_3_SLICE_O_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_SPEC.md",
     ]
     for path in paths:
         text = Path(path).read_text(encoding="utf-8")

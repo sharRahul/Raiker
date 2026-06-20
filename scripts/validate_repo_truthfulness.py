@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DOCS = [ROOT / "README.md", *(ROOT / "docs").glob("*.md"), ROOT / "EVENT_CATALOG.md"]
+DOCS = [ROOT / "README.md", *(ROOT / "docs").glob("*.md")]
 RUNTIME_DISABLED_MARKERS = [
     "plugin_execution_enabled",
     "graph_indexing_enabled",
@@ -263,9 +263,9 @@ def main() -> int:
         + "\n"
         + (ROOT / "docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md").read_text(encoding="utf-8")
     )
-    if (ROOT / "docs/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md").exists():
+    if (ROOT / "docs/completed/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md").exists():
         proposal_docs += "\n" + (
-            ROOT / "docs/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md"
+            ROOT / "docs/completed/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md"
         ).read_text(encoding="utf-8")
     lowered_proposal_docs = proposal_docs.lower()
     for overclaim in PROPOSAL_LIFECYCLE_FORBIDDEN_OVERCLAIMS:

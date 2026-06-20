@@ -9,8 +9,9 @@ from raiker.tui.status_bar import StatusBarConfig, StatusBarRenderer, StatusCont
 
 # Pure presentation modules that must never gain runtime authority.
 _PANEL_MODULES = [
-    "raiker/tui/panels.py",
-    "raiker/tui/default_layout.py",
+    "raiker/tui/layout.py",
+    "raiker/tui/transcript.py",
+    "raiker/tui/welcome.py",
     "raiker/tui/render_models.py",
     "raiker/tui/accessibility.py",
     "raiker/tui/command_palette.py",
@@ -112,15 +113,14 @@ def test_tui_does_not_create_new_command_semantics() -> None:
             assert entry.name.startswith("/")
 
 
-def test_activity_panel_does_not_leak_sensitive_fields() -> None:
-    from raiker.tui.default_layout import render_default_layout
-    from raiker.tui.render_models import ActivityContent, InputContent, MainPanelContent
+def test_default_layout_does_not_leak_sensitive_fields() -> None:
+    from raiker.tui.layout import render_home_layout
+    from raiker.tui.welcome import WelcomeContent
 
-    out = render_default_layout(
-        main=MainPanelContent(),
-        activity=ActivityContent(),
-        input_content=InputContent(),
+    out = render_home_layout(
+        WelcomeContent(),
         status_line=StatusBarRenderer().render(StatusContext(), clock="00:00"),
+        input_hint="? side question | / command",
         profile=TerminalProfile(width=120, color=False),
     )
     for forbidden in ("Authorization", "api_key", "secret", "BEGIN PRIVATE KEY"):

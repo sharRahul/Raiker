@@ -99,9 +99,8 @@ def test_docs_catalog_event_consistency() -> None:
         Path("README.md"),
         Path("docs/IMPLEMENTATION_STATUS.md"),
         Path("docs/EVENT_CATALOG.md"),
-        Path("EVENT_CATALOG.md"),
         Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"),
-        Path("docs/PHASE_3_SLICE_L_APPROVAL_PREVIEW_PERSISTENCE_READINESS_SPEC.md"),
+        Path("docs/completed/PHASE_3_SLICE_L_APPROVAL_PREVIEW_PERSISTENCE_READINESS_SPEC.md"),
     ]:
         text = path.read_text()
         assert "Slice L" in text

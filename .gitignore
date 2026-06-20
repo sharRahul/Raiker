@@ -4,6 +4,7 @@
 .pytest_cache
 .mypy_cache
 .claude
+.tmp
 cli_output.txt
 /raiker.egg-info
 __pycache__/

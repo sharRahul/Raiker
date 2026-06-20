@@ -31,7 +31,7 @@ storage, approval-preview, and checkpoint path. This is a coherent, non-generic 
 
 **Is the architecture aligned with building an AI platform?** — **Yes.** The nested-boundary
 model (interface → event-logging → security/privacy → agent-core) in
-`docs/03_ARCHITECTURE.md` / `docs/NESTED_BOUNDARIES_ARCHITECTURE.md`, and the code layout under
+`docs/completed/03_ARCHITECTURE.md` / `docs/NESTED_BOUNDARIES_ARCHITECTURE.md`, and the code layout under
 `raiker/` (gateway, runtime, policy, tools, events, storage, approvals, checkpoints, sessions,
 tasks) match the documented design. The agent loop is a real deterministic state machine
 (`raiker/runtime/orchestrator.py`, `raiker/runtime/state_machine.py`), and the tool broker is

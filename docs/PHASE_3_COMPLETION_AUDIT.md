@@ -10,11 +10,11 @@ This document audits every Phase 3 requirement from the source documentation to 
 
 ## Source documents
 
-- `docs/PHASE_3_BUILD_PLAN.md`
+- `docs/completed/PHASE_3_BUILD_PLAN.md`
 - `docs/IMPLEMENTATION_STATUS.md`
 - `README.md`
 - `docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md`
-- All `docs/PHASE_3_SLICE_*` files
+- All `docs/completed/PHASE_3_SLICE_*` files
 
 ## Audit checklist
 
@@ -61,8 +61,8 @@ This document audits every Phase 3 requirement from the source documentation to 
 
 | Requirement | Status | Tests | Docs | Runtime boundary |
 |---|---|---|---|---|
-| `raiker/readiness/contracts.py` shared helpers | `implemented_verified` | `test_phase_3_readiness_contract_helpers.py` | `docs/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md` | Metadata-only helpers |
-| `raiker/readiness/registry.py` shared helpers | `implemented_verified` | `test_phase_3_readiness_registry_helpers.py` | `docs/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md` | Metadata-only helpers |
+| `raiker/readiness/contracts.py` shared helpers | `implemented_verified` | `test_phase_3_readiness_contract_helpers.py` | `docs/completed/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md` | Metadata-only helpers |
+| `raiker/readiness/registry.py` shared helpers | `implemented_verified` | `test_phase_3_readiness_registry_helpers.py` | `docs/completed/PHASE_3_READINESS_PATTERN_CONSOLIDATION_AUDIT.md` | Metadata-only helpers |
 
 ## Runtime safety verification
 

@@ -6,8 +6,8 @@ from raiker.tui.accessibility import (
     ascii_safe,
     detect_terminal_profile,
 )
-from raiker.tui.default_layout import render_default_layout
-from raiker.tui.render_models import ActivityContent, InputContent, MainPanelContent
+from raiker.tui.layout import render_full_layout
+from raiker.tui.session import UISession
 from raiker.tui.status_bar import StatusBarConfig, StatusBarRenderer, StatusContext
 
 
@@ -15,11 +15,12 @@ def _render(profile: TerminalProfile) -> str:
     status = StatusBarRenderer(StatusBarConfig(use_blocks=profile.unicode)).render(
         StatusContext(model="qwen", approvals=1, network="blocked"), clock="09:00"
     )
-    return render_default_layout(
-        main=MainPanelContent(workspace="/ws", model="qwen"),
-        activity=ActivityContent(workspace="/ws", approvals="1", model="qwen"),
-        input_content=InputContent(),
+    session = UISession()
+    session.transcript.add_result("prompt", "hello")
+    return render_full_layout(
+        session,
         status_line=status,
+        input_hint="? side question | / command",
         profile=profile,
     )
 
@@ -29,7 +30,7 @@ def test_no_colour_rendering_keeps_all_safety_labels() -> None:
     assert "READY" in out  # state label
     assert "net:blocked" in out  # network label
     assert "approvals:1" in out  # approvals label
-    assert "runtime execution disabled" in out  # disabled runtime label
+    assert "Transcript" in out  # single main panel
 
 
 def test_state_network_approvals_labels_are_text_not_colour_only() -> None:
@@ -52,7 +53,7 @@ def test_ascii_profile_layout_has_no_box_unicode() -> None:
     out = _render(TerminalProfile(width=120, unicode=False, color=False))
     for unicode_char in ("│", "─", "┌", "█", "✓", "▶", "•"):
         assert unicode_char not in out
-    assert "runtime execution disabled" in out
+    assert "Transcript" in out
     assert "net:blocked" in out
 
 

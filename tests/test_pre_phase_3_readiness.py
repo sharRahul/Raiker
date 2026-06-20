@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -10,11 +10,11 @@ def _read(rel: str) -> str:
 
 
 def test_readiness_audit_doc_exists() -> None:
-    assert (ROOT / "docs" / "PRE_PHASE_3_READINESS_AUDIT.md").exists()
+    assert (ROOT / "docs" / "completed" / "PRE_PHASE_3_READINESS_AUDIT.md").exists()
 
 
 def test_readiness_audit_lists_all_phases_complete() -> None:
-    text = _read("docs/PRE_PHASE_3_READINESS_AUDIT.md")
+    text = _read("docs/completed/PRE_PHASE_3_READINESS_AUDIT.md")
     for marker in (
         "Phase 1",
         "Phase 2",
@@ -27,20 +27,20 @@ def test_readiness_audit_lists_all_phases_complete() -> None:
 
 
 def test_readiness_audit_says_phase_3_ready_to_start_planning() -> None:
-    text = _read("docs/PRE_PHASE_3_READINESS_AUDIT.md")
+    text = _read("docs/completed/PRE_PHASE_3_READINESS_AUDIT.md")
     assert "Ready to start Phase 3 planning" in text
     assert "scoped plan" in text
 
 
 def test_readiness_audit_does_not_claim_phase_3_runtime_activation() -> None:
-    text = _read("docs/PRE_PHASE_3_READINESS_AUDIT.md").lower()
+    text = _read("docs/completed/PRE_PHASE_3_READINESS_AUDIT.md").lower()
     assert "phase 3 is **not** complete" in text or "phase 3 is not complete" in text
     assert "phase 3 runtime activation complete" not in text
     assert "phase 3 is implemented by this task" not in text
 
 
 def test_readiness_audit_lists_deferred_capabilities() -> None:
-    text = _read("docs/PRE_PHASE_3_READINESS_AUDIT.md")
+    text = _read("docs/completed/PRE_PHASE_3_READINESS_AUDIT.md")
     for marker in (
         "Auto-fix",
         "GitHub PR review automation",
@@ -52,7 +52,7 @@ def test_readiness_audit_lists_deferred_capabilities() -> None:
 
 
 def test_readiness_audit_lists_disabled_runtime_flags() -> None:
-    text = _read("docs/PRE_PHASE_3_READINESS_AUDIT.md")
+    text = _read("docs/completed/PRE_PHASE_3_READINESS_AUDIT.md")
     for flag in (
         "plugin_execution_enabled",
         "graph_indexing_enabled",
@@ -77,7 +77,7 @@ def test_readiness_audit_lists_disabled_runtime_flags() -> None:
 
 
 def test_readiness_audit_includes_green_local_validation_baseline() -> None:
-    text = _read("docs/PRE_PHASE_3_READINESS_AUDIT.md")
+    text = _read("docs/completed/PRE_PHASE_3_READINESS_AUDIT.md")
     assert "ruff" in text
     assert "mypy" in text
     assert "pytest" in text
@@ -86,7 +86,7 @@ def test_readiness_audit_includes_green_local_validation_baseline() -> None:
 
 
 def test_readiness_audit_states_proposal_only_safety() -> None:
-    text = _read("docs/PRE_PHASE_3_READINESS_AUDIT.md")
+    text = _read("docs/completed/PRE_PHASE_3_READINESS_AUDIT.md")
     for marker in (
         "Proposal-only.",
         "No fixes are applied.",

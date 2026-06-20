@@ -6,9 +6,10 @@ from pathlib import Path
 from raiker.context.gatherer import ContextGatherer
 from raiker.context.models import ContextBundle
 from raiker.contracts.models import AgentResponse, PromptEnvelope, ToolAction, ToolResult
+from raiker.contracts.streaming import FINAL, LIFECYCLE, TEXT_DELTA, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
-from raiker.models.contracts import ModelMessage, ModelResponse
+from raiker.models.contracts import ModelMessage, ModelResponse, ToolCallProposal
 from raiker.models.exceptions import ModelProviderError
 from raiker.models.router import ModelRouter
 from raiker.models.tool_call_validation import (
@@ -50,6 +51,10 @@ class RuntimeOrchestrator:
         self.context_gatherer = ContextGatherer()
         self.verifier = Verifier()
         self.tool_specs = default_tool_specs()
+        # When streaming, lifecycle events are mirrored here so the turn generator can
+        # surface them to a client in near-real-time. ``None`` disables mirroring (the
+        # synchronous ``ahandle`` path), which keeps its behaviour byte-for-byte unchanged.
+        self._sink: list[StreamEvent] | None = None
 
     def _state(
         self, machine: RuntimeStateMachine, envelope: PromptEnvelope, new_state: str
@@ -78,6 +83,8 @@ class RuntimeOrchestrator:
                 client=envelope.client,
             )
         )
+        if self._sink is not None:
+            self._sink.append(StreamEvent(kind=LIFECYCLE, event_type=event_type, payload=dict(payload)))
 
     @staticmethod
     def _context_prompt(bundle: ContextBundle) -> str:
@@ -144,7 +151,116 @@ class RuntimeOrchestrator:
             return str(output)
         return "Tool completed."
 
+    @staticmethod
+    def _reconstruct_tool_calls(deltas: list[dict[str, object]]) -> list[ToolCallProposal]:
+        """Best-effort reconstruction of tool calls from streamed deltas.
+
+        Current providers stream text only, so this is normally empty; it future-proofs the
+        streaming path for providers that emit ``tool_call_delta`` chunks. Malformed deltas
+        are skipped — model output is untrusted and validated downstream regardless.
+        """
+
+        calls: list[ToolCallProposal] = []
+        for delta in deltas:
+            name = delta.get("tool_name") or delta.get("name")
+            args = delta.get("arguments")
+            if not isinstance(name, str) or not name:
+                continue
+            if not isinstance(args, dict):
+                args = {}
+            call_id = delta.get("call_id")
+            calls.append(
+                ToolCallProposal(
+                    call_id=str(call_id) if isinstance(call_id, str) else f"call_{len(calls)}",
+                    tool_name=name,
+                    arguments=args,
+                )
+            )
+        return calls
+
+    async def _astream_model_call(
+        self, envelope: PromptEnvelope, messages: list[ModelMessage]
+    ) -> tuple[ModelResponse, list[StreamEvent]]:
+        """Stream one model call, returning (response, text_delta StreamEvents).
+
+        Emits the same JSONL events as :meth:`_acall_model` so observers are unchanged.
+        On provider error it fails safe, exactly like the non-streaming path.
+        """
+
+        provider, model = self.default_provider
+        self._event(
+            envelope,
+            "model_request_started",
+            {"provider": provider, "model": model, "message_count": len(messages)},
+        )
+        deltas: list[StreamEvent] = []
+        text_parts: list[str] = []
+        tool_deltas: list[dict[str, object]] = []
+        finish: str | None = None
+        try:
+            async for sev in self.model_router.astream(provider, model, messages, self.tool_specs):
+                if sev.text_delta:
+                    text_parts.append(sev.text_delta)
+                    deltas.append(StreamEvent(kind=TEXT_DELTA, text=sev.text_delta))
+                if sev.tool_call_delta:
+                    tool_deltas.append(sev.tool_call_delta)
+                if sev.event_type == "finish":
+                    finish = sev.finish_reason
+        except Exception as exc:
+            self._event(
+                envelope,
+                "model_request_failed",
+                {
+                    "provider": provider,
+                    "finish_reason": "error",
+                    "error_class": type(exc).__name__,
+                    "safe_error_code": "provider_connection_failed",
+                },
+            )
+            return (
+                ModelResponse(text="model_unavailable: provider_connection_failed", finish_reason="error"),
+                deltas,
+            )
+        response = ModelResponse(
+            text="".join(text_parts),
+            finish_reason=finish or "stop",
+            tool_calls=self._reconstruct_tool_calls(tool_deltas),
+        )
+        self._event(
+            envelope,
+            "model_request_completed",
+            {
+                "provider": provider,
+                "finish_reason": response.finish_reason,
+                "tool_call_count": len(response.tool_calls),
+                "text_length": len(response.text),
+            },
+        )
+        return response, deltas
+
+    async def astream_handle(self, envelope: PromptEnvelope):  # type: ignore[no-untyped-def]
+        """Run a turn, yielding :class:`StreamEvent`s incrementally (text + lifecycle + final)."""
+
+        async for event in self._aturn_events(envelope, stream=True):
+            yield event
+
     async def ahandle(self, envelope: PromptEnvelope) -> AgentResponse:
+        final: AgentResponse | None = None
+        async for event in self._aturn_events(envelope, stream=False):
+            if event.kind == FINAL and event.response is not None:
+                final = event.response
+        assert final is not None  # the generator always yields a FINAL event
+        return final
+
+    async def _aturn_events(self, envelope: PromptEnvelope, *, stream: bool):  # type: ignore[no-untyped-def]
+        self._sink = [] if stream else None
+        try:
+            async for event in self._aturn_events_inner(envelope, stream=stream):
+                yield event
+        finally:
+            self._sink = None
+
+    async def _aturn_events_inner(self, envelope: PromptEnvelope, *, stream: bool):  # type: ignore[no-untyped-def]
         machine = RuntimeStateMachine()
         self._state(machine, envelope, "NORMALISED")
         self._event(envelope, "prompt_normalised", {"text_length": len(envelope.prompt.text)})
@@ -203,8 +319,19 @@ class RuntimeOrchestrator:
         last_action: ToolAction | None = None
         last_result: ToolResult | None = None
 
+        # Surface everything accumulated before the first model call.
+        while self._sink:
+            yield self._sink.pop(0)
+
         while True:
-            response = await self._acall_model(envelope, messages)
+            if stream and hasattr(self.model_router, "astream"):
+                response, deltas = await self._astream_model_call(envelope, messages)
+                for delta in deltas:
+                    yield delta
+            else:
+                response = await self._acall_model(envelope, messages)
+            while self._sink:
+                yield self._sink.pop(0)
             if response.finish_reason == "error":
                 status = "failed"
                 message = response.text or "model_unavailable: provider_connection_failed"
@@ -292,6 +419,8 @@ class RuntimeOrchestrator:
                     name=action.tool_name,
                 )
             )
+            while self._sink:
+                yield self._sink.pop(0)
 
         if status is None:
             self._state(machine, envelope, "RESPONDING")
@@ -307,15 +436,20 @@ class RuntimeOrchestrator:
             "response_created",
             {"status": status, "summary": message[:200], "runtime_state": machine.state},
         )
-        return AgentResponse(
-            request_id=envelope.request_id,
-            session_id=envelope.session_id,
-            turn_id=envelope.turn_id,
-            status=status,
-            message=message,
-            client=envelope.client,
-            approval=approval,
-            last_event_id=self.writer.last_event_id,
+        while self._sink:
+            yield self._sink.pop(0)
+        yield StreamEvent(
+            kind=FINAL,
+            response=AgentResponse(
+                request_id=envelope.request_id,
+                session_id=envelope.session_id,
+                turn_id=envelope.turn_id,
+                status=status,
+                message=message,
+                client=envelope.client,
+                approval=approval,
+                last_event_id=self.writer.last_event_id,
+            ),
         )
 
 

@@ -244,6 +244,11 @@ The terminal client currently exposes these inspection and controlled-action com
 /routines
 /budgets
 /retention
+/channel-pair
+/approval-relay
+/subagents
+/teams
+/remote-exec
 /capabilities
 /execution-profiles
 /workspace

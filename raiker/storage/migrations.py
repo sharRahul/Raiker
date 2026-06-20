@@ -576,6 +576,97 @@ CREATE TABLE IF NOT EXISTS backup_manifests (
 );
 """
 
+PHASE_6_CHANNEL_PAIRINGS_MIGRATION_ID = "RAIKER-6001-phase6-channel-pairings"
+
+PHASE_6_CHANNEL_PAIRINGS_SQL = """
+CREATE TABLE IF NOT EXISTS channel_pairings (
+  pairing_id TEXT PRIMARY KEY,
+  connector_id TEXT NOT NULL,
+  channel_type TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  paired_at TEXT NOT NULL,
+  paired_by TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  sender_allowlist_json TEXT NOT NULL DEFAULT '[]'
+);
+"""
+
+PHASE_6_APPROVAL_RELAY_MIGRATION_ID = "RAIKER-6101-phase6-approval-relay"
+
+PHASE_6_APPROVAL_RELAY_SQL = """
+CREATE TABLE IF NOT EXISTS approval_relay_records (
+  relay_id TEXT PRIMARY KEY,
+  pairing_id TEXT NOT NULL,
+  action_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  requested_at TEXT NOT NULL,
+  resolved_at TEXT,
+  resolved_by TEXT
+);
+"""
+
+PHASE_6_SUBAGENTS_MIGRATION_ID = "RAIKER-6201-phase6-subagents"
+
+PHASE_6_SUBAGENTS_SQL = """
+CREATE TABLE IF NOT EXISTS subagent_contracts (
+  subagent_id TEXT PRIMARY KEY,
+  parent_task_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  allowed_tools_json TEXT NOT NULL,
+  max_depth INTEGER NOT NULL DEFAULT 1,
+  max_runtime_seconds INTEGER NOT NULL DEFAULT 300,
+  max_cost REAL NOT NULL DEFAULT 0.0,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'created'
+);
+"""
+
+PHASE_6_TEAMS_MIGRATION_ID = "RAIKER-6301-phase6-teams"
+
+PHASE_6_TEAMS_SQL = """
+CREATE TABLE IF NOT EXISTS team_ledgers (
+  team_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  members_json TEXT NOT NULL,
+  max_depth INTEGER NOT NULL DEFAULT 1,
+  max_cost REAL NOT NULL DEFAULT 0.0,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'created'
+);
+"""
+
+PHASE_6_REMOTE_EXECUTION_MIGRATION_ID = "RAIKER-6401-phase6-remote-execution"
+
+PHASE_6_REMOTE_EXECUTION_SQL = """
+CREATE TABLE IF NOT EXISTS remote_execution_profiles (
+  profile_id TEXT PRIMARY KEY,
+  profile_type TEXT NOT NULL,
+  name TEXT NOT NULL,
+  config_json TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS execution_budgets (
+  budget_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  max_cost REAL NOT NULL,
+  current_cost REAL NOT NULL DEFAULT 0.0,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  profile_id TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
 PHASE_5_AUDIT_EXPORT_MIGRATION_ID = "RAIKER-5201-phase5-audit-export"
 
 PHASE_5_AUDIT_EXPORT_SQL = """

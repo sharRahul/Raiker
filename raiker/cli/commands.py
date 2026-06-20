@@ -1798,6 +1798,56 @@ def handle_retention(*, workspace_root: str | Path = ".") -> str:
     return "\n".join(lines)
 
 
+def handle_channel_pair(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    pairings = store.list_channel_pairings()
+    if not pairings:
+        return "No channel pairings. Connector profiles are listed via /channels."
+    lines = ["Channel pairings:"]
+    for p in pairings:
+        enabled = "enabled" if p.get("enabled") else "disabled"
+        lines.append(f"- {p['pairing_id']} connector={p.get('connector_id', '')} type={p.get('channel_type', '')} {enabled}")
+    return "\n".join(lines)
+
+
+def handle_approval_relay(*, workspace_root: str | Path = ".") -> str:
+    return "Approval relay is disabled by default. Use /channel-pair to list paired channels."
+
+
+def handle_subagents(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    contracts = store.list_subagent_contracts()
+    if not contracts:
+        return "No subagent contracts. Subagent spawning is disabled by default."
+    lines = ["Subagent contracts:"]
+    for c in contracts:
+        lines.append(f"- {c['subagent_id']} name={c.get('name', '')} mode={c.get('mode', '')} status={c.get('status', '')}")
+    return "\n".join(lines)
+
+
+def handle_teams(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    teams = store.list_team_ledgers()
+    if not teams:
+        return "No team ledgers. Multi-agent team coordination is disabled by default."
+    lines = ["Team ledgers:"]
+    for t in teams:
+        lines.append(f"- {t['team_id']} name={t.get('name', '')} mode={t.get('mode', '')} status={t.get('status', '')}")
+    return "\n".join(lines)
+
+
+def handle_remote_exec_profiles(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    profiles = store.list_remote_execution_profiles()
+    if not profiles:
+        return "No remote execution profiles. Remote execution is denied by default."
+    lines = ["Remote execution profiles:"]
+    for p in profiles:
+        enabled = "enabled" if p.get("enabled") else "disabled"
+        lines.append(f"- {p['profile_id']} name={p.get('name', '')} type={p.get('profile_type', '')} {enabled}")
+    return "\n".join(lines)
+
+
 def handle_export_command(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     session_id: str | None = None
@@ -1982,6 +2032,16 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_role_revoke(command, workspace_root=workspace_root)
     if command == "/routines":
         return handle_routines(workspace_root=workspace_root)
+    if command == "/channel-pair":
+        return handle_channel_pair(workspace_root=workspace_root)
+    if command == "/approval-relay":
+        return handle_approval_relay(workspace_root=workspace_root)
+    if command == "/subagents":
+        return handle_subagents(workspace_root=workspace_root)
+    if command == "/teams":
+        return handle_teams(workspace_root=workspace_root)
+    if command == "/remote-exec":
+        return handle_remote_exec_profiles(workspace_root=workspace_root)
     if command == "/budgets":
         return handle_budgets(workspace_root=workspace_root)
     if command == "/retention":

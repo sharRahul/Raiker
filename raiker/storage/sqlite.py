@@ -10,18 +10,24 @@ from typing import Any
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import (
     AgentEvent,
+    ApprovalRelayRecord,
     BackupManifest,
     BudgetRecord,
+    ChannelPairing,
     Checkpoint,
     ConnectorProfile,
+    ExecutionBudget,
     HostedRoutine,
     ManagedPolicyRule,
     ModelProfile,
     PluginInstallRecord,
     PolicyDecision,
+    RemoteExecutionProfile,
     RetentionPolicy,
     Role,
+    SubagentContract,
     TaskRecord,
+    TeamLedger,
     ToolAction,
     User,
     UserRoleAssignment,
@@ -72,6 +78,16 @@ from raiker.storage.migrations import (
     PHASE_5_BUDGET_RECORDS_SQL,
     PHASE_5_RETENTION_POLICIES_MIGRATION_ID,
     PHASE_5_RETENTION_POLICIES_SQL,
+    PHASE_6_CHANNEL_PAIRINGS_MIGRATION_ID,
+    PHASE_6_CHANNEL_PAIRINGS_SQL,
+    PHASE_6_APPROVAL_RELAY_MIGRATION_ID,
+    PHASE_6_APPROVAL_RELAY_SQL,
+    PHASE_6_SUBAGENTS_MIGRATION_ID,
+    PHASE_6_SUBAGENTS_SQL,
+    PHASE_6_TEAMS_MIGRATION_ID,
+    PHASE_6_TEAMS_SQL,
+    PHASE_6_REMOTE_EXECUTION_MIGRATION_ID,
+    PHASE_6_REMOTE_EXECUTION_SQL,
 )
 
 
@@ -244,6 +260,31 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PHASE_5_RETENTION_POLICIES_MIGRATION_ID,
                 PHASE_5_RETENTION_POLICIES_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_6_CHANNEL_PAIRINGS_MIGRATION_ID,
+                PHASE_6_CHANNEL_PAIRINGS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_6_APPROVAL_RELAY_MIGRATION_ID,
+                PHASE_6_APPROVAL_RELAY_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_6_SUBAGENTS_MIGRATION_ID,
+                PHASE_6_SUBAGENTS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_6_TEAMS_MIGRATION_ID,
+                PHASE_6_TEAMS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_6_REMOTE_EXECUTION_MIGRATION_ID,
+                PHASE_6_REMOTE_EXECUTION_SQL,
                 connection,
             )
             with contextlib.suppress(sqlite3.OperationalError):
@@ -1108,6 +1149,124 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(
                 "SELECT * FROM backup_manifests ORDER BY created_at DESC LIMIT ?", (limit,)
             ).fetchall()
+        return [dict(row) for row in rows]
+
+    # ── Phase 6: Channels & Relay ──
+
+    def insert_channel_pairing(self, pairing: ChannelPairing) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO channel_pairings
+                (pairing_id, connector_id, channel_type, display_name, paired_at, paired_by, enabled, sender_allowlist_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (pairing.pairing_id, pairing.connector_id, pairing.channel_type, pairing.display_name, pairing.paired_at, pairing.paired_by, int(pairing.enabled), pairing.sender_allowlist_json),
+            )
+
+    def list_channel_pairings(self, enabled_only: bool = False) -> list[dict[str, Any]]:
+        query = "SELECT * FROM channel_pairings"
+        params: list[Any] = []
+        if enabled_only:
+            query += " WHERE enabled = 1"
+        query += " ORDER BY paired_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def insert_approval_relay(self, relay: ApprovalRelayRecord) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO approval_relay_records
+                (relay_id, pairing_id, action_id, status, requested_at, resolved_at, resolved_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (relay.relay_id, relay.pairing_id, relay.action_id, relay.status, relay.requested_at, relay.resolved_at, relay.resolved_by),
+            )
+
+    # ── Phase 6: Subagents ──
+
+    def insert_subagent_contract(self, contract: SubagentContract) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO subagent_contracts
+                (subagent_id, parent_task_id, name, mode, allowed_tools_json, max_depth, max_runtime_seconds, max_cost, created_by, created_at, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (contract.subagent_id, contract.parent_task_id, contract.name, contract.mode, contract.allowed_tools_json, contract.max_depth, contract.max_runtime_seconds, contract.max_cost, contract.created_by, contract.created_at, contract.status),
+            )
+
+    def list_subagent_contracts(self) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM subagent_contracts ORDER BY created_at DESC"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    # ── Phase 6: Teams ──
+
+    def insert_team_ledger(self, team: TeamLedger) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO team_ledgers
+                (team_id, name, mode, members_json, max_depth, max_cost, created_by, created_at, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (team.team_id, team.name, team.mode, team.members_json, team.max_depth, team.max_cost, team.created_by, team.created_at, team.status),
+            )
+
+    def list_team_ledgers(self) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM team_ledgers ORDER BY created_at DESC"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    # ── Phase 6: Remote Execution & Budget ──
+
+    def insert_remote_execution_profile(self, profile: RemoteExecutionProfile) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO remote_execution_profiles
+                (profile_id, profile_type, name, config_json, enabled, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (profile.profile_id, profile.profile_type, profile.name, profile.config_json, int(profile.enabled), profile.created_by, profile.created_at, profile.updated_at),
+            )
+
+    def list_remote_execution_profiles(self, enabled_only: bool = False) -> list[dict[str, Any]]:
+        query = "SELECT * FROM remote_execution_profiles"
+        params: list[Any] = []
+        if enabled_only:
+            query += " WHERE enabled = 1"
+        query += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def insert_execution_budget(self, budget: ExecutionBudget) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO execution_budgets
+                (budget_id, name, max_cost, current_cost, currency, profile_id, enabled, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (budget.budget_id, budget.name, budget.max_cost, budget.current_cost, budget.currency, budget.profile_id, int(budget.enabled), budget.created_by, budget.created_at, budget.updated_at),
+            )
+
+    def list_execution_budgets(self, enabled_only: bool = False) -> list[dict[str, Any]]:
+        query = "SELECT * FROM execution_budgets"
+        params: list[Any] = []
+        if enabled_only:
+            query += " WHERE enabled = 1"
+        query += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
     def delete_managed_policy(self, rule_id: str) -> bool:

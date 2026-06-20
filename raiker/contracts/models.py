@@ -135,6 +135,23 @@ EVENT_TYPES = {
     "budget_threshold_exceeded",
     "retention_policy_applied",
     "backup_manifest_created",
+    "channel_paired",
+    "channel_unpaired",
+    "channel_message_received",
+    "channel_message_rejected",
+    "approval_relay_requested",
+    "approval_relay_approved",
+    "approval_relay_denied",
+    "approval_relay_denied_by_default",
+    "subagent_contract_created",
+    "subagent_spawn_denied",
+    "team_ledger_created",
+    "team_work_proposed",
+    "team_execution_denied",
+    "remote_execution_planned",
+    "remote_execution_denied",
+    "execution_budget_recorded",
+    "execution_cleanup_planned",
 }
 INTENTS = {
     "chat",
@@ -808,6 +825,143 @@ class ManagedPolicyRule:
         _require(self.tool_pattern, "tool_pattern")
         _require(self.reason, "reason")
         _require(self.created_by, "created_by")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+CHANNEL_RELAY_STATUSES = {"pending", "approved", "denied", "expired"}
+SUBAGENT_STATUSES = {"created", "running", "completed", "failed", "cancelled"}
+TEAM_STATUSES = {"created", "active", "completed", "cancelled"}
+
+
+@dataclass(frozen=True)
+class ChannelPairing:
+    pairing_id: str
+    connector_id: str
+    channel_type: str
+    display_name: str
+    paired_at: str
+    paired_by: str
+    enabled: bool
+    sender_allowlist_json: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.pairing_id, "pairing_id")
+        _require(self.connector_id, "connector_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ApprovalRelayRecord:
+    relay_id: str
+    pairing_id: str
+    action_id: str
+    status: str
+    requested_at: str
+    resolved_at: str | None
+    resolved_by: str | None
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.relay_id, "relay_id")
+        _require(self.pairing_id, "pairing_id")
+        _one_of(self.status, CHANNEL_RELAY_STATUSES, "relay_status")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class SubagentContract:
+    subagent_id: str
+    parent_task_id: str
+    name: str
+    mode: str
+    allowed_tools_json: str
+    max_depth: int
+    max_runtime_seconds: int
+    max_cost: float
+    created_by: str
+    created_at: str
+    status: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.subagent_id, "subagent_id")
+        _require(self.parent_task_id, "parent_task_id")
+        _one_of(self.status, SUBAGENT_STATUSES, "subagent_status")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class TeamLedger:
+    team_id: str
+    name: str
+    mode: str
+    members_json: str
+    max_depth: int
+    max_cost: float
+    created_by: str
+    created_at: str
+    status: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.team_id, "team_id")
+        _one_of(self.status, TEAM_STATUSES, "team_status")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class RemoteExecutionProfile:
+    profile_id: str
+    profile_type: str
+    name: str
+    config_json: str
+    enabled: bool
+    created_by: str
+    created_at: str
+    updated_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.profile_id, "profile_id")
+        _one_of(self.profile_type, {"container", "ssh", "vps", "kubernetes", "cloud", "sandbox"}, "remote_execution_type")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ExecutionBudget:
+    budget_id: str
+    name: str
+    max_cost: float
+    current_cost: float
+    currency: str
+    profile_id: str
+    enabled: bool
+    created_by: str
+    created_at: str
+    updated_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.budget_id, "budget_id")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

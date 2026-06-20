@@ -35,6 +35,12 @@ _PREFIXES = {
     "bud_",
     "ret_",
     "bkm_",
+    "chn_",
+    "chr_",
+    "sba_",
+    "team_",
+    "rex_",
+    "exb_",
 }
 
 

@@ -573,6 +573,33 @@ The following event names are reserved for Phase 5 enterprise governance, manage
 | `execution_budget_recorded` | `budget_service` | `budget_id`, `max_cost`, `current_cost` | Execution budget recorded. |
 | `execution_cleanup_planned` | `cleanup_service` | `budget_id`, `planned_action` | Execution cleanup planned (no execution). |
 
+## Phase 7 Desktop, Web, Plugins, Graph, Semantic Memory, IDE Events
+
+| Event | Actor | Required payload fields | Notes |
+|---|---|---|---|
+| `desktop_app_launched` | `desktop_client` | `session_id`, `app_version` | Desktop UI application launched. |
+| `desktop_workspace_rendered` | `desktop_client` | `session_id` | Desktop rendered workspace view. |
+| `web_app_launched` | `web_client` | `session_id`, `client_type` | Web UI application launched. |
+| `web_api_request_authenticated` | `web_api` | `token_id`, `session_id` | REST API request authenticated. |
+| `dashboard_widget_rendered` | `dashboard_client` | `widget_type`, `session_id` | Dashboard widget rendered. |
+| `mobile_app_launched` | `mobile_client` | `session_id`, `platform` | Mobile app launched. |
+| `mobile_approval_submitted` | `mobile_client` | `approval_id`, `session_id` | Mobile approval submitted. |
+| `mobile_approval_rejected_stale` | `mobile_client` | `approval_id`, `reason` | Stale mobile state rejected. |
+| `plugin_code_execution_planned` | `plugin_executor` | `execution_id`, `plugin_id` | Plugin code execution planned. |
+| `plugin_code_execution_started` | `plugin_executor` | `execution_id`, `entrypoint` | Plugin code execution started. |
+| `plugin_code_execution_completed` | `plugin_executor` | `execution_id`, `status` | Plugin code execution completed. |
+| `plugin_code_execution_denied` | `plugin_executor` | `execution_id`, `reason` | Plugin code execution denied by policy. |
+| `graph_runtime_index_requested` | `graph_indexer` | `index_id`, `workspace_root` | Graph runtime index requested. |
+| `graph_runtime_index_started` | `graph_indexer` | `index_id` | Graph runtime index started. |
+| `graph_runtime_index_completed` | `graph_indexer` | `index_id`, `nodes_count`, `edges_count` | Graph runtime index completed. |
+| `graph_runtime_index_denied` | `graph_indexer` | `index_id`, `reason` | Graph runtime index denied. |
+| `semantic_memory_write_requested` | `memory_service` | `write_id`, `content_summary` | Semantic memory write requested. |
+| `semantic_memory_write_approved` | `memory_service` | `write_id`, `approved_by` | Semantic memory write approved. |
+| `semantic_memory_write_completed` | `memory_service` | `write_id`, `vector_count` | Semantic memory write completed. |
+| `semantic_memory_write_denied` | `memory_service` | `write_id`, `reason` | Semantic memory write denied. |
+| `ide_extension_connected` | `ide_client` | `session_id`, `ide_type` | IDE extension connected. |
+| `ide_action_routed` | `ide_client` | `session_id`, `action_type` | IDE action routed through gateway. |
+
 ## Raiker TUI (native interactive shell)
 
 Raiker TUI adds **no new events**. The native interactive shell renders the existing command/runtime events and streams `TEXT_DELTA`/`LIFECYCLE`/`FINAL` from `AgentGateway.astream_prompt` into the transcript. No new storage is added.

@@ -667,6 +667,87 @@ CREATE TABLE IF NOT EXISTS execution_budgets (
 );
 """
 
+PHASE_7_DESKTOP_SESSIONS_MIGRATION_ID = "RAIKER-7001-phase7-desktop-sessions"
+
+PHASE_7_DESKTOP_SESSIONS_SQL = """
+CREATE TABLE IF NOT EXISTS desktop_app_sessions (
+  session_id TEXT PRIMARY KEY,
+  app_version TEXT NOT NULL,
+  window_state TEXT NOT NULL DEFAULT 'normal',
+  connected_at TEXT NOT NULL,
+  last_active_at TEXT NOT NULL
+);
+"""
+
+PHASE_7_WEB_SESSIONS_MIGRATION_ID = "RAIKER-7101-phase7-web-sessions"
+
+PHASE_7_WEB_SESSIONS_SQL = """
+CREATE TABLE IF NOT EXISTS web_api_sessions (
+  token_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  client_type TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+"""
+
+PHASE_7_PLUGIN_EXECUTION_MIGRATION_ID = "RAIKER-7401-phase7-plugin-execution"
+
+PHASE_7_PLUGIN_EXECUTION_SQL = """
+CREATE TABLE IF NOT EXISTS plugin_execution_records (
+  execution_id TEXT PRIMARY KEY,
+  plugin_id TEXT NOT NULL,
+  version TEXT NOT NULL,
+  trust_level TEXT NOT NULL,
+  permissions_json TEXT NOT NULL,
+  entrypoint TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'planned',
+  started_at TEXT,
+  completed_at TEXT,
+  created_by TEXT NOT NULL
+);
+"""
+
+PHASE_7_GRAPH_INDEX_MIGRATION_ID = "RAIKER-7501-phase7-graph-index"
+
+PHASE_7_GRAPH_INDEX_SQL = """
+CREATE TABLE IF NOT EXISTS graph_index_records (
+  index_id TEXT PRIMARY KEY,
+  workspace_root TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'requested',
+  nodes_count INTEGER NOT NULL DEFAULT 0,
+  edges_count INTEGER NOT NULL DEFAULT 0,
+  started_at TEXT,
+  completed_at TEXT,
+  created_by TEXT NOT NULL
+);
+"""
+
+PHASE_7_SEMANTIC_MEMORY_MIGRATION_ID = "RAIKER-7601-phase7-semantic-memory"
+
+PHASE_7_SEMANTIC_MEMORY_SQL = """
+CREATE TABLE IF NOT EXISTS semantic_memory_write_records (
+  write_id TEXT PRIMARY KEY,
+  content_summary TEXT NOT NULL,
+  embedding_model TEXT NOT NULL,
+  vector_count INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'requested',
+  approved_by TEXT,
+  created_at TEXT NOT NULL
+);
+"""
+
+PHASE_7_IDE_SESSIONS_MIGRATION_ID = "RAIKER-7701-phase7-ide-sessions"
+
+PHASE_7_IDE_SESSIONS_SQL = """
+CREATE TABLE IF NOT EXISTS ide_extension_sessions (
+  session_id TEXT PRIMARY KEY,
+  extension_version TEXT NOT NULL,
+  ide_type TEXT NOT NULL,
+  connected_at TEXT NOT NULL
+);
+"""
+
 PHASE_5_AUDIT_EXPORT_MIGRATION_ID = "RAIKER-5201-phase5-audit-export"
 
 PHASE_5_AUDIT_EXPORT_SQL = """

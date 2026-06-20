@@ -1848,6 +1848,39 @@ def handle_remote_exec_profiles(*, workspace_root: str | Path = ".") -> str:
     return "\n".join(lines)
 
 
+def handle_plugin_exec(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    records = store.list_plugin_execution_records()
+    if not records:
+        return "No plugin execution records. Plugin execution is denied by default."
+    lines = ["Plugin execution records:"]
+    for r in records:
+        lines.append(f"- {r['execution_id']} plugin={r.get('plugin_id', '')} status={r.get('status', '')}")
+    return "\n".join(lines)
+
+
+def handle_graph_index(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    records = store.list_graph_index_records()
+    if not records:
+        return "No graph index records. Graph indexing is denied by default."
+    lines = ["Graph index records:"]
+    for r in records:
+        lines.append(f"- {r['index_id']} status={r.get('status', '')} nodes={r.get('nodes_count', 0)} edges={r.get('edges_count', 0)}")
+    return "\n".join(lines)
+
+
+def handle_semantic_write(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    records = store.list_semantic_memory_writes()
+    if not records:
+        return "No semantic memory write records. Semantic writes are denied by default."
+    lines = ["Semantic memory write records:"]
+    for r in records:
+        lines.append(f"- {r['write_id']} model={r.get('embedding_model', '')} vectors={r.get('vector_count', 0)} status={r.get('status', '')}")
+    return "\n".join(lines)
+
+
 def handle_export_command(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     session_id: str | None = None
@@ -2042,6 +2075,12 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_teams(workspace_root=workspace_root)
     if command == "/remote-exec":
         return handle_remote_exec_profiles(workspace_root=workspace_root)
+    if command == "/plugin-exec":
+        return handle_plugin_exec(workspace_root=workspace_root)
+    if command == "/graph-index":
+        return handle_graph_index(workspace_root=workspace_root)
+    if command == "/semantic-write":
+        return handle_semantic_write(workspace_root=workspace_root)
     if command == "/budgets":
         return handle_budgets(workspace_root=workspace_root)
     if command == "/retention":

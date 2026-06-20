@@ -16,21 +16,27 @@ from raiker.contracts.models import (
     ChannelPairing,
     Checkpoint,
     ConnectorProfile,
+    DesktopAppSession,
     ExecutionBudget,
+    GraphIndexRecord,
     HostedRoutine,
+    IdeExtensionSession,
     ManagedPolicyRule,
     ModelProfile,
+    PluginExecutionRecord,
     PluginInstallRecord,
     PolicyDecision,
     RemoteExecutionProfile,
     RetentionPolicy,
     Role,
+    SemanticMemoryWriteRecord,
     SubagentContract,
     TaskRecord,
     TeamLedger,
     ToolAction,
     User,
     UserRoleAssignment,
+    WebApiSession,
 )
 from raiker.models.session_state import ModelSessionState
 from raiker.storage.migrations import (
@@ -88,6 +94,18 @@ from raiker.storage.migrations import (
     PHASE_6_TEAMS_SQL,
     PHASE_6_REMOTE_EXECUTION_MIGRATION_ID,
     PHASE_6_REMOTE_EXECUTION_SQL,
+    PHASE_7_DESKTOP_SESSIONS_MIGRATION_ID,
+    PHASE_7_DESKTOP_SESSIONS_SQL,
+    PHASE_7_WEB_SESSIONS_MIGRATION_ID,
+    PHASE_7_WEB_SESSIONS_SQL,
+    PHASE_7_PLUGIN_EXECUTION_MIGRATION_ID,
+    PHASE_7_PLUGIN_EXECUTION_SQL,
+    PHASE_7_GRAPH_INDEX_MIGRATION_ID,
+    PHASE_7_GRAPH_INDEX_SQL,
+    PHASE_7_SEMANTIC_MEMORY_MIGRATION_ID,
+    PHASE_7_SEMANTIC_MEMORY_SQL,
+    PHASE_7_IDE_SESSIONS_MIGRATION_ID,
+    PHASE_7_IDE_SESSIONS_SQL,
 )
 
 
@@ -285,6 +303,36 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PHASE_6_REMOTE_EXECUTION_MIGRATION_ID,
                 PHASE_6_REMOTE_EXECUTION_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_7_DESKTOP_SESSIONS_MIGRATION_ID,
+                PHASE_7_DESKTOP_SESSIONS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_7_WEB_SESSIONS_MIGRATION_ID,
+                PHASE_7_WEB_SESSIONS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_7_PLUGIN_EXECUTION_MIGRATION_ID,
+                PHASE_7_PLUGIN_EXECUTION_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_7_GRAPH_INDEX_MIGRATION_ID,
+                PHASE_7_GRAPH_INDEX_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_7_SEMANTIC_MEMORY_MIGRATION_ID,
+                PHASE_7_SEMANTIC_MEMORY_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_7_IDE_SESSIONS_MIGRATION_ID,
+                PHASE_7_IDE_SESSIONS_SQL,
                 connection,
             )
             with contextlib.suppress(sqlite3.OperationalError):
@@ -1275,6 +1323,66 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "DELETE FROM managed_policies WHERE rule_id = ?", (rule_id,)
             )
         return cursor.rowcount > 0
+
+    # ── Phase 7: Plugin Execution ──
+
+    def insert_plugin_execution_record(self, record: PluginExecutionRecord) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO plugin_execution_records
+                (execution_id, plugin_id, version, trust_level, permissions_json, entrypoint, status, started_at, completed_at, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (record.execution_id, record.plugin_id, record.version, record.trust_level, record.permissions_json, record.entrypoint, record.status, record.started_at, record.completed_at, record.created_by),
+            )
+
+    def list_plugin_execution_records(self, limit: int = 20) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM plugin_execution_records ORDER BY COALESCE(started_at, created_by) DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    # ── Phase 7: Graph Index ──
+
+    def insert_graph_index_record(self, record: GraphIndexRecord) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO graph_index_records
+                (index_id, workspace_root, status, nodes_count, edges_count, started_at, completed_at, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (record.index_id, record.workspace_root, record.status, record.nodes_count, record.edges_count, record.started_at, record.completed_at, record.created_by),
+            )
+
+    def list_graph_index_records(self, limit: int = 20) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM graph_index_records ORDER BY COALESCE(started_at, index_id) DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    # ── Phase 7: Semantic Memory Writes ──
+
+    def insert_semantic_memory_write(self, record: SemanticMemoryWriteRecord) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO semantic_memory_write_records
+                (write_id, content_summary, embedding_model, vector_count, status, approved_by, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (record.write_id, record.content_summary, record.embedding_model, record.vector_count, record.status, record.approved_by, record.created_at),
+            )
+
+    def list_semantic_memory_writes(self, limit: int = 20) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM semantic_memory_write_records ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def load_model_session_state(self, session_id: str) -> ModelSessionState | None:
         with self.connect() as connection:

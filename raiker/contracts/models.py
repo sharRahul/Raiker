@@ -152,6 +152,28 @@ EVENT_TYPES = {
     "remote_execution_denied",
     "execution_budget_recorded",
     "execution_cleanup_planned",
+    "desktop_app_launched",
+    "desktop_workspace_rendered",
+    "web_app_launched",
+    "web_api_request_authenticated",
+    "dashboard_widget_rendered",
+    "mobile_app_launched",
+    "mobile_approval_submitted",
+    "mobile_approval_rejected_stale",
+    "plugin_code_execution_planned",
+    "plugin_code_execution_started",
+    "plugin_code_execution_completed",
+    "plugin_code_execution_denied",
+    "graph_runtime_index_requested",
+    "graph_runtime_index_started",
+    "graph_runtime_index_completed",
+    "graph_runtime_index_denied",
+    "semantic_memory_write_requested",
+    "semantic_memory_write_approved",
+    "semantic_memory_write_completed",
+    "semantic_memory_write_denied",
+    "ide_extension_connected",
+    "ide_action_routed",
 }
 INTENTS = {
     "chat",
@@ -825,6 +847,118 @@ class ManagedPolicyRule:
         _require(self.tool_pattern, "tool_pattern")
         _require(self.reason, "reason")
         _require(self.created_by, "created_by")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DesktopAppSession:
+    session_id: str
+    app_version: str
+    window_state: str
+    connected_at: str
+    last_active_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.session_id, "session_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class WebApiSession:
+    token_id: str
+    session_id: str
+    client_type: str
+    created_at: str
+    expires_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.token_id, "token_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PluginExecutionRecord:
+    execution_id: str
+    plugin_id: str
+    version: str
+    trust_level: str
+    permissions_json: str
+    entrypoint: str
+    status: str
+    started_at: str | None
+    completed_at: str | None
+    created_by: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.execution_id, "execution_id")
+        _require(self.plugin_id, "plugin_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class GraphIndexRecord:
+    index_id: str
+    workspace_root: str
+    status: str
+    nodes_count: int
+    edges_count: int
+    started_at: str | None
+    completed_at: str | None
+    created_by: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.index_id, "index_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class SemanticMemoryWriteRecord:
+    write_id: str
+    content_summary: str
+    embedding_model: str
+    vector_count: int
+    status: str
+    approved_by: str | None
+    created_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.write_id, "write_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IdeExtensionSession:
+    session_id: str
+    extension_version: str
+    ide_type: str
+    connected_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.session_id, "session_id")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

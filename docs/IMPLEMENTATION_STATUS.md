@@ -305,6 +305,25 @@ Do not commit generated metadata/cache files including `*.egg-info/`, `build/`, 
 
 ---
 
+## Phase 7 Desktop, Web, Plugins Runtime, Graph Index, Semantic Memory, IDE Status
+
+Phase 7 activates the runtime features deferred from Phase 3 (safe foundation/readiness slices A-P only were implemented). All execution remains policy-gated and approval-required.
+
+| Task | Status | Source | Tests |
+|---|---|---|---|
+| RAIKER-7001 Desktop app session model | `implemented_verified` | `raiker/contracts/models.py` | `tests/test_phase_7_desktop_web_plugins_graph_memory_ide.py` |
+| RAIKER-7101 Web API session model | `implemented_verified` | `raiker/contracts/models.py` | `tests/test_phase_7_desktop_web_plugins_graph_memory_ide.py` |
+| RAIKER-7201 Dashboard data parity | `specified_not_implemented` | — | Dashboard widgets require UI framework. |
+| RAIKER-7301 Mobile apps | `specified_not_implemented` | — | Mobile apps require native build toolchain. |
+| RAIKER-7401 Plugin runtime execution | `implemented_verified` | `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_7_desktop_web_plugins_graph_memory_ide.py` |
+| RAIKER-7501 Graph/codemap runtime indexing | `implemented_verified` | `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_7_desktop_web_plugins_graph_memory_ide.py` |
+| RAIKER-7601 Semantic/vector memory writes | `implemented_verified` | `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_7_desktop_web_plugins_graph_memory_ide.py` |
+| RAIKER-7701 IDE extension session model | `implemented_verified` | `raiker/contracts/models.py` | `tests/test_phase_7_desktop_web_plugins_graph_memory_ide.py` |
+
+All execution remains policy-gated. No runtime is activated without explicit policy, approval, and audit.
+
+---
+
 ## Phase 1 MVP Status
 
 Post-restore audit note: the long-form Phase 1 build plan is restored and remains the detailed scope source for implemented/verified Phase 1 behavior. Later Slice G/H lifecycle metadata does not change Phase 1 runtime scope.

@@ -249,6 +249,9 @@ The terminal client currently exposes these inspection and controlled-action com
 /subagents
 /teams
 /remote-exec
+/plugin-exec
+/graph-index
+/semantic-write
 /capabilities
 /execution-profiles
 /workspace

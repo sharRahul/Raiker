@@ -41,6 +41,13 @@ _PREFIXES = {
     "team_",
     "rex_",
     "exb_",
+    "dsk_",
+    "web_",
+    "mob_",
+    "plgex_",
+    "gix_",
+    "smw_",
+    "ide_",
 }
 
 

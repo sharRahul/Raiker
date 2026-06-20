@@ -551,6 +551,28 @@ The following event names are reserved for Phase 5 enterprise governance, manage
 | `backup_created` | `backup_service` | `manifest_id`, `backup_type` | Backup manifest created. |
 | `backup_restored` | `backup_service` | `manifest_id`, `scope_json` | Backup restore record (metadata only). |
 
+## Phase 6 Channels, Subagents, Remote Execution Events
+
+| Event | Actor | Required payload fields | Notes |
+|---|---|---|---|
+| `channel_paired` | `channel_service` | `pairing_id`, `connector_id` | Channel paired with sender allowlist. |
+| `channel_unpaired` | `channel_service` | `pairing_id` | Channel pairing removed. |
+| `channel_message_received` | `channel_service` | `pairing_id`, `sender` | Inbound channel message. |
+| `channel_message_rejected` | `channel_service` | `pairing_id`, `reason` | Inbound channel message rejected by policy. |
+| `approval_relay_requested` | `relay_service` | `relay_id`, `pairing_id`, `action_id` | Approval relay requested over channel. |
+| `approval_relay_approved` | `relay_service` | `relay_id`, `resolved_by` | Approval relay resolved (approved). |
+| `approval_relay_denied` | `relay_service` | `relay_id`, `resolved_by` | Approval relay resolved (denied). |
+| `approval_relay_denied_by_default` | `relay_service` | `pairing_id` | Approval relay denied because no explicit policy exists. |
+| `subagent_contract_created` | `subagent_service` | `subagent_id`, `parent_task_id`, `mode` | Subagent contract created (no spawn). |
+| `subagent_spawn_denied` | `subagent_service` | `subagent_id`, `reason` | Subagent spawn denied by policy. |
+| `team_ledger_created` | `team_service` | `team_id`, `name`, `mode` | Multi-agent team ledger created. |
+| `team_work_proposed` | `team_service` | `team_id`, `work_description` | Team work proposed (no execution). |
+| `team_execution_denied` | `team_service` | `team_id`, `reason` | Team execution denied by policy. |
+| `remote_execution_planned` | `execution_service` | `profile_id`, `profile_type` | Remote execution plan created (no execution). |
+| `remote_execution_denied` | `execution_service` | `profile_id`, `reason` | Remote execution denied by policy. |
+| `execution_budget_recorded` | `budget_service` | `budget_id`, `max_cost`, `current_cost` | Execution budget recorded. |
+| `execution_cleanup_planned` | `cleanup_service` | `budget_id`, `planned_action` | Execution cleanup planned (no execution). |
+
 ## Raiker TUI (native interactive shell)
 
 Raiker TUI adds **no new events**. The native interactive shell renders the existing command/runtime events and streams `TEXT_DELTA`/`LIFECYCLE`/`FINAL` from `AgentGateway.astream_prompt` into the transcript. No new storage is added.

@@ -465,4 +465,9 @@ Slice P adds deterministic metadata-only readiness contracts, registry, optional
 | `/routines` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/budgets` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/retention` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/channel-pair` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/approval-relay` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/subagents` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/teams` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
+| `/remote-exec` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/quit` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |

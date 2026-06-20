@@ -620,6 +620,21 @@ Phase 5 adds managed governance, org roles, audit export, plugin marketplace, ho
 | RAIKER-5501 Budget records | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_5_hosted_budget_retention.py` |
 | RAIKER-5601 Retention and backup | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_5_hosted_budget_retention.py` |
 
+All runtime execution remains disabled.
+
+## Phase 6 Channels, Subagents, Remote Execution Status
+
+Phase 6 adds external channel profiles, approval relay, subagent contracts, multi-agent team ledgers, remote execution profiles, and execution budgets. All execution remains disabled by default.
+
+| Task | Status | Source | Tests |
+|---|---|---|---|
+| RAIKER-6001 External channel connectors | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_6_channels_subagents_remote.py` |
+| RAIKER-6101 Channel approval relay | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_6_channels_subagents_remote.py` |
+| RAIKER-6201 Subagent contracts | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_6_channels_subagents_remote.py` |
+| RAIKER-6301 Multi-agent teams | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_6_channels_subagents_remote.py` |
+| RAIKER-6401 Remote/container execution | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_6_channels_subagents_remote.py` |
+| RAIKER-6501 Execution budget | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_6_channels_subagents_remote.py` |
+
 Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
 
 ## Phase 3 Completion Status

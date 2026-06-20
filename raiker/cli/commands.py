@@ -32,7 +32,10 @@ from raiker.contracts.models import (
     PromptEnvelope,
     PromptOptions,
     PromptPayload,
+    Role,
+    User,
     UserMetadata,
+    UserRoleAssignment,
 )
 from raiker.diagnostics import render_doctor
 from raiker.events.query import EventViewer
@@ -1612,6 +1615,124 @@ def handle_reasoning_command(command: str, *, workspace_root: str | Path = ".") 
     return "Usage: /reasoning [status|set <mode-or-effort>|off]"
 
 
+def handle_users(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    users = store.list_users()
+    if not users:
+        return "No users."
+    lines = ["Users:"]
+    for u in users:
+        active = "active" if u.get("is_active") else "inactive"
+        roles = store.list_user_roles(str(u["user_id"]))
+        role_names = ", ".join(str(r.get("role_name", "")) for r in roles)
+        lines.append(
+            f"- {u['user_id']} display={u.get('display_name', '')} email={u.get('email', '')} "
+            f"status={active} roles=[{role_names}]"
+        )
+    return "\n".join(lines)
+
+
+def handle_user_create(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) < 3:
+        return "Usage: /user create <user_id> [--display <name>] [--email <email>]"
+    user_id = parts[2]
+    display_name: str | None = None
+    email: str | None = None
+    i = 3
+    while i < len(parts):
+        if parts[i] == "--display" and i + 1 < len(parts):
+            display_name = parts[i + 1]
+            i += 2
+        elif parts[i] == "--email" and i + 1 < len(parts):
+            email = parts[i + 1]
+            i += 2
+        else:
+            i += 1
+    now = utc_now()
+    user = User(user_id=user_id, display_name=display_name, email=email, is_active=True, created_at=now, updated_at=now)
+    store = SQLiteStore(workspace_root)
+    store.insert_user(user)
+    return f"User created: {user_id}"
+
+
+def handle_user_deactivate(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) != 3:
+        return "Usage: /user deactivate <user_id>"
+    store = SQLiteStore(workspace_root)
+    if store.deactivate_user(parts[2]):
+        return f"User deactivated: {parts[2]}"
+    return f"User not found or already inactive: {parts[2]}"
+
+
+def handle_roles(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    role_list = store.list_roles()
+    if not role_list:
+        return "No roles."
+    lines = ["Roles:"]
+    for r in role_list:
+        system = "(system)" if r.get("is_system_role") else ""
+        lines.append(f"- {r['role_id']} name={r.get('name', '')} {system}")
+    return "\n".join(lines)
+
+
+def handle_role_create(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) < 4:
+        return "Usage: /role create <role_id> <name> [--description <text>]"
+    role_id = parts[2]
+    name = parts[3]
+    description: str | None = None
+    i = 4
+    while i < len(parts):
+        if parts[i] == "--description" and i + 1 < len(parts):
+            description = parts[i + 1]
+            i += 2
+        else:
+            i += 1
+    now = utc_now()
+    role = Role(role_id=role_id, name=name, description=description, is_system_role=False, created_at=now)
+    store = SQLiteStore(workspace_root)
+    store.insert_role(role)
+    return f"Role created: {role_id} ({name})"
+
+
+def handle_role_grant(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) < 5:
+        return "Usage: /role grant <role_id> <user_id>"
+    role_id = parts[2]
+    user_id = parts[3]
+    now = utc_now()
+    assignment = UserRoleAssignment(
+        assignment_id=new_id("ura_"),
+        user_id=user_id,
+        role_id=role_id,
+        granted_at=now,
+        granted_by="cli",
+    )
+    store = SQLiteStore(workspace_root)
+    store.insert_user_role_assignment(assignment)
+    return f"Role '{role_id}' granted to user '{user_id}'."
+
+
+def handle_role_revoke(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) < 5:
+        return "Usage: /role revoke <role_id> <user_id>"
+    role_id = parts[2]
+    user_id = parts[3]
+    store = SQLiteStore(workspace_root)
+    assignments = store.list_user_roles(user_id)
+    for a in assignments:
+        if str(a.get("role_id")) == role_id:
+            if store.delete_user_role_assignment(str(a["assignment_id"])):
+                return f"Role '{role_id}' revoked from user '{user_id}'."
+    return f"No assignment found for role '{role_id}' on user '{user_id}'."
+
+
 def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> str:
     command = command.strip()
     if command in {"/quit", "/exit"}:
@@ -1731,6 +1852,20 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_proposals(command, workspace_root=workspace_root)
     if command == "/proposal" or command.startswith("/proposal "):
         return handle_proposal_detail(command, workspace_root=workspace_root)
+    if command == "/users":
+        return handle_users(workspace_root=workspace_root)
+    if command == "/user create" or command.startswith("/user create "):
+        return handle_user_create(command, workspace_root=workspace_root)
+    if command == "/user deactivate" or command.startswith("/user deactivate "):
+        return handle_user_deactivate(command, workspace_root=workspace_root)
+    if command == "/roles":
+        return handle_roles(workspace_root=workspace_root)
+    if command == "/role create" or command.startswith("/role create "):
+        return handle_role_create(command, workspace_root=workspace_root)
+    if command == "/role grant" or command.startswith("/role grant "):
+        return handle_role_grant(command, workspace_root=workspace_root)
+    if command == "/role revoke" or command.startswith("/role revoke "):
+        return handle_role_revoke(command, workspace_root=workspace_root)
     if command == "/doctor":
         return render_doctor(workspace_root=workspace_root)
     if (

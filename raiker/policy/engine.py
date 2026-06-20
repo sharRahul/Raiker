@@ -68,10 +68,44 @@ class PolicyEngine:
             )
         return None
 
-    def review(self, action: ToolAction) -> PolicyDecision:
+    def _check_role_policy(self, action: ToolAction, user_id: str | None) -> PolicyDecision | None:
+        if user_id is None or self.store is None:
+            return None
+        try:
+            user = self.store.load_user(user_id)
+        except Exception:
+            return None
+        if user is None:
+            return PolicyDecision(
+                decision_id=new_id("pol_"),
+                action_id=action.action_id,
+                decision="deny",
+                reasons=[f"unknown_user:{user_id}"],
+                requires_user_approval=False,
+                policy_version=self.config.policy_version,
+                risk_level="blocked",
+                timestamp=utc_now(),
+            )
+        if not user.get("is_active", 0):
+            return PolicyDecision(
+                decision_id=new_id("pol_"),
+                action_id=action.action_id,
+                decision="deny",
+                reasons=[f"user_not_active:{user_id}"],
+                requires_user_approval=False,
+                policy_version=self.config.policy_version,
+                risk_level="blocked",
+                timestamp=utc_now(),
+            )
+        return None
+
+    def review(self, action: ToolAction, user_id: str | None = None) -> PolicyDecision:
         managed = self._check_managed_policy(action)
         if managed is not None:
             return managed
+        role_check = self._check_role_policy(action, user_id)
+        if role_check is not None:
+            return role_check
         if action.tool_name in self.config.allowed_read_actions:
             inside, reasons = self._path_arguments_inside_workspace(action)
             if not inside:

@@ -231,6 +231,13 @@ The terminal client currently exposes these inspection and controlled-action com
 /memory-search <query>
 /memory-forget <memory_id>
 /memory-list
+/users
+/user create <user_id> [--display <name>] [--email <email>]
+/user deactivate <user_id>
+/roles
+/role create <role_id> <name> [--description <text>]
+/role grant <role_id> <user_id>
+/role revoke <role_id> <user_id>
 /semantic-memory
 /capabilities
 /execution-profiles

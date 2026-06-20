@@ -462,3 +462,35 @@ CREATE TABLE IF NOT EXISTS managed_policies (
 CREATE INDEX IF NOT EXISTS idx_managed_policies_enabled ON managed_policies(enabled);
 CREATE INDEX IF NOT EXISTS idx_managed_policies_priority ON managed_policies(priority);
 """
+
+PHASE_5_ORG_ROLES_MIGRATION_ID = "RAIKER-5101-phase5-org-roles"
+
+PHASE_5_ORG_ROLES_SQL = """
+CREATE TABLE IF NOT EXISTS users (
+  user_id TEXT PRIMARY KEY,
+  display_name TEXT,
+  email TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS roles (
+  role_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  description TEXT,
+  is_system_role INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_role_assignments (
+  assignment_id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(user_id),
+  role_id TEXT NOT NULL REFERENCES roles(role_id),
+  granted_at TEXT NOT NULL,
+  granted_by TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_role_user ON user_role_assignments(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_role_role ON user_role_assignments(role_id);
+"""

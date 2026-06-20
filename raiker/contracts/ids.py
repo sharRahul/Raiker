@@ -26,6 +26,9 @@ _PREFIXES = {
     "apv_",
     "mem_",
     "mng_",
+    "usr_",
+    "rl_",
+    "ura_",
 }
 
 

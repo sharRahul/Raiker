@@ -117,6 +117,13 @@ EVENT_TYPES = {
     "proposal_approval_preview_viewed",
     "managed_policy_applied",
     "managed_policy_override",
+    "user_created",
+    "user_deactivated",
+    "role_created",
+    "role_deleted",
+    "user_role_granted",
+    "user_role_revoked",
+    "session_user_bound",
 }
 INTENTS = {
     "chat",
@@ -572,6 +579,61 @@ class InterruptAction:
         _require(self.reason, "reason")
         if self.action_type == "steer" and not self.steer_text:
             raise ContractValidationError("missing_steer_text")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class User:
+    user_id: str
+    display_name: str | None
+    email: str | None
+    is_active: bool
+    created_at: str
+    updated_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.user_id, "user_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class Role:
+    role_id: str
+    name: str
+    description: str | None
+    is_system_role: bool
+    created_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.role_id, "role_id")
+        _require(self.name, "role_name")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class UserRoleAssignment:
+    assignment_id: str
+    user_id: str
+    role_id: str
+    granted_at: str
+    granted_by: str | None
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.assignment_id, "assignment_id")
+        _require(self.user_id, "user_id")
+        _require(self.role_id, "role_id")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

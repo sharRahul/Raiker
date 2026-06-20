@@ -15,8 +15,11 @@ from raiker.contracts.models import (
     ManagedPolicyRule,
     ModelProfile,
     PolicyDecision,
+    Role,
     TaskRecord,
     ToolAction,
+    User,
+    UserRoleAssignment,
 )
 from raiker.models.session_state import ModelSessionState
 from raiker.storage.migrations import (
@@ -52,6 +55,8 @@ from raiker.storage.migrations import (
     PHASE_4_MEMORY_MVP_SQL,
     PHASE_5_MANAGED_POLICY_MIGRATION_ID,
     PHASE_5_MANAGED_POLICY_SQL,
+    PHASE_5_ORG_ROLES_MIGRATION_ID,
+    PHASE_5_ORG_ROLES_SQL,
 )
 
 
@@ -196,6 +201,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 PHASE_5_MANAGED_POLICY_SQL,
                 connection,
             )
+            self._apply_migration(
+                PHASE_5_ORG_ROLES_MIGRATION_ID,
+                PHASE_5_ORG_ROLES_SQL,
+                connection,
+            )
+            with contextlib.suppress(sqlite3.OperationalError):
+                connection.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)")
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
         row = connection.execute(
@@ -217,16 +229,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return {str(row["name"]) for row in rows}
 
-    def create_session(self, session_id: str, project_root: str, title: str | None = None) -> None:
+    def create_session(self, session_id: str, project_root: str, title: str | None = None, user_id: str | None = None) -> None:
         now = utc_now()
         with self.connect() as connection:
             connection.execute(
                 """
                 INSERT OR IGNORE INTO sessions
-                (session_id, project_root, created_at, updated_at, status, title)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (session_id, project_root, created_at, updated_at, status, title, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (session_id, project_root, now, now, "open", title),
+                (session_id, project_root, now, now, "open", title, user_id),
             )
 
     def load_session(self, session_id: str) -> dict[str, Any] | None:
@@ -731,6 +743,127 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
+
+    def insert_user(self, user: User) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO users
+                (user_id, display_name, email, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user.user_id,
+                    user.display_name,
+                    user.email,
+                    int(user.is_active),
+                    user.created_at,
+                    user.updated_at,
+                ),
+            )
+
+    def list_users(self, active_only: bool = True) -> list[dict[str, Any]]:
+        query = "SELECT * FROM users"
+        params: list[Any] = []
+        if active_only:
+            query += " WHERE is_active = 1"
+        query += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_user(self, user_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM users WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def deactivate_user(self, user_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE users SET is_active = 0, updated_at = ? WHERE user_id = ? AND is_active = 1",
+                (utc_now(), user_id),
+            )
+        return cursor.rowcount > 0
+
+    def insert_role(self, role: Role) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO roles
+                (role_id, name, description, is_system_role, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    role.role_id,
+                    role.name,
+                    role.description,
+                    int(role.is_system_role),
+                    role.created_at,
+                ),
+            )
+
+    def list_roles(self) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM roles ORDER BY is_system_role DESC, name ASC"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_role(self, role_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM roles WHERE role_id = ?", (role_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def delete_role(self, role_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM roles WHERE role_id = ? AND is_system_role = 0",
+                (role_id,),
+            )
+        return cursor.rowcount > 0
+
+    def insert_user_role_assignment(self, assignment: UserRoleAssignment) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO user_role_assignments
+                (assignment_id, user_id, role_id, granted_at, granted_by)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    assignment.assignment_id,
+                    assignment.user_id,
+                    assignment.role_id,
+                    assignment.granted_at,
+                    assignment.granted_by,
+                ),
+            )
+
+    def list_user_roles(self, user_id: str) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT ura.*, r.name AS role_name, r.description AS role_description
+                FROM user_role_assignments ura
+                JOIN roles r ON ura.role_id = r.role_id
+                WHERE ura.user_id = ?
+                ORDER BY ura.granted_at DESC
+                """,
+                (user_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_user_role_assignment(self, assignment_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM user_role_assignments WHERE assignment_id = ?",
+                (assignment_id,),
+            )
+        return cursor.rowcount > 0
 
     def delete_managed_policy(self, rule_id: str) -> bool:
         with self.connect() as connection:

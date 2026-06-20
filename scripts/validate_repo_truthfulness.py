@@ -140,7 +140,7 @@ def _literal_command_prefixes() -> set[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.startswith("/"):
             prefixes.add(node.value.split()[0])
-    return {p for p in prefixes if p not in {"/exit"}}
+    return {p for p in prefixes if p not in {"/exit", "/"}}
 
 
 def _ci_has_active_triggers() -> bool:

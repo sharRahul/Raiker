@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from raiker.plugins.manifest import PluginManifestValidation, validate_plugin_manifest
+from raiker.plugins.verify import validate_supply_chain
 
 SAFE_READ_ONLY = {
     "tool:read_file",
@@ -58,6 +59,8 @@ def plan_plugin_registration(manifest: dict[str, Any]) -> PluginRegistrationPlan
     if trust_level not in KNOWN_TRUST_LEVELS:
         reasons.append(f"unknown_trust_level:{trust_level}")
     permissions = validation.permissions
+    supply_chain_reasons = validate_supply_chain(manifest)
+    reasons.extend(supply_chain_reasons)
     for permission in permissions:
         if permission.startswith(DENIED_PREFIXES) or any(
             token in permission for token in ("..", "$(", "`;", "__import__")

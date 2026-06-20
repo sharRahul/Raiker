@@ -10,11 +10,16 @@ from typing import Any
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import (
     AgentEvent,
+    BackupManifest,
+    BudgetRecord,
     Checkpoint,
     ConnectorProfile,
+    HostedRoutine,
     ManagedPolicyRule,
     ModelProfile,
+    PluginInstallRecord,
     PolicyDecision,
+    RetentionPolicy,
     Role,
     TaskRecord,
     ToolAction,
@@ -59,6 +64,14 @@ from raiker.storage.migrations import (
     PHASE_5_ORG_ROLES_SQL,
     PHASE_5_AUDIT_EXPORT_MIGRATION_ID,
     PHASE_5_AUDIT_EXPORT_SQL,
+    PHASE_5_PLUGIN_MARKETPLACE_MIGRATION_ID,
+    PHASE_5_PLUGIN_MARKETPLACE_SQL,
+    PHASE_5_HOSTED_ROUTINES_MIGRATION_ID,
+    PHASE_5_HOSTED_ROUTINES_SQL,
+    PHASE_5_BUDGET_RECORDS_MIGRATION_ID,
+    PHASE_5_BUDGET_RECORDS_SQL,
+    PHASE_5_RETENTION_POLICIES_MIGRATION_ID,
+    PHASE_5_RETENTION_POLICIES_SQL,
 )
 
 
@@ -211,6 +224,26 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PHASE_5_AUDIT_EXPORT_MIGRATION_ID,
                 PHASE_5_AUDIT_EXPORT_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_5_PLUGIN_MARKETPLACE_MIGRATION_ID,
+                PHASE_5_PLUGIN_MARKETPLACE_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_5_HOSTED_ROUTINES_MIGRATION_ID,
+                PHASE_5_HOSTED_ROUTINES_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_5_BUDGET_RECORDS_MIGRATION_ID,
+                PHASE_5_BUDGET_RECORDS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_5_RETENTION_POLICIES_MIGRATION_ID,
+                PHASE_5_RETENTION_POLICIES_SQL,
                 connection,
             )
             with contextlib.suppress(sqlite3.OperationalError):
@@ -929,6 +962,151 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(
                 "SELECT event_id, payload_sha256, prev_event_sha256, jsonl_path, jsonl_offset FROM events_index WHERE session_id = ? ORDER BY jsonl_offset ASC",
                 (session_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def insert_plugin_install_record(self, record: PluginInstallRecord) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO plugin_install_records
+                (record_id, plugin_id, version, trust_level, checksum, signature, source_url, commit_sha, permissions_json, status, installed_at, installed_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.record_id,
+                    record.plugin_id,
+                    record.version,
+                    record.trust_level,
+                    record.checksum,
+                    record.signature,
+                    record.source_url,
+                    record.commit_sha,
+                    record.permissions_json,
+                    record.status,
+                    record.installed_at,
+                    record.installed_by,
+                ),
+            )
+
+    def list_plugin_install_records(self, status: str | None = None) -> list[dict[str, Any]]:
+        query = "SELECT * FROM plugin_install_records"
+        params: list[Any] = []
+        if status is not None:
+            query += " WHERE status = ?"
+            params.append(status)
+        query += " ORDER BY installed_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_plugin_install_record(self, record_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM plugin_install_records WHERE record_id = ?", (record_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def insert_hosted_routine(self, routine: HostedRoutine) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO hosted_routines
+                (routine_id, name, routine_type, schedule, endpoint, enabled, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (routine.routine_id, routine.name, routine.routine_type, routine.schedule, routine.endpoint, int(routine.enabled), routine.created_by, routine.created_at, routine.updated_at),
+            )
+
+    def list_hosted_routines(self, enabled_only: bool = False) -> list[dict[str, Any]]:
+        query = "SELECT * FROM hosted_routines"
+        params: list[Any] = []
+        if enabled_only:
+            query += " WHERE enabled = 1"
+        query += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_hosted_routine(self, routine_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM hosted_routines WHERE routine_id = ?", (routine_id,)
+            )
+        return cursor.rowcount > 0
+
+    def insert_budget_record(self, budget: BudgetRecord) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO budget_records
+                (budget_id, name, max_cost, current_cost, currency, scope, enabled, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (budget.budget_id, budget.name, budget.max_cost, budget.current_cost, budget.currency, budget.scope, int(budget.enabled), budget.created_by, budget.created_at, budget.updated_at),
+            )
+
+    def list_budget_records(self, enabled_only: bool = False) -> list[dict[str, Any]]:
+        query = "SELECT * FROM budget_records"
+        params: list[Any] = []
+        if enabled_only:
+            query += " WHERE enabled = 1"
+        query += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_budget_record(self, budget_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM budget_records WHERE budget_id = ?", (budget_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def update_budget_cost(self, budget_id: str, additional_cost: float) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE budget_records SET current_cost = current_cost + ?, updated_at = ? WHERE budget_id = ?",
+                (additional_cost, utc_now(), budget_id),
+            )
+        return cursor.rowcount > 0
+
+    def insert_retention_policy(self, policy: RetentionPolicy) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO retention_policies
+                (policy_id, target_type, retention_days, legal_hold, enabled, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (policy.policy_id, policy.target_type, policy.retention_days, int(policy.legal_hold), int(policy.enabled), policy.created_by, policy.created_at, policy.updated_at),
+            )
+
+    def list_retention_policies(self, enabled_only: bool = False) -> list[dict[str, Any]]:
+        query = "SELECT * FROM retention_policies"
+        params: list[Any] = []
+        if enabled_only:
+            query += " WHERE enabled = 1"
+        query += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def insert_backup_manifest(self, manifest: BackupManifest) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO backup_manifests
+                (manifest_id, backup_type, scope_json, path, checksum, size_bytes, created_by, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (manifest.manifest_id, manifest.backup_type, manifest.scope_json, manifest.path, manifest.checksum, manifest.size_bytes, manifest.created_by, manifest.created_at),
+            )
+
+    def list_backup_manifests(self, limit: int = 20) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM backup_manifests ORDER BY created_at DESC LIMIT ?", (limit,)
             ).fetchall()
         return [dict(row) for row in rows]
 

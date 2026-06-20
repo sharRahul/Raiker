@@ -495,6 +495,87 @@ CREATE INDEX IF NOT EXISTS idx_user_role_user ON user_role_assignments(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_role_role ON user_role_assignments(role_id);
 """
 
+PHASE_5_PLUGIN_MARKETPLACE_MIGRATION_ID = "RAIKER-5301-phase5-plugin-marketplace"
+
+PHASE_5_PLUGIN_MARKETPLACE_SQL = """
+CREATE TABLE IF NOT EXISTS plugin_install_records (
+  record_id TEXT PRIMARY KEY,
+  plugin_id TEXT NOT NULL,
+  version TEXT NOT NULL,
+  trust_level TEXT NOT NULL,
+  checksum TEXT,
+  signature TEXT,
+  source_url TEXT,
+  commit_sha TEXT,
+  permissions_json TEXT NOT NULL,
+  status TEXT NOT NULL,
+  installed_at TEXT NOT NULL,
+  installed_by TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_plugin_install_plugin_id ON plugin_install_records(plugin_id);
+CREATE INDEX IF NOT EXISTS idx_plugin_install_status ON plugin_install_records(status);
+"""
+
+PHASE_5_HOSTED_ROUTINES_MIGRATION_ID = "RAIKER-5401-phase5-hosted-routines"
+
+PHASE_5_HOSTED_ROUTINES_SQL = """
+CREATE TABLE IF NOT EXISTS hosted_routines (
+  routine_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  routine_type TEXT NOT NULL,
+  schedule TEXT,
+  endpoint TEXT,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
+PHASE_5_BUDGET_RECORDS_MIGRATION_ID = "RAIKER-5501-phase5-budget-records"
+
+PHASE_5_BUDGET_RECORDS_SQL = """
+CREATE TABLE IF NOT EXISTS budget_records (
+  budget_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  max_cost REAL NOT NULL,
+  current_cost REAL NOT NULL DEFAULT 0.0,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  scope TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
+PHASE_5_RETENTION_POLICIES_MIGRATION_ID = "RAIKER-5601-phase5-retention-policies"
+
+PHASE_5_RETENTION_POLICIES_SQL = """
+CREATE TABLE IF NOT EXISTS retention_policies (
+  policy_id TEXT PRIMARY KEY,
+  target_type TEXT NOT NULL,
+  retention_days INTEGER NOT NULL,
+  legal_hold INTEGER NOT NULL DEFAULT 0,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS backup_manifests (
+  manifest_id TEXT PRIMARY KEY,
+  backup_type TEXT NOT NULL,
+  scope_json TEXT NOT NULL,
+  path TEXT,
+  checksum TEXT,
+  size_bytes INTEGER,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+"""
+
 PHASE_5_AUDIT_EXPORT_MIGRATION_ID = "RAIKER-5201-phase5-audit-export"
 
 PHASE_5_AUDIT_EXPORT_SQL = """

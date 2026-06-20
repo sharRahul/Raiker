@@ -30,6 +30,11 @@ _PREFIXES = {
     "rl_",
     "ura_",
     "aex_",
+    "plr_",
+    "htr_",
+    "bud_",
+    "ret_",
+    "bkm_",
 }
 
 

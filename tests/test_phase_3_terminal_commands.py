@@ -8,7 +8,7 @@ from raiker.cli.commands import handle_slash_command
 def test_phase_3_read_only_terminal_commands(tmp_path) -> None:  # type: ignore[no-untyped-def]
     assert "Workspace inspection:" in handle_slash_command("/workspace", workspace_root=tmp_path)
     assert "desktop: UIActionEnvelope" in handle_slash_command("/clients", workspace_root=tmp_path)
-    assert "Plugin registration plans:" in handle_slash_command("/plugins", workspace_root=tmp_path)
+    assert "plugin install records" in handle_slash_command("/plugins", workspace_root=tmp_path).lower()
     assert "/workspace-view" in handle_slash_command("/help", workspace_root=tmp_path)
 
 
@@ -28,6 +28,9 @@ def test_workspace_view_command_is_read_only_and_validates_usage(tmp_path) -> No
 
 def test_plugin_plan_command_validates_without_execution(tmp_path) -> None:  # type: ignore[no-untyped-def]
     manifest = tmp_path / "raiker-plugin.json"
+    import hashlib
+    body = json.dumps({"plugin_id": "com.example.safe", "name": "Safe", "version": "1", "permissions": ["tool:read_file"]}, sort_keys=True, separators=(",", ":"))
+    checksum = hashlib.sha256(body.encode("utf-8")).hexdigest()
     manifest.write_text(
         json.dumps(
             {
@@ -35,6 +38,7 @@ def test_plugin_plan_command_validates_without_execution(tmp_path) -> None:  # t
                 "name": "Safe",
                 "version": "1",
                 "permissions": ["tool:read_file"],
+                "supply_chain": {"checksum": checksum, "signature": "sig_abc"},
             }
         ),
         encoding="utf-8",
@@ -42,14 +46,16 @@ def test_plugin_plan_command_validates_without_execution(tmp_path) -> None:  # t
     output = handle_slash_command(f"/plugin-plan {manifest}", workspace_root=tmp_path)
     assert "status: planned" in output
     assert "execution_enabled: False" in output
-    assert (
-        handle_slash_command("/plugin-plan", workspace_root=tmp_path)
-        == "Usage: /plugin-plan <manifest_path>"
+    assert "Usage: /plugin-plan" in handle_slash_command(
+        "/plugin-plan", workspace_root=tmp_path
     )
 
 
 def test_plugin_plan_accepts_utf8_bom_manifest(tmp_path) -> None:  # type: ignore[no-untyped-def]
     manifest = tmp_path / "raiker-plugin-bom.json"
+    import hashlib
+    body = json.dumps({"plugin_id": "com.example.safe-bom", "name": "Safe BOM", "version": "1", "permissions": []}, sort_keys=True, separators=(",", ":"))
+    checksum = hashlib.sha256(body.encode("utf-8")).hexdigest()
     manifest.write_text(
         json.dumps(
             {
@@ -57,6 +63,7 @@ def test_plugin_plan_accepts_utf8_bom_manifest(tmp_path) -> None:  # type: ignor
                 "name": "Safe BOM",
                 "version": "1",
                 "permissions": [],
+                "supply_chain": {"checksum": checksum, "signature": "sig_def"},
             }
         ),
         encoding="utf-8-sig",

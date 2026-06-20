@@ -126,6 +126,15 @@ EVENT_TYPES = {
     "session_user_bound",
     "audit_export_created",
     "event_integrity_verified",
+    "plugin_checksum_verified",
+    "plugin_signature_verified",
+    "plugin_marketplace_install_recorded",
+    "hosted_routine_created",
+    "hosted_routine_deleted",
+    "budget_record_created",
+    "budget_threshold_exceeded",
+    "retention_policy_applied",
+    "backup_manifest_created",
 }
 INTENTS = {
     "chat",
@@ -636,6 +645,118 @@ class UserRoleAssignment:
         _require(self.assignment_id, "assignment_id")
         _require(self.user_id, "user_id")
         _require(self.role_id, "role_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class HostedRoutine:
+    routine_id: str
+    name: str
+    routine_type: str
+    schedule: str | None
+    endpoint: str | None
+    enabled: bool
+    created_by: str
+    created_at: str
+    updated_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.routine_id, "routine_id")
+        _require(self.name, "name")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class BudgetRecord:
+    budget_id: str
+    name: str
+    max_cost: float
+    current_cost: float
+    currency: str
+    scope: str
+    enabled: bool
+    created_by: str
+    created_at: str
+    updated_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.budget_id, "budget_id")
+        _require(self.name, "name")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class RetentionPolicy:
+    policy_id: str
+    target_type: str
+    retention_days: int
+    legal_hold: bool
+    enabled: bool
+    created_by: str
+    created_at: str
+    updated_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.policy_id, "policy_id")
+        _require(self.target_type, "target_type")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class BackupManifest:
+    manifest_id: str
+    backup_type: str
+    scope_json: str
+    path: str | None
+    checksum: str | None
+    size_bytes: int | None
+    created_by: str
+    created_at: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.manifest_id, "manifest_id")
+        _require(self.backup_type, "backup_type")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class PluginInstallRecord:
+    record_id: str
+    plugin_id: str
+    version: str
+    trust_level: str
+    checksum: str | None
+    signature: str | None
+    source_url: str | None
+    commit_sha: str | None
+    permissions_json: str
+    status: str
+    installed_at: str
+    installed_by: str
+    schema_version: str = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _schema(self.schema_version)
+        _require(self.record_id, "record_id")
+        _require(self.plugin_id, "plugin_id")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

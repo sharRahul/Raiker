@@ -350,15 +350,23 @@ def handle_clients() -> str:
     return "\n".join(lines)
 
 
-def handle_plugins() -> str:
-    return "Plugin registration plans:\n- no persisted plugin plans; use /plugin-plan <manifest_path> for read-only planning"
+def handle_plugins(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    records = store.list_plugin_install_records()
+    if not records:
+        return "No plugin install records. Use /plugin-plan <manifest_path> to plan a plugin install."
+    lines = ["Plugin install records:"]
+    for r in records:
+        lines.append(f"- {r['plugin_id']} v={r['version']} trust={r['trust_level']} status={r['status']} checksum={'yes' if r.get('checksum') else 'no'} signature={'yes' if r.get('signature') else 'no'}")
+    return "\n".join(lines)
 
 
-def handle_plugin_plan(command: str) -> str:
+def handle_plugin_plan(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command, posix=False)
-    if len(parts) != 2:
-        return "Usage: /plugin-plan <manifest_path>"
+    if len(parts) < 2:
+        return "Usage: /plugin-plan <manifest_path> [--install]"
     path = Path(parts[1].strip("\"'"))
+    install_flag = "--install" in parts
     try:
         manifest = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -366,16 +374,30 @@ def handle_plugin_plan(command: str) -> str:
     if not isinstance(manifest, dict):
         return "Plugin plan failed: manifest must be a JSON object"
     plan = plan_plugin_registration(manifest).to_dict()
-    return "\n".join(
-        [
-            "Plugin registration plan:",
-            f"plugin_id: {plan['plugin_id']}",
-            f"status: {plan['status']}",
-            f"execution_enabled: {plan['execution_enabled']}",
-            f"permissions: {','.join(plan['permissions'])}",
-            f"reasons: {','.join(plan['reasons']) if plan['reasons'] else 'none'}",
-        ]
-    )
+    lines = [
+        "Plugin registration plan:",
+        f"plugin_id: {plan['plugin_id']}",
+        f"status: {plan['status']}",
+        f"execution_enabled: {plan['execution_enabled']}",
+        f"permissions: {','.join(plan['permissions'])}",
+        f"reasons: {','.join(plan['reasons']) if plan['reasons'] else 'none'}",
+    ]
+    if install_flag and plan["status"] != "denied":
+        supply_chain = manifest.get("supply_chain") or {}
+        from raiker.plugins.registry import record_plugin_install
+        record = record_plugin_install(
+            store=SQLiteStore(workspace_root),
+            plugin_id=str(plan["plugin_id"]),
+            version=str(manifest.get("version", "0.0.0")),
+            trust_level=str(plan["trust_level"]),
+            permissions_json=json.dumps(plan["permissions"], sort_keys=True),
+            checksum=supply_chain.get("checksum"),
+            signature=supply_chain.get("signature"),
+            source_url=supply_chain.get("source_url"),
+            commit_sha=supply_chain.get("commit_sha"),
+        )
+        lines.append(f"Installed: {record.record_id}")
+    return "\n".join(lines)
 
 
 def handle_workspace_view(
@@ -1733,6 +1755,49 @@ def handle_role_revoke(command: str, *, workspace_root: str | Path = ".") -> str
     return f"No assignment found for role '{role_id}' on user '{user_id}'."
 
 
+def handle_routines(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    routines = store.list_hosted_routines()
+    if not routines:
+        return "No hosted routines."
+    lines = ["Hosted routines:"]
+    for r in routines:
+        enabled = "enabled" if r.get("enabled") else "disabled"
+        lines.append(f"- {r['routine_id']} name={r.get('name', '')} type={r.get('routine_type', '')} {enabled}")
+    return "\n".join(lines)
+
+
+def handle_budgets(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    budgets = store.list_budget_records()
+    if not budgets:
+        return "No budget records."
+    lines = ["Budget records:"]
+    for b in budgets:
+        enabled = "enabled" if b.get("enabled") else "disabled"
+        pct = (float(b.get("current_cost", 0)) / float(b.get("max_cost", 1))) * 100 if float(b.get("max_cost", 0)) > 0 else 0
+        lines.append(f"- {b['budget_id']} name={b.get('name', '')} cost={b.get('current_cost', 0)}/{b.get('max_cost', 0)} {b.get('currency', 'USD')} ({pct:.0f}%) {enabled}")
+    return "\n".join(lines)
+
+
+def handle_retention(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    policies = store.list_retention_policies()
+    if not policies:
+        return "No retention policies."
+    lines = ["Retention policies:"]
+    for p in policies:
+        hold = "legal_hold" if p.get("legal_hold") else ""
+        enabled = "enabled" if p.get("enabled") else "disabled"
+        lines.append(f"- {p['policy_id']} target={p.get('target_type', '')} days={p.get('retention_days', 0)} {hold} {enabled}")
+    backups = store.list_backup_manifests(limit=5)
+    if backups:
+        lines.append("Recent backup manifests:")
+        for b in backups:
+            lines.append(f"  - {b['manifest_id']} type={b.get('backup_type', '')} size={b.get('size_bytes', 'N/A')}")
+    return "\n".join(lines)
+
+
 def handle_export_command(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     session_id: str | None = None
@@ -1892,9 +1957,9 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command == "/clients":
         return handle_clients()
     if command == "/plugins":
-        return handle_plugins()
+        return handle_plugins(workspace_root=workspace_root)
     if command == "/plugin-plan" or command.startswith("/plugin-plan "):
-        return handle_plugin_plan(command)
+        return handle_plugin_plan(command, workspace_root=workspace_root)
     if command == "/review" or command.startswith("/review "):
         return handle_review(command, workspace_root=workspace_root)
     if command == "/proposals" or command.startswith("/proposals "):
@@ -1915,6 +1980,12 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_role_grant(command, workspace_root=workspace_root)
     if command == "/role revoke" or command.startswith("/role revoke "):
         return handle_role_revoke(command, workspace_root=workspace_root)
+    if command == "/routines":
+        return handle_routines(workspace_root=workspace_root)
+    if command == "/budgets":
+        return handle_budgets(workspace_root=workspace_root)
+    if command == "/retention":
+        return handle_retention(workspace_root=workspace_root)
     if command == "/export" or command.startswith("/export "):
         return handle_export_command(command, workspace_root=workspace_root)
     if command == "/doctor":

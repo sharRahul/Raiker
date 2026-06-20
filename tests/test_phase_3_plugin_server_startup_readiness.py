@@ -56,7 +56,6 @@ def test_registry_create_list_get_summary_and_sqlite_boundaries(tmp_path: Path) 
     assert "phase3_plugin_server_startup_readiness" in tables
     forbidden = {
         "plugin_execution_jobs",
-        "plugin_install_records",
         "plugin_activation_records",
         "mcp_server_runtime_state",
         "lsp_server_runtime_state",

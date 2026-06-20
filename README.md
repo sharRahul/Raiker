@@ -241,6 +241,9 @@ The terminal client currently exposes these inspection and controlled-action com
 /semantic-memory
 /export [--session <session_id>] [--no-redact]
 /export --verify --session <session_id>
+/routines
+/budgets
+/retention
 /capabilities
 /execution-profiles
 /workspace

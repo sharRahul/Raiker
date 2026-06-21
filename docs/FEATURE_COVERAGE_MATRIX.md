@@ -37,7 +37,7 @@ Specification status and implementation status are separate: `fully-specified` m
 | Builder dependency order | fully-specified | phase-1-to-5-build | see status ledger for current implementation | `docs/BUILD_ORDER.md` |
 | Reference requirement mapping | fully-specified | phase-1-to-5-build | see status ledger for current implementation | `docs/REFERENCE_REQUIREMENTS_MATRIX.md` |
 | Non-goals and boundaries | fully-specified | phase-1-to-5-build | see status ledger for current implementation | `docs/NON_GOALS_AND_BOUNDARIES.md` |
-| Threat model | fully-specified | phase-1-to-5-build | see status ledger for current implementation | `docs/THREAT_MODEL.md`, `docs/SECURITY_AND_POLICY.md` |
+| Threat model | fully-specified | phase-1-to-5-build | see status ledger for current implementation | `docs/THREAT_MODEL.md`, `docs/SECURITY_AND_POLICY.md`, `docs/SECURITY_ARCHITECTURE.md` |
 | Acceptance tests by phase | fully-specified | phase-1-to-5-build | see status ledger for current implementation | `docs/ACCEPTANCE_TESTS_BY_PHASE.md`, `docs/VERIFICATION_PLAN.md` |
 | API and contract schemas | fully-specified | phase-1-build | see status ledger for current implementation | `docs/API_AND_CONTRACT_SCHEMAS.md`, `docs/CONTRACTS.md` |
 | Event catalog | fully-specified | phase-1-build | see status ledger for current implementation | `docs/EVENT_CATALOG.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |

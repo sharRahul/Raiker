@@ -83,3 +83,20 @@ All items below are specified but not implemented unless explicitly marked other
 | Scheduled automations/hosted routines | Specs only. | Runtime specs | specified_not_implemented | RAIKER-8707 | Scheduler storage, owner consent, budget/egress tests. | runtime_execution_enabled=false | No background hosted routines before explicit enablement. |
 | Deferred filesystem/code tools delete/copy/move, PowerShell/Python execution, web search/fetch, LSP | Not implemented as executable tools. | Tool catalog | specified_not_implemented | RAIKER-8708 | ToolBroker policy, previews, approvals, sandbox tests. | process_execution_enabled=false, shell_execution_enabled=false, network_execution_enabled=false | Tools appear only as disabled/deferred until tests and approvals exist. |
 | `/sessions` command | No safe session-listing slash command is currently dispatched. | Command catalog | missing_deferred | RAIKER-8709 | Read-only session query, redacted output, command/help tests. | runtime_execution_enabled=false | Either implement read-only listing or keep omitted from help/catalog. |
+
+## Security architecture and deferred-control gaps
+
+`docs/SECURITY_ARCHITECTURE.md` is the dedicated current security architecture document. The remaining security items below are missing/deferred unless a future implementation task explicitly marks them implemented with code, tests, validation, and documentation.
+
+| Security gap | Current status | Required future work |
+|---|---|---|
+| Formal threat model review per deferred capability | missing/deferred | Run and record a threat-model review before enabling each Phase 8 client, plugin runtime, channel transport, remote execution adapter, shell/process/network tool, graph indexer, semantic/vector writer, subagent/team runtime, approval relay, or scheduler. |
+| Authentication/authorization model for future Web/API clients | missing/deferred | Define identities, roles, sessions, tokens/cookies, CSRF/CORS, rate limits, admin boundaries, and API authorization tests before any Web/API server is runtime-enabled. |
+| Secure session isolation for future multi-client interfaces | missing/deferred | Bind client identity, session scope, approval authority, event subscriptions, and redaction policy before Desktop/Web/Mobile/IDE/API clients can share sessions. |
+| Plugin sandboxing model | missing/deferred | Define sandbox/runtime isolation, signatures, permission diffs, install/activate approval flow, revocation, event logging, and abuse tests before plugin execution is enabled. |
+| Remote execution sandboxing model | missing/deferred | Define container/remote/cloud isolation, secret injection, egress limits, artifact handling, cost/budget policy, cancellation, and audit records before remote execution is enabled. |
+| Secret storage and redaction design | missing/deferred | Add API-key/connector-token storage, rotation, masking, export redaction, provider prompt redaction, and regression tests before broader hosted/external integrations. |
+| Log integrity/tamper evidence | missing/deferred | Add hash chaining, verification/export semantics, retention policy, and tamper-evidence tests if Raiker needs stronger audit guarantees than local append-style logs. |
+| Provider data-leakage controls | missing/deferred | Add endpoint allowlists, hosted-provider egress policy, prompt/context redaction, no silent fallback tests, and provider-risk audit events. |
+| Enterprise policy profiles | missing/deferred | Define managed policy profiles, policy precedence, import/export, audit evidence, and tests before claiming enterprise enforcement. |
+| Security regression tests | missing/deferred | Add suites for prompt injection, tool output injection, malicious tool calls, path escape, approval bypass, provider leakage, plugin abuse, hook abuse, memory poisoning, cross-session leakage, and deferred-gate regressions. |

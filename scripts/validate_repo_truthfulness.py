@@ -257,6 +257,41 @@ def main() -> int:
     if "/launch --provider mock --model mock-deterministic" in catalog and not _has_test_only_launch_wording(catalog):
         errors.append("Catalog must mark /launch --provider mock --model mock-deterministic as test-only/policy-blocked, not normal production CLI")
 
+
+    security_arch = ROOT / "docs" / "SECURITY_ARCHITECTURE.md"
+    if not security_arch.exists():
+        errors.append("Missing docs/SECURITY_ARCHITECTURE.md")
+    else:
+        security_text = security_arch.read_text(encoding="utf-8")
+        security_lower = security_text.lower()
+        link_sources = readme_text + "\n" + architecture
+        if "docs/security_architecture.md" not in link_sources.lower() and "security_architecture.md" not in link_sources.lower():
+            errors.append("README or ARCHITECTURE must link docs/SECURITY_ARCHITECTURE.md")
+        required_security_markers = [
+            "current launchable interface is the plain local terminal client only",
+            "rich/native tui, desktop, web, dashboard, mobile, ide, voice, browser extension, and rest/api clients are phase 8 deferred",
+            "runtime execution capabilities remain disabled",
+            "deterministic/mock providers are test-only",
+            "specified/deferred, not active runtime",
+            "shell/process execution | disabled/deferred",
+            "plugin execution | disabled/deferred",
+            "remote/container/cloud execution | disabled/deferred",
+        ]
+        for marker in required_security_markers:
+            if marker not in security_lower:
+                errors.append(f"SECURITY_ARCHITECTURE missing truthfulness marker: {marker}")
+        forbidden_security_claims = [
+            "plugin execution is implemented",
+            "remote execution is implemented",
+            "web/api clients are implemented",
+            "deterministic/mock providers are production fallback",
+        ]
+        for phrase in forbidden_security_claims:
+            if phrase in security_lower:
+                errors.append(f"SECURITY_ARCHITECTURE may overclaim security/runtime status: {phrase}")
+        if "tamper-proof logging is implemented" in security_lower or "immutable storage is implemented" in security_lower:
+            errors.append("SECURITY_ARCHITECTURE must not claim implemented tamper-proof or immutable logging")
+
     status_text = (ROOT / "docs/IMPLEMENTATION_STATUS.md").read_text(encoding="utf-8")
     for marker in RUNTIME_DISABLED_MARKERS:
         if marker not in readme_text + status_text + catalog:

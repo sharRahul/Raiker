@@ -7,7 +7,7 @@
 ## Features
 
 - **Local-first governed runtime** — A deterministic gather → act → verify loop (`raiker/runtime/orchestrator.py`) drives every turn through a 16-state machine, a static policy engine, a tool broker, and an append-only JSONL + SQLite event/state layer. Model outputs and tool calls are always untrusted proposals that must pass validation, policy, and approval.
-- **Plain local terminal client only** — `raiker` launches the line-oriented terminal client. Rich/native TUI, Desktop, Web, Dashboard, Mobile, IDE, Voice, Browser Extension, and REST/API clients are Phase 8 deferred work, not active runtime surfaces. The deterministic mock/test provider is test-only and policy-blocked in the normal CLI.
+- **Plain local terminal client only** — `raiker` launches the line-oriented terminal client. Rich/native TUI is Phase 8 deferred work; Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, not active runtime surfaces. The deterministic mock/test provider is test-only and policy-blocked in the normal CLI.
 - **Policy-gated automation with approvals, review, and checkpoints** — Safe read/search/git tools run directly; file mutations become approval-gated proposals. A deterministic local code-review workflow (`/review`), a proposal lifecycle, metadata-only approval previews, and checkpoint/rewind metadata give you reviewable, reversible automation.
 
 ---
@@ -78,6 +78,7 @@ The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPL
 - The **current launchable UI is the plain local terminal client only**. **Rich/native TUI/Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred**: specified but not implemented as launchable apps.
 - **Runtime execution remains disabled.** Plugin execution, graph/codemap indexing, semantic/vector memory writes, embeddings, approval execution, external channels, notifications, subagents, multi-agent teams, and remote/container/cloud execution are intentionally off; the readiness/preview surfaces for them are metadata-only and must not silently activate runtime.
 - Phases 5–7 add governed-enterprise, channel/subagent/remote, and runtime-feature metadata/readiness foundations. Phase 8 is the planned UI/client implementation phase. Phase 9 covers advanced memory/graph foundations. Capabilities still needing implementation are tracked in [`docs/GAP_AND_TODO_ANALYSIS.md`](docs/GAP_AND_TODO_ANALYSIS.md).
+- The dedicated current security architecture, trust-boundary model, and deferred-control gates are documented in [`docs/SECURITY_ARCHITECTURE.md`](docs/SECURITY_ARCHITECTURE.md).
 
 ---
 

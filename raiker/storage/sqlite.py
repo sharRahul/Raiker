@@ -120,6 +120,8 @@ from raiker.storage.migrations import (
     PHASE_9_SYMBOL_GRAPH_SQL,
     PHASE_9_VECTOR_INDEX_MIGRATION_ID,
     PHASE_9_VECTOR_INDEX_SQL,
+    PHASE_10_RUNTIME_AUTHORITY_MIGRATION_ID,
+    PHASE_10_RUNTIME_AUTHORITY_SQL,
 )
 
 
@@ -372,6 +374,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PHASE_9_SKILL_CANDIDATES_MIGRATION_ID,
                 PHASE_9_SKILL_CANDIDATES_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_10_RUNTIME_AUTHORITY_MIGRATION_ID,
+                PHASE_10_RUNTIME_AUTHORITY_SQL,
                 connection,
             )
             with contextlib.suppress(sqlite3.OperationalError):
@@ -1601,3 +1608,143 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             reasoning_mode=row["reasoning_mode"],
             reasoning_budget_tokens=row["reasoning_budget_tokens"],
         )
+
+    # ── Phase 10: Runtime Authority (Principals + Risk Acceptance) ──
+
+    def insert_principal(self, principal_id: str, principal_type: str, display_name: str,
+                         delegated_by_user_id: str | None = None,
+                         model_profile_id: str | None = None,
+                         session_id: str | None = None,
+                         role_ids: tuple[str, ...] = (),
+                         domain_scopes: tuple[str, ...] = (),
+                         max_runtime_mode: str = "development_preview",
+                         expires_at: str | None = None,
+                         is_active: bool = True) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO principals
+                (principal_id, principal_type, display_name, delegated_by_user_id,
+                 model_profile_id, session_id, role_ids, domain_scopes,
+                 max_runtime_mode, created_at, expires_at, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    principal_id, principal_type, display_name, delegated_by_user_id,
+                    model_profile_id, session_id,
+                    json.dumps(list(role_ids), sort_keys=True),
+                    json.dumps(list(domain_scopes), sort_keys=True),
+                    max_runtime_mode, utc_now(), expires_at, int(is_active),
+                ),
+            )
+
+    def get_principal(self, principal_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM principals WHERE principal_id = ?", (principal_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        result["role_ids"] = tuple(json.loads(result.get("role_ids", "[]")))
+        result["domain_scopes"] = tuple(json.loads(result.get("domain_scopes", "[]")))
+        result["is_active"] = bool(result.get("is_active", 1))
+        return result
+
+    def list_principals(self, active_only: bool = True, principal_type: str | None = None) -> list[dict[str, Any]]:
+        query = "SELECT * FROM principals"
+        params: list[Any] = []
+        conditions: list[str] = []
+        if active_only:
+            conditions.append("is_active = 1")
+        if principal_type:
+            conditions.append("principal_type = ?")
+            params.append(principal_type)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        results = []
+        for row in rows:
+            d = dict(row)
+            d["role_ids"] = tuple(json.loads(d.get("role_ids", "[]")))
+            d["domain_scopes"] = tuple(json.loads(d.get("domain_scopes", "[]")))
+            d["is_active"] = bool(d.get("is_active", 1))
+            results.append(d)
+        return results
+
+    def deactivate_principal(self, principal_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE principals SET is_active = 0 WHERE principal_id = ? AND is_active = 1",
+                (principal_id,),
+            )
+        return cursor.rowcount > 0
+
+    def get_role_name(self, role_id: str) -> str | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT name FROM roles WHERE role_id = ?", (role_id,)
+            ).fetchone()
+        return str(row["name"]) if row else None
+
+    def insert_risk_acceptance(self, acceptance: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO risk_acceptances
+                (risk_acceptance_id, accepted_by, accepted_for_principal_id, action_id,
+                 action_type, domain_scope, risk_level, risk_summary, data_involved,
+                 expected_effect, one_time_or_reusable, expires_at, created_at,
+                 policy_decision_id, approval_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    acceptance["risk_acceptance_id"],
+                    acceptance["accepted_by"],
+                    acceptance["accepted_for_principal_id"],
+                    acceptance["action_id"],
+                    acceptance["action_type"],
+                    acceptance["domain_scope"],
+                    acceptance["risk_level"],
+                    acceptance["risk_summary"],
+                    acceptance["data_involved"],
+                    acceptance["expected_effect"],
+                    acceptance.get("one_time_or_reusable", "one_time"),
+                    acceptance.get("expires_at"),
+                    acceptance["created_at"],
+                    acceptance.get("policy_decision_id"),
+                    acceptance.get("approval_id"),
+                ),
+            )
+
+    def find_valid_risk_acceptance(self, principal_id: str, action_type: str,
+                                    domain_scope: str, risk_level: str) -> dict[str, Any] | None:
+        now = utc_now()
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM risk_acceptances
+                WHERE accepted_for_principal_id = ?
+                  AND action_type = ?
+                  AND domain_scope = ?
+                  AND risk_level = ?
+                  AND (expires_at IS NULL OR expires_at >= ?)
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (principal_id, action_type, domain_scope, risk_level, now),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_risk_acceptances(self, principal_id: str | None = None) -> list[dict[str, Any]]:
+        query = "SELECT * FROM risk_acceptances"
+        params: list[Any] = []
+        if principal_id:
+            query += " WHERE accepted_for_principal_id = ?"
+            params.append(principal_id)
+        query += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]

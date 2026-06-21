@@ -73,6 +73,8 @@ from raiker.remote.readiness_registry import (
 )
 from raiker.rollback_plans import render_rollback_plan
 from raiker.rollback_registry import create_workspace_rollback_plans, rollback_plan_summary
+from raiker.runtime.authority import ActionRouter, RiskLevelValue, RuntimeAuthority
+from raiker.runtime.authority.models import Principal, PrincipalType
 from raiker.storage.cleanup_readiness_registry import (
     cleanup_readiness_summary,
     render_cleanup_readiness,
@@ -1699,6 +1701,45 @@ def handle_reasoning_command(command: str, *, workspace_root: str | Path = ".") 
     return "Usage: /reasoning [status|set <mode-or-effort>|off]"
 
 
+def _govern_admin_mutation(
+    action_type: str,
+    tool_or_service_name: str,
+    arguments: dict[str, object],
+    *,
+    workspace_root: str | Path = ".",
+    risk_level: str = RiskLevelValue.MEDIUM,
+    domain_scope: str = "",
+    requires_approval: bool = False,
+    requires_risk_acceptance: bool = False,
+) -> str | None:
+    store = SQLiteStore(workspace_root)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    router = ActionRouter(authority)
+    local_principal = Principal(
+        principal_id="cli_local",
+        principal_type=PrincipalType.HUMAN,
+        display_name="CLI Local User",
+        role_ids=("rl_admin",),
+        domain_scopes=(),
+        max_runtime_mode="local_single_user_safe",
+        is_active=True,
+    )
+    result = router.route(
+        action_type=action_type,
+        tool_or_service_name=tool_or_service_name,
+        arguments=arguments,
+        principal=local_principal,
+        domain_scope=domain_scope,
+        risk_level=risk_level,
+        requires_approval=requires_approval,
+        requires_risk_acceptance=requires_risk_acceptance,
+    )
+    if result.decision == "deny":
+        return f"Governed action denied: {result.message}"
+    return None
+
+
 def handle_users(*, workspace_root: str | Path = ".") -> str:
     store = SQLiteStore(workspace_root)
     users = store.list_users()
@@ -1733,6 +1774,12 @@ def handle_user_create(command: str, *, workspace_root: str | Path = ".") -> str
             i += 2
         else:
             i += 1
+    denial = _govern_admin_mutation(
+        "admin_mutation", "user_create", {"user_id": user_id, "display_name": display_name},
+        workspace_root=workspace_root, risk_level=RiskLevelValue.MEDIUM, domain_scope="",
+    )
+    if denial:
+        return denial
     now = utc_now()
     user = User(user_id=user_id, display_name=display_name, email=email, is_active=True, created_at=now, updated_at=now)
     store = SQLiteStore(workspace_root)
@@ -1744,6 +1791,12 @@ def handle_user_deactivate(command: str, *, workspace_root: str | Path = ".") ->
     parts = shlex.split(command)
     if len(parts) != 3:
         return "Usage: /user deactivate <user_id>"
+    denial = _govern_admin_mutation(
+        "admin_mutation", "user_deactivate", {"user_id": parts[2]},
+        workspace_root=workspace_root, risk_level=RiskLevelValue.MEDIUM,
+    )
+    if denial:
+        return denial
     store = SQLiteStore(workspace_root)
     if store.deactivate_user(parts[2]):
         return f"User deactivated: {parts[2]}"
@@ -1776,6 +1829,12 @@ def handle_role_create(command: str, *, workspace_root: str | Path = ".") -> str
             i += 2
         else:
             i += 1
+    denial = _govern_admin_mutation(
+        "role_mutation", "role_create", {"role_id": role_id, "name": name},
+        workspace_root=workspace_root, risk_level=RiskLevelValue.MEDIUM,
+    )
+    if denial:
+        return denial
     now = utc_now()
     role = Role(role_id=role_id, name=name, description=description, is_system_role=False, created_at=now)
     store = SQLiteStore(workspace_root)
@@ -1789,6 +1848,12 @@ def handle_role_grant(command: str, *, workspace_root: str | Path = ".") -> str:
         return "Usage: /role grant <role_id> <user_id>"
     role_id = parts[2]
     user_id = parts[3]
+    denial = _govern_admin_mutation(
+        "role_mutation", "role_grant", {"role_id": role_id, "user_id": user_id},
+        workspace_root=workspace_root, risk_level=RiskLevelValue.MEDIUM,
+    )
+    if denial:
+        return denial
     now = utc_now()
     assignment = UserRoleAssignment(
         assignment_id=new_id("ura_"),

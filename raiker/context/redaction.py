@@ -38,6 +38,11 @@ _PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
         re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"),
         REDACTED_EMAIL,
     ),
+    # Bank/card-like numbers
+    (re.compile(r"\b(?:\d{4}[-\s]?){3}\d{4}\b"), "[REDACTED_CARD]"),
+    (re.compile(r"\b(?:account|iban|bic|swift|routing)\s*[:=#]?\s*['\"]?[A-Z0-9]{8,}\b", re.IGNORECASE), "[REDACTED_ACCOUNT]"),
+    # Medical identifiers (NHS/SSN-like patterns)
+    (re.compile(r"\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b"), "[REDACTED_ID]"),
     # High-entropy fallback for long opaque strings (kept last so specific shapes win).
     (re.compile(r"\b[A-Za-z0-9+/_\-]{40,}\b"), REDACTED_SECRET),
 )

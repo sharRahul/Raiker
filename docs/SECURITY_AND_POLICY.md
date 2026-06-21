@@ -11,14 +11,21 @@ This document defines Phase 1 security behaviour and phase-scheduled policy boun
 No agent-controlled action may execute unless it has passed through:
 
 ```text
-ToolAction proposal
-  -> PolicyEngine review
-  -> optional user approval
-  -> ToolBroker dispatch
+Client / CLI / Future UI / Automation / Agent
+  -> Gateway
+  -> Runtime Authority / Action Router
+  -> Capability Gate
+  -> PolicyEngine
+  -> Risk Classifier
+  -> Approval / Risk Acceptance where required
+  -> ToolBroker or Governed Service Executor
   -> EventLog recording
+  -> Checkpoint where needed
 ```
 
 Clients, runtime modules, plugins, models, channels, and subagents must never execute tools directly.
+
+The `RuntimeAuthority` (`raiker/runtime/authority/router.py`) enforces principal validity, domain scoping, AI role restrictions (no self-approval, no self-grant, no gate enablement), human-only role protections, risk level escalation, and risk acceptance validation.
 
 Current backend truth: approval resolution is metadata-only and does not execute approved actions; approval execution relay remains disabled/deferred; runtime execution remains disabled for deferred capabilities.
 

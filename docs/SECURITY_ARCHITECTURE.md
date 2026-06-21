@@ -19,12 +19,90 @@ Current launchable interface is the plain local terminal client only. Rich/nativ
 | Hosted providers | `implemented_policy_gated` | Explicit policy, API key, and egress/budget controls required. |
 | Deterministic/mock providers | `test_only` | Never a silent production fallback. |
 
+## Runtime Authority / Governed Action Path
+
+All actions (CLI, future UI, automation, plugin, model tool call, channel, background task) must pass through a single governed path:
+
+```text
+Client / CLI / Future UI / Automation / Agent
+→ Gateway
+→ Runtime Authority / Action Router
+→ Capability Gate
+→ PolicyEngine
+→ Risk Classifier
+→ Approval / Risk Acceptance where required
+→ ToolBroker or Governed Service Executor
+→ EventLog + SQLite
+→ Checkpoint where needed
+→ Response / Report
+```
+
+The `RuntimeAuthority` (`raiker/runtime/authority/router.py`) is the central governance point. It enforces:
+- Principal active/expired status
+- Domain scope boundaries
+- AI role restrictions (no self-approval, no self-grant, no gate enablement)
+- Human-only role protections
+- Risk level escalation (critical requires human confirmation)
+- Risk acceptance validation
+
+The `ActionRouter` provides a unified `route()` method that creates `GovernedAction` records and routes them through the full authority chain.
+
+## AI-Executable Roles
+
+Four AI roles are defined:
+
+| Role | Auto-allowed | Requires approval/risk acceptance | Denied |
+|------|-------------|-----------------------------------|--------|
+| **assistant** | read, search, summarise, draft, plan, recommend, prepare actions, create reports, reminders | send email, delete email, move money, buy/sell stock, share records, medical decisions, grant permissions, enable runtime gates | - |
+| **automation** | scheduled summaries, recurring reports, alerts, reminders, monitoring | Must be scoped by task; cannot self-expand scope | buy/sell stock, move money, change portfolio settings |
+| **operator** | check runtime status, check backups, diagnostics, maintenance recommendations | delete backups, change CCTV settings, disable monitoring, restart service | enable runtime gates, change security policy, remote execution, delete CCTV footage |
+| **developer** | read workspace, inspect git diff, review findings, plans, proposals | write_file, edit_file, apply_patch, run tests, shell commands, memory mutations | approve own action, merge PR, change policy, grant roles, enable runtime gates, install/execute plugins |
+
+## Human-Only Roles
+
+The following roles are reserved for humans and cannot be assigned to AI principals:
+`owner`, `admin`, `approver`, `security_admin`, `finance_approver`, `medical_decision_maker`, `runtime_gate_manager`
+
+## Domain Scopes
+
+Actions are scoped to domains: `email`, `calendar`, `reminders`, `documents`, `finance`, `investments`, `medical`, `pregnancy_baby`, `home_security`, `cctv`, `hardware`, `systems`, `projects`, `coding`, `shopping`, `travel`.
+
+A principal's effective permissions are the intersection of their role permissions, domain scopes, workspace policy, capability gate state, task scope, and risk acceptance/approval state.
+
+## Risk Levels
+
+| Level | Behavior |
+|-------|----------|
+| Low | Auto-allowed for permitted roles |
+| Medium | Auto-allowed if pre-approved rule exists |
+| High | Requires approval or risk acceptance |
+| Critical | Always requires human confirmation |
+
+## Risk Acceptance
+
+Users can explicitly accept risk. A risk acceptance record captures: `risk_acceptance_id`, `accepted_by`, `accepted_for_principal_id`, `action_id`, `action_type`, `domain_scope`, `risk_level`, `risk_summary`, `data_involved`, `expected_effect`, `one_time_or_reusable`, `expires_at`.
+
+Risk acceptance cannot be used by AI to approve its own actions, and critical-risk actions always require human confirmation regardless of risk acceptance state.
+
+## Effective Permission Calculation
+
+```
+effective_permissions =
+  delegating_human_permissions
+  ∩ ai_role_permissions
+  ∩ domain_scope_permissions
+  ∩ workspace_policy
+  ∩ capability_gate_state
+  ∩ task_scope
+  ∩ risk_acceptance_or_approval_state
+```
+
 ## Trust Boundaries
 
 All mutable actions must follow:
 
 ```text
-Gateway -> Runtime -> ToolBroker -> PolicyEngine -> Approval/Event/Checkpoint handling
+Gateway -> Runtime Authority -> ToolBroker -> PolicyEngine -> Approval/Event/Checkpoint handling
 ```
 
 Model output is always untrusted. No tool, plugin, channel, subagent, remote, memory, or approval path is allowed to execute outside that authority chain.

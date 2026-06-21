@@ -30,6 +30,14 @@ Current high-signal truth:
 - CLI durable memory mutation is `implemented_approval_required`: requests are brokered and approval-required by default.
 - Governed durable memory writes are `implemented_policy_gated`: they require provenance, retention, approval_state, confidence, trust_score, and event logging on the governed path.
 - Semantic/vector writes, graph indexing, plugin execution, channel runtime, and remote execution remain `disabled_deferred`.
+- **Runtime Authority / Action Router** (`raiker/runtime/authority/`) is `implemented_policy_gated` — governs all mutation actions through capability gates, policy engine, risk classification, approval/risk acceptance, and event logging.
+- **AI-executable role model** is `implemented_policy_gated` — defines `assistant`, `automation`, `operator`, `developer` roles with per-role permissions, denied capabilities, and self-approval/self-grant restrictions.
+- **Human-only role protection** is `implemented_policy_gated` — `owner`, `admin`, `approver`, `security_admin`, `finance_approver`, `medical_decision_maker`, `runtime_gate_manager` cannot be assigned to AI principals.
+- **Domain scopes** are `implemented_policy_gated` — 16 domain scopes enforced at the authority level.
+- **Risk acceptance model** is `implemented_policy_gated` — risk acceptance records with required fields, expiry, one-time/reusable, and event logging.
+- **Capability registry** is `implemented_policy_gated` — expanded to 47 capabilities covering all domain runtimes, all default-disabled.
+- **Event redaction** is `implemented_policy_gated` — extended with bank/card/medical ID patterns.
+- **Runtime enablement validator** is `implemented_verified` — `scripts/validate_runtime_enablement_readiness.py`.
 
 ---
 

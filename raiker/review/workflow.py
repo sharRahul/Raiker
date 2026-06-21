@@ -220,6 +220,8 @@ class CodeReviewWorkflow:
         staged: bool,
         mode_base: str,
     ) -> tuple[str, bool]:
+        if not self._is_git_workspace(root):
+            return "", False
         broker = ToolBroker(
             workspace_root=root,
             policy_engine=PolicyEngine(StaticPolicyConfig(root)),
@@ -260,6 +262,8 @@ class CodeReviewWorkflow:
     def _collect_untracked_files(
         self, broker: ToolBroker, *, path_filter: str | None
     ) -> list[str]:
+        if not self._is_git_workspace(broker.workspace_root):
+            return []
         action = ToolAction(
             action_id=new_id("act_"),
             tool_name="git_status",
@@ -295,6 +299,9 @@ class CodeReviewWorkflow:
                 or stripped == p.rstrip("/")
             ]
         return untracked[:20]
+
+    def _is_git_workspace(self, root: Path) -> bool:
+        return (root / ".git").exists()
 
     def _context_summary(self, root: Path, session_id: str) -> str:
         try:

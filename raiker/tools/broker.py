@@ -4,12 +4,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ClientMetadata, PolicyDecision, ToolAction, ToolResult
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.hooks.contracts import HookInput, HookOutcome
 from raiker.hooks.dispatcher import HookDispatcher
+from raiker.memory.governance import GovernedMemoryService
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.filesystem import (
@@ -21,7 +23,11 @@ from raiker.tools.filesystem import (
     stat_path,
 )
 from raiker.tools.git import run_git
-from raiker.tools.memory_tools import memory_forget, memory_get, memory_list, memory_search, memory_write
+from raiker.tools.memory_tools import (
+    memory_get,
+    memory_list,
+    memory_search,
+)
 from raiker.tools.search import glob, grep
 
 
@@ -40,6 +46,11 @@ class ToolBroker:
         self.store = store
         self.writer = writer
         self.hook_dispatcher = hook_dispatcher
+        self.memory_service = GovernedMemoryService(
+            self.workspace_root,
+            store=store or SQLiteStore(self.workspace_root),
+            writer=writer,
+        )
         self.executors: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
             "read_file": lambda args: read_file(self.workspace_root, str(args.get("path", "."))),
             "list_directory": lambda args: list_directory(
@@ -81,22 +92,11 @@ class ToolBroker:
                 "patch": str(args.get("patch", "")),
                 "requires_approval": True,
             },
-            "memory_write": lambda args: memory_write(
-                self.workspace_root,
-                str(args.get("text", "")),
-                scope=str(args.get("scope", "project")),
-                tags=tuple(args.get("tags", [])),
-                source=str(args.get("source", "agent")),
-            ),
             "memory_search": lambda args: memory_search(
                 self.workspace_root,
                 str(args.get("query", "")),
                 scope=args.get("scope"),
                 max_results=int(args.get("max_results", 20)),
-            ),
-            "memory_forget": lambda args: memory_forget(
-                self.workspace_root,
-                str(args.get("memory_id", "")),
             ),
             "memory_list": lambda args: memory_list(
                 self.workspace_root,
@@ -108,6 +108,25 @@ class ToolBroker:
                 str(args.get("memory_id", "")),
             ),
         }
+
+    @staticmethod
+    def _redact_value(value: Any) -> Any:
+        if isinstance(value, str):
+            redacted, _ = redact_text(value)
+            return redacted
+        if isinstance(value, list):
+            return [ToolBroker._redact_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [ToolBroker._redact_value(item) for item in value]
+        if isinstance(value, dict):
+            return {str(key): ToolBroker._redact_value(item) for key, item in value.items()}
+        return value
+
+    @classmethod
+    def _sanitized_action_payload(cls, action: ToolAction) -> dict[str, Any]:
+        payload = action.to_dict()
+        payload["arguments"] = cls._redact_value(action.arguments)
+        return payload
 
     def _event(
         self,
@@ -225,16 +244,24 @@ class ToolBroker:
         turn_id: str | None,
         client: ClientMetadata | None = None,
     ) -> tuple[ToolResult, PolicyDecision]:
+        sanitized_action = ToolAction(
+            action_id=action.action_id,
+            tool_name=action.tool_name,
+            arguments=self._redact_value(action.arguments),
+            risk_level=action.risk_level,
+            requires_approval=action.requires_approval,
+            proposed_by=action.proposed_by,
+        )
         self._event(
             session_id=session_id,
             turn_id=turn_id,
             event_type="action_proposed",
             actor="tool_broker",
-            payload={"action": action.to_dict(), "risk_level": action.risk_level},
+            payload={"action": self._sanitized_action_payload(action), "risk_level": action.risk_level},
             client=client,
         )
         if self.store is not None:
-            self.store.insert_tool_action(action, session_id, turn_id, "proposed")
+            self.store.insert_tool_action(sanitized_action, session_id, turn_id, "proposed")
         self._event(
             session_id=session_id,
             turn_id=turn_id,
@@ -273,7 +300,7 @@ class ToolBroker:
         now = utc_now()
         if decision.decision == "deny":
             if self.store is not None:
-                self.store.insert_tool_action(action, session_id, turn_id, "denied")
+                self.store.insert_tool_action(sanitized_action, session_id, turn_id, "denied")
             self._notify_hook(
                 "PermissionDenied",
                 action,
@@ -306,17 +333,31 @@ class ToolBroker:
                     "approval_id": approval_id,
                     "action_id": action.action_id,
                     "tool_name": action.tool_name,
-                    "arguments_preview": action.arguments,
+                    "arguments_preview": self._redact_value(action.arguments),
                     "proposal_preview": proposal_preview,
                     "risk_level": "high",
                     "policy_reasons": decision.reasons,
-                    "expected_effect": "Records an action-bound approval request and does not execute until resolved.",
+                    "expected_effect": "Records an action-bound approval request only. Approval resolution is metadata-only and does not execute the action.",
+                    "state_changes": {
+                        "files": action.tool_name in {"write_file", "edit_file", "apply_patch"},
+                        "memory": action.tool_name in {"memory_write", "memory_forget"},
+                        "network": action.tool_name == "shell",
+                        "shell": action.tool_name == "shell",
+                        "provider": False,
+                        "export": False,
+                        "plugin": False,
+                        "graph": False,
+                        "channel": False,
+                        "remote": False,
+                    },
                 },
                 client=client,
             )
             if self.store is not None:
-                self.store.insert_approval(approval_id, action.action_id)
-                self.store.insert_tool_action(action, session_id, turn_id, "approval_required")
+                self.store.insert_approval(approval_id, action)
+                self.store.insert_tool_action(
+                    sanitized_action, session_id, turn_id, "approval_required"
+                )
             self._notify_hook(
                 "PermissionRequest",
                 action,
@@ -332,8 +373,13 @@ class ToolBroker:
                     status="approval_required",
                     output={
                         "approval_id": approval_id,
+                        "action_id": action.action_id,
+                        "tool_name": action.tool_name,
+                        "exact_arguments": self._redact_value(action.arguments),
+                        "risk_level": "high",
                         "reasons": decision.reasons,
                         "proposal_preview": proposal_preview,
+                        "expected_effect": "Stores approval metadata only. Resolving approval does not execute the action in the current backend.",
                     },
                     error=None,
                     started_at=now,
@@ -342,25 +388,6 @@ class ToolBroker:
                 decision,
             )
         executor = self.executors.get(action.tool_name)
-        if executor is None:
-            failed = ToolResult(
-                action_id=action.action_id,
-                tool_name=action.tool_name,
-                status="failed",
-                output=None,
-                error={"type": "unknown_tool"},
-                started_at=now,
-                completed_at=utc_now(),
-            )
-            self._event(
-                session_id=session_id,
-                turn_id=turn_id,
-                event_type="tool_failed",
-                actor="tool_broker",
-                payload=failed.to_dict(),
-                client=client,
-            )
-            return failed, decision
         self._event(
             session_id=session_id,
             turn_id=turn_id,
@@ -369,30 +396,59 @@ class ToolBroker:
             payload={"action_id": action.action_id, "tool_name": action.tool_name},
             client=client,
         )
-        try:
-            raw = executor(action.arguments)
-            status = "success" if raw.get("status") == "success" else "failed"
-            result = ToolResult(
-                action_id=action.action_id,
-                tool_name=action.tool_name,
-                status=status,
-                output=raw if status == "success" else None,
-                error=None if status == "success" else raw.get("error", {"type": "tool_failed"}),
-                started_at=now,
-                completed_at=utc_now(),
-            )
-        except FilesystemSafetyError as exc:
-            result = ToolResult(
-                action_id=action.action_id,
-                tool_name=action.tool_name,
-                status="failed",
-                output=None,
-                error={"type": str(exc)},
-                started_at=now,
-                completed_at=utc_now(),
-            )
+        if executor is None:
+            if action.tool_name == "memory_write":
+                raw = self.memory_service.write_from_action(
+                    action,
+                    decision,
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    client=client,
+                )
+            elif action.tool_name == "memory_forget":
+                raw = self.memory_service.forget_from_action(
+                    action,
+                    decision,
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    client=client,
+                )
+            else:
+                failed = ToolResult(
+                    action_id=action.action_id,
+                    tool_name=action.tool_name,
+                    status="failed",
+                    output=None,
+                    error={"type": "unknown_tool"},
+                    started_at=now,
+                    completed_at=utc_now(),
+                )
+                self._event(
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    event_type="tool_failed",
+                    actor="tool_broker",
+                    payload=failed.to_dict(),
+                    client=client,
+                )
+                return failed, decision
+        else:
+            try:
+                raw = executor(action.arguments)
+            except FilesystemSafetyError as exc:
+                raw = {"status": "failed", "error": {"type": str(exc)}}
+        status = "success" if raw.get("status") == "success" else ("denied" if raw.get("status") == "denied" else "failed")
+        result = ToolResult(
+            action_id=action.action_id,
+            tool_name=action.tool_name,
+            status=status,
+            output=raw if status == "success" else None,
+            error=None if status == "success" else raw.get("error", {"type": "tool_failed"}),
+            started_at=now,
+            completed_at=utc_now(),
+        )
         if self.store is not None:
-            self.store.insert_tool_action(action, session_id, turn_id, result.status)
+            self.store.insert_tool_action(sanitized_action, session_id, turn_id, result.status)
         self._event(
             session_id=session_id,
             turn_id=turn_id,

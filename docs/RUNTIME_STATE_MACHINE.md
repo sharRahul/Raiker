@@ -22,10 +22,9 @@ The runtime must be deterministic. A client implementation may render state diff
 | `DENIED` | Policy denied the proposed action. |
 | `OBSERVING` | Runtime is collecting tool/model result observations. |
 | `VERIFYING` | Runtime is checking whether outcome satisfies intent. |
-| `MEMORY_REVIEWING` | Runtime is deciding whether to create/defer memory candidates. |
 | `RESPONDING` | Runtime is creating the user-visible response. |
-| `CHECKPOINTING` | Checkpoint service is writing a checkpoint manifest/stub. |
-| `CLOSED` | Turn is complete. |
+| `CHECKPOINTING` | Defined in the state machine but not currently emitted by the runtime orchestrator. |
+| `CLOSED` | Defined in the state machine; gateway finalisation closes the turn after checkpoint/event finalisation. |
 | `FAILED` | Turn failed with structured error. |
 | `CANCELLED` | Turn was cancelled by user/runtime control. |
 
@@ -51,14 +50,13 @@ Phase 2 adds durable `PAUSED`, `WAITING_FOR_USER`, and background task states. P
 | `POLICY_REVIEWED` | `RESPONDING` | `response_created` | No tool action is needed. |
 | `EXECUTING` | `OBSERVING` | `tool_completed` or `tool_failed` | Broker returned a structured result. |
 | `WAITING_FOR_APPROVAL` | `RESPONDING` | `response_created` | Phase 1 returns approval-required response. |
-| `WAITING_FOR_APPROVAL` | `EXECUTING` | `approval_received`, `tool_started` | Exact approval exists and execution is in task scope. |
+| `WAITING_FOR_APPROVAL` | `EXECUTING` | deferred | Approval execution relay is not implemented in the current backend. |
 | `WAITING_FOR_APPROVAL` | `DENIED` | `approval_denied` | User denied the exact action. |
 | `DENIED` | `RESPONDING` | `response_created` | Denial reason is safe to show. |
 | `OBSERVING` | `VERIFYING` | `verification_completed` | Verification check can run or stub result is available. |
-| `VERIFYING` | `MEMORY_REVIEWING` | `memory_candidate_reviewed` | Memory candidate review is enabled or skipped safely. |
-| `MEMORY_REVIEWING` | `RESPONDING` | `response_created` | Response can be assembled. |
-| `RESPONDING` | `CHECKPOINTING` | `checkpoint_created` | Turn should create checkpoint. |
-| `CHECKPOINTING` | `CLOSED` | `turn_closed` | Checkpoint write completed or safe failure recorded. |
+| `VERIFYING` | `RESPONDING` | `response_created` | Response can be assembled. |
+| `RESPONDING` | `CHECKPOINTING` | optional internal transition | State exists in the machine but current gateway finalisation appends `checkpoint_created`. |
+| `CHECKPOINTING` | `CLOSED` | optional internal transition | Gateway finalisation appends `turn_closed`. |
 | Any non-terminal state | `FAILED` | `error_recorded` | Structured recoverable/unrecoverable error. |
 | Any non-terminal state | `CANCELLED` | `turn_closed` or `error_recorded` | User/runtime cancellation. |
 

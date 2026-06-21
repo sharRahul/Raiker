@@ -4,13 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
-from raiker.memory.store import (
-    forget_memory as _forget_memory,
-    get_memory,
-    list_memory,
-    search_memory as _search_memory,
-    write_memory as _write_memory,
-)
+from raiker.memory.store import get_memory, list_memory
+from raiker.memory.store import search_memory as _search_memory
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -22,8 +17,12 @@ def memory_write(
     tags: tuple[str, ...] = (),
     source: str = "agent",
 ) -> dict[str, Any]:
+    _ = (scope, tags, source, SQLiteStore(workspace_root))
     if not text or not text.strip():
-        return {"status": "failed", "error": {"type": "empty_text", "message": "Cannot write empty memory."}}
+        return {
+            "status": "failed",
+            "error": {"type": "empty_text", "message": "Cannot write empty memory."},
+        }
     sensitivity = classify_memory_sensitivity(text)
     if sensitivity in {MemorySensitivity.CREDENTIAL_LIKE, MemorySensitivity.SECRET_LIKE}:
         return {
@@ -34,21 +33,12 @@ def memory_write(
                 "sensitivity": sensitivity.value,
             },
         }
-    store = SQLiteStore(workspace_root)
-    entry = _write_memory(
-        text,
-        workspace_root=workspace_root,
-        scope=scope,
-        source=source,
-        tags=tags,
-        store=store,
-    )
     return {
-        "status": "success",
-        "memory_id": entry.memory_id,
-        "scope": entry.scope,
-        "sensitivity": entry.sensitivity,
-        "created_at": entry.created_at,
+        "status": "denied",
+        "error": {
+            "type": "policy_bypass_denied",
+            "reason": "memory_write_requires_tool_broker",
+        },
     }
 
 
@@ -91,11 +81,19 @@ def memory_forget(
     workspace_root: str | Path,
     memory_id: str,
 ) -> dict[str, Any]:
-    store = SQLiteStore(workspace_root)
-    found = _forget_memory(memory_id, workspace_root=workspace_root, store=store)
-    if not found:
-        return {"status": "failed", "error": {"type": "not_found", "message": f"Memory '{memory_id}' not found."}}
-    return {"status": "success", "memory_id": memory_id}
+    _ = SQLiteStore(workspace_root)
+    if not memory_id.strip():
+        return {
+            "status": "failed",
+            "error": {"type": "missing_memory_id", "message": "memory_id is required."},
+        }
+    return {
+        "status": "denied",
+        "error": {
+            "type": "policy_bypass_denied",
+            "reason": "memory_forget_requires_tool_broker",
+        },
+    }
 
 
 def memory_list(

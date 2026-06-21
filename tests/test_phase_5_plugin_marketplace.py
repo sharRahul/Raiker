@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -9,12 +10,16 @@ import pytest
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import PluginInstallRecord
 from raiker.plugins.policy import plan_plugin_registration
-from raiker.plugins.verify import validate_supply_chain, verify_plugin_checksum, verify_plugin_signature
+from raiker.plugins.verify import (
+    validate_supply_chain,
+    verify_plugin_checksum,
+    verify_plugin_signature,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 
 @pytest.fixture
-def workspace() -> Path:
+def workspace() -> Iterator[Path]:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         yield Path(d)
 

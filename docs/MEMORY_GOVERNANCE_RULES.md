@@ -4,6 +4,16 @@ This document defines Raiker's memory write, update, use, correction, and forget
 
 Phase 1 may create memory candidates. It must not write durable long-term memory automatically.
 
+Current backend truth (2026-06-21):
+
+- `/memory-store` and `/memory-forget` are brokered approval-required requests by default.
+- Approval resolution is metadata-only.
+- `/approve` and `/deny` are metadata-only and do not execute pending memory mutations.
+- Secret/credential-like durable memory content is denied before approval creation.
+- The governed durable-memory write contract exists for broker/policy-gated execution paths and tests; it is not a broad user-enabled runtime write path.
+- Semantic/vector writes remain disabled.
+- Runtime execution remains disabled for deferred capabilities.
+
 ---
 
 ## Memory Types
@@ -35,16 +45,15 @@ Phase 1 may create memory candidates. It must not write durable long-term memory
   "memory_type": "project",
   "scope": "project",
   "text": "Raiker Phase 1 must keep terminal/TUI as the first client only, not the privileged interface.",
-  "sensitivity": "normal",
+  "sensitivity": "project",
   "confidence": 0.9,
-  "decision": "deferred",
-  "reason": "Requires governance before durable write.",
+  "decision": "needs_user_review",
   "created_at": "2026-06-17T12:00:00Z",
   "resolved_at": null
 }
 ```
 
-Allowed candidate decisions: `deferred`, `approved`, `rejected`, `needs_user_review`, `expired`.
+Allowed candidate decisions in the current backend: `needs_user_review`, `approved_for_later`, `denied`.
 
 ---
 
@@ -57,17 +66,18 @@ Allowed candidate decisions: `deferred`, `approved`, `rejected`, `needs_user_rev
   "memory_type": "project",
   "scope": "project",
   "text": "All Raiker clients must enter through the Agent Gateway.",
-  "structured": {},
   "provenance": {
     "source_event_id": "evt_01H...",
     "source_session_id": "sess_01H...",
-    "source_type": "user_confirmed"
+    "source_turn_id": "turn_01H...",
+    "source_type": "local_user"
   },
   "confidence": 0.95,
-  "sensitivity": "normal",
+  "sensitivity": "project",
   "trust_score": 0.9,
   "retention": "until_project_forget",
-  "approval_state": "approved",
+  "approval_state": "approved_after_governed_path",
+  "created_by": "local_terminal_command",
   "created_at": "2026-06-17T12:00:00Z",
   "updated_at": null,
   "expires_at": null,
@@ -82,22 +92,23 @@ Allowed candidate decisions: `deferred`, `approved`, `rejected`, `needs_user_rev
 | Level | Meaning | Default behaviour |
 |---|---|---|
 | `public` | Safe project/public info | May be used in context if relevant. |
-| `normal` | Non-sensitive user/project memory | Use with provenance. |
-| `confidential` | Private data, business context, internal details | Use only when task-relevant; no hosted egress without policy. |
-| `secret` | Credentials/tokens/private keys or equivalent | Do not store raw values; references only. |
-| `restricted` | Regulated or highly sensitive info | Requires explicit policy and audit. |
+| `project` | Project-local durable memory | Use with provenance and scope. |
+| `personal` | User-personal content | Use only when task-relevant; no hosted egress without policy. |
+| `secret_like` | Secret-like opaque value | Deny durable storage. |
+| `credential_like` | Credential/token/private-key-like material | Deny durable storage. |
+| `unknown` | Unclassified content | Review before broad use. |
 
 ---
 
 ## Write Rules
 
 1. Phase 1 may create candidates only.
-2. Durable writes require memory type, scope, sensitivity, confidence, provenance, retention, and approval state.
+2. Governed durable writes require memory type, scope, sensitivity, confidence, provenance, retention, approval state, and created_by metadata.
 3. Model output alone is never sufficient provenance for durable memory.
 4. Untrusted file/channel/tool output must not become durable memory without trust labels and review.
 5. Sensitive memory must not be sent to hosted providers unless egress policy explicitly allows it.
-6. Memory writes must emit events and be queryable from SQLite.
-7. Memory correction and forgetting must be supported before memory is presented as durable user/profile memory.
+6. Governed durable writes emit `memory_record_created`; governed forgetting emits `memory_record_forgotten`.
+7. Forgetting creates a tombstone-style deleted record locally and removes the entry from normal reads/lists/search.
 
 ---
 
@@ -140,13 +151,7 @@ A memory extracted from a prompt-injected document, unpaired channel, or untrust
 - `memory_candidate_created`
 - `memory_candidate_reviewed`
 - `memory_record_created`
-- `memory_record_updated`
 - `memory_record_forgotten`
-- `memory_record_expired`
-- `memory_used_in_context`
-- `memory_export_requested`
-- `memory_export_completed`
-- `memory_export_denied`
 
 ---
 
@@ -156,7 +161,7 @@ Tests must prove:
 
 1. Phase 1 does not write durable memory automatically;
 2. memory candidates include provenance and sensitivity;
-3. durable memory record rejects missing provenance;
+3. governed durable memory record rejects missing provenance/governance metadata;
 4. secret-like values are not stored raw;
 5. memory retrieval records usage attribution;
 6. deleted/forgotten memory is not returned;

@@ -13,6 +13,7 @@ class ApprovalResolution:
     approval_id: str
     action_id: str
     status: str
+    executes_action: bool = False
 
 
 class ApprovalInbox:
@@ -31,6 +32,14 @@ class ApprovalInbox:
             raise ValueError("approval_not_found")
         if approval["status"] != "pending":
             raise ValueError("approval_already_resolved")
+        current_hash = self.store.tool_action_payload_sha256(
+            str(approval["tool_name"]),
+            str(approval["arguments_json"]),
+            str(approval["risk_level"]),
+        )
+        stored_hash = approval.get("action_payload_sha256")
+        if stored_hash is not None and str(stored_hash) != current_hash:
+            raise ValueError("approval_payload_tampered")
         status = "approved" if approve else "denied"
         self.store.resolve_approval(
             approval_id, status=status, resolved_by=resolved_by, resolved_at=utc_now()
@@ -46,9 +55,13 @@ class ApprovalInbox:
                         "approval_id": approval_id,
                         "action_id": approval["action_id"],
                         "status": status,
+                        "executes_action": False,
                     },
                 )
             )
         return ApprovalResolution(
-            approval_id=approval_id, action_id=str(approval["action_id"]), status=status
+            approval_id=approval_id,
+            action_id=str(approval["action_id"]),
+            status=status,
+            executes_action=False,
         )

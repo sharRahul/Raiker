@@ -3,10 +3,13 @@ from __future__ import annotations
 import json
 
 from raiker.contracts.ids import new_id
-from raiker.contracts.models import ClientMetadata
+from raiker.contracts.models import ClientMetadata, ToolAction
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
+from raiker.policy.config import StaticPolicyConfig
+from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tools.broker import ToolBroker
 
 
 def test_event_writer_appends_and_indexes(tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -41,3 +44,30 @@ def test_event_writer_appends_and_indexes(tmp_path) -> None:  # type: ignore[no-
     with store.connect() as connection:
         count = connection.execute("SELECT count(*) FROM events_index").fetchone()[0]
     assert count == 2
+
+
+def test_secret_like_memory_arguments_are_redacted_from_event_log(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    store = SQLiteStore(tmp_path)
+    writer = EventLogWriter(store)
+    broker = ToolBroker(
+        workspace_root=tmp_path,
+        policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)),
+        store=store,
+        writer=writer,
+    )
+    session_id = new_id("sess_")
+    turn_id = new_id("turn_")
+    broker.execute(
+        ToolAction(
+            new_id("act_"),
+            "memory_write",
+            {"text": "password=supersecret123456789", "scope": "project"},
+            "high",
+            True,
+        ),
+        session_id=session_id,
+        turn_id=turn_id,
+    )
+    event_text = writer.path_for_session(session_id).read_text(encoding="utf-8")
+    assert "supersecret123456789" not in event_text
+    assert "[REDACTED_SECRET]" in event_text

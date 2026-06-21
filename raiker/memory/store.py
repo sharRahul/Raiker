@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-import os
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
+from raiker.memory.policy import classify_memory_sensitivity
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -22,6 +21,36 @@ class MemoryEntry:
     created_at: str
     tags: tuple[str, ...]
     source: str
+    provenance: dict[str, Any]
+    confidence: float
+    trust_score: float
+    retention: str
+    approval_state: str
+    created_by: str
+    updated_at: str | None = None
+    deleted_at: str | None = None
+
+
+@dataclass(frozen=True)
+class MemoryGovernance:
+    source_event_id: str
+    source_session_id: str
+    source_turn_id: str | None
+    source_type: str
+    confidence: float
+    trust_score: float
+    retention: str
+    approval_state: str
+    created_by: str
+
+
+@dataclass(frozen=True)
+class MemoryForgetGovernance:
+    source_event_id: str
+    source_session_id: str
+    source_turn_id: str | None
+    source_type: str
+    deleted_by: str
 
 
 def _memory_dir(workspace_root: str | Path) -> Path:
@@ -44,6 +73,14 @@ def _encode_frontmatter(entry: MemoryEntry) -> str:
         "created_at": entry.created_at,
         "tags": list(entry.tags),
         "source": entry.source,
+        "provenance": entry.provenance,
+        "confidence": entry.confidence,
+        "trust_score": entry.trust_score,
+        "retention": entry.retention,
+        "approval_state": entry.approval_state,
+        "created_by": entry.created_by,
+        "updated_at": entry.updated_at,
+        "deleted_at": entry.deleted_at,
     }
     return json.dumps(meta, sort_keys=True)
 
@@ -69,7 +106,10 @@ def write_memory(
     tags: tuple[str, ...] = (),
     source: str = "agent",
     store: SQLiteStore | None = None,
+    governance: MemoryGovernance | None = None,
 ) -> MemoryEntry:
+    if governance is None:
+        raise PermissionError("memory_write_requires_governed_path")
     mem_dir = _memory_dir(workspace_root)
     sensitivity = classify_memory_sensitivity(text)
     memory_id = new_id("mem_")
@@ -83,6 +123,17 @@ def write_memory(
         created_at=utc_now(),
         tags=tags,
         source=source,
+        provenance={
+            "source_event_id": governance.source_event_id,
+            "source_session_id": governance.source_session_id,
+            "source_turn_id": governance.source_turn_id,
+            "source_type": governance.source_type,
+        },
+        confidence=governance.confidence,
+        trust_score=governance.trust_score,
+        retention=governance.retention,
+        approval_state=governance.approval_state,
+        created_by=governance.created_by,
     )
     content = _encode_frontmatter(entry) + "\n" + text
     _entry_path(mem_dir, memory_id).write_text(content, encoding="utf-8")
@@ -106,7 +157,7 @@ def search_memory(
         return results
     paths = sorted(mem_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
     for path in paths:
-        if not path.suffix == ".md":
+        if path.suffix != ".md":
             continue
         if len(results) >= max_results:
             break
@@ -126,7 +177,17 @@ def search_memory(
             created_at=str(meta.get("created_at", "")),
             tags=tuple(meta.get("tags", [])),
             source=str(meta.get("source", "agent")),
+            provenance=dict(meta.get("provenance", {})),
+            confidence=float(meta.get("confidence", 0.0)),
+            trust_score=float(meta.get("trust_score", 0.0)),
+            retention=str(meta.get("retention", "until_forget")),
+            approval_state=str(meta.get("approval_state", "approved")),
+            created_by=str(meta.get("created_by", "system")),
+            updated_at=meta.get("updated_at"),
+            deleted_at=meta.get("deleted_at"),
         )
+        if entry.deleted_at is not None:
+            continue
         if scope is not None and entry.scope != scope:
             continue
         if query_lower in body.lower() or query_lower in str(meta.get("tags", [])):
@@ -139,24 +200,62 @@ def forget_memory(
     *,
     workspace_root: str | Path = ".",
     store: SQLiteStore | None = None,
+    governance: MemoryForgetGovernance | None = None,
 ) -> bool:
+    if governance is None:
+        raise PermissionError("memory_forget_requires_governed_path")
     mem_dir = _memory_dir(workspace_root)
     path = _entry_path(mem_dir, memory_id)
-    if not path.exists():
+    target = path
+    if not target.exists():
         for p in mem_dir.glob("*.md"):
             try:
                 content = p.read_text(encoding="utf-8")
             except OSError:
                 continue
             if memory_id in content and f'"memory_id": "{memory_id}"' in content:
-                p.unlink()
-                if store is not None:
-                    store.delete_approved_memory(memory_id)
-                return True
+                target = p
+                break
+        else:
+            return False
+    try:
+        content = target.read_text(encoding="utf-8")
+    except OSError:
         return False
-    path.unlink()
+    meta, _ = _decode_frontmatter(content)
+    now = utc_now()
+    tombstone = MemoryEntry(
+        memory_id=str(meta.get("memory_id") or memory_id),
+        text="",
+        scope=str(meta.get("scope", "project")),
+        sensitivity=str(meta.get("sensitivity", "unknown")),
+        source_event_id=str(meta.get("source_event_id", governance.source_event_id)),
+        memory_type=str(meta.get("memory_type", "project")),
+        created_at=str(meta.get("created_at", now)),
+        tags=tuple(meta.get("tags", [])),
+        source=str(meta.get("source", "agent")),
+        provenance=dict(
+            meta.get(
+                "provenance",
+                {
+                    "source_event_id": governance.source_event_id,
+                    "source_session_id": governance.source_session_id,
+                    "source_turn_id": governance.source_turn_id,
+                    "source_type": governance.source_type,
+                },
+            )
+        ),
+        confidence=float(meta.get("confidence", 0.0)),
+        trust_score=float(meta.get("trust_score", 0.0)),
+        retention=str(meta.get("retention", "until_forget")),
+        approval_state="forgotten",
+        created_by=str(meta.get("created_by", governance.deleted_by)),
+        updated_at=now,
+        deleted_at=now,
+    )
+    target.write_text(_encode_frontmatter(tombstone) + "\n", encoding="utf-8")
     if store is not None:
-        store.delete_approved_memory(memory_id)
+        store.mark_approved_memory_forgotten(memory_id, deleted_at=now, updated_at=now)
     return True
 
 
@@ -172,7 +271,7 @@ def list_memory(
         return results
     paths = sorted(mem_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
     for path in paths:
-        if not path.suffix == ".md":
+        if path.suffix != ".md":
             continue
         if len(results) >= limit:
             break
@@ -191,7 +290,17 @@ def list_memory(
             created_at=str(meta.get("created_at", "")),
             tags=tuple(meta.get("tags", [])),
             source=str(meta.get("source", "agent")),
+            provenance=dict(meta.get("provenance", {})),
+            confidence=float(meta.get("confidence", 0.0)),
+            trust_score=float(meta.get("trust_score", 0.0)),
+            retention=str(meta.get("retention", "until_forget")),
+            approval_state=str(meta.get("approval_state", "approved")),
+            created_by=str(meta.get("created_by", "system")),
+            updated_at=meta.get("updated_at"),
+            deleted_at=meta.get("deleted_at"),
         )
+        if entry.deleted_at is not None:
+            continue
         if scope is not None and entry.scope != scope:
             continue
         results.append(entry)
@@ -211,7 +320,7 @@ def get_memory(
         except OSError:
             return None
         meta, body = _decode_frontmatter(content)
-        return MemoryEntry(
+        entry = MemoryEntry(
             memory_id=str(meta.get("memory_id") or memory_id),
             text=body,
             scope=str(meta.get("scope", "project")),
@@ -221,7 +330,18 @@ def get_memory(
             created_at=str(meta.get("created_at", "")),
             tags=tuple(meta.get("tags", [])),
             source=str(meta.get("source", "agent")),
+            provenance=dict(meta.get("provenance", {})),
+            confidence=float(meta.get("confidence", 0.0)),
+            trust_score=float(meta.get("trust_score", 0.0)),
+            retention=str(meta.get("retention", "until_forget")),
+            approval_state=str(meta.get("approval_state", "approved")),
+            created_by=str(meta.get("created_by", "system")),
+            updated_at=meta.get("updated_at"),
+            deleted_at=meta.get("deleted_at"),
         )
+        if entry.deleted_at is not None:
+            return None
+        return entry
     for p in mem_dir.glob("*.md"):
         try:
             content = p.read_text(encoding="utf-8")
@@ -229,7 +349,7 @@ def get_memory(
             continue
         if memory_id in content:
             meta, body = _decode_frontmatter(content)
-            return MemoryEntry(
+            entry = MemoryEntry(
                 memory_id=str(meta.get("memory_id") or p.stem),
                 text=body,
                 scope=str(meta.get("scope", "project")),
@@ -239,7 +359,18 @@ def get_memory(
                 created_at=str(meta.get("created_at", "")),
                 tags=tuple(meta.get("tags", [])),
                 source=str(meta.get("source", "agent")),
+                provenance=dict(meta.get("provenance", {})),
+                confidence=float(meta.get("confidence", 0.0)),
+                trust_score=float(meta.get("trust_score", 0.0)),
+                retention=str(meta.get("retention", "until_forget")),
+                approval_state=str(meta.get("approval_state", "approved")),
+                created_by=str(meta.get("created_by", "system")),
+                updated_at=meta.get("updated_at"),
+                deleted_at=meta.get("deleted_at"),
             )
+            if entry.deleted_at is not None:
+                return None
+            return entry
     return None
 
 

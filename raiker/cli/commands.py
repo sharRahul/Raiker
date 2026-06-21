@@ -25,14 +25,17 @@ from raiker.approvals.readiness_registry import (
 from raiker.channels.readiness_registry import channel_readiness_summary, render_channel_readiness
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
-from raiker.contracts.ids import new_id
+from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import (
     ClientMetadata,
     ModelProfile,
+    PolicyDecision,
     PromptEnvelope,
     PromptOptions,
     PromptPayload,
     Role,
+    ToolAction,
+    ToolResult,
     User,
     UserMetadata,
     UserRoleAssignment,
@@ -62,6 +65,8 @@ from raiker.models.session_state import ModelSessionState
 from raiker.phase_gates import list_disabled_capabilities
 from raiker.plugins.policy import plan_plugin_registration
 from raiker.plugins.readiness_registry import plugin_readiness_summary, render_plugin_readiness
+from raiker.policy.config import StaticPolicyConfig
+from raiker.policy.engine import PolicyEngine
 from raiker.remote.readiness_registry import (
     remote_readiness_summary,
     render_remote_readiness,
@@ -80,6 +85,7 @@ from raiker.storage.lifecycle_registry import (
 )
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
+from raiker.tools.broker import ToolBroker
 from raiker.workspace.inspection import inspect_workspace
 from raiker.workspace.views import render_workspace_view
 
@@ -1281,10 +1287,42 @@ def _memory_tool_result(title: str, result: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def handle_memory_store(command: str, *, workspace_root: str | Path = ".") -> str:
-    import shlex
-    from raiker.tools.memory_tools import memory_write
+def _broker_command_result(title: str, result: object) -> str:
+    from raiker.contracts.models import ToolResult
 
+    if not isinstance(result, ToolResult):
+        return f"{title}:\n  status: failed\n  error: invalid_result"
+    lines = [f"{title}:", f"  status: {result.status}"]
+    if result.output is not None:
+        for key, value in result.output.items():
+            lines.append(f"  {key}: {value}")
+    if result.error is not None:
+        lines.append(f"  error: {result.error}")
+    return "\n".join(lines)
+
+
+def _run_terminal_tool_action(
+    action: ToolAction, *, workspace_root: str | Path = "."
+) -> tuple[ToolResult, PolicyDecision]:
+    store = SQLiteStore(workspace_root)
+    session_id = new_id("sess_")
+    turn_id = new_id("turn_")
+    store.create_session(session_id, str(Path(workspace_root).resolve()))
+    broker = ToolBroker(
+        workspace_root=workspace_root,
+        policy_engine=PolicyEngine(StaticPolicyConfig(Path(workspace_root))),
+        store=store,
+        writer=EventLogWriter(store),
+    )
+    return broker.execute(
+        action,
+        session_id=session_id,
+        turn_id=turn_id,
+        client=terminal_client(),
+    )
+
+
+def handle_memory_store(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     if len(parts) < 2:
         return "Usage: /memory-store <text> [--scope <scope>] [--tag <tag>]"
@@ -1302,12 +1340,28 @@ def handle_memory_store(command: str, *, workspace_root: str | Path = ".") -> st
         else:
             text += " " + parts[i]
             i += 1
-    result = memory_write(workspace_root, text, scope=scope, tags=tuple(tags))
-    return _memory_tool_result("Memory store", result)
+    result, _ = _run_terminal_tool_action(
+        ToolAction(
+            action_id=new_id("act_"),
+            tool_name="memory_write",
+            arguments={
+                "text": text,
+                "scope": scope,
+                "tags": tags,
+                "source": "local_terminal_command",
+            },
+            risk_level="high",
+            requires_approval=True,
+            proposed_by="local_terminal_command",
+        ),
+        workspace_root=workspace_root,
+    )
+    return _broker_command_result("Memory store", result)
 
 
 def handle_memory_search(command: str, *, workspace_root: str | Path = ".") -> str:
     import shlex
+
     from raiker.tools.memory_tools import memory_search
 
     parts = shlex.split(command)
@@ -1334,18 +1388,26 @@ def handle_memory_search(command: str, *, workspace_root: str | Path = ".") -> s
 
 
 def handle_memory_forget(command: str, *, workspace_root: str | Path = ".") -> str:
-    import shlex
-    from raiker.tools.memory_tools import memory_forget
-
     parts = shlex.split(command)
     if len(parts) != 2:
         return "Usage: /memory-forget <memory_id>"
-    result = memory_forget(workspace_root, parts[1])
-    return _memory_tool_result("Memory forget", result)
+    result, _ = _run_terminal_tool_action(
+        ToolAction(
+            action_id=new_id("act_"),
+            tool_name="memory_forget",
+            arguments={"memory_id": parts[1]},
+            risk_level="high",
+            requires_approval=True,
+            proposed_by="local_terminal_command",
+        ),
+        workspace_root=workspace_root,
+    )
+    return _broker_command_result("Memory forget", result)
 
 
 def handle_memory_list_command(command: str, *, workspace_root: str | Path = ".") -> str:
     import shlex
+
     from raiker.tools.memory_tools import memory_list
 
     parts = shlex.split(command)
@@ -1373,10 +1435,10 @@ def handle_approvals(*, workspace_root: str | Path = ".") -> str:
     approvals = inbox.list_pending()
     if not approvals:
         return "No pending approvals."
-    lines = ["Pending approvals:"]
+    lines = ["Pending approvals (metadata only; resolution does not execute actions):"]
     for approval in approvals:
         lines.append(
-            f"- {approval['approval_id']} action={approval['action_id']} tool={approval['tool_name']} risk={approval['risk_level']}"
+            f"- {approval['approval_id']} action={approval['action_id']} tool={approval['tool_name']} risk={approval['risk_level']} args={approval['arguments_json']}"
         )
     return "\n".join(lines)
 
@@ -1391,7 +1453,7 @@ def handle_approval_resolution(command: str, *, workspace_root: str | Path = "."
     except ValueError as exc:
         return f"Approval resolution failed: {exc}"
     return (
-        f"Approval {resolution.approval_id} {resolution.status} for action {resolution.action_id}."
+        f"Approval {resolution.approval_id} {resolution.status} for action {resolution.action_id}. Metadata only; no action was executed."
     )
 
 
@@ -1749,9 +1811,10 @@ def handle_role_revoke(command: str, *, workspace_root: str | Path = ".") -> str
     store = SQLiteStore(workspace_root)
     assignments = store.list_user_roles(user_id)
     for a in assignments:
-        if str(a.get("role_id")) == role_id:
-            if store.delete_user_role_assignment(str(a["assignment_id"])):
-                return f"Role '{role_id}' revoked from user '{user_id}'."
+        if str(a.get("role_id")) == role_id and store.delete_user_role_assignment(
+            str(a["assignment_id"])
+        ):
+            return f"Role '{role_id}' revoked from user '{user_id}'."
     return f"No assignment found for role '{role_id}' on user '{user_id}'."
 
 

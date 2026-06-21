@@ -71,7 +71,9 @@ class GraphIndexer:
                 continue
             self.index_python_file(py_file)
 
-    def _extract_symbols(self, tree: ast.Module, module: str, file_path: str, parent: str | None = None) -> None:
+    def _extract_symbols(
+        self, tree: ast.AST, module: str, file_path: str, parent: str | None = None
+    ) -> None:
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, ast.FunctionDef):
                 kind = "async_function" if isinstance(node, ast.AsyncFunctionDef) else "function"

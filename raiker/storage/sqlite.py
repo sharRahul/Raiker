@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import sqlite3
 from dataclasses import dataclass
@@ -17,11 +18,10 @@ from raiker.contracts.models import (
     Checkpoint,
     ConnectorProfile,
     DependencyEdge,
-    DesktopAppSession,
     ExecutionBudget,
+    ExportManifest,
     GraphIndexRecord,
     HostedRoutine,
-    IdeExtensionSession,
     ManagedPolicyRule,
     ModelProfile,
     PluginExecutionRecord,
@@ -41,7 +41,6 @@ from raiker.contracts.models import (
     User,
     UserRoleAssignment,
     VectorRecord,
-    WebApiSession,
 )
 from raiker.models.session_state import ModelSessionState
 from raiker.storage.migrations import (
@@ -73,52 +72,54 @@ from raiker.storage.migrations import (
     PHASE_3_STORAGE_LIFECYCLE_RETENTION_MIGRATION_ID,
     PHASE_3_STORAGE_LIFECYCLE_RETENTION_SQL,
     PHASE_3_STORAGE_LIFECYCLE_SQL,
+    PHASE_4_MEMORY_GOVERNANCE_HARDENING_MIGRATION_ID,
+    PHASE_4_MEMORY_GOVERNANCE_HARDENING_SQL,
     PHASE_4_MEMORY_MVP_MIGRATION_ID,
     PHASE_4_MEMORY_MVP_SQL,
+    PHASE_5_AUDIT_EXPORT_MIGRATION_ID,
+    PHASE_5_AUDIT_EXPORT_SQL,
+    PHASE_5_BUDGET_RECORDS_MIGRATION_ID,
+    PHASE_5_BUDGET_RECORDS_SQL,
+    PHASE_5_HOSTED_ROUTINES_MIGRATION_ID,
+    PHASE_5_HOSTED_ROUTINES_SQL,
     PHASE_5_MANAGED_POLICY_MIGRATION_ID,
     PHASE_5_MANAGED_POLICY_SQL,
     PHASE_5_ORG_ROLES_MIGRATION_ID,
     PHASE_5_ORG_ROLES_SQL,
-    PHASE_5_AUDIT_EXPORT_MIGRATION_ID,
-    PHASE_5_AUDIT_EXPORT_SQL,
     PHASE_5_PLUGIN_MARKETPLACE_MIGRATION_ID,
     PHASE_5_PLUGIN_MARKETPLACE_SQL,
-    PHASE_5_HOSTED_ROUTINES_MIGRATION_ID,
-    PHASE_5_HOSTED_ROUTINES_SQL,
-    PHASE_5_BUDGET_RECORDS_MIGRATION_ID,
-    PHASE_5_BUDGET_RECORDS_SQL,
     PHASE_5_RETENTION_POLICIES_MIGRATION_ID,
     PHASE_5_RETENTION_POLICIES_SQL,
-    PHASE_6_CHANNEL_PAIRINGS_MIGRATION_ID,
-    PHASE_6_CHANNEL_PAIRINGS_SQL,
     PHASE_6_APPROVAL_RELAY_MIGRATION_ID,
     PHASE_6_APPROVAL_RELAY_SQL,
+    PHASE_6_CHANNEL_PAIRINGS_MIGRATION_ID,
+    PHASE_6_CHANNEL_PAIRINGS_SQL,
+    PHASE_6_REMOTE_EXECUTION_MIGRATION_ID,
+    PHASE_6_REMOTE_EXECUTION_SQL,
     PHASE_6_SUBAGENTS_MIGRATION_ID,
     PHASE_6_SUBAGENTS_SQL,
     PHASE_6_TEAMS_MIGRATION_ID,
     PHASE_6_TEAMS_SQL,
-    PHASE_6_REMOTE_EXECUTION_MIGRATION_ID,
-    PHASE_6_REMOTE_EXECUTION_SQL,
     PHASE_7_DESKTOP_SESSIONS_MIGRATION_ID,
     PHASE_7_DESKTOP_SESSIONS_SQL,
-    PHASE_7_WEB_SESSIONS_MIGRATION_ID,
-    PHASE_7_WEB_SESSIONS_SQL,
-    PHASE_7_PLUGIN_EXECUTION_MIGRATION_ID,
-    PHASE_7_PLUGIN_EXECUTION_SQL,
     PHASE_7_GRAPH_INDEX_MIGRATION_ID,
     PHASE_7_GRAPH_INDEX_SQL,
-    PHASE_7_SEMANTIC_MEMORY_MIGRATION_ID,
-    PHASE_7_SEMANTIC_MEMORY_SQL,
     PHASE_7_IDE_SESSIONS_MIGRATION_ID,
     PHASE_7_IDE_SESSIONS_SQL,
-    PHASE_9_VECTOR_INDEX_MIGRATION_ID,
-    PHASE_9_VECTOR_INDEX_SQL,
-    PHASE_9_SYMBOL_GRAPH_MIGRATION_ID,
-    PHASE_9_SYMBOL_GRAPH_SQL,
+    PHASE_7_PLUGIN_EXECUTION_MIGRATION_ID,
+    PHASE_7_PLUGIN_EXECUTION_SQL,
+    PHASE_7_SEMANTIC_MEMORY_MIGRATION_ID,
+    PHASE_7_SEMANTIC_MEMORY_SQL,
+    PHASE_7_WEB_SESSIONS_MIGRATION_ID,
+    PHASE_7_WEB_SESSIONS_SQL,
     PHASE_9_PROJECT_GRAPH_MIGRATION_ID,
     PHASE_9_PROJECT_GRAPH_SQL,
     PHASE_9_SKILL_CANDIDATES_MIGRATION_ID,
     PHASE_9_SKILL_CANDIDATES_SQL,
+    PHASE_9_SYMBOL_GRAPH_MIGRATION_ID,
+    PHASE_9_SYMBOL_GRAPH_SQL,
+    PHASE_9_VECTOR_INDEX_MIGRATION_ID,
+    PHASE_9_VECTOR_INDEX_SQL,
 )
 
 
@@ -256,6 +257,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PHASE_4_MEMORY_MVP_MIGRATION_ID,
                 PHASE_4_MEMORY_MVP_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_4_MEMORY_GOVERNANCE_HARDENING_MIGRATION_ID,
+                PHASE_4_MEMORY_GOVERNANCE_HARDENING_SQL,
                 connection,
             )
             self._apply_migration(
@@ -467,6 +473,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ),
             )
 
+    @staticmethod
+    def tool_action_payload_sha256(tool_name: str, arguments_json: str, risk_level: str) -> str:
+        payload = json.dumps(
+            {
+                "tool_name": tool_name,
+                "arguments": json.loads(arguments_json),
+                "risk_level": risk_level,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
     def insert_tool_action(
         self, action: ToolAction, session_id: str, turn_id: str | None, status: str
     ) -> None:
@@ -494,6 +513,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ),
             )
 
+    def load_tool_action(self, action_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM tool_actions WHERE action_id = ?", (action_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
     def insert_policy_decision(self, decision: PolicyDecision) -> None:
         with self.connect() as connection:
             connection.execute(
@@ -512,15 +538,34 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ),
             )
 
-    def insert_approval(self, approval_id: str, action_id: str, status: str = "pending") -> None:
+    def insert_approval(
+        self, approval_id: str, action: ToolAction | str, status: str = "pending"
+    ) -> None:
+        if isinstance(action, ToolAction):
+            action_id = action.action_id
+            payload_hash = self.tool_action_payload_sha256(
+                action.tool_name,
+                json.dumps(action.arguments, sort_keys=True),
+                action.risk_level,
+            )
+        else:
+            action_id = action
+            row = self.load_tool_action(action_id)
+            if row is None:
+                raise ValueError(f"unknown_tool_action:{action_id}")
+            payload_hash = self.tool_action_payload_sha256(
+                str(row["tool_name"]),
+                str(row["arguments_json"]),
+                str(row["risk_level"]),
+            )
         with self.connect() as connection:
             connection.execute(
                 """
                 INSERT INTO approvals
-                (approval_id, action_id, status, approval_scope, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                (approval_id, action_id, status, approval_scope, created_at, action_payload_sha256)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (approval_id, action_id, status, "action", utc_now()),
+                (approval_id, action_id, status, "action", utc_now(), payload_hash),
             )
 
     def insert_checkpoint(self, checkpoint: Checkpoint, manifest_path: str) -> None:
@@ -775,7 +820,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             row = connection.execute(
                 """
-                SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id
+                SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id, tool_actions.tool_name, tool_actions.arguments_json, tool_actions.risk_level
                 FROM approvals
                 JOIN tool_actions ON approvals.action_id = tool_actions.action_id
                 WHERE approval_id = ?
@@ -833,8 +878,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO approved_memory
-                (memory_id, text, scope, sensitivity, source_event_id, memory_type, created_at, tags_json, source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (memory_id, text, scope, sensitivity, source_event_id, memory_type, created_at, tags_json, source, provenance_json, confidence, trust_score, retention, approval_state, created_by, updated_at, deleted_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     entry.memory_id,
@@ -846,20 +891,40 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     entry.created_at,
                     json.dumps(list(entry.tags)),
                     entry.source,
+                    json.dumps(entry.provenance, sort_keys=True),
+                    entry.confidence,
+                    entry.trust_score,
+                    entry.retention,
+                    entry.approval_state,
+                    entry.created_by,
+                    entry.updated_at,
+                    entry.deleted_at,
                 ),
             )
 
+    def mark_approved_memory_forgotten(
+        self, memory_id: str, *, deleted_at: str, updated_at: str
+    ) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE approved_memory
+                SET approval_state = ?, deleted_at = ?, updated_at = ?
+                WHERE memory_id = ? AND deleted_at IS NULL
+                """,
+                ("forgotten", deleted_at, updated_at, memory_id),
+            )
+        return cursor.rowcount > 0
+
     def delete_approved_memory(self, memory_id: str) -> None:
         with self.connect() as connection:
-            connection.execute(
-                "DELETE FROM approved_memory WHERE memory_id = ?", (memory_id,)
-            )
+            connection.execute("DELETE FROM approved_memory WHERE memory_id = ?", (memory_id,))
 
     def list_approved_memory(self, scope: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
-        query = "SELECT * FROM approved_memory"
+        query = "SELECT * FROM approved_memory WHERE deleted_at IS NULL"
         params: list[Any] = []
         if scope is not None:
-            query += " WHERE scope = ?"
+            query += " AND scope = ?"
             params.append(scope)
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)

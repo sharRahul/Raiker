@@ -24,24 +24,17 @@ Run the full set from a clean virtual environment before merge or any main push:
 
 ```bash
 python -m ruff check .
-python -m mypy raiker apps tests
+python -m mypy .
 python -m pytest
 python scripts/validate_phase_status.py
 python scripts/validate_repo_truthfulness.py
-raiker --help
-raiker --prompt "Hello Raiker"
-raiker --prompt "/providers"
-raiker --prompt "/models"
-raiker --prompt "/model current"
-raiker --prompt "/model capabilities"
-raiker --prompt "/reasoning status"
-raiker --prompt "/graph-readiness --json"
-raiker --prompt "/memory-readiness --json"
-raiker --prompt "/approval-readiness --json"
-raiker --prompt "/cleanup-readiness --json"
-raiker --prompt "/remote-readiness --json"
-raiker --prompt "/plugin-readiness --json"
-raiker --prompt "/channel-readiness --json"
+python -m compileall raiker
+raiker --workspace . --prompt "status"
+raiker --workspace . --prompt "/status"
+raiker --workspace . --prompt "/capabilities"
+raiker --workspace . --prompt "/memory-readiness"
+raiker --workspace . --prompt "/plugin-readiness"
+raiker --workspace . --prompt "/cleanup-readiness"
 ```
 
 For Phase 3 rollout branches, also run manual or scripted smoke coverage for:

@@ -64,9 +64,11 @@ def test_approval_inbox_and_terminal_resolution(tmp_path: Path) -> None:
     approval_id = str(result.output["approval_id"])  # type: ignore[index]
     assert approval_id in handle_approvals(workspace_root=tmp_path)
     assert ApprovalInbox(broker.store).list_pending()[0]["approval_scope"] == "action"  # type: ignore[arg-type,union-attr]
-    assert "approved" in handle_approval_resolution(
+    resolution_output = handle_approval_resolution(
         f"/approve {approval_id}", workspace_root=tmp_path
     )
+    assert "approved" in resolution_output
+    assert "Metadata only; no action was executed." in resolution_output
     assert handle_approvals(workspace_root=tmp_path) == "No pending approvals."
 
 
@@ -148,6 +150,30 @@ def test_write_approval_includes_before_snapshot_and_resolution_event(tmp_path: 
     ApprovalInbox(store, writer).resolve(approval_id, approve=False)
     assert store.list_event_index(session_id="sess", event_type="approval_denied")
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "before"
+
+
+def test_tampered_approval_payload_cannot_be_resolved(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    broker = ToolBroker(
+        workspace_root=tmp_path,
+        policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)),
+        store=store,
+        writer=EventLogWriter(store),
+    )
+    result, _ = broker.execute(
+        ToolAction(new_id("act_"), "write_file", {"path": "a.txt", "text": "after"}, "high", True),
+        session_id="sess",
+        turn_id="turn",
+    )
+    approval_id = str(result.output["approval_id"])  # type: ignore[index]
+    with store.connect() as connection:
+        connection.execute(
+            "UPDATE tool_actions SET arguments_json = ? WHERE action_id = ?",
+            ('{"path":"a.txt","text":"tampered"}', result.action_id),
+        )
+    assert "approval_payload_tampered" in handle_approval_resolution(
+        f"/approve {approval_id}", workspace_root=tmp_path
+    )
 
 
 def test_memory_and_doctor_terminal_commands(tmp_path: Path) -> None:

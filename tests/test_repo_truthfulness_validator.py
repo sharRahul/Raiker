@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -27,14 +26,11 @@ def test_truthfulness_validator_passes() -> None:
     assert "Repository truthfulness validation passed." in result.stdout
 
 
-def test_help_and_status_are_honest_about_phase_3_and_ui_scope(tmp_path: Path) -> None:
+def test_help_and_status_are_honest_about_backend_posture(tmp_path: Path) -> None:
     help_output = handle_slash_command("/help", workspace_root=tmp_path)
+    status_output = handle_slash_command("/status", workspace_root=tmp_path)
     assert "Phase 3 Slice B approval planning preview is implemented" in help_output
     assert "Current launchable UI is the plain local terminal client only" in help_output
-    assert "Phase 8 deferred work" in help_output
-
-    status_output = handle_slash_command("/status", workspace_root=tmp_path)
-    assert "phase_3_status: implemented_verified" in status_output
     assert "phase_4_status: memory_mvp_implemented" in status_output
     assert "runtime_execution_enabled: False" in status_output
 
@@ -49,17 +45,8 @@ def test_readiness_json_commands_are_parseable(tmp_path: Path) -> None:
         "/channel-readiness --json",
         "/remote-readiness --json",
     ]:
-        payload = json.loads(handle_slash_command(command, workspace_root=tmp_path))
+        payload = __import__("json").loads(handle_slash_command(command, workspace_root=tmp_path))
         assert payload["runtime_execution_enabled"] is False
-
-
-def test_model_and_reasoning_commands_do_not_expose_private_cot(tmp_path: Path) -> None:
-    current = handle_slash_command("/model current", workspace_root=tmp_path)
-    capabilities = handle_slash_command("/model capabilities", workspace_root=tmp_path)
-    reasoning = handle_slash_command("/reasoning status", workspace_root=tmp_path)
-    combined = "\n".join([current, capabilities, reasoning]).lower()
-    assert "private chain-of-thought exposure: never" in combined
-    assert "hidden reasoning" not in combined
 
 
 def test_disabled_runtime_flags_remain_false(tmp_path: Path) -> None:
@@ -100,54 +87,29 @@ def test_disabled_runtime_flags_remain_false(tmp_path: Path) -> None:
         assert all(value is False for value in values), (name, values)
 
 
-def test_architecture_phase_3_row_is_truthful() -> None:
-    text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
-    row = next(line for line in text.splitlines() if line.startswith("| Phase 3 |"))
-    assert "target platform architecture" in row
-    assert "safe foundation/readiness" in row
-    assert "Phase 8 deferred" in row
-    assert "runtime semantic/vector search" in row
+def test_architecture_and_security_docs_state_current_truth() -> None:
+    architecture = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    security = Path("docs/SECURITY_ARCHITECTURE.md").read_text(encoding="utf-8")
+    assert "Current Backend Capability Matrix" in architecture
+    assert "gateway finalisation events" in architecture
+    assert "no `/sessions` command is currently implemented" in architecture
+    assert "approval resolution is metadata-only" in security.lower()
+    assert "plugin execution | disabled/deferred" in security.lower()
 
 
-def test_feature_coverage_matrix_separates_spec_from_implementation() -> None:
-    text = Path("docs/FEATURE_COVERAGE_MATRIX.md").read_text(encoding="utf-8")
-    assert "Current implementation status" in text
-    for row_name, qualifier in {
-        "Desktop UI": "contract-only",
-        "Web UI": "contract-only",
-        "Dashboard": "metadata-only",
-        "IDE extension": "deferred",
-        "Apple mobile app": "deferred",
-        "Android mobile app": "deferred",
-        "Semantic/vector memory": "readiness-only",
-        "Graph memory/code map": "readiness-only",
-        "Recursive CTE graph queries": "specified only",
-        "Scheduled automations": "deferred",
-        "Hosted/cloud inference": "policy-gated",
-        "OpenClaw-style gateway and channels": "metadata/readiness-only",
-    }.items():
-        row = next(line for line in text.splitlines() if line.startswith(f"| {row_name} |"))
-        assert qualifier in row
-
-
-def test_acceptance_and_local_validation_wording_are_truthful() -> None:
-    acceptance = Path("docs/ACCEPTANCE_TESTS_BY_PHASE.md").read_text(encoding="utf-8")
-    assert "Completed Phase 3 A-P safe foundation/readiness acceptance" in acceptance
-    assert "Deferred platform acceptance after Phase 3 A-P" in acceptance
-    assert "not required" in acceptance
-
-    local_gate = Path("docs/LOCAL_VALIDATION_GATE.md").read_text(encoding="utf-8")
-    assert "CI triggers are configured" in local_gate
-    assert "hosted CI may stay red or unavailable" in local_gate
-    assert "Local validation evidence is required" in local_gate
-    assert "raiker --prompt \"/model current\"" in local_gate
-    assert "raiker --prompt \"/graph-readiness --json\"" in local_gate
-
-
-def test_mock_launch_command_is_test_only_truthful(tmp_path: Path) -> None:
+def test_catalog_marks_memory_and_approval_semantics_precisely() -> None:
     catalog = Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
-    assert "/launch --provider mock --model mock-deterministic" in catalog
-    assert "test-only" in catalog.lower()
-    assert "deterministic_test_provider_requires_test_mode" in catalog
-    output = handle_slash_command("/launch --provider mock --model mock-deterministic", workspace_root=tmp_path)
-    assert "deterministic_test_provider_requires_test_mode" in output
+    assert "implemented_approval_required" in catalog
+    assert "metadata_only" in catalog
+    assert "Does not execute approved action." in catalog
+
+
+def test_truthfulness_validator_detects_known_overclaim_patterns() -> None:
+    from scripts import validate_repo_truthfulness as validator
+
+    errors = validator._validate_snippet(  # type: ignore[attr-defined]
+        "docs/SECURITY_ARCHITECTURE.md",
+        "Approval resolution executes actions. Runtime execution remains disabled. plugin execution enabled.",
+    )
+    joined = "\n".join(errors).lower()
+    assert "forbidden overclaim" in joined

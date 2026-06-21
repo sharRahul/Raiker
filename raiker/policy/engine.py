@@ -6,6 +6,7 @@ from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import PolicyDecision, ToolAction
+from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
 from raiker.policy.config import StaticPolicyConfig
 
 
@@ -106,6 +107,26 @@ class PolicyEngine:
         role_check = self._check_role_policy(action, user_id)
         if role_check is not None:
             return role_check
+        if action.tool_name == "memory_write":
+            text = str(action.arguments.get("text", ""))
+            sensitivity = classify_memory_sensitivity(text)
+            if sensitivity in {
+                MemorySensitivity.SECRET_LIKE,
+                MemorySensitivity.CREDENTIAL_LIKE,
+            }:
+                return PolicyDecision(
+                    decision_id=new_id("pol_"),
+                    action_id=action.action_id,
+                    decision="deny",
+                    reasons=[
+                        "secret_or_credential_like_memory_blocked",
+                        f"sensitivity:{sensitivity.value}",
+                    ],
+                    requires_user_approval=False,
+                    policy_version=self.config.policy_version,
+                    risk_level="blocked",
+                    timestamp=utc_now(),
+                )
         if action.tool_name in self.config.allowed_read_actions:
             inside, reasons = self._path_arguments_inside_workspace(action)
             if not inside:

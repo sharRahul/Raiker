@@ -29,3 +29,17 @@ def test_policy_requires_approval_for_shell(tmp_path) -> None:  # type: ignore[n
         ToolAction(new_id("act_"), "shell", {"command": "pytest"}, "high", True)
     )
     assert decision.decision == "needs_approval"
+
+
+def test_policy_denies_secret_like_memory_write(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    decision = _engine(tmp_path).review(
+        ToolAction(
+            new_id("act_"),
+            "memory_write",
+            {"text": "api_key=supersecret123456789", "scope": "project"},
+            "high",
+            True,
+        )
+    )
+    assert decision.decision == "deny"
+    assert "secret_or_credential_like_memory_blocked" in decision.reasons

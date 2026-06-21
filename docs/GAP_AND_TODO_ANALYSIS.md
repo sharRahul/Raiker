@@ -11,6 +11,8 @@ It replaces the older `REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md`. It separates two 
 
 The implementation control ledger is `docs/IMPLEMENTATION_STATUS.md`; this file only tracks gaps.
 
+Backend hardening note (2026-06-21): direct CLI durable-memory mutation bypass is closed; approval resolution is metadata-only; runtime execution remains disabled; stale `/sessions` documentation is treated as a documentation gap until a safe read-only command is intentionally implemented.
+
 ---
 
 ## 1. Missing documentation (code without a dedicated spec)

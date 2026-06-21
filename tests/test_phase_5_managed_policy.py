@@ -2,19 +2,20 @@ from __future__ import annotations
 
 import json
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import ManagedPolicyRule, PolicyDecision, ToolAction
+from raiker.contracts.models import ManagedPolicyRule, ToolAction
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 
 
 @pytest.fixture
-def workspace() -> Path:
+def workspace() -> Iterator[Path]:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         path = Path(d)
         (path / ".raiker").mkdir(parents=True, exist_ok=True)

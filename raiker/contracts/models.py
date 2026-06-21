@@ -57,6 +57,8 @@ EVENT_TYPES = {
     "verification_started",
     "verification_completed",
     "memory_candidate_reviewed",
+    "memory_record_created",
+    "memory_record_forgotten",
     "response_created",
     "checkpoint_created",
     "turn_closed",
@@ -208,6 +210,11 @@ TOOLS = {
     "git_status",
     "git_diff",
     "git_log",
+    "memory_write",
+    "memory_search",
+    "memory_forget",
+    "memory_list",
+    "memory_get",
     "shell",
 }
 POLICY_DECISIONS = {"allow", "deny", "needs_approval", "allow_managed"}

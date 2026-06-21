@@ -121,3 +121,13 @@ class TestTerminalCommands:
     def test_slash_checkpoints(self, tmp_path: Path) -> None:
         result = handle_slash_command("/checkpoints", workspace_root=str(tmp_path))
         assert result == "No checkpoints." or "Checkpoints:" in result
+
+    def test_memory_mutation_commands_are_approval_only(self, tmp_path: Path) -> None:
+        store_output = handle_slash_command(
+            '/memory-store "project note"', workspace_root=str(tmp_path)
+        )
+        assert "status: approval_required" in store_output
+        assert "does not execute the action" in store_output
+        assert handle_slash_command("/memory-forget mem_missing", workspace_root=str(tmp_path)).startswith(
+            "Memory forget:\n  status: approval_required"
+        )

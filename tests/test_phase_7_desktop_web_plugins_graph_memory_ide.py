@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ from raiker.storage.sqlite import SQLiteStore
 
 
 @pytest.fixture
-def workspace() -> Path:
+def workspace() -> Iterator[Path]:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         yield Path(d)
 
@@ -29,7 +30,6 @@ def store(workspace: Path) -> SQLiteStore:
 
 
 def test_plugin_execution_record_crud(store: SQLiteStore) -> None:
-    now = utc_now()
     r = PluginExecutionRecord(
         execution_id=new_id("plgex_"),
         plugin_id="com.example.safe",
@@ -69,8 +69,7 @@ def test_plugin_execution_denied_by_default(store: SQLiteStore) -> None:
 # ── RAIKER-7501: Graph/Codemap Runtime Indexing ──
 
 
-def test_graph_index_record_crud(store: SQLiteStore) -> None:
-    now = utc_now()
+def test_graph_index_record_crud(store: SQLiteStore, workspace: Path) -> None:
     r = GraphIndexRecord(
         index_id=new_id("gix_"),
         workspace_root=str(workspace),

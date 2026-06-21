@@ -378,8 +378,8 @@ The current terminal client exposes these inspection and control commands throug
 | `/events` | implemented | Lists recent indexed events. |
 | `/checkpoints` | implemented | Lists checkpoint timeline entries. |
 | `/approvals` | implemented | Lists pending action-bound approvals. |
-| `/approve <approval_id>` | implemented | Resolves one exact pending approval as approved. |
-| `/deny <approval_id>` | implemented | Resolves one exact pending approval as denied. |
+| `/approve <approval_id>` | implemented | Resolves one exact pending approval as approved; metadata only and does not execute the action. |
+| `/deny <approval_id>` | implemented | Resolves one exact pending approval as denied; metadata only and does not execute the action. |
 | `/memory` | implemented | Shows read-only governed memory candidate status; durable writes remain disabled. |
 | `/semantic-memory` | implemented | Shows semantic memory disabled status. |
 | `/memory-review` | implemented | Shows governed memory review queue without writes. |

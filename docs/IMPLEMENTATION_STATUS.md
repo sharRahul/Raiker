@@ -9,6 +9,28 @@ This document is the implementation control ledger for Raiker. It converts the e
 
 A feature marked as specified is not automatically implemented. A feature marked as phase-scheduled is not permission to invent behaviour in code. A feature may only be marked `implemented_verified` when the implementation maps to documented task IDs, required tests exist, and validation has passed for the current change set.
 
+## Canonical Backend Capability Statuses
+
+The backend foundation uses these current-status labels when the simpler phase ledger terms would be ambiguous:
+
+- `implemented_read_only`
+- `implemented_policy_gated`
+- `implemented_approval_required`
+- `metadata_only`
+- `readiness_only`
+- `dry_run_only`
+- `contract_only`
+- `disabled_deferred`
+- `test_only`
+
+Current high-signal truth:
+
+- Approval resolution is `metadata_only`: `/approve` and `/deny` do not execute actions.
+- Approval resolution is metadata-only.
+- CLI durable memory mutation is `implemented_approval_required`: requests are brokered and approval-required by default.
+- Governed durable memory writes are `implemented_policy_gated`: they require provenance, retention, approval_state, confidence, trust_score, and event logging on the governed path.
+- Semantic/vector writes, graph indexing, plugin execution, channel runtime, and remote execution remain `disabled_deferred`.
+
 ---
 
 ## Status Vocabulary

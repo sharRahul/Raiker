@@ -7,6 +7,22 @@ This catalog is the Raiker-native inventory of tools and plugin components that 
 
 It is intentionally written in Raiker terminology. A row in this file is **not** runtime activation approval. Every tool and plugin component must still pass Raiker contracts, policy, storage, event logging, approval, UI parity, security, and acceptance-test gates before it can execute.
 
+## Canonical Backend Capability Statuses
+
+Use these labels when a plain `implemented_verified` claim would overstate runtime authority:
+
+- `implemented_read_only`
+- `implemented_policy_gated`
+- `implemented_approval_required`
+- `metadata_only`
+- `readiness_only`
+- `dry_run_only`
+- `contract_only`
+- `disabled_deferred`
+- `test_only`
+
+Approval resolution is metadata-only. `/approve` and `/deny` do not execute actions.
+
 ---
 
 ## CLI Command Surface
@@ -534,12 +550,12 @@ Slice P adds deterministic metadata-only readiness contracts, registry, optional
 | `/events` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/checkpoints` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/approvals` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
-| `/approve <id>` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | approval metadata status update only | Does not execute approved action. |
-| `/deny <id>` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | approval metadata status update only | Does not execute approved action. |
+| `/approve <id>` | Inspection/control command exposed by terminal CLI. | local_terminal | `metadata_only` | approval metadata status update only | Does not execute approved action. |
+| `/deny <id>` | Inspection/control command exposed by terminal CLI. | local_terminal | `metadata_only` | approval metadata status update only | Does not execute approved action. |
 | `/memory` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
-| `/memory-store <text>` | Governed memory write command exposed by terminal CLI. | local_terminal | `implemented_verified` | policy-gated write | Requires approval; secret/credential content blocked. |
+| `/memory-store <text>` | Governed memory write command exposed by terminal CLI. | local_terminal | `implemented_approval_required` | approval-required request only | Requires approval; secret/credential content blocked; `/approve` does not execute it. |
 | `/memory-search <query>` | Memory search command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
-| `/memory-forget <memory_id>` | Governed memory forget command exposed by terminal CLI. | local_terminal | `implemented_verified` | policy-gated write | Requires approval. |
+| `/memory-forget <memory_id>` | Governed memory forget command exposed by terminal CLI. | local_terminal | `implemented_approval_required` | approval-required request only | Requires approval; `/approve` does not execute it. |
 | `/memory-list` | Memory list command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/semantic-memory` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/capabilities` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |

@@ -7,6 +7,18 @@ Raiker is a local-first AI agent platform. It is designed as an operating layer 
 
 This document turns the high-level README into implementation-ready architecture. Implementation is phased, but the architecture is fully specified now. Security boundaries, implemented controls, and deferred security gates are detailed in [`docs/SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md).
 
+## Current Backend Capability Matrix
+
+| Capability | Status | Current truth |
+|---|---|---|
+| workspace inspection, events, checkpoints, readiness commands | `implemented_read_only` | Read-only backend surfaces available now. |
+| file mutation proposals and memory mutation requests | `implemented_approval_required` | Brokered requests create approval metadata only by default. |
+| governed durable memory write contract | `implemented_policy_gated` | Provenance, retention, approval state, and event logging enforced on the governed path. |
+| approval resolution | `metadata_only` | `/approve` and `/deny` do not execute actions. Approval resolution is metadata-only. |
+| graph plans, approval previews, rollback plans | `dry_run_only` | Planning/preview only. |
+| plugin/channel/remote/graph/semantic runtime execution | `disabled_deferred` | Readiness/records may exist, runtime remains off. |
+| desktop/web/dashboard/mobile/ide/api clients | `contract_only` | Phase 8 deferred. |
+
 ---
 
 ## System Goals
@@ -123,13 +135,10 @@ RECEIVED
   -> EXECUTING or WAITING_FOR_APPROVAL or DENIED
   -> OBSERVING
   -> VERIFYING
-  -> MEMORY_REVIEWING
   -> RESPONDING
-  -> CHECKPOINTING
-  -> CLOSED
 ```
 
-The runtime must expose state transitions in logs, SQLite state, interface status surfaces, and tests.
+`checkpoint_created` and `turn_closed` are gateway finalisation events, not additional runtime-orchestrator states. The runtime must expose only the implemented state transitions in logs, SQLite state, interface status surfaces, and tests.
 
 ### Context Gatherer
 
@@ -161,7 +170,7 @@ Responsible for connector profile registry, channel linking, pairing, sender tru
 
 ### Model Router
 
-Responsible for abstracting model providers. The deterministic `mock` provider is the offline/test fallback; the **llama.cpp server is the native default local backend** (`raiker/models/providers/llama_cpp_server.py`), selected automatically when its `/health` endpoint is reachable. LM Studio and OpenAI-compatible local endpoints have profiles but are not yet wired; vLLM is a later high-throughput GPU option. Hosted providers are policy-controlled and documented in `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`.
+Responsible for abstracting model providers. Deterministic `mock` and `test` providers are `test_only` and never a silent production fallback. The default provider selection is currently a static local-first profile choice, not a health-checked chooser. Hosted providers are policy-controlled and documented in `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`.
 
 ### Event Log
 
@@ -226,7 +235,7 @@ model launch: /launch --provider lm-studio --model local-model
 model launch: /launch --provider openai-compatible --endpoint http://localhost:1234/v1 --model local-model
 models: /models
 channels: /channels
-sessions: /sessions
+sessions: deferred; no `/sessions` command is currently implemented
 checkpoints: /checkpoints
 doctor: /doctor
 ```

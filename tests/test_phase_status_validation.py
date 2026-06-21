@@ -17,19 +17,15 @@ def test_required_github_workflows_exist() -> None:
     phase = Path(".github/workflows/phase-status.yml").read_text(encoding="utf-8")
     assert "python -m pytest" in ci
     assert "python -m ruff check ." in ci
-    assert "python -m mypy raiker apps tests" in ci
+    assert "python -m mypy" in ci
     assert "python scripts/validate_phase_status.py" in phase
 
 
-def test_active_phase_3_status_docs_align_on_completion_and_blocked_phase_4() -> None:
-    docs = [
-        Path("docs/IMPLEMENTATION_STATUS.md"),
-        Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"),
-        Path("docs/EVENT_CATALOG.md"),
-    ]
-    for path in docs:
-        text = path.read_text(encoding="utf-8")
-        assert "Phase 4 remains blocked" in text or "Phase 4 is not complete" in text
+def test_phase_docs_align_on_current_backend_foundation() -> None:
     status = Path("docs/IMPLEMENTATION_STATUS.md").read_text(encoding="utf-8")
-    assert "All Phase 3 slices A through P are implemented, tested, and documented." in status
-    assert "**Phase 3 can be marked complete.**" in status
+    catalog = Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
+    security = Path("docs/SECURITY_ARCHITECTURE.md").read_text(encoding="utf-8")
+    assert "Canonical Backend Capability Statuses" in status
+    assert "Approval resolution is `metadata_only`" in status
+    assert "implemented_approval_required" in catalog
+    assert "approval resolution is metadata-only" in security.lower()

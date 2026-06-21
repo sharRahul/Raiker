@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -11,7 +12,7 @@ from raiker.storage.sqlite import SQLiteStore
 
 
 @pytest.fixture
-def workspace() -> Path:
+def workspace() -> Iterator[Path]:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         yield Path(d)
 
@@ -79,6 +80,7 @@ def test_budget_crud(store: SQLiteStore) -> None:
     assert loaded["current_cost"] == 25.0
     assert store.update_budget_cost(b.budget_id, 10.0) is True
     loaded2 = store.load_budget_record(b.budget_id)
+    assert loaded2 is not None
     assert loaded2["current_cost"] == 35.0
 
 

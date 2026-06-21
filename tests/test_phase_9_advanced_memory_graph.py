@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -22,7 +23,7 @@ from raiker.vector import VectorIndex
 
 
 @pytest.fixture
-def workspace() -> Path:
+def workspace() -> Iterator[Path]:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         yield Path(d)
 

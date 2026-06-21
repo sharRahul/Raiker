@@ -20,6 +20,8 @@ ToolAction proposal
 
 Clients, runtime modules, plugins, models, channels, and subagents must never execute tools directly.
 
+Current backend truth: approval resolution is metadata-only and does not execute approved actions; approval execution relay remains disabled/deferred; runtime execution remains disabled for deferred capabilities.
+
 ---
 
 ## Threats Raiker Must Consider
@@ -119,7 +121,7 @@ Every security-relevant decision must be logged:
 - error;
 - checkpoint.
 
-Event log records must not include secrets unless explicitly redacted.
+Event log records must not include secrets unless explicitly redacted. Raiker does not currently claim tamper-proof storage, immutable storage, or cryptographic non-repudiation for the local audit log.
 
 ---
 
@@ -161,6 +163,8 @@ Phase-scheduled memory writes must include provenance, confidence, sensitivity, 
 Approval prompts must include action ID, tool name, exact arguments, risk level, policy reasons, expected effect, and whether the action changes files, runs a command, uses network, exports data, persists memory, or may cost money.
 
 Approvals must be bound to action ID. A user approving one action must not approve a different action accidentally.
+
+Pending approval records are also bound to a stored action payload hash. If the stored tool payload is tampered with before resolution, resolution fails closed.
 
 ---
 

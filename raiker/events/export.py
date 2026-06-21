@@ -140,9 +140,8 @@ def generate_export(
             evt = _read_event_from_jsonl(Path(path_str), int(offset))
             if evt is None:
                 continue
-            if redact:
-                if "payload" in evt and isinstance(evt["payload"], dict):
-                    evt["payload"] = redact_event_payload(evt["payload"])
+            if redact and "payload" in evt and isinstance(evt["payload"], dict):
+                evt["payload"] = redact_event_payload(evt["payload"])
             out.write(json.dumps(evt, sort_keys=True, separators=(",", ":")) + "\n")
     updated = ExportManifest(
         export_id=manifest.export_id,

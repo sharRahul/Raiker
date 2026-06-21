@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import AgentEvent, ClientMetadata, ExportManifest
+from raiker.contracts.models import AgentEvent, ExportManifest
 from raiker.events.export import build_export_manifest, generate_export, redact_event_payload
 from raiker.events.integrity import compute_session_root_hash, verify_session_events
 from raiker.events.types import make_event
@@ -17,7 +17,7 @@ from raiker.storage.sqlite import SQLiteStore
 
 
 @pytest.fixture
-def workspace() -> Path:
+def workspace() -> Iterator[Path]:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         yield Path(d)
 
@@ -150,6 +150,7 @@ def test_generate_export_redacted(store: SQLiteStore, writer: EventLogWriter) ->
     )
     writer.append(sensitive)
     manifest = generate_export(store, session_id=sess_id, redact=True)
+    assert manifest.export_path is not None
     with open(manifest.export_path) as f:
         line = f.readline()
         loaded = json.loads(line)

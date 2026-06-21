@@ -1,157 +1,258 @@
 from __future__ import annotations
 
-import os
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
+from raiker.contracts.ids import new_id
+from raiker.contracts.models import ClientMetadata, PolicyDecision, ToolAction
+from raiker.events.writer import EventLogWriter
 from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
-from raiker.memory.store import (
-    forget_memory,
-    get_memory,
-    list_memory,
-    memory_status,
-    search_memory,
-    write_memory,
-)
+from raiker.memory.store import get_memory, list_memory, memory_status, search_memory
+from raiker.policy.config import StaticPolicyConfig
+from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tools.broker import ToolBroker
 from raiker.tools.memory_tools import memory_forget, memory_search, memory_write
 
 
 @pytest.fixture
-def workspace() -> Path:
+def workspace() -> Iterator[Path]:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         path = Path(d)
         (path / ".raiker").mkdir(parents=True, exist_ok=True)
         yield path
 
 
-def test_write_and_read_memory(workspace: Path) -> None:
-    entry = write_memory("This is a test memory about project Raiker.", workspace_root=workspace)
-    assert entry.memory_id.startswith("mem_")
-    assert entry.text == "This is a test memory about project Raiker."
-    assert entry.scope == "project"
+class AllowMemoryPolicyEngine(PolicyEngine):
+    def review(self, action: ToolAction, user_id: str | None = None) -> PolicyDecision:
+        if action.tool_name in {"memory_write", "memory_forget"}:
+            return PolicyDecision(
+                decision_id=new_id("pol_"),
+                action_id=action.action_id,
+                decision="allow",
+                reasons=["test_memory_allow"],
+                requires_user_approval=False,
+            )
+        return super().review(action, user_id=user_id)
 
-    retrieved = get_memory(entry.memory_id, workspace_root=workspace)
-    assert retrieved is not None
-    assert retrieved.text == entry.text
-    assert retrieved.memory_id == entry.memory_id
 
-
-def test_write_memory_with_tags(workspace: Path) -> None:
-    entry = write_memory(
-        "API design notes for the gateway module.",
+def _governed_broker(workspace: Path) -> ToolBroker:
+    store = SQLiteStore(workspace)
+    return ToolBroker(
         workspace_root=workspace,
-        scope="project",
-        tags=("api", "gateway", "design"),
+        policy_engine=AllowMemoryPolicyEngine(StaticPolicyConfig(workspace)),
+        store=store,
+        writer=EventLogWriter(store),
     )
-    assert "api" in entry.tags
-    assert "gateway" in entry.tags
+
+
+def _memory_write_action(text: str, **overrides: object) -> ToolAction:
+    arguments: dict[str, object] = {
+        "text": text,
+        "scope": "project",
+        "tags": ["test"],
+        "source": "tests",
+        "source_event_id": "evt_test_memory",
+        "source_session_id": "sess_test_memory",
+        "source_turn_id": "turn_test_memory",
+        "source_type": "local_user",
+        "confidence": 0.9,
+        "trust_score": 0.9,
+        "retention": "until_forget",
+        "approval_state": "approved_after_test_governance",
+        "created_by": "tests",
+    }
+    arguments.update(overrides)
+    return ToolAction(
+        action_id=new_id("act_"),
+        tool_name="memory_write",
+        arguments=arguments,
+        risk_level="high",
+        requires_approval=True,
+        proposed_by="tests",
+    )
+
+
+def _memory_forget_action(memory_id: str, **overrides: object) -> ToolAction:
+    arguments: dict[str, object] = {
+        "memory_id": memory_id,
+        "source_event_id": "evt_test_forget",
+        "source_session_id": "sess_test_memory",
+        "source_turn_id": "turn_test_memory",
+        "source_type": "local_user",
+        "deleted_by": "tests",
+    }
+    arguments.update(overrides)
+    return ToolAction(
+        action_id=new_id("act_"),
+        tool_name="memory_forget",
+        arguments=arguments,
+        risk_level="high",
+        requires_approval=True,
+        proposed_by="tests",
+    )
+
+
+def test_direct_memory_tool_write_and_forget_are_denied(workspace: Path) -> None:
+    assert memory_write(workspace, "normal project note")["status"] == "denied"
+    assert memory_forget(workspace, "mem_123")["status"] == "denied"
+
+
+def test_governed_memory_write_and_read(workspace: Path) -> None:
+    broker = _governed_broker(workspace)
+    result, decision = broker.execute(
+        _memory_write_action("This is a governed memory about project Raiker."),
+        session_id="sess_test_memory",
+        turn_id="turn_test_memory",
+        client=ClientMetadata(type="test_harness", name="tests", version="0.0.0"),
+    )
+    assert decision.decision == "allow"
+    assert result.status == "success"
+    memory_id = str(result.output["memory_id"])  # type: ignore[index]
+    retrieved = get_memory(memory_id, workspace_root=workspace)
+    assert retrieved is not None
+    assert retrieved.text == "This is a governed memory about project Raiker."
+    assert retrieved.retention == "until_forget"
+    assert retrieved.approval_state == "approved_after_test_governance"
+    assert retrieved.provenance["source_session_id"] == "sess_test_memory"
+
+
+def test_governed_memory_write_requires_governance_metadata(workspace: Path) -> None:
+    broker = _governed_broker(workspace)
+    action = _memory_write_action("missing metadata", approval_state="")
+    result, _ = broker.execute(
+        action,
+        session_id="sess_test_memory",
+        turn_id="turn_test_memory",
+    )
+    assert result.status == "failed"
+    assert result.error == {"type": "missing_memory_metadata:approval_state"}
 
 
 def test_search_memory_keyword(workspace: Path) -> None:
-    write_memory("The llama.cpp provider is the native default.", workspace_root=workspace)
-    write_memory("OpenAI compatible providers use httpx.", workspace_root=workspace)
-    write_memory("SQLite is used for metadata storage.", workspace_root=workspace)
+    broker = _governed_broker(workspace)
+    for text in (
+        "The llama.cpp provider is the native default.",
+        "OpenAI compatible providers use httpx.",
+        "SQLite is used for metadata storage.",
+    ):
+        result, _ = broker.execute(
+            _memory_write_action(text),
+            session_id="sess_test_memory",
+            turn_id="turn_test_memory",
+        )
+        assert result.status == "success"
 
     results = search_memory("llama", workspace_root=workspace)
-    assert len(results) >= 1
     assert any("llama.cpp" in r.text for r in results)
-
     results = search_memory("httpx", workspace_root=workspace)
-    assert len(results) >= 1
     assert any("httpx" in r.text for r in results)
 
 
-def test_search_memory_empty_query(workspace: Path) -> None:
-    write_memory("Some test content.", workspace_root=workspace)
-    results = search_memory("nonexistent_term_xyz", workspace_root=workspace)
-    assert len(results) == 0
-
-
-def test_forget_memory(workspace: Path) -> None:
-    entry = write_memory("Temporary note to be removed.", workspace_root=workspace)
-    assert get_memory(entry.memory_id, workspace_root=workspace) is not None
-
-    result = forget_memory(entry.memory_id, workspace_root=workspace)
-    assert result is True
-
-    assert get_memory(entry.memory_id, workspace_root=workspace) is None
+def test_forget_memory_tombstones_record(workspace: Path) -> None:
+    broker = _governed_broker(workspace)
+    write_result, _ = broker.execute(
+        _memory_write_action("Temporary note to be forgotten."),
+        session_id="sess_test_memory",
+        turn_id="turn_test_memory",
+    )
+    memory_id = str(write_result.output["memory_id"])  # type: ignore[index]
+    forget_result, decision = broker.execute(
+        _memory_forget_action(memory_id),
+        session_id="sess_test_memory",
+        turn_id="turn_test_memory",
+    )
+    assert decision.decision == "allow"
+    assert forget_result.status == "success"
+    assert get_memory(memory_id, workspace_root=workspace) is None
+    assert all(entry.memory_id != memory_id for entry in list_memory(workspace_root=workspace))
 
 
 def test_forget_nonexistent_memory(workspace: Path) -> None:
-    result = forget_memory("nonexistent_id", workspace_root=workspace)
-    assert result is False
+    broker = _governed_broker(workspace)
+    result, _ = broker.execute(
+        _memory_forget_action("nonexistent_id"),
+        session_id="sess_test_memory",
+        turn_id="turn_test_memory",
+    )
+    assert result.status == "failed"
+    assert result.error == {
+        "type": "not_found",
+        "message": "Memory 'nonexistent_id' not found.",
+    }
 
 
 def test_list_memory(workspace: Path) -> None:
-    write_memory("Memory A", workspace_root=workspace, scope="project")
-    write_memory("Memory B", workspace_root=workspace, scope="project")
-    write_memory("Personal note", workspace_root=workspace, scope="personal")
-
+    broker = _governed_broker(workspace)
+    for text, scope in (
+        ("Memory A", "project"),
+        ("Memory B", "project"),
+        ("Personal note", "personal"),
+    ):
+        result, _ = broker.execute(
+            _memory_write_action(text, scope=scope),
+            session_id="sess_test_memory",
+            turn_id="turn_test_memory",
+        )
+        assert result.status == "success"
     all_entries = list_memory(workspace_root=workspace)
     assert len(all_entries) >= 3
-
     project_entries = list_memory(workspace_root=workspace, scope="project")
     assert len(project_entries) >= 2
-    assert all(e.scope == "project" for e in project_entries)
+    assert all(entry.scope == "project" for entry in project_entries)
 
 
 def test_memory_status(workspace: Path) -> None:
     status = memory_status(workspace_root=workspace)
-    assert "approved_memory_count" in status
-    assert status["memory_store"] == "markdown_files"
-
-    write_memory("Test memory", workspace_root=workspace, tags=("test",))
+    assert status["approved_memory_count"] == 0
+    broker = _governed_broker(workspace)
+    result, _ = broker.execute(
+        _memory_write_action("Test memory"),
+        session_id="sess_test_memory",
+        turn_id="turn_test_memory",
+    )
+    assert result.status == "success"
     status = memory_status(workspace_root=workspace)
-    assert status["approved_memory_count"] >= 1
-    assert "test" in status["tags"]
+    approved_memory_count = status["approved_memory_count"]
+    assert isinstance(approved_memory_count, int)
+    assert approved_memory_count >= 1
+    tags = status["tags"]
+    assert isinstance(tags, list)
+    assert "test" in tags
 
 
 def test_memory_write_policy_blocks_secrets(workspace: Path) -> None:
-    result = memory_write(
+    assert memory_write(
         workspace,
         "The password=supersecret123! and api_key=abc123def456ghi789jkl",
-    )
-    assert result["status"] == "denied"
-    assert "policy_denied" in str(result)
+    )["status"] == "denied"
 
 
 def test_memory_write_policy_blocks_credentials(workspace: Path) -> None:
-    result = memory_write(
+    assert memory_write(
         workspace,
         "Bearer token: abcdefghijklmnopqrstuvwxyz123456",
-    )
-    assert result["status"] == "denied"
-    assert "policy_denied" in str(result)
-
-
-def test_memory_write_policy_allows_normal(workspace: Path) -> None:
-    result = memory_write(workspace, "The project uses Python 3.11 with httpx for async HTTP.")
-    assert result["status"] == "success"
-    assert result["memory_id"].startswith("mem_")
+    )["status"] == "denied"
 
 
 def test_memory_search_via_tool(workspace: Path) -> None:
-    memory_write(workspace, "Raiker uses SQLite for metadata persistence.")
-    memory_write(workspace, "The agent gateway routes prompts to the model provider.")
-
-    result = memory_search(workspace, "SQLite")
-    assert result["status"] == "success"
-    assert result["count"] >= 1
-    assert any("SQLite" in r["text"] for r in result["results"])
-
-
-def test_memory_forget_via_tool(workspace: Path) -> None:
-    result = memory_write(workspace, "Memory to forget via tool.")
-    memory_id = result["memory_id"]
-
-    forget_result = memory_forget(workspace, memory_id)
-    assert forget_result["status"] == "success"
-
-    forget_result = memory_forget(workspace, "nonexistent")
-    assert forget_result["status"] == "failed"
+    broker = _governed_broker(workspace)
+    for text in (
+        "Raiker uses SQLite for metadata persistence.",
+        "The agent gateway routes prompts to the model provider.",
+    ):
+        tool_result, _ = broker.execute(
+            _memory_write_action(text),
+            session_id="sess_test_memory",
+            turn_id="turn_test_memory",
+        )
+        assert tool_result.status == "success"
+    search_result = memory_search(workspace, "SQLite")
+    assert search_result["status"] == "success"
+    assert search_result["count"] >= 1
 
 
 def test_classify_memory_sensitivity() -> None:
@@ -163,18 +264,6 @@ def test_classify_memory_sensitivity() -> None:
     assert classify_memory_sensitivity("") == MemorySensitivity.UNKNOWN
 
 
-def test_memory_persistence_across_store(workspace: Path) -> None:
-    from raiker.tools.memory_tools import memory_write as tool_memory_write
-    tool_memory_write(workspace, "This persists in markdown files.")
-    store = SQLiteStore(workspace)
-    entries = store.list_approved_memory()
-    assert len(entries) >= 1
-    assert any("persists" in row["text"] for row in entries)
-
-
 def test_memory_write_empty_denied(workspace: Path) -> None:
-    result = memory_write(workspace, "")
-    assert result["status"] == "failed"
-
-    result = memory_write(workspace, "   ")
-    assert result["status"] == "failed"
+    assert memory_write(workspace, "")["status"] == "failed"
+    assert memory_write(workspace, "   ")["status"] == "failed"

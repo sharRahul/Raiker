@@ -443,6 +443,22 @@ CREATE INDEX IF NOT EXISTS idx_approved_memory_scope ON approved_memory(scope);
 CREATE INDEX IF NOT EXISTS idx_approved_memory_created ON approved_memory(created_at);
 """
 
+PHASE_4_MEMORY_GOVERNANCE_HARDENING_MIGRATION_ID = (
+    "RAIKER-2002-phase4-memory-governance-hardening"
+)
+
+PHASE_4_MEMORY_GOVERNANCE_HARDENING_SQL = """
+ALTER TABLE approved_memory ADD COLUMN provenance_json TEXT NOT NULL DEFAULT '{}';
+ALTER TABLE approved_memory ADD COLUMN confidence REAL NOT NULL DEFAULT 0.0;
+ALTER TABLE approved_memory ADD COLUMN trust_score REAL NOT NULL DEFAULT 0.0;
+ALTER TABLE approved_memory ADD COLUMN retention TEXT NOT NULL DEFAULT 'until_forget';
+ALTER TABLE approved_memory ADD COLUMN approval_state TEXT NOT NULL DEFAULT 'approved';
+ALTER TABLE approved_memory ADD COLUMN created_by TEXT NOT NULL DEFAULT 'system';
+ALTER TABLE approved_memory ADD COLUMN updated_at TEXT;
+ALTER TABLE approved_memory ADD COLUMN deleted_at TEXT;
+ALTER TABLE approvals ADD COLUMN action_payload_sha256 TEXT;
+"""
+
 PHASE_5_MANAGED_POLICY_MIGRATION_ID = "RAIKER-5001-phase5-managed-policy"
 
 PHASE_5_MANAGED_POLICY_SQL = """

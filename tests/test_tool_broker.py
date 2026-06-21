@@ -53,3 +53,46 @@ def test_broker_shell_returns_approval_required(tmp_path) -> None:  # type: igno
     )
     assert decision.decision == "needs_approval"
     assert result.status == "approval_required"
+
+
+def test_broker_memory_write_requires_approval_and_does_not_mutate(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    broker = _broker(tmp_path)
+    result, decision = broker.execute(
+        ToolAction(
+            new_id("act_"),
+            "memory_write",
+            {"text": "remember this", "scope": "project"},
+            "high",
+            True,
+        ),
+        session_id=new_id("sess_"),
+        turn_id=new_id("turn_"),
+    )
+    assert decision.decision == "needs_approval"
+    assert result.status == "approval_required"
+    assert "exact_arguments" in result.output  # type: ignore[operator]
+    assert not list((tmp_path / ".raiker" / "memory").glob("*.md"))
+
+
+def test_broker_memory_write_denies_secret_without_approval_record(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    store = SQLiteStore(tmp_path)
+    broker = ToolBroker(
+        workspace_root=tmp_path,
+        policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)),
+        store=store,
+        writer=EventLogWriter(store),
+    )
+    result, decision = broker.execute(
+        ToolAction(
+            new_id("act_"),
+            "memory_write",
+            {"text": "password=supersecret123456789", "scope": "project"},
+            "high",
+            True,
+        ),
+        session_id=new_id("sess_"),
+        turn_id=new_id("turn_"),
+    )
+    assert decision.decision == "deny"
+    assert result.status == "denied"
+    assert store.list_approvals(status="pending") == []

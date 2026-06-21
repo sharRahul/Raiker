@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from raiker.contracts.ids import new_id
-from raiker.contracts.models import TOOLS, ToolAction
+from raiker.contracts.models import ToolAction
 from raiker.models.contracts import ToolCallProposal, ToolSpec
 
 # Tool -> (risk_level, requires_approval). Read-only tools are medium/no-approval;
@@ -24,6 +24,8 @@ _TOOL_RISK: dict[str, tuple[str, bool]] = {
     "apply_patch": ("high", True),
     "shell": ("high", True),
 }
+
+_MODEL_EXPOSED_TOOLS = frozenset(_TOOL_RISK)
 
 # Minimal required string arguments per tool. Presence + type only; path safety and
 # permission are enforced later by the filesystem layer and policy engine.
@@ -73,7 +75,7 @@ def default_tool_specs() -> list[ToolSpec]:
     """Tool schemas advertised to the model. Only registered, brokered tools are offered."""
 
     specs: list[ToolSpec] = []
-    for name in sorted(TOOLS):
+    for name in sorted(_MODEL_EXPOSED_TOOLS):
         required = list(_REQUIRED_ARGS.get(name, ()))
         properties = {arg: {"type": "string"} for arg in required}
         specs.append(
@@ -99,7 +101,7 @@ def validate_tool_call(proposal: ToolCallProposal) -> ToolAction:
     """
 
     tool_name = proposal.tool_name
-    if tool_name not in TOOLS:
+    if tool_name not in _MODEL_EXPOSED_TOOLS:
         raise ToolCallRejected(f"unknown_tool:{tool_name}", tool_name=tool_name)
     arguments: dict[str, Any] = proposal.arguments
     if not isinstance(arguments, dict):

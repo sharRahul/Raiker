@@ -36,3 +36,25 @@ def test_gateway_preserves_client_metadata_and_writes_events(tmp_path, monkeypat
         .splitlines()
     ]  # type: ignore[arg-type]
     assert lines[0]["payload"]["client"]["interface_status"] == "equal_primary_when_enabled"
+
+
+def test_gateway_finalization_events_are_not_runtime_states(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "config").mkdir()
+    source_config = __import__("pathlib").Path(__file__).resolve().parents[1] / "config"
+    for name in ["model-profiles.json", "channel-connectors.json"]:
+        (tmp_path / "config" / name).write_text(
+            (source_config / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("Hello Raiker"))
+    lines = [
+        json.loads(line)
+        for line in __import__("pathlib")
+        .Path(response.events_path)
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]  # type: ignore[arg-type]
+    checkpoint_event = next(event for event in lines if event["event_type"] == "checkpoint_created")
+    turn_closed_event = next(event for event in lines if event["event_type"] == "turn_closed")
+    assert checkpoint_event["actor"] == "checkpoint_service"
+    assert turn_closed_event["actor"] == "agent_gateway"

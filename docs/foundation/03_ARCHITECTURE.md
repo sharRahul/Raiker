@@ -1,4 +1,4 @@
-> **Foundation document.** This is a living design-foundation doc (moved from `docs/completed/` during the 2026-06-21 documentation alignment). For current implementation status see the canonical ledger `docs/IMPLEMENTATION_STATUS.md`; for outstanding work see `docs/GAP_AND_TODO_ANALYSIS.md`. As of that date: Phases 1–9 foundations are in place (no Phase 8), the launchable UI is a local terminal client (native Textual Rich TUI + plain fallback), and all runtime execution remains disabled.
+> **Foundation document.** This is a living design-foundation doc (moved from `docs/completed/` during the 2026-06-21 documentation alignment). For current implementation status see the canonical ledger `docs/IMPLEMENTATION_STATUS.md`; for outstanding work see `docs/GAP_AND_TODO_ANALYSIS.md`. As of that date: Phases 1–9 foundations are in place (Phase 8 is the planned UI/client phase), the launchable UI is a local terminal client (plain local terminal client only; Rich/native TUI deferred to Phase 8), and all runtime execution remains disabled.
 
 # 03 Architecture Document
 

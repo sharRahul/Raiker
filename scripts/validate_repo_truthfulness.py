@@ -182,10 +182,10 @@ def main() -> int:
         errors.append("Unreconciled 'No — Phase 3 planned' rows: " + ", ".join(stale))
 
     required_truth = [
-        "current launchable UI is a local terminal client",
-        "native Textual Rich TUI",
-        "Desktop/Web/Dashboard/Mobile apps",
-        "specified/deferred, not implemented",
+        "current launchable UI is the plain local terminal client only",
+        "Rich/native TUI is Phase 8 deferred work",
+        "Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred",
+        "specified but not implemented",
         "safe foundation/readiness slices A-P",
         "Phase 4 memory MVP is implemented",
         "runtime execution remains disabled",
@@ -194,6 +194,17 @@ def main() -> int:
     for marker in required_truth:
         if marker.lower() not in readme_text.lower():
             errors.append(f"README missing truthfulness marker: {marker}")
+    combined_docs = "\n".join(path.read_text(encoding="utf-8") for path in DOCS)
+    forbidden_phase8 = ("there is no Phase 8", "numbering jumps 7→9", "numbering jumps 7->9")
+    for phrase in forbidden_phase8:
+        if phrase.lower() in combined_docs.lower():
+            errors.append(f"Docs contain stale Phase 8 wording: {phrase}")
+    forbidden_active_ui = ("native Textual Rich TUI by default", "Textual TUI front-end", "default Rich TUI")
+    for phrase in forbidden_active_ui:
+        if phrase.lower() in combined_docs.lower():
+            errors.append(f"Docs still imply active Rich/Textual runtime: {phrase}")
+    if "Phase 8" not in combined_docs or "UI/client" not in combined_docs:
+        errors.append("Docs must define Phase 8 as the UI/client phase")
 
     ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     phase = (ROOT / ".github/workflows/phase-status.yml").read_text(encoding="utf-8")
@@ -210,8 +221,8 @@ def main() -> int:
     phase3_line = next((line for line in architecture.splitlines() if line.startswith("| Phase 3 |")), "")
     if not phase3_line:
         errors.append("ARCHITECTURE missing Phase 3 row")
-    elif not all(marker in phase3_line for marker in ["target platform architecture", "safe foundation/readiness", "Deferred after Phase 3"]):
-        errors.append("ARCHITECTURE Phase 3 row must separate target platform architecture, completed A-P readiness scope, and deferred runtime/app work")
+    elif not all(marker in phase3_line for marker in ["target platform architecture", "safe foundation/readiness", "Phase 8"]):
+        errors.append("ARCHITECTURE Phase 3 row must separate target platform architecture, completed A-P readiness scope, and Phase 8 deferred runtime/app work")
     overclaim_terms = ["Desktop UI, Web UI, Dashboard, Apple mobile app, Android mobile app, plugin manager, semantic search, graph/codemap, REST API, worktree isolation."]
     if any(term in phase3_line and "safe foundation/readiness" not in phase3_line for term in overclaim_terms):
         errors.append("ARCHITECTURE Phase 3 row overclaims full app/runtime features")

@@ -1,5 +1,8 @@
 # Commands And Equal Interface Mode Specification
 
+> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+
+
 Raiker must provide a rich interactive experience across all enabled interfaces, not a set of fragmented or privileged entry points.
 
 CLI, Rich TUI, Desktop, Web, Dashboard, IDE, Voice, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and other governed clients are equal-status primary interfaces when implemented and enabled. No interface is canonical over another. All actions must enter through the same Agent Gateway, contracts, policy gates, event log, session state, approval binding, task controls, checkpoint model, memory governance, and runtime orchestration.
@@ -14,7 +17,7 @@ Raiker must install one human-facing global command named `raiker` as the local 
 raiker
 ```
 
-Running `raiker` launches the configured local terminal client, which may be implemented as a Rich TUI or a plain terminal client. This terminal client is one primary interface, not the canonical place for normal user actions.
+Running `raiker` launches the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. The terminal client is one primary interface, not the canonical place for normal user actions.
 
 The global command must not require the user to choose separate primary modes such as ask/chat/tui. Those behaviours are actions inside Raiker clients. This rule does not reduce the equal primary status of Desktop, Web, IDE, Voice, Hotkeys, REST, Webhooks, chat channels, Email, Browser Extension, Apple mobile app, Android mobile app, or Mobile Companion.
 
@@ -439,7 +442,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Rich TUI panels | Minimal terminal shell/status rendering only; rich panels are specified, not implemented as a full app. | Partial/minimal | None. | Build panel framework only in a future approved slice. |
+| Rich TUI panels | Plain terminal shell/status rendering only; Rich/native TUI panels are Phase 8 deferred. | Plain-only | None. | Build panel framework only in a future approved slice. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
@@ -626,6 +629,6 @@ auto-fix, not patch application, not GitHub PR automation, not a UI/API/IDE/dash
 Disabled runtime flags remain false.
 
 
-## Raiker TUI — native interactive shell command access
+## Plain terminal client command access; Rich/native TUI deferred
 
 The native Raiker TUI routes `/commands`/`/palette` (or Ctrl+P) to the command-palette overlay, slash commands through `handle_slash_command()`, and prompts through `submit_terminal_prompt()` / Agent Gateway streaming. The TUI adds no new command semantics and does not bypass policy or the existing handlers. `/q`, `/quit`, and `/exit` exit safely, and `Ctrl+C`/`Ctrl+D` exit without a crash. `RAIKER_TUI=plain`, `--prompt`, and non-interactive stdin keep the minimal plain fallback.

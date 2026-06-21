@@ -4,7 +4,7 @@
 > Phase 8 ("UI and Channels") UX proposal derived from the foundation docs `docs/foundation/01_PRD.md`
 > through `docs/foundation/11_DIRECTORY_STRUCTURE.md`. It describes intended screens and behaviour; it
 > does not change current implementation status. The current launchable UI is a local terminal client
-> (native Textual Rich TUI + plain fallback); Desktop/Web/Dashboard/Mobile/IDE/REST surfaces remain
+> (plain local terminal client only; Rich/native TUI deferred to Phase 8); Desktop/Web/Dashboard/Mobile/IDE/REST surfaces remain
 > specified/deferred. Runtime execution remains disabled, and **no UI surface ever executes tools
 > directly** — every client routes through the Agent Gateway → Session Manager → Agent Runtime → Tool
 > Broker → Policy Engine. Canonical status lives in `docs/IMPLEMENTATION_STATUS.md`.
@@ -125,8 +125,7 @@ so the user is never surprised about what changes.
 
 ### B.1 Navigation model — command-palette-first, thin rail
 
-**Choice:** a **command palette as the primary navigator** (already present in the TUI:
-`raiker/tui/textual_app.py`, `/commands` · `/palette` · Ctrl/Cmd-P), backed by a **collapsible icon
+**Choice:** a **command palette as the primary navigator** (planned for the Phase 8 Rich/native TUI; the current plain terminal already supports `/commands` and `/palette` as text output), backed by a **collapsible icon
 rail** of at most seven destinations. **Rejected:** a wide always-on sidebar with nested trees.
 
 Why this fits the architecture and the philosophy:
@@ -206,7 +205,7 @@ AppShell
 │       │   └─ TurnCard*
 │       │       ├─ StateRibbon            (loop states from AgentEvent)
 │       │       ├─ PlanCard               (approve/edit/cancel)
-│       │       ├─ ToolCallBlock          (args · trust · policy · result)   ← reuse raiker/tui ToolCallBlock
+│       │       ├─ ToolCallBlock          (args · trust · policy · result)   ← reuse future Phase 8 ToolCallBlock
 │       │       ├─ PermissionCard         (focus-trap; allow/ask/deny)
 │       │       ├─ VerificationCard       (PASS/FAIL/PARTIAL + evidence)
 │       │       ├─ MemoryCandidateCard    (approve/edit/reject)

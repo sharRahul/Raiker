@@ -435,7 +435,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Rich TUI panels | Minimal terminal shell/status rendering only; rich panels are specified, not implemented as a full app. | Partial/minimal | None. | Build panel framework only in a future approved slice. |
+| Rich TUI panels | Plain terminal shell/status rendering only; Rich/native TUI panels are Phase 8 deferred. | Plain-only | None. | Build panel framework only in a future approved slice. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
@@ -616,6 +616,6 @@ The following event names are reserved for Phase 5 enterprise governance, manage
 | `skill_candidate_reviewed` | `skill_candidate_store` | `candidate_id`, `status` | Skill candidate reviewed (approved/rejected). |
 | `skill_candidate_generated` | `skill_candidate_store` | `candidate_id`, `name`, `pattern` | Skill candidate auto-generated from pattern.
 
-## Raiker TUI (native interactive shell)
+## Plain terminal client events; Rich/native TUI deferred
 
-Raiker TUI adds **no new events**. The native interactive shell renders the existing command/runtime events and streams `TEXT_DELTA`/`LIFECYCLE`/`FINAL` from `AgentGateway.astream_prompt` into the transcript. No new storage is added.
+The plain terminal client adds **no new events**. Future Phase 8 Rich/native TUI clients must render existing command/runtime events and gateway streaming events without adding private storage or bypass events.

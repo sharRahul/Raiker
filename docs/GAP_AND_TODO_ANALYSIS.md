@@ -52,10 +52,34 @@ The full list of disabled runtime flags (all `False`) is enforced by
 
 ## 3. Structural notes
 
-- **Phase 8 does not exist.** Phase numbering jumps from Phase 7 to Phase 9; this is intentional and
-  is now recorded in `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_STATUS.md`.
+- **Phase 8 exists.** Phase 8 is the planned UI/client implementation phase and is recorded in `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_STATUS.md`.
 - **Pre-existing lint/type debt (out of scope for this docs audit):** `ruff check .` and
   `mypy raiker apps tests` currently report errors on the development branch (notably in
-  `raiker/tui/textual_app.py` and several tests) that predate this change. They are tracked here so
+  the removed legacy Textual implementation and old tests) that predate this change. They are tracked here so
   they are not forgotten; the repo's documentation-truthfulness gate
   (`scripts/validate_repo_truthfulness.py`, `scripts/validate_phase_status.py`) and `pytest` pass.
+
+## Phase 8 deferred UI/client and runtime implementation backlog (current, actionable)
+
+All items below are specified but not implemented unless explicitly marked otherwise. They must not be enabled until policy, storage, event, and test gates exist and pass local validation.
+
+| Feature | Current code reality | Relevant docs/specs | Status label | Proposed phase/task ID | Required policy/storage/events/tests | Safety gates that remain disabled | Acceptance criteria |
+|---|---|---|---|---|---|---|---|
+| Rich/native TUI | Active Rich/Textual runtime removed; plain terminal remains. | UI/UX spec, command spec | phase8_deferred | RAIKER-8001 | Client contract tests, no bypass of AgentGateway/ToolBroker/PolicyEngine/approvals/events. | runtime_execution_enabled=false | Launches only after explicit Phase 8 scope; no Rich/Textual import required before then. |
+| Desktop UI | Contract/readiness records only; no launchable app. | UI/UX spec | phase8_deferred | RAIKER-8101 | Auth/session storage, event-stream tests, approval binding tests. | external_channels_enabled=false | Desktop app cannot execute directly and uses gateway contracts. |
+| Web UI and REST/API | Contract/spec only; no API server. | UI/UX, contracts | phase8_deferred | RAIKER-8201 | Auth, CSRF/CORS, event redaction, API contract tests. | network_execution_enabled=false | Server remains absent until authenticated policy-gated implementation. |
+| Dashboard | Metadata/readiness only; no launchable dashboard. | Feature matrix | phase8_deferred | RAIKER-8301 | Read-only event projections, redaction, parity tests. | notifications_enabled=false | Dashboard is read-only unless future approvals permit writes. |
+| Mobile apps | Contract/spec only. | UI/UX | phase8_deferred | RAIKER-8401 | Device session storage, approval UX tests, notification policy. | external_channels_enabled=false | Mobile approvals bind to same approval records. |
+| IDE extension | Session contracts only; no extension runtime. | UI/UX, contracts | phase8_deferred | RAIKER-8501 | Workspace trust, editor transport, command parity tests. | process_execution_enabled=false | Extension cannot run tools outside gateway policy. |
+| Voice UI and Browser Extension | Spec only. | UI/UX | phase8_deferred | RAIKER-8601 | Consent, transcript redaction, extension permissions tests. | external_channels_enabled=false | No microphone/browser access before explicit enablement. |
+| Hook handler types http/mcp_tool/prompt/agent | Hook specs exist; handlers missing. | HOOKS_SPEC | specified_not_implemented | RAIKER-8701 | Handler policy, audit events, dry-run tests. | network_execution_enabled=false, plugin_execution_enabled=false | Unsupported hook types fail closed with clear errors. |
+| Subagent spawning/team execution | Strategy docs/contracts only. | MULTI_AGENT_AND_SUBAGENT_STRATEGY | specified_not_implemented | RAIKER-8702 | Agent identity, budgets, event causality, cancellation tests. | runtime_execution_enabled=false | No subagent runtime until isolation and policy tests exist. |
+| Plugin code execution | Manifest planning/validation only. | Tool/plugin catalog | readiness_only | RAIKER-8703 | Sandboxing, signatures, permission prompts, event logs. | plugin_execution_enabled=false | Plugin code cannot execute until isolated and approved. |
+| Graph/codemap runtime indexing | Readiness/dry-run only. | Architecture, memory specs | readiness_only | RAIKER-9001 | Index storage migrations, redaction, incremental tests. | graph_indexing_enabled=false | Index writes occur only after explicit opt-in and tests. |
+| Semantic/vector writes and embeddings | Status/readiness only. | Memory specs | readiness_only | RAIKER-9002 | Vector store policy, retention, embedding-provider tests. | semantic_memory_writes_enabled=false, vector_writes_enabled=false, embedding_creation_enabled=false | No embedding/vector writes before policy and storage gates. |
+| External transports and notifications | Registry/readiness only. | Channels specs | readiness_only | RAIKER-8704 | Connector auth, outbound allowlist, redacted event tests. | external_channels_enabled=false, notifications_enabled=false | Outbound messages disabled until explicit connector approval. |
+| Remote/container/cloud execution | Profiles/readiness only. | Runtime orchestration | readiness_only | RAIKER-8705 | Isolation, secrets, artifact storage, egress tests. | remote_execution_enabled=false, container_execution_enabled=false, cloud_execution_enabled=false | Remote execution impossible until policies pass. |
+| Approval execution and relay runtime | Approval preview/audit only. | Approval specs | readiness_only | RAIKER-8706 | Human binding, replay protection, audit events, rollback tests. | approval_execution_enabled=false, approval_relay_runtime_enabled=false | Approval actions remain metadata-only until safe execution exists. |
+| Scheduled automations/hosted routines | Specs only. | Runtime specs | specified_not_implemented | RAIKER-8707 | Scheduler storage, owner consent, budget/egress tests. | runtime_execution_enabled=false | No background hosted routines before explicit enablement. |
+| Deferred filesystem/code tools delete/copy/move, PowerShell/Python execution, web search/fetch, LSP | Not implemented as executable tools. | Tool catalog | specified_not_implemented | RAIKER-8708 | ToolBroker policy, previews, approvals, sandbox tests. | process_execution_enabled=false, shell_execution_enabled=false, network_execution_enabled=false | Tools appear only as disabled/deferred until tests and approvals exist. |
+| `/sessions` command | No safe session-listing slash command is currently dispatched. | Command catalog | missing_deferred | RAIKER-8709 | Read-only session query, redacted output, command/help tests. | runtime_execution_enabled=false | Either implement read-only listing or keep omitted from help/catalog. |

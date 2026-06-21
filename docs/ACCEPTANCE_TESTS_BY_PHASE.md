@@ -1,5 +1,8 @@
 # Acceptance Tests By Phase
 
+> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+
+
 This document defines the acceptance tests that prove Raiker is implemented according to the documentation. It complements `docs/VERIFICATION_PLAN.md` by grouping tests by phase and by implementation gate.
 
 A feature is not complete until its acceptance tests exist and pass.
@@ -318,7 +321,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Raiker TUI | Native Textual interactive shell: welcome screen, single scrolling transcript with token-by-token streaming, docked input, docked status bar, command-palette overlay. `RAIKER_TUI=plain`/`--prompt`/non-interactive keep the plain fallback. | Yes | No direct tool authority; prompts stream through gateway/broker/policy. | Polish: inline tool-call blocks, optional docked panels remain deferred. |
+| Plain terminal client | Line-oriented terminal client with `/help`, `/commands`, slash-command routing, and prompt submission. Rich/native TUI is Phase 8 deferred. | Yes | No direct tool authority; prompts route through gateway/broker/policy. | Implement richer clients only in Phase 8. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
@@ -331,6 +334,6 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 
 
-## Raiker TUI (native interactive shell)
+## Plain terminal client acceptance; Rich/native TUI deferred
 
-Raiker TUI acceptance: the native Textual interactive shell launches a welcome screen with the Raiker cloud logo, replaces it with a single scrolling transcript on the first prompt, streams assistant replies token-by-token via `AgentGateway.astream_prompt`, shows a docked input box and docked status bar, and exposes a command-palette overlay via `/commands`, `/palette`, or Ctrl+P. `RAIKER_TUI=plain`, `--prompt`, and non-interactive stdin keep the minimal plain fallback. The TUI adds no runtime authority: prompts route through `submit_terminal_prompt()` / Agent Gateway and slash commands route through `handle_slash_command()`; TUI modules call no tools, models, plugins, channels, shell, subprocess, sockets, or network APIs directly. Covered by `tests/test_raiker_textual_tui.py` (offline FakeStreamingGateway) and `tests/test_raiker_tui_real_provider_integration.py` (opt-in real-provider integration, skipped without env vars).
+Plain terminal acceptance: `raiker` launches the line-oriented client; `raiker --prompt` submits one prompt and exits; `/help` and `/commands` are plain text; slash commands route through `handle_slash_command()`; prompts route through `submit_terminal_prompt()`. Rich/native TUI acceptance is deferred to Phase 8.

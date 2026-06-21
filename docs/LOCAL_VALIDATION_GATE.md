@@ -1,5 +1,8 @@
 # Local Validation Gate while hosted CI quota is unreliable
 
+> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+
+
 ## Reason
 
 CI triggers are configured, but hosted CI may stay red or unavailable because the Actions run limit/quota is exhausted.
@@ -147,7 +150,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Rich TUI panels | Minimal terminal shell/status rendering only; rich panels are specified, not implemented as a full app. | Partial/minimal | None. | Build panel framework only in a future approved slice. |
+| Rich TUI panels | Plain terminal shell/status rendering only; Rich/native TUI panels are Phase 8 deferred. | Plain-only | None. | Build panel framework only in a future approved slice. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
@@ -213,10 +216,10 @@ After Phase 3 Slice B approval planning preview:
 Run the Raiker TUI smoke commands locally (hosted Actions may stay red/unavailable):
 
 ```text
-python -m pytest tests/test_raiker_textual_tui.py
+python -m pytest tests/test_phase_3_slice_q1_rich_tui_command_access.py
 raiker --prompt "Hello Raiker"
 raiker --prompt "/help"
 RAIKER_TUI=plain raiker --prompt "/help"
 ```
 
-The opt-in real-provider integration test (`tests/test_raiker_tui_real_provider_integration.py`) is skipped without the required env vars. `approval_execution_enabled: False` and `runtime_execution_enabled: False` remain unchanged; all disabled runtime flags remain false.
+The opt-in real-provider integration test (`Phase 8 real-provider UI integration tests (deferred)`) is skipped without the required env vars. `approval_execution_enabled: False` and `runtime_execution_enabled: False` remain unchanged; all disabled runtime flags remain false.

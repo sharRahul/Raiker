@@ -1,7 +1,7 @@
 """UI-facing streaming event contract.
 
 The runtime and gateway already emit a durable JSONL event log. ``StreamEvent`` is the
-*in-memory* channel used to surface a turn incrementally to a client (the Textual TUI,
+*in-memory* channel used to surface a turn incrementally to a client (the plain terminal client or future Phase 8 UI clients,
 and any future streaming client) — token-level text deltas, lifecycle transitions, tool
 activity, and the final response — without changing the durable event log or granting any
 new authority. Tool execution still flows through the broker, policy, and approvals; this

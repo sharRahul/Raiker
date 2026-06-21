@@ -358,6 +358,10 @@ Tests must prove:
 9. response preserves client metadata;
 10. checkpoint manifests include `last_event_id` and `runtime_state`.
 
+## Persisted runtime mode and capability gate state
+
+Runtime mode state and capability gate state are persisted in SQLite tables (`runtime_mode_state`, `capability_gate_state`) and read by `RuntimeAuthority` on startup. All 47 capabilities default to disabled. State survives restarts and is governed via the `runtime_gate_manager` human-only role.
+
 ## Phase 3 workspace inspection contract
 
 `WorkspaceInspectionSummary` is a read-only service-layer contract shared by terminal, desktop, web, and dashboard clients. It includes `contract`, `runtime_status`, `recent_events`, `checkpoint_timeline`, `tasks`, `approvals`, `model_profiles`, `channel_connectors`, `capability_gates`, `semantic_memory`, `execution_profiles`, and `plugin_registration_plans` keys. Clients must not bypass this contract for privileged workspace reads.

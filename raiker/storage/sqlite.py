@@ -120,8 +120,12 @@ from raiker.storage.migrations import (
     PHASE_9_SYMBOL_GRAPH_SQL,
     PHASE_9_VECTOR_INDEX_MIGRATION_ID,
     PHASE_9_VECTOR_INDEX_SQL,
+    PHASE_10_CAPABILITY_GATE_STATE_MIGRATION_ID,
+    PHASE_10_CAPABILITY_GATE_STATE_SQL,
     PHASE_10_RUNTIME_AUTHORITY_MIGRATION_ID,
     PHASE_10_RUNTIME_AUTHORITY_SQL,
+    PHASE_10_RUNTIME_MODE_STATE_MIGRATION_ID,
+    PHASE_10_RUNTIME_MODE_STATE_SQL,
 )
 
 
@@ -379,6 +383,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PHASE_10_RUNTIME_AUTHORITY_MIGRATION_ID,
                 PHASE_10_RUNTIME_AUTHORITY_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_10_RUNTIME_MODE_STATE_MIGRATION_ID,
+                PHASE_10_RUNTIME_MODE_STATE_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PHASE_10_CAPABILITY_GATE_STATE_MIGRATION_ID,
+                PHASE_10_CAPABILITY_GATE_STATE_SQL,
                 connection,
             )
             with contextlib.suppress(sqlite3.OperationalError):
@@ -1755,3 +1769,130 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
+
+    # ── Runtime Mode State ──
+
+    def get_runtime_mode_state(self) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM runtime_mode_state ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+        return dict(row) if row else None
+
+    def get_active_runtime_mode(self) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM runtime_mode_state WHERE status = 'active' ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+        return dict(row) if row else None
+
+    def insert_runtime_mode_state(self, record: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO runtime_mode_state
+                  (runtime_mode_id, mode_name, status, activated_by, activated_at,
+                   disabled_by, disabled_at, reason, risk_acceptance_id, approval_id,
+                   policy_decision_id, validation_evidence_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["runtime_mode_id"],
+                    record["mode_name"],
+                    record["status"],
+                    record.get("activated_by"),
+                    record.get("activated_at"),
+                    record.get("disabled_by"),
+                    record.get("disabled_at"),
+                    record.get("reason"),
+                    record.get("risk_acceptance_id"),
+                    record.get("approval_id"),
+                    record.get("policy_decision_id"),
+                    record.get("validation_evidence_id"),
+                    record["created_at"],
+                    record["updated_at"],
+                ),
+            )
+
+    def update_runtime_mode_state(self, runtime_mode_id: str, updates: dict[str, Any]) -> None:
+        sets: list[str] = []
+        params: list[Any] = []
+        for key in ("status", "mode_name", "activated_by", "activated_at", "disabled_by",
+                     "disabled_at", "reason", "risk_acceptance_id", "approval_id",
+                     "policy_decision_id", "validation_evidence_id", "updated_at"):
+            if key in updates:
+                sets.append(f"{key} = ?")
+                params.append(updates[key])
+        if not sets:
+            return
+        params.append(runtime_mode_id)
+        with self.connect() as connection:
+            connection.execute(
+                f"UPDATE runtime_mode_state SET {', '.join(sets)} WHERE runtime_mode_id = ?",
+                params,
+            )
+
+    def disable_all_runtime_modes(self, disabled_by: str, reason: str) -> None:
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                """UPDATE runtime_mode_state SET status = 'disabled', disabled_by = ?,
+                   disabled_at = ?, reason = ?, updated_at = ? WHERE status = 'active'""",
+                (disabled_by, now, reason, now),
+            )
+
+    # ── Capability Gate State ──
+
+    def get_capability_gate_state(self, capability: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM capability_gate_state WHERE capability = ?",
+                (capability,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_capability_gate_states(self) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM capability_gate_state ORDER BY capability"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def upsert_capability_gate_state(self, record: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO capability_gate_state
+                  (capability, state, runtime_mode, requested_by, requested_at,
+                   activated_by, activated_at, disabled_by, disabled_at, reason,
+                   readiness_snapshot_json, risk_acceptance_id, approval_id,
+                   policy_decision_id, event_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["capability"],
+                    record["state"],
+                    record.get("runtime_mode"),
+                    record.get("requested_by"),
+                    record.get("requested_at"),
+                    record.get("activated_by"),
+                    record.get("activated_at"),
+                    record.get("disabled_by"),
+                    record.get("disabled_at"),
+                    record.get("reason"),
+                    record.get("readiness_snapshot_json"),
+                    record.get("risk_acceptance_id"),
+                    record.get("approval_id"),
+                    record.get("policy_decision_id"),
+                    record.get("event_id"),
+                    record["created_at"],
+                    record["updated_at"],
+                ),
+            )
+
+    def delete_capability_gate_state(self, capability: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM capability_gate_state WHERE capability = ?",
+                (capability,),
+            )

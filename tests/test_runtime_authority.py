@@ -929,3 +929,334 @@ def test_runtime_enablement_validator_fails_on_bypass() -> None:
     from scripts.validate_runtime_enablement_readiness import main
     result = main()
     assert result == 0
+
+
+# ── Controlled Runtime Mode Activation ──
+
+
+def test_default_runtime_mode_is_development_preview(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    mode = authority.get_runtime_mode()
+    assert mode["mode_name"] == "development_preview"
+    assert mode["status"] == "active"
+
+
+def test_local_single_user_runtime_inactive_by_default(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    mode = authority.get_runtime_mode()
+    assert mode["mode_name"] != "local_single_user_runtime"
+
+
+def test_human_runtime_gate_manager_can_activate_runtime_mode(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    from raiker.contracts.models import Role
+    now = utc_now()
+    store.insert_role(Role(
+        role_id="rl_rgm", name="runtime_gate_manager",
+        description="", is_system_role=True, created_at=now,
+    ))
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="human_gm",
+        principal_type=PrincipalType.HUMAN,
+        display_name="Gate Manager",
+        role_ids=("rl_rgm",),
+        is_active=True,
+    )
+    result = authority.activate_runtime_mode("local_single_user_runtime", principal, "Testing")
+    assert result is None  # allowed
+
+
+def test_ai_cannot_activate_runtime_mode(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="ai_agent",
+        principal_type=PrincipalType.AI_AGENT,
+        display_name="AI",
+        role_ids=("rl_assistant",),
+        is_active=True,
+    )
+    result = authority.activate_runtime_mode("local_single_user_runtime", principal, "AI attempt")
+    assert result is not None
+    assert "ai_cannot_manage_runtime_gates" in result
+
+
+def test_non_gate_manager_human_cannot_activate_runtime_mode(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="human_no_rgm",
+        principal_type=PrincipalType.HUMAN,
+        display_name="Regular Human",
+        role_ids=("rl_admin",),
+        is_active=True,
+    )
+    result = authority.activate_runtime_mode("local_single_user_runtime", principal, "No RGM role")
+    assert result is not None
+    assert "only_runtime_gate_manager" in result
+
+
+def test_runtime_mode_activation_emits_event(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    from raiker.contracts.models import Role
+    now = utc_now()
+    store.insert_role(Role(
+        role_id="rl_rgm", name="runtime_gate_manager",
+        description="", is_system_role=True, created_at=now,
+    ))
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="human_gm",
+        principal_type=PrincipalType.HUMAN,
+        display_name="GM",
+        role_ids=("rl_rgm",),
+        is_active=True,
+    )
+    authority.activate_runtime_mode("local_single_user_runtime", principal, "Event test")
+    events = store.list_event_index(session_id="authz", limit=10)
+    event_types = [e["event_type"] for e in events]
+    assert "runtime_mode_activated" in event_types
+
+
+def test_runtime_mode_disable_emits_event(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    from raiker.contracts.models import Role
+    now = utc_now()
+    store.insert_role(Role(
+        role_id="rl_rgm", name="runtime_gate_manager",
+        description="", is_system_role=True, created_at=now,
+    ))
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="human_gm",
+        principal_type=PrincipalType.HUMAN,
+        display_name="GM",
+        role_ids=("rl_rgm",),
+        is_active=True,
+    )
+    authority.activate_runtime_mode("local_single_user_runtime", principal, "Enable")
+    authority.disable_runtime_mode(principal, "Disable test")
+    events = store.list_event_index(session_id="authz", limit=10)
+    event_types = [e["event_type"] for e in events]
+    assert "runtime_mode_disabled" in event_types
+
+
+def test_only_one_active_runtime_mode(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    from raiker.contracts.models import Role
+    now = utc_now()
+    store.insert_role(Role(
+        role_id="rl_rgm", name="runtime_gate_manager",
+        description="", is_system_role=True, created_at=now,
+    ))
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="human_gm",
+        principal_type=PrincipalType.HUMAN,
+        display_name="GM",
+        role_ids=("rl_rgm",),
+        is_active=True,
+    )
+    authority.activate_runtime_mode("local_single_user_runtime", principal, "First")
+    mode1 = authority.get_runtime_mode()
+    assert mode1["mode_name"] == "local_single_user_runtime"
+    authority.activate_runtime_mode("development_preview", principal, "Second")
+    mode2 = authority.get_runtime_mode()
+    assert mode2["mode_name"] == "development_preview"
+
+
+def test_admin_mutation_disabled_by_default(authority: RuntimeAuthority) -> None:
+    result = authority.get_effective_capability_gate("admin_mutation")
+    assert result["state"] == "disabled"
+
+
+def test_role_mutation_disabled_by_default(authority: RuntimeAuthority) -> None:
+    result = authority.get_effective_capability_gate("role_mutation")
+    assert result["state"] == "disabled"
+
+
+def test_admin_mutation_can_be_enabled_through_governed_transition(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    from raiker.contracts.models import Role
+    now = utc_now()
+    store.insert_role(Role(
+        role_id="rl_rgm", name="runtime_gate_manager",
+        description="", is_system_role=True, created_at=now,
+    ))
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="human_gm",
+        principal_type=PrincipalType.HUMAN,
+        display_name="GM",
+        role_ids=("rl_rgm",),
+        is_active=True,
+    )
+    result = authority.request_capability_transition("admin_mutation", "enabled_policy_gated", principal, "Testing")
+    assert result is None  # allowed
+    gate = authority.get_effective_capability_gate("admin_mutation")
+    assert gate["state"] == "enabled_policy_gated"
+    assert gate["source"] == "persisted"
+
+
+def test_role_mutation_can_be_enabled_through_governed_transition(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    from raiker.contracts.models import Role
+    now = utc_now()
+    store.insert_role(Role(
+        role_id="rl_rgm", name="runtime_gate_manager",
+        description="", is_system_role=True, created_at=now,
+    ))
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="human_gm",
+        principal_type=PrincipalType.HUMAN,
+        display_name="GM",
+        role_ids=("rl_rgm",),
+        is_active=True,
+    )
+    result = authority.request_capability_transition("role_mutation", "enabled_policy_gated", principal, "Testing")
+    assert result is None
+    gate = authority.get_effective_capability_gate("role_mutation")
+    assert gate["state"] == "enabled_policy_gated"
+
+
+def test_disabled_capability_blocks_after_disable(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    from raiker.contracts.models import Role
+    now = utc_now()
+    store.insert_role(Role(
+        role_id="rl_rgm", name="runtime_gate_manager",
+        description="", is_system_role=True, created_at=now,
+    ))
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="human_gm",
+        principal_type=PrincipalType.HUMAN,
+        display_name="GM",
+        role_ids=("rl_rgm",),
+        is_active=True,
+    )
+    authority.request_capability_transition("admin_mutation", "enabled_policy_gated", principal, "Enable")
+    gate1 = authority.get_effective_capability_gate("admin_mutation")
+    assert gate1["state"] == "enabled_policy_gated"
+    authority.request_capability_transition("admin_mutation", "disabled", principal, "Disable")
+    gate2 = authority.get_effective_capability_gate("admin_mutation")
+    assert gate2["state"] == "disabled"
+
+
+def test_dangerous_capabilities_remain_disabled_by_default(authority: RuntimeAuthority) -> None:
+    dangerous = [
+        "shell_execution", "process_execution", "network_execution",
+        "web_fetch", "email_runtime", "calendar_runtime", "finance_runtime",
+        "investment_runtime", "medical_runtime", "cctv_runtime",
+        "plugin_execution_cap", "remote_execution_cap", "container_execution_cap",
+        "cloud_execution_cap", "approval_execution_relay",
+    ]
+    for cap in dangerous:
+        gate = authority.get_effective_capability_gate(cap)
+        assert gate["state"] == "disabled", f"{cap} should be disabled, got {gate['state']}"
+
+
+def test_dangerous_capability_transition_blocked(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    from raiker.contracts.models import Role
+    now = utc_now()
+    store.insert_role(Role(
+        role_id="rl_rgm", name="runtime_gate_manager",
+        description="", is_system_role=True, created_at=now,
+    ))
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="human_gm",
+        principal_type=PrincipalType.HUMAN,
+        display_name="GM",
+        role_ids=("rl_rgm",),
+        is_active=True,
+    )
+    result = authority.request_capability_transition("shell_execution", "enabled_policy_gated", principal, "Attempt")
+    assert result is not None
+    assert "requires a future explicit activation task" in result
+
+
+def test_unknown_capability_transition_blocked(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    from raiker.contracts.models import Role
+    now = utc_now()
+    store.insert_role(Role(
+        role_id="rl_rgm", name="runtime_gate_manager",
+        description="", is_system_role=True, created_at=now,
+    ))
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="human_gm",
+        principal_type=PrincipalType.HUMAN,
+        display_name="GM",
+        role_ids=("rl_rgm",),
+        is_active=True,
+    )
+    result = authority.request_capability_transition("nonexistent_cap", "disabled", principal, "Attempt")
+    assert result is not None
+    assert "unknown_capability" in result
+
+
+def test_ai_cannot_request_capability_transition(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    principal = Principal(
+        principal_id="ai_agent",
+        principal_type=PrincipalType.AI_AGENT,
+        display_name="AI",
+        role_ids=("rl_assistant",),
+        is_active=True,
+    )
+    result = authority.request_capability_transition("admin_mutation", "enabled_policy_gated", principal, "AI attempt")
+    assert result is not None
+    assert "ai_cannot_manage_runtime_gates" in result
+
+
+def test_persisted_gate_state_overrides_static(authority: RuntimeAuthority, store: SQLiteStore) -> None:
+    now = utc_now()
+    store.upsert_capability_gate_state({
+        "capability": "admin_mutation",
+        "state": "enabled_policy_gated",
+        "runtime_mode": "local_single_user_runtime",
+        "requested_by": "human_gm",
+        "requested_at": now,
+        "activated_by": "human_gm",
+        "activated_at": now,
+        "reason": "Test",
+        "created_at": now,
+        "updated_at": now,
+    })
+    result = authority.check_capability_gate("admin_mutation", "user_create")
+    assert result is None  # no longer blocked
+
+    store.upsert_capability_gate_state({
+        "capability": "admin_mutation",
+        "state": "disabled",
+        "runtime_mode": "",
+        "requested_by": "human_gm",
+        "requested_at": now,
+        "reason": "Disable test",
+        "created_at": now,
+        "updated_at": now,
+    })
+    result2 = authority.check_capability_gate("admin_mutation", "user_create")
+    assert result2 == "disabled_by_capability_gate"

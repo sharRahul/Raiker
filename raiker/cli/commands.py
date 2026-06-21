@@ -1894,6 +1894,253 @@ def handle_role_revoke(command: str, *, workspace_root: str | Path = ".") -> str
     return f"No assignment found for role '{role_id}' on user '{user_id}'."
 
 
+def _ensure_runtime_gate_manager_role(store: SQLiteStore) -> None:
+    role = store.load_role("rl_rgm")
+    if role is None:
+        now = utc_now()
+        store.insert_role(Role(
+            role_id="rl_rgm", name="runtime_gate_manager",
+            description="System role for runtime gate management",
+            is_system_role=True, created_at=now,
+        ))
+
+
+def handle_runtime_mode_status(*, workspace_root: str | Path = ".") -> str:
+    store = SQLiteStore(workspace_root)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    mode = authority.get_runtime_mode()
+    mode_name = mode.get("mode_name", "development_preview")
+    status = mode.get("status", "inactive")
+    activated_by = mode.get("activated_by", "system") or "system"
+    activated_at = mode.get("activated_at", "") or ""
+    lines = [
+        f"Runtime mode: {mode_name}",
+        f"Status: {status}",
+        f"Activated by: {activated_by}",
+        f"Activated at: {activated_at}",
+    ]
+    if mode.get("reason"):
+        lines.append(f"Reason: {mode['reason']}")
+    return "\n".join(lines)
+
+
+def handle_runtime_mode_activate(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) < 4:
+        return "Usage: /runtime-mode activate <mode_name> [--reason <reason>]"
+    mode_name = parts[2]
+    reason = ""
+    if "--reason" in parts:
+        ridx = parts.index("--reason")
+        if ridx + 1 < len(parts):
+            reason = parts[ridx + 1]
+    store = SQLiteStore(workspace_root)
+    _ensure_runtime_gate_manager_role(store)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    local_principal = Principal(
+        principal_id="cli_local",
+        principal_type=PrincipalType.HUMAN,
+        display_name="CLI Local User",
+        role_ids=("rl_admin", "rl_rgm"),
+        domain_scopes=(),
+        max_runtime_mode="local_single_user_safe",
+        is_active=True,
+    )
+    denial = authority.activate_runtime_mode(mode_name, local_principal, reason)
+    if denial:
+        return f"Runtime mode activation denied: {denial}"
+    return f"Runtime mode activated: {mode_name}"
+
+
+def handle_runtime_mode_disable(command: str, *, workspace_root: str | Path = ".") -> str:
+    reason = ""
+    parts = shlex.split(command)
+    if "--reason" in parts:
+        ridx = parts.index("--reason")
+        if ridx + 1 < len(parts):
+            reason = parts[ridx + 1]
+    store = SQLiteStore(workspace_root)
+    _ensure_runtime_gate_manager_role(store)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    local_principal = Principal(
+        principal_id="cli_local",
+        principal_type=PrincipalType.HUMAN,
+        display_name="CLI Local User",
+        role_ids=("rl_admin", "rl_rgm"),
+        domain_scopes=(),
+        max_runtime_mode="local_single_user_safe",
+        is_active=True,
+    )
+    denial = authority.disable_runtime_mode(local_principal, reason)
+    if denial:
+        return f"Runtime mode disable denied: {denial}"
+    return "Runtime mode disabled. Reverted to development_preview."
+
+
+def handle_capability_gates(*, workspace_root: str | Path = ".") -> str:
+    from raiker.phase_gates import RUNTIME_DOMAIN_CAPABILITIES
+    store = SQLiteStore(workspace_root)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    lines = ["Capability gates:"]
+    for cap in sorted(RUNTIME_DOMAIN_CAPABILITIES):
+        gate = authority.get_effective_capability_gate(cap)
+        state = gate["state"]
+        source = gate["source"]
+        lines.append(f"  {cap}: {state} ({source})")
+    return "\n".join(lines)
+
+
+def handle_capability_gate_detail(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) < 2:
+        return "Usage: /capability-gate <capability>"
+    capability = parts[1]
+    from raiker.phase_gates import ALL_CAPABILITIES
+    if capability not in ALL_CAPABILITIES:
+        return f"Unknown capability: {capability}"
+    store = SQLiteStore(workspace_root)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    gate = authority.get_effective_capability_gate(capability)
+    persisted = authority.get_persisted_capability_state(capability)
+    lines = [
+        f"Capability: {capability}",
+        f"Effective state: {gate['state']}",
+        f"Source: {gate['source']}",
+    ]
+    if persisted:
+        lines.append(f"Persisted state: {persisted.get('state', '')}")
+        lines.append(f"Activated by: {persisted.get('activated_by', '') or ''}")
+        lines.append(f"Activated at: {persisted.get('activated_at', '') or ''}")
+        if persisted.get("reason"):
+            lines.append(f"Reason: {persisted['reason']}")
+    else:
+        lines.append("Persisted state: none (using static default)")
+    return "\n".join(lines)
+
+
+def handle_capability_gate_enable(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) < 4:
+        return "Usage: /capability-gate enable <capability> --state <state> [--reason <reason>]"
+    capability = parts[2]
+    target_state = ""
+    reason = ""
+    if "--state" in parts:
+        sidx = parts.index("--state")
+        if sidx + 1 < len(parts):
+            target_state = parts[sidx + 1]
+    if "--reason" in parts:
+        ridx = parts.index("--reason")
+        if ridx + 1 < len(parts):
+            reason = parts[ridx + 1]
+    if not target_state:
+        return "Usage: /capability-gate enable <capability> --state <state> [--reason <reason>]"
+    store = SQLiteStore(workspace_root)
+    _ensure_runtime_gate_manager_role(store)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    local_principal = Principal(
+        principal_id="cli_local",
+        principal_type=PrincipalType.HUMAN,
+        display_name="CLI Local User",
+        role_ids=("rl_admin", "rl_rgm"),
+        domain_scopes=(),
+        max_runtime_mode="local_single_user_safe",
+        is_active=True,
+    )
+    denial = authority.request_capability_transition(capability, target_state, local_principal, reason)
+    if denial:
+        return f"Capability transition denied: {denial}"
+    return f"Capability '{capability}' transitioned to state '{target_state}'."
+
+
+def handle_capability_gate_disable(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) < 3:
+        return "Usage: /capability-gate disable <capability> [--reason <reason>]"
+    capability = parts[2]
+    reason = ""
+    if "--reason" in parts:
+        ridx = parts.index("--reason")
+        if ridx + 1 < len(parts):
+            reason = parts[ridx + 1]
+    store = SQLiteStore(workspace_root)
+    _ensure_runtime_gate_manager_role(store)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    local_principal = Principal(
+        principal_id="cli_local",
+        principal_type=PrincipalType.HUMAN,
+        display_name="CLI Local User",
+        role_ids=("rl_admin", "rl_rgm"),
+        domain_scopes=(),
+        max_runtime_mode="local_single_user_safe",
+        is_active=True,
+    )
+    denial = authority.request_capability_transition(capability, "disabled", local_principal, reason)
+    if denial:
+        return f"Capability disable denied: {denial}"
+    return f"Capability '{capability}' disabled."
+
+
+def handle_runtime_readiness(*, workspace_root: str | Path = ".") -> str:
+    from raiker.phase_gates import RUNTIME_DOMAIN_CAPABILITIES, CapabilityState
+    store = SQLiteStore(workspace_root)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    mode = authority.get_runtime_mode()
+    mode_name = mode.get("mode_name", "development_preview")
+    mode_status = mode.get("status", "inactive")
+    enabled_caps: list[str] = []
+    disabled_caps: list[str] = []
+    policy_gated_caps: list[str] = []
+    for cap in sorted(RUNTIME_DOMAIN_CAPABILITIES):
+        gate = authority.get_effective_capability_gate(cap)
+        state = gate["state"]
+        if state == CapabilityState.ENABLED_RUNTIME:
+            enabled_caps.append(cap)
+        elif state == CapabilityState.ENABLED_POLICY_GATED:
+            policy_gated_caps.append(cap)
+        else:
+            disabled_caps.append(cap)
+    lines = [
+        f"Current runtime mode: {mode_name}",
+        f"Runtime mode status: {mode_status}",
+        f"Enabled capabilities ({len(enabled_caps)}):",
+    ]
+    if enabled_caps:
+        for c in enabled_caps:
+            lines.append(f"  - {c}")
+    else:
+        lines.append("  (none)")
+    lines.append(f"Policy-gated capabilities ({len(policy_gated_caps)}):")
+    if policy_gated_caps:
+        for c in policy_gated_caps:
+            lines.append(f"  - {c}")
+    else:
+        lines.append("  (none)")
+    lines.append(f"Disabled capabilities ({len(disabled_caps)}):")
+    for c in disabled_caps:
+        lines.append(f"  - {c}")
+    lines.append("")
+    lines.append("Readiness blockers:")
+    if mode_name == "development_preview":
+        lines.append("  - Runtime mode is development_preview")
+    if mode_status == "inactive":
+        lines.append("  - Runtime mode is inactive")
+    lines.append("  - Approval execution relay remains metadata-only/deferred")
+    lines.append("  - Shell/network/plugin/remote/container/cloud remain disabled")
+    lines.append("  - Email/calendar/finance/medical/CCTV remain disabled")
+    lines.append("")
+    lines.append("production_ready_local_single_user_runtime: false")
+    return "\n".join(lines)
+
+
 def handle_routines(*, workspace_root: str | Path = ".") -> str:
     store = SQLiteStore(workspace_root)
     routines = store.list_hosted_routines()
@@ -2246,6 +2493,22 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_role_grant(command, workspace_root=workspace_root)
     if command == "/role revoke" or command.startswith("/role revoke "):
         return handle_role_revoke(command, workspace_root=workspace_root)
+    if command == "/runtime-mode" or command == "/runtime-mode status":
+        return handle_runtime_mode_status(workspace_root=workspace_root)
+    if command.startswith("/runtime-mode activate "):
+        return handle_runtime_mode_activate(command, workspace_root=workspace_root)
+    if command == "/runtime-mode disable" or command.startswith("/runtime-mode disable "):
+        return handle_runtime_mode_disable(command, workspace_root=workspace_root)
+    if command == "/capability-gates":
+        return handle_capability_gates(workspace_root=workspace_root)
+    if command == "/capability-gate" or (command.startswith("/capability-gate ") and not command.startswith("/capability-gate enable ") and not command.startswith("/capability-gate disable ")):
+        return handle_capability_gate_detail(command, workspace_root=workspace_root)
+    if command.startswith("/capability-gate enable "):
+        return handle_capability_gate_enable(command, workspace_root=workspace_root)
+    if command.startswith("/capability-gate disable "):
+        return handle_capability_gate_disable(command, workspace_root=workspace_root)
+    if command == "/runtime-readiness":
+        return handle_runtime_readiness(workspace_root=workspace_root)
     if command == "/routines":
         return handle_routines(workspace_root=workspace_root)
     if command == "/channel-pair":

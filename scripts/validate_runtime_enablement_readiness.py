@@ -181,6 +181,54 @@ def main() -> int:
             except PermissionError:
                 errors.append(f"unknown_capability_in_transition:{cap}")
 
+    # 10. Controlled runtime mode activation checks
+    runtime_high_risk_remain_disabled = {
+        "shell_execution", "process_execution", "network_execution",
+        "web_fetch", "email_runtime", "calendar_runtime", "finance_runtime",
+        "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
+        "cctv_runtime", "home_security_runtime", "hardware_operator_runtime",
+        "plugin_execution_cap", "plugin_install", "external_channel_runtime",
+        "channel_approval_relay", "remote_execution_cap", "container_execution_cap",
+        "cloud_execution_cap", "approval_execution_relay", "scheduled_routines",
+        "graph_indexing_runtime", "semantic_memory_runtime",
+        "vector_embedding_runtime", "hosted_model_runtime",
+        "private_network_model_runtime",
+    }
+    for cap in runtime_high_risk_remain_disabled:
+        remain_gate = gates.get(cap)
+        if remain_gate is None:
+            errors.append(f"runtime_activation_cap_not_in_gates:{cap}")
+        elif remain_gate.state not in (CapabilityState.DISABLED, CapabilityState.PLANNED):
+            errors.append(f"runtime_activation_cap_not_disabled:{cap}")
+
+    # 11. CLI commands for runtime mode/capability must exist in commands.py
+    commands_path = repo_root / "raiker" / "cli" / "commands.py"
+    if commands_path.exists():
+        text = commands_path.read_text(encoding="utf-8")
+        required_commands = [
+            "/runtime-mode",
+            "/runtime-mode status",
+            "/runtime-mode activate",
+            "/runtime-mode disable",
+            "/capability-gates",
+            "/capability-gate",
+            "/capability-gate enable",
+            "/capability-gate disable",
+            "/runtime-readiness",
+        ]
+        for cmd_name in required_commands:
+            if cmd_name not in text:
+                errors.append(f"missing_runtime_cli_command:{cmd_name}")
+
+    # 12. Runtime mode table must exist in migrations
+    migrations_path = repo_root / "raiker" / "storage" / "migrations.py"
+    if migrations_path.exists():
+        text = migrations_path.read_text(encoding="utf-8")
+        if "runtime_mode_state" not in text:
+            errors.append("missing_runtime_mode_state_table_migration")
+        if "capability_gate_state" not in text:
+            errors.append("missing_capability_gate_state_table_migration")
+
     if errors:
         print("RUNTIME ENABLEMENT READINESS: FAILED")
         for err in errors:

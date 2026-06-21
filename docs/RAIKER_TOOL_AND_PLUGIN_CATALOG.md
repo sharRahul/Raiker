@@ -66,6 +66,15 @@ currently exposes. It is the source of truth checked by `scripts/validate_repo_t
 /role create <role_id> <name> [--description <text>]
 /role grant <role_id> <user_id>
 /role revoke <role_id> <user_id>
+/runtime-mode
+/runtime-mode status
+/runtime-mode activate <mode_name> [--reason <reason>]
+/runtime-mode disable [--reason <reason>]
+/capability-gates
+/capability-gate <capability>
+/capability-gate enable <capability> --state <state> [--reason <reason>]
+/capability-gate disable <capability> [--reason <reason>]
+/runtime-readiness
 /semantic-memory
 /export [--session <session_id>] [--no-redact]
 /export --verify --session <session_id>

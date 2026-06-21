@@ -41,7 +41,7 @@ Current high-signal truth:
 
 ### Enforcement status
 
-- Runtime readiness decision: `runtime_enablement_candidate`.
+- Runtime readiness decision: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`.
 - strict non-allow blocking: enforced — `_govern_admin_mutation` blocks on all non-allow decisions (`deny`, `needs_approval`, `needs_risk_acceptance`, `needs_human_confirmation`, `disabled_by_capability_gate`).
 - role revoke governed: enforced — routes through `_govern_admin_mutation` / RuntimeAuthority before mutation.
 - capability gate per action: enforced — `RuntimeAuthority.check_capability_gate()` checks the relevant gate for each governed action and returns `disabled_by_capability_gate` when the gate is disabled.
@@ -49,6 +49,18 @@ Current high-signal truth:
 - **Validator depth**: `scripts/validate_runtime_enablement_readiness.py` now detects direct store mutation patterns in CLI handlers without governance, and validates documentation markers across all 8 required docs.
 - Approval resolution remains `metadata_only` — does not execute approved actions.
 - No UI/API client implements RuntimeAuthority as the sole authority path (no UI/API clients exist yet).
+
+### Controlled runtime mode activation
+
+- **Controlled runtime mode activation**: `controlled_runtime_mode_activation_implemented` — RuntimeAuthority governs activation of runtime modes and capability gates through persisted state.
+- **Runtime mode state persistence**: `runtime_mode_state` table stores the current runtime mode (`local_single_user_runtime`, `deferred_runtime`, etc.) and is read by RuntimeAuthority at startup.
+- **Capability gate state persistence**: `capability_gate_state` table stores enabled/disabled state for all 47 capability gates, all default-disabled. Persisted state survives restarts.
+- **RuntimeAuthority integration**: `RuntimeAuthority.check_runtime_mode()` and `RuntimeAuthority.enforce_capability_gate_state()` read from persisted SQLite state rather than in-memory defaults. All 47 capabilities remain default-disabled.
+- **CLI commands**: `/runtime-mode status|activate|disable`, `/capability-gates`, `/capability-gate detail|enable|disable`, `/runtime-readiness` are implemented and route through RuntimeAuthority governance.
+- **Human-only activation**: `runtime_gate_manager` role (human-only) can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation` capability gates. AI principals cannot activate runtime modes or capability gates.
+- **Tests**: `tests/test_runtime_mode_activation.py`, `tests/test_capability_gate_persistence.py`, `tests/test_runtime_authority_mode_gate.py`.
+- **Production-ready local single-user runtime**: `production_ready_local_single_user_runtime_candidate` — the activation mechanism is implemented and persisted, but production readiness validation remains a separate milestone.
+- **Deferred runtimes** remain disabled. **Approval execution relay** remains metadata-only/deferred. All 47 capabilities remain default-disabled.
 
 ---
 

@@ -134,9 +134,11 @@ When updating documentation to reflect backend changes (e.g., Runtime Authority,
 
 - Runtime readiness is stated as `runtime_enablement_candidate`, not `production_ready_runtime`.
 - Strict enforcement status is documented (strict non-allow blocking, /role revoke governed, capability gate per action enforced, risk acceptance enforced before execution).
+- Runtime mode activation is stated as `controlled_runtime_mode_activation_implemented`, not production-enabled.
 - No document claims production runtime enablement, approval execution relay enabled, or broad runtime execution active.
 - Admin mutation governance (`_govern_admin_mutation`) is referenced where CLI commands describe their authority path.
 - The AI-executable roles and human-only role protections are documented consistently across all docs.
+- Controlled runtime mode activation states that human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates.
 
 Run `python scripts/validate_runtime_enablement_readiness.py` after any authority-related changes.
 

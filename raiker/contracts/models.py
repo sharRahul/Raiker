@@ -187,6 +187,15 @@ EVENT_TYPES = {
     "skill_candidate_proposed",
     "skill_candidate_reviewed",
     "skill_candidate_recorded",
+    "runtime_mode_activation_requested",
+    "runtime_mode_activated",
+    "runtime_mode_disabled",
+    "capability_transition_requested",
+    "capability_transition_approved",
+    "capability_enabled",
+    "capability_disabled",
+    "capability_transition_denied",
+    "runtime_readiness_checked",
 }
 INTENTS = {
     "chat",

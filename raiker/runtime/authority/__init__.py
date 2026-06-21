@@ -16,6 +16,7 @@ from raiker.runtime.authority.models import (
     RuntimeMode,
 )
 from raiker.runtime.authority.router import (
+    CAPABILITY_GATE_MAP,
     NON_ALLOW_DECISIONS,
     ActionRouter,
     GovernedAction,
@@ -44,4 +45,5 @@ __all__ = [
     "RUNTIME_MODES",
     "PRINCIPAL_TYPES",
     "NON_ALLOW_DECISIONS",
+    "CAPABILITY_GATE_MAP",
 ]

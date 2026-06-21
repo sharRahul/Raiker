@@ -27,7 +27,7 @@ A feature must never be marked as merely "future" without a full specification.
 
 Specification status and implementation status are separate: `fully-specified` means the contract is complete enough to build, not that runtime/app behavior is currently shipped. Rows marked `phase-3-build` may still be contract-only, readiness-only, metadata-only, or deferred in the current implementation status column.
 
-Runtime readiness decision: `runtime_enablement_candidate`. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Approval execution relay remains metadata-only/deferred. Broad runtime execution remains disabled.
+Runtime readiness decision: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Approval execution relay remains metadata-only/deferred. Broad runtime execution remains disabled. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Production-ready local single-user runtime: `production_ready_local_single_user_runtime_candidate`.
 
 Current backend implementation labels used across the hardening pass:
 

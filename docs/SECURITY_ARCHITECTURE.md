@@ -126,6 +126,10 @@ Model output is always untrusted. No tool, plugin, channel, subagent, remote, me
 - No plugin runtime, channel runtime, remote execution runtime, graph runtime indexing, semantic/vector write runtime, or UI/API client runtime is enabled.
 - No provider health-checked default selection is implemented; the current default is a static local-first profile choice.
 
+## Runtime Mode and Capability Gate Activation
+
+Runtime mode and capability gate activation is governed by `RuntimeAuthority`. Only the human `runtime_gate_manager` role can activate `local_single_user_runtime` or enable `admin_mutation`/`role_mutation` capability gates. AI principals cannot activate runtime modes or capability gates. Activation events are audited via the event log. Runtime mode state is persisted in the `runtime_mode_state` table; capability gate state is persisted in the `capability_gate_state` table. All 47 capabilities remain default-disabled.
+
 ## Disabled Capabilities
 
 - shell/process execution | disabled/deferred

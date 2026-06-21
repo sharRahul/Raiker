@@ -93,6 +93,15 @@ REQUIRED_COMMANDS = {
     "/channels",
     "/launch --provider mock --model mock-deterministic",
     "/quit",
+    "/runtime-mode",
+    "/runtime-mode status",
+    "/runtime-mode activate <mode_name> [--reason <reason>]",
+    "/runtime-mode disable [--reason <reason>]",
+    "/capability-gates",
+    "/capability-gate <capability>",
+    "/capability-gate enable <capability> --state <state> [--reason <reason>]",
+    "/capability-gate disable <capability> [--reason <reason>]",
+    "/runtime-readiness",
 }
 REQUIRED_DISABLED_MARKERS = {
     "plugin_execution_enabled",

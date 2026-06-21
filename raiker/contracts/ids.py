@@ -54,6 +54,7 @@ _PREFIXES = {
     "pg_",
     "skc_",
     "ra_",
+    "rm_",
 }
 
 

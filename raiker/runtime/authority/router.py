@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -162,6 +163,17 @@ class RuntimeAuthority:
             return "ai_cannot_grant_roles"
         return None
 
+    def _check_human_runtime_gate_manager(self, principal: Principal) -> str | None:
+        if principal.principal_type != PrincipalType.HUMAN:
+            return "ai_cannot_manage_runtime_gates"
+        is_gate_manager = any(
+            self.store.get_role_name(rid) == "runtime_gate_manager"
+            for rid in principal.role_ids
+        )
+        if not is_gate_manager:
+            return "only_runtime_gate_manager_can_manage_gates"
+        return None
+
     def check_runtime_gate_enable(self, principal: Principal, action_type: str) -> str | None:
         if action_type == "enable_runtime_gate":
             if principal.principal_type != PrincipalType.HUMAN:
@@ -175,16 +187,176 @@ class RuntimeAuthority:
         return None
 
     def check_capability_gate(self, action_type: str, tool_or_service_name: str) -> str | None:
-        from raiker.phase_gates import CapabilityState, get_capability_gate
+        from raiker.phase_gates import CapabilityState, default_capability_gates
         cap_name = CAPABILITY_GATE_MAP.get(action_type) or CAPABILITY_GATE_MAP.get(tool_or_service_name)
         if cap_name is None:
             return None
+        persisted = self.store.get_capability_gate_state(cap_name)
+        if persisted is not None:
+            state = persisted["state"]
+            if state in (CapabilityState.DISABLED, CapabilityState.PLANNED):
+                return "disabled_by_capability_gate"
+            return None
         try:
-            gate = get_capability_gate(cap_name)
-        except PermissionError:
+            gates = default_capability_gates()
+            gate = gates.get(cap_name)
+            if gate is None:
+                return "unknown_capability_gate"
+            if gate.state in (CapabilityState.DISABLED, CapabilityState.PLANNED):
+                return "disabled_by_capability_gate"
+            return None
+        except Exception:
             return "unknown_capability_gate"
-        if gate.state == CapabilityState.DISABLED or gate.state == CapabilityState.PLANNED:
-            return "disabled_by_capability_gate"
+
+    def get_persisted_capability_state(self, cap_name: str) -> dict[str, Any] | None:
+        return self.store.get_capability_gate_state(cap_name)
+
+    def get_effective_capability_gate(self, cap_name: str) -> dict[str, Any]:
+        from raiker.phase_gates import CapabilityState, default_capability_gates
+        persisted = self.store.get_capability_gate_state(cap_name)
+        if persisted is not None:
+            return {"capability": cap_name, "state": persisted["state"], "source": "persisted"}
+        gates = default_capability_gates()
+        gate = gates.get(cap_name)
+        if gate is None:
+            return {"capability": cap_name, "state": CapabilityState.DISABLED, "source": "unknown"}
+        return {"capability": cap_name, "state": gate.state.value, "source": "static_default"}
+
+    def get_runtime_mode(self) -> dict[str, Any]:
+        active = self.store.get_active_runtime_mode()
+        if active is not None:
+            return active
+        return {
+            "runtime_mode_id": "default_dev_preview",
+            "mode_name": "development_preview",
+            "status": "active",
+            "activated_by": "system",
+            "activated_at": utc_now(),
+            "reason": "Default runtime mode",
+        }
+
+    def activate_runtime_mode(
+        self, mode_name: str, principal: Principal, reason: str = "",
+    ) -> str | None:
+        gate_check = self._check_human_runtime_gate_manager(principal)
+        if gate_check:
+            self._event("runtime_mode_activation_requested", principal.principal_id, {
+                "mode_name": mode_name, "status": "denied", "reason": gate_check,
+            })
+            return gate_check
+        if mode_name not in ("development_preview", "local_single_user_safe", "local_single_user_runtime",
+                             "multi_user_local_runtime", "hosted_or_networked_runtime"):
+            return f"unknown_runtime_mode:{mode_name}"
+        now = utc_now()
+        self.store.disable_all_runtime_modes(principal.principal_id, f"activating {mode_name}")
+        record = {
+            "runtime_mode_id": new_id("rm_"),
+            "mode_name": mode_name,
+            "status": "active",
+            "activated_by": principal.principal_id,
+            "activated_at": now,
+            "reason": reason,
+            "created_at": now,
+            "updated_at": now,
+        }
+        self.store.insert_runtime_mode_state(record)
+        self._event("runtime_mode_activated", principal.principal_id, {
+            "mode_name": mode_name, "runtime_mode_id": record["runtime_mode_id"], "reason": reason,
+        })
+        return None
+
+    def disable_runtime_mode(self, principal: Principal, reason: str = "") -> str | None:
+        gate_check = self._check_human_runtime_gate_manager(principal)
+        if gate_check:
+            self._event("runtime_mode_disabled", principal.principal_id, {
+                "status": "denied", "reason": gate_check,
+            })
+            return gate_check
+        now = utc_now()
+        self.store.disable_all_runtime_modes(principal.principal_id, reason)
+        record = {
+            "runtime_mode_id": new_id("rm_"),
+            "mode_name": "development_preview",
+            "status": "active",
+            "activated_by": principal.principal_id,
+            "activated_at": now,
+            "reason": "Disabled; reverted to development_preview",
+            "created_at": now,
+            "updated_at": now,
+        }
+        self.store.insert_runtime_mode_state(record)
+        self._event("runtime_mode_disabled", principal.principal_id, {
+            "mode_name": "development_preview", "reason": reason,
+        })
+        return None
+
+    def request_capability_transition(
+        self, capability: str, target_state: str, principal: Principal, reason: str = "",
+    ) -> str | None:
+        from raiker.phase_gates import ALL_CAPABILITIES, CapabilityState, default_capability_gates
+        gate_check = self._check_human_runtime_gate_manager(principal)
+        if gate_check:
+            self._event("capability_transition_requested", principal.principal_id, {
+                "capability": capability, "target_state": target_state,
+                "status": "denied", "reason": gate_check,
+            })
+            return gate_check
+        if capability not in ALL_CAPABILITIES:
+            return f"unknown_capability:{capability}"
+        allowed_targets = {s.value for s in CapabilityState}
+        if target_state not in allowed_targets:
+            return f"invalid_target_state:{target_state}"
+        if target_state in (CapabilityState.ENABLED_RUNTIME,):
+            active_mode = self.store.get_active_runtime_mode()
+            mode_name = active_mode["mode_name"] if active_mode else "development_preview"
+            if mode_name not in ("local_single_user_runtime", "multi_user_local_runtime"):
+                return "runtime_mode_not_activated"
+        if capability in ("shell_execution", "process_execution", "network_execution",
+                          "web_fetch", "email_runtime", "calendar_runtime", "finance_runtime",
+                          "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
+                          "cctv_runtime", "home_security_runtime", "hardware_operator_runtime",
+                          "plugin_execution_cap", "plugin_install", "external_channel_runtime",
+                          "channel_approval_relay", "remote_execution_cap", "container_execution_cap",
+                          "cloud_execution_cap", "approval_execution_relay", "scheduled_routines",
+                          "graph_indexing_runtime", "semantic_memory_runtime",
+                          "vector_embedding_runtime", "hosted_model_runtime",
+                          "private_network_model_runtime"):
+            return f"Capability remains disabled: {capability} requires a future explicit activation task."
+        now = utc_now()
+        gates = default_capability_gates()
+        default_gate = gates.get(capability)
+        readiness_json = ""
+        if default_gate is not None:
+            readiness_json = json.dumps({
+                "phase": default_gate.phase,
+                "default_state": default_gate.state.value,
+                "policy_ready": default_gate.policy_ready,
+                "contract_ready": default_gate.contract_ready,
+                "storage_ready": default_gate.storage_ready,
+                "event_ready": default_gate.event_ready,
+                "test_ready": default_gate.test_ready,
+            })
+        self._event("capability_transition_requested", principal.principal_id, {
+            "capability": capability, "target_state": target_state, "reason": reason,
+        })
+        record = {
+            "capability": capability,
+            "state": target_state,
+            "runtime_mode": "",
+            "requested_by": principal.principal_id,
+            "requested_at": now,
+            "activated_by": principal.principal_id,
+            "activated_at": now if target_state not in ("disabled", "planned") else "",
+            "reason": reason,
+            "readiness_snapshot_json": readiness_json,
+            "created_at": now,
+            "updated_at": now,
+        }
+        self.store.upsert_capability_gate_state(record)
+        event_type = "capability_enabled" if target_state not in ("disabled", "planned") else "capability_disabled"
+        self._event(event_type, principal.principal_id, {
+            "capability": capability, "new_state": target_state, "reason": reason,
+        })
         return None
 
     def evaluate_effective_permissions(self, principal: Principal) -> dict[str, Any]:

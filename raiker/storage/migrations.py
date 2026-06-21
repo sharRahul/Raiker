@@ -887,3 +887,48 @@ CREATE TABLE IF NOT EXISTS audit_exports (
   created_at TEXT NOT NULL
 );
 """
+
+PHASE_10_RUNTIME_MODE_STATE_MIGRATION_ID = "RAIKER-1001-runtime-mode-state"
+
+PHASE_10_RUNTIME_MODE_STATE_SQL = """
+CREATE TABLE IF NOT EXISTS runtime_mode_state (
+  runtime_mode_id TEXT PRIMARY KEY,
+  mode_name TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('inactive', 'active', 'disabled')),
+  activated_by TEXT,
+  activated_at TEXT,
+  disabled_by TEXT,
+  disabled_at TEXT,
+  reason TEXT,
+  risk_acceptance_id TEXT,
+  approval_id TEXT,
+  policy_decision_id TEXT,
+  validation_evidence_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
+PHASE_10_CAPABILITY_GATE_STATE_MIGRATION_ID = "RAIKER-1002-capability-gate-state"
+
+PHASE_10_CAPABILITY_GATE_STATE_SQL = """
+CREATE TABLE IF NOT EXISTS capability_gate_state (
+  capability TEXT PRIMARY KEY,
+  state TEXT NOT NULL,
+  runtime_mode TEXT,
+  requested_by TEXT,
+  requested_at TEXT,
+  activated_by TEXT,
+  activated_at TEXT,
+  disabled_by TEXT,
+  disabled_at TEXT,
+  reason TEXT,
+  readiness_snapshot_json TEXT,
+  risk_acceptance_id TEXT,
+  approval_id TEXT,
+  policy_decision_id TEXT,
+  event_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""

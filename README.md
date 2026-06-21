@@ -75,7 +75,7 @@ Inside the client, `/help` lists commands. The full CLI command surface is docum
 The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) — read it before implementing anything. In summary:
 
 - **All Phase 3 slices A through P are implemented, tested, and documented.** Phase 3 is `implemented_verified` only for the **safe foundation/readiness slices A-P**, and **Phase 4 memory MVP is implemented**.
-- The **current launchable UI is the plain local terminal client only**. **Rich/native TUI is Phase 8 deferred work**. **Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred**: specified but not implemented as launchable apps.
+- The **current launchable UI is the plain local terminal client only**. **Rich/native TUI/Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred**: specified but not implemented as launchable apps.
 - **Runtime execution remains disabled.** Plugin execution, graph/codemap indexing, semantic/vector memory writes, embeddings, approval execution, external channels, notifications, subagents, multi-agent teams, and remote/container/cloud execution are intentionally off; the readiness/preview surfaces for them are metadata-only and must not silently activate runtime.
 - Phases 5–7 add governed-enterprise, channel/subagent/remote, and runtime-feature metadata/readiness foundations. Phase 8 is the planned UI/client implementation phase. Phase 9 covers advanced memory/graph foundations. Capabilities still needing implementation are tracked in [`docs/GAP_AND_TODO_ANALYSIS.md`](docs/GAP_AND_TODO_ANALYSIS.md).
 

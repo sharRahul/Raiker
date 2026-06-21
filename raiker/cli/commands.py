@@ -1897,17 +1897,6 @@ def handle_role_revoke(command: str, *, workspace_root: str | Path = ".") -> str
     return f"No assignment found for role '{role_id}' on user '{user_id}'."
 
 
-def _ensure_runtime_gate_manager_role(store: SQLiteStore) -> None:
-    role = store.load_role("rl_rgm")
-    if role is None:
-        now = utc_now()
-        store.insert_role(Role(
-            role_id="rl_rgm", name="runtime_gate_manager",
-            description="System role for runtime gate management",
-            is_system_role=True, created_at=now,
-        ))
-
-
 def handle_runtime_mode_status(*, workspace_root: str | Path = ".") -> str:
     store = SQLiteStore(workspace_root)
     writer = EventLogWriter(store)

@@ -148,6 +148,7 @@ def main() -> int:
     errors.extend(check_owner_bootstrap_module_exists())
     errors.extend(check_owner_bootstrap_test_file())
     errors.extend(check_synthetic_principal_in_commands(cli_path))
+    errors.extend(check_no_synthetic_rgm_role_auto_creation(cli_path))
     errors.extend(check_dangerous_capabilities_disabled_by_default())
     errors.extend(check_ai_cannot_be_runtime_gate_manager())
     errors.extend(check_docs_markers())

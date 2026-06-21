@@ -54,6 +54,14 @@ Current backend implementation labels used across the hardening pass:
 | API and contract schemas | fully-specified | phase-1-build | see status ledger for current implementation | `docs/API_AND_CONTRACT_SCHEMAS.md`, `docs/CONTRACTS.md` |
 | Event catalog | fully-specified | phase-1-build | see status ledger for current implementation | `docs/EVENT_CATALOG.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
 | Runtime state transition table | fully-specified | phase-1-build | see status ledger for current implementation | `docs/RUNTIME_STATE_MACHINE.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
+| Runtime Authority / Action Router | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/runtime/authority/`, `docs/SECURITY_ARCHITECTURE.md` |
+| AI-executable role model (assistant, automation, operator, developer) | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/runtime/authority/models.py`, `docs/SECURITY_ARCHITECTURE.md` |
+| Human-only role protection | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/runtime/authority/models.py`, `docs/SECURITY_ARCHITECTURE.md` |
+| Domain scopes (16 domains) | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/runtime/authority/models.py`, `docs/SECURITY_ARCHITECTURE.md` |
+| Risk acceptance model | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/runtime/authority/models.py`, `docs/SECURITY_ARCHITECTURE.md` |
+| Expanded capability registry (47 capabilities) | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/phase_gates.py`, `docs/SECURITY_ARCHITECTURE.md` |
+| Event redaction (bank/card/medical IDs) | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/context/redaction.py` |
+| Runtime enablement validator | fully-specified | phase-1-build | `implemented_verified` | `scripts/validate_runtime_enablement_readiness.py` |
 | Equal primary interface invariant | fully-specified | phase-1-to-5-build | see status ledger for current implementation | `README.md`, `docs/ARCHITECTURE.md`, `docs/UI_UX_DESIGN_SPEC.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
 | Global `raiker` terminal command | fully-specified | phase-1-build | see status ledger for current implementation | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/ARCHITECTURE.md` |
 | Interface action parity | fully-specified | phase-1-to-5-build | see status ledger for current implementation | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/UI_UX_DESIGN_SPEC.md`, `docs/CHANNELS_SPEC.md` |
@@ -115,7 +123,8 @@ Current backend implementation labels used across the hardening pass:
 ## Capability Coverage
 
 | Capability class | Raiker requirement |
-|---|---|
+|---|---|---|
+| Runtime Authority and governance | Every action must pass through RuntimeAuthority for principal validation, domain scoping, AI role restrictions, human-only role protections, risk classification, and risk acceptance validation. No action bypasses authority. |
 | Equal primary interfaces | Every enabled human or programmatic interface can be the primary interface and must use the same gateway, contracts, policy, event log, and runtime. |
 | Action parity | Prompts, side questions, approvals, task controls, model launch, channel linking, memory, graph/codemap, diagnostics, checkpoints, and settings must have equivalent action paths across enabled interfaces. |
 | Interactive coding agent loop | Runtime must support plan/act/observe/verify with bounded tool calls and resumable checkpoints. |

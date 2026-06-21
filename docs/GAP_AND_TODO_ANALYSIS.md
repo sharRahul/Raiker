@@ -11,7 +11,7 @@ It replaces the older `REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md`. It separates two 
 
 The implementation control ledger is `docs/IMPLEMENTATION_STATUS.md`; this file only tracks gaps.
 
-Backend hardening note (2026-06-21): direct CLI durable-memory mutation bypass is closed; approval resolution is metadata-only; runtime execution remains disabled; stale `/sessions` documentation is treated as a documentation gap until a safe read-only command is intentionally implemented.
+Backend hardening note (2026-06-21): direct CLI durable-memory mutation bypass is closed via `_govern_admin_mutation`; Runtime Authority / Action Router governs all mutation actions through capability gates, policy engine, risk classification, approval/risk acceptance, and event logging; AI-executable roles, human-only protections, and domain scopes are enforced at the authority level. Known gaps remain: non-allow decisions do not yet block execution in development/safe modes, `/role revoke` is not yet governed, capability gate checks per action are not yet enforced. Runtime readiness: `runtime_enablement_candidate_with_limitations`. Approval resolution is metadata-only; runtime execution remains disabled; stale `/sessions` documentation is treated as a documentation gap until a safe read-only command is intentionally implemented.
 
 ---
 
@@ -91,7 +91,9 @@ All items below are specified but not implemented unless explicitly marked other
 `docs/SECURITY_ARCHITECTURE.md` is the dedicated current security architecture document. The remaining security items below are missing/deferred unless a future implementation task explicitly marks them implemented with code, tests, validation, and documentation.
 
 | Security gap | Current status | Required future work |
-|---|---|---|
+|---|---|---|---|
+| Runtime Authority strict enforcement | `implemented_policy_gated` with known gaps | Non-allow decisions do not yet block execution in development/safe modes; `/role revoke` does not yet call `_govern_admin_mutation`; capability gate checks per action are not yet enforced. Add strict enforcement tests and wire missing commands through governance. |
+| Runtime Authority validator depth | `implemented_verified` for surface-level checks | `validate_runtime_enablement_readiness.py` does not prove no direct mutation bypasses exist; add deep static analysis for ungoverned mutation paths. |
 | Formal threat model review per deferred capability | missing/deferred | Run and record a threat-model review before enabling each Phase 8 client, plugin runtime, channel transport, remote execution adapter, shell/process/network tool, graph indexer, semantic/vector writer, subagent/team runtime, approval relay, or scheduler. |
 | Authentication/authorization model for future Web/API clients | missing/deferred | Define identities, roles, sessions, tokens/cookies, CSRF/CORS, rate limits, admin boundaries, and API authorization tests before any Web/API server is runtime-enabled. |
 | Secure session isolation for future multi-client interfaces | missing/deferred | Bind client identity, session scope, approval authority, event subscriptions, and redaction policy before Desktop/Web/Mobile/IDE/API clients can share sessions. |

@@ -86,26 +86,99 @@ However, Phase 1 must still preserve the contracts, registries, storage hooks, p
 ```text
 Interface and Channel Layer
   -> Agent Gateway
-    -> Session Manager
-      -> Runtime Orchestrator
-        -> Context Gatherer
-        -> Planner
-        -> Policy Engine
-        -> Tool Broker
-        -> Hook Engine
-        -> Plugin Manager
-        -> Channel Manager
-        -> Model Router
-        -> Memory Service
-        -> Graph/Codemap Service
-        -> Verifier
-        -> Checkpoint Service
-        -> Execution Adapter Registry
-      -> Event Log
-      -> SQLite State Store
+    -> Runtime Authority / Action Router (every action)
+      -> Session Manager
+        -> Runtime Orchestrator
+          -> Context Gatherer
+          -> Planner
+          -> Policy Engine
+          -> Tool Broker
+          -> Hook Engine
+          -> Plugin Manager
+          -> Channel Manager
+          -> Model Router
+          -> Memory Service
+          -> Graph/Codemap Service
+          -> Verifier
+          -> Checkpoint Service
+          -> Execution Adapter Registry
+        -> Event Log
+        -> SQLite State Store
 ```
 
 Every client talks to the gateway. No client can call tools directly. No client gets a private bypass path because it was implemented earlier or has a richer UI.
+
+---
+
+## Runtime Authority
+
+The `RuntimeAuthority` (`raiker/runtime/authority/router.py`) is the central governance point for every action. No action — CLI, future UI, plugin, model tool call, channel message, or background task — may proceed without passing through the authority chain.
+
+### Governed Action Path
+
+```text
+Action received
+  -> Principal validation (active, not expired)
+  -> Role classification (AI role or human-only role)
+  -> Domain scope boundary check
+  -> Capability gate check (registry of 47 capabilities)
+  -> Risk classification (low / medium / high / critical)
+  -> PolicyEngine decision (allow / deny / needs_approval)
+  -> Approval or risk acceptance where required
+  -> ActionRouter.route() produces GovernedAction
+  -> GovernedActionResult with decision + event log
+  -> ToolBroker or Governed Service Executor
+```
+
+The `ActionRouter` provides a unified `route()` method that creates `GovernedAction` records with full provenance and routes them through the authority chain.
+
+### AI-Executable Roles
+
+| Role | Auto-allowed | Requires approval/risk acceptance | Denied |
+|------|-------------|-----------------------------------|--------|
+| **assistant** | read, search, summarise, draft, plan, recommend, prepare actions, create reports, reminders | send email, delete email, move money, buy/sell stock, share records, medical decisions, grant permissions, enable runtime gates | - |
+| **automation** | scheduled summaries, recurring reports, alerts, reminders, monitoring | Must be scoped by task; cannot self-expand scope | buy/sell stock, move money, change portfolio settings |
+| **operator** | check runtime status, check backups, diagnostics, maintenance recommendations | delete backups, change CCTV settings, disable monitoring, restart service | enable runtime gates, change security policy, remote execution, delete CCTV footage |
+| **developer** | read workspace, inspect git diff, review findings, plans, proposals | write_file, edit_file, apply_patch, run tests, shell commands, memory mutations | approve own action, merge PR, change policy, grant roles, enable runtime gates, install/execute plugins |
+
+### Human-Only Roles
+
+`owner`, `admin`, `approver`, `security_admin`, `finance_approver`, `medical_decision_maker`, `runtime_gate_manager` — cannot be assigned to AI principals.
+
+### Domain Scopes
+
+16 domains: `email`, `calendar`, `reminders`, `documents`, `finance`, `investments`, `medical`, `pregnancy_baby`, `home_security`, `cctv`, `hardware`, `systems`, `projects`, `coding`, `shopping`, `travel`.
+
+### Risk Levels & Acceptance
+
+| Level | Behaviour |
+|-------|-----------|
+| Low | Auto-allowed for permitted roles |
+| Medium | Auto-allowed if pre-approved rule exists |
+| High | Requires approval or risk acceptance |
+| Critical | Always requires human confirmation |
+
+Risk acceptance records capture: `risk_acceptance_id`, `accepted_by`, `accepted_for_principal_id`, `action_id`, `action_type`, `domain_scope`, `risk_level`, `risk_summary`, `data_involved`, `expected_effect`, `one_time_or_reusable`, `expires_at`. AI principals cannot use risk acceptance to self-approve.
+
+### Effective Permission Calculation
+
+```
+effective_permissions =
+  delegating_human_permissions
+  ∩ ai_role_permissions
+  ∩ domain_scope_permissions
+  ∩ workspace_policy
+  ∩ capability_gate_state
+  ∩ task_scope
+  ∩ risk_acceptance_or_approval_state
+```
+
+### Known Limitations
+
+- Non-allow decisions do not yet block execution in development/safe modes.
+- `/role revoke` does not yet call `_govern_admin_mutation`.
+- Capability gate checks per action are not yet enforced.
+- Runtime readiness: `runtime_enablement_candidate_with_limitations`.
 
 ---
 

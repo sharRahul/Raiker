@@ -29,6 +29,40 @@ The `RuntimeAuthority` (`raiker/runtime/authority/router.py`) enforces principal
 
 Current backend truth: approval resolution is metadata-only and does not execute approved actions; approval execution relay remains disabled/deferred; runtime execution remains disabled for deferred capabilities.
 
+### AI-Executable Roles
+
+Four AI roles are defined in `raiker/runtime/authority/models.py`:
+
+| Role | Auto-allowed | Requires approval/risk acceptance | Denied |
+|------|-------------|-----------------------------------|--------|
+| **assistant** | read, search, summarise, draft, plan, recommend, prepare actions, create reports, reminders | send email, delete email, move money, buy/sell stock, share records, medical decisions, grant permissions, enable runtime gates | - |
+| **automation** | scheduled summaries, recurring reports, alerts, reminders, monitoring | Must be scoped by task; cannot self-expand scope | buy/sell stock, move money, change portfolio settings |
+| **operator** | check runtime status, check backups, diagnostics, maintenance recommendations | delete backups, change CCTV settings, disable monitoring, restart service | enable runtime gates, change security policy, remote execution, delete CCTV footage |
+| **developer** | read workspace, inspect git diff, review findings, plans, proposals | write_file, edit_file, apply_patch, run tests, shell commands, memory mutations | approve own action, merge PR, change policy, grant roles, enable runtime gates, install/execute plugins |
+
+AI role rules:
+- No AI principal may self-approve its own actions.
+- No AI principal may self-grant roles or permissions.
+- No AI principal may enable runtime capability gates.
+- Human-only roles are enforced at the authority level and cannot be assigned to AI principals.
+
+### Human-Only Roles
+
+`owner`, `admin`, `approver`, `security_admin`, `finance_approver`, `medical_decision_maker`, `runtime_gate_manager` cannot be assigned to AI principals. These roles always require human interaction for any action they take.
+
+### Risk Acceptance Rules
+
+Users may explicitly accept risk for high-risk actions. Rules:
+- Risk acceptance records require: `accepted_by`, `accepted_for_principal_id`, `action_id`, `action_type`, `domain_scope`, `risk_level`, `risk_summary`, `data_involved`, `expected_effect`, `one_time_or_reusable`, `expires_at`.
+- AI principals cannot use risk acceptance to self-approve actions.
+- Critical-risk actions always require human confirmation regardless of risk acceptance state.
+- Risk acceptance may be one-time or reusable (scoped by principal + domain + action type).
+- Expired risk acceptance records are treated as non-existent.
+
+### Admin Mutation Governance
+
+All admin CLI mutation commands (`/user create`, `/user deactivate`, `/role create`, `/role grant`) route through `_govern_admin_mutation` which delegates to `RuntimeAuthority` before mutating. Known gap: `/role revoke` does not yet call `_govern_admin_mutation`.
+
 ---
 
 ## Threats Raiker Must Consider
@@ -57,11 +91,31 @@ Event log: append-only audit record
 
 Every `ToolAction` receives one decision:
 
-- `allow` — broker may execute;
-- `deny` — broker must not execute;
-- `needs_approval` — broker must pause and request user approval.
+| Decision | Meaning | Implemented |
+|---|---|---|
+| `allow` | Broker may execute immediately. | Phase 1 |
+| `deny` | Broker must not execute. Return denied result. | Phase 1 |
+| `needs_approval` | Broker must pause and request user approval. | Phase 1 |
+| `defer` | Put action into deferred queue. | Phase 2 (scheduled) |
+| `allow_once` | Allow one exact action ID only. | Phase 2 (scheduled) |
+| `allow_for_session` | Allow matching action pattern for current session. | Phase 2 (scheduled) |
+| `allow_for_project` | Allow matching action pattern for current project config. | Phase 2 (scheduled) |
+| `allow_managed` | Allow by administrator/managed policy. | Phase 5 (scheduled) |
 
 Phase-scheduled decisions such as `defer`, `allow_once`, `allow_for_session`, `allow_for_project`, and `allow_managed` are defined in `docs/TOOLS_AND_PERMISSIONS_SPEC.md`.
+
+### Policy resolution and authority chain
+
+Policy decisions are produced within the Runtime Authority chain:
+
+```text
+Action -> RuntimeAuthority (principal, role, scope, risk, capability gates)
+       -> PolicyEngine (allow/deny/needs_approval)
+       -> Approval or Risk Acceptance where required
+       -> GovernedAction record with full decision provenance
+```
+
+Approval resolution is metadata-only: `/approve` and `/deny` update one pending approval record and do not execute the approved action. Non-allow decisions do not yet block execution in development/safe modes (known limitation).
 
 ---
 

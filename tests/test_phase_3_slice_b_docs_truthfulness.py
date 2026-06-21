@@ -2,70 +2,68 @@ from __future__ import annotations
 
 from pathlib import Path
 
+STATUS = "docs/IMPLEMENTATION_STATUS.md"
+
 
 def _read(path: str) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
 def test_implementation_status_marks_slice_b_implemented() -> None:
-    content = _read("docs/IMPLEMENTATION_STATUS.md")
+    content = _read(STATUS)
     assert "Phase 3 Slice B" in content
     assert "implemented_verified" in content
 
 
-def test_readme_mentions_slice_b() -> None:
-    content = _read("README.md")
+def test_status_mentions_slice_b() -> None:
+    content = _read(STATUS)
     assert "Slice B" in content or "approval planning" in content.lower()
 
 
-def test_docs_state_preview_only() -> None:
-    readme = _read("README.md")
-    assert "preview-only" in readme or "preview only" in readme.lower()
+def test_status_states_preview_only() -> None:
+    content = _read(STATUS)
+    assert "preview-only" in content or "preview only" in content.lower()
 
 
-def test_docs_state_no_approval_execution() -> None:
-    readme = _read("README.md")
-    assert "no approval execution" in readme.lower()
+def test_status_states_no_approval_execution() -> None:
+    assert "no approval execution" in _read(STATUS).lower()
 
 
-def test_docs_state_no_proposal_execution() -> None:
-    readme = _read("README.md")
-    assert "no proposal execution" in readme.lower() or "not execute proposals" in readme.lower()
+def test_status_states_no_proposal_execution() -> None:
+    content = _read(STATUS).lower()
+    assert "no proposal execution" in content or "not execute proposals" in content
 
 
-def test_docs_state_no_auto_fix() -> None:
-    readme = _read("README.md")
-    assert "auto-fix" in readme.lower() or "no auto" in readme.lower()
+def test_status_states_no_auto_fix() -> None:
+    content = _read(STATUS).lower()
+    assert "auto-fix" in content or "no auto" in content
 
 
-def test_docs_state_no_patch_application() -> None:
-    readme = _read("README.md")
-    assert "no patch application" in readme.lower() or "patches" in readme.lower()
+def test_status_states_no_patch_application() -> None:
+    content = _read(STATUS).lower()
+    assert "no patch application" in content or "patches" in content
 
 
-def test_docs_state_no_file_mutation() -> None:
-    readme = _read("README.md")
-    assert "no file mutation" in readme.lower() or "not modify files" in readme.lower()
+def test_status_states_no_file_mutation() -> None:
+    content = _read(STATUS).lower()
+    assert "no file mutation" in content or "not modify files" in content
 
 
-def test_docs_state_no_test_execution_by_preview_commands() -> None:
-    readme = _read("README.md")
-    assert "no test execution" in readme.lower()
+def test_status_states_no_test_execution_by_preview_commands() -> None:
+    assert "no test execution" in _read(STATUS).lower()
 
 
-def test_docs_state_no_github_pr_automation() -> None:
-    readme = _read("README.md")
-    assert "no GitHub PR" in readme.lower() or "no github pr" in readme.lower()
+def test_status_states_no_github_pr_automation() -> None:
+    assert "no github pr" in _read(STATUS).lower()
 
 
-def test_docs_state_no_ui_api_ide_dashboard_mobile() -> None:
-    readme = _read("README.md")
-    assert "no UI" in readme.lower() or "no ui/api" in readme.lower()
+def test_status_states_no_ui_api_ide_dashboard_mobile() -> None:
+    content = _read(STATUS).lower()
+    assert "no ui" in content or "no ui/api" in content
 
 
-def test_docs_state_no_phase_4() -> None:
-    readme = _read("README.md")
-    assert "no Phase 4" in readme
+def test_status_states_no_phase_4() -> None:
+    assert "no Phase 4" in _read(STATUS)
 
 
 def test_event_catalog_lists_preview_events() -> None:
@@ -78,9 +76,3 @@ def test_event_catalog_lists_preview_events() -> None:
 def test_documentation_drift_audit_exists() -> None:
     content = _read("docs/DOCUMENTATION_DRIFT_AUDIT.md")
     assert "Phase 3 Slice B" in content
-
-
-def test_slice_b_spec_exists() -> None:
-    content = _read("docs/completed/PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SPEC.md")
-    assert "implemented_verified" in content
-    assert "preview" in content.lower()

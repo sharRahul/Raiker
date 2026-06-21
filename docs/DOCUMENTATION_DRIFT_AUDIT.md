@@ -1,45 +1,35 @@
 # Documentation Drift Audit
 
-Date: 2026-06-19
-Repository state: after Phase 3 Slice B approval planning preview
+Date: 2026-06-21
+Repository state: after the documentation alignment overhaul (Phases 1–9 reconciled; README rewritten).
 
-## Current implementation baseline
+This audit records where documentation had drifted from the code and what was done to realign it.
+The canonical status ledger is `docs/IMPLEMENTATION_STATUS.md`; the missing-work backlog is
+`docs/GAP_AND_TODO_ANALYSIS.md`.
 
-- Phase 1: implemented_verified
-- Phase 2: implemented_verified
-- Phase 2.5: implemented_verified
-- Phase 2.6: implemented_verified
-- Phase 3 Slice A: implemented_verified
-- Phase 3 Slice B: implemented_verified
-- Phase 4: deferred / not started
+## Drift found and corrected
 
-## Documentation files reviewed
+| Drift | Reality in code | Resolution |
+|---|---|---|
+| README and `/help` said the launchable UI was "a simple terminal/CLI shell" and that the Rich TUI was "specified/deferred". | `raiker/cli/main.py` → `raiker/tui/app.py` launches a native Textual Rich TUI (`raiker/tui/textual_app.py`, tested in `tests/test_raiker_textual_tui.py`); the plain shell is the fallback. | README, `/help`, `docs/IMPLEMENTATION_STATUS.md`, and the truthfulness validator now describe a "local terminal client: native Textual Rich TUI by default, plain shell fallback". |
+| README and `docs/ARCHITECTURE.md` omitted Phases 5–9, which are `implemented_verified` (record/metadata level) in the ledger. | Phases 5–9 exist in `raiker/` with SQLite records and CLI surfaces; runtime stays disabled. | Added Phase 6/7/9 rows to `docs/ARCHITECTURE.md`; the README "Project Status" section and the ledger now cover Phases 5–9. |
+| Phase 8 appeared "missing". | There is no Phase 8; numbering intentionally skips 7→9. | Documented explicitly in `docs/ARCHITECTURE.md`, `docs/IMPLEMENTATION_STATUS.md`, and `docs/GAP_AND_TODO_ANALYSIS.md`. |
+| README was a ~1000-line status ledger duplicating `docs/IMPLEMENTATION_STATUS.md`. | — | README rewritten into a conventional format; the exhaustive ledger, the CLI command surface, and the async-runtime notes now live in `docs/IMPLEMENTATION_STATUS.md` and `docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md`. |
+| Spent planning scaffolding (build plans, per-slice specs, completion/readiness audits, the Phase 2–5 roadmap) lingered in `docs/` and `docs/completed/`. | Those phases/slices are complete. | Deleted the scaffolding; the truthfulness/phase validators and tests were repointed to the living docs so nothing was kept solely to satisfy a test. |
+| Base design docs were buried under `docs/completed/`. | They are living foundations. | Moved the numbered `01`–`12` design docs to `docs/foundation/` and refreshed them. |
 
-- README.md
-- ~~EVENT_CATALOG.md~~ (removed 2026-06-20; stale root-level stub, `docs/EVENT_CATALOG.md` is canonical)
-- docs/EVENT_CATALOG.md
-- docs/IMPLEMENTATION_STATUS.md
-- docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md
-- docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md
-- docs/LOCAL_VALIDATION_GATE.md
-- docs/completed/PRE_PHASE_3_READINESS_AUDIT.md
-- docs/completed/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md
-- docs/completed/PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SPEC.md
+## Verification
 
-> Update (2026-06-20): the slice specs and audits listed above have been archived under
-> `docs/completed/` once their slices reached `implemented_verified`. The canonical event
-> catalog is `docs/EVENT_CATALOG.md`; the stale root-level `EVENT_CATALOG.md` stub was removed.
+- `python scripts/validate_repo_truthfulness.py` → passed.
+- `python scripts/validate_phase_status.py` → passed.
+- `python -m pytest` → passed (1 skipped, opt-in real-provider TUI integration).
 
-## Truthfulness boundaries
+## Truthfulness boundaries (unchanged guarantees)
 
-- approval previews are metadata-only
-- approval previews do not execute approvals
-- approval previews do not execute proposals
-- fixes are not applied
-- patches are not applied
-- files are not modified
-- tests are not run by preview commands
-- GitHub PR automation is not implemented
-- UI/API/IDE/dashboard/mobile are not implemented
-- Phase 4 is not implemented
-- disabled runtime flags remain false
+- Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P.
+- Phase 3 Slice A is metadata-only/proposal-only; Phase 3 Slice B is preview-only.
+- Approval previews do not execute approvals or proposals; no fixes/patches are applied; no files are
+  modified; preview commands run no tests; GitHub PR automation is not implemented.
+- Desktop/Web/Dashboard/Mobile/IDE/REST apps are specified/deferred, not implemented.
+- Phase 4 memory MVP is implemented; remaining Phase 4 capabilities remain blocked.
+- All disabled runtime flags remain false; runtime execution remains disabled.

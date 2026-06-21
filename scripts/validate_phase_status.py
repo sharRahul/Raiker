@@ -19,9 +19,7 @@ REQUIRED_PHASE_2_ROWS = [
 
 REQUIRED_DOCS = [
     Path("README.md"),
-    Path("docs/completed/PHASE_3_BUILD_PLAN.md"),
-    Path("docs/PHASE_3_COMPLETION_AUDIT.md"),
-    Path("docs/PHASE_4_BUILD_PLAN.md"),
+    Path("docs/IMPLEMENTATION_STATUS.md"),
     Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"),
     Path("docs/EVENT_CATALOG.md"),
 ]
@@ -31,27 +29,24 @@ REQUIRED_IMPLEMENTATION_STATUS_MARKERS = [
     "RAIKER-3501 read-only rich workspace view/API foundation | `implemented_verified`",
     "`/workspace-view` safe terminal snapshot command | `implemented_verified`",
     "All Phase 3 slices A through P are implemented, tested, and documented.",
-    "Phase 3 is now marked `implemented_verified` per the completion audit",
+    "Phase 3 is now marked `implemented_verified`",
     "All runtime execution remains disabled. Phase 4 memory MVP is implemented.",
+    "**Phase 3 can be marked complete.**",
+    "Phase 4 remains blocked.",
 ]
 
 REQUIRED_STATUS_FILES = {
-    Path("README.md"): [
+    Path("docs/IMPLEMENTATION_STATUS.md"): [
         "All Phase 3 slices A through P are implemented, tested, and documented.",
         "Runtime execution remains disabled.",
         "Phase 4 memory MVP is implemented",
     ],
-    Path("docs/PHASE_3_COMPLETION_AUDIT.md"): [
-        "**Phase 3 can be marked complete.**",
-        "Runtime execution remains disabled.",
-        "Phase 4 remains blocked.",
-    ],
     Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"): [
-        "Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`.",
+        "Phase 3 is complete",
         "Phase 4 memory MVP",
     ],
     Path("docs/EVENT_CATALOG.md"): [
-        "Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`.",
+        "Phase 3 is complete",
         "Phase 4 memory MVP",
     ],
 }

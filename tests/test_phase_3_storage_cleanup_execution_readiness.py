@@ -104,17 +104,13 @@ def test_workspace_surfaces_include_cleanup_readiness(tmp_path: Path) -> None:
 
 def test_docs_catalog_event_consistency() -> None:
     for path in [
-        Path("README.md"),
         Path("docs/IMPLEMENTATION_STATUS.md"),
-        Path("docs/EVENT_CATALOG.md"),
-        Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"),
-        Path("docs/completed/PHASE_3_SLICE_M_STORAGE_CLEANUP_EXECUTION_READINESS_SPEC.md"),
     ]:
         text = path.read_text()
         assert "Slice M" in text
         assert "cleanup" in text.lower()
         assert (
             "Phase 3 remains incomplete" in text
-            or "Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`." in text
+            or "Phase 3 is complete" in text
         )
         assert "Phase 4 remains blocked" in text

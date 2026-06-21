@@ -52,6 +52,11 @@ Phase boundaries exist to control implementation order, not to hide missing desi
 | Phase 3 | Desktop/Web/Mobile/Plugin/Graph target platform architecture | Target platform architecture covers Desktop UI, Web UI, Dashboard, Apple mobile app, Android mobile app, plugin manager, semantic search, graph/codemap, REST API, and worktree isolation. Currently completed Phase 3 A-P scope is the safe foundation/readiness layer only: CLI functional-test surfaces, read-only shared workspace/view contracts, plugin manifest planning/validation, approval previews, readiness metadata, storage lifecycle metadata, and disabled-runtime validation. Deferred after Phase 3 are launchable desktop/web/mobile/dashboard/IDE/API apps and runtime semantic/vector search, graph indexing/query execution, plugin execution, scheduled automation, and hosted/cloud runtime work. |
 | Phase 4 | Channels/Multi-Agent/Remote Execution | Channel connectors, subagents, agent teams, container/remote profiles, voice/hotkeys/browser extension, chat/email clients. |
 | Phase 5 | Governed Enterprise/Home-Lab Platform | Managed policies, multi-user governance, signed plugins, event integrity, audit export, cloud/GPU budgets, deployment operations. |
+| Phase 6 | Channels/Subagents/Remote Foundations | External channel connectors and approval relay, subagent contracts, multi-agent team ledgers, remote/container execution profiles, execution budgets. Records/metadata implemented; runtime transports and execution remain disabled. |
+| Phase 7 | Runtime Feature Foundations | Desktop/Web/IDE session models, plugin runtime, graph/codemap indexing, and semantic/vector memory writes as record-level foundations. Dashboard and mobile apps remain `specified_not_implemented`; all execution stays policy-gated and disabled. |
+| Phase 9 | Advanced Memory & Graph | Vector index, AST symbol/dependency graph indexer, project graph extraction, and procedural-memory-to-skill-candidate conversion as in-memory modules with SQLite persistence. All execution remains policy-gated and disabled. (There is no Phase 8; numbering intentionally skips from 7 to 9.) |
+
+> Phase 6–9 status detail lives in the canonical ledger `docs/IMPLEMENTATION_STATUS.md`.
 
 ### Phase 1 Exclusions Are Implementation Exclusions Only
 

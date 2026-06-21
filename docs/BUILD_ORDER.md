@@ -1,6 +1,6 @@
 # Build Order
 
-This document defines the dependency-safe order for implementing Raiker. It complements `docs/completed/PHASE_1_MVP_BUILD_PLAN.md` by making the build sequence explicit enough that a builder agent does not implement UI, tools, memory, plugins, channels, or storage lifecycles before the contracts and safety rails exist.
+This document defines the dependency-safe order for implementing Raiker. It complements `docs/foundation/09_IMPLEMENTATION_PLAN.md` by making the build sequence explicit enough that a builder agent does not implement UI, tools, memory, plugins, channels, or storage lifecycles before the contracts and safety rails exist.
 
 Phase order controls implementation sequencing only. It does not create an interface hierarchy.
 
@@ -25,14 +25,14 @@ README.md
   -> docs/SECURITY_AND_POLICY.md
   -> docs/THREAT_MODEL.md
   -> docs/NON_GOALS_AND_BOUNDARIES.md
-  -> docs/completed/PHASE_1_MVP_BUILD_PLAN.md
-  -> docs/completed/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md
-  -> docs/completed/PHASE_3_BUILD_PLAN.md
-  -> docs/completed/PHASE_3_SLICE_G_STORAGE_LIFECYCLE_SPEC.md
-  -> docs/completed/PHASE_1_TO_5_SLICE_G_ALIGNMENT.md
-  -> docs/completed/SLICE_G_CODING_AGENT_HANDOFF.md
-  -> docs/PHASE_4_BUILD_PLAN.md
-  -> docs/PHASE_5_BUILD_PLAN.md
+  -> docs/foundation/09_IMPLEMENTATION_PLAN.md
+  -> docs/foundation/09_IMPLEMENTATION_PLAN.md
+  -> docs/IMPLEMENTATION_STATUS.md
+  -> docs/IMPLEMENTATION_STATUS.md
+  -> docs/IMPLEMENTATION_STATUS.md
+  -> docs/IMPLEMENTATION_STATUS.md
+  -> docs/IMPLEMENTATION_STATUS.md
+  -> docs/IMPLEMENTATION_STATUS.md
   -> docs/RUNTIME_ORCHESTRATION_SPEC.md
   -> docs/TOOLS_AND_PERMISSIONS_SPEC.md
   -> docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md
@@ -249,8 +249,8 @@ Every implementation PR must include:
 
 ## Phase 3 Slice H lifecycle retention reference
 
-Slice H is metadata-only retention, cleanup-preview, and approval-handoff planning. Keep detailed contract and safety requirements in `docs/completed/PHASE_3_SLICE_H_LIFECYCLE_RETENTION_SPEC.md`; this document only references Slice H where its local status, validation, command, event, or storage responsibility applies.
+Slice H is metadata-only retention, cleanup-preview, and approval-handoff planning. Keep detailed contract and safety requirements in `docs/IMPLEMENTATION_STATUS.md`; this document only references Slice H where its local status, validation, command, event, or storage responsibility applies.
 
 ## Phase 3 Slice I lifecycle evidence reference
 
-Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/completed/PHASE_3_SLICE_I_LIFECYCLE_EVIDENCE_SPEC.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.
+Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/IMPLEMENTATION_STATUS.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.

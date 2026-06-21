@@ -24,6 +24,11 @@ class StaticPolicyConfig:
                 "memory_search",
                 "memory_list",
                 "memory_get",
+                "user_create",
+                "user_deactivate",
+                "role_create",
+                "role_grant",
+                "role_revoke",
             }
         )
     )

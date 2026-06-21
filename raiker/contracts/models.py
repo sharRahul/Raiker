@@ -196,6 +196,15 @@ EVENT_TYPES = {
     "capability_disabled",
     "capability_transition_denied",
     "runtime_readiness_checked",
+    "owner_bootstrap_requested",
+    "owner_bootstrap_created",
+    "owner_bootstrap_denied",
+    "owner_recovery_requested",
+    "owner_recovery_created",
+    "owner_recovery_denied",
+    "owner_recovery_old_owner_deactivated",
+    "principal_resolved",
+    "principal_resolution_failed",
 }
 INTENTS = {
     "chat",

@@ -70,6 +70,8 @@ Inside the client, `/help` lists commands. The full CLI command surface is docum
 
 ---
 
+> runtime_enablement_candidate: completed
+
 ## Project Status
 
 The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) — read it before implementing anything. In summary:
@@ -82,7 +84,7 @@ The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPL
 - **Backend capability labels are explicit:** `implemented_read_only`, `implemented_policy_gated`, `implemented_approval_required`, `metadata_only`, `readiness_only`, `dry_run_only`, `contract_only`, `disabled_deferred`, and `test_only`.
 - **Runtime Authority / Action Router** (`raiker/runtime/authority/`) governs all mutation actions through capability gates, policy engine, risk classification, approval/risk acceptance, and event logging. It enforces four AI-executable roles (`assistant`, `automation`, `operator`, `developer`), seven human-only roles, 16 domain scopes, and risk acceptance with expiry.
 - **Capability registry** is expanded to 47 capabilities across all domain runtimes, all default-disabled. The `ALL_CAPABILITIES` and `RUNTIME_DOMAIN_CAPABILITIES` sets are defined in `raiker/phase_gates.py`.
-- **Current runtime readiness: `runtime_enablement_candidate`** — strict non-allow blocking, role revoke governed, and capability gate per action are now enforced. **Controlled runtime mode activation is implemented** — runtime mode and capability gate state are persisted; human runtime-gate-manager can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation` via governed transitions; AI cannot activate runtime modes or capability gates. All 47 capabilities remain default-disabled; deferred runtimes remain disabled. Approval execution relay remains metadata-only/deferred. `production_ready_local_single_user_runtime: false`.
+- **Current runtime readiness: `runtime_enablement_candidate`** — strict non-allow blocking, role revoke governed, and capability gate per action are now enforced. **Controlled runtime mode activation is implemented** — runtime mode and capability gate state are persisted; human runtime-gate-manager can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation` via governed transitions; AI cannot activate runtime modes or capability gates. All 47 capabilities remain default-disabled; deferred runtimes remain disabled. Approval execution relay remains metadata-only/deferred. `production_ready_local_single_user_runtime: false`. Owner bootstrap flow (`/bootstrap-owner`) is implemented with recovery support; `resolve_local_principal()` is used for all production-path principal resolution.
 - Phases 5–7 add governed-enterprise, channel/subagent/remote, and runtime-feature metadata/readiness foundations. Phase 8 is the planned UI/client implementation phase. Phase 9 covers advanced memory/graph foundations. Capabilities still needing implementation are tracked in [`docs/GAP_AND_TODO_ANALYSIS.md`](docs/GAP_AND_TODO_ANALYSIS.md).
 - The dedicated current security architecture, trust-boundary model, and deferred-control gates are documented in [`docs/SECURITY_ARCHITECTURE.md`](docs/SECURITY_ARCHITECTURE.md).
 

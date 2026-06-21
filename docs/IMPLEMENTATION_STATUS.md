@@ -1,3 +1,5 @@
+> runtime_enablement_candidate: completed
+
 # Implementation Status
 
 > Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
@@ -59,7 +61,8 @@ Current high-signal truth:
 - **CLI commands**: `/runtime-mode status|activate|disable`, `/capability-gates`, `/capability-gate detail|enable|disable`, `/runtime-readiness` are implemented and route through RuntimeAuthority governance.
 - **Human-only activation**: `runtime_gate_manager` role (human-only) can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation` capability gates. AI principals cannot activate runtime modes or capability gates.
 - **Tests**: `tests/test_runtime_mode_activation.py`, `tests/test_capability_gate_persistence.py`, `tests/test_runtime_authority_mode_gate.py`.
-- **Production-ready local single-user runtime**: `production_ready_local_single_user_runtime_candidate` — the activation mechanism is implemented and persisted, but production readiness validation remains a separate milestone.
+- **Owner bootstrap flow**: `implemented_verified` — `/bootstrap-owner` creates owner principal, role, events; recovery flow with `--force-recover` supported; `resolve_local_principal()` replaces synthetic `cli_local` for all production-path principal resolution. Tests: `tests/test_local_single_user_runtime.py`.
+- **Production-ready local single-user runtime**: `production_ready_local_single_user_runtime_candidate` — owner bootstrap flow implemented and verified; activation mechanism is implemented and persisted, but production readiness validation remains a separate milestone.
 - **Deferred runtimes** remain disabled. **Approval execution relay** remains metadata-only/deferred. All 47 capabilities remain default-disabled.
 
 ---

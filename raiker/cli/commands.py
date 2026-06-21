@@ -25,6 +25,16 @@ from raiker.approvals.readiness_registry import (
 from raiker.channels.readiness_registry import channel_readiness_summary, render_channel_readiness
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
+from raiker.cli.principal_resolver import (
+    bootstrap_owner,
+    check_acting_principal_available,
+    check_owner_bootstrapped,
+    check_runtime_gate_manager_available,
+    get_principal_detail,
+    get_principal_info,
+    list_principals_info,
+    resolve_local_principal,
+)
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import (
     ClientMetadata,
@@ -79,7 +89,6 @@ from raiker.runtime.authority import (
     RiskLevelValue,
     RuntimeAuthority,
 )
-from raiker.runtime.authority.models import Principal, PrincipalType
 from raiker.storage.cleanup_readiness_registry import (
     cleanup_readiness_summary,
     render_cleanup_readiness,
@@ -1721,20 +1730,14 @@ def _govern_admin_mutation(
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
     router = ActionRouter(authority)
-    local_principal = Principal(
-        principal_id="cli_local",
-        principal_type=PrincipalType.HUMAN,
-        display_name="CLI Local User",
-        role_ids=("rl_admin",),
-        domain_scopes=(),
-        max_runtime_mode="local_single_user_safe",
-        is_active=True,
-    )
+    principal, err = resolve_local_principal(workspace_root)
+    if principal is None:
+        return f"Governed action denied: {err}"
     result = router.route(
         action_type=action_type,
         tool_or_service_name=tool_or_service_name,
         arguments=arguments,
-        principal=local_principal,
+        principal=principal,
         domain_scope=domain_scope,
         risk_level=risk_level,
         requires_approval=requires_approval,
@@ -1849,7 +1852,7 @@ def handle_role_create(command: str, *, workspace_root: str | Path = ".") -> str
 
 def handle_role_grant(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
-    if len(parts) < 5:
+    if len(parts) < 4:
         return "Usage: /role grant <role_id> <user_id>"
     role_id = parts[2]
     user_id = parts[3]
@@ -1874,7 +1877,7 @@ def handle_role_grant(command: str, *, workspace_root: str | Path = ".") -> str:
 
 def handle_role_revoke(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
-    if len(parts) < 5:
+    if len(parts) < 4:
         return "Usage: /role revoke <role_id> <user_id>"
     role_id = parts[2]
     user_id = parts[3]
@@ -1922,62 +1925,69 @@ def handle_runtime_mode_status(*, workspace_root: str | Path = ".") -> str:
     ]
     if mode.get("reason"):
         lines.append(f"Reason: {mode['reason']}")
+    principal, _ = resolve_local_principal(workspace_root)
+    if principal is not None:
+        lines.append(f"Acting principal: {principal.principal_id} ({principal.display_name})")
+    else:
+        lines.append("Acting principal: none (run /bootstrap-owner first)")
     return "\n".join(lines)
 
 
 def handle_runtime_mode_activate(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     if len(parts) < 4:
-        return "Usage: /runtime-mode activate <mode_name> [--reason <reason>]"
+        return "Usage: /runtime-mode activate <mode_name> [--reason <reason>] [--as <principal_id>]"
     mode_name = parts[2]
     reason = ""
+    explicit_principal = None
     if "--reason" in parts:
         ridx = parts.index("--reason")
         if ridx + 1 < len(parts):
             reason = parts[ridx + 1]
+    if "--as" in parts:
+        aidx = parts.index("--as")
+        if aidx + 1 < len(parts):
+            explicit_principal = parts[aidx + 1]
+    principal, err = resolve_local_principal(workspace_root, explicit_principal)
+    if principal is None:
+        return f"Runtime mode activation denied: {err}"
     store = SQLiteStore(workspace_root)
-    _ensure_runtime_gate_manager_role(store)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    local_principal = Principal(
-        principal_id="cli_local",
-        principal_type=PrincipalType.HUMAN,
-        display_name="CLI Local User",
-        role_ids=("rl_admin", "rl_rgm"),
-        domain_scopes=(),
-        max_runtime_mode="local_single_user_safe",
-        is_active=True,
-    )
-    denial = authority.activate_runtime_mode(mode_name, local_principal, reason)
+    denial = authority.activate_runtime_mode(mode_name, principal, reason)
     if denial:
         return f"Runtime mode activation denied: {denial}"
-    return f"Runtime mode activated: {mode_name}"
+    return (
+        f"Runtime mode activated: {mode_name}\n"
+        f"Acting principal: {principal.principal_id} ({principal.display_name})"
+    )
 
 
 def handle_runtime_mode_disable(command: str, *, workspace_root: str | Path = ".") -> str:
     reason = ""
+    explicit_principal = None
     parts = shlex.split(command)
     if "--reason" in parts:
         ridx = parts.index("--reason")
         if ridx + 1 < len(parts):
             reason = parts[ridx + 1]
+    if "--as" in parts:
+        aidx = parts.index("--as")
+        if aidx + 1 < len(parts):
+            explicit_principal = parts[aidx + 1]
+    principal, err = resolve_local_principal(workspace_root, explicit_principal)
+    if principal is None:
+        return f"Runtime mode disable denied: {err}"
     store = SQLiteStore(workspace_root)
-    _ensure_runtime_gate_manager_role(store)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    local_principal = Principal(
-        principal_id="cli_local",
-        principal_type=PrincipalType.HUMAN,
-        display_name="CLI Local User",
-        role_ids=("rl_admin", "rl_rgm"),
-        domain_scopes=(),
-        max_runtime_mode="local_single_user_safe",
-        is_active=True,
-    )
-    denial = authority.disable_runtime_mode(local_principal, reason)
+    denial = authority.disable_runtime_mode(principal, reason)
     if denial:
         return f"Runtime mode disable denied: {denial}"
-    return "Runtime mode disabled. Reverted to development_preview."
+    return (
+        "Runtime mode disabled. Reverted to development_preview.\n"
+        f"Acting principal: {principal.principal_id} ({principal.display_name})"
+    )
 
 
 def handle_capability_gates(*, workspace_root: str | Path = ".") -> str:
@@ -2026,10 +2036,11 @@ def handle_capability_gate_detail(command: str, *, workspace_root: str | Path = 
 def handle_capability_gate_enable(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     if len(parts) < 4:
-        return "Usage: /capability-gate enable <capability> --state <state> [--reason <reason>]"
+        return "Usage: /capability-gate enable <capability> --state <state> [--reason <reason>] [--as <principal_id>]"
     capability = parts[2]
     target_state = ""
     reason = ""
+    explicit_principal = None
     if "--state" in parts:
         sidx = parts.index("--state")
         if sidx + 1 < len(parts):
@@ -2038,54 +2049,55 @@ def handle_capability_gate_enable(command: str, *, workspace_root: str | Path = 
         ridx = parts.index("--reason")
         if ridx + 1 < len(parts):
             reason = parts[ridx + 1]
+    if "--as" in parts:
+        aidx = parts.index("--as")
+        if aidx + 1 < len(parts):
+            explicit_principal = parts[aidx + 1]
     if not target_state:
-        return "Usage: /capability-gate enable <capability> --state <state> [--reason <reason>]"
+        return "Usage: /capability-gate enable <capability> --state <state> [--reason <reason>] [--as <principal_id>]"
+    principal, err = resolve_local_principal(workspace_root, explicit_principal)
+    if principal is None:
+        return f"Capability transition denied: {err}"
     store = SQLiteStore(workspace_root)
-    _ensure_runtime_gate_manager_role(store)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    local_principal = Principal(
-        principal_id="cli_local",
-        principal_type=PrincipalType.HUMAN,
-        display_name="CLI Local User",
-        role_ids=("rl_admin", "rl_rgm"),
-        domain_scopes=(),
-        max_runtime_mode="local_single_user_safe",
-        is_active=True,
-    )
-    denial = authority.request_capability_transition(capability, target_state, local_principal, reason)
+    denial = authority.request_capability_transition(capability, target_state, principal, reason)
     if denial:
         return f"Capability transition denied: {denial}"
-    return f"Capability '{capability}' transitioned to state '{target_state}'."
+    return (
+        f"Capability '{capability}' transitioned to state '{target_state}'.\n"
+        f"Acting principal: {principal.principal_id} ({principal.display_name})"
+    )
 
 
 def handle_capability_gate_disable(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     if len(parts) < 3:
-        return "Usage: /capability-gate disable <capability> [--reason <reason>]"
+        return "Usage: /capability-gate disable <capability> [--reason <reason>] [--as <principal_id>]"
     capability = parts[2]
     reason = ""
+    explicit_principal = None
     if "--reason" in parts:
         ridx = parts.index("--reason")
         if ridx + 1 < len(parts):
             reason = parts[ridx + 1]
+    if "--as" in parts:
+        aidx = parts.index("--as")
+        if aidx + 1 < len(parts):
+            explicit_principal = parts[aidx + 1]
+    principal, err = resolve_local_principal(workspace_root, explicit_principal)
+    if principal is None:
+        return f"Capability disable denied: {err}"
     store = SQLiteStore(workspace_root)
-    _ensure_runtime_gate_manager_role(store)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
-    local_principal = Principal(
-        principal_id="cli_local",
-        principal_type=PrincipalType.HUMAN,
-        display_name="CLI Local User",
-        role_ids=("rl_admin", "rl_rgm"),
-        domain_scopes=(),
-        max_runtime_mode="local_single_user_safe",
-        is_active=True,
-    )
-    denial = authority.request_capability_transition(capability, "disabled", local_principal, reason)
+    denial = authority.request_capability_transition(capability, "disabled", principal, reason)
     if denial:
         return f"Capability disable denied: {denial}"
-    return f"Capability '{capability}' disabled."
+    return (
+        f"Capability '{capability}' disabled.\n"
+        f"Acting principal: {principal.principal_id} ({principal.display_name})"
+    )
 
 
 def handle_runtime_readiness(*, workspace_root: str | Path = ".") -> str:
@@ -2096,6 +2108,11 @@ def handle_runtime_readiness(*, workspace_root: str | Path = ".") -> str:
     mode = authority.get_runtime_mode()
     mode_name = mode.get("mode_name", "development_preview")
     mode_status = mode.get("status", "inactive")
+
+    owner_bootstrapped = check_owner_bootstrapped(workspace_root)
+    acting_principal_available = check_acting_principal_available(workspace_root)
+    gate_manager_available = check_runtime_gate_manager_available(workspace_root)
+
     enabled_caps: list[str] = []
     disabled_caps: list[str] = []
     policy_gated_caps: list[str] = []
@@ -2108,9 +2125,56 @@ def handle_runtime_readiness(*, workspace_root: str | Path = ".") -> str:
             policy_gated_caps.append(cap)
         else:
             disabled_caps.append(cap)
+
+    dangerous_caps_disabled = True
+    dangerous_caps = {
+        "shell_execution", "process_execution", "network_execution",
+        "web_fetch", "email_runtime", "calendar_runtime", "finance_runtime",
+        "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
+        "cctv_runtime", "home_security_runtime", "plugin_execution_cap",
+        "plugin_install", "external_channel_runtime", "channel_approval_relay",
+        "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
+        "approval_execution_relay", "scheduled_routines", "graph_indexing_runtime",
+        "semantic_memory_runtime", "vector_embedding_runtime",
+        "hosted_model_runtime", "private_network_model_runtime",
+    }
+    for cap in dangerous_caps:
+        gate = authority.get_effective_capability_gate(cap)
+        if gate["state"] not in ("disabled", "planned"):
+            dangerous_caps_disabled = False
+            break
+
+    production_ready = (
+        owner_bootstrapped
+        and mode_name in ("local_single_user_runtime", "local_single_user_safe")
+        and mode_status == "active"
+        and gate_manager_available
+        and acting_principal_available
+        and dangerous_caps_disabled
+    )
+
+    writer.append(make_event(
+        turn_id=None,
+        session_id="authz",
+        event_type="runtime_readiness_checked",
+        actor="system",
+        payload={
+            "current_runtime_mode": mode_name,
+            "runtime_mode_status": mode_status,
+            "owner_bootstrapped": owner_bootstrapped,
+            "acting_principal_available": acting_principal_available,
+            "runtime_gate_manager_available": gate_manager_available,
+            "dangerous_capabilities_disabled": dangerous_caps_disabled,
+            "production_ready_local_single_user_runtime": production_ready,
+        },
+    ))
+
     lines = [
         f"Current runtime mode: {mode_name}",
         f"Runtime mode status: {mode_status}",
+        f"Owner bootstrapped: {owner_bootstrapped}",
+        f"Acting principal available: {acting_principal_available}",
+        f"Runtime gate manager available: {gate_manager_available}",
         f"Enabled capabilities ({len(enabled_caps)}):",
     ]
     if enabled_caps:
@@ -2129,15 +2193,29 @@ def handle_runtime_readiness(*, workspace_root: str | Path = ".") -> str:
         lines.append(f"  - {c}")
     lines.append("")
     lines.append("Readiness blockers:")
+    blockers = []
+    if not owner_bootstrapped:
+        blockers.append("Owner not bootstrapped. Run /bootstrap-owner first.")
     if mode_name == "development_preview":
-        lines.append("  - Runtime mode is development_preview")
+        blockers.append("Runtime mode is development_preview")
     if mode_status == "inactive":
-        lines.append("  - Runtime mode is inactive")
-    lines.append("  - Approval execution relay remains metadata-only/deferred")
-    lines.append("  - Shell/network/plugin/remote/container/cloud remain disabled")
-    lines.append("  - Email/calendar/finance/medical/CCTV remain disabled")
+        blockers.append("Runtime mode is inactive")
+    if not gate_manager_available:
+        blockers.append("No runtime_gate_manager principal available")
+    if not acting_principal_available:
+        blockers.append("No acting principal available")
+    if not dangerous_caps_disabled:
+        blockers.append("Some dangerous capabilities are not disabled")
+    blockers.append("Approval execution relay remains metadata-only/deferred")
+    blockers.append("Shell/network/plugin/remote/container/cloud remain disabled")
+    blockers.append("Email/calendar/finance/medical/CCTV remain disabled")
+    if not blockers:
+        lines.append("  (none)")
+    else:
+        for b in blockers:
+            lines.append(f"  - {b}")
     lines.append("")
-    lines.append("production_ready_local_single_user_runtime: false")
+    lines.append(f"production_ready_local_single_user_runtime: {str(production_ready).lower()}")
     return "\n".join(lines)
 
 
@@ -2360,6 +2438,95 @@ def handle_export_command(command: str, *, workspace_root: str | Path = ".") -> 
     return "\n".join(lines)
 
 
+def handle_bootstrap_owner(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) < 3:
+        return (
+            "Usage: /bootstrap-owner <user_id> --display <name> [--email <email>]\n"
+            "Recovery: /bootstrap-owner --recover <user_id> --display <name> [--email <email>] "
+            "--reason <reason> --confirm-local-recovery [--force-recover]"
+        )
+
+    is_recovery = "--recover" in parts
+    user_id = ""
+    display_name = ""
+    email = None
+    force_recover = False
+    confirm_recovery = False
+    recovery_reason = ""
+
+    if is_recovery:
+        idx = parts.index("--recover")
+        rest = parts[idx + 1:]
+        if rest:
+            user_id = rest[0]
+        i = 1 if not rest else 1
+        while i < len(rest):
+            if rest[i] == "--display" and i + 1 < len(rest):
+                display_name = rest[i + 1]
+                i += 2
+            elif rest[i] == "--email" and i + 1 < len(rest):
+                email = rest[i + 1]
+                i += 2
+            elif rest[i] == "--reason" and i + 1 < len(rest):
+                recovery_reason = rest[i + 1]
+                i += 2
+            elif rest[i] == "--confirm-local-recovery":
+                confirm_recovery = True
+                i += 1
+            elif rest[i] == "--force-recover":
+                force_recover = True
+                i += 1
+            else:
+                i += 1
+    else:
+        user_id = parts[1]
+        if user_id.startswith("--"):
+            return (
+                "Usage: /bootstrap-owner <user_id> --display <name> [--email <email>]\n"
+                "Recovery: /bootstrap-owner --recover <user_id> --display <name> [--email <email>] "
+                "--reason <reason> --confirm-local-recovery [--force-recover]"
+            )
+        i = 2
+        while i < len(parts):
+            if parts[i] == "--display" and i + 1 < len(parts):
+                display_name = parts[i + 1]
+                i += 2
+            elif parts[i] == "--email" and i + 1 < len(parts):
+                email = parts[i + 1]
+                i += 2
+            else:
+                i += 1
+
+    if not user_id or not display_name:
+        return "Error: user_id and --display <name> are required."
+
+    return bootstrap_owner(
+        user_id, display_name, email,
+        workspace_root=workspace_root,
+        is_recovery=is_recovery,
+        force_recover=force_recover,
+        confirm_deactivate_old=confirm_recovery,
+        recovery_reason=recovery_reason,
+    )
+
+
+def handle_whoami(*, workspace_root: str | Path = ".") -> str:
+    return get_principal_info(workspace_root)
+
+
+def handle_principals(*, workspace_root: str | Path = ".") -> str:
+    return list_principals_info(workspace_root)
+
+
+def handle_principal_detail(command: str, *, workspace_root: str | Path = ".") -> str:
+    parts = shlex.split(command)
+    if len(parts) < 2:
+        return "Usage: /principal <principal_id>"
+    principal_id = parts[1]
+    return get_principal_detail(principal_id, workspace_root)
+
+
 def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> str:
     command = command.strip()
     if command in {"/quit", "/exit"}:
@@ -2479,6 +2646,14 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_proposals(command, workspace_root=workspace_root)
     if command == "/proposal" or command.startswith("/proposal "):
         return handle_proposal_detail(command, workspace_root=workspace_root)
+    if command == "/bootstrap-owner" or command.startswith("/bootstrap-owner "):
+        return handle_bootstrap_owner(command, workspace_root=workspace_root)
+    if command == "/whoami":
+        return handle_whoami(workspace_root=workspace_root)
+    if command == "/principals":
+        return handle_principals(workspace_root=workspace_root)
+    if command == "/principal" or command.startswith("/principal "):
+        return handle_principal_detail(command, workspace_root=workspace_root)
     if command == "/users":
         return handle_users(workspace_root=workspace_root)
     if command == "/user create" or command.startswith("/user create "):

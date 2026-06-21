@@ -1,3 +1,5 @@
+> runtime_enablement_candidate: completed
+
 # Raiker Full Platform Feature Coverage Matrix
 
 > Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
@@ -27,7 +29,7 @@ A feature must never be marked as merely "future" without a full specification.
 
 Specification status and implementation status are separate: `fully-specified` means the contract is complete enough to build, not that runtime/app behavior is currently shipped. Rows marked `phase-3-build` may still be contract-only, readiness-only, metadata-only, or deferred in the current implementation status column.
 
-Runtime readiness decision: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Approval execution relay remains metadata-only/deferred. Broad runtime execution remains disabled. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Production-ready local single-user runtime: `production_ready_local_single_user_runtime_candidate`.
+Runtime readiness decision: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Approval execution relay remains metadata-only/deferred. Broad runtime execution remains disabled. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Owner bootstrap flow implemented (`/bootstrap-owner`, recovery, tests). Production-ready local single-user runtime: `production_ready_local_single_user_runtime_candidate` (owner bootstrap implemented).
 
 Current backend implementation labels used across the hardening pass:
 

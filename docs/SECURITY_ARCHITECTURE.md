@@ -1,3 +1,5 @@
+> runtime_enablement_candidate: completed
+
 # Security Architecture
 
 Current launchable interface is the plain local terminal client only. Rich/native TUI, desktop, web, dashboard, mobile, IDE, voice, browser extension, and REST/API clients are Phase 8 deferred, specified/deferred, not active runtime.

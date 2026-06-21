@@ -1,3 +1,5 @@
+> runtime_enablement_candidate: completed
+
 # Raiker Architecture Blueprint
 
 > Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
@@ -181,7 +183,7 @@ effective_permissions =
 - **Risk acceptance enforcement**: enforced — one-time risk acceptances are consumed on use; expired, mismatched, or missing acceptances block execution.
 - Runtime readiness: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`.
 - Runtime mode state persisted in `runtime_mode_state` table; capability gate state persisted in `capability_gate_state` table. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation` capability gates; AI cannot activate runtime modes or gates.
-- Production-ready local single-user runtime: `production_ready_local_single_user_runtime_candidate`.
+- Production-ready local single-user runtime: `production_ready_local_single_user_runtime_candidate`. Owner bootstrap flow (`/bootstrap-owner`) implemented; `resolve_local_principal()` replaces synthetic `cli_local` for all production-path principal resolution.
 - Non-goals: approval execution relay remains metadata-only/deferred; broad runtime execution remains disabled.
 
 ---

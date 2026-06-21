@@ -1,3 +1,5 @@
+> runtime_enablement_candidate: completed
+
 # Raiker Contracts
 
 This document defines the implementation contracts that builder agents must follow.

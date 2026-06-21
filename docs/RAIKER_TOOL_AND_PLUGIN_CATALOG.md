@@ -1,3 +1,5 @@
+> runtime_enablement_candidate: completed
+
 # Raiker Tool and Plugin Catalog
 
 > Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
@@ -75,6 +77,10 @@ currently exposes. It is the source of truth checked by `scripts/validate_repo_t
 /capability-gate enable <capability> --state <state> [--reason <reason>]
 /capability-gate disable <capability> [--reason <reason>]
 /runtime-readiness
+/bootstrap-owner [--display <name>] [--email <email>] [--force-recover] [--confirm-local-recovery] [--reason <reason>]
+/whoami
+/principals
+/principal <principal_id>
 /semantic-memory
 /export [--session <session_id>] [--no-redact]
 /export --verify --session <session_id>

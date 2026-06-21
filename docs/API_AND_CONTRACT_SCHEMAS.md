@@ -1,3 +1,5 @@
+> runtime_enablement_candidate: completed
+
 # API And Contract Schemas
 
 This document is the builder-facing schema reference for Raiker. It does not replace `docs/CONTRACTS.md`; it tightens the implementation details that must be reflected in code models, validators, tests, and client adapters.

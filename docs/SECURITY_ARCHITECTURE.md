@@ -1,8 +1,43 @@
 > runtime_enablement_candidate: completed
+> controlled_runtime_mode_activation: implemented
+> local_single_user_production_hardening: implemented
+> production_ready_local_single_user_runtime: ready
 
 # Security Architecture
 
 Current launchable interface is the plain local terminal client only. Rich/native TUI, desktop, web, dashboard, mobile, IDE, voice, browser extension, and REST/API clients are Phase 8 deferred, specified/deferred, not active runtime.
+
+## Local single-user production readiness
+
+The local single-user runtime is production-ready because privileged local actions require persisted human authority and RuntimeAuthority enforcement.
+
+### Owner bootstrap trust boundary
+
+- First-run owner bootstrap creates a persisted owner principal, user, and role in the SQLite store.
+- The owner principal is persisted in the `principals` table with role `rl_owner`, `rl_admin`, `rl_rgm`, `rl_approver`.
+- The `runtime_gate_manager` role (`rl_rgm`) is created during bootstrap as a system role.
+- All production-path CLI commands use `resolve_local_principal()` to resolve the acting principal, which validates principal existence, active status, and human-only role requirements.
+- AI principals are denied at the authority level from activating runtime modes or changing capability gate state.
+- Runtime mode state is persisted in the `runtime_mode_state` table.
+- Capability gate state is persisted in the `capability_gate_state` table.
+- Recovery/break-glass flow (`--force-recover`) is supported and audited via events.
+- All privileged mutations generate audit events (owner_bootstrap_created, runtime_mode_activated, capability_gate_enabled, etc.).
+
+### Deferred execution domains
+
+The following remain disabled/deferred and are not covered by the local production readiness declaration:
+- Approval execution relay
+- Shell/process execution
+- Network/web fetch
+- Plugin execution
+- Graph/codemap runtime indexing
+- Semantic/vector writes
+- External channels
+- Remote/container/cloud execution
+- Hosted routines/schedulers
+- Desktop/web/mobile/dashboard/ide/api runtime clients
+
+---
 
 ## Backend Posture
 

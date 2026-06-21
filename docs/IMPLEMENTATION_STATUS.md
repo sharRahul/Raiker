@@ -1,4 +1,7 @@
 > runtime_enablement_candidate: completed
+> controlled_runtime_mode_activation: implemented
+> local_single_user_production_hardening: implemented
+> production_ready_local_single_user_runtime: ready
 
 # Implementation Status
 
@@ -44,6 +47,7 @@ Current high-signal truth:
 ### Enforcement status
 
 - Runtime readiness decision: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`.
+- `production_ready_local_single_user_runtime`: `ready` — see validation evidence below.
 - strict non-allow blocking: enforced — `_govern_admin_mutation` blocks on all non-allow decisions (`deny`, `needs_approval`, `needs_risk_acceptance`, `needs_human_confirmation`, `disabled_by_capability_gate`).
 - role revoke governed: enforced — routes through `_govern_admin_mutation` / RuntimeAuthority before mutation.
 - capability gate per action: enforced — `RuntimeAuthority.check_capability_gate()` checks the relevant gate for each governed action and returns `disabled_by_capability_gate` when the gate is disabled.
@@ -62,7 +66,8 @@ Current high-signal truth:
 - **Human-only activation**: `runtime_gate_manager` role (human-only) can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation` capability gates. AI principals cannot activate runtime modes or capability gates.
 - **Tests**: `tests/test_runtime_mode_activation.py`, `tests/test_capability_gate_persistence.py`, `tests/test_runtime_authority_mode_gate.py`.
 - **Owner bootstrap flow**: `implemented_verified` — `/bootstrap-owner` creates owner principal, role, events; recovery flow with `--force-recover` supported; `resolve_local_principal()` replaces synthetic `cli_local` for all production-path principal resolution. Tests: `tests/test_local_single_user_runtime.py`.
-- **Production-ready local single-user runtime**: `production_ready_local_single_user_runtime_candidate` — owner bootstrap flow implemented and verified; activation mechanism is implemented and persisted, but production readiness validation remains a separate milestone.
+- **Local single-user production hardening**: `implemented_verified` — first-run owner bootstrap, persisted owner principal, acting-principal resolution, runtime-gate-manager authorization, recovery/break-glass flow, AI principal denial for runtime mode/capability gate changes.
+- **Production-ready local single-user runtime**: `ready` — all production readiness criteria completed and validated. See validation evidence below.
 - **Deferred runtimes** remain disabled. **Approval execution relay** remains metadata-only/deferred. All 47 capabilities remain default-disabled.
 
 ---
@@ -99,6 +104,19 @@ none of them change the validator-required Phase 1/2/3 markers below.
 
 These do not activate or disable any runtime capability; they correct the *claimed* maturity only.
 Close them via named phase tasks with tests before marking any `implemented_verified`.
+
+## Validation evidence for production_ready_local_single_user_runtime
+
+```text
+ruff: passed
+mypy: passed
+pytest: 790 passed, 2 skipped
+validate_phase_status: passed
+validate_repo_truthfulness: passed
+validate_runtime_enablement_readiness: passed
+validate_local_single_user_runtime: passed
+compileall: passed
+```
 
 ### Phase 1/2 runtime maturity update (context gathering + verifier)
 

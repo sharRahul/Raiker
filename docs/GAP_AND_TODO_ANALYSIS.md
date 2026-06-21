@@ -1,4 +1,7 @@
 > runtime_enablement_candidate: completed
+> controlled_runtime_mode_activation: implemented
+> local_single_user_production_hardening: implemented
+> production_ready_local_single_user_runtime: ready
 
 # Gap & TODO Analysis
 
@@ -13,7 +16,18 @@ It replaces the older `REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md`. It separates two 
 
 The implementation control ledger is `docs/IMPLEMENTATION_STATUS.md`; this file only tracks gaps.
 
-Backend hardening note (2026-06-21): direct CLI durable-memory mutation bypass is closed via `_govern_admin_mutation`; Runtime Authority / Action Router governs all mutation actions through capability gates, policy engine, risk classification, approval/risk acceptance, and event logging; AI-executable roles, human-only protections, and domain scopes are enforced at the authority level. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Runtime readiness: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Approval resolution is metadata-only; runtime execution remains disabled; stale `/sessions` documentation is treated as a documentation gap until a safe read-only command is intentionally implemented.
+Backend hardening note (2026-06-21): direct CLI durable-memory mutation bypass is closed via `_govern_admin_mutation`; Runtime Authority / Action Router governs all mutation actions through capability gates, policy engine, risk classification, approval/risk acceptance, and event logging; AI-executable roles, human-only protections, and domain scopes are enforced at the authority level. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Runtime readiness: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Approval resolution is metadata-only; runtime execution remains disabled.
+
+Completed items (no longer active gaps):
+- strict runtime enforcement — completed
+- controlled runtime mode activation — implemented
+- persisted runtime mode state — implemented
+- persisted capability gate state — implemented
+- owner bootstrap — implemented and verified
+- persisted owner principal — implemented
+- acting principal resolution — implemented
+- local single-user production hardening — implemented
+- production_ready_local_single_user_runtime — ready
 
 ---
 

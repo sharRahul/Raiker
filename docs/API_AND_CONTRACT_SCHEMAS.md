@@ -1,4 +1,7 @@
 > runtime_enablement_candidate: completed
+> controlled_runtime_mode_activation: implemented
+> local_single_user_production_hardening: implemented
+> production_ready_local_single_user_runtime: ready
 
 # API And Contract Schemas
 
@@ -490,3 +493,52 @@ Validation commands: `python -m pytest`, `python -m ruff check .`, and `python -
 Raiker uses `httpx.AsyncClient` for async model transport and does not use the OpenAI SDK or Pydantic. FastAPI, LangChain, and LlamaIndex are deferred because no governed API, agent-framework, or retrieval integration is implemented in this change. llama.cpp is local-first through the async OpenAI-compatible path; Ollama, LM Studio, vLLM, generic endpoints, and OpenRouter are OpenAI-compatible profiles. OpenRouter is hosted and policy-gated. The deterministic provider is test-only, and production does not fall back to deterministic providers or silently switch from local to hosted providers.
 
 Event/status labels distinguish `implemented_verified`, `implemented_unverified`, `offline_mock_verified`, `profile_defined_only`, `policy_gated_disabled`, `test_only`, and `specified_not_implemented`. Emitted model events must contain only safe metadata: provider, profile_id, model, endpoint_kind, duration_ms, finish_reason, tool_call_count, text_length, usage summary, error_class, safe_error_code, capability booleans, and reasoning settings. Raw prompts, completions, streamed chunks, Authorization headers, API keys, file contents, and tool outputs are not event payload material.
+
+## Runtime mode state schema
+
+The `runtime_mode_state` table stores the current runtime mode:
+
+| Column | Type | Description |
+|---|---|---|
+| `mode_name` | TEXT | Runtime mode identifier (`local_single_user_runtime`, `deferred_runtime`, etc.) |
+| `status` | TEXT | Current status (`active`, `inactive`) |
+| `activated_by` | TEXT | Principal ID that activated the mode |
+| `activated_at` | TEXT | ISO 8601 UTC timestamp of activation |
+| `reason` | TEXT | Reason provided during activation |
+
+## Capability gate state schema
+
+The `capability_gate_state` table stores the state of each capability gate:
+
+| Column | Type | Description |
+|---|---|---|
+| `capability` | TEXT | Capability identifier |
+| `state` | TEXT | Gate state (`default_disabled`, `enabled_policy_gated`, `enabled_audited`, etc.) |
+| `enabled_by` | TEXT | Principal ID that changed the state |
+| `enabled_at` | TEXT | ISO 8601 UTC timestamp of change |
+| `reason` | TEXT | Reason provided during state change |
+
+## Persisted principal contract
+
+Owner bootstrap creates a persisted principal with:
+
+- `principal_id`: assigned by the system
+- `user_id`: references the created user
+- `principal_type`: `human`
+- `role_ids`: `rl_owner`, `rl_admin`, `rl_rgm`, `rl_approver`
+- `display_name`: provided by the user
+- `is_active`: `true`
+- Events: `owner_bootstrap_requested`, `owner_bootstrap_created`
+
+## Runtime-readiness output contract
+
+The `/runtime-readiness` command returns:
+
+- `current runtime mode`: the active runtime mode name
+- `runtime mode status`: `active` or `inactive`
+- `owner bootstrapped`: `True` or `False`
+- `acting principal available`: `True` or `False`
+- `runtime gate manager available`: `True` or `False`
+- `dangerous capabilities disabled`: `True` or `False`
+- `production_ready_local_single_user_runtime`: `True` or `False`
+- List of currently activated capability gates (if any)

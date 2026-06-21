@@ -1,4 +1,7 @@
 > runtime_enablement_candidate: completed
+> controlled_runtime_mode_activation: implemented
+> local_single_user_production_hardening: implemented
+> production_ready_local_single_user_runtime: ready
 
 # Raiker Full Platform Feature Coverage Matrix
 
@@ -29,7 +32,7 @@ A feature must never be marked as merely "future" without a full specification.
 
 Specification status and implementation status are separate: `fully-specified` means the contract is complete enough to build, not that runtime/app behavior is currently shipped. Rows marked `phase-3-build` may still be contract-only, readiness-only, metadata-only, or deferred in the current implementation status column.
 
-Runtime readiness decision: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Approval execution relay remains metadata-only/deferred. Broad runtime execution remains disabled. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Owner bootstrap flow implemented (`/bootstrap-owner`, recovery, tests). Production-ready local single-user runtime: `production_ready_local_single_user_runtime_candidate` (owner bootstrap implemented).
+Runtime readiness decision: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Approval execution relay remains metadata-only/deferred. Broad runtime execution remains disabled. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Owner bootstrap flow implemented (`/bootstrap-owner`, recovery, tests). Local single-user production hardening implemented: first-run owner bootstrap, persisted owner principal, acting-principal resolution, runtime-gate-manager authorization. Production-ready local single-user runtime: `ready`. Current production readiness applies only to local single-user runtime.
 
 Current backend implementation labels used across the hardening pass:
 
@@ -192,4 +195,14 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Browser extension | Specified/deferred. | No | None. | Define extension boundary after explicit activation scope. |
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
 | REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
+
+## Current limitations
+
+- Approval execution relay remains metadata-only/deferred.
+- Shell/process/network/web-fetch runtime remains disabled/deferred.
+- Plugin execution remains disabled/deferred.
+- Remote/container/cloud runtime remains disabled/deferred.
+- Email/calendar/finance/medical/CCTV runtime remains disabled/deferred.
+- Hosted/multi-user/cloud runtime is future implementation work.
+- Current production readiness applies only to local single-user runtime.
 

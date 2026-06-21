@@ -1,4 +1,7 @@
 > runtime_enablement_candidate: completed
+> controlled_runtime_mode_activation: implemented
+> local_single_user_production_hardening: implemented
+> production_ready_local_single_user_runtime: ready
 
 # Raiker Tool and Plugin Catalog
 
@@ -27,7 +30,7 @@ Approval resolution is metadata-only. `/approve` and `/deny` do not execute acti
 
 ## Runtime Authority Governance
 
-All mutation commands route through the `RuntimeAuthority` (`raiker/runtime/authority/router.py`) via `_govern_admin_mutation`. The authority chain enforces principal validity, domain scoping, AI role restrictions, human-only role protections, risk classification, risk acceptance validation, strict non-allow blocking (all non-allow decisions block mutation), capability gate per action (each governed action checks its relevant gate), role revoke governed (routes through `_govern_admin_mutation` before mutation). Runtime readiness: `runtime_enablement_candidate`.
+All mutation commands route through the `RuntimeAuthority` (`raiker/runtime/authority/router.py`) via `_govern_admin_mutation`. The authority chain enforces principal validity, domain scoping, AI role restrictions, human-only role protections, risk classification, risk acceptance validation, strict non-allow blocking (all non-allow decisions block mutation), capability gate per action (each governed action checks its relevant gate), role revoke governed (routes through `_govern_admin_mutation` before mutation). Runtime readiness: `runtime_enablement_candidate`. Production-ready local single-user runtime: `ready`.
 
 ---
 
@@ -81,6 +84,25 @@ currently exposes. It is the source of truth checked by `scripts/validate_repo_t
 /whoami
 /principals
 /principal <principal_id>
+
+### Command details
+
+| Command | Status | Risk level | Authority path | State mutation | Owner/RGM required | Available before bootstrap |
+|---|---|---|---|---|---|---|
+| `/bootstrap-owner` | implemented | low | creates owner principal/role; direct store write | inserts user, principal, role rows; appends events | N/A (bootstraps owner) | yes |
+| `/bootstrap-owner --force-recover` | implemented | critical | validates force-recover flag; deactivates old owner; creates new owner | deactivates old principal; creates new principal; appends events | human at console | yes |
+| `/whoami` | implemented | low | resolve_local_principal → reads current principal | read-only | no | after bootstrap |
+| `/principals` | implemented | low | resolve_local_principal → reads principal list | read-only | no | after bootstrap |
+| `/principal <id>` | implemented | low | resolve_local_principal → reads specific principal | read-only | no | after bootstrap |
+| `/runtime-mode status` | implemented | low | RuntimeAuthority.get_runtime_mode() | read-only | no | after bootstrap |
+| `/runtime-mode activate` | implemented | high | RuntimeAuthority.activate_runtime_mode(); persisted in runtime_mode_state table | sets mode_name, status, activated_by, activated_at, reason; appends event | owner or rl_rgm | after bootstrap |
+| `/runtime-mode disable` | implemented | high | RuntimeAuthority.deactivate_runtime_mode(); persisted in runtime_mode_state table | sets status=inactive; appends event | owner or rl_rgm | after bootstrap |
+| `/capability-gates` | implemented | low | RuntimeAuthority.list_capability_gates() | read-only | no | after bootstrap |
+| `/capability-gate <cap>` | implemented | low | RuntimeAuthority.get_effective_capability_gate() | read-only | no | after bootstrap |
+| `/capability-gate enable` | implemented | high | RuntimeAuthority.enable_capability_gate(); persisted in capability_gate_state table | sets gate state; appends event | owner or rl_rgm | after bootstrap |
+| `/capability-gate disable` | implemented | high | RuntimeAuthority.disable_capability_gate(); persisted in capability_gate_state table | sets gate state; appends event | owner or rl_rgm | after bootstrap |
+| `/runtime-readiness` | implemented | low | reads runtime mode, owner status, gate manager, principal, dangerous gates | read-only | no | after bootstrap |
+
 /semantic-memory
 /export [--session <session_id>] [--no-redact]
 /export --verify --session <session_id>

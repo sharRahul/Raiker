@@ -1,4 +1,7 @@
 > runtime_enablement_candidate: completed
+> controlled_runtime_mode_activation: implemented
+> local_single_user_production_hardening: implemented
+> production_ready_local_single_user_runtime: ready
 
 # Raiker Contracts
 
@@ -412,3 +415,27 @@ Minimum tests:
 - denied action produces no tool execution;
 - completed turn writes checkpoint;
 - interface/client identity is preserved in events and responses.
+
+## Runtime mode activation contract
+
+- Command: `/runtime-mode activate <mode> --as <principal_id> --reason <reason>`
+- Authority: `RuntimeAuthority.activate_runtime_mode()`
+- Persistence: `runtime_mode_state` SQLite table
+- Gate: `runtime_gate_manager` role required
+- Events: `runtime_mode_activated`
+
+## Capability gate transition contract
+
+- Command: `/capability-gate enable <capability> --state <state> --as <principal_id> --reason <reason>`
+- Authority: `RuntimeAuthority.enable_capability_gate()`
+- Persistence: `capability_gate_state` SQLite table
+- Gate: `runtime_gate_manager` role required
+- Events: `capability_gate_enabled`, `capability_gate_disabled`
+
+## Principal resolution contract
+
+- CLI handler: `resolve_local_principal(workspace_root)`
+- Behavior: loads owner principal from SQLite store; validates active status, human-only role, single match
+- Returns: `(principal, error_message)` tuple
+- On failure: returns `(None, "denied: <reason>")` — no fallback to synthetic principal
+- Audit: events `principal_resolved` and `principal_resolution_failed`

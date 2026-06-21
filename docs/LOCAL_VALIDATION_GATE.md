@@ -1,4 +1,7 @@
 > runtime_enablement_candidate: completed
+> controlled_runtime_mode_activation: implemented
+> local_single_user_production_hardening: implemented
+> production_ready_local_single_user_runtime: ready
 
 # Local Validation Gate while hosted CI quota is unreliable
 
@@ -31,6 +34,8 @@ python -m pytest
 python scripts/validate_phase_status.py
 python scripts/validate_repo_truthfulness.py
 python scripts/validate_runtime_enablement_readiness.py
+python scripts/validate_local_single_user_runtime.py
+python scripts/validate_documentation_truthfulness.py
 python -m compileall raiker
 raiker --workspace . --prompt "status"
 raiker --workspace . --prompt "/status"

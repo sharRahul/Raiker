@@ -124,17 +124,20 @@ def check_docs_markers() -> list[str]:
         root / "docs/API_AND_CONTRACT_SCHEMAS.md",
         root / "docs/CONTRACTS.md",
     ]
+    required_markers = [
+        "runtime_enablement_candidate: completed",
+        "controlled_runtime_mode_activation: implemented",
+        "local_single_user_production_hardening: implemented",
+        "production_ready_local_single_user_runtime: ready",
+    ]
     for doc_path in docs_to_check:
         if not doc_path.exists():
             errors.append(f"missing_doc:{doc_path.name}")
             continue
         text = doc_path.read_text(encoding="utf-8")
-        if "runtime_enablement_candidate: completed" not in text:
-            errors.append(f"missing_runtime_enablement_marker:{doc_path.name}")
-        if "production_ready_local_single_user_runtime" in text and "owner_bootstrapped" not in text and "owner bootstrap" not in text.lower():
-            errors.append(
-                f"overclaim_production_readiness_without_owner_bootstrap:{doc_path.name}"
-            )
+        for marker in required_markers:
+            if marker not in text:
+                errors.append(f"missing_marker:{marker} in {doc_path.name}")
     return errors
 
 

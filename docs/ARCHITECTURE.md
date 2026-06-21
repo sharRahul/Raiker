@@ -1,4 +1,7 @@
 > runtime_enablement_candidate: completed
+> controlled_runtime_mode_activation: implemented
+> local_single_user_production_hardening: implemented
+> production_ready_local_single_user_runtime: ready
 
 # Raiker Architecture Blueprint
 
@@ -183,7 +186,7 @@ effective_permissions =
 - **Risk acceptance enforcement**: enforced — one-time risk acceptances are consumed on use; expired, mismatched, or missing acceptances block execution.
 - Runtime readiness: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`.
 - Runtime mode state persisted in `runtime_mode_state` table; capability gate state persisted in `capability_gate_state` table. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation` capability gates; AI cannot activate runtime modes or gates.
-- Production-ready local single-user runtime: `production_ready_local_single_user_runtime_candidate`. Owner bootstrap flow (`/bootstrap-owner`) implemented; `resolve_local_principal()` replaces synthetic `cli_local` for all production-path principal resolution.
+- Production-ready local single-user runtime: `ready`. Owner bootstrap flow (`/bootstrap-owner`) implemented; `resolve_local_principal()` replaces synthetic `cli_local` for all production-path principal resolution.
 - Non-goals: approval execution relay remains metadata-only/deferred; broad runtime execution remains disabled.
 
 ---

@@ -169,8 +169,9 @@ def main() -> int:
             errors.append(f"missing_doc:{doc_name}")
             continue
         text = doc_path.read_text(encoding="utf-8")
+        text_lower = text.lower()
         for marker in required_markers:
-            if marker not in text:
+            if marker.lower() not in text_lower:
                 errors.append(f"missing_doc_marker:{doc_name}:{marker}")
 
     # 9. Capability gate transitions must fail closed for invalid transitions

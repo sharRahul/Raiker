@@ -71,20 +71,65 @@ Inside the client, `/help` lists commands. The full CLI command surface is docum
 ---
 
 > runtime_enablement_candidate: completed
+> controlled_runtime_mode_activation: implemented
+> local_single_user_production_hardening: implemented
+> production_ready_local_single_user_runtime: ready
 
 ## Project Status
 
+Raiker now has a **production-ready local single-user runtime foundation** with persisted owner bootstrap, acting-principal resolution, governed runtime mode activation, governed capability gate transitions, strict RuntimeAuthority enforcement, audit events, validators, and end-to-end tests.
+
 The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) — read it before implementing anything. In summary:
+
+### Readiness table
+
+| Area | Status | Scope |
+|---|---|---|
+| Runtime enablement candidate | Completed | Strict non-allow blocking, role revoke governed, capability gate per action, risk acceptance, validator coverage |
+| Controlled runtime mode activation | Implemented | Runtime mode state and capability gate state are persisted, governed, auditable, and reversible |
+| Local single-user production hardening | Implemented | First-run owner bootstrap, persisted owner principal, acting-principal resolution, runtime-gate-manager authorization, recovery flow |
+| `production_ready_local_single_user_runtime` | Ready | Local single-user terminal/runtime foundation |
+| Approval execution relay | Deferred | `/approve` and `/deny` remain metadata-only |
+| Shell/network/plugin/remote/container/cloud execution | Disabled/deferred | Future runtime capability work |
+| Email/calendar/finance/medical/CCTV runtime | Disabled/deferred | Future runtime capability work |
+| Hosted/multi-user/cloud runtime | Future phase | Local single-user readiness does not cover hosted or multi-user deployment |
+
+### Production-ready local runtime criteria (completed)
+
+1. First-run owner bootstrap exists.
+2. Owner bootstrap creates persisted user, principal, and roles.
+3. Runtime/capability gate changes require persisted owner or `runtime_gate_manager` authority.
+4. Synthetic CLI runtime-gate-manager authority is removed from production paths.
+5. Acting principal resolution is implemented.
+6. Owner recovery/break-glass flow is implemented and audited.
+7. AI principals cannot activate runtime modes or capability gates.
+8. `admin_mutation` and `role_mutation` remain disabled by default and require explicit owner/gate-manager activation.
+9. Deferred dangerous runtimes remain disabled.
+10. Runtime/capability transitions are reversible.
+11. Runtime-readiness command reports local production readiness accurately.
+12. Validators prevent production-readiness overclaims.
+13. End-to-end local runtime workflow is tested.
+14. Broad runtime execution remains deferred capability work.
+
+### Current limitations
+
+- Approval execution relay remains metadata-only/deferred.
+- Shell/process/network/web-fetch runtime remains disabled/deferred.
+- Plugin execution remains disabled/deferred.
+- Remote/container/cloud runtime remains disabled/deferred.
+- Email/calendar/finance/medical/CCTV runtime remains disabled/deferred.
+- Hosted/multi-user/cloud runtime is future implementation work.
+- Current production readiness applies only to local single-user runtime.
+
+### Detailed status
 
 - **All Phase 3 slices A through P are implemented, tested, and documented.** Phase 3 is `implemented_verified` only for the **safe foundation/readiness slices A-P**, and **Phase 4 memory MVP is implemented**.
 - The **current launchable UI is the plain local terminal client only**. **Rich/native TUI/Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred**: specified but not implemented as launchable apps.
-- **Runtime execution remains disabled.** Plugin execution, graph/codemap indexing, semantic/vector memory writes, embeddings, approval execution, external channels, notifications, subagents, multi-agent teams, and remote/container/cloud execution are intentionally off; the readiness/preview surfaces for them are metadata-only and must not silently activate runtime.
 - **Approval resolution is metadata-only.** `/approve` and `/deny` update one pending approval record and do not execute the approved action. Approval execution relay remains disabled/deferred.
 - **Durable memory mutation is broker-governed.** `/memory-store` and `/memory-forget` are approval-required brokered requests by default; secret/credential-like content is denied before approval creation, and no CLI path bypasses policy or event logging.
 - **Backend capability labels are explicit:** `implemented_read_only`, `implemented_policy_gated`, `implemented_approval_required`, `metadata_only`, `readiness_only`, `dry_run_only`, `contract_only`, `disabled_deferred`, and `test_only`.
 - **Runtime Authority / Action Router** (`raiker/runtime/authority/`) governs all mutation actions through capability gates, policy engine, risk classification, approval/risk acceptance, and event logging. It enforces four AI-executable roles (`assistant`, `automation`, `operator`, `developer`), seven human-only roles, 16 domain scopes, and risk acceptance with expiry.
 - **Capability registry** is expanded to 47 capabilities across all domain runtimes, all default-disabled. The `ALL_CAPABILITIES` and `RUNTIME_DOMAIN_CAPABILITIES` sets are defined in `raiker/phase_gates.py`.
-- **Current runtime readiness: `runtime_enablement_candidate`** — strict non-allow blocking, role revoke governed, and capability gate per action are now enforced. **Controlled runtime mode activation is implemented** — runtime mode and capability gate state are persisted; human runtime-gate-manager can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation` via governed transitions; AI cannot activate runtime modes or capability gates. All 47 capabilities remain default-disabled; deferred runtimes remain disabled. Approval execution relay remains metadata-only/deferred. `production_ready_local_single_user_runtime: false`. Owner bootstrap flow (`/bootstrap-owner`) is implemented with recovery support; `resolve_local_principal()` is used for all production-path principal resolution.
 - Phases 5–7 add governed-enterprise, channel/subagent/remote, and runtime-feature metadata/readiness foundations. Phase 8 is the planned UI/client implementation phase. Phase 9 covers advanced memory/graph foundations. Capabilities still needing implementation are tracked in [`docs/GAP_AND_TODO_ANALYSIS.md`](docs/GAP_AND_TODO_ANALYSIS.md).
 - The dedicated current security architecture, trust-boundary model, and deferred-control gates are documented in [`docs/SECURITY_ARCHITECTURE.md`](docs/SECURITY_ARCHITECTURE.md).
 

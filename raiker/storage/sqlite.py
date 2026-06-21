@@ -1738,6 +1738,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
+    def consume_risk_acceptance(self, risk_acceptance_id: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM risk_acceptances WHERE risk_acceptance_id = ?",
+                (risk_acceptance_id,),
+            )
+
     def list_risk_acceptances(self, principal_id: str | None = None) -> list[dict[str, Any]]:
         query = "SELECT * FROM risk_acceptances"
         params: list[Any] = []

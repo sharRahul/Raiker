@@ -173,12 +173,14 @@ effective_permissions =
   ∩ risk_acceptance_or_approval_state
 ```
 
-### Known Limitations
+### Enforcement Status
 
-- Non-allow decisions do not yet block execution in development/safe modes.
-- `/role revoke` does not yet call `_govern_admin_mutation`.
-- Capability gate checks per action are not yet enforced.
-- Runtime readiness: `runtime_enablement_candidate_with_limitations`.
+- strict non-allow blocking: enforced — all non-allow decisions block mutation.
+- role revoke governed: enforced — routes through `_govern_admin_mutation` / RuntimeAuthority.
+- capability gate per action: enforced — each governed action checks its relevant capability gate before execution.
+- **Risk acceptance enforcement**: enforced — one-time risk acceptances are consumed on use; expired, mismatched, or missing acceptances block execution.
+- Runtime readiness: `runtime_enablement_candidate`.
+- Non-goals: approval execution relay remains metadata-only/deferred; broad runtime execution remains disabled.
 
 ---
 

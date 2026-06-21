@@ -73,7 +73,12 @@ from raiker.remote.readiness_registry import (
 )
 from raiker.rollback_plans import render_rollback_plan
 from raiker.rollback_registry import create_workspace_rollback_plans, rollback_plan_summary
-from raiker.runtime.authority import ActionRouter, RiskLevelValue, RuntimeAuthority
+from raiker.runtime.authority import (
+    NON_ALLOW_DECISIONS,
+    ActionRouter,
+    RiskLevelValue,
+    RuntimeAuthority,
+)
 from raiker.runtime.authority.models import Principal, PrincipalType
 from raiker.storage.cleanup_readiness_registry import (
     cleanup_readiness_summary,
@@ -1735,8 +1740,8 @@ def _govern_admin_mutation(
         requires_approval=requires_approval,
         requires_risk_acceptance=requires_risk_acceptance,
     )
-    if result.decision == "deny":
-        return f"Governed action denied: {result.message}"
+    if result.decision in NON_ALLOW_DECISIONS:
+        return f"Governed action denied: [{result.decision}] {result.message}"
     return None
 
 
@@ -1873,6 +1878,12 @@ def handle_role_revoke(command: str, *, workspace_root: str | Path = ".") -> str
         return "Usage: /role revoke <role_id> <user_id>"
     role_id = parts[2]
     user_id = parts[3]
+    denial = _govern_admin_mutation(
+        "role_mutation", "role_revoke", {"role_id": role_id, "user_id": user_id},
+        workspace_root=workspace_root, risk_level=RiskLevelValue.MEDIUM,
+    )
+    if denial:
+        return denial
     store = SQLiteStore(workspace_root)
     assignments = store.list_user_roles(user_id)
     for a in assignments:

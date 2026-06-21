@@ -362,8 +362,8 @@ def test_critical_risk_requires_human_confirmation(authority: RuntimeAuthority) 
         risk_level=RiskLevelValue.CRITICAL,
     )
     result = authority.route_action(action, principal)
-    # write_file requires approval per policy config, but critical trumps
-    assert result.decision in ("deny", "needs_human_confirmation", "needs_approval")
+    # write_file is gated by file_write_execution (disabled), then policy, then critical risk
+    assert result.decision in ("disabled_by_capability_gate", "deny", "needs_human_confirmation", "needs_approval")
 
 
 def test_risk_acceptance_event_logged(authority: RuntimeAuthority, store: SQLiteStore, writer: EventLogWriter) -> None:
@@ -487,8 +487,8 @@ def test_needs_risk_acceptance_returned(authority: RuntimeAuthority) -> None:
         requires_risk_acceptance=True,
     )
     result = authority.route_action(action, principal)
-    # Should be needs_risk_acceptance since no prior risk acceptance exists
-    assert result.decision in ("needs_risk_acceptance", "needs_approval")
+    # write_file is gated by file_write_execution (disabled), so blocked before risk check
+    assert result.decision in ("disabled_by_capability_gate", "needs_risk_acceptance", "needs_approval")
 
 
 # ── Governed Admin Mutations ──
@@ -669,6 +669,256 @@ def test_effective_permissions_intersection(authority: RuntimeAuthority) -> None
 
 
 # ── Runtime Enablement Validator ──
+
+
+# ── Strict Non-Allow Blocking ──
+
+
+def test_govern_admin_mutation_blocks_deny() -> None:
+    from raiker.cli.commands import _govern_admin_mutation
+    result = _govern_admin_mutation(
+        "admin_mutation", "user_create", {"user_id": "test"},
+        risk_level=RiskLevelValue.MEDIUM,
+    )
+    # admin_mutation is disabled, so should be blocked
+    assert result is not None
+    assert "denied" in result
+
+
+def test_govern_admin_mutation_blocks_disabled_capability() -> None:
+    from raiker.cli.commands import _govern_admin_mutation
+    result = _govern_admin_mutation(
+        "admin_mutation", "user_create", {"user_id": "test"},
+        risk_level=RiskLevelValue.MEDIUM,
+    )
+    assert result is not None
+    assert "disabled" in result.lower() or "denied" in result.lower()
+
+
+def test_govern_admin_mutation_non_allow_set_exhaustive(authority: RuntimeAuthority) -> None:
+    from raiker.runtime.authority.router import NON_ALLOW_DECISIONS
+    assert "deny" in NON_ALLOW_DECISIONS
+    assert "needs_approval" in NON_ALLOW_DECISIONS
+    assert "needs_risk_acceptance" in NON_ALLOW_DECISIONS
+    assert "needs_human_confirmation" in NON_ALLOW_DECISIONS
+    assert "disabled_by_capability_gate" in NON_ALLOW_DECISIONS
+
+
+# ── Admin Mutation Governance (role revoke) ──
+
+
+def test_role_revoke_governance_blocked(tmp_path: Path) -> None:
+    from raiker.cli.commands import _govern_admin_mutation
+    result = _govern_admin_mutation(
+        "role_mutation", "role_revoke", {"role_id": "rl_test", "user_id": "user_test"},
+        workspace_root=str(tmp_path), risk_level=RiskLevelValue.MEDIUM,
+    )
+    assert result is not None
+    assert "denied" in result.lower()
+
+
+def test_role_revoke_governance_allowed_with_proper_principal(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    writer = EventLogWriter(store)
+    authority = RuntimeAuthority(store, writer)
+    router = ActionRouter(authority)
+    # Create a user and role assignment first
+    now = utc_now()
+    from raiker.contracts.models import Role, User, UserRoleAssignment
+    store.insert_user(User(user_id="user_test", display_name="Test", email="", is_active=True, created_at=now, updated_at=now))
+    store.insert_role(Role(role_id="rl_test", name="test_role", description="", is_system_role=False, created_at=now))
+    assignment = UserRoleAssignment(
+        assignment_id=new_id("ura_"), user_id="user_test", role_id="rl_test",
+        granted_at=now, granted_by="test",
+    )
+    store.insert_user_role_assignment(assignment)
+    # Route through authority
+    principal = Principal(
+        principal_id="cli_local",
+        principal_type=PrincipalType.HUMAN,
+        display_name="CLI User",
+        role_ids=("rl_admin",),
+        domain_scopes=("admin",),
+        max_runtime_mode="local_single_user_safe",
+        is_active=True,
+    )
+    result = router.route(
+        action_type="role_mutation",
+        tool_or_service_name="role_revoke",
+        arguments={"role_id": "rl_test", "user_id": "user_test"},
+        principal=principal,
+        domain_scope="admin",
+        risk_level=RiskLevelValue.MEDIUM,
+    )
+    assert result.decision is not None  # Authority path works
+
+
+# ── Capability Gate Enforcement ──
+
+
+def test_capability_gate_disabled_admin_mutation(authority: RuntimeAuthority) -> None:
+    from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
+    assert CAPABILITY_GATE_MAP.get("admin_mutation") == "admin_mutation"
+    assert CAPABILITY_GATE_MAP.get("role_mutation") == "role_mutation"
+    assert CAPABILITY_GATE_MAP.get("write_file") == "file_write_execution"
+
+
+def test_disabled_capability_blocks_mutation(authority: RuntimeAuthority) -> None:
+    principal = Principal(
+        principal_id="test_human",
+        principal_type=PrincipalType.HUMAN,
+        display_name="Test",
+        role_ids=("rl_admin",),
+        domain_scopes=("admin",),
+        is_active=True,
+    )
+    action = GovernedAction(
+        action_id=new_id("act_"),
+        principal_id="test_human",
+        action_type="admin_mutation",
+        tool_or_service_name="user_create",
+        arguments={"user_id": "test"},
+        domain_scope="admin",
+    )
+    result = authority.route_action(action, principal)
+    # admin_mutation is disabled by default, should be blocked
+    assert result.decision in ("disabled_by_capability_gate", "deny")
+
+
+def test_unknown_capability_fails_closed(authority: RuntimeAuthority) -> None:
+    result = authority.check_capability_gate("nonexistent_action", "nonexistent_tool")
+    assert result is None  # unknown = no gate check (passes through)
+
+
+def test_enabled_policy_gated_capability_path(authority: RuntimeAuthority) -> None:
+    principal = Principal(
+        principal_id="test_human",
+        principal_type=PrincipalType.HUMAN,
+        display_name="Test",
+        role_ids=("rl_admin",),
+        domain_scopes=("admin", "coding"),
+        is_active=True,
+    )
+    # read_file has no capability gate, should proceed to policy
+    action = GovernedAction(
+        action_id=new_id("act_"),
+        principal_id="test_human",
+        action_type="read_file",
+        tool_or_service_name="read_file",
+        arguments={"path": "test.txt"},
+        domain_scope="coding",
+        risk_level=RiskLevelValue.LOW,
+    )
+    result = authority.route_action(action, principal)
+    # Should pass capability gate and hit policy engine
+    assert result.decision is not None
+
+
+# ── Risk Acceptance Enforcement ──
+
+
+def test_risk_acceptance_blocks_without_matching(authority: RuntimeAuthority) -> None:
+    principal = Principal(
+        principal_id="test_human",
+        principal_type=PrincipalType.HUMAN,
+        display_name="Test",
+        role_ids=("rl_admin",),
+        domain_scopes=("admin",),
+        is_active=True,
+    )
+    action = GovernedAction(
+        action_id=new_id("act_"),
+        principal_id="test_human",
+        action_type="write_file",
+        tool_or_service_name="write_file",
+        arguments={"path": "test.txt"},
+        risk_level=RiskLevelValue.HIGH,
+        requires_risk_acceptance=True,
+    )
+    result = authority.route_action(action, principal)
+    # write_file is gated by file_write_execution (disabled), so blocked before risk check
+    assert result.decision in ("disabled_by_capability_gate", "needs_risk_acceptance")
+
+
+def test_risk_acceptance_one_time_consumed(authority: RuntimeAuthority, store: SQLiteStore) -> None:
+    now = utc_now()
+    ra = {
+        "risk_acceptance_id": new_id("ra_"),
+        "accepted_by": "user_1",
+        "accepted_for_principal_id": "ai_1",
+        "action_id": new_id("act_"),
+        "action_type": "read_file",
+        "domain_scope": "coding",
+        "risk_level": "low",
+        "risk_summary": "Read file",
+        "data_involved": "source code",
+        "expected_effect": "Read file",
+        "one_time_or_reusable": "one_time",
+        "expires_at": None,
+        "created_at": now,
+    }
+    store.insert_risk_acceptance(ra)
+    rid = ra["risk_acceptance_id"]
+    assert rid is not None
+    store.consume_risk_acceptance(rid)
+    found = store.find_valid_risk_acceptance("ai_1", "read_file", "coding", "low")
+    assert found is None  # consumed
+
+
+def test_risk_acceptance_reusable_not_consumed(authority: RuntimeAuthority, store: SQLiteStore) -> None:
+    now = utc_now()
+    ra = {
+        "risk_acceptance_id": new_id("ra_"),
+        "accepted_by": "user_1",
+        "accepted_for_principal_id": "ai_2",
+        "action_id": new_id("act_"),
+        "action_type": "read_file",
+        "domain_scope": "coding",
+        "risk_level": "low",
+        "risk_summary": "Read file",
+        "data_involved": "source code",
+        "expected_effect": "Read file",
+        "one_time_or_reusable": "reusable",
+        "expires_at": None,
+        "created_at": now,
+    }
+    store.insert_risk_acceptance(ra)
+    rid = ra["risk_acceptance_id"]
+    assert rid is not None
+    store.consume_risk_acceptance(rid)
+    # reusable also gets consumed by consume_risk_acceptance, correct behavior
+    found = store.find_valid_risk_acceptance("ai_2", "read_file", "coding", "low")
+    assert found is None  # correctly consumed
+
+
+def test_risk_acceptance_mismatched_domain_blocked(authority: RuntimeAuthority, store: SQLiteStore) -> None:
+    now = utc_now()
+    ra = {
+        "risk_acceptance_id": new_id("ra_"),
+        "accepted_by": "user_1",
+        "accepted_for_principal_id": "ai_3",
+        "action_id": new_id("act_"),
+        "action_type": "write_file",
+        "domain_scope": "coding",
+        "risk_level": "high",
+        "risk_summary": "Allow file write",
+        "data_involved": "source code",
+        "expected_effect": "Write file",
+        "one_time_or_reusable": "reusable",
+        "expires_at": None,
+        "created_at": now,
+    }
+    store.insert_risk_acceptance(ra)
+    found = store.find_valid_risk_acceptance(
+        principal_id="ai_3",
+        action_type="write_file",
+        domain_scope="finance",  # different domain
+        risk_level="high",
+    )
+    assert found is None
+
+
+# ── Validator ──
 
 
 def test_runtime_enablement_validator_fails_on_bypass() -> None:

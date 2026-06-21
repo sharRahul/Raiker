@@ -19,6 +19,44 @@ from raiker.runtime.authority.models import (
 )
 from raiker.storage.sqlite import SQLiteStore
 
+NON_ALLOW_DECISIONS = frozenset({
+    "deny",
+    "needs_approval",
+    "needs_risk_acceptance",
+    "needs_human_confirmation",
+    "disabled_by_capability_gate",
+})
+
+# Maps action_type / tool_or_service_name to capability gate names
+CAPABILITY_GATE_MAP: dict[str, str] = {
+    "admin_mutation": "admin_mutation",
+    "role_mutation": "role_mutation",
+    "policy_mutation": "policy_mutation",
+    "user_create": "admin_mutation",
+    "user_deactivate": "admin_mutation",
+    "role_create": "role_mutation",
+    "role_grant": "role_mutation",
+    "role_revoke": "role_mutation",
+    "write_file": "file_write_execution",
+    "edit_file": "file_write_execution",
+    "apply_patch": "patch_apply_execution",
+    "memory_write": "memory_write_execution",
+    "memory_forget": "memory_forget_execution",
+    "shell": "shell_execution",
+    "process": "process_execution",
+    "network": "network_execution",
+    "web_fetch": "web_fetch",
+    "email_runtime": "email_runtime",
+    "calendar_runtime": "calendar_runtime",
+    "finance_runtime": "finance_runtime",
+    "investment_runtime": "investment_runtime",
+    "medical_runtime": "medical_runtime",
+    "cctv_runtime": "cctv_runtime",
+    "plugin_install": "plugin_install",
+    "plugin_execution_cap": "plugin_execution_cap",
+    "scheduled_routines": "scheduled_routines",
+}
+
 
 @dataclass(frozen=True)
 class GovernedAction:
@@ -136,6 +174,19 @@ class RuntimeAuthority:
                 return "only_runtime_gate_manager_can_enable_gates"
         return None
 
+    def check_capability_gate(self, action_type: str, tool_or_service_name: str) -> str | None:
+        from raiker.phase_gates import CapabilityState, get_capability_gate
+        cap_name = CAPABILITY_GATE_MAP.get(action_type) or CAPABILITY_GATE_MAP.get(tool_or_service_name)
+        if cap_name is None:
+            return None
+        try:
+            gate = get_capability_gate(cap_name)
+        except PermissionError:
+            return "unknown_capability_gate"
+        if gate.state == CapabilityState.DISABLED or gate.state == CapabilityState.PLANNED:
+            return "disabled_by_capability_gate"
+        return None
+
     def evaluate_effective_permissions(self, principal: Principal) -> dict[str, Any]:
         return {
             "principal_id": principal.principal_id,
@@ -202,6 +253,14 @@ class RuntimeAuthority:
                 message=gate_check,
             )
 
+        cap_gate = self.check_capability_gate(action.action_type, action.tool_or_service_name)
+        if cap_gate:
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="disabled_by_capability_gate" if cap_gate == "disabled_by_capability_gate" else "deny",
+                message=cap_gate,
+            )
+
         from raiker.contracts.models import ToolAction
 
         tool_action = ToolAction(
@@ -266,6 +325,8 @@ class RuntimeAuthority:
                     policy_decision=decision,
                     message="risk_acceptance_required",
                 )
+            if valid.get("one_time_or_reusable") == "one_time":
+                self.store.consume_risk_acceptance(valid["risk_acceptance_id"])
 
         return GovernedActionResult(
             action_id=action.action_id,

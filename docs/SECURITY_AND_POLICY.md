@@ -27,7 +27,7 @@ Clients, runtime modules, plugins, models, channels, and subagents must never ex
 
 The `RuntimeAuthority` (`raiker/runtime/authority/router.py`) enforces principal validity, domain scoping, AI role restrictions (no self-approval, no self-grant, no gate enablement), human-only role protections, risk level escalation, and risk acceptance validation.
 
-Current backend truth: approval resolution is metadata-only and does not execute approved actions; approval execution relay remains disabled/deferred; runtime execution remains disabled for deferred capabilities.
+Current backend truth: approval resolution is metadata-only and does not execute approved actions; approval execution relay remains disabled/deferred; runtime execution remains disabled for deferred capabilities. Runtime readiness: runtime_enablement_candidate. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation.
 
 ### AI-Executable Roles
 
@@ -115,7 +115,7 @@ Action -> RuntimeAuthority (principal, role, scope, risk, capability gates)
        -> GovernedAction record with full decision provenance
 ```
 
-Approval resolution is metadata-only: `/approve` and `/deny` update one pending approval record and do not execute the approved action. Non-allow decisions do not yet block execution in development/safe modes (known limitation).
+Approval resolution is metadata-only: `/approve` and `/deny` update one pending approval record and do not execute the approved action. Strict non-allow blocking is enforced: all non-allow decisions (`deny`, `needs_approval`, `needs_risk_acceptance`, `needs_human_confirmation`, `disabled_by_capability_gate`) block mutation. Each governed action checks its relevant capability gate before execution.
 
 ---
 

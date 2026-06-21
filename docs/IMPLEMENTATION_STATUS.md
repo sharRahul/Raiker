@@ -39,14 +39,15 @@ Current high-signal truth:
 - **Event redaction** is `implemented_policy_gated` — extended with bank/card/medical ID patterns.
 - **Runtime enablement validator** is `implemented_verified` — `scripts/validate_runtime_enablement_readiness.py`.
 
-### Known limitations (strict enforcement gaps)
+### Enforcement status
 
-- Runtime readiness decision: `runtime_enablement_candidate_with_limitations` — not production runtime-ready.
-- Non-allow decisions do not yet block execution in development/safe modes; policy decision metadata is recorded but does not prevent the action from proceeding in non-production modes.
-- `/role revoke` is not yet governed by `_govern_admin_mutation`; it mutates role assignments without RuntimeAuthority checks.
-- Capability gate checks per action are not yet enforced at the authority level; the registry exists and is queryable but does not gate individual actions.
-- The `validate_runtime_enablement_readiness.py` validator checks surface-level registration but does not prove no direct mutation bypasses exist in the codebase.
-- Approval resolution is `metadata_only` — does not execute approved actions.
+- Runtime readiness decision: `runtime_enablement_candidate`.
+- strict non-allow blocking: enforced — `_govern_admin_mutation` blocks on all non-allow decisions (`deny`, `needs_approval`, `needs_risk_acceptance`, `needs_human_confirmation`, `disabled_by_capability_gate`).
+- role revoke governed: enforced — routes through `_govern_admin_mutation` / RuntimeAuthority before mutation.
+- capability gate per action: enforced — `RuntimeAuthority.check_capability_gate()` checks the relevant gate for each governed action and returns `disabled_by_capability_gate` when the gate is disabled.
+- risk acceptance enforcement: enforced — one-time risk acceptances are consumed (deleted) on use; expired, mismatched, or missing acceptances block execution; critical-risk always requires human confirmation.
+- **Validator depth**: `scripts/validate_runtime_enablement_readiness.py` now detects direct store mutation patterns in CLI handlers without governance, and validates documentation markers across all 8 required docs.
+- Approval resolution remains `metadata_only` — does not execute approved actions.
 - No UI/API client implements RuntimeAuthority as the sole authority path (no UI/API clients exist yet).
 
 ---

@@ -130,11 +130,11 @@ Record this evidence in the PR body or `docs/IMPLEMENTATION_STATUS.md`:
 
 ## Documentation alignment validation
 
-When updating documentation to reflect backend changes (e.g., Runtime Authority, AI roles, domain scopes, risk acceptance model, expanded capability gates), validate that:
+When updating documentation to reflect backend changes (e.g., Runtime Authority, AI roles, domain scopes, risk acceptance model, expanded capability gates, strict enforcement), validate that:
 
-- Runtime readiness is stated as `runtime_enablement_candidate_with_limitations`, not production runtime-ready.
-- Strict enforcement gaps are documented (non-allow decisions not blocking, `/role revoke` ungoverned, capability gate checks per action not enforced).
-- No document claims production runtime enablement or claims runtime execution is active.
+- Runtime readiness is stated as `runtime_enablement_candidate`, not `production_ready_runtime`.
+- Strict enforcement status is documented (strict non-allow blocking, /role revoke governed, capability gate per action enforced, risk acceptance enforced before execution).
+- No document claims production runtime enablement, approval execution relay enabled, or broad runtime execution active.
 - Admin mutation governance (`_govern_admin_mutation`) is referenced where CLI commands describe their authority path.
 - The AI-executable roles and human-only role protections are documented consistently across all docs.
 

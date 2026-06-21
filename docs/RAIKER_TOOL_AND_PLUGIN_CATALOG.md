@@ -25,7 +25,7 @@ Approval resolution is metadata-only. `/approve` and `/deny` do not execute acti
 
 ## Runtime Authority Governance
 
-All mutation commands route through the `RuntimeAuthority` (`raiker/runtime/authority/router.py`) via `_govern_admin_mutation`. The authority chain enforces principal validity, domain scoping, AI role restrictions, human-only role protections, risk classification, and risk acceptance validation. Known gaps: non-allow decisions do not yet block execution in development/safe modes, `/role revoke` does not yet call `_govern_admin_mutation`, and capability gate checks per action are not yet enforced. Current runtime readiness: `runtime_enablement_candidate_with_limitations`.
+All mutation commands route through the `RuntimeAuthority` (`raiker/runtime/authority/router.py`) via `_govern_admin_mutation`. The authority chain enforces principal validity, domain scoping, AI role restrictions, human-only role protections, risk classification, risk acceptance validation, strict non-allow blocking (all non-allow decisions block mutation), capability gate per action (each governed action checks its relevant gate), role revoke governed (routes through `_govern_admin_mutation` before mutation). Runtime readiness: `runtime_enablement_candidate`.
 
 ---
 

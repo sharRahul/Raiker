@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import sys
 from pathlib import Path
 
@@ -19,9 +20,68 @@ from raiker.runtime.authority.models import (
     RISK_ACCEPTANCE_REQUIRED_FIELDS,
 )
 
+DIRECT_MUTATION_PATTERNS = {
+    "store.insert_user": "admin_mutation",
+    "store.deactivate_user": "admin_mutation",
+    "store.insert_role": "role_mutation",
+    "store.insert_user_role_assignment": "role_mutation",
+    "store.delete_user_role_assignment": "role_mutation",
+}
+
+
+def check_cli_mutation_handlers(source_path: Path) -> list[str]:
+    errors: list[str] = []
+    text = source_path.read_text(encoding="utf-8")
+    tree = ast.parse(text)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name.startswith("handle_"):
+            has_governance = any(
+                _calls_govern_admin_mutation(n) for n in ast.walk(node)
+            )
+            has_direct_mutation = any(
+                _has_direct_mutation_pattern(n) for n in ast.walk(node)
+            )
+            if has_direct_mutation and not has_governance:
+                errors.append(
+                    f"cli_mutation_without_governance:{node.name} in {source_path.name}"
+                )
+    return errors
+
+
+def _calls_govern_admin_mutation(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_govern_admin_mutation"
+    )
+
+
+def _has_direct_mutation_pattern(node: ast.AST) -> bool:
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        dotted = _format_attr_call(node)
+        if dotted in DIRECT_MUTATION_PATTERNS:
+            return True
+    return False
+
+
+def _format_attr_call(node: ast.Call) -> str:
+    parts: list[str] = []
+    current = node.func
+    while isinstance(current, ast.Attribute):
+        parts.append(current.attr)
+        current = current.value
+    if isinstance(current, ast.Name):
+        parts.append(current.id)
+    return ".".join(reversed(parts))
+
 
 def main() -> int:
     errors: list[str] = []
+
+    # 0. Check CLI handler governance
+    cli_path = Path(__file__).resolve().parent.parent / "raiker" / "cli" / "commands.py"
+    if cli_path.exists():
+        errors.extend(check_cli_mutation_handlers(cli_path))
 
     # 1. All high-risk capabilities must be in the registry
     runtime_high_risk = {
@@ -85,7 +145,35 @@ def main() -> int:
         if scope not in DOMAIN_SCOPES:
             errors.append(f"missing_domain_scope:{scope}")
 
-    # 8. Capability gate transitions must fail closed for invalid transitions
+    # 8. Validate documentation markers
+    doc_files = [
+        "README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/SECURITY_AND_POLICY.md",
+        "docs/FEATURE_COVERAGE_MATRIX.md",
+        "docs/GAP_AND_TODO_ANALYSIS.md",
+        "docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md",
+        "docs/LOCAL_VALIDATION_GATE.md",
+        "docs/IMPLEMENTATION_STATUS.md",
+    ]
+    repo_root = Path(__file__).resolve().parent.parent
+    required_markers = [
+        "runtime_enablement_candidate",
+        "strict non-allow blocking",
+        "role revoke governed",
+        "capability gate per action",
+    ]
+    for doc_name in doc_files:
+        doc_path = repo_root / doc_name
+        if not doc_path.exists():
+            errors.append(f"missing_doc:{doc_name}")
+            continue
+        text = doc_path.read_text(encoding="utf-8")
+        for marker in required_markers:
+            if marker not in text:
+                errors.append(f"missing_doc_marker:{doc_name}:{marker}")
+
+    # 9. Capability gate transitions must fail closed for invalid transitions
     for cap in runtime_high_risk:
         if cap in gates:
             try:

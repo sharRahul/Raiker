@@ -27,6 +27,8 @@ A feature must never be marked as merely "future" without a full specification.
 
 Specification status and implementation status are separate: `fully-specified` means the contract is complete enough to build, not that runtime/app behavior is currently shipped. Rows marked `phase-3-build` may still be contract-only, readiness-only, metadata-only, or deferred in the current implementation status column.
 
+Runtime readiness decision: `runtime_enablement_candidate`. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Approval execution relay remains metadata-only/deferred. Broad runtime execution remains disabled.
+
 Current backend implementation labels used across the hardening pass:
 
 - `implemented_read_only`

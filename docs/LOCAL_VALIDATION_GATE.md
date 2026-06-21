@@ -128,6 +128,18 @@ Record this evidence in the PR body or `docs/IMPLEMENTATION_STATUS.md`:
 11. Remaining risks
 12. Statement that CI triggers are configured, hosted CI may be red/unavailable due quota, local validation evidence is required, and `phase-status.yml` remains manual if still true
 
+## Documentation alignment validation
+
+When updating documentation to reflect backend changes (e.g., Runtime Authority, AI roles, domain scopes, risk acceptance model, expanded capability gates), validate that:
+
+- Runtime readiness is stated as `runtime_enablement_candidate_with_limitations`, not production runtime-ready.
+- Strict enforcement gaps are documented (non-allow decisions not blocking, `/role revoke` ungoverned, capability gate checks per action not enforced).
+- No document claims production runtime enablement or claims runtime execution is active.
+- Admin mutation governance (`_govern_admin_mutation`) is referenced where CLI commands describe their authority path.
+- The AI-executable roles and human-only role protections are documented consistently across all docs.
+
+Run `python scripts/validate_runtime_enablement_readiness.py` after any authority-related changes.
+
 ## Re-enable requirement
 
 Keep `pull_request` and `push` triggers for CI configured. If `phase-status.yml` remains `workflow_dispatch`-only, keep that manual status explicit. Hosted CI must be made reliable again before future release tagging when Actions quota is available.

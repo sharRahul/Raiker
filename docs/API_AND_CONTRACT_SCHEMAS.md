@@ -22,6 +22,8 @@ Raiker package/application versioning starts at `0.0.0`. Patch updates must prog
 | Action | `act_` | `act_01H...` |
 | Policy decision | `pol_` | `pol_01H...` |
 | Approval | `appr_` | `appr_01H...` |
+| Risk acceptance | `ra_` | `ra_01H...` |
+| Principal | `prin_` | `prin_01H...` |
 | Checkpoint | `ckpt_` | `ckpt_01H...` |
 | Memory candidate | `memcand_` | `memcand_01H...` |
 | Memory record | `mem_` | `mem_01H...` |
@@ -403,7 +405,7 @@ Required fields:
   "target_capability": "graph_codemap_indexing | semantic_memory_writes",
   "title": "Human-readable preview title",
   "summary": "Redacted deterministic summary",
-  "risk_level": "low | medium | high",
+  "risk_level": "low | medium | high | critical",
   "requested_by": "local_user",
   "created_at": "UTC ISO timestamp",
   "requires_user_approval": true,

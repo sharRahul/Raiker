@@ -203,6 +203,7 @@ Allowed risk levels:
 - `low`
 - `medium`
 - `high`
+- `critical`
 - `blocked`
 
 Minimum Phase 1 risk rules:

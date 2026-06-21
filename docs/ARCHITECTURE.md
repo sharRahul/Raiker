@@ -5,7 +5,7 @@
 
 Raiker is a local-first AI agent platform. It is designed as an operating layer for prompts, models, tools, policy, memory, plugins, hooks, subagents, channels, user interfaces, storage, search, graph context, checkpoints, and execution environments.
 
-This document turns the high-level README into implementation-ready architecture. Implementation is phased, but the architecture is fully specified now.
+This document turns the high-level README into implementation-ready architecture. Implementation is phased, but the architecture is fully specified now. Security boundaries, implemented controls, and deferred security gates are detailed in [`docs/SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md).
 
 ---
 

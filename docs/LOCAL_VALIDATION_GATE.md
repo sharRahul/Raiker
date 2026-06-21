@@ -14,6 +14,8 @@ During this period:
 - Developers must run the full validation set locally before merge or main push.
 - The validation evidence must be copied into the PR body or `docs/IMPLEMENTATION_STATUS.md`.
 
+Security documentation changes must also keep [`docs/SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md) linked and truthfully separated between implemented, metadata/readiness, specified/deferred, and missing controls.
+
 This is a temporary infrastructure pause only. It is not a waiver of validation requirements, phase status rules, or runtime safety gates.
 
 ## Required local validation commands
@@ -25,6 +27,7 @@ python -m ruff check .
 python -m mypy raiker apps tests
 python -m pytest
 python scripts/validate_phase_status.py
+python scripts/validate_repo_truthfulness.py
 raiker --help
 raiker --prompt "Hello Raiker"
 raiker --prompt "/providers"

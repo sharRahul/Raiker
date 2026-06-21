@@ -616,6 +616,6 @@ The following event names are reserved for Phase 5 enterprise governance, manage
 | `skill_candidate_reviewed` | `skill_candidate_store` | `candidate_id`, `status` | Skill candidate reviewed (approved/rejected). |
 | `skill_candidate_generated` | `skill_candidate_store` | `candidate_id`, `name`, `pattern` | Skill candidate auto-generated from pattern.
 
-## Raiker TUI (native interactive shell)
+## Plain terminal client events; Rich/native TUI deferred
 
-Raiker TUI adds **no new events**. The native interactive shell renders the existing command/runtime events and streams `TEXT_DELTA`/`LIFECYCLE`/`FINAL` from `AgentGateway.astream_prompt` into the transcript. No new storage is added.
+The plain terminal client adds **no new events**. Future Phase 8 Rich/native TUI clients must render existing command/runtime events and gateway streaming events without adding private storage or bypass events.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from raiker.tui.app import run_terminal_client
+from raiker.terminal.app import run_terminal_client
 
 
 def main(argv: list[str] | None = None) -> int:

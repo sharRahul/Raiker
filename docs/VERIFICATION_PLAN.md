@@ -528,7 +528,7 @@ container_execution_enabled, cloud_execution_enabled, process_execution_enabled,
 shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
 
 
-## Raiker TUI (native interactive shell)
+## Plain terminal client verification; Rich/native TUI deferred
 
 Verify the native Raiker TUI with:
 

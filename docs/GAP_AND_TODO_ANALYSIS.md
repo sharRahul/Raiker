@@ -55,7 +55,7 @@ The full list of disabled runtime flags (all `False`) is enforced by
 - **Phase 8 exists.** Phase 8 is the planned UI/client implementation phase and is recorded in `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_STATUS.md`.
 - **Pre-existing lint/type debt (out of scope for this docs audit):** `ruff check .` and
   `mypy raiker apps tests` currently report errors on the development branch (notably in
-  the removed `raiker/tui/textual_app.py` implementation and old tests) that predate this change. They are tracked here so
+  the removed legacy Textual implementation and old tests) that predate this change. They are tracked here so
   they are not forgotten; the repo's documentation-truthfulness gate
   (`scripts/validate_repo_truthfulness.py`, `scripts/validate_phase_status.py`) and `pytest` pass.
 

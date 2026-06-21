@@ -732,7 +732,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
 
 
-## Raiker TUI (native interactive shell)
+## Plain terminal client (implemented); Rich/native TUI deferred
 
 Plain terminal client is `implemented_verified`: `raiker`, `raiker --prompt`, and `RAIKER_TUI=plain` route slash commands through `handle_slash_command()` and normal prompts through `submit_terminal_prompt()`. Rich/native TUI is Phase 8 deferred; the active Textual implementation and tests have been removed. All disabled runtime flags remain false.
 

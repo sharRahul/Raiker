@@ -1075,11 +1075,11 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 
 
-## Raiker TUI (native interactive shell — implemented)
+## Plain terminal client (implemented); Rich/native TUI deferred to Phase 8
 
-The active Raiker terminal client is the plain line-oriented client in `raiker/tui/app.py`. Rich/native TUI implementation, including Textual panels, docked input, keyboard overlays, and transcript widgets, is Phase 8 deferred work.
+The active Raiker terminal client is the plain line-oriented client in `raiker/terminal/app.py`. Rich/native TUI implementation, including Textual panels, docked input, keyboard overlays, and transcript widgets, is Phase 8 deferred work.
 
-## Raiker TUI — layout and inspection views
+## Phase 8 Rich/native TUI — layout and inspection views (deferred)
 
 Raiker TUI is a single-panel transcript shell (Claude Code is a reference pattern only, not a product name): one full-width scrolling transcript, a live execution indicator, the docked input box, and a single configurable status bar. There are no simultaneously docked side/region drawers, no `minimal`/`standard`/`advanced` mode variants, and no panel focus cycling. This supersedes the former Phase 3 Slice Q1/Q2/Q3 multi-panel/drawer UX.
 

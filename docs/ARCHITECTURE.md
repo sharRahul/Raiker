@@ -271,7 +271,7 @@ raiker/
   checkpoints/
   memory/
   channels/
-  tui/
+  terminal/
 apps/
   cli/
     main.py

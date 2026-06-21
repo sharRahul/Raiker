@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from raiker.tui.accessibility import TerminalProfile, safe_lines
+from raiker.terminal.accessibility import TerminalProfile, safe_lines
 
 
 @dataclass(frozen=True)
@@ -171,6 +171,6 @@ def palette_lines(profile: TerminalProfile) -> list[str]:
 def render_command_palette(profile: TerminalProfile | None = None) -> str:
     """Render the command plain-text catalog as text for main-panel/transient display."""
 
-    from raiker.tui.accessibility import TerminalProfile as _TP
+    from raiker.terminal.accessibility import TerminalProfile as _TP
 
     return "\n".join(palette_lines(profile or _TP()))

@@ -71,7 +71,7 @@ plugins/
       server.json
     monitors/
       monitors.json
-    tui/
+    phase8-ui/
       panels.json
     web/
       panels.json

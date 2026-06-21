@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from raiker.cli.commands import handle_slash_command
 from raiker.cli.main import main
-from raiker.tui.accessibility import TerminalProfile
-from raiker.tui.app import _route_input, run_terminal_client
-from raiker.tui.command_palette import COMMAND_GROUPS, render_command_palette
+from raiker.terminal.accessibility import TerminalProfile
+from raiker.terminal.app import _route_input, run_terminal_client
+from raiker.terminal.command_palette import COMMAND_GROUPS, render_command_palette
 
 _PLAIN = TerminalProfile(width=120, color=False, unicode=False, interactive=False)
 

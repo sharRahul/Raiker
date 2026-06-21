@@ -5,7 +5,7 @@ from pathlib import Path
 
 from raiker.cli.commands import build_prompt_envelope
 from raiker.gateway.agent_gateway import AgentGateway
-from raiker.tui.status_bar import StatusBarRenderer, StatusContext
+from raiker.terminal.status_bar import StatusBarRenderer, StatusContext
 
 
 def _copy_config(tmp_path: Path) -> None:

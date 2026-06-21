@@ -334,6 +334,6 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 
 
-## Raiker TUI (native interactive shell)
+## Plain terminal client acceptance; Rich/native TUI deferred
 
 Plain terminal acceptance: `raiker` launches the line-oriented client; `raiker --prompt` submits one prompt and exits; `/help` and `/commands` are plain text; slash commands route through `handle_slash_command()`; prompts route through `submit_terminal_prompt()`. Rich/native TUI acceptance is deferred to Phase 8.

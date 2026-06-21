@@ -205,7 +205,7 @@ AppShell
 │       │   └─ TurnCard*
 │       │       ├─ StateRibbon            (loop states from AgentEvent)
 │       │       ├─ PlanCard               (approve/edit/cancel)
-│       │       ├─ ToolCallBlock          (args · trust · policy · result)   ← reuse raiker/tui ToolCallBlock
+│       │       ├─ ToolCallBlock          (args · trust · policy · result)   ← reuse future Phase 8 ToolCallBlock
 │       │       ├─ PermissionCard         (focus-trap; allow/ask/deny)
 │       │       ├─ VerificationCard       (PASS/FAIL/PARTIAL + evidence)
 │       │       ├─ MemoryCandidateCard    (approve/edit/reject)

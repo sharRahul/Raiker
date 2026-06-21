@@ -14,9 +14,9 @@ import sys
 from pathlib import Path
 
 from raiker.cli.commands import handle_slash_command, submit_terminal_prompt
-from raiker.tui.accessibility import TerminalProfile, ascii_safe, detect_terminal_profile
-from raiker.tui.command_palette import render_command_palette
-from raiker.tui.status_bar import StatusBarConfig, StatusBarRenderer, StatusContext
+from raiker.terminal.accessibility import TerminalProfile, ascii_safe, detect_terminal_profile
+from raiker.terminal.command_palette import render_command_palette
+from raiker.terminal.status_bar import StatusBarConfig, StatusBarRenderer, StatusContext
 
 WELCOME = "Raiker terminal client. Type /help, /commands, /quit, or a prompt."
 _PALETTE_COMMANDS = {"/commands", "/palette"}

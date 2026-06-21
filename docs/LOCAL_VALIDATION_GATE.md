@@ -28,6 +28,7 @@ python -m mypy .
 python -m pytest
 python scripts/validate_phase_status.py
 python scripts/validate_repo_truthfulness.py
+python scripts/validate_runtime_enablement_readiness.py
 python -m compileall raiker
 raiker --workspace . --prompt "status"
 raiker --workspace . --prompt "/status"

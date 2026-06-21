@@ -196,7 +196,7 @@ INTENTS = {
     "local_action_request",
     "unknown",
 }
-RISK_LEVELS = {"low", "medium", "high", "blocked"}
+RISK_LEVELS = {"low", "medium", "high", "critical", "blocked"}
 TOOLS = {
     "read_file",
     "list_directory",

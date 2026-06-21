@@ -45,6 +45,50 @@ PHASE_3_DISABLED_CAPABILITIES = {
 READ_ONLY_CONTRACT_CAPABILITIES = {"desktop_ui", "web_ui", "dashboard"}
 PHASE_3_POLICY_READY_CAPABILITIES = {"graph_codemap_planning", "semantic_memory_review_queue"}
 
+RUNTIME_DOMAIN_CAPABILITIES = {
+    "shell_execution",
+    "process_execution",
+    "network_execution",
+    "web_fetch",
+    "file_write_execution",
+    "patch_apply_execution",
+    "memory_write_execution",
+    "memory_forget_execution",
+    "approval_execution_relay",
+    "admin_mutation",
+    "policy_mutation",
+    "role_mutation",
+    "model_provider_runtime",
+    "hosted_model_runtime",
+    "private_network_model_runtime",
+    "email_runtime",
+    "calendar_runtime",
+    "reminder_runtime",
+    "finance_runtime",
+    "investment_runtime",
+    "medical_runtime",
+    "pregnancy_baby_runtime",
+    "cctv_runtime",
+    "home_security_runtime",
+    "hardware_operator_runtime",
+    "plugin_execution_cap",
+    "plugin_install",
+    "external_channel_runtime",
+    "channel_approval_relay",
+    "remote_execution_cap",
+    "container_execution_cap",
+    "cloud_execution_cap",
+    "graph_indexing_runtime",
+    "semantic_memory_runtime",
+    "vector_embedding_runtime",
+    "scheduled_routines",
+    "audit_export",
+}
+
+ALL_CAPABILITIES = (
+    PHASE_3_CAPABILITIES | PHASE_4_DISABLED_CAPABILITIES | RUNTIME_DOMAIN_CAPABILITIES
+)
+
 
 @dataclass(frozen=True)
 class CapabilityGate:
@@ -92,11 +136,13 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
         )
     for name in PHASE_4_DISABLED_CAPABILITIES:
         gates[name] = CapabilityGate(name, 4, CapabilityState.DISABLED)
+    for name in RUNTIME_DOMAIN_CAPABILITIES:
+        gates[name] = CapabilityGate(name, 5, CapabilityState.DISABLED)
     return gates
 
 
 def transition_capability(gate: CapabilityGate, target: CapabilityState) -> CapabilityGate:
-    if gate.capability not in PHASE_3_CAPABILITIES | PHASE_4_DISABLED_CAPABILITIES:
+    if gate.capability not in ALL_CAPABILITIES:
         raise PermissionError(f"unknown_capability:{gate.capability}")
     if target == CapabilityState.ENABLED_READ_ONLY:
         if (
@@ -135,6 +181,9 @@ def list_disabled_capabilities() -> dict[str, list[str]]:
     return {
         "phase_3": sorted(k for k, v in gates.items() if v.phase == 3 and not v.runtime_enabled),
         "phase_4": sorted(k for k, v in gates.items() if v.phase == 4 and not v.runtime_enabled),
+        "phase_5_runtime_domains": sorted(
+            k for k, v in gates.items() if v.phase == 5 and not v.runtime_enabled
+        ),
     }
 
 

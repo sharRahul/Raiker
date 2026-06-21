@@ -1,0 +1,311 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.models import PolicyDecision
+from raiker.events.types import make_event
+from raiker.events.writer import EventLogWriter
+from raiker.policy.config import StaticPolicyConfig
+from raiker.policy.engine import PolicyEngine
+from raiker.runtime.authority.models import (
+    AI_ROLE_NAMES,
+    HUMAN_ONLY_ROLES,
+    Principal,
+    PrincipalType,
+    RiskAcceptance,
+    RiskLevelValue,
+)
+from raiker.storage.sqlite import SQLiteStore
+
+
+@dataclass(frozen=True)
+class GovernedAction:
+    action_id: str
+    principal_id: str
+    action_type: str
+    tool_or_service_name: str
+    arguments: dict[str, Any]
+    domain_scope: str = ""
+    risk_level: str = RiskLevelValue.LOW
+    expected_effect: str = ""
+    requires_approval: bool = False
+    requires_risk_acceptance: bool = False
+    session_id: str = ""
+    turn_id: str | None = None
+
+
+@dataclass(frozen=True)
+class GovernedActionResult:
+    action_id: str
+    decision: str
+    policy_decision: PolicyDecision | None = None
+    risk_acceptance: RiskAcceptance | None = None
+    approved: bool = False
+    message: str = ""
+    error: str | None = None
+
+
+class RuntimeAuthority:
+    def __init__(
+        self,
+        store: SQLiteStore,
+        writer: EventLogWriter,
+        policy_engine: PolicyEngine | None = None,
+    ) -> None:
+        self.store = store
+        self.writer = writer
+        self.policy_engine = policy_engine or PolicyEngine(
+            StaticPolicyConfig(store.paths.workspace_root),
+            store=store,
+        )
+
+    def _event(
+        self,
+        event_type: str,
+        actor: str,
+        payload: dict[str, object],
+        session_id: str = "",
+        turn_id: str | None = None,
+    ) -> None:
+        self.writer.append(
+            make_event(
+                session_id=session_id or "authz",
+                turn_id=turn_id,
+                event_type=event_type,
+                actor=actor,
+                payload=payload,
+            )
+        )
+
+    def get_principal(self, principal_id: str) -> Principal | None:
+        raw = self.store.get_principal(principal_id)
+        if raw is None:
+            return None
+        return Principal(**raw)
+
+    def is_human_role(self, role_name: str) -> bool:
+        return role_name in HUMAN_ONLY_ROLES
+
+    def is_ai_role(self, role_name: str) -> bool:
+        return role_name in AI_ROLE_NAMES
+
+    def check_ai_role_assignment(self, principal: Principal) -> str | None:
+        for role_id in principal.role_ids:
+            role_name = self.store.get_role_name(role_id)
+            if role_name and role_name in HUMAN_ONLY_ROLES:
+                return f"cannot_assign_human_role_to_ai:{role_name}"
+        return None
+
+    def check_principal_active(self, principal: Principal) -> str | None:
+        if not principal.is_active:
+            return "principal_not_active"
+        if principal.expires_at and utc_now() > principal.expires_at:
+            return "principal_expired"
+        return None
+
+    def check_domain_scope(
+        self, principal: Principal, required_scope: str
+    ) -> str | None:
+        if required_scope and required_scope not in principal.domain_scopes:
+            return f"domain_scope_denied:{required_scope}"
+        return None
+
+    def check_self_approval(
+        self, principal: Principal, action: GovernedAction
+    ) -> str | None:
+        if action.principal_id == principal.principal_id and action.requires_approval and principal.principal_type != PrincipalType.HUMAN:
+            return "ai_cannot_approve_own_action"
+        return None
+
+    def check_self_grant(self, principal: Principal, action_type: str) -> str | None:
+        if action_type in ("role_grant", "role_assign") and principal.principal_type != PrincipalType.HUMAN:
+            return "ai_cannot_grant_roles"
+        return None
+
+    def check_runtime_gate_enable(self, principal: Principal, action_type: str) -> str | None:
+        if action_type == "enable_runtime_gate":
+            if principal.principal_type != PrincipalType.HUMAN:
+                return "ai_cannot_enable_runtime_gate"
+            is_runtime_manager = any(
+                self.store.get_role_name(rid) == "runtime_gate_manager"
+                for rid in principal.role_ids
+            )
+            if not is_runtime_manager:
+                return "only_runtime_gate_manager_can_enable_gates"
+        return None
+
+    def evaluate_effective_permissions(self, principal: Principal) -> dict[str, Any]:
+        return {
+            "principal_id": principal.principal_id,
+            "principal_type": principal.principal_type.value,
+            "role_ids": list(principal.role_ids),
+            "domain_scopes": list(principal.domain_scopes),
+            "max_runtime_mode": principal.max_runtime_mode,
+            "is_active": principal.is_active,
+            "is_expired": principal.expires_at is not None and utc_now() > principal.expires_at,
+        }
+
+    def route_action(self, action: GovernedAction, principal: Principal) -> GovernedActionResult:
+        self._event(
+            event_type="action_proposed",
+            actor="runtime_authority",
+            payload={
+                "action_id": action.action_id,
+                "action_type": action.action_type,
+                "principal_id": action.principal_id,
+                "domain_scope": action.domain_scope,
+                "risk_level": action.risk_level,
+            },
+            session_id=action.session_id,
+            turn_id=action.turn_id,
+        )
+
+        active_check = self.check_principal_active(principal)
+        if active_check:
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="deny",
+                message=active_check,
+            )
+
+        domain_check = self.check_domain_scope(principal, action.domain_scope)
+        if domain_check:
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="deny",
+                message=domain_check,
+            )
+
+        self_approval = self.check_self_approval(principal, action)
+        if self_approval:
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="deny",
+                message=self_approval,
+            )
+
+        self_grant = self.check_self_grant(principal, action.action_type)
+        if self_grant:
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="deny",
+                message=self_grant,
+            )
+
+        gate_check = self.check_runtime_gate_enable(principal, action.action_type)
+        if gate_check:
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="deny",
+                message=gate_check,
+            )
+
+        from raiker.contracts.models import ToolAction
+
+        tool_action = ToolAction(
+            action_id=action.action_id,
+            tool_name=action.tool_or_service_name,
+            arguments=action.arguments,
+            risk_level=action.risk_level,
+            requires_approval=action.requires_approval,
+            proposed_by=principal.principal_id,
+        )
+        decision = self.policy_engine.review(tool_action)
+        self._event(
+            event_type="policy_decision",
+            actor="policy_engine",
+            payload=decision.to_dict(),
+            session_id=action.session_id,
+            turn_id=action.turn_id,
+        )
+
+        if decision.decision == "deny":
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="deny",
+                policy_decision=decision,
+                message="denied_by_policy",
+            )
+
+        if action.risk_level == RiskLevelValue.CRITICAL:
+            if principal.principal_type != PrincipalType.HUMAN:
+                return GovernedActionResult(
+                    action_id=action.action_id,
+                    decision="deny",
+                    policy_decision=decision,
+                    message="critical_action_requires_human_confirmation",
+                )
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="needs_human_confirmation",
+                policy_decision=decision,
+                message="critical_action_requires_human_confirmation",
+            )
+
+        if (action.requires_approval or decision.decision == "needs_approval") and principal.principal_type != PrincipalType.HUMAN:
+            return GovernedActionResult(
+                    action_id=action.action_id,
+                    decision="needs_approval",
+                    policy_decision=decision,
+                    message="approval_required",
+                )
+
+        if action.requires_risk_acceptance:
+            valid = self.store.find_valid_risk_acceptance(
+                principal_id=principal.principal_id,
+                action_type=action.action_type,
+                domain_scope=action.domain_scope,
+                risk_level=action.risk_level,
+            )
+            if not valid:
+                return GovernedActionResult(
+                    action_id=action.action_id,
+                    decision="needs_risk_acceptance",
+                    policy_decision=decision,
+                    message="risk_acceptance_required",
+                )
+
+        return GovernedActionResult(
+            action_id=action.action_id,
+            decision="allow",
+            policy_decision=decision,
+            message="allowed",
+        )
+
+
+class ActionRouter:
+    def __init__(self, authority: RuntimeAuthority) -> None:
+        self.authority = authority
+
+    def route(
+        self,
+        action_type: str,
+        tool_or_service_name: str,
+        arguments: dict[str, Any],
+        principal: Principal,
+        *,
+        domain_scope: str = "",
+        risk_level: str = RiskLevelValue.LOW,
+        expected_effect: str = "",
+        requires_approval: bool = False,
+        requires_risk_acceptance: bool = False,
+        session_id: str = "",
+        turn_id: str | None = None,
+    ) -> GovernedActionResult:
+        action = GovernedAction(
+            action_id=new_id("act_"),
+            principal_id=principal.principal_id,
+            action_type=action_type,
+            tool_or_service_name=tool_or_service_name,
+            arguments=arguments,
+            domain_scope=domain_scope,
+            risk_level=risk_level,
+            expected_effect=expected_effect,
+            requires_approval=requires_approval,
+            requires_risk_acceptance=requires_risk_acceptance,
+            session_id=session_id,
+            turn_id=turn_id,
+        )
+        return self.authority.route_action(action, principal)

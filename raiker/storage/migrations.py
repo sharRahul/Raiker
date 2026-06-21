@@ -832,6 +832,43 @@ CREATE TABLE IF NOT EXISTS skill_candidates (
 );
 """
 
+PHASE_10_RUNTIME_AUTHORITY_MIGRATION_ID = "RAIKER-10001-phase10-runtime-authority"
+
+PHASE_10_RUNTIME_AUTHORITY_SQL = """
+CREATE TABLE IF NOT EXISTS principals (
+  principal_id TEXT PRIMARY KEY,
+  principal_type TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  delegated_by_user_id TEXT,
+  model_profile_id TEXT,
+  session_id TEXT,
+  role_ids TEXT NOT NULL DEFAULT '[]',
+  domain_scopes TEXT NOT NULL DEFAULT '[]',
+  max_runtime_mode TEXT NOT NULL DEFAULT 'development_preview',
+  created_at TEXT NOT NULL,
+  expires_at TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS risk_acceptances (
+  risk_acceptance_id TEXT PRIMARY KEY,
+  accepted_by TEXT NOT NULL,
+  accepted_for_principal_id TEXT NOT NULL,
+  action_id TEXT NOT NULL,
+  action_type TEXT NOT NULL,
+  domain_scope TEXT NOT NULL,
+  risk_level TEXT NOT NULL,
+  risk_summary TEXT NOT NULL,
+  data_involved TEXT NOT NULL,
+  expected_effect TEXT NOT NULL,
+  one_time_or_reusable TEXT NOT NULL DEFAULT 'one_time',
+  expires_at TEXT,
+  created_at TEXT NOT NULL,
+  policy_decision_id TEXT,
+  approval_id TEXT
+);
+"""
+
 PHASE_5_AUDIT_EXPORT_MIGRATION_ID = "RAIKER-5201-phase5-audit-export"
 
 PHASE_5_AUDIT_EXPORT_SQL = """

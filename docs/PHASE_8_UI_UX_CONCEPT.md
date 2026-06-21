@@ -46,7 +46,7 @@ requirements to user-facing surfaces and to the contracts that feed them.
 
 | Foundation source | Capability | Primary screen / component | Backing contract |
 |---|---|---|---|
-| PR-001, `02_SPEC` §2.2, `03_ARCH` §2.1 | Equal-status interfaces; same envelope/event everywhere | **Conversation** (shared across CLI/TUI/Desktop/Web) | `PromptEnvelope`, `AgentEvent` |
+| PR-001, `02_SPEC` §2.2, `03_ARCH` §2.1 | Equal-status interfaces; same envelope/event everywhere | **Conversation** (shared across CLI/TUI/Desktop/Web/Mobile) | `PromptEnvelope`, `AgentEvent` |
 | PR-002, `02_SPEC` §4 | Bounded, interruptible agent loop (13 states) | **Turn Stream** with state ribbon + Pause/Steer/Cancel | `AgentEvent.event_type`, state-skipped events |
 | PR-002 (planning), `07_PROMPT_FILES` §4 | Plan-before-risky-work | **Plan card** (goal, files, tools, checkpoints, rollback) | plan_proposed event |
 | PR-009, `06_SECURITY_MODEL` §4 | allow / ask / deny, risk classes | **Permission prompt** (focus-trapped inline card) | `PolicyDecision`, `PermissionRequest` |

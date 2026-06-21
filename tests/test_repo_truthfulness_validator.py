@@ -30,7 +30,7 @@ def test_truthfulness_validator_passes() -> None:
 def test_help_and_status_are_honest_about_phase_3_and_ui_scope(tmp_path: Path) -> None:
     help_output = handle_slash_command("/help", workspace_root=tmp_path)
     assert "Phase 3 Slice B approval planning preview is implemented" in help_output
-    assert "Current launchable UI is a simple terminal/CLI shell" in help_output
+    assert "Current launchable UI is a local terminal client" in help_output
     assert "contract-only or specified/deferred" in help_output
 
     status_output = handle_slash_command("/status", workspace_root=tmp_path)
@@ -145,11 +145,9 @@ def test_acceptance_and_local_validation_wording_are_truthful() -> None:
 
 
 def test_mock_launch_command_is_test_only_truthful(tmp_path: Path) -> None:
-    readme = Path("README.md").read_text(encoding="utf-8")
     catalog = Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
-    for text in (readme, catalog):
-        assert "/launch --provider mock --model mock-deterministic" in text
-        assert "test-only" in text.lower()
-        assert "deterministic_test_provider_requires_test_mode" in text
+    assert "/launch --provider mock --model mock-deterministic" in catalog
+    assert "test-only" in catalog.lower()
+    assert "deterministic_test_provider_requires_test_mode" in catalog
     output = handle_slash_command("/launch --provider mock --model mock-deterministic", workspace_root=tmp_path)
     assert "deterministic_test_provider_requires_test_mode" in output

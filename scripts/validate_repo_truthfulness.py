@@ -126,8 +126,10 @@ def _slash_prefix(command: str) -> str:
     return token
 
 
-def _readme_commands() -> set[str]:
-    text = (ROOT / "README.md").read_text(encoding="utf-8")
+def _catalog_commands() -> set[str]:
+    # The canonical CLI command surface lives in the tool/plugin catalog (the README is a
+    # conventional overview and no longer carries the full ledger).
+    text = (ROOT / "docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
     match = re.search(r"## CLI Command Surface.*?```text\n(.*?)\n```", text, re.S)
     if not match:
         return set()
@@ -155,15 +157,15 @@ def _has_test_only_launch_wording(text: str) -> bool:
 
 def main() -> int:
     errors: list[str] = []
-    readme_commands = _readme_commands()
-    missing = REQUIRED_COMMANDS - readme_commands
+    catalog_commands = _catalog_commands()
+    missing = REQUIRED_COMMANDS - catalog_commands
     if missing:
-        errors.append("README CLI Command Surface missing: " + ", ".join(sorted(missing)))
+        errors.append("Catalog CLI Command Surface missing: " + ", ".join(sorted(missing)))
     code_prefixes = _literal_command_prefixes()
-    readme_prefixes = {_slash_prefix(c) for c in readme_commands}
-    missing_prefixes = code_prefixes - readme_prefixes
+    catalog_prefixes = {_slash_prefix(c) for c in catalog_commands}
+    missing_prefixes = code_prefixes - catalog_prefixes
     if missing_prefixes:
-        errors.append("README command list omits implemented command prefixes: " + ", ".join(sorted(missing_prefixes)))
+        errors.append("Catalog command list omits implemented command prefixes: " + ", ".join(sorted(missing_prefixes)))
 
     catalog = (ROOT / "docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
     for command in REQUIRED_COMMANDS:
@@ -180,7 +182,8 @@ def main() -> int:
         errors.append("Unreconciled 'No — Phase 3 planned' rows: " + ", ".join(stale))
 
     required_truth = [
-        "current launchable UI is a simple terminal/CLI shell",
+        "current launchable UI is a local terminal client",
+        "native Textual Rich TUI",
         "Desktop/Web/Dashboard/Mobile apps",
         "specified/deferred, not implemented",
         "safe foundation/readiness slices A-P",
@@ -240,9 +243,8 @@ def main() -> int:
         if marker not in local_gate:
             errors.append(f"LOCAL_VALIDATION_GATE missing CI quota truth marker: {marker}")
 
-    launch_docs = readme_text + "\n" + catalog
-    if "/launch --provider mock --model mock-deterministic" in launch_docs and not (_has_test_only_launch_wording(readme_text) and _has_test_only_launch_wording(catalog)):
-        errors.append("README/catalog must mark /launch --provider mock --model mock-deterministic as test-only/policy-blocked, not normal production CLI")
+    if "/launch --provider mock --model mock-deterministic" in catalog and not _has_test_only_launch_wording(catalog):
+        errors.append("Catalog must mark /launch --provider mock --model mock-deterministic as test-only/policy-blocked, not normal production CLI")
 
     status_text = (ROOT / "docs/IMPLEMENTATION_STATUS.md").read_text(encoding="utf-8")
     for marker in RUNTIME_DISABLED_MARKERS:
@@ -267,10 +269,6 @@ def main() -> int:
         + "\n"
         + (ROOT / "docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md").read_text(encoding="utf-8")
     )
-    if (ROOT / "docs/completed/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md").exists():
-        proposal_docs += "\n" + (
-            ROOT / "docs/completed/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md"
-        ).read_text(encoding="utf-8")
     lowered_proposal_docs = proposal_docs.lower()
     for overclaim in PROPOSAL_LIFECYCLE_FORBIDDEN_OVERCLAIMS:
         if overclaim in lowered_proposal_docs:

@@ -22,7 +22,7 @@ A feature marked as specified is not automatically implemented. A feature marked
 
 ## Known Documentation/Code Gaps (Review 2026-06-19)
 
-A repository review (`docs/REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md`) verified the following gaps
+A repository review (`docs/GAP_AND_TODO_ANALYSIS.md`) verified the following gaps
 where documentation runs ahead of code. These are recorded here so the ledger stays trustworthy;
 none of them change the validator-required Phase 1/2/3 markers below.
 
@@ -189,7 +189,7 @@ Evidence: `tests/test_phase_2_6_review_action_proposals.py`,
 `tests/test_phase_2_6_review_action_proposal_safety.py`,
 `tests/test_pre_phase_3_readiness.py`.
 
-Pre-Phase-3 readiness audit: `docs/completed/PRE_PHASE_3_READINESS_AUDIT.md` records that Phase 1, Phase 2,
+Pre-Phase-3 readiness audit: `docs/IMPLEMENTATION_STATUS.md` records that Phase 1, Phase 2,
 Phase 2.5, and Phase 2.6 are complete and that it is safe to start Phase 3 planning next. It does
 not mark Phase 3 runtime activation complete; Phase 4 remains blocked.
 
@@ -237,7 +237,7 @@ Evidence: `tests/test_phase_3_slice_a_proposal_lifecycle_models.py`,
 `tests/test_phase_3_slice_a_proposal_lifecycle_safety.py`,
 `tests/test_phase_3_slice_a_docs_truthfulness.py`.
 
-Spec: `docs/completed/PHASE_3_SLICE_A_PROPOSAL_LIFECYCLE_SPEC.md`.
+Spec: `docs/IMPLEMENTATION_STATUS.md`.
 
 ## Phase 3 Slice B Approval Planning Preview Status
 
@@ -279,7 +279,7 @@ Evidence: `tests/test_phase_3_slice_b_approval_preview_models.py`,
 `tests/test_phase_3_slice_b_approval_preview_safety.py`,
 `tests/test_phase_3_slice_b_docs_truthfulness.py`.
 
-Spec: `docs/completed/PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SPEC.md`.
+Spec: `docs/IMPLEMENTATION_STATUS.md`.
 
 ### Local validation baseline (2026-06-19)
 
@@ -336,7 +336,7 @@ PR #11 removed generated Python bytecode artifacts and strengthened .gitignore.
 
 | Area | Required status | Current repository status | Canonical docs | Required tests |
 |---|---:|---:|---|---|
-| Python package scaffold | `phase_1_required` | `implemented_verified` | `docs/completed/PHASE_1_MVP_BUILD_PLAN.md`, `docs/ARCHITECTURE.md` | import/package smoke |
+| Python package scaffold | `phase_1_required` | `implemented_verified` | `docs/foundation/09_IMPLEMENTATION_PLAN.md`, `docs/ARCHITECTURE.md` | import/package smoke |
 | Global `raiker` command | `phase_1_required` | `implemented_verified` | `README.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | `tests/test_scaffold.py`, terminal smoke |
 | Equal-interface metadata | `phase_1_required` | `implemented_verified` | `docs/CONTRACTS.md`, `docs/FEATURE_COVERAGE_MATRIX.md` | `tests/test_equal_interface_invariant.py` or equivalent invariant coverage |
 | PromptEnvelope contract | `phase_1_required` | `implemented_verified` | `docs/CONTRACTS.md`, `docs/API_AND_CONTRACT_SCHEMAS.md` | `tests/test_contracts.py` |
@@ -395,7 +395,7 @@ PR #12 established the Phase 2 build plan, CI baseline, task manager, event view
 
 | Area | Required status | Current repository status | Canonical docs | Required tests |
 |---|---|---|---|---|
-| Phase 2 build plan and status ledger | `phase_2_required` | `implemented_verified` | `docs/completed/PHASE_2_RICH_LOCAL_WORKSPACE_BUILD_PLAN.md`, `docs/IMPLEMENTATION_STATUS.md` | doc consistency |
+| Phase 2 build plan and status ledger | `phase_2_required` | `implemented_verified` | `docs/foundation/09_IMPLEMENTATION_PLAN.md`, `docs/IMPLEMENTATION_STATUS.md` | doc consistency |
 | CI baseline | `phase_2_required` | `implemented_verified` | `.github/workflows/ci.yml`, `docs/VERIFICATION_PLAN.md` | workflow syntax |
 | Task record contract and storage helpers | `phase_2_required` | `implemented_verified` | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` | `tests/test_phase_2_task_manager.py` |
 | Background task manager service | `phase_2_required` | `implemented_verified` | `docs/RUNTIME_ORCHESTRATION_SPEC.md` | `tests/test_phase_2_task_manager.py` |
@@ -424,7 +424,7 @@ PR #12 established the Phase 2 build plan, CI baseline, task manager, event view
 
 ## Phase 3 and Phase 4 Planning Status
 
-Detailed Phase 3 and Phase 4 plans are now recorded in `docs/completed/PHASE_3_BUILD_PLAN.md` and `docs/PHASE_4_BUILD_PLAN.md`. Safe foundations now include disabled/listable capability gates, plugin manifest validation without code execution, graph/codemap planning schemas, semantic-memory disabled status reporting, remote/container execution profiles, subagent planning, external-channel activation status, and terminal inspection commands. Tests prove these foundations are discoverable and remain non-executable until policy, storage, approval, and lifecycle controls are complete.
+Detailed Phase 3 and Phase 4 plans are now recorded in `docs/IMPLEMENTATION_STATUS.md` and `docs/IMPLEMENTATION_STATUS.md`. Safe foundations now include disabled/listable capability gates, plugin manifest validation without code execution, graph/codemap planning schemas, semantic-memory disabled status reporting, remote/container execution profiles, subagent planning, external-channel activation status, and terminal inspection commands. Tests prove these foundations are discoverable and remain non-executable until policy, storage, approval, and lifecycle controls are complete.
 
 | Phase | Implemented foundation | Runtime state | Evidence |
 |---|---|---|---|
@@ -585,41 +585,41 @@ Safety status:
 
 ## Phase 3 Slice H lifecycle retention status
 
-Slice H is `implemented_verified` locally for metadata-only retention policies, cleanup previews, approval-handoff planning, read-only summaries, and SQLite metadata tables. Full Phase 3 is still incomplete. Keep detailed contract and safety requirements in `docs/completed/PHASE_3_SLICE_H_LIFECYCLE_RETENTION_SPEC.md`; this document records only the status summary. Slice H does not execute cleanup, graph/codemap indexing, semantic/vector memory writes, embeddings, rollback, plugins, channels, subagents, approval relay, or remote/container/cloud execution.
+Slice H is `implemented_verified` locally for metadata-only retention policies, cleanup previews, approval-handoff planning, read-only summaries, and SQLite metadata tables. Full Phase 3 is still incomplete. Keep detailed contract and safety requirements in `docs/IMPLEMENTATION_STATUS.md`; this document records only the status summary. Slice H does not execute cleanup, graph/codemap indexing, semantic/vector memory writes, embeddings, rollback, plugins, channels, subagents, approval relay, or remote/container/cloud execution.
 
 ## Phase 3 Slice I lifecycle evidence reference
 
-Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/completed/PHASE_3_SLICE_I_LIFECYCLE_EVIDENCE_SPEC.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.
+Slice I lifecycle evidence bundles, policy simulations, JSON exports, CLI surfaces, SQLite metadata tables, and disabled-runtime validation are centralized in `docs/IMPLEMENTATION_STATUS.md`. Slice I is metadata-only/read-only/export-only/simulation-only and does not mark Phase 3 complete.
 
 ## Phase 3 Slice J — Graph/Codemap Indexing Readiness Metadata
 
 Slice J is `implemented_verified` for metadata-only readiness surfaces: deterministic contract, registry create/list/get/summary, read-only CLI, optional SQLite metadata table, workspace inspection/view fields, docs, and tests.
 
-Slice J did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked. Graph/codemap runtime indexing, graph writes, workers, schedulers, file watchers, daemons, and runtime jobs remain disabled.
+Slice J did not by itself mark Phase 3 complete. Phase 3 is complete (see `docs/IMPLEMENTATION_STATUS.md`). Phase 4 remains blocked. Graph/codemap runtime indexing, graph writes, workers, schedulers, file watchers, daemons, and runtime jobs remain disabled.
 
 
 ## Phase 3 Slice K — Semantic Memory Write Readiness — Metadata Only
 - Adds deterministic metadata-only semantic memory readiness contracts, registry, optional SQLite metadata table, CLI, and workspace surfaces.
 - Semantic memory writes, vector writes, embeddings, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled.
 - Reserved Slice K metadata-only events: `phase3.semantic_memory_readiness.metadata_created`, `phase3.semantic_memory_readiness.summary_viewed`, `phase3.semantic_memory_readiness.exported`. No runtime memory write events are enabled.
-- Slice K did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
+- Slice K did not by itself mark Phase 3 complete. Phase 3 is complete (see `docs/IMPLEMENTATION_STATUS.md`). Phase 4 remains blocked.
 
 ## Phase 3 Slice L — Approval Preview Persistence Readiness — Metadata Only
 
-Slice L is implemented as metadata-only readiness for future durable approval preview persistence. It adds `/approval-readiness [--summary|--json]`, deterministic `appr_` readiness contracts, optional `phase3_approval_preview_persistence_readiness` SQLite metadata storage, and workspace inspection/view fields. Approval execution, approval relay runtime, durable approval queues, approval workers, schedulers, watchers, daemons, and runtime execution remain disabled. Slice L did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
+Slice L is implemented as metadata-only readiness for future durable approval preview persistence. It adds `/approval-readiness [--summary|--json]`, deterministic `appr_` readiness contracts, optional `phase3_approval_preview_persistence_readiness` SQLite metadata storage, and workspace inspection/view fields. Approval execution, approval relay runtime, durable approval queues, approval workers, schedulers, watchers, daemons, and runtime execution remain disabled. Slice L did not by itself mark Phase 3 complete. Phase 3 is complete (see `docs/IMPLEMENTATION_STATUS.md`). Phase 4 remains blocked.
 
 
 ## Phase 3 Slice M — Storage Cleanup Execution Readiness — Metadata Only
 
-Implemented deterministic metadata-only readiness contracts, registry, optional SQLite metadata table, CLI surface, and workspace summaries for storage cleanup execution readiness. Cleanup execution, deletion, purge, tombstone, rollback, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled. Slice M did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
+Implemented deterministic metadata-only readiness contracts, registry, optional SQLite metadata table, CLI surface, and workspace summaries for storage cleanup execution readiness. Cleanup execution, deletion, purge, tombstone, rollback, jobs, workers, schedulers, watchers, daemons, and runtime execution remain disabled. Slice M did not by itself mark Phase 3 complete. Phase 3 is complete (see `docs/IMPLEMENTATION_STATUS.md`). Phase 4 remains blocked.
 
 ## Phase 3 Slice N: Plugin/Server Startup Readiness — Metadata Only
 
-Slice N reserves metadata-only readiness surfaces and events for future plugin/server startup. Reserved metadata-only events: `phase3.plugin_server_readiness.metadata_created`, `phase3.plugin_server_readiness.summary_viewed`, `phase3.plugin_server_readiness.exported`. No plugin execution, plugin installation, plugin activation, MCP/LSP/plugin server startup, monitor daemon startup, marketplace install, hosted routine, external channel, worker, scheduler, watcher, daemon, relay, or runtime execution events are enabled. Slice N did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
+Slice N reserves metadata-only readiness surfaces and events for future plugin/server startup. Reserved metadata-only events: `phase3.plugin_server_readiness.metadata_created`, `phase3.plugin_server_readiness.summary_viewed`, `phase3.plugin_server_readiness.exported`. No plugin execution, plugin installation, plugin activation, MCP/LSP/plugin server startup, monitor daemon startup, marketplace install, hosted routine, external channel, worker, scheduler, watcher, daemon, relay, or runtime execution events are enabled. Slice N did not by itself mark Phase 3 complete. Phase 3 is complete (see `docs/IMPLEMENTATION_STATUS.md`). Phase 4 remains blocked.
 
 ## Phase 3 Slice O — External Channels/Notifications Readiness — Metadata Only
 
-Implemented metadata-only readiness contracts, registry operations, optional SQLite persistence, read-only `/channel-readiness` CLI output, and workspace summary fields for future external channels and notifications. No external channels, notifications, push notifications, share links, webhook dispatch, relay runtime, hosted channels/routines, workers, schedulers, watchers, daemons, or runtime execution are enabled. Slice O did not by itself mark Phase 3 complete. Phase 3 is now complete per `docs/PHASE_3_COMPLETION_AUDIT.md`. Phase 4 remains blocked.
+Implemented metadata-only readiness contracts, registry operations, optional SQLite persistence, read-only `/channel-readiness` CLI output, and workspace summary fields for future external channels and notifications. No external channels, notifications, push notifications, share links, webhook dispatch, relay runtime, hosted channels/routines, workers, schedulers, watchers, daemons, or runtime execution are enabled. Slice O did not by itself mark Phase 3 complete. Phase 3 is complete (see `docs/IMPLEMENTATION_STATUS.md`). Phase 4 remains blocked.
 
 ## Phase 3 Slice P — Remote/Container/Cloud Execution Readiness — Metadata Only
 
@@ -658,7 +658,26 @@ Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_en
 
 ## Phase 3 Completion Status
 
-All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` per the completion audit in `docs/PHASE_3_COMPLETION_AUDIT.md`. All runtime execution remains disabled. Phase 4 memory MVP is implemented.
+All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled. Phase 4 memory MVP is implemented. Remaining Phase 4 capabilities (external channels, subagents, multi-agent teams, remote/container/cloud execution) stay blocked: **Phase 4 remains blocked.**
+
+### Current launchable UI & runtime truth
+
+The current launchable UI is a local terminal client: a native Textual Rich TUI by default on an
+interactive TTY, with a plain line-oriented CLI shell as the fallback (`RAIKER_TUI=plain`,
+`--prompt`, or non-interactive stdin). Both route through the Agent Gateway, ToolBroker, and
+PolicyEngine and add no runtime authority of their own. Desktop/Web/Dashboard/Mobile apps, IDE
+extension, Voice, Browser Extension, and REST/API remain specified/deferred, not implemented as
+launchable apps. Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P;
+runtime execution remains disabled. Phase 4 memory MVP is implemented.
+
+Runtime execution remains disabled.
+
+### Phase 3 Slice A & B consolidated safety markers
+
+These single-line markers are the canonical safety guarantees for the proposal-lifecycle (Slice A) and approval-planning-preview (Slice B) surfaces. They are intentionally unwrapped so tooling can assert them verbatim:
+
+- Phase 3 Slice A proposal lifecycle foundation: implemented_verified. It is metadata-only and proposal-only with no proposal execution, no auto-fix, no patch application, no file mutation, no staging/unstaging, no test execution, no GitHub PR automation, no UI/API/IDE/dashboard/mobile, no approval execution, and no Phase 4; disabled runtime flags remain false.
+- Phase 3 Slice B approval planning preview: implemented_verified. It is preview-only with no approval execution, no proposal execution, no auto-fix, no patch application, no file mutation, no staging/unstaging, no test execution, no GitHub PR automation, no UI/API/IDE/dashboard/mobile, and no Phase 4; disabled runtime flags remain false.
 
 ## Async model-provider runtime update
 

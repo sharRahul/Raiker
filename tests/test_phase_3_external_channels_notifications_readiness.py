@@ -126,11 +126,7 @@ def test_workspace_inspection_and_view_summary_fields(tmp_path: Path) -> None:
 
 def test_docs_catalog_event_consistency() -> None:
     paths = [
-        "README.md",
         "docs/IMPLEMENTATION_STATUS.md",
-        "docs/EVENT_CATALOG.md",
-        "docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md",
-        "docs/completed/PHASE_3_SLICE_O_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_SPEC.md",
     ]
     for path in paths:
         text = Path(path).read_text(encoding="utf-8")

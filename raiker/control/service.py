@@ -64,6 +64,10 @@ class RuntimeControlService:
         self._workspace_root = Path(workspace_root)
         self._store = SQLiteStore(self._workspace_root)
         self._writer = EventLogWriter(self._store)
+        if executor_registry is None:
+            from raiker.runtime.executors import build_default_executor_registry
+            executor_registry = build_default_executor_registry(self._workspace_root, self._store)
+        self._registry = executor_registry
         self._authority = RuntimeAuthority(
             self._store, self._writer,
             executor_registry=executor_registry,
@@ -94,7 +98,7 @@ class RuntimeControlService:
                 mode_name = (active_mode or {}).get("mode_name", "development_preview")
                 if mode_name not in _RUNTIME_ENABLEMENT_MODES:
                     continue
-            if cs in (CapabilityState.ENABLED_RUNTIME, CapabilityState.ENABLED_POLICY_GATED) and req is not None and req.requires_executor and not has_executor(capability):
+            if cs in (CapabilityState.ENABLED_RUNTIME, CapabilityState.ENABLED_POLICY_GATED) and req is not None and req.requires_executor and not has_executor(capability, self._registry):
                     continue
             allowed.append(sv)
         return tuple(allowed)
@@ -278,11 +282,14 @@ class RuntimeControlService:
         target_state: str,
         acting_principal_id: str | None,
         reason: str = "",
+        confirmation_token: str | None = None,
     ) -> ControlResult:
         principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
         if principal is None:
             return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
-        denial = self._authority.request_capability_transition(capability, target_state, principal, reason)
+        denial = self._authority.request_capability_transition(
+            capability, target_state, principal, reason, confirmation_token=confirmation_token,
+        )
         if denial is not None:
             return ControlResult(ok=False, reason_code=denial)
         return ControlResult(ok=True, data={"capability": capability, "target_state": target_state})

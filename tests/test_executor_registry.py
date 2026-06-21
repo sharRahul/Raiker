@@ -131,7 +131,7 @@ def test_executor_called_on_allow(tmp_path: Path) -> None:
     registry = ExecutorRegistry()
     registry.register("read_file", executor)
     authority = RuntimeAuthority(
-        store, writer, policy_engine=MockPolicyEngine(decision="allow"),
+        store, writer, policy_engine=MockPolicyEngine(decision="allow"),  # type: ignore[arg-type]
         executor_registry=registry,
     )
     principal = _make_human_principal(store)
@@ -150,7 +150,7 @@ def test_executor_not_called_on_deny(tmp_path: Path) -> None:
     registry = ExecutorRegistry()
     registry.register("read_file", executor)
     authority = RuntimeAuthority(
-        store, writer, policy_engine=MockPolicyEngine(decision="deny"),
+        store, writer, policy_engine=MockPolicyEngine(decision="deny"),  # type: ignore[arg-type]
         executor_registry=registry,
     )
     principal = _make_human_principal(store)
@@ -167,7 +167,7 @@ def test_executor_not_called_on_needs_approval(tmp_path: Path) -> None:
     registry = ExecutorRegistry()
     registry.register("read_file", executor)
     authority = RuntimeAuthority(
-        store, writer, policy_engine=MockPolicyEngine(decision="needs_approval"),
+        store, writer, policy_engine=MockPolicyEngine(decision="needs_approval"),  # type: ignore[arg-type]
         executor_registry=registry,
     )
     principal = _make_ai_principal(store)
@@ -186,7 +186,7 @@ def test_executor_not_called_on_needs_risk_acceptance(tmp_path: Path) -> None:
     registry = ExecutorRegistry()
     registry.register("read_file", executor)
     authority = RuntimeAuthority(
-        store, writer, policy_engine=MockPolicyEngine(decision="allow"),
+        store, writer, policy_engine=MockPolicyEngine(decision="allow"),  # type: ignore[arg-type]
         executor_registry=registry,
     )
     principal = _make_human_principal(store)
@@ -206,7 +206,7 @@ def test_executor_not_called_on_needs_human_confirmation(tmp_path: Path) -> None
     registry = ExecutorRegistry()
     registry.register("read_file", executor)
     authority = RuntimeAuthority(
-        store, writer, policy_engine=MockPolicyEngine(decision="allow"),
+        store, writer, policy_engine=MockPolicyEngine(decision="allow"),  # type: ignore[arg-type]
         executor_registry=registry,
     )
     principal = _make_human_principal(store)
@@ -247,7 +247,7 @@ def test_missing_executor_fails_closed(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     registry = ExecutorRegistry()
     authority = RuntimeAuthority(
-        store, writer, policy_engine=MockPolicyEngine(decision="allow"),
+        store, writer, policy_engine=MockPolicyEngine(decision="allow"),  # type: ignore[arg-type]
         executor_registry=registry,
     )
     principal = _make_human_principal(store)
@@ -265,7 +265,7 @@ def test_executor_for_different_capability_not_called(tmp_path: Path) -> None:
     registry = ExecutorRegistry()
     registry.register("file_write_execution", executor)
     authority = RuntimeAuthority(
-        store, writer, policy_engine=MockPolicyEngine(decision="allow"),
+        store, writer, policy_engine=MockPolicyEngine(decision="allow"),  # type: ignore[arg-type]
         executor_registry=registry,
     )
     principal = _make_human_principal(store)
@@ -287,7 +287,7 @@ def test_action_executed_event_emitted(tmp_path: Path) -> None:
     registry = ExecutorRegistry()
     registry.register("read_file", executor)
     authority = RuntimeAuthority(
-        store, writer, policy_engine=MockPolicyEngine(decision="allow"),
+        store, writer, policy_engine=MockPolicyEngine(decision="allow"),  # type: ignore[arg-type]
         executor_registry=registry,
     )
     principal = _make_human_principal(store)
@@ -313,7 +313,7 @@ def test_action_executed_not_emitted_on_non_allow(tmp_path: Path) -> None:
     registry = ExecutorRegistry()
     registry.register("read_file", executor)
     authority = RuntimeAuthority(
-        store, writer, policy_engine=MockPolicyEngine(decision="deny"),
+        store, writer, policy_engine=MockPolicyEngine(decision="deny"),  # type: ignore[arg-type]
         executor_registry=registry,
     )
     principal = _make_human_principal(store)

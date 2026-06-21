@@ -311,6 +311,7 @@ class RuntimeAuthority:
 
     def request_capability_transition(
         self, capability: str, target_state: str, principal: Principal, reason: str = "",
+        confirmation_token: str | None = None,
     ) -> str | None:
         from raiker.phase_gates import ALL_CAPABILITIES, CapabilityState, default_capability_gates
         gate_check = self._check_human_runtime_gate_manager(principal)
@@ -325,7 +326,10 @@ class RuntimeAuthority:
         allowed_targets = {s.value for s in CapabilityState}
         if target_state not in allowed_targets:
             return f"invalid_target_state:{target_state}"
-        activation_reason = evaluate_activation_requirement(capability, target_state, principal, self.store)
+        activation_reason = evaluate_activation_requirement(
+            capability, target_state, principal, self.store,
+            registry=self.executor_registry, confirmation_token=confirmation_token,
+        )
         if activation_reason is not None:
             return activation_reason
         now = utc_now()

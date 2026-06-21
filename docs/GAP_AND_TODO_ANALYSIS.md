@@ -18,6 +18,22 @@ The implementation control ledger is `docs/IMPLEMENTATION_STATUS.md`; this file 
 
 Backend hardening note (2026-06-21): direct CLI durable-memory mutation bypass is closed via `_govern_admin_mutation`; Runtime Authority / Action Router governs all mutation actions through capability gates, policy engine, risk classification, approval/risk acceptance, and event logging; AI-executable roles, human-only protections, and domain scopes are enforced at the authority level. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Runtime readiness: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Approval resolution is metadata-only; runtime execution remains disabled.
 
+Executor implementation update (2026-06-21): the control plane (`raiker/control/`),
+the API + session→principal auth surface (`raiker/api/`), the per-capability
+`ActivationRequirement` model (`raiker/runtime/authority/activation.py`), and a real
+executor registry (`raiker/runtime/executors/`) are now implemented. **Real local
+executors** exist and are governed-flippable for the Tier 1–3 local set in
+`REAL_EXECUTOR_CAPABILITIES` (file write/patch/approval-relay/memory, sandboxed
+shell/process/web-fetch/network, graph indexing, semantic memory). All other
+capabilities — plugins, vector/embedding and hosted/private model runtime, external
+channels, remote/container/cloud execution, scheduled routines, and every Tier-6
+sensitive domain — have **no real executor and fail closed** (`not_implemented` /
+`activation_blocked:no_executor`); they cannot be flipped to a working state and never
+fabricate success. `has_executor` is registry-backed (no static allowlist), enforced by
+`scripts/validate_runtime_enablement_readiness.py`. Per-capability detail:
+`docs/RUNTIME_EXECUTORS_SPEC.md`. The remaining (fail-closed) executors are the active
+backlog.
+
 Completed items (no longer active gaps):
 - strict runtime enforcement — completed
 - controlled runtime mode activation — implemented

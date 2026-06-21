@@ -22,3 +22,19 @@ class ExecutionResult:
     reason_code: str | None = None
     summary: str = ""
     artifacts: dict[str, Any] = field(default_factory=dict)
+
+
+def not_implemented(capability: str, action_id: str) -> ExecutionResult:
+    """Fail-closed result for a capability whose executor is not yet implemented.
+
+    Returning this (instead of a fabricated ``ok=True``) preserves the
+    no-silent-runtime invariant: a flipped-on gate whose real runtime does not
+    exist reports an honest failure rather than a fake success.
+    """
+    return ExecutionResult(
+        ok=False,
+        capability=capability,
+        action_id=action_id,
+        reason_code=f"not_implemented:{capability}",
+        summary=f"{capability} runtime is not implemented; failing closed.",
+    )

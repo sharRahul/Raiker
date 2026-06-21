@@ -5,7 +5,7 @@
 
 # Implementation Status
 
-> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Tier-1 executors (`approval_execution_relay`, `file_write_execution`, `patch_apply_execution`) are now implemented and satisfiable. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Real local executors exist and are governed-flippable for: Tier 1 (`approval_execution_relay`, `file_write_execution`, `patch_apply_execution`, `memory_write_execution`, `memory_forget_execution`), Tier 2 (`shell_execution`, `process_execution`, `web_fetch`, `network_execution` — sandboxed/egress-allowlisted), and Tier 3 local code-intelligence (`graph_indexing_runtime`, `semantic_memory_runtime`). These are the only members of `REAL_EXECUTOR_CAPABILITIES`. Every other capability — plugins, vector/embedding and hosted/private model runtime, external channels/notifications, remote/container/cloud execution, scheduled routines, and all Tier-6 sensitive domains (email/calendar/finance/investment/medical/pregnancy/cctv/home-security/hardware) — has **no real executor and fails closed** (`not_implemented` / `activation_blocked:no_executor`); it cannot be flipped to a working state. All capability gates still ship `disabled` by default; enabling is owner/`runtime_gate_manager`-only, governed, reversible, and audited. Per-capability detail: [`docs/RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md).
 
 
 Security architecture status and deferred-control gates are summarized in [`docs/SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md).
@@ -336,14 +336,11 @@ Scope and boundaries:
 - Phase 3 Slice B is preview-only; no approval execution; no proposal execution; no auto-fix; no
   patch application; no file mutation; no staging/unstaging; no test execution; no GitHub PR
   automation; no UI/API/IDE/dashboard/mobile; no Phase 4.
-- `approval_execution_enabled` now true (Tier-1 executors implemented). All
-  disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled,
-  semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled,
-  approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled,
-  rollback_execution_enabled, external_channels_enabled, notifications_enabled,
-  remote_execution_enabled, container_execution_enabled, cloud_execution_enabled,
-  process_execution_enabled, shell_execution_enabled, network_execution_enabled,
-  runtime_execution_enabled.
+- Phase 3 Slice B itself was preview-only and enabled no runtime execution. Current
+  per-capability executor status is tracked in
+  [`docs/RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md) and the "Executor
+  enablement status" section below; do not read this historical slice note as the
+  current runtime flag state.
 - Preview statuses are planning labels only: `preview_created`, `needs_human_review`, `blocked`,
   `ready_for_planning`, `superseded`. No status implies execution approval.
 - No raw diff, raw file contents, secrets, prompt text, private reasoning, chain-of-thought, raw
@@ -734,7 +731,7 @@ Phase 6 adds external channel profiles, approval relay, subagent contracts, mult
 | RAIKER-6501 Execution budget | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_6_channels_subagents_remote.py` |
 
 Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
-Tier-1 executors now enabled: approval_execution_enabled=true, file_write_execution_enabled=true, patch_apply_execution_enabled=true.
+Executor enablement status: real local executors (Tier 1-3 local set in `REAL_EXECUTOR_CAPABILITIES`) are governed-flippable; all sensitive/external capabilities fail closed. See `docs/RUNTIME_EXECUTORS_SPEC.md`.
 
 ## Phase 3 Completion Status
 
@@ -807,7 +804,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 
 Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
-Tier-1 executors now enabled: approval_execution_enabled=true, file_write_execution_enabled=true, patch_apply_execution_enabled=true.
+Executor enablement status: real local executors (Tier 1-3 local set in `REAL_EXECUTOR_CAPABILITIES`) are governed-flippable; all sensitive/external capabilities fail closed. See `docs/RUNTIME_EXECUTORS_SPEC.md`.
 
 
 ## Plain terminal client (implemented); Rich/native TUI deferred

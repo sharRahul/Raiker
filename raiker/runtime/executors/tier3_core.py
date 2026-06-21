@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from raiker.graph.indexer import GraphIndexer
-from raiker.runtime.executors.base import ExecutionResult
+from raiker.runtime.executors.base import ExecutionResult, not_implemented
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -65,18 +65,9 @@ class VectorEmbeddingExecutor:
         self._workspace_root = Path(workspace_root).resolve()
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        text = str(action.arguments.get("text", ""))
-        if not text:
-            return ExecutionResult(
-                ok=False, capability=self.capability, action_id=action.action_id,
-                reason_code="missing_argument:text",
-                summary="Vector embedding denied: no text provided.",
-            )
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary=f"Vector embedding created ({len(text)} chars).",
-            artifacts={"text_length": len(text)},
-)
+        # No embedding model or vector store is wired yet; reporting success
+        # while persisting nothing would be a silent fake. Fail closed.
+        return not_implemented(self.capability, action.action_id)
 
 
 class ModelProviderExecutor:
@@ -86,9 +77,6 @@ class ModelProviderExecutor:
         self._workspace_root = Path(workspace_root).resolve()
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        action_type = str(action.arguments.get("action_type", "health"))
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary=f"Model provider action '{action_type}' completed.",
-            artifacts={"action_type": action_type},
-        )
+        # Real provider dispatch is owned by the gateway/provider layer; this
+        # executor does not perform a model call, so it fails closed.
+        return not_implemented(self.capability, action.action_id)

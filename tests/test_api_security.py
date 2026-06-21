@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
@@ -29,12 +30,12 @@ def bootstrapped_ws(temp_workspace: Path) -> Path:
 
 
 @pytest.fixture
-def app(bootstrapped_ws: Path):
+def app(bootstrapped_ws: Path) -> FastAPI:
     return create_app(bootstrapped_ws)
 
 
 @pytest.fixture
-def client(app):
+def client(app: FastAPI) -> TestClient:
     return TestClient(app)
 
 
@@ -163,7 +164,7 @@ class TestRedactionGuard:
 
 
 class TestTokenRevocation:
-    def test_revoked_token_returns_401(self, bootstrapped_ws: Path, app) -> None:
+    def test_revoked_token_returns_401(self, bootstrapped_ws: Path, app: FastAPI) -> None:
         store = ApiSessionStore(bootstrapped_ws)
         raw, session = store.create_session("principal_rahul")
         store.revoke_session(session.session_id)

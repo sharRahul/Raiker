@@ -43,8 +43,12 @@ def test_dependency_baseline() -> None:
     with open("pyproject.toml", "rb") as handle:
         data = tomllib.loads(handle.read().decode())
     deps = data["project"]["dependencies"]
-    assert deps == ["httpx>=0.27"]
+    # httpx is the model-transport dependency; fastapi backs the API/UI surface.
+    assert any(d.startswith("httpx") for d in deps)
+    assert any(d.startswith("fastapi") for d in deps)
     assert not any("rich" in d or "textual" in d for d in deps)
+    # No heavyweight agent frameworks that would bypass Raiker contracts.
+    assert not any(d.startswith(("langchain", "llama-index")) for d in deps)
     assert not any("openai" in d or "pydantic" in d or "requests" in d or "aiohttp" in d for d in deps)
 
 

@@ -230,6 +230,37 @@ def main() -> int:
         if "capability_gate_state" not in text:
             errors.append("missing_capability_gate_state_table_migration")
 
+    # 13. Executor availability must be registry-backed, not a static allowlist.
+    #     A static "satisfied" set decouples activation from real executors and
+    #     was the cause of fake-success gates. Forbid its reintroduction.
+    activation_path = repo_root / "raiker" / "runtime" / "authority" / "activation.py"
+    if activation_path.exists():
+        atext = activation_path.read_text(encoding="utf-8")
+        if "_SATISFIED_CAPS" in atext:
+            errors.append("activation_uses_static_satisfied_set")
+        if "registry" not in atext or "def has_executor" not in atext:
+            errors.append("has_executor_not_registry_backed")
+
+    # 14. The default executor registry must contain only genuinely-implemented
+    #     executors, and must NOT register sensitive/external capabilities.
+    try:
+        from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+    except Exception as exc:  # pragma: no cover - import guard
+        REAL_EXECUTOR_CAPABILITIES = frozenset()
+        errors.append(f"cannot_import_real_executor_capabilities:{exc}")
+    must_not_have_default_executor = {
+        "email_runtime", "calendar_runtime", "finance_runtime", "investment_runtime",
+        "medical_runtime", "pregnancy_baby_runtime", "cctv_runtime",
+        "home_security_runtime", "hardware_operator_runtime",
+        "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
+        "external_channel_runtime", "channel_approval_relay", "hosted_model_runtime",
+        "private_network_model_runtime", "scheduled_routines",
+        "plugin_execution_cap", "plugin_install",
+    }
+    for cap in must_not_have_default_executor:
+        if cap in REAL_EXECUTOR_CAPABILITIES:
+            errors.append(f"sensitive_capability_has_default_executor:{cap}")
+
     if errors:
         print("RUNTIME ENABLEMENT READINESS: FAILED")
         for err in errors:

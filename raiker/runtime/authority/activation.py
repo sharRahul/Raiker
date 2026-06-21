@@ -139,11 +139,16 @@ def evaluate_activation_requirement(
     target_state: str,
     principal: Principal,
     store: Any,
+    registry: Any = None,
     confirmation_token: str | None = None,
 ) -> str | None:
     """Evaluate whether *capability* can transition to *target_state*.
 
     Returns None if allowed, or a specific reason-code string if blocked.
+
+    ``registry`` is the live :class:`ExecutorRegistry`. Executor availability is
+    determined from the registry's actual contents (no static allowlist), so a
+    capability without a genuinely-registered executor can never be activated.
     """
     enabled_states = {
         CapabilityState.ENABLED_READ_ONLY,
@@ -166,7 +171,7 @@ def evaluate_activation_requirement(
         if mode_name not in req.requires_runtime_mode:
             return f"{ACTIVATION_BLOCKED_RUNTIME_MODE_NOT_ACTIVE}:{capability} (needs {req.requires_runtime_mode})"
 
-    if req.requires_executor and not has_executor(capability):
+    if req.requires_executor and not has_executor(capability, registry):
         return f"{ACTIVATION_BLOCKED_NO_EXECUTOR}:{capability}"
 
     if req.requires_threat_model_ack and not _has_threat_model_ack(capability, store):
@@ -178,24 +183,14 @@ def evaluate_activation_requirement(
     return None
 
 
-_SATISFIED_CAPS: frozenset[str] = frozenset({
-    "approval_execution_relay", "file_write_execution", "patch_apply_execution",
-    "memory_write_execution", "memory_forget_execution",
-    "shell_execution", "process_execution", "web_fetch", "network_execution",
-    "graph_indexing_runtime", "semantic_memory_runtime", "vector_embedding_runtime",
-    "model_provider_runtime",
-    "plugin_install", "plugin_execution_cap",
-    "external_channel_runtime", "channel_approval_relay", "remote_execution_cap",
-    "container_execution_cap", "cloud_execution_cap", "hosted_model_runtime",
-    "private_network_model_runtime", "scheduled_routines",
-    "email_runtime", "calendar_runtime", "reminder_runtime", "finance_runtime",
-    "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
-    "cctv_runtime", "home_security_runtime", "hardware_operator_runtime",
-})
+def has_executor(capability: str, registry: Any = None) -> bool:
+    """True only if a real executor is registered for *capability*.
 
-
-def has_executor(capability: str) -> bool:
-    return capability in _SATISFIED_CAPS
+    Backed by the live registry — there is no static "satisfied" allowlist, so
+    activation cannot be granted for a capability whose executor is missing or
+    fail-closed-only (those are simply never registered).
+    """
+    return registry is not None and registry.has(capability)
 
 
 def _has_threat_model_ack(capability: str, store: Any) -> bool:

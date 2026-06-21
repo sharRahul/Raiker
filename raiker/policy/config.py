@@ -29,11 +29,25 @@ class StaticPolicyConfig:
                 "role_create",
                 "role_grant",
                 "role_revoke",
+                "approval_execution_relay",
             }
         )
     )
     approval_required_actions: frozenset[str] = field(
-        default_factory=lambda: frozenset({"shell", "write_file", "edit_file", "apply_patch", "memory_write", "memory_forget"})
+        default_factory=lambda: frozenset({
+            "shell", "write_file", "edit_file", "apply_patch",
+            "memory_write", "memory_forget",
+            "process", "network", "web_fetch",
+            "graph_indexing", "semantic_memory", "vector_embedding", "model_provider",
+            "plugin_install", "plugin_execution_cap",
+            "external_channel_runtime", "channel_approval_relay",
+            "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
+            "hosted_model_runtime", "private_network_model_runtime", "scheduled_routines",
+            "email_runtime", "calendar_runtime", "reminder_runtime",
+            "finance_runtime", "investment_runtime", "medical_runtime",
+            "pregnancy_baby_runtime", "cctv_runtime", "home_security_runtime",
+            "hardware_operator_runtime",
+        })
     )
     denied_actions: frozenset[str] = field(
         default_factory=lambda: frozenset(
@@ -45,6 +59,8 @@ class StaticPolicyConfig:
                 "web_fetch",
                 "plugin_execute",
                 "remote_execute",
+                "process",
+                "network",
             }
         )
     )

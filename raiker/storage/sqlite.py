@@ -44,6 +44,8 @@ from raiker.contracts.models import (
 )
 from raiker.models.session_state import ModelSessionState
 from raiker.storage.migrations import (
+    API_SESSIONS_MIGRATION_ID,
+    API_SESSIONS_SQL,
     PHASE_1_MIGRATION_ID,
     PHASE_1_SQL,
     PHASE_2_MIGRATION_ID,
@@ -126,6 +128,8 @@ from raiker.storage.migrations import (
     PHASE_10_RUNTIME_AUTHORITY_SQL,
     PHASE_10_RUNTIME_MODE_STATE_MIGRATION_ID,
     PHASE_10_RUNTIME_MODE_STATE_SQL,
+    THREAT_MODEL_ACKS_MIGRATION_ID,
+    THREAT_MODEL_ACKS_SQL,
 )
 
 
@@ -399,6 +403,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection.execute("ALTER TABLE events_index ADD COLUMN prev_event_sha256 TEXT")
             with contextlib.suppress(sqlite3.OperationalError):
                 connection.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)")
+            self._apply_migration(API_SESSIONS_MIGRATION_ID, API_SESSIONS_SQL, connection)
+            self._apply_migration(THREAT_MODEL_ACKS_MIGRATION_ID, THREAT_MODEL_ACKS_SQL, connection)
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
         row = connection.execute(

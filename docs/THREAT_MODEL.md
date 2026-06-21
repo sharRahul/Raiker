@@ -170,3 +170,22 @@ Phase 1 does not fully implement:
 - complete prompt-injection classifier.
 
 These are not ignored. They are phase-scheduled and must not be partially wired without their acceptance tests.
+
+---
+
+## Tier-1 Executors: approval_execution_relay, file_write_execution, patch_apply_execution
+
+These three executors are the first capabilities with real runtime execution. They share a single threat model.
+
+**Asset:** Workspace file system (files written/applied via approved proposals).
+
+**Trust boundary:** The executor runs ONLY when `RuntimeAuthority.route_action()` returns `decision="allow"` — meaning every governance gate (principal active, domain scope valid, no self-approval by AI, no self-grant, runtime gate enabled, capability gate ENABLED_RUNTIME/ENABLED_POLICY_GATED, policy allows, risk acceptance valid if required) has passed.
+
+**Threats:**
+- T1: File write bypasses governance → mitigated by the single chokepoint: no executor runs except via `route_action` returning `allow`. Non-allow decisions (deny, needs_approval, needs_human_confirmation, needs_risk_acceptance, disabled_by_capability_gate) never execute.
+- T2: Executor writes outside workspace → mitigated by `resolve_workspace_path()` which rejects paths outside the workspace root.
+- T3: Executor runs without a registered executor → mitigated by fail-closed: `decision="allow"` with `error="execution_unavailable:no_executor"`, no file written.
+- T4: File contents leaked into events/results → mitigated by `ExecutionResult` carrying only `summary` (safe text) and `artifacts` (metadata: path, size_bytes). Never raw file contents.
+- T5: Approval relay resolves a tampered approval → mitigated by `insert_approval` computing `action_payload_sha256`; the executor loads the stored tool action arguments, not caller-supplied arguments.
+
+**Acceptance:** `tests/test_vertical_slice_e2e.py` (8 tests) covers happy path (file write, patch apply, approval relay) and all negative cases (deny, disabled gate, missing executor, unknown approval, AI principal).

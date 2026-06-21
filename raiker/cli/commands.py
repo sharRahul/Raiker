@@ -27,9 +27,6 @@ from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
 from raiker.cli.principal_resolver import (
     bootstrap_owner,
-    check_acting_principal_available,
-    check_owner_bootstrapped,
-    check_runtime_gate_manager_available,
     get_principal_detail,
     get_principal_info,
     list_principals_info,
@@ -50,6 +47,7 @@ from raiker.contracts.models import (
     UserMetadata,
     UserRoleAssignment,
 )
+from raiker.control.service import RuntimeControlService
 from raiker.diagnostics import render_doctor
 from raiker.events.query import EventViewer
 from raiker.events.types import make_event
@@ -1898,25 +1896,19 @@ def handle_role_revoke(command: str, *, workspace_root: str | Path = ".") -> str
 
 
 def handle_runtime_mode_status(*, workspace_root: str | Path = ".") -> str:
-    store = SQLiteStore(workspace_root)
-    writer = EventLogWriter(store)
-    authority = RuntimeAuthority(store, writer)
-    mode = authority.get_runtime_mode()
-    mode_name = mode.get("mode_name", "development_preview")
-    status = mode.get("status", "inactive")
-    activated_by = mode.get("activated_by", "system") or "system"
-    activated_at = mode.get("activated_at", "") or ""
+    service = RuntimeControlService(workspace_root)
+    view = service.get_runtime_mode()
     lines = [
-        f"Runtime mode: {mode_name}",
-        f"Status: {status}",
-        f"Activated by: {activated_by}",
-        f"Activated at: {activated_at}",
+        f"Runtime mode: {view.mode_name}",
+        f"Status: {view.status}",
+        f"Activated by: {view.activated_by}",
+        f"Activated at: {view.activated_at}",
     ]
-    if mode.get("reason"):
-        lines.append(f"Reason: {mode['reason']}")
-    principal, _ = resolve_local_principal(workspace_root)
-    if principal is not None:
-        lines.append(f"Acting principal: {principal.principal_id} ({principal.display_name})")
+    if view.reason:
+        lines.append(f"Reason: {view.reason}")
+    principal_ref, _ = service.resolve_principal()
+    if principal_ref is not None:
+        lines.append(f"Acting principal: {principal_ref.principal_id} ({principal_ref.display_name})")
     else:
         lines.append("Acting principal: none (run /bootstrap-owner first)")
     return "\n".join(lines)
@@ -1937,18 +1929,16 @@ def handle_runtime_mode_activate(command: str, *, workspace_root: str | Path = "
         aidx = parts.index("--as")
         if aidx + 1 < len(parts):
             explicit_principal = parts[aidx + 1]
-    principal, err = resolve_local_principal(workspace_root, explicit_principal)
-    if principal is None:
+    service = RuntimeControlService(workspace_root)
+    principal_ref, err = service.resolve_principal(explicit_principal)
+    if principal_ref is None:
         return f"Runtime mode activation denied: {err}"
-    store = SQLiteStore(workspace_root)
-    writer = EventLogWriter(store)
-    authority = RuntimeAuthority(store, writer)
-    denial = authority.activate_runtime_mode(mode_name, principal, reason)
-    if denial:
-        return f"Runtime mode activation denied: {denial}"
+    result = service.activate_runtime_mode(mode_name, explicit_principal, reason)
+    if not result.ok:
+        return f"Runtime mode activation denied: {result.reason_code}"
     return (
         f"Runtime mode activated: {mode_name}\n"
-        f"Acting principal: {principal.principal_id} ({principal.display_name})"
+        f"Acting principal: {principal_ref.principal_id} ({principal_ref.display_name})"
     )
 
 
@@ -1964,32 +1954,27 @@ def handle_runtime_mode_disable(command: str, *, workspace_root: str | Path = ".
         aidx = parts.index("--as")
         if aidx + 1 < len(parts):
             explicit_principal = parts[aidx + 1]
-    principal, err = resolve_local_principal(workspace_root, explicit_principal)
-    if principal is None:
+    service = RuntimeControlService(workspace_root)
+    principal_ref, err = service.resolve_principal(explicit_principal)
+    if principal_ref is None:
         return f"Runtime mode disable denied: {err}"
-    store = SQLiteStore(workspace_root)
-    writer = EventLogWriter(store)
-    authority = RuntimeAuthority(store, writer)
-    denial = authority.disable_runtime_mode(principal, reason)
-    if denial:
-        return f"Runtime mode disable denied: {denial}"
+    result = service.disable_runtime_mode(explicit_principal, reason)
+    if not result.ok:
+        return f"Runtime mode disable denied: {result.reason_code}"
     return (
         "Runtime mode disabled. Reverted to development_preview.\n"
-        f"Acting principal: {principal.principal_id} ({principal.display_name})"
+        f"Acting principal: {principal_ref.principal_id} ({principal_ref.display_name})"
     )
 
 
 def handle_capability_gates(*, workspace_root: str | Path = ".") -> str:
     from raiker.phase_gates import RUNTIME_DOMAIN_CAPABILITIES
-    store = SQLiteStore(workspace_root)
-    writer = EventLogWriter(store)
-    authority = RuntimeAuthority(store, writer)
+    service = RuntimeControlService(workspace_root)
     lines = ["Capability gates:"]
     for cap in sorted(RUNTIME_DOMAIN_CAPABILITIES):
-        gate = authority.get_effective_capability_gate(cap)
-        state = gate["state"]
-        source = gate["source"]
-        lines.append(f"  {cap}: {state} ({source})")
+        gate = service.get_capability_gate(cap)
+        if gate is not None:
+            lines.append(f"  {cap}: {gate.state} ({gate.source})")
     return "\n".join(lines)
 
 
@@ -2001,15 +1986,14 @@ def handle_capability_gate_detail(command: str, *, workspace_root: str | Path = 
     from raiker.phase_gates import ALL_CAPABILITIES
     if capability not in ALL_CAPABILITIES:
         return f"Unknown capability: {capability}"
-    store = SQLiteStore(workspace_root)
-    writer = EventLogWriter(store)
-    authority = RuntimeAuthority(store, writer)
-    gate = authority.get_effective_capability_gate(capability)
-    persisted = authority.get_persisted_capability_state(capability)
+    service = RuntimeControlService(workspace_root)
+    gate = service.get_capability_gate(capability)
+    assert gate is not None, f"Expected gate for known capability {capability}"
+    persisted = service.get_persisted_capability_state(capability)
     lines = [
         f"Capability: {capability}",
-        f"Effective state: {gate['state']}",
-        f"Source: {gate['source']}",
+        f"Effective state: {gate.state}",
+        f"Source: {gate.source}",
     ]
     if persisted:
         lines.append(f"Persisted state: {persisted.get('state', '')}")
@@ -2044,18 +2028,16 @@ def handle_capability_gate_enable(command: str, *, workspace_root: str | Path = 
             explicit_principal = parts[aidx + 1]
     if not target_state:
         return "Usage: /capability-gate enable <capability> --state <state> [--reason <reason>] [--as <principal_id>]"
-    principal, err = resolve_local_principal(workspace_root, explicit_principal)
-    if principal is None:
+    service = RuntimeControlService(workspace_root)
+    principal_ref, err = service.resolve_principal(explicit_principal)
+    if principal_ref is None:
         return f"Capability transition denied: {err}"
-    store = SQLiteStore(workspace_root)
-    writer = EventLogWriter(store)
-    authority = RuntimeAuthority(store, writer)
-    denial = authority.request_capability_transition(capability, target_state, principal, reason)
-    if denial:
-        return f"Capability transition denied: {denial}"
+    result = service.set_capability_state(capability, target_state, explicit_principal, reason)
+    if not result.ok:
+        return f"Capability transition denied: {result.reason_code}"
     return (
         f"Capability '{capability}' transitioned to state '{target_state}'.\n"
-        f"Acting principal: {principal.principal_id} ({principal.display_name})"
+        f"Acting principal: {principal_ref.principal_id} ({principal_ref.display_name})"
     )
 
 
@@ -2074,74 +2056,47 @@ def handle_capability_gate_disable(command: str, *, workspace_root: str | Path =
         aidx = parts.index("--as")
         if aidx + 1 < len(parts):
             explicit_principal = parts[aidx + 1]
-    principal, err = resolve_local_principal(workspace_root, explicit_principal)
-    if principal is None:
+    service = RuntimeControlService(workspace_root)
+    principal_ref, err = service.resolve_principal(explicit_principal)
+    if principal_ref is None:
         return f"Capability disable denied: {err}"
-    store = SQLiteStore(workspace_root)
-    writer = EventLogWriter(store)
-    authority = RuntimeAuthority(store, writer)
-    denial = authority.request_capability_transition(capability, "disabled", principal, reason)
-    if denial:
-        return f"Capability disable denied: {denial}"
+    result = service.disable_capability(capability, explicit_principal, reason)
+    if not result.ok:
+        return f"Capability disable denied: {result.reason_code}"
     return (
         f"Capability '{capability}' disabled.\n"
-        f"Acting principal: {principal.principal_id} ({principal.display_name})"
+        f"Acting principal: {principal_ref.principal_id} ({principal_ref.display_name})"
     )
 
 
 def handle_runtime_readiness(*, workspace_root: str | Path = ".") -> str:
     from raiker.phase_gates import RUNTIME_DOMAIN_CAPABILITIES, CapabilityState
-    store = SQLiteStore(workspace_root)
-    writer = EventLogWriter(store)
-    authority = RuntimeAuthority(store, writer)
-    mode = authority.get_runtime_mode()
-    mode_name = mode.get("mode_name", "development_preview")
-    mode_status = mode.get("status", "inactive")
 
-    owner_bootstrapped = check_owner_bootstrapped(workspace_root)
-    acting_principal_available = check_acting_principal_available(workspace_root)
-    gate_manager_available = check_runtime_gate_manager_available(workspace_root)
+    service = RuntimeControlService(workspace_root)
+    readiness = service.get_runtime_readiness()
+    mode_name = readiness.mode.mode_name
+    mode_status = readiness.mode.status
+    owner_bootstrapped = readiness.summary["owner_bootstrapped"]
+    acting_principal_available = readiness.summary["acting_principal_available"]
+    gate_manager_available = readiness.summary["runtime_gate_manager_available"]
+    dangerous_caps_disabled = readiness.summary["dangerous_capabilities_disabled"]
+    production_ready = readiness.summary["production_ready_local_single_user_runtime"]
 
     enabled_caps: list[str] = []
     disabled_caps: list[str] = []
     policy_gated_caps: list[str] = []
     for cap in sorted(RUNTIME_DOMAIN_CAPABILITIES):
-        gate = authority.get_effective_capability_gate(cap)
-        state = gate["state"]
-        if state == CapabilityState.ENABLED_RUNTIME:
-            enabled_caps.append(cap)
-        elif state == CapabilityState.ENABLED_POLICY_GATED:
-            policy_gated_caps.append(cap)
-        else:
-            disabled_caps.append(cap)
+        gate = service.get_capability_gate(cap)
+        if gate is not None:
+            if gate.state == CapabilityState.ENABLED_RUNTIME:
+                enabled_caps.append(cap)
+            elif gate.state == CapabilityState.ENABLED_POLICY_GATED:
+                policy_gated_caps.append(cap)
+            else:
+                disabled_caps.append(cap)
 
-    dangerous_caps_disabled = True
-    dangerous_caps = {
-        "shell_execution", "process_execution", "network_execution",
-        "web_fetch", "email_runtime", "calendar_runtime", "finance_runtime",
-        "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
-        "cctv_runtime", "home_security_runtime", "plugin_execution_cap",
-        "plugin_install", "external_channel_runtime", "channel_approval_relay",
-        "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
-        "approval_execution_relay", "scheduled_routines", "graph_indexing_runtime",
-        "semantic_memory_runtime", "vector_embedding_runtime",
-        "hosted_model_runtime", "private_network_model_runtime",
-    }
-    for cap in dangerous_caps:
-        gate = authority.get_effective_capability_gate(cap)
-        if gate["state"] not in ("disabled", "planned"):
-            dangerous_caps_disabled = False
-            break
-
-    production_ready = (
-        owner_bootstrapped
-        and mode_name in ("local_single_user_runtime", "local_single_user_safe")
-        and mode_status == "active"
-        and gate_manager_available
-        and acting_principal_available
-        and dangerous_caps_disabled
-    )
-
+    store = SQLiteStore(workspace_root)
+    writer = EventLogWriter(store)
     writer.append(make_event(
         turn_id=None,
         session_id="authz",

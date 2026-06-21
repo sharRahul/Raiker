@@ -182,3 +182,29 @@ def proposed_write_snapshot(
         "proposed_text": new_text,
         "requires_approval": True,
     }
+
+
+def write_file_content(workspace_root: str | Path, path: str | Path, text: str) -> dict[str, Any]:
+    resolved = resolve_workspace_path(workspace_root, path)
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(text, encoding="utf-8")
+    return {
+        "status": "success",
+        "path": str(resolved.relative_to(Path(workspace_root).resolve())),
+        "size_bytes": resolved.stat().st_size,
+    }
+
+
+def edit_file_content(workspace_root: str | Path, path: str | Path, text: str) -> dict[str, Any]:
+    return write_file_content(workspace_root, path, text)
+
+
+def apply_patch_content(workspace_root: str | Path, path: str | Path, new_text: str) -> dict[str, Any]:
+    resolved = resolve_workspace_path(workspace_root, path)
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(new_text, encoding="utf-8")
+    return {
+        "status": "success",
+        "path": str(resolved.relative_to(Path(workspace_root).resolve())),
+        "size_bytes": resolved.stat().st_size,
+    }

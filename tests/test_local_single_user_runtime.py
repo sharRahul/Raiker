@@ -372,8 +372,8 @@ def test_commands_have_resolved_principal(temp_workspace: Path):
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef) and node.name in handlers_to_check:
             body_text = ast.unparse(node)
-            assert "resolve_local_principal" in body_text, (
-                f"{node.name} does not use resolve_local_principal"
+            assert "RuntimeControlService" in body_text, (
+                f"{node.name} does not use RuntimeControlService"
             )
 
 

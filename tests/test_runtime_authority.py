@@ -36,6 +36,15 @@ from raiker.runtime.authority.models import (
 )
 from raiker.storage.sqlite import SQLiteStore
 
+
+def _insert_ack(store: SQLiteStore, capability: str, now: str) -> None:
+    with store.connect() as connection:
+        connection.execute(
+            "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
+            (capability, "test", now, "test_doc"),
+        )
+
+
 # ── Fixtures ──
 
 
@@ -1094,6 +1103,7 @@ def test_admin_mutation_can_be_enabled_through_governed_transition(tmp_path: Pat
         role_id="rl_rgm", name="runtime_gate_manager",
         description="", is_system_role=True, created_at=now,
     ))
+    _insert_ack(store, "admin_mutation", now)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
     principal = Principal(
@@ -1118,6 +1128,7 @@ def test_role_mutation_can_be_enabled_through_governed_transition(tmp_path: Path
         role_id="rl_rgm", name="runtime_gate_manager",
         description="", is_system_role=True, created_at=now,
     ))
+    _insert_ack(store, "role_mutation", now)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
     principal = Principal(
@@ -1141,6 +1152,7 @@ def test_disabled_capability_blocks_after_disable(tmp_path: Path) -> None:
         role_id="rl_rgm", name="runtime_gate_manager",
         description="", is_system_role=True, created_at=now,
     ))
+    _insert_ack(store, "admin_mutation", now)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
     principal = Principal(
@@ -1190,7 +1202,7 @@ def test_dangerous_capability_transition_blocked(tmp_path: Path) -> None:
     )
     result = authority.request_capability_transition("shell_execution", "enabled_policy_gated", principal, "Attempt")
     assert result is not None
-    assert "requires a future explicit activation task" in result
+    assert "activation_blocked" in result or "no_executor" in result
 
 
 def test_unknown_capability_transition_blocked(tmp_path: Path) -> None:

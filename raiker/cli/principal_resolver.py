@@ -76,6 +76,15 @@ def _get_active_owner_principals(store: SQLiteStore) -> list[dict[str, Any]]:
     return owners
 
 
+def _pre_ack_gov_caps(store: SQLiteStore, principal_id: str, now: str) -> None:
+    with store.connect() as connection:
+        for cap in ("admin_mutation", "policy_mutation", "role_mutation"):
+            connection.execute(
+                "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
+                (cap, principal_id, now, "system_bootstrap"),
+            )
+
+
 def bootstrap_owner(
     user_id: str,
     display_name: str,
@@ -146,6 +155,8 @@ def bootstrap_owner(
             granted_at=now,
             granted_by="system_bootstrap",
         ))
+
+    _pre_ack_gov_caps(store, principal_id, now)
 
     writer.append(make_event(
         session_id="bootstrap",
@@ -249,6 +260,7 @@ def _handle_owner_recovery(
         max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_RUNTIME.value,
         is_active=True,
     )
+    _pre_ack_gov_caps(store, principal_id, now)
 
     writer.append(make_event(
         session_id="bootstrap",

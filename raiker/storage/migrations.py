@@ -932,3 +932,32 @@ CREATE TABLE IF NOT EXISTS capability_gate_state (
   updated_at TEXT NOT NULL
 );
 """
+
+# ── Threat Model Acks (Workstream C) ─────────────────────────────────────────
+
+THREAT_MODEL_ACKS_MIGRATION_ID = "RAIKER-11002-threat-model-acks"
+
+THREAT_MODEL_ACKS_SQL = """
+CREATE TABLE IF NOT EXISTS threat_model_acks (
+  capability TEXT PRIMARY KEY,
+  acked_by TEXT NOT NULL,
+  acked_at TEXT NOT NULL,
+  doc_ref TEXT NOT NULL DEFAULT ''
+);
+"""
+
+# ── API Sessions (Workstream B) ─────────────────────────────────────────────
+
+API_SESSIONS_MIGRATION_ID = "RAIKER-11001-api-sessions"
+
+API_SESSIONS_SQL = """
+CREATE TABLE IF NOT EXISTS api_sessions (
+  session_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL REFERENCES principals(principal_id),
+  token_hash TEXT NOT NULL,
+  scopes TEXT NOT NULL DEFAULT '["control"]',
+  created_at TEXT NOT NULL,
+  expires_at TEXT,
+  revoked INTEGER NOT NULL DEFAULT 0
+);
+"""

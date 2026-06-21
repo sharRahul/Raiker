@@ -205,6 +205,8 @@ EVENT_TYPES = {
     "owner_recovery_old_owner_deactivated",
     "principal_resolved",
     "principal_resolution_failed",
+    "action_executed",
+    "action_failed",
 }
 INTENTS = {
     "chat",

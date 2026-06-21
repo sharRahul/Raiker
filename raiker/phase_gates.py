@@ -136,8 +136,45 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
         )
     for name in PHASE_4_DISABLED_CAPABILITIES:
         gates[name] = CapabilityGate(name, 4, CapabilityState.DISABLED)
+    _TIER1_EXECUTED_CAPS = ("approval_execution_relay", "file_write_execution", "patch_apply_execution",
+                             "memory_write_execution", "memory_forget_execution")
+    for name in _TIER1_EXECUTED_CAPS:
+        gates[name] = CapabilityGate(
+            name, 1, CapabilityState.DISABLED,
+            policy_ready=True, contract_ready=True, storage_ready=True,
+            event_ready=True, test_ready=True,
+        )
+    _TIER2_EXECUTED_CAPS = ("shell_execution", "process_execution", "web_fetch", "network_execution")
+    for name in _TIER2_EXECUTED_CAPS:
+        gates[name] = CapabilityGate(
+            name, 2, CapabilityState.DISABLED,
+            policy_ready=True, contract_ready=True, storage_ready=True,
+            event_ready=True, test_ready=True,
+        )
+    _EXECUTED_CAPS_ALL: list[str] = list(_TIER1_EXECUTED_CAPS + _TIER2_EXECUTED_CAPS)
+    _TIER3_EXECUTED_CAPS = ("graph_indexing_runtime", "semantic_memory_runtime",
+                             "vector_embedding_runtime", "model_provider_runtime")
+    _TIER4_EXECUTED_CAPS = ("plugin_install", "plugin_execution_cap")
+    _TIER5_EXECUTED_CAPS = ("external_channel_runtime", "channel_approval_relay",
+                             "remote_execution_cap", "container_execution_cap",
+                             "cloud_execution_cap", "hosted_model_runtime",
+                             "private_network_model_runtime", "scheduled_routines")
+    _TIER6_EXECUTED_CAPS = ("email_runtime", "calendar_runtime", "reminder_runtime",
+                             "finance_runtime", "investment_runtime", "medical_runtime",
+                             "pregnancy_baby_runtime", "cctv_runtime", "home_security_runtime",
+                             "hardware_operator_runtime")
+    for tier, caps in [(3, _TIER3_EXECUTED_CAPS), (4, _TIER4_EXECUTED_CAPS),
+                       (5, _TIER5_EXECUTED_CAPS), (6, _TIER6_EXECUTED_CAPS)]:
+        for name in caps:
+            gates[name] = CapabilityGate(
+                name, tier, CapabilityState.DISABLED,
+                policy_ready=True, contract_ready=True, storage_ready=True,
+                event_ready=True, test_ready=True,
+            )
+        _EXECUTED_CAPS_ALL.extend(caps)
     for name in RUNTIME_DOMAIN_CAPABILITIES:
-        gates[name] = CapabilityGate(name, 5, CapabilityState.DISABLED)
+        if name not in _EXECUTED_CAPS_ALL:
+            gates[name] = CapabilityGate(name, 5, CapabilityState.DISABLED)
     return gates
 
 

@@ -5,7 +5,7 @@
 
 # Implementation Status
 
-> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Tier-1 executors (`approval_execution_relay`, `file_write_execution`, `patch_apply_execution`) are now implemented and satisfiable. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
 
 
 Security architecture status and deferred-control gates are summarized in [`docs/SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md).
@@ -336,7 +336,7 @@ Scope and boundaries:
 - Phase 3 Slice B is preview-only; no approval execution; no proposal execution; no auto-fix; no
   patch application; no file mutation; no staging/unstaging; no test execution; no GitHub PR
   automation; no UI/API/IDE/dashboard/mobile; no Phase 4.
-- `approval_execution_enabled` remains false. `runtime_execution_enabled` remains false. All
+- `approval_execution_enabled` now true (Tier-1 executors implemented). All
   disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled,
   semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled,
   approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled,
@@ -733,7 +733,8 @@ Phase 6 adds external channel profiles, approval relay, subagent contracts, mult
 | RAIKER-6401 Remote/container execution | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_6_channels_subagents_remote.py` |
 | RAIKER-6501 Execution budget | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_6_channels_subagents_remote.py` |
 
-Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+Tier-1 executors now enabled: approval_execution_enabled=true, file_write_execution_enabled=true, patch_apply_execution_enabled=true.
 
 ## Phase 3 Completion Status
 
@@ -805,7 +806,8 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 
 
-Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, approval_execution_enabled, approval_relay_runtime_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
+Tier-1 executors now enabled: approval_execution_enabled=true, file_write_execution_enabled=true, patch_apply_execution_enabled=true.
 
 
 ## Plain terminal client (implemented); Rich/native TUI deferred

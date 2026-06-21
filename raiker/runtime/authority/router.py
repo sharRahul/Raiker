@@ -10,6 +10,7 @@ from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.authority.activation import evaluate_activation_requirement
 from raiker.runtime.authority.models import (
     AI_ROLE_NAMES,
     HUMAN_ONLY_ROLES,
@@ -18,6 +19,7 @@ from raiker.runtime.authority.models import (
     RiskAcceptance,
     RiskLevelValue,
 )
+from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.storage.sqlite import SQLiteStore
 
 NON_ALLOW_DECISIONS = frozenset({
@@ -47,15 +49,30 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "process": "process_execution",
     "network": "network_execution",
     "web_fetch": "web_fetch",
+    "graph_indexing": "graph_indexing_runtime",
+    "semantic_memory": "semantic_memory_runtime",
+    "vector_embedding": "vector_embedding_runtime",
+    "model_provider": "model_provider_runtime",
+    "plugin_install": "plugin_install",
+    "plugin_execution_cap": "plugin_execution_cap",
+    "external_channel_runtime": "external_channel_runtime",
+    "channel_approval_relay": "channel_approval_relay",
+    "remote_execution_cap": "remote_execution_cap",
+    "container_execution_cap": "container_execution_cap",
+    "cloud_execution_cap": "cloud_execution_cap",
+    "hosted_model_runtime": "hosted_model_runtime",
+    "private_network_model_runtime": "private_network_model_runtime",
+    "scheduled_routines": "scheduled_routines",
     "email_runtime": "email_runtime",
     "calendar_runtime": "calendar_runtime",
+    "reminder_runtime": "reminder_runtime",
     "finance_runtime": "finance_runtime",
     "investment_runtime": "investment_runtime",
     "medical_runtime": "medical_runtime",
+    "pregnancy_baby_runtime": "pregnancy_baby_runtime",
     "cctv_runtime": "cctv_runtime",
-    "plugin_install": "plugin_install",
-    "plugin_execution_cap": "plugin_execution_cap",
-    "scheduled_routines": "scheduled_routines",
+    "home_security_runtime": "home_security_runtime",
+    "hardware_operator_runtime": "hardware_operator_runtime",
 }
 
 
@@ -92,6 +109,7 @@ class RuntimeAuthority:
         store: SQLiteStore,
         writer: EventLogWriter,
         policy_engine: PolicyEngine | None = None,
+        executor_registry: ExecutorRegistry | None = None,
     ) -> None:
         self.store = store
         self.writer = writer
@@ -99,6 +117,7 @@ class RuntimeAuthority:
             StaticPolicyConfig(store.paths.workspace_root),
             store=store,
         )
+        self.executor_registry = executor_registry or ExecutorRegistry()
 
     def _event(
         self,
@@ -306,22 +325,9 @@ class RuntimeAuthority:
         allowed_targets = {s.value for s in CapabilityState}
         if target_state not in allowed_targets:
             return f"invalid_target_state:{target_state}"
-        if target_state in (CapabilityState.ENABLED_RUNTIME,):
-            active_mode = self.store.get_active_runtime_mode()
-            mode_name = active_mode["mode_name"] if active_mode else "development_preview"
-            if mode_name not in ("local_single_user_runtime", "multi_user_local_runtime"):
-                return "runtime_mode_not_activated"
-        if capability in ("shell_execution", "process_execution", "network_execution",
-                          "web_fetch", "email_runtime", "calendar_runtime", "finance_runtime",
-                          "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
-                          "cctv_runtime", "home_security_runtime", "hardware_operator_runtime",
-                          "plugin_execution_cap", "plugin_install", "external_channel_runtime",
-                          "channel_approval_relay", "remote_execution_cap", "container_execution_cap",
-                          "cloud_execution_cap", "approval_execution_relay", "scheduled_routines",
-                          "graph_indexing_runtime", "semantic_memory_runtime",
-                          "vector_embedding_runtime", "hosted_model_runtime",
-                          "private_network_model_runtime"):
-            return f"Capability remains disabled: {capability} requires a future explicit activation task."
+        activation_reason = evaluate_activation_requirement(capability, target_state, principal, self.store)
+        if activation_reason is not None:
+            return activation_reason
         now = utc_now()
         gates = default_capability_gates()
         default_gate = gates.get(capability)
@@ -500,11 +506,39 @@ class RuntimeAuthority:
             if valid.get("one_time_or_reusable") == "one_time":
                 self.store.consume_risk_acceptance(valid["risk_acceptance_id"])
 
+        capability = CAPABILITY_GATE_MAP.get(action.action_type, action.action_type)
+        executor = self.executor_registry.get(capability)
+        if executor is not None:
+            result = executor.execute(action, principal)
+            event_type = "action_executed" if result.ok else "action_failed"
+            self._event(
+                event_type=event_type,
+                actor="executor",
+                payload={
+                    "action_id": result.action_id,
+                    "capability": result.capability,
+                    "ok": result.ok,
+                    "reason_code": result.reason_code,
+                    "summary": result.summary,
+                    "artifacts": result.artifacts,
+                },
+                session_id=action.session_id,
+                turn_id=action.turn_id,
+            )
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="allow",
+                policy_decision=decision,
+                message="executed" if result.ok else f"execution_failed:{result.reason_code}",
+                error=None if result.ok else result.reason_code,
+            )
+
         return GovernedActionResult(
             action_id=action.action_id,
             decision="allow",
             policy_decision=decision,
             message="allowed",
+            error="execution_unavailable:no_executor",
         )
 
 

@@ -7,7 +7,7 @@
 ## Features
 
 - **Local-first governed runtime** — A deterministic gather → act → verify loop (`raiker/runtime/orchestrator.py`) drives every turn through a 16-state machine, a static policy engine, a tool broker, and an append-only JSONL + SQLite event/state layer. Model outputs and tool calls are always untrusted proposals that must pass validation, policy, and approval.
-- **Native Textual Rich TUI (privacy-respecting, offline-capable)** — `raiker` launches a native Textual interactive shell with a welcome screen, a single scrolling transcript, token-by-token streaming, a docked input, a configurable status bar, and a command-palette overlay. A plain line-oriented shell is the deterministic fallback. The deterministic mock/test provider keeps the whole stack runnable offline with no network calls.
+- **Plain local terminal client only** — `raiker` launches the line-oriented terminal client. Rich/native TUI, Desktop, Web, Dashboard, Mobile, IDE, Voice, Browser Extension, and REST/API clients are Phase 8 deferred work, not active runtime surfaces. The deterministic mock/test provider is test-only and policy-blocked in the normal CLI.
 - **Policy-gated automation with approvals, review, and checkpoints** — Safe read/search/git tools run directly; file mutations become approval-gated proposals. A deterministic local code-review workflow (`/review`), a proposal lifecycle, metadata-only approval previews, and checkpoint/rewind metadata give you reviewable, reversible automation.
 
 ---
@@ -17,7 +17,7 @@
 A quick breakdown of how the system is put together:
 
 - **Core:** Python 3.11+ (typed; `ruff` + `mypy` enforced).
-- **Frameworks/Engines:** [Textual](https://textual.textualize.io/) + [Rich](https://rich.readthedocs.io/) for the TUI; `asyncio` for the runtime; `httpx.AsyncClient` as the only runtime HTTP transport (no provider SDKs).
+- **Frameworks/Engines:** `asyncio` for the runtime; `httpx.AsyncClient` as the only runtime HTTP transport (no provider SDKs). Rich/Textual are not runtime dependencies.
 - **Storage/State:** SQLite (`raiker/storage/sqlite.py`) for runtime state, tasks, sessions, approvals, checkpoints, memory candidates, and metadata records; append-only JSONL for the event log.
 - **Integrations/APIs:** Local LLM runtimes via an async OpenAI-compatible adapter — **llama.cpp** server is the native local-first default (`http://127.0.0.1:8080`); Ollama, LM Studio, and vLLM are local/home-lab profiles; OpenRouter is hosted and policy/budget-gated; a deterministic provider powers offline tests.
 
@@ -50,7 +50,7 @@ This installs the package in editable mode with the dev toolchain (`pytest`, `ru
 
 Raiker is local-first and needs **no credentials** to run. Behavior is controlled by a few environment variables and the bundled JSON config files — never by hard-coded secrets:
 
-- `RAIKER_TUI=plain` — force the plain line-oriented shell instead of the Textual TUI.
+- `RAIKER_TUI=plain` — keep the plain line-oriented shell path (the only launchable UI).
 - `RAIKER_TEST_MODE=1` — enable the deterministic test provider (test/offline only; production CLI policy blocks it with `deterministic_test_provider_requires_test_mode`).
 - `--workspace <path>` — choose the workspace root that holds local runtime state (defaults to the current directory).
 - Model endpoints are declared in [`config/model-profiles.json`](config/model-profiles.json) (e.g. the llama.cpp profile’s `endpoint` is `http://127.0.0.1:8080`); channel connector profiles live in [`config/channel-connectors.json`](config/channel-connectors.json).
@@ -60,7 +60,7 @@ Hosted providers (e.g. OpenRouter) require explicit network + egress + budget po
 ### Running the Application
 
 ```bash
-raiker                               # interactive TUI (or plain shell with RAIKER_TUI=plain)
+raiker                               # interactive plain terminal client
 raiker --prompt "Hello Raiker"       # submit one prompt and exit
 raiker --workspace /path/to/project  # use a specific workspace root
 raiker --help                        # usage
@@ -75,9 +75,9 @@ Inside the client, `/help` lists commands. The full CLI command surface is docum
 The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) — read it before implementing anything. In summary:
 
 - **All Phase 3 slices A through P are implemented, tested, and documented.** Phase 3 is `implemented_verified` only for the **safe foundation/readiness slices A-P**, and **Phase 4 memory MVP is implemented**.
-- The **current launchable UI is a local terminal client**: a **native Textual Rich TUI** by default on a TTY, with a plain shell fallback. **Desktop/Web/Dashboard/Mobile apps**, IDE extension, Voice, Browser Extension, and REST/API remain **specified/deferred, not implemented** as launchable apps.
+- The **current launchable UI is the plain local terminal client only**. **Rich/native TUI is Phase 8 deferred work**. **Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred**: specified but not implemented as launchable apps.
 - **Runtime execution remains disabled.** Plugin execution, graph/codemap indexing, semantic/vector memory writes, embeddings, approval execution, external channels, notifications, subagents, multi-agent teams, and remote/container/cloud execution are intentionally off; the readiness/preview surfaces for them are metadata-only and must not silently activate runtime.
-- Phases 5–9 add governed-enterprise, channel/subagent/remote, runtime-feature, and advanced memory/graph foundations as recorded in the ledger (there is no Phase 8; numbering jumps 7→9). Capabilities still needing implementation are tracked in [`docs/GAP_AND_TODO_ANALYSIS.md`](docs/GAP_AND_TODO_ANALYSIS.md).
+- Phases 5–7 add governed-enterprise, channel/subagent/remote, and runtime-feature metadata/readiness foundations. Phase 8 is the planned UI/client implementation phase. Phase 9 covers advanced memory/graph foundations. Capabilities still needing implementation are tracked in [`docs/GAP_AND_TODO_ANALYSIS.md`](docs/GAP_AND_TODO_ANALYSIS.md).
 
 ---
 

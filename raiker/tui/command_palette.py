@@ -1,6 +1,6 @@
-"""Command list overlay for the Rich TUI default access shell.
+"""Command list plain-text catalog for the plain terminal client.
 
-This is a lightweight, grouped command catalogue rendered as a transient overlay
+This is a lightweight, grouped command catalogue rendered as a transient plain-text catalog
 (option B in the Q1 spec). A searchable, keyboard-driven palette is deferred to a
 later slice. It only describes commands; it never executes them and never creates new
 command semantics. Selecting/submitting a command is the user's responsibility through
@@ -32,7 +32,7 @@ COMMAND_GROUPS: tuple[CommandGroup, ...] = (
         "Core",
         (
             CommandEntry("/help", "Show command help in the main panel."),
-            CommandEntry("/commands", "Show this grouped command overlay."),
+            CommandEntry("/commands", "Show this grouped command plain-text catalog."),
             CommandEntry("/home", "Return to the welcome/home screen."),
             CommandEntry("/panels", "List optional panels you can open."),
             CommandEntry("/panel <id>", "Open an optional panel in its region."),
@@ -154,9 +154,9 @@ COMMAND_GROUPS: tuple[CommandGroup, ...] = (
 
 
 def palette_lines(profile: TerminalProfile) -> list[str]:
-    """Return the grouped command overlay as plain, accessible text lines."""
+    """Return the grouped command plain-text catalog as plain, accessible text lines."""
 
-    lines: list[str] = ["Command palette (overlay) — submit a command to run it:"]
+    lines: list[str] = ["Command palette (plain-text catalog) — submit a command to run it:"]
     for group in COMMAND_GROUPS:
         lines.append("")
         lines.append(f"[{group.title}]")
@@ -169,7 +169,7 @@ def palette_lines(profile: TerminalProfile) -> list[str]:
 
 
 def render_command_palette(profile: TerminalProfile | None = None) -> str:
-    """Render the command overlay as text for main-panel/transient display."""
+    """Render the command plain-text catalog as text for main-panel/transient display."""
 
     from raiker.tui.accessibility import TerminalProfile as _TP
 

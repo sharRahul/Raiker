@@ -1,5 +1,8 @@
 # Raiker Architecture Blueprint
 
+> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+
+
 Raiker is a local-first AI agent platform. It is designed as an operating layer for prompts, models, tools, policy, memory, plugins, hooks, subagents, channels, user interfaces, storage, search, graph context, checkpoints, and execution environments.
 
 This document turns the high-level README into implementation-ready architecture. Implementation is phased, but the architecture is fully specified now.
@@ -49,12 +52,12 @@ Phase boundaries exist to control implementation order, not to hide missing desi
 |---|---|---|
 | Phase 1 | Secure Local Interface Core | Contracts, gateway, sessions, runtime, policy, broker, event log, SQLite bootstrap, first local terminal client, mock model, checkpoint stub, equal-interface contracts. |
 | Phase 2 | Rich Local Workspace | Full terminal/TUI panels, background tasks, side questions, full checkpoints/rewind, local model providers, hooks, approved project/profile memory. |
-| Phase 3 | Desktop/Web/Mobile/Plugin/Graph target platform architecture | Target platform architecture covers Desktop UI, Web UI, Dashboard, Apple mobile app, Android mobile app, plugin manager, semantic search, graph/codemap, REST API, and worktree isolation. Currently completed Phase 3 A-P scope is the safe foundation/readiness layer only: CLI functional-test surfaces, read-only shared workspace/view contracts, plugin manifest planning/validation, approval previews, readiness metadata, storage lifecycle metadata, and disabled-runtime validation. Deferred after Phase 3 are launchable desktop/web/mobile/dashboard/IDE/API apps and runtime semantic/vector search, graph indexing/query execution, plugin execution, scheduled automation, and hosted/cloud runtime work. |
+| Phase 3 | Desktop/Web/Mobile/Plugin/Graph target platform architecture | Target platform architecture covers Desktop UI, Web UI, Dashboard, Apple mobile app, Android mobile app, plugin manager, semantic search, graph/codemap, REST API, and worktree isolation. Currently completed Phase 3 A-P scope is the safe foundation/readiness layer only: CLI functional-test surfaces, read-only shared workspace/view contracts, plugin manifest planning/validation, approval previews, readiness metadata, storage lifecycle metadata, and disabled-runtime validation. Phase 8 deferred runtime/app work includes launchable Rich/native TUI, desktop/web/mobile/dashboard/IDE/API apps; deferred runtime semantic/vector search, graph indexing/query execution, plugin execution, scheduled automation, and hosted/cloud runtime work. |
 | Phase 4 | Channels/Multi-Agent/Remote Execution | Channel connectors, subagents, agent teams, container/remote profiles, voice/hotkeys/browser extension, chat/email clients. |
 | Phase 5 | Governed Enterprise/Home-Lab Platform | Managed policies, multi-user governance, signed plugins, event integrity, audit export, cloud/GPU budgets, deployment operations. |
 | Phase 6 | Channels/Subagents/Remote Foundations | External channel connectors and approval relay, subagent contracts, multi-agent team ledgers, remote/container execution profiles, execution budgets. Records/metadata implemented; runtime transports and execution remain disabled. |
 | Phase 7 | Runtime Feature Foundations | Desktop/Web/IDE session models, plugin runtime, graph/codemap indexing, and semantic/vector memory writes as record-level foundations. Dashboard and mobile apps remain `specified_not_implemented`; all execution stays policy-gated and disabled. |
-| Phase 9 | Advanced Memory & Graph | Vector index, AST symbol/dependency graph indexer, project graph extraction, and procedural-memory-to-skill-candidate conversion as in-memory modules with SQLite persistence. All execution remains policy-gated and disabled. (There is no Phase 8; numbering intentionally skips from 7 to 9.) |
+| Phase 9 | Advanced Memory & Graph | Vector index, AST symbol/dependency graph indexer, project graph extraction, and procedural-memory-to-skill-candidate conversion as in-memory modules with SQLite persistence. All execution remains policy-gated and disabled. (There is Phase 8 is the planned UI/client phase; numbering intentionally skips from 7 to 9.) |
 
 > Phase 6–9 status detail lives in the canonical ledger `docs/IMPLEMENTATION_STATUS.md`.
 
@@ -211,7 +214,7 @@ Raiker must install one human-facing global command named `raiker` as the local 
 raiker
 ```
 
-Running `raiker` launches the configured local terminal client. The default terminal client may be a Rich TUI, but it is not the canonical or exclusive human interface.
+Running `raiker` launches the configured local terminal client. The default terminal client is currently the plain local terminal client only; Rich/native TUI is Phase 8 deferred.
 
 Required terminal actions:
 
@@ -240,7 +243,7 @@ These choices minimise drift and complexity while preserving the full architectu
 
 - Language: Python 3.11 or 3.12.
 - Package manager: uv or pip with a lockfile.
-- Terminal client: Textual, Rich, or a minimal dependency-free terminal renderer. Prefer the smallest implementation that supports panels and input safely.
+- Terminal client: a minimal dependency-free terminal renderer; Textual/Rich are Phase 8 deferred. Prefer the smallest implementation that supports panels and input safely.
 - Data validation: Pydantic or dataclasses. Use one consistently.
 - Tests: pytest.
 - Event log: JSONL files plus SQLite indexes.
@@ -335,7 +338,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Rich TUI panels | Minimal terminal shell/status rendering only; rich panels are specified, not implemented as a full app. | Partial/minimal | None. | Build panel framework only in a future approved slice. |
+| Rich TUI panels | Plain terminal shell/status rendering only; Rich/native TUI panels are Phase 8 deferred. | Plain-only | None. | Build panel framework only in a future approved slice. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |

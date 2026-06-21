@@ -1,4 +1,4 @@
-"""Accessibility and terminal-capability helpers for the Rich TUI default access shell.
+"""Accessibility and terminal-capability helpers for the plain terminal client.
 
 This module is a pure presentation helper. It must not import subprocess, socket,
 requests, urllib, httpx, or any model/tool/network/process runtime. It only inspects
@@ -63,7 +63,6 @@ class TerminalProfile:
     color: bool = True
     unicode: bool = True
     interactive: bool = False
-    rich_available: bool = True
     force_plain: bool = False
     compact_below: int = DEFAULT_COMPACT_BELOW
 
@@ -71,18 +70,6 @@ class TerminalProfile:
     def narrow(self) -> bool:
         return self.width < self.compact_below
 
-    @property
-    def use_rich(self) -> bool:
-        """Rich rendering only when available, allowed, and interactive."""
-        return self.rich_available and not self.force_plain and self.interactive
-
-
-def _rich_importable() -> bool:
-    try:
-        import rich  # noqa: F401
-    except Exception:
-        return False
-    return True
 
 
 def detect_terminal_profile(
@@ -90,12 +77,10 @@ def detect_terminal_profile(
     env: Mapping[str, str] | None = None,
     interactive: bool | None = None,
     width: int | None = None,
-    rich_available: bool | None = None,
 ) -> TerminalProfile:
     """Detect a :class:`TerminalProfile` from environment hints.
 
-    ``RAIKER_TUI=plain`` forces the plain/ASCII fallback. ``RAIKER_TUI=rich``
-    requests rich rendering. ``NO_COLOR`` disables colour. Nothing here launches a
+    ``RAIKER_TUI=plain`` keeps the plain/ASCII-safe terminal path. ``NO_COLOR`` disables colour. Nothing here launches a
     process, opens a socket, or contacts a model.
     """
 
@@ -104,8 +89,6 @@ def detect_terminal_profile(
     force_plain = mode == "plain"
     if width is None:
         width = shutil.get_terminal_size((DEFAULT_COMPACT_BELOW, 24)).columns
-    if rich_available is None:
-        rich_available = _rich_importable()
     no_color = bool(env.get("NO_COLOR")) or force_plain
     unicode_ok = not force_plain and _terminal_supports_unicode(env)
     return TerminalProfile(
@@ -113,7 +96,6 @@ def detect_terminal_profile(
         color=not no_color,
         unicode=unicode_ok,
         interactive=bool(interactive),
-        rich_available=bool(rich_available),
         force_plain=force_plain,
     )
 

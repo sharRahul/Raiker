@@ -1,5 +1,8 @@
 # Implementation Status
 
+> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+
+
 This document is the implementation control ledger for Raiker. It converts the existing phase blueprint into a builder-proof status view so a local or cloud coding agent can tell what is specified, what is implemented, what is intentionally disabled, and what must not be built yet.
 
 A feature marked as specified is not automatically implemented. A feature marked as phase-scheduled is not permission to invent behaviour in code. A feature may only be marked `implemented_verified` when the implementation maps to documented task IDs, required tests exist, and validation has passed for the current change set.
@@ -662,7 +665,7 @@ All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 
 
 ### Current launchable UI & runtime truth
 
-The current launchable UI is a local terminal client: a native Textual Rich TUI by default on an
+The current launchable UI is a local terminal client: a plain local terminal client only; Rich/native TUI is Phase 8 deferred. Previously this section referred to a Textual shell on an
 interactive TTY, with a plain line-oriented CLI shell as the fallback (`RAIKER_TUI=plain`,
 `--prompt`, or non-interactive stdin). Both route through the Agent Gateway, ToolBroker, and
 PolicyEngine and add no runtime authority of their own. Desktop/Web/Dashboard/Mobile apps, IDE
@@ -713,7 +716,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Surface | Current implementation | Functional-testable? | Runtime authority | Next task |
 |---|---|---:|---|---|
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
-| Raiker TUI | Native Textual interactive shell: welcome screen, single scrolling transcript with token-by-token streaming, docked input, docked status bar, command-palette overlay. `RAIKER_TUI=plain`/`--prompt`/non-interactive keep the plain fallback. | Yes | No direct tool authority; prompts stream through gateway/broker/policy. | Polish: inline tool-call blocks, optional docked panels remain deferred. |
+| Plain terminal client | Line-oriented terminal client with `/help`, `/commands`, slash-command routing, and prompt submission. Rich/native TUI is Phase 8 deferred. | Yes | No direct tool authority; prompts route through gateway/broker/policy. | Implement richer clients only in Phase 8. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
@@ -731,7 +734,7 @@ Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_en
 
 ## Raiker TUI (native interactive shell)
 
-Raiker TUI is `implemented_verified` for the native Textual interactive shell: welcome screen with Raiker cloud logo, single scrolling transcript, docked input, docked status bar, command-palette overlay, and token-by-token streaming wired through `AgentGateway.astream_prompt`. The old Phase 3 Slice Q1/Q2/Q3 TUI specs are superseded. `RAIKER_TUI=plain`, `--prompt`, and non-interactive stdin keep a minimal plain fallback in `raiker/tui/app.py`. The TUI adds no runtime authority: prompts route through `submit_terminal_prompt()` / Agent Gateway and slash commands route through `handle_slash_command()`. TUI modules call no tools, models, plugins, channels, shell, subprocess, sockets, or network APIs directly. All disabled runtime flags remain false. Evidence: `tests/test_raiker_textual_tui.py` (offline FakeStreamingGateway), `tests/test_raiker_tui_real_provider_integration.py` (opt-in real-provider integration, skipped without env vars).
+Plain terminal client is `implemented_verified`: `raiker`, `raiker --prompt`, and `RAIKER_TUI=plain` route slash commands through `handle_slash_command()` and normal prompts through `submit_terminal_prompt()`. Rich/native TUI is Phase 8 deferred; the active Textual implementation and tests have been removed. All disabled runtime flags remain false.
 
 ---
 

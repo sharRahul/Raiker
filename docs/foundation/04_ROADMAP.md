@@ -1,10 +1,10 @@
-> **Foundation document.** This is a living design-foundation doc (moved from `docs/completed/` during the 2026-06-21 documentation alignment). For current implementation status see the canonical ledger `docs/IMPLEMENTATION_STATUS.md`; for outstanding work see `docs/GAP_AND_TODO_ANALYSIS.md`. As of that date: Phases 1–9 foundations are in place, the launchable UI is a local terminal client (native Textual Rich TUI + plain fallback), and all runtime execution remains disabled.
+> **Foundation document.** This is a living design-foundation doc (moved from `docs/completed/` during the 2026-06-21 documentation alignment). For current implementation status see the canonical ledger `docs/IMPLEMENTATION_STATUS.md`; for outstanding work see `docs/GAP_AND_TODO_ANALYSIS.md`. As of that date: Phases 1–9 foundations are in place, the launchable UI is a local terminal client (plain local terminal client only; Rich/native TUI deferred to Phase 8), and all runtime execution remains disabled.
 
 # 04 Roadmap
 
 > **Two phase-numbering schemes exist.** This foundation roadmap uses the *original design*
 > numbering below (Phase 0–9, where Phase 8 = "UI and Channels"). The **build/ledger** scheme used by
-> `docs/IMPLEMENTATION_STATUS.md` and `docs/ARCHITECTURE.md` is different and has **no Phase 8**
+> `docs/IMPLEMENTATION_STATUS.md` and `docs/ARCHITECTURE.md` is different and has **Phase 8 is the planned UI/client phase**
 > (build phases jump 7 → 9). When reconciling status, the ledger's build-phase scheme is canonical.
 
 ## Roadmap Rules

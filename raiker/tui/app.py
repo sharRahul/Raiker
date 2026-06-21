@@ -1,14 +1,6 @@
-"""Plain line-oriented fallback terminal client for Raiker.
+"""Plain line-oriented terminal client for Raiker.
 
-This is the non-Textual path. It is used when:
-  * ``RAIKER_TUI=plain`` is set,
-  * ``--prompt`` submits one prompt and exits,
-  * stdin is non-interactive.
-
-The interactive default is the native Raiker TUI (Textual) in
-``raiker.tui.textual_app``. This module is deliberately minimal and reliable:
-no rich panels, no docked regions, no overlays. It prints a one-line status
-header and routes prompts/commands through the existing handlers.
+This module is deliberately minimal and reliable: no Rich/Textual panels, no docked regions, no overlays. It prints a one-line status header and routes prompts/commands through the existing handlers.
 
 This shell adds no runtime authority. Prompts route through
 ``submit_terminal_prompt`` and slash commands route through
@@ -135,12 +127,4 @@ def run_terminal_client(
         _print_header(workspace_root, profile)
         print("Non-interactive input detected; terminal client started and exited safely.")
         return 0
-    if profile.force_plain:
-        return _run_plain_interactive(workspace_root, profile)
-    return _run_textual_interactive(workspace_root, profile)
-
-
-def _run_textual_interactive(workspace_root: str | Path, profile: TerminalProfile) -> int:
-    from raiker.tui.textual_app import run_textual_tui
-
-    return run_textual_tui(workspace_root=workspace_root, profile=profile)
+    return _run_plain_interactive(workspace_root, profile)

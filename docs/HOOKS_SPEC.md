@@ -1,5 +1,8 @@
 # Hooks Specification
 
+> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+
+
 > **Code status: implemented (core).** `raiker/hooks/` is a working dispatcher wired through the
 > tool broker and gateway. Implemented now:
 > - **Handler types:** `builtin` (in-process, trusted) and `command` (subprocess). `http`,

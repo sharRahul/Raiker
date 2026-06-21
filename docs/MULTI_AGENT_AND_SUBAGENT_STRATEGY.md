@@ -1,5 +1,8 @@
 # Multi-Agent And Subagent Strategy
 
+> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+
+
 Raiker supports subagents and coordinated multi-agent teams through phase-scheduled implementation. The design is fully specified now; phase numbers control when behaviour is wired, not whether behaviour is defined.
 
 Subagents are useful for specialised work, but they increase risk, cost, complexity, and drift. They must be bounded by contracts, permissions, event logs, and explicit task ownership.

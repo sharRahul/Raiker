@@ -1,5 +1,8 @@
 # UI And UX Design Specification
 
+> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+
+
 Raiker must provide consistent UI behaviour across CLI, Rich TUI, Desktop UI, Web UI, Dashboard, IDE extension, Voice UI, Hotkeys, REST, Webhooks, Slack, Teams, Discord, Signal, Email, Browser Extension, Apple mobile app, Android mobile app, Mobile Companion, and channel clients.
 
 Implementation is phased, but the user experience is fully specified now. No builder agent should invent how a screen, panel, status bar, connector wizard, dashboard widget, mobile view, approval surface, or channel interaction works.
@@ -1074,7 +1077,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 ## Raiker TUI (native interactive shell — implemented)
 
-The native Raiker TUI is the single interactive terminal shell, built on Textual. It supersedes the former Phase 3 Slice Q1/Q2/Q3 TUI specs. Running `raiker` interactively launches a welcome screen with the Raiker cloud logo, then replaces it with a single scrolling transcript on the first prompt. The transcript shows user prompts, streamed assistant replies (token-by-token), and inline collapsible tool blocks. A docked input box and a thin configurable status bar are always visible. A command-palette overlay is available via `/commands`, `/palette`, or Ctrl+P. `RAIKER_TUI=plain`, `--prompt`, and non-interactive stdin keep a minimal plain fallback. See `raiker/tui/textual_app.py` and `raiker/tui/app.py`.
+The active Raiker terminal client is the plain line-oriented client in `raiker/tui/app.py`. Rich/native TUI implementation, including Textual panels, docked input, keyboard overlays, and transcript widgets, is Phase 8 deferred work.
 
 ## Raiker TUI — layout and inspection views
 

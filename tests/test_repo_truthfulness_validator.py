@@ -30,8 +30,8 @@ def test_truthfulness_validator_passes() -> None:
 def test_help_and_status_are_honest_about_phase_3_and_ui_scope(tmp_path: Path) -> None:
     help_output = handle_slash_command("/help", workspace_root=tmp_path)
     assert "Phase 3 Slice B approval planning preview is implemented" in help_output
-    assert "Current launchable UI is a local terminal client" in help_output
-    assert "contract-only or specified/deferred" in help_output
+    assert "Current launchable UI is the plain local terminal client only" in help_output
+    assert "Phase 8 deferred work" in help_output
 
     status_output = handle_slash_command("/status", workspace_root=tmp_path)
     assert "phase_3_status: implemented_verified" in status_output
@@ -105,7 +105,7 @@ def test_architecture_phase_3_row_is_truthful() -> None:
     row = next(line for line in text.splitlines() if line.startswith("| Phase 3 |"))
     assert "target platform architecture" in row
     assert "safe foundation/readiness" in row
-    assert "Deferred after Phase 3" in row
+    assert "Phase 8 deferred" in row
     assert "runtime semantic/vector search" in row
 
 

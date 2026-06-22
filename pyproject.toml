@@ -8,13 +8,14 @@ version = "0.0.0"
 description = "Local-first agent runtime core"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["httpx>=0.27", "fastapi>=0.110"]
+dependencies = ["httpx>=0.27", "fastapi>=0.110", "uvicorn>=0.30"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10"]
 
 [project.scripts]
 raiker = "raiker.cli.main:main"
+raiker-web = "apps.api.main:main"
 
 [tool.setuptools.packages.find]
 include = ["raiker*", "apps*"]

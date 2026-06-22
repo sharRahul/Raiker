@@ -460,6 +460,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def list_turns(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM turns WHERE session_id = ? ORDER BY created_at ASC LIMIT ?",
+                (session_id, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_turn(self, turn_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM turns WHERE turn_id = ?", (turn_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
     def insert_turn(
         self, session_id: str, turn_id: str, prompt_text: str, status: str = "running"
     ) -> None:

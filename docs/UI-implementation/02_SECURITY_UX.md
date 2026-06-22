@@ -27,26 +27,59 @@ Capability-matrix labels mirror backend statuses exactly: `implemented_read_only
 
 ## `reason_code` → plain-English copy map
 
-The backend returns machine `reason_code`s on denial (403 `{ok:false, reason_code}`) and inside
-`PolicyDecision`/`GovernedActionResult`. The UI maps each to a human explanation **and** a
-"what would be required" remediation. Representative mapping (extend as backend codes are
-enumerated during M5/M7):
+The backend returns machine `reason_code` / message strings on denial (403 `{ok:false,
+reason_code}`) and inside `PolicyDecision` / `GovernedActionResult.message`. The codes below are
+**transcribed verbatim from source** (not invented) — keep this table in sync with code; the M7
+anti-drift test asserts every code listed here exists in the codebase.
 
-| reason_code (pattern) | Plain English | Remediation shown |
+### Decision values — `GovernedActionResult.decision` (`raiker/runtime/authority/router.py`)
+The UI renders each decision distinctly: `allow`, `deny`, `disabled_by_capability_gate`,
+`needs_human_confirmation`, `needs_approval`, `needs_risk_acceptance`.
+
+### Principal / role / scope denials — `router.py`
+| reason_code | Plain English | Remediation | Source |
+|---|---|---|---|
+| `principal_not_active` | "Your account/principal is not active." | "A human owner must re-activate it." | `check_principal_active` |
+| `principal_expired` | "Your principal has expired." | "Re-bootstrap or renew the principal." | `check_principal_active` |
+| `cannot_assign_human_role_to_ai:{role}` | "An AI principal can't hold a human-only role." | "Only a human can hold this role." | `check_ai_role_assignment` |
+| `domain_scope_denied:{scope}` | "This action's domain isn't in your granted scopes." | "Grant the domain scope to the principal." | `check_domain_scope` |
+| `ai_cannot_approve_own_action` | "An AI can't approve its own action." | "Another authorised human must approve." | `check_self_approval` |
+| `ai_cannot_grant_roles` | "An AI can't grant/assign roles." | "A human owner must grant roles." | `check_self_grant` |
+| `ai_cannot_manage_runtime_gates` | "An AI can't change runtime modes/gates." | "A human `runtime_gate_manager` must do this." | `_check_human_runtime_gate_manager` |
+| `only_runtime_gate_manager_can_manage_gates` | "You lack the runtime-gate-manager role." | "Use an owner/`runtime_gate_manager` principal." | `_check_human_runtime_gate_manager` |
+| `ai_cannot_enable_runtime_gate` | "An AI can't enable a runtime gate." | "A human `runtime_gate_manager` must do this." | `check_runtime_gate_enable` |
+| `only_runtime_gate_manager_can_enable_gates` | "You lack the role to enable gates." | "Use a `runtime_gate_manager` principal." | `check_runtime_gate_enable` |
+
+### Capability-gate / mode / transition denials — `router.py`
+| reason_code | Plain English | Remediation | Source |
+|---|---|---|---|
+| `disabled_by_capability_gate` | "This capability is turned off." | "Enable it in Security Settings → Runtime Mutations (if supported)." | `check_capability_gate` |
+| `unknown_capability_gate` | "This capability isn't recognised." | "No such gate; nothing to enable." | `check_capability_gate` |
+| `unknown_runtime_mode:{mode}` | "That runtime mode doesn't exist." | "Pick a valid mode." | `activate_runtime_mode` |
+| `unknown_capability:{cap}` | "That capability doesn't exist." | "Pick a valid capability." | `request_capability_transition` |
+| `invalid_target_state:{state}` | "That target state isn't allowed." | "Choose an allowed transition." | `request_capability_transition` |
+
+### Policy / execution outcomes — `route_action` (`router.py`)
+| reason_code / message | Plain English | Remediation | Source |
+|---|---|---|---|
+| `denied_by_policy` | "Policy blocked this action." | Show the `PolicyDecision` reason; no UI override. | `route_action` |
+| `critical_action_requires_human_confirmation` | "Critical action needs a human." | "A human must confirm; AI is blocked." | `route_action` |
+| `approval_required` | "This needs human approval first." | "Route to Approvals (resolution is metadata-only)." | `route_action` |
+| `risk_acceptance_required` | "You must accept the risk first." | "Review and accept the risk in the action detail." | `route_action` |
+| `execution_failed:{reason_code}` | "The executor failed." | Show the inner `reason_code`. | `route_action` |
+| `execution_unavailable:no_executor` | "No runtime exists for this — it's deferred." | "Not available in the local single-user runtime." | `route_action` / executors |
+
+### Activation blocks — `raiker/runtime/authority/activation.py`
+| reason_code | Plain English | Remediation |
 |---|---|---|
-| `capability_gate_disabled:*` | "This capability is turned off." | "Enable it in Security Settings → Runtime Mutations (if supported)." |
-| `activation_blocked:no_executor:*` | "No runtime exists for this yet — it's deferred." | "Not available in the local single-user runtime." |
-| `activation_blocked:runtime_mode_not_active:*` | "The required runtime mode isn't active." | "Activate the runtime mode first (Security Settings)." |
-| `activation_blocked:no_threat_model_ack:*` | "A threat-model acknowledgement is required." | "Provide the acknowledgement in the step-up window." |
-| `activation_blocked:needs_human_confirmation:*` | "Human confirmation token required." | "Enter the confirmation token (Tier 2)." |
-| `*human_only*` / AI role denial | "An AI principal can't perform this human-only action." | "A human owner must do this." |
-| `policy_denied:*` | "Policy blocked this action." | Show policy reason; no override in UI. |
-| `risk_acceptance_required:*` | "You must accept the risk first." | "Review and accept the risk in the action detail." |
-| `self_approval_denied` | "You can't approve your own action." | "Another authorised human must approve." |
-| `secret_like_content_denied` | "Looks like a secret/credential — blocked before storage." | "Remove sensitive content." |
+| `activation_blocked:no_executor` | "No runtime exists for this yet — deferred." | "Not available in the local single-user runtime." |
+| `activation_blocked:no_threat_model_ack` | "A threat-model acknowledgement is required." | "Provide the acknowledgement in the step-up window." |
+| `activation_blocked:runtime_mode_not_active` | "The required runtime mode isn't active." | "Activate the runtime mode first (Security Settings)." |
+| `activation_blocked:needs_human_confirmation` | "Human confirmation token required (Tier 2)." | "Enter the confirmation token." |
+| `activation_blocked:no_requirement_entry` | "No activation requirement entry — can't enable." | "Capability is not flippable in this runtime." |
 
-If a `reason_code` is unknown to the UI, show the raw code plus a generic explanation — **never
-hide it**.
+If a `reason_code` is unknown to the UI, show the **raw code** plus a generic explanation —
+**never hide it**.
 
 ## Step-up auth window (Security Settings)
 

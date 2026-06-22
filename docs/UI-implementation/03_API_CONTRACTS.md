@@ -130,3 +130,113 @@ decisions, verification result.
 4. Events emitted as documented.
 5. Contract test: response schema matches the dataclass (`to_dict`) and rejects unknown request
    fields.
+
+---
+
+## Concrete request/response examples
+
+> These examples mirror the dataclasses in `raiker/api/schemas.py` and the DTO `to_dict()` shapes
+> in `raiker/control/dtos.py` / `raiker/contracts/models.py`. **The dataclasses are the single
+> source of truth** — if an example and the code disagree, the code wins and this doc is fixed.
+> Field values are illustrative; field *names/shapes* are contractual and asserted by contract tests.
+
+### `POST /api/auth/session`
+Request:
+```json
+{ "as_principal": null }
+```
+Response `200`:
+```json
+{ "token": "9f3c…", "session_id": "api_ses_8a1b…", "principal_id": "prin_owner_01", "expires_at": "2026-07-22T08:00:00+00:00" }
+```
+Denied (no owner / non-human) `403`: `{ "ok": false, "reason_code": "principal_not_active" }`
+
+### `GET /api/capability-gates` → `CapabilityGateView[]`
+Response `200` (one element shown):
+```json
+[
+  {
+    "capability": "shell_execution",
+    "phase": 3,
+    "state": "disabled",
+    "default_state": "disabled",
+    "source": "static_default",
+    "runtime_enabled": false,
+    "allowed_transitions": [],
+    "can_current_principal_change": false,
+    "blocked_reason_code": "activation_blocked:no_executor",
+    "readiness": { "policy_ready": true, "contract_ready": true, "storage_ready": true, "event_ready": true, "test_ready": true }
+  }
+]
+```
+
+### `GET /api/runtime-mode` → `RuntimeModeView`
+```json
+{
+  "mode_name": "local_single_user_runtime",
+  "status": "active",
+  "activated_by": "prin_owner_01",
+  "activated_at": "2026-06-22T08:00:00+00:00",
+  "reason": "local dev",
+  "allowed_modes": ["development_preview","local_single_user_safe","local_single_user_runtime","multi_user_local_runtime","hosted_or_networked_runtime"]
+}
+```
+
+### `POST /api/capability-gates/{cap}/set`
+Request:
+```json
+{ "target_state": "enabled_policy_gated", "reason": "enable graph indexing", "as_principal": "prin_owner_01" }
+```
+Allowed `200`: `{ "ok": true, "capability": "graph_indexing_runtime", "target_state": "enabled_policy_gated" }`
+Denied `403`: `{ "ok": false, "reason_code": "only_runtime_gate_manager_can_manage_gates" }`
+
+### `POST /api/prompts` → `AgentResponse`
+Request:
+```json
+{ "text": "Summarise the README", "session_id": null, "options": { "model_profile": "mock-test", "approval_mode": "interactive" } }
+```
+Response `200`:
+```json
+{
+  "request_id": "req_…", "session_id": "sess_…", "turn_id": "turn_…",
+  "status": "completed", "message": "…",
+  "events_path": "/abs/.raiker/events/sess_….jsonl",
+  "checkpoint_path": "/abs/.raiker/checkpoints/sess_…/ckpt_….json",
+  "approval": null, "last_event_id": "evt_…"
+}
+```
+When a tool needs approval, `status` is `needs_approval` and `approval` is populated:
+```json
+{ "action_id": "act_…", "tool_name": "write_file", "risk_level": "high", "capability": "file_write_execution" }
+```
+
+### `POST /api/approvals/{id}/resolve` → `ApprovalResolution`
+Request:
+```json
+{ "approve": true, "reason": "looks correct" }
+```
+Response `200` (**note `executes_action` is always false**):
+```json
+{ "approval_id": "appr_…", "action_id": "act_…", "status": "approved", "executes_action": false }
+```
+
+### `POST /api/interrupts` (STOP switch)
+Request:
+```json
+{ "session_id": "sess_…", "task_id": null, "all": true, "action_type": "cancel", "reason": "user pressed STOP" }
+```
+Response `200`:
+```json
+{ "applied": [ { "task_id": "task_…", "result": "cancelled" } ], "safe_boundary": true }
+```
+Denied (AI principal) `403`: `{ "ok": false, "reason_code": "ai_cannot_manage_runtime_gates" }`
+
+### `GET /api/diagnostics`
+```json
+{
+  "readiness": { "production_ready_local_single_user_runtime": true, "owner_bootstrapped": true, "current_runtime_mode": "local_single_user_runtime" },
+  "disabled_capabilities": ["shell_execution","email_runtime","plugin_execution_cap"],
+  "missing_config": [],
+  "provider_health": [ { "profile_id": "raiker-local-llama-cpp", "status": "unavailable", "detail": "provider_connection_failed" } ]
+}
+```

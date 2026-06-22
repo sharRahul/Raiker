@@ -82,7 +82,10 @@ not a loosening: every `metadata_only` / `disabled_deferred` / risk marker stays
 ## Document map
 
 - `01_INFORMATION_ARCHITECTURE.md` — navigation, screens, Security Settings flow, STOP switch.
-- `02_SECURITY_UX.md` — status badges, `reason_code` → copy map, step-up auth, deferred treatments.
-- `03_API_CONTRACTS.md` — every endpoint: request/response schema, governed path, events, tests.
-- `MILESTONES.md` — detailed M1–M7 (scope, deliverables, acceptance criteria, validation).
+- `02_SECURITY_UX.md` — status badges, real `reason_code` catalog, step-up auth, deferred treatments.
+- `03_API_CONTRACTS.md` — every endpoint: request/response schema + concrete JSON examples, governed path, events, tests.
+- `04_FLOWS.md` — ASCII flow diagrams (prompt-turn, governed-mutation, STOP) + low-fi wireframes.
+- `05_TEST_MATRIX.md` — security invariants → regression tests → owning milestone.
+- `06_FUNCTIONAL_TESTS.md` — end-to-end functional UI test scenarios + deterministic seed/fixtures.
+- `MILESTONES.md` — detailed M0–M7 (scope, deliverables, acceptance criteria, validation).
 - `prompts/M1.md … M7.md` — a self-contained implementation prompt per milestone.

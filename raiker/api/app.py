@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from raiker.api.redaction import redact_response_body
@@ -29,7 +30,11 @@ class RedactionMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if scope.get("path") in _REDACTION_EXEMPT_PATHS:
+        path = scope.get("path", "")
+        # Only governed JSON API responses are buffered + redacted. Everything else (the static
+        # web UI: index.html, hashed JS/CSS assets) is served untouched — no buffering, and no risk
+        # of the redactor mangling a bundle that happens to contain a secret-like literal.
+        if not path.startswith("/api") or path in _REDACTION_EXEMPT_PATHS:
             await self.app(scope, receive, send)
             return
 
@@ -82,6 +87,7 @@ def _try_redact_json_body(raw: bytes) -> Any | None:
 def create_app(
     workspace_root: str | Path = ".",
     executor_registry: ExecutorRegistry | None = None,
+    ui_dir: str | Path | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="Raiker API",
@@ -98,4 +104,12 @@ def create_app(
     app.include_router(dashboard_router)
     app.include_router(prompts_router)
     app.include_router(approvals_router)
+    # Serve the built local web dashboard (apps/web/dist) from the same loopback origin, so the
+    # dashboard launches with one command and the SPA's relative /api paths resolve directly.
+    # Mounted LAST so the /api routes above keep precedence; skipped when no build is present
+    # (API-only mode is unchanged). The SPA uses hash routing, so html=True at "/" is sufficient.
+    if ui_dir is not None:
+        ui_path = Path(ui_dir)
+        if ui_path.is_dir() and (ui_path / "index.html").is_file():
+            app.mount("/", StaticFiles(directory=ui_path, html=True), name="web-ui")
     return app

@@ -4,8 +4,14 @@ import { defineConfig } from "vite";
 
 export default defineConfig(({ mode }) => ({
   plugins: [svelte({ hot: false })],
-  // Local-first: the dev server binds to localhost only. M1 makes no backend calls.
-  server: { host: "127.0.0.1", port: 5174 },
+  // Local-first: the dev server binds to localhost only and proxies /api to the local Raiker
+  // API server (`raiker-web`, default 127.0.0.1:8765). In production the SPA is served by the
+  // same FastAPI origin, so these relative /api paths resolve directly.
+  server: {
+    host: "127.0.0.1",
+    port: 5174,
+    proxy: { "/api": "http://127.0.0.1:8765" },
+  },
   // Resolve Svelte's browser entry under jsdom so component tests can mount.
   resolve: mode === "test" ? { conditions: ["browser"] } : {},
   test: {

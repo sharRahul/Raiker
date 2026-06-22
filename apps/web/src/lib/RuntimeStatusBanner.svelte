@@ -1,26 +1,41 @@
 <script lang="ts">
   import Badge from "./Badge.svelte";
-  import type { RuntimeStatus } from "../fixtures/runtimeStatus";
 
-  let { status }: { status: RuntimeStatus } = $props();
+  let {
+    runtimeMode = "—",
+    scope = "local · single-user",
+    principal = "—",
+    ready = false,
+    warnings = [],
+    fixture = false,
+    connecting = false,
+  }: {
+    runtimeMode?: string;
+    scope?: string;
+    principal?: string;
+    ready?: boolean;
+    warnings?: string[];
+    fixture?: boolean;
+    connecting?: boolean;
+  } = $props();
 </script>
 
 <div class="runtime-banner" role="status" aria-label="Runtime status">
   <span class="brand">Raiker</span>
-  <span class="rb-item"><span class="rb-key">Mode</span> <code>{status.runtimeMode}</code></span>
-  <span class="rb-item"><span class="rb-key">Scope</span> {status.scope}</span>
-  <span class="rb-item"><span class="rb-key">Principal</span> {status.principal}</span>
+  <span class="rb-item"><span class="rb-key">Mode</span> <code>{runtimeMode}</code></span>
+  <span class="rb-item"><span class="rb-key">Scope</span> {scope}</span>
+  <span class="rb-item"><span class="rb-key">Principal</span> {principal}</span>
   <span class="rb-item">
     <span class="rb-key">Readiness</span>
-    {#if status.ready}<Badge variant="implemented" />{:else}<Badge variant="blocked" />{/if}
+    {#if connecting}
+      <span class="rb-connecting">connecting…</span>
+    {:else if ready}<Badge variant="implemented" />{:else}<Badge variant="blocked" />{/if}
   </span>
-  {#each status.warnings as warning (warning)}
+  {#each warnings as warning (warning)}
     <span class="rb-item rb-warning"><Badge variant="deferred" /> {warning}</span>
   {/each}
-  {#if status.fixture}
-    <span class="fixture-tag" title="This banner shows sample data, not a live runtime."
-      >FIXTURE DATA — not connected to a runtime</span
-    >
+  {#if fixture}
+    <span class="fixture-tag">FIXTURE DATA — not connected to a runtime</span>
   {/if}
 </div>
 
@@ -47,6 +62,10 @@
   }
   code {
     color: #cfe5ff;
+  }
+  .rb-connecting {
+    color: #8b8b93;
+    font-style: italic;
   }
   .fixture-tag {
     margin-left: auto;

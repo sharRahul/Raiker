@@ -1,12 +1,12 @@
 # Raiker
 
-**Raiker** is a local-first AI agent runtime that runs as a secure, observable, and extensible agent operating layer on your own machine, where every interface talks to the same governed core — contracts, policy, append-only events, SQLite state, approvals, and checkpoints. Its core philosophy is *no privileged interface and no silent runtime*: capabilities stay disabled until their policy, storage, audit, and acceptance work is complete, so the documentation never runs ahead of the code. It is built for developers, home-lab operators, and governed-enterprise users who want an auditable agent platform instead of an opaque chatbot.
+**Raiker** is an AI agent runtime that runs as a secure, observable, and extensible agent operating layer on your own machine, where every interface talks to the same governed core — contracts, policy, append-only events, SQLite state, approvals, and checkpoints. Its core philosophy is *no privileged interface and no silent runtime*: capabilities stay disabled until their policy, storage, audit, and acceptance work is complete, so the documentation never runs ahead of the code. It is built for developers, home-lab operators, and governed-enterprise users who want an auditable agent platform instead of an opaque chatbot.
 
 ---
 
 ## Features
 
-- **Local-first governed runtime** — A deterministic gather → act → verify loop (`raiker/runtime/orchestrator.py`) drives every turn through a 16-state machine, a static policy engine, a tool broker, and an append-only JSONL + SQLite event/state layer. Model outputs and tool calls are always untrusted proposals that must pass validation, policy, and approval.
+- **Governed runtime** — A deterministic gather → act → verify loop (`raiker/runtime/orchestrator.py`) drives every turn through a 16-state machine, a static policy engine, a tool broker, and an append-only JSONL + SQLite event/state layer. Model outputs and tool calls are always untrusted proposals that must pass validation, policy, and approval.
 - **Plain local terminal client only** — `raiker` launches the line-oriented terminal client. Rich/native TUI is Phase 8 deferred work; Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, not active runtime surfaces. The deterministic mock/test provider is test-only and policy-blocked in the normal CLI.
 - **Policy-gated automation with approvals, review, and checkpoints** — Safe read/search/git tools run directly; file mutations become approval-gated proposals. A deterministic local code-review workflow (`/review`), a proposal lifecycle, metadata-only approval previews, and checkpoint/rewind metadata give you reviewable, reversible automation.
 
@@ -19,7 +19,7 @@ A quick breakdown of how the system is put together:
 - **Core:** Python 3.11+ (typed; `ruff` + `mypy` enforced).
 - **Frameworks/Engines:** `asyncio` for the runtime; `httpx.AsyncClient` as the only runtime HTTP transport (no provider SDKs). Rich/Textual are not runtime dependencies.
 - **Storage/State:** SQLite (`raiker/storage/sqlite.py`) for runtime state, tasks, sessions, approvals, checkpoints, memory candidates, and metadata records; append-only JSONL for the event log.
-- **Integrations/APIs:** Local LLM runtimes via an async OpenAI-compatible adapter — **llama.cpp** server is the native local-first default (`http://127.0.0.1:8080`); Ollama, LM Studio, and vLLM are local/home-lab profiles; OpenRouter is hosted and policy/budget-gated; a deterministic provider powers offline tests.
+- **Integrations/APIs:** Local LLM runtimes via an async OpenAI-compatible adapter — **llama.cpp** server is the native local default (`http://127.0.0.1:8080`); Ollama, LM Studio, and vLLM are local/home-lab profiles; OpenRouter is hosted and policy/budget-gated; a deterministic provider powers offline tests.
 
 Component-by-component responsibilities live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); design foundations are under [`docs/foundation/`](docs/foundation/).
 
@@ -48,7 +48,7 @@ This installs the package in editable mode with the dev toolchain (`pytest`, `ru
 
 ### Configuration
 
-Raiker is local-first and needs **no credentials** to run. Behavior is controlled by a few environment variables and the bundled JSON config files — never by hard-coded secrets:
+Raiker is local and needs **no credentials** to run. Behavior is controlled by a few environment variables and the bundled JSON config files — never by hard-coded secrets:
 
 - `RAIKER_TUI=plain` — keep the plain line-oriented shell path (the only launchable UI).
 - `RAIKER_TEST_MODE=1` — enable the deterministic test provider (test/offline only; production CLI policy blocks it with `deterministic_test_provider_requires_test_mode`).

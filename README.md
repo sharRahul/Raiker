@@ -73,23 +73,32 @@ provider_connection_failed` (by design — it never fabricates output). Model pr
 **2. Select the profile in the terminal client:**
 
 ```text
-/providers                         # list providers and profiles
-/models                            # list model profiles
-/model use raiker-local-llama-cpp  # select the built-in llama.cpp profile
-/model health                      # confirm the server is reachable
-/model current                     # show the active profile
+/providers                              # list providers and profiles
+/models                                 # list model profiles
+/model use raiker-local-llama-cpp       # select the built-in llama.cpp profile
+/model use ollama-local-openai-compatible   # Ollama (auto-detects the served model)
+/model use lm-studio-local-openai-compatible # LM Studio (auto-detects the served model)
+/model health                           # confirm the server is reachable
+/model current                          # show the active profile
 ```
 
-The built-in `raiker-local-llama-cpp` profile works out of the box when a llama.cpp server is
-serving `local-gguf` at `:8080`. The Ollama / LM Studio / vLLM / generic profiles ship with a
-`"<model>"` placeholder and **must be edited first** (see step 3), otherwise selecting them fails
-with `model_name_not_configured`.
+**llama.cpp, Ollama, and LM Studio work out of the box.** The built-in `raiker-local-llama-cpp`
+profile expects a llama.cpp server serving `local-gguf` at `:8080`. For **Ollama** and **LM Studio**,
+selecting the profile **auto-detects the served model** from the server's `/v1/models` endpoint when
+exactly one model is loaded. If several models are loaded, pick one explicitly:
 
-**3. Add or edit a model profile** by editing `config/model-profiles.json`: copy an existing entry
-and set a real `model` (the name your server serves), the correct `endpoint`, and the capability
-flags. Supported `provider` values are `llama.cpp`, `ollama`, `lm-studio`, `vllm`, and
-`openai-compatible` (the `mock`/`test` providers are test-only and policy-blocked in the normal CLI).
-Re-launch `raiker` to pick up changes, then `/model use <profile_id>` and `/model health`.
+```text
+/model use --provider ollama --model llama3.1
+```
+
+The selected model is remembered and is what subsequent prompts actually run on. If the server isn't
+reachable, the command says so and leaves the native llama.cpp default active (it never fabricates a
+model).
+
+**3. (Optional) Add or edit a model profile** by editing `config/model-profiles.json`: copy an entry
+and set the `endpoint` and capability flags. Supported `provider` values are `llama.cpp`, `ollama`,
+`lm-studio`, `vllm`, and `openai-compatible` (the `mock`/`test` providers are test-only and
+policy-blocked in the normal CLI). Re-launch `raiker` to pick up file changes.
 
 **Hosted / cloud models are not enabled in the current build.** The OpenRouter (hosted) and vLLM
 (home-lab / private-network) profiles exist as configuration/contract only: the runtime policy that

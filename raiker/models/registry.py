@@ -97,3 +97,28 @@ class ModelProfileRegistry:
     def find(self, provider: str, model: str) -> list[ModelProfile]:
         normal_provider = provider.replace("_", "-")
         return [p for p in self.profiles if p.provider == normal_provider and p.model == model]
+
+    def profiles_for_provider(self, provider: str) -> list[ModelProfile]:
+        normal_provider = provider.replace("_", "-")
+        aliases = {"llama-cpp": "llama.cpp"}
+        normal_provider = aliases.get(normal_provider, normal_provider)
+        return [p for p in self.profiles if p.provider == normal_provider]
+
+    def register(self, profile: ModelProfile) -> None:
+        """Add a runtime-resolved profile so ``resolve(provider, model)`` can find it."""
+        self.profiles.append(profile)
+
+
+def profile_with_model(profile: ModelProfile, model: str) -> ModelProfile:
+    """Return a copy of ``profile`` with a concrete resolved model name."""
+    return ModelProfile(
+        profile_id=profile.profile_id,
+        provider=profile.provider,
+        model=model,
+        build_phase=profile.build_phase,
+        default_state=profile.default_state,
+        tui_launch_action=profile.tui_launch_action,
+        local_only=profile.local_only,
+        requires_network=profile.requires_network,
+        raw={**profile.raw, "model": model},
+    )

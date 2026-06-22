@@ -46,6 +46,8 @@ from raiker.models.session_state import ModelSessionState
 from raiker.storage.migrations import (
     API_SESSIONS_MIGRATION_ID,
     API_SESSIONS_SQL,
+    MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
+    MODEL_SESSION_RESOLVED_MODEL_SQL,
     PHASE_1_MIGRATION_ID,
     PHASE_1_SQL,
     PHASE_2_MIGRATION_ID,
@@ -194,6 +196,7 @@ class SQLiteStore:
 CREATE TABLE IF NOT EXISTS model_session_state (
   session_id TEXT PRIMARY KEY,
   profile_id TEXT NOT NULL,
+  model TEXT,
   reasoning_enabled INTEGER NOT NULL DEFAULT 0,
   reasoning_effort TEXT,
   reasoning_mode TEXT,
@@ -206,6 +209,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (PHASE_1_MIGRATION_ID, utc_now()),
             )
             self._apply_migration(PHASE_2_MIGRATION_ID, PHASE_2_MIGRATION_SQL, connection)
+            self._apply_migration(
+                MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
+                MODEL_SESSION_RESOLVED_MODEL_SQL,
+                connection,
+            )
             self._apply_migration(
                 PHASE_3_STORAGE_LIFECYCLE_MIGRATION_ID, PHASE_3_STORAGE_LIFECYCLE_SQL, connection
             )
@@ -964,10 +972,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO model_session_state
-                (session_id, profile_id, reasoning_enabled, reasoning_effort, reasoning_mode, reasoning_budget_tokens, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (session_id, profile_id, model, reasoning_enabled, reasoning_effort, reasoning_mode, reasoning_budget_tokens, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (state.session_id, state.profile_id, int(state.reasoning_enabled), state.reasoning_effort, state.reasoning_mode, state.reasoning_budget_tokens, utc_now()),
+                (state.session_id, state.profile_id, state.model, int(state.reasoning_enabled), state.reasoning_effort, state.reasoning_mode, state.reasoning_budget_tokens, utc_now()),
             )
 
     def insert_managed_policy(self, rule: ManagedPolicyRule) -> None:
@@ -1623,6 +1631,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return ModelSessionState(
             session_id=str(row["session_id"]),
             profile_id=str(row["profile_id"]),
+            model=(str(row["model"]) if row["model"] else None),
             reasoning_enabled=bool(row["reasoning_enabled"]),
             reasoning_effort=row["reasoning_effort"],
             reasoning_mode=row["reasoning_mode"],

@@ -63,7 +63,7 @@ class ModelProviderFactory:
         object.__setattr__(self, "require_api_key_for_hosted", policy.require_api_key_for_hosted)
         object.__setattr__(self, "test_mode", policy.test_mode)
 
-    def create(self, profile: ModelProfile) -> Any:
+    def create(self, profile: ModelProfile, *, require_model: bool = True) -> Any:
         provider = profile.provider.replace("_", "-").lower()
         raw = profile.raw
         is_test = provider in {"mock", "test", "deterministic-test"} or bool(raw.get("test_only"))
@@ -80,7 +80,7 @@ class ModelProviderFactory:
         if state == "disabled_until_policy_approved" and not self.allow_policy_gated_provider:
             raise ProviderPolicyError("provider_requires_explicit_policy_approval")
         model_name = str(profile.model or "")
-        if not model_name or "<" in model_name or ">" in model_name:
+        if require_model and (not model_name or "<" in model_name or ">" in model_name):
             raise ProviderConfigurationError("model_name_not_configured")
         endpoint = str(raw.get("endpoint") or raw.get("base_url") or "")
         if not endpoint or "<" in endpoint:

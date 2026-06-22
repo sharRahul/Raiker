@@ -66,10 +66,10 @@ from raiker.memory.readiness_registry import (
 from raiker.memory.review import MemoryReviewQueue
 from raiker.memory.semantic import semantic_memory_status
 from raiker.models.exceptions import ModelProviderError, ProviderPolicyError, safe_error
-from raiker.models.factory import capabilities_from_profile
-from raiker.models.registry import ModelProfileRegistry, RegistryError
+from raiker.models.factory import ModelProviderFactory, capabilities_from_profile
+from raiker.models.registry import ModelProfileRegistry, RegistryError, profile_with_model
 from raiker.models.router import ModelRouter
-from raiker.models.session_state import ModelSessionState
+from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 from raiker.phase_gates import list_disabled_capabilities
 from raiker.plugins.policy import plan_plugin_registration
 from raiker.plugins.readiness_registry import plugin_readiness_summary, render_plugin_readiness
@@ -128,7 +128,7 @@ def build_prompt_envelope(
 
 
 def _model_session_id() -> str:
-    return "terminal-local"
+    return TERMINAL_MODEL_SESSION_ID
 
 
 def _selected_profile(
@@ -138,13 +138,50 @@ def _selected_profile(
     state = store.load_model_session_state(_model_session_id())
     if state is not None:
         try:
-            return registry.resolve_profile_id(state.profile_id)
+            profile = registry.resolve_profile_id(state.profile_id)
+            if state.model and state.model != profile.model:
+                return profile_with_model(profile, state.model)
+            return profile
         except RegistryError:
             pass
     for profile in registry.list_profiles():
         if profile.raw.get("is_native_default"):
             return profile
     return registry.list_profiles()[0]
+
+
+async def _resolve_use_model(
+    router: ModelRouter, profile: ModelProfile, explicit_model: str | None
+) -> tuple[str | None, str]:
+    """Resolve the concrete model for a `/model use` selection.
+
+    Returns (resolved_model, message). resolved_model is None when selection cannot proceed
+    (ambiguous, none available, or unreachable) and the message explains why.
+    """
+    if explicit_model:
+        return explicit_model, (
+            f"Selected model profile {profile.profile_id} with model {explicit_model} for this session."
+        )
+    if profile.model and "<" not in profile.model:
+        return profile.model, f"Selected model profile {profile.profile_id} for this session."
+    try:
+        models = await router.alist_models_for_profile(profile)
+    except Exception as exc:
+        return None, (
+            f"Could not reach {profile.provider} to detect a model: "
+            f"{type(exc).__name__}:{safe_error(str(exc))}"
+        )
+    ids = [m.id for m in models]
+    if len(ids) == 1:
+        return ids[0], (
+            f"Selected {profile.profile_id} with auto-detected model {ids[0]} for this session."
+        )
+    if not ids:
+        return None, f"No models available on {profile.provider}; load or pull a model first."
+    return None, (
+        f"Multiple models available on {profile.provider}: {', '.join(ids)}. "
+        f"Select one with /model use --provider {profile.provider} --model <name>."
+    )
 
 
 async def render_models_async(
@@ -1564,22 +1601,49 @@ async def handle_model_command_async(command: str, *, workspace_root: str | Path
             return f"Model health: unreachable error_class={type(exc).__name__} endpoint_kind={selected.raw.get('endpoint_kind', 'unknown')}"
     if parts[1] == "use":
         try:
+            explicit_model: str | None = None
             if len(parts) >= 3 and not parts[2].startswith("--"):
-                profile = router.select_profile(parts[2])
+                profile = registry.resolve_profile_id(parts[2])
             else:
                 parser = argparse.ArgumentParser(prog="/model use", add_help=False)
                 parser.add_argument("--provider", required=True)
                 parser.add_argument("--model", required=True)
                 args = parser.parse_args(parts[2:])
-                matches = registry.find(args.provider, args.model)
-                if len(matches) != 1:
-                    return "Model selection is ambiguous or unavailable; specify a profile_id."
-                profile = router.select_profile(matches[0].profile_id)
-            store.save_model_session_state(
-                ModelSessionState(session_id=_model_session_id(), profile_id=profile.profile_id)
+                candidates = registry.profiles_for_provider(args.provider)
+                if not candidates:
+                    return f"No model profile for provider {args.provider}."
+                profile = next((p for p in candidates if p.model == args.model), candidates[0])
+                explicit_model = args.model
+            resolved_model, message = await _resolve_use_model(router, profile, explicit_model)
+            if resolved_model is None:
+                _append_model_event(
+                    store,
+                    "model_provider_rejected_by_policy",
+                    {**_profile_event_payload(profile), "reason": "model_not_resolved"},
+                )
+                return message
+            effective = (
+                profile if resolved_model == profile.model else profile_with_model(profile, resolved_model)
             )
-            _append_model_event(store, "model_profile_selected", _profile_event_payload(profile))
-            return f"Selected model profile {profile.profile_id} for this session."
+            # Validate the effective profile (concrete model + endpoint + provider policy) without connecting.
+            validator = ModelProviderFactory(policy=router.runtime_policy).create(effective)
+            aclose = getattr(validator, "aclose", None)
+            if aclose is not None:
+                await aclose()
+            router.active_profile_id = profile.profile_id
+            store.save_model_session_state(
+                ModelSessionState(
+                    session_id=_model_session_id(),
+                    profile_id=profile.profile_id,
+                    model=(None if resolved_model == profile.model else resolved_model),
+                )
+            )
+            _append_model_event(
+                store,
+                "model_profile_selected",
+                {**_profile_event_payload(profile), "resolved_model": resolved_model},
+            )
+            return message
         except Exception as exc:
             payload = {"error_class": type(exc).__name__, "safe_error_code": safe_error(str(exc))}
             if len(parts) >= 3:

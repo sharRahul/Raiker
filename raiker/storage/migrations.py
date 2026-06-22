@@ -459,6 +459,12 @@ ALTER TABLE approved_memory ADD COLUMN deleted_at TEXT;
 ALTER TABLE approvals ADD COLUMN action_payload_sha256 TEXT;
 """
 
+MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID = "RAIKER-1203-model-session-resolved-model"
+
+MODEL_SESSION_RESOLVED_MODEL_SQL = """
+ALTER TABLE model_session_state ADD COLUMN model TEXT;
+"""
+
 PHASE_5_MANAGED_POLICY_MIGRATION_ID = "RAIKER-5001-phase5-managed-policy"
 
 PHASE_5_MANAGED_POLICY_SQL = """

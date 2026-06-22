@@ -36,6 +36,26 @@ class AuthSessionRequest:
     as_principal: str | None = None
 
 
+@dataclass
+class PromptRequest:
+    text: str
+    session_id: str | None = None
+    planning_mode: str | None = None
+    approval_mode: str | None = None
+    model_profile: str | None = None
+    max_tool_calls: int | None = None
+
+
+@dataclass
+class InterruptRequest:
+    session_id: str
+    task_id: str | None = None
+    all: bool = False
+    action_type: str = "cancel"
+    reason: str = "user requested stop"
+    steer_text: str | None = None
+
+
 def serialize_dto(dto: Any) -> Any:
     if hasattr(dto, "to_dict"):
         return dto.to_dict()

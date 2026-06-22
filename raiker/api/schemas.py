@@ -24,6 +24,8 @@ class SetCapabilityStateRequest:
     target_state: str
     reason: str = ""
     as_principal: str | None = None
+    # Tier-2 step-up: forwarded to the existing activation check; no new authority is granted.
+    confirmation_token: str | None = None
 
 
 @dataclass

@@ -118,7 +118,13 @@ async def set_capability_state(
 ) -> dict[str, Any]:
     session, _principal = _auth_data
     service = _get_service(request)
-    result = service.set_capability_state(capability, body.target_state, session.principal_id, body.reason)
+    result = service.set_capability_state(
+        capability,
+        body.target_state,
+        session.principal_id,
+        body.reason,
+        confirmation_token=body.confirmation_token,
+    )
     if not result.ok:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

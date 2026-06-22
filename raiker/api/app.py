@@ -10,7 +10,13 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from raiker.api.redaction import redact_response_body
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
+from raiker.api.routes_prompts import router as prompts_router
 from raiker.runtime.executors.registry import ExecutorRegistry
+
+# Paths whose responses must not be buffered/redacted by RedactionMiddleware:
+# - /api/auth/session returns the owner's bearer token (must reach the client intact);
+# - /api/prompts/stream is an SSE stream (buffering would break streaming; it is redacted per-chunk).
+_REDACTION_EXEMPT_PATHS = frozenset({"/api/auth/session", "/api/prompts/stream"})
 
 
 class RedactionMiddleware:
@@ -22,10 +28,7 @@ class RedactionMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # The local token-mint endpoint must return the owner's bearer token to the loopback
-        # client; redacting it would defeat the endpoint. This is the only exemption — every other
-        # response is still scrubbed of secret-like fields.
-        if scope.get("path") == "/api/auth/session":
+        if scope.get("path") in _REDACTION_EXEMPT_PATHS:
             await self.app(scope, receive, send)
             return
 
@@ -92,4 +95,5 @@ def create_app(
     app.add_middleware(RedactionMiddleware)
     app.include_router(control_router)
     app.include_router(dashboard_router)
+    app.include_router(prompts_router)
     return app

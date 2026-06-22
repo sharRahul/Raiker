@@ -61,9 +61,20 @@ decisions, verification result.
   `approval?`, `last_event_id`, `turn_id`, `session_id`).
 - Tests: valid prompt → `prompt_received`…`turn_closed` events; invalid envelope → `failed`.
 
-**`GET /api/prompts/{turn_id}/stream`** — Server-Sent Events over `AgentGateway.astream_prompt`.
-- Emits text deltas + lifecycle `StreamEvent`s, terminating with `FINAL` (the `AgentResponse`).
-- Same authority as `POST /api/prompts` (durable log, checkpoint, turn close identical).
+**`POST /api/prompts/stream`** — Server-Sent Events over `AgentGateway.astream_prompt`. (Implemented
+as POST, not `GET /{turn_id}/stream`: the turn is *created by* the stream from the prompt body, so a
+GET-by-turn-id is semantically wrong.)
+- Body: same as `POST /api/prompts`. Emits `data: {StreamEvent}` lines — lifecycle + text deltas,
+  terminating with a `FINAL` event carrying the `AgentResponse`.
+- Same authority as `POST /api/prompts` (durable log, checkpoint, turn close identical). Exempt from
+  the buffering `RedactionMiddleware` (it would break streaming); each chunk is redacted in-stream.
+
+### Interrupts (STOP switch)
+**`POST /api/interrupts`** — `{session_id, task_id?|all, action_type:"cancel"|..., reason, steer_text?}`.
+- Human-only (AI principals → 403 `human_principal_required`). For each active task: governed
+  `InterruptController.apply_at_safe_boundary` (emits `interrupt_received` + `safe_boundary_reached`)
+  + `TaskManager.cancel_task` (emits `task_cancelled`). Returns `{applied:[{task_id,result}], safe_boundary:true}`.
+- Semantics: cancel at the next safe boundary — not an instant force-kill.
 
 ### Approvals
 **`GET /api/approvals`**, **`GET /api/approvals/{id}`** — pending list + detail.

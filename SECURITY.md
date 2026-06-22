@@ -1,10 +1,10 @@
 # Raiker Security Architecture
 
-> Current truth (2026-06-21): Raiker is local-first. The current launchable interface is the plain local terminal client only. Rich/native TUI, Desktop, Web, Dashboard, Mobile, IDE, Voice, Browser Extension, and REST/API clients are Phase 8 deferred, specified/deferred, not active runtime. Runtime execution capabilities remain disabled unless explicitly implemented, tested, documented, and policy-gated. This document does not claim security coverage for deferred features as if they are implemented.
+> Current truth (2026-06-21): Raiker is an AI agent. The current launchable interface is the plain local terminal client only. Rich/native TUI, Desktop, Web, Dashboard, Mobile, IDE, Voice, Browser Extension, and REST/API clients are Phase 8 deferred, specified/deferred, not active runtime. Runtime execution capabilities remain disabled unless explicitly implemented, tested, documented, and policy-gated. This document does not claim security coverage for deferred features as if they are implemented.
 
 This document separates claims into four categories:
 
-- **Implemented:** code and tests exist for the current local-first runtime.
+- **Implemented:** code and tests exist for the current local runtime.
 - **Metadata/readiness:** records, previews, plans, or read-only surfaces exist, but execution is not enabled.
 - **Specified/deferred:** security requirements are documented for future phases, but no active runtime exists.
 - **Missing:** a design or implementation gap remains and must be closed before enablement.
@@ -13,11 +13,11 @@ This document separates claims into four categories:
 
 ## 1. Purpose and Scope
 
-This document describes Raiker's security architecture for the current local-first runtime. It is intended to be practical and audit-ready: each security claim is tied to the current runtime model and avoids treating planned capabilities as shipped controls.
+This document describes Raiker's security architecture for the current local runtime. It is intended to be practical and audit-ready: each security claim is tied to the current runtime model and avoids treating planned capabilities as shipped controls.
 
 Scope boundaries:
 
-- Raiker is **local-first**: current runtime state, event logs, approvals, checkpoints, memory records, provider profiles, and workspace operations are designed around a local workspace and local SQLite/JSONL storage.
+- Raiker is **local AI Agent**: current runtime state, event logs, approvals, checkpoints, memory records, provider profiles, and workspace operations are designed around a local workspace and local SQLite/JSONL storage.
 - The current launchable interface is the **plain local terminal client only**. Rich/native TUI has been removed/deferred from active launch behavior.
 - Rich/native TUI, Desktop, Web, Dashboard, Mobile, IDE, Voice, Browser Extension, and REST/API interfaces are **Phase 8 deferred** and are specified/deferred, not active runtime surfaces.
 - Plugin execution, graph/codemap runtime indexing, semantic/vector memory writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, subagents, multi-agent teams, remote/container/cloud execution, shell/process execution, and network/web fetch remain disabled unless a future change explicitly implements, tests, documents, and policy-gates them.
@@ -29,7 +29,7 @@ Scope boundaries:
 
 Raiker's current security principles are:
 
-1. **Local-first by default:** prefer local workspace state, local providers, and local audit evidence before hosted services.
+1. **Local by default:** prefer local workspace state, local providers, and local audit evidence before hosted services.
 2. **Least privilege:** commands, tools, providers, and future clients receive only the permissions needed for their scoped action.
 3. **Deny-by-default:** unknown tools, unsafe actions, unsupported hook handlers, disabled runtimes, and unconfigured providers fail closed.
 4. **Policy-gated tool execution:** model-suggested tool calls must pass validation, Tool Broker routing, and Policy Engine review.
@@ -179,7 +179,7 @@ Raiker prefers local model operation and exposes providers through an async Open
 
 Current model security properties:
 
-- Local-first preference: llama.cpp is the native local-first profile when configured/reachable.
+- Local preference: llama.cpp is the native local profile when configured/reachable.
 - Ollama, LM Studio, vLLM, and generic OpenAI-compatible profiles are configurable local/home-lab or endpoint-compatible profiles according to `config/model-profiles.json`.
 - OpenRouter/hosted profiles are external and require explicit configuration, policy, and budget/egress consideration.
 - Deterministic/mock providers are test-only and must not be documented or used as production fallback.
@@ -190,7 +190,7 @@ Current model security properties:
 
 | Provider type | Current role | Security note |
 |---|---|---|
-| llama.cpp | Local-first/native profile if configured | Preferred local runtime profile |
+| llama.cpp | Local/native profile if configured | Preferred local runtime profile |
 | Ollama | Local provider profile if configured | Local endpoint risk |
 | LM Studio | Local provider profile if configured | Local endpoint risk |
 | vLLM | Local/network-compatible profile if configured | Endpoint trust required |
@@ -251,7 +251,7 @@ Before any deferred capability can move from specified/deferred or metadata/read
 | Malicious/hallucinated model tool calls | Model may invent tools or unsafe args. | Tool-call schema validation, Tool Broker, Policy Engine, unknown-tool denial. | Complex semantic intent may be hard to classify. | Expand adversarial tool-call tests. |
 | Unauthorized file modification | Writes could alter user code without consent. | Write/edit/patch paths are approval/proposal-gated; read-only tools separated. | Future tools could regress if bypassing broker. | Enforce broker-only mutation tests. |
 | Workspace boundary escape | Path traversal/symlinks could read/write outside workspace. | Workspace boundary checks in implemented file/readiness paths. | Coverage must be maintained for every new tool. | Centralize and fuzz path canonicalization. |
-| Secret leakage to external providers | Prompts/context may expose secrets to hosted endpoints. | Local-first preference; hosted providers explicit/policy-gated; redaction where implemented. | No complete secret manager/redaction guarantee. | Secret storage/redaction design and hosted-provider DLP tests. |
+| Secret leakage to external providers | Prompts/context may expose secrets to hosted endpoints. | Local preference; hosted providers explicit/policy-gated; redaction where implemented. | No complete secret manager/redaction guarantee. | Secret storage/redaction design and hosted-provider DLP tests. |
 | Unsafe fallback to hosted models | Local failure could route data externally. | No silent local-to-hosted fallback; deterministic/mock test-only. | Profile misconfiguration can still be risky. | Provider allowlist and egress audit controls. |
 | Plugin abuse | Plugins could run code or request excessive permissions. | Plugin execution disabled; manifest planning/validation only. | No runtime sandbox because runtime is deferred. | Sandboxing, signatures, permission prompts, abuse tests. |
 | Hook abuse | Hooks could run commands or exfiltrate data. | Supported handlers constrained; unsupported handlers deferred; hooks must not bypass policy. | Command hook safety depends on policy and future expansion. | Handler allowlist, sandbox/timeout, network restrictions, tests. |

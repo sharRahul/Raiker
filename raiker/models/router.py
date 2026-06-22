@@ -80,6 +80,18 @@ class ModelRouter:
         finally:
             await p.aclose()
 
+    async def alist_models_for_profile(self, profile: ModelProfile) -> list[ProviderModelInfo]:
+        """List models served by ``profile``'s endpoint without requiring a concrete model name.
+
+        Used to auto-detect the served model for profiles that ship a placeholder model
+        (e.g. Ollama / LM Studio). Endpoint and provider policy are still enforced.
+        """
+        p = self._factory().create(profile, require_model=False)
+        try:
+            return await p.list_models()
+        finally:
+            await p.aclose()
+
     async def ahealth(self, provider: str, model: str) -> ProviderHealth:
         profile = self._profile(provider, model)
         p = self._factory().create(profile)

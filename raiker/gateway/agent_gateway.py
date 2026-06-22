@@ -11,8 +11,9 @@ from raiker.events.writer import EventLogWriter
 from raiker.hooks.contracts import HookInput
 from raiker.hooks.dispatcher import HookDispatcher
 from raiker.hooks.registry import HooksRegistry
-from raiker.models.registry import ModelProfileRegistry
+from raiker.models.registry import ModelProfileRegistry, RegistryError, profile_with_model
 from raiker.models.router import ModelRouter
+from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.orchestrator import RuntimeOrchestrator
@@ -47,7 +48,8 @@ class AgentGateway:
         self.store.upsert_connector_profiles(self.connector_registry.list_profiles())
         self.model_router = ModelRouter(self.model_registry, self.writer, allow_test_provider=False)
         # Native default backend: configured llama.cpp profile only; production never falls back to deterministic test providers.
-        self.default_provider = self.model_router.default_provider()
+        # Honor the operator's selected model profile (e.g. via `/model use`); fall back to the native default.
+        self.default_provider = self._resolve_default_provider()
         self.runtime = RuntimeOrchestrator(
             workspace_root=self.workspace_root,
             writer=self.writer,
@@ -55,6 +57,29 @@ class AgentGateway:
             model_router=self.model_router,
             default_provider=self.default_provider,
         )
+
+    def _resolve_default_provider(self) -> tuple[str, str]:
+        """Pick the runtime model from the persisted selection, else the native default.
+
+        A selection made with ``/model use`` is stored as a ``ModelSessionState``. When it
+        resolves to a concrete model, the orchestrator uses it; otherwise (no selection, or an
+        unresolved placeholder model) it falls back to the native llama.cpp default. This is the
+        only place selection is bound to a turn, so the CLI and any future client share it.
+        """
+        native_default = self.model_router.default_provider()
+        state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        if state is None:
+            return native_default
+        try:
+            profile = self.model_registry.resolve_profile_id(state.profile_id)
+        except RegistryError:
+            return native_default
+        effective_model = state.model or profile.model
+        if not effective_model or "<" in effective_model:
+            return native_default
+        if effective_model != profile.model:
+            self.model_registry.register(profile_with_model(profile, effective_model))
+        return (profile.provider, effective_model)
 
     def _dispatch_lifecycle_hook(self, event_name: str, envelope: PromptEnvelope) -> None:
         self.hook_dispatcher.dispatch(

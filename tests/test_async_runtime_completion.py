@@ -114,9 +114,10 @@ def test_stream_cancellation_preserves_cancelled_error() -> None:
 
 def test_cli_persists_model_state(tmp_path: Path) -> None:
     assert "raiker-local-llama-cpp" in handle_model_command("/model current", workspace_root=tmp_path)
+    # A placeholder-model profile now attempts auto-detection; with no server reachable it reports a
+    # connection error and does not persist the selection (the native default stays active).
     out = handle_model_command("/model use ollama-local-openai-compatible", workspace_root=tmp_path)
-    assert "Model selection failed" in out
-    assert "model_name_not_configured" in out
+    assert "Could not reach ollama" in out
     assert "raiker-local-llama-cpp" in handle_model_command("/model current", workspace_root=tmp_path)
     assert "(selected)" in render_models(workspace_root=tmp_path)
     assert "does not support reasoning" in handle_reasoning_command("/reasoning set high", workspace_root=tmp_path)

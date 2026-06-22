@@ -1,0 +1,36 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #08080a;
+  color: #d6d6dc;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0 0 0.5rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+}
+
+:focus-visible {
+  outline: 2px solid #6aa9ff;
+  outline-offset: 2px;
+}

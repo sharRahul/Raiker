@@ -252,7 +252,7 @@ Responsible for connector profile registry, channel linking, pairing, sender tru
 
 ### Model Router
 
-Responsible for abstracting model providers. Deterministic `mock` and `test` providers are `test_only` and never a silent production fallback. The default provider selection is currently a static local-first profile choice, not a health-checked chooser. Hosted providers are policy-controlled and documented in `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`.
+Responsible for abstracting model providers. Deterministic `mock` and `test` providers are `test_only` and never a silent production fallback. The gateway runs the operator's persisted selection (`/model use`) for each turn; when none is set the default is a static local-first profile choice (llama.cpp), not a health-checked chooser. For local OpenAI-compatible providers without a fixed model (Ollama, LM Studio), the served model is auto-detected at selection. Hosted providers are policy-controlled and documented in `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`.
 
 ### Event Log
 

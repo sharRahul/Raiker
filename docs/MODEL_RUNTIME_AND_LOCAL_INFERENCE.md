@@ -11,7 +11,8 @@
 > OpenRouter are profile-compatible through that same adapter. OpenRouter is hosted and policy-gated.
 > The deterministic provider is test-only; production never silently falls back to deterministic or hosted
 > providers. Live model listing is available for the selected provider when policy permits, model/reasoning
-> state is persisted for the terminal session, reasoning controls are capability-gated, and private
+> state is persisted for the terminal session and the selected profile drives subsequent turns (Ollama and
+> LM Studio auto-detect the served model), reasoning controls are capability-gated, and private
 > chain-of-thought is never exposed.
 
 Raiker is local-first. It must support local inference runtimes while allowing policy-controlled hosted providers.
@@ -60,7 +61,8 @@ Raiker must support:
 |---|---|---:|---|
 | `mock` | deterministic test provider | Phase 1 | **implemented for tests only**; never a production fallback |
 | `llama.cpp` | local `llama-server` (OpenAI-compatible HTTP) | Phase 2 | **implemented — native default** through async `httpx` OpenAI-compatible adapter; local allowed |
-| `lm-studio` | local OpenAI-compatible API | Phase 2 | profile-compatible through shared adapter; disabled until provider detected/configured |
+| `lm-studio` | local OpenAI-compatible API | Phase 2 | profile-compatible through shared adapter; served model auto-detected on `/model use`; disabled until provider detected/configured |
+| `ollama` | local OpenAI-compatible API | Phase 2 | profile-compatible through shared adapter; served model auto-detected on `/model use`; disabled until provider detected/configured |
 | `openai-compatible` | generic OpenAI-compatible endpoint | Phase 2/3 | profile only; local endpoint allowed, remote policy-gated |
 | `vllm` | high-throughput GPU server (home lab / VPS) | Phase 5 | disabled until high-throughput serving + egress/budget policy approved |
 | `hosted` | hosted API | Phase 3-5 | disabled until egress/budget policy configured |
@@ -349,4 +351,4 @@ llama.cpp, Ollama, LM Studio, vLLM, generic OpenAI-compatible endpoints, and Ope
 
 The deterministic provider is `test_only`; production gateways and normal CLI runtime do not fall back to it. If no real provider is configured or usable, runtime fails safely with a `no_real_model_provider_available`/provider-policy style error instead of silently switching to a mock or hosted backend. No silent local-to-hosted fallback is implemented. Provider support is offline-tested with `httpx.MockTransport`; real provider validation requires an operator-provided server or API key and was not performed here.
 
-UI model selection is session-scoped and persisted in the workspace SQLite store. `/model use` writes the selected profile, `/model current` reads it, `/models` marks it, and reasoning controls are capability-gated. Private chain-of-thought is never exposed; any reasoning summary must be labeled as a summary, not raw reasoning. Model events use safe metadata only and must not include prompts, completions, stream chunks, Authorization headers, API keys, file contents, or tool outputs.
+Model selection is session-scoped and persisted in the workspace SQLite store, and the selected profile is what subsequent prompts actually run on: the gateway resolves the persisted selection per turn and falls back to the native llama.cpp profile when none is set. `/model use` writes the selection, `/model current` reads it, and `/models` marks it. For local OpenAI-compatible providers that ship without a fixed model (Ollama, LM Studio), `/model use` auto-detects the served model from `/v1/models` when exactly one is available, or accepts an explicit `--provider/--model`; the resolved model is persisted (`model_session_state.model`). Reasoning controls are capability-gated. Private chain-of-thought is never exposed; any reasoning summary must be labeled as a summary, not raw reasoning. Model events use safe metadata only and must not include prompts, completions, stream chunks, Authorization headers, API keys, file contents, or tool outputs.

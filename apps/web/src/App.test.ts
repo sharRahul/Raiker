@@ -14,11 +14,14 @@ describe("App shell", () => {
     }
   });
 
-  it("opens the STOP confirm dialog (no-op until M3)", async () => {
+  it("opens the STOP confirm dialog with a wired, enabled confirm action", async () => {
     render(App);
     expect(screen.queryByRole("dialog")).toBeNull();
     await fireEvent.click(screen.getByRole("button", { name: /stop all tasks/i }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /confirm/i })).toBeDisabled();
+    // Wired in M3: the confirm action is enabled and the copy is safe-boundary, not force-kill.
+    const confirm = screen.getByRole("button", { name: /stop at safe boundary/i });
+    expect(confirm).toBeEnabled();
+    expect(screen.getByText(/next safe boundary/i)).toBeInTheDocument();
   });
 });

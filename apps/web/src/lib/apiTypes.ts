@@ -94,3 +94,77 @@ export interface AuthSession {
   principal_id: string;
   expires_at: string | null;
 }
+
+// Approval proposal carried on an AgentResponse when status === "needs_approval".
+// Mirrors the `approval` dict built in raiker/runtime/orchestrator.py. No action is executed.
+export interface ApprovalInfo {
+  action_id: string;
+  tool_name: string;
+  arguments: Record<string, unknown>;
+  risk_level: string;
+  reasons: string[];
+  message: string;
+}
+
+// raiker.contracts.models.AgentResponse.to_dict()
+export interface AgentResponse {
+  request_id: string;
+  session_id: string;
+  turn_id: string;
+  status: string; // queued|running|completed|failed|denied|needs_approval (see RESPONSE_STATUSES)
+  message: string;
+  events_path?: string | null;
+  checkpoint_path?: string | null;
+  approval?: ApprovalInfo | null;
+  last_event_id?: string | null;
+}
+
+// raiker.contracts.streaming.StreamEvent serialized over SSE (see routes_prompts._sse).
+export type StreamKind = "lifecycle" | "text_delta" | "tool" | "final" | "error";
+
+export interface StreamEvent {
+  kind: StreamKind;
+  text: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  response: AgentResponse | null;
+}
+
+// raiker/control/dashboard.py TaskView.to_dict()
+export interface TaskView {
+  task_id: string;
+  session_id: string;
+  status: string;
+  title: string;
+  objective: string;
+  current_step: string | null;
+  progress_percent: number | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+  summary: string | null;
+}
+
+// POST /api/interrupts response (raiker/api/routes_prompts.py).
+export interface InterruptResult {
+  applied: { task_id: string; result: string }[];
+  safe_boundary: boolean;
+}
+
+export interface PromptRequestBody {
+  text: string;
+  session_id?: string;
+  planning_mode?: string;
+  approval_mode?: string;
+  model_profile?: string;
+  max_tool_calls?: number;
+}
+
+export interface InterruptRequestBody {
+  session_id: string;
+  task_id?: string;
+  all?: boolean;
+  action_type?: string;
+  reason?: string;
+  steer_text?: string;
+}

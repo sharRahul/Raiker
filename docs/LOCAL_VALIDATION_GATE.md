@@ -59,17 +59,25 @@ npm --prefix apps/web run build
 ```
 
 Backend routes the dashboard depends on are covered by `pytest` (`tests/test_api_*.py`,
-`tests/test_security_regression_ui.py`, `tests/test_api_contract_schemas.py`). To smoke the running
-server locally (loopback only — never expose it):
+`tests/test_security_regression_ui.py`, `tests/test_api_contract_schemas.py`,
+`tests/test_api_web_ui_serving.py`).
+
+Launch the whole dashboard with **one command** (loopback only — never expose it). When the built
+SPA (`apps/web/dist`) is present, `raiker-web` serves it from the same origin as the API, so the
+UI's relative `/api` paths resolve directly — no second process, no CORS:
 
 ```bash
-raiker-web --workspace . --host 127.0.0.1 --port 8765   # serves the governed local API
-# then, in another shell, mint a token and read a governed view:
-curl -s -XPOST 127.0.0.1:8765/api/auth/session -H 'content-type: application/json' -d '{}'
-curl -s 127.0.0.1:8765/api/diagnostics -H "authorization: Bearer <token>"
-# serve the built SPA for a full UI smoke (read-only views, prompt stream, approvals, security settings):
-npm --prefix apps/web run preview
+npm --prefix apps/web run build          # produce apps/web/dist
+raiker-web --workspace . --host 127.0.0.1 --port 8765
+# open http://127.0.0.1:8765 in a browser, or smoke from the shell:
+curl -s 127.0.0.1:8765/ | grep '<div id="app">'        # SPA shell
+TOKEN=$(curl -s -XPOST 127.0.0.1:8765/api/auth/session -H 'content-type: application/json' -d '{}' | jq -r .token)
+curl -s 127.0.0.1:8765/api/diagnostics -H "authorization: Bearer $TOKEN"
 ```
+
+For hot-reload development, run the SPA dev server instead (it proxies `/api` to `raiker-web`):
+`raiker-web --workspace .` in one shell and `npm --prefix apps/web run dev` in another. If the SPA
+is not built, `raiker-web` serves the API only and prints a one-line build hint.
 
 Web dashboard truths to keep honest during smoke: read views render real backend state only;
 approval resolution is metadata-only (`executes_action=false`); disabled/deferred and sensitive-domain

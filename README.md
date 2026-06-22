@@ -7,7 +7,7 @@
 ## Features
 
 - **Governed runtime** — A deterministic gather → act → verify loop (`raiker/runtime/orchestrator.py`) drives every turn through a 16-state machine, a static policy engine, a tool broker, and an append-only JSONL + SQLite event/state layer. Model outputs and tool calls are always untrusted proposals that must pass validation, policy, and approval.
-- **Plain local terminal client only** — `raiker` launches the line-oriented terminal client. Rich/native TUI is Phase 8 deferred work; Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, not active runtime surfaces. The deterministic mock/test provider is test-only and policy-blocked in the normal CLI.
+- **Two launchable local surfaces** — `raiker` launches the line-oriented terminal client, and `raiker-web` serves the local web dashboard (`apps/web`) + governed API from one loopback origin (single-user, `127.0.0.1` only). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST clients are Phase 8 deferred, not active runtime surfaces. The deterministic mock/test provider is test-only and policy-blocked in the normal CLI.
 - **Policy-gated automation with approvals, review, and checkpoints** — Safe read/search/git tools run directly; file mutations become approval-gated proposals. A deterministic local code-review workflow (`/review`), a proposal lifecycle, metadata-only approval previews, and checkpoint/rewind metadata give you reviewable, reversible automation.
 
 ---
@@ -118,6 +118,22 @@ raiker --prompt "Hello Raiker"       # submit one prompt and exit
 raiker --workspace /path/to/project  # use a specific workspace root
 raiker --help                        # usage
 ```
+
+#### Local web dashboard (one command)
+
+The local web dashboard is the second launchable surface (single-user, `127.0.0.1` only). Build the
+SPA once, then `raiker-web` serves both the governed API and the dashboard from the same origin:
+
+```bash
+npm --prefix apps/web install        # first time only
+npm --prefix apps/web run build      # produce apps/web/dist
+raiker-web --workspace .             # serves API + dashboard on http://127.0.0.1:8765
+```
+
+Open `http://127.0.0.1:8765`. The dashboard adds no authority of its own — every read and mutation
+goes through the same governed gateway/RuntimeAuthority/broker path as the CLI, and approval
+resolution stays metadata-only. If the SPA is not built, `raiker-web` serves the API only. For
+hot-reload development, run `npm --prefix apps/web run dev` (it proxies `/api` to `raiker-web`).
 
 Inside the client, `/help` lists commands. The full CLI command surface is documented in [`docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md`](docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md).
 

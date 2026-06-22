@@ -95,6 +95,41 @@ export interface AuthSession {
   expires_at: string | null;
 }
 
+// raiker/control/dashboard.py ApprovalView.to_dict()
+export interface ApprovalView {
+  approval_id: string;
+  action_id: string;
+  status: string;
+  tool_name: string;
+  capability: string;
+  risk_level: string;
+  session_id: string;
+  turn_id: string | null;
+  created_at: string;
+  age_seconds: number | null;
+  requires_approval: boolean;
+  executes_action: boolean; // always false — resolution is metadata-only
+}
+
+// raiker/control/dashboard.py ApprovalDetailView.to_dict()
+export interface ApprovalDetailView {
+  approval: ApprovalView;
+  arguments: Record<string, unknown>;
+  diff: string | null;
+  diff_path: string | null;
+  preview_kind: "file_diff" | "patch" | "arguments";
+  metadata_only_notice: string;
+}
+
+// POST /api/approvals/{id}/resolve response.
+export interface ResolveApprovalResult {
+  approval_id: string;
+  action_id: string;
+  status: string;
+  executes_action: boolean;
+  reason: string;
+}
+
 // Approval proposal carried on an AgentResponse when status === "needs_approval".
 // Mirrors the `approval` dict built in raiker/runtime/orchestrator.py. No action is executed.
 export interface ApprovalInfo {

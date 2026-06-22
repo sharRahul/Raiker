@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from raiker.api.redaction import redact_response_body
+from raiker.api.routes_approvals import router as approvals_router
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
 from raiker.api.routes_prompts import router as prompts_router
@@ -96,4 +97,5 @@ def create_app(
     app.include_router(control_router)
     app.include_router(dashboard_router)
     app.include_router(prompts_router)
+    app.include_router(approvals_router)
     return app

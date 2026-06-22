@@ -13,6 +13,7 @@
   import EventLogViewer from "./lib/EventLogViewer.svelte";
   import CheckpointViewer from "./lib/CheckpointViewer.svelte";
   import DiagnosticsPanel from "./lib/DiagnosticsPanel.svelte";
+  import ApprovalQueue from "./lib/ApprovalQueue.svelte";
 
   let current = $state(typeof window === "undefined" ? DEFAULT_ROUTE : routeFromHash(window.location.hash));
   const activeItem = $derived(NAV_ITEMS.find((item) => item.id === current) ?? NAV_ITEMS[0]);
@@ -79,6 +80,8 @@
         <p class="state-loading">Connecting to the local Raiker runtime…</p>
       {:else if current === "home"}
         <Home />
+      {:else if current === "approvals"}
+        <ApprovalQueue />
       {:else if current === "capabilities"}
         <CapabilityMatrix />
       {:else if current === "runtime-gates"}

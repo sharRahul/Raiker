@@ -1,5 +1,7 @@
 import type {
   AgentResponse,
+  ApprovalDetailView,
+  ApprovalView,
   AuthSession,
   CapabilityGate,
   Checkpoint,
@@ -9,6 +11,7 @@ import type {
   InterruptResult,
   ModelsView,
   PromptRequestBody,
+  ResolveApprovalResult,
   RuntimeMode,
   RuntimeReadiness,
   SessionSummary,
@@ -104,6 +107,15 @@ export const api = {
   // Issue a governed safe-boundary interrupt for one task or all active tasks in a session.
   interrupt: (body: InterruptRequestBody) =>
     request<InterruptResult>("/api/interrupts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  approvals: () => request<ApprovalView[]>("/api/approvals"),
+  approval: (id: string) => request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(id)}`),
+  // Resolution is metadata-only — it records a decision and never executes the action.
+  resolveApproval: (id: string, body: { approve: boolean; reason: string }) =>
+    request<ResolveApprovalResult>(`/api/approvals/${encodeURIComponent(id)}/resolve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

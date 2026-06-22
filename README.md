@@ -55,7 +55,51 @@ Raiker is local-first and needs **no credentials** to run. Behavior is controlle
 - `--workspace <path>` — choose the workspace root that holds local runtime state (defaults to the current directory).
 - Model endpoints are declared in [`config/model-profiles.json`](config/model-profiles.json) (e.g. the llama.cpp profile’s `endpoint` is `http://127.0.0.1:8080`); channel connector profiles live in [`config/channel-connectors.json`](config/channel-connectors.json).
 
-Hosted providers (e.g. OpenRouter) require explicit network + egress + budget policy and an API key supplied through an environment variable; there is no silent fallback from local to hosted or from production to the test provider.
+There is no silent fallback from local to hosted, or from production to the test provider.
+
+### Choosing and adding a model (required to use Raiker as an agent)
+
+Raiker does **not** ship with a model — it talks to an OpenAI-compatible inference server you run
+locally. Until you point it at a reachable model, prompts return `model_unavailable:
+provider_connection_failed` (by design — it never fabricates output). Model profiles live in
+[`config/model-profiles.json`](config/model-profiles.json) and are inspected/selected from the CLI.
+
+**1. Run a local model server**, e.g. one of:
+
+- **llama.cpp** (native default): serve a GGUF as model name `local-gguf` on `http://127.0.0.1:8080`.
+- **Ollama**: `ollama serve` (OpenAI-compatible endpoint `http://127.0.0.1:11434/v1`).
+- **LM Studio**: start its local server on `http://127.0.0.1:1234/v1`.
+
+**2. Select the profile in the terminal client:**
+
+```text
+/providers                         # list providers and profiles
+/models                            # list model profiles
+/model use raiker-local-llama-cpp  # select the built-in llama.cpp profile
+/model health                      # confirm the server is reachable
+/model current                     # show the active profile
+```
+
+The built-in `raiker-local-llama-cpp` profile works out of the box when a llama.cpp server is
+serving `local-gguf` at `:8080`. The Ollama / LM Studio / vLLM / generic profiles ship with a
+`"<model>"` placeholder and **must be edited first** (see step 3), otherwise selecting them fails
+with `model_name_not_configured`.
+
+**3. Add or edit a model profile** by editing `config/model-profiles.json`: copy an existing entry
+and set a real `model` (the name your server serves), the correct `endpoint`, and the capability
+flags. Supported `provider` values are `llama.cpp`, `ollama`, `lm-studio`, `vllm`, and
+`openai-compatible` (the `mock`/`test` providers are test-only and policy-blocked in the normal CLI).
+Re-launch `raiker` to pick up changes, then `/model use <profile_id>` and `/model health`.
+
+**Hosted / cloud models are not enabled in the current build.** The OpenRouter (hosted) and vLLM
+(home-lab / private-network) profiles exist as configuration/contract only: the runtime policy that
+would permit hosted, policy-gated, or private-network providers is not turned on anywhere, so
+selecting them fails closed (e.g. `hosted_provider_requires_explicit_policy`,
+`provider_requires_explicit_policy_approval`). A governed enablement path and secret storage for
+API keys are deferred work — until then, run Raiker against a **local** model. (Hosted profiles
+declare `requires_network` + `requires_egress_policy` + `requires_budget_policy` and read their key
+from an environment variable such as `OPENROUTER_API_KEY`; the key is never stored by Raiker and is
+redacted from logs.)
 
 ### Running the Application
 

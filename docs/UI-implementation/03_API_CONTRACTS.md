@@ -77,17 +77,28 @@ GET-by-turn-id is semantically wrong.)
 - Semantics: cancel at the next safe boundary — not an instant force-kill.
 
 ### Approvals
-**`GET /api/approvals`**, **`GET /api/approvals/{id}`** — pending list + detail.
-- Service: `ApprovalInbox.list_pending` + detail (payload preview + diff for file mutations).
-- Response: `{approval_id, action_id, capability, risk_level, age, source_turn_id, status, preview, diff?}`.
+**`GET /api/approvals`** — pending list (optional `?status_filter=`, default `pending`).
+- Service: `DashboardService.list_approvals` over `SQLiteStore.list_approvals`.
+- Each item: `{approval_id, action_id, status, tool_name, capability, risk_level, session_id,
+  turn_id, created_at, age_seconds, requires_approval, executes_action:false}` (capability via
+  `CAPABILITY_GATE_MAP`).
 
-**`POST /api/approvals/{id}/resolve`** — record a decision.
-- Service: `ApprovalInbox.resolve(approval_id, approve, resolved_by)`.
-- Request: `{ "approve": boolean, "reason": string }`.
-- Response: `{ "approval_id": string, "status": "approved"|"denied", "executes_action": false }`.
+**`GET /api/approvals/{id}`** — detail with a redacted payload preview and a diff for file mutations.
+- Response: `{approval, arguments, diff?, diff_path?, preview_kind, metadata_only_notice}` where
+  `preview_kind ∈ {file_diff, patch, arguments}`. `write_file`/`edit_file` produce a unified diff
+  from `proposed_write_snapshot`; secrets are redacted in arguments and diff. `404` if unknown.
+
+**`POST /api/approvals/{id}/resolve`** — record a decision (metadata-only).
+- Service: `ApprovalInbox.resolve(approval_id, approve, resolved_by, reason)`.
+- Request: `{ "approve": boolean, "reason": string }` — **unknown fields are rejected (`422`)**, so
+  the UI cannot smuggle an edited payload or an execute flag.
+- Response: `{ "approval_id", "action_id", "status": "approved"|"denied", "executes_action": false,
+  "reason" }`.
 - **`executes_action` is always `false`** and echoed so the UI cannot imply execution.
+- Errors: unknown → `404`; already resolved → `409 approval_already_resolved`; tampered
+  `action_payload_sha256` → `409 approval_payload_tampered`.
 - Tests: approve → `approval_received` event, `executes_action=false`; deny → `approval_denied`;
-  tampered payload hash → rejected.
+  tampered payload hash → rejected; unknown request field → `422`.
 
 ### Events / Checkpoints
 **`GET /api/events`** — filtered append-only events.

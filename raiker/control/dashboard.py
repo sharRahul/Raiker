@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+import difflib
+import json
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from raiker.approval_previews import redact_secret_like_text
 from raiker.control.service import RuntimeControlService
 from raiker.models.registry import ModelProfileRegistry
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
 from raiker.runtime.authority.models import PrincipalType
+from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tools.filesystem import FilesystemSafetyError, proposed_write_snapshot
 
 # Capability states that mean the gate is off / fail-closed.
 _DISABLED_STATES = {"disabled", "planned"}
@@ -162,6 +168,51 @@ class DiagnosticsView:
 
 
 @dataclass(frozen=True)
+class ApprovalView:
+    approval_id: str
+    action_id: str
+    status: str
+    tool_name: str
+    capability: str
+    risk_level: str
+    session_id: str
+    turn_id: str | None
+    created_at: str
+    age_seconds: int | None
+    requires_approval: bool
+    # Resolving an approval records a decision; it never executes the action.
+    executes_action: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ApprovalDetailView:
+    approval: ApprovalView
+    # Redacted, metadata-only preview of the proposed action's arguments.
+    arguments: dict[str, Any]
+    # Unified diff for file-mutation proposals (write_file/edit_file); None otherwise.
+    diff: str | None
+    diff_path: str | None
+    # "file_diff" | "patch" | "arguments" — tells the UI how to render the preview.
+    preview_kind: str
+    metadata_only_notice: str = (
+        "Approval resolution is metadata-only. Recording a decision does NOT execute the action."
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "approval": self.approval.to_dict(),
+            "arguments": dict(self.arguments),
+            "diff": self.diff,
+            "diff_path": self.diff_path,
+            "preview_kind": self.preview_kind,
+            "metadata_only_notice": self.metadata_only_notice,
+        }
+
+
+@dataclass(frozen=True)
 class AuthSessionView:
     # The only response that intentionally contains a token. Never logged; held in memory by the SPA.
     token: str
@@ -235,6 +286,16 @@ class DashboardService:
 
     def list_tasks(self, session_id: str | None = None, status: str | None = None) -> list[TaskView]:
         return [self._task_view(t) for t in self.store.list_tasks(session_id=session_id, status=status)]
+
+    # ── Approvals (read-only views; resolution lives in ApprovalInbox) ───
+    def list_approvals(self, status: str = "pending") -> list[ApprovalView]:
+        return [self._approval_view(row) for row in self.store.list_approvals(status=status)]
+
+    def get_approval(self, approval_id: str) -> ApprovalDetailView | None:
+        row = self.store.load_approval(approval_id)
+        if row is None:
+            return None
+        return self._approval_detail(row)
 
     # ── Models / diagnostics ────────────────────────────────────────────
     def get_models(self) -> ModelsView:
@@ -349,6 +410,97 @@ class DashboardService:
         )
 
     @staticmethod
+    def _age_seconds(created_at: str) -> int | None:
+        try:
+            then = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            return None
+        from datetime import UTC
+
+        delta = datetime.now(UTC) - then
+        return max(0, int(delta.total_seconds()))
+
+    @classmethod
+    def _approval_view(cls, row: dict[str, Any]) -> ApprovalView:
+        tool_name = str(row.get("tool_name", ""))
+        created_at = str(row.get("created_at", ""))
+        return ApprovalView(
+            approval_id=str(row["approval_id"]),
+            action_id=str(row.get("action_id", "")),
+            status=str(row.get("status", "")),
+            tool_name=tool_name,
+            capability=CAPABILITY_GATE_MAP.get(tool_name, tool_name),
+            risk_level=str(row.get("risk_level", "")),
+            session_id=str(row.get("session_id", "")),
+            turn_id=row.get("turn_id"),
+            created_at=created_at,
+            age_seconds=cls._age_seconds(created_at),
+            requires_approval=str(row.get("status", "")) == "pending",
+        )
+
+    def _approval_detail(self, row: dict[str, Any]) -> ApprovalDetailView:
+        view = self._approval_view(row)
+        try:
+            raw_args = json.loads(str(row.get("arguments_json", "{}")))
+        except (ValueError, TypeError):
+            raw_args = {}
+        arguments = self._redact_arguments(raw_args)
+        diff, diff_path, kind = self._build_preview(view.tool_name, raw_args)
+        return ApprovalDetailView(
+            approval=view,
+            arguments=arguments,
+            diff=diff,
+            diff_path=diff_path,
+            preview_kind=kind,
+        )
+
+    @classmethod
+    def _redact_arguments(cls, args: Any) -> dict[str, Any]:
+        if not isinstance(args, dict):
+            return {}
+        return {str(k): cls._redact_value(v) for k, v in args.items()}
+
+    @classmethod
+    def _redact_value(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return redact_secret_like_text(value)
+        if isinstance(value, list):
+            return [cls._redact_value(v) for v in value]
+        if isinstance(value, dict):
+            return {str(k): cls._redact_value(v) for k, v in value.items()}
+        return value
+
+    def _build_preview(
+        self, tool_name: str, args: dict[str, Any]
+    ) -> tuple[str | None, str | None, str]:
+        """Return (diff, path, preview_kind). File mutations get a unified diff; never executes."""
+        if tool_name in {"write_file", "edit_file"}:
+            try:
+                snapshot = proposed_write_snapshot(
+                    self.workspace_root,
+                    str(args.get("path", ".")),
+                    str(args.get("text", "")),
+                )
+            except FilesystemSafetyError:
+                return None, str(args.get("path", "")), "arguments"
+            before = snapshot.get("before_snapshot") or ""
+            after = str(snapshot.get("proposed_text", ""))
+            path = str(snapshot.get("path", args.get("path", "")))
+            diff = "".join(
+                difflib.unified_diff(
+                    redact_secret_like_text(before).splitlines(keepends=True),
+                    redact_secret_like_text(after).splitlines(keepends=True),
+                    fromfile=f"a/{path}",
+                    tofile=f"b/{path}",
+                )
+            )
+            return diff, path, "file_diff"
+        if tool_name == "apply_patch":
+            patch = redact_secret_like_text(str(args.get("patch", "")))
+            return patch, str(args.get("path", "")) or None, "patch"
+        return None, None, "arguments"
+
+    @staticmethod
     def _task_view(task: Any) -> TaskView:
         d = asdict(task) if not isinstance(task, dict) else task
         return TaskView(
@@ -367,6 +519,8 @@ class DashboardService:
 
 
 __all__ = [
+    "ApprovalDetailView",
+    "ApprovalView",
     "AuthError",
     "AuthSessionView",
     "CheckpointView",

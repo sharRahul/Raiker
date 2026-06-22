@@ -25,7 +25,12 @@ class ApprovalInbox:
         return self.store.list_approvals(status="pending")
 
     def resolve(
-        self, approval_id: str, *, approve: bool, resolved_by: str = "local_user"
+        self,
+        approval_id: str,
+        *,
+        approve: bool,
+        resolved_by: str = "local_user",
+        reason: str = "",
     ) -> ApprovalResolution:
         approval = self.store.load_approval(approval_id)
         if approval is None:
@@ -55,6 +60,8 @@ class ApprovalInbox:
                         "approval_id": approval_id,
                         "action_id": approval["action_id"],
                         "status": status,
+                        "reason": reason,
+                        # Resolution is metadata-only: it records a decision, never executes.
                         "executes_action": False,
                     },
                 )

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict
+
 
 @dataclass
 class ActivateRuntimeModeRequest:
@@ -54,6 +56,14 @@ class InterruptRequest:
     action_type: str = "cancel"
     reason: str = "user requested stop"
     steer_text: str | None = None
+
+
+class ResolveApprovalRequest(BaseModel):
+    # extra="forbid" rejects unknown request fields (e.g. an attempt to smuggle an edited payload).
+    model_config = ConfigDict(extra="forbid")
+
+    approve: bool
+    reason: str
 
 
 def serialize_dto(dto: Any) -> Any:

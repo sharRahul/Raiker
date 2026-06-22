@@ -14,6 +14,7 @@
   import CheckpointViewer from "./lib/CheckpointViewer.svelte";
   import DiagnosticsPanel from "./lib/DiagnosticsPanel.svelte";
   import ApprovalQueue from "./lib/ApprovalQueue.svelte";
+  import SecuritySettingsPanel from "./lib/SecuritySettingsPanel.svelte";
 
   let current = $state(typeof window === "undefined" ? DEFAULT_ROUTE : routeFromHash(window.location.hash));
   const activeItem = $derived(NAV_ITEMS.find((item) => item.id === current) ?? NAV_ITEMS[0]);
@@ -94,6 +95,8 @@
         <CheckpointViewer />
       {:else if current === "diagnostics"}
         <DiagnosticsPanel />
+      {:else if current === "settings"}
+        <SecuritySettingsPanel {principal} />
       {:else}
         <Placeholder title={activeItem.label} />
       {/if}

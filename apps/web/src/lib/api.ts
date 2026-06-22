@@ -120,6 +120,41 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+  // ── Runtime mutations (Security Settings). These reuse the existing governed control routes;
+  // the UI adds no authority. Every call is enforced server-side by RuntimeAuthority. ──
+  activateRuntimeMode: (mode_name: string, reason: string) =>
+    request<{ ok: boolean }>("/api/runtime-mode/activate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode_name, reason }),
+    }),
+  disableRuntimeMode: (reason: string) =>
+    request<{ ok: boolean }>("/api/runtime-mode/disable", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    }),
+  setCapabilityState: (
+    capability: string,
+    body: { target_state: string; reason: string; confirmation_token?: string },
+  ) =>
+    request<{ ok: boolean; capability: string; target_state: string }>(
+      `/api/capability-gates/${encodeURIComponent(capability)}/set`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    ),
+  disableCapability: (capability: string, reason: string) =>
+    request<{ ok: boolean; capability: string }>(
+      `/api/capability-gates/${encodeURIComponent(capability)}/disable`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      },
+    ),
 };
 
 /**

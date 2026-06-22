@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { CapabilityGate } from "./apiTypes";
-import { explainCapability, gateBadge, groupByPhase, isDeferred, isDisabled } from "./capabilityModel";
+import {
+  canDisable,
+  canEnable,
+  enableableTargets,
+  explainCapability,
+  gateBadge,
+  groupByPhase,
+  isDeferred,
+  isDisabled,
+  requiresStepUpToken,
+} from "./capabilityModel";
 
 function gate(partial: Partial<CapabilityGate>): CapabilityGate {
   return {
@@ -57,5 +67,37 @@ describe("grouping and explanations", () => {
     );
     expect(info.kind).toBe("gated");
     expect(info.requirement.toLowerCase()).toContain("test");
+  });
+});
+
+describe("enableability for Security Settings", () => {
+  it("offers enable targets only from the backend's allowed_transitions", () => {
+    expect(enableableTargets(gate({ allowed_transitions: ["disabled", "enabled_policy_gated"] }))).toEqual([
+      "enabled_policy_gated",
+    ]);
+    expect(
+      enableableTargets(gate({ allowed_transitions: ["disabled", "planned", "enabled_read_only"] })),
+    ).toEqual([]);
+  });
+
+  it("canEnable requires authority and a real enabled target", () => {
+    const enableable = gate({ can_current_principal_change: true, allowed_transitions: ["disabled", "enabled_runtime"] });
+    expect(canEnable(enableable)).toBe(true);
+    // No authority → cannot enable.
+    expect(canEnable(gate({ allowed_transitions: ["enabled_runtime"] }))).toBe(false);
+    // Authority but no enabled target offered (fail-closed/deferred) → cannot enable.
+    expect(canEnable(gate({ can_current_principal_change: true, allowed_transitions: ["disabled", "enabled_read_only"] }))).toBe(false);
+  });
+
+  it("canDisable requires authority and a currently-enabled gate", () => {
+    expect(canDisable(gate({ can_current_principal_change: true, state: "enabled_runtime" }))).toBe(true);
+    expect(canDisable(gate({ can_current_principal_change: true, state: "disabled" }))).toBe(false);
+    expect(canDisable(gate({ can_current_principal_change: false, state: "enabled_runtime" }))).toBe(false);
+  });
+
+  it("flags Tier-2 caps as needing a step-up confirmation token", () => {
+    expect(requiresStepUpToken("shell_execution")).toBe(true);
+    expect(requiresStepUpToken("web_fetch")).toBe(true);
+    expect(requiresStepUpToken("audit_export")).toBe(false);
   });
 });

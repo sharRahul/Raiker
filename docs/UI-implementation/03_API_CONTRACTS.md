@@ -207,10 +207,15 @@ Response `200` (one element shown):
 ### `POST /api/capability-gates/{cap}/set`
 Request:
 ```json
-{ "target_state": "enabled_policy_gated", "reason": "enable graph indexing", "as_principal": "prin_owner_01" }
+{ "target_state": "enabled_policy_gated", "reason": "enable graph indexing", "confirmation_token": "…", "as_principal": "prin_owner_01" }
 ```
+`confirmation_token` is optional and only consulted for Tier-2 capabilities that require human
+confirmation (`shell_execution`, `process_execution`, `network_execution`, `web_fetch`); it is
+forwarded to the existing `request_capability_transition` activation check (no new authority).
 Allowed `200`: `{ "ok": true, "capability": "graph_indexing_runtime", "target_state": "enabled_policy_gated" }`
-Denied `403`: `{ "ok": false, "reason_code": "only_runtime_gate_manager_can_manage_gates" }`
+Denied `403`: `{ "ok": false, "reason_code": "only_runtime_gate_manager_can_manage_gates" }` (other
+reason codes: `activation_blocked:no_executor:{cap}` for deferred caps,
+`activation_blocked:no_threat_model_ack:{cap}`, `activation_blocked:needs_human_confirmation:{cap}`).
 
 ### `POST /api/prompts` → `AgentResponse`
 Request:

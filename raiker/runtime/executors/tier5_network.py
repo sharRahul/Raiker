@@ -3,128 +3,58 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from raiker.runtime.executors.base import ExecutionResult
+from raiker.runtime.executors.base import ExecutionResult, not_implemented
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
     from raiker.runtime.authority.router import GovernedAction
 
 
-class ExternalChannelExecutor:
+class _NetworkExecutorBase:
+    """Tier-5 outbound / remote executor.
+
+    Channels, relay, remote/container/cloud execution, and hosted/private model
+    runtimes require real external infrastructure, secret injection, egress
+    allowlists, and budget controls. Until those land, they **fail closed**
+    instead of fabricating success.
+    """
+
+    capability = ""
+
+    def __init__(self, workspace_root: str | Path) -> None:
+        self._workspace_root = Path(workspace_root).resolve()
+
+    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        return not_implemented(self.capability, action.action_id)
+
+
+class ExternalChannelExecutor(_NetworkExecutorBase):
     capability = "external_channel_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        channel = str(action.arguments.get("channel", ""))
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary=f"External channel '{channel}' message routed.",
-            artifacts={"channel": channel},
-        )
-
-
-class ChannelApprovalRelayExecutor:
+class ChannelApprovalRelayExecutor(_NetworkExecutorBase):
     capability = "channel_approval_relay"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        channel = str(action.arguments.get("channel", ""))
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary=f"Approval relayed on channel '{channel}'.",
-            artifacts={"channel": channel},
-        )
-
-
-class RemoteExecutionExecutor:
+class RemoteExecutionExecutor(_NetworkExecutorBase):
     capability = "remote_execution_cap"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        target = str(action.arguments.get("target", ""))
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary=f"Remote execution on '{target}' completed.",
-            artifacts={"target": target},
-        )
-
-
-class ContainerExecutionExecutor:
+class ContainerExecutionExecutor(_NetworkExecutorBase):
     capability = "container_execution_cap"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        image = str(action.arguments.get("image", ""))
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary=f"Container execution with image '{image}' completed.",
-            artifacts={"image": image},
-        )
-
-
-class CloudExecutionExecutor:
+class CloudExecutionExecutor(_NetworkExecutorBase):
     capability = "cloud_execution_cap"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        provider = str(action.arguments.get("provider", ""))
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary=f"Cloud execution on '{provider}' completed.",
-            artifacts={"provider": provider},
-        )
-
-
-class HostedModelExecutor:
+class HostedModelExecutor(_NetworkExecutorBase):
     capability = "hosted_model_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        model = str(action.arguments.get("model", ""))
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary=f"Hosted model '{model}' request completed.",
-            artifacts={"model": model},
-        )
-
-
-class PrivateNetworkModelExecutor:
+class PrivateNetworkModelExecutor(_NetworkExecutorBase):
     capability = "private_network_model_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        endpoint = str(action.arguments.get("endpoint", ""))
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary=f"Private network model call to '{endpoint}' completed.",
-            artifacts={"endpoint": endpoint},
-        )
-
-
-class ScheduledRoutinesExecutor:
+class ScheduledRoutinesExecutor(_NetworkExecutorBase):
     capability = "scheduled_routines"
-
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
-
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        routine_id = str(action.arguments.get("routine_id", ""))
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary=f"Scheduled routine '{routine_id}' executed.",
-            artifacts={"routine_id": routine_id},
-        )

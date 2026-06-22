@@ -13,3 +13,6 @@ class ExecutorRegistry:
 
     def has(self, capability: str) -> bool:
         return capability in self._executors
+
+    def capabilities(self) -> frozenset[str]:
+        return frozenset(self._executors)

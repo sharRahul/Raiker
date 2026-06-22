@@ -203,10 +203,12 @@ class TestListCapabilityGates:
         views = service.list_capability_gates()
         for v in views:
             req = get_activation_requirement(v.capability)
-            if req is not None and req.requires_executor and not has_executor(v.capability):
+            # A capability that requires an executor but has none registered must
+            # never offer an enabled transition.
+            if req is not None and req.requires_executor and not has_executor(v.capability, service._registry):
                 for state in ("enabled_runtime", "enabled_policy_gated"):
                     assert state not in v.allowed_transitions, (
-                        f"{v.capability} should exclude {state} due to requires_executor"
+                        f"{v.capability} should exclude {state} due to missing executor"
                     )
 
 

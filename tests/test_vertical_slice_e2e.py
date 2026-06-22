@@ -210,7 +210,7 @@ def test_executor_not_called_on_deny(tmp_path: Path) -> None:
                 decision="deny", reasons=["mock_deny"], requires_user_approval=False,
             )
 
-    authority = RuntimeAuthority(store, writer, policy_engine=DenyEngine(), executor_registry=registry)
+    authority = RuntimeAuthority(store, writer, policy_engine=DenyEngine(), executor_registry=registry)  # type: ignore[arg-type]
 
     principal = _make_human(store)
     action = GovernedAction(

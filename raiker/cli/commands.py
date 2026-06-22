@@ -2026,13 +2026,20 @@ def handle_capability_gate_enable(command: str, *, workspace_root: str | Path = 
         aidx = parts.index("--as")
         if aidx + 1 < len(parts):
             explicit_principal = parts[aidx + 1]
+    confirmation_token: str | None = None
+    if "--confirm" in parts:
+        cidx = parts.index("--confirm")
+        if cidx + 1 < len(parts):
+            confirmation_token = parts[cidx + 1]
     if not target_state:
-        return "Usage: /capability-gate enable <capability> --state <state> [--reason <reason>] [--as <principal_id>]"
+        return "Usage: /capability-gate enable <capability> --state <state> [--reason <reason>] [--as <principal_id>] [--confirm <token>]"
     service = RuntimeControlService(workspace_root)
     principal_ref, err = service.resolve_principal(explicit_principal)
     if principal_ref is None:
         return f"Capability transition denied: {err}"
-    result = service.set_capability_state(capability, target_state, explicit_principal, reason)
+    result = service.set_capability_state(
+        capability, target_state, explicit_principal, reason, confirmation_token=confirmation_token,
+    )
     if not result.ok:
         return f"Capability transition denied: {result.reason_code}"
     return (

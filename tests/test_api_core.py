@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
@@ -24,7 +25,7 @@ def bootstrapped_workspace(temp_workspace: Path) -> Path:
 
 
 @pytest.fixture
-def app(bootstrapped_workspace: Path):
+def app(bootstrapped_workspace: Path) -> FastAPI:
     return create_app(bootstrapped_workspace)
 
 
@@ -36,7 +37,7 @@ def owner_token(bootstrapped_workspace: Path) -> str:
 
 
 @pytest.fixture
-def client(app, bootstrapped_workspace: Path):
+def client(app: FastAPI, bootstrapped_workspace: Path) -> TestClient:
     return TestClient(app)
 
 
@@ -97,7 +98,7 @@ class TestOwnerAuthenticated:
 
 class TestAiPrincipalDenied:
     def test_ai_principal_cannot_flip_gate_403(
-        self, temp_workspace: Path, app,
+        self, temp_workspace: Path, app: FastAPI,
     ) -> None:
         bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
         _create_ai_principal(temp_workspace)

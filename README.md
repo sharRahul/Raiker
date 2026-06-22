@@ -89,9 +89,12 @@ The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPL
 | Controlled runtime mode activation | Implemented | Runtime mode state and capability gate state are persisted, governed, auditable, and reversible |
 | Local single-user production hardening | Implemented | First-run owner bootstrap, persisted owner principal, acting-principal resolution, runtime-gate-manager authorization, recovery flow |
 | `production_ready_local_single_user_runtime` | Ready | Local single-user terminal/runtime foundation |
-| Approval execution relay | Deferred | `/approve` and `/deny` remain metadata-only |
-| Shell/network/plugin/remote/container/cloud execution | Disabled/deferred | Future runtime capability work |
-| Email/calendar/finance/medical/CCTV runtime | Disabled/deferred | Future runtime capability work |
+| Control plane + API | Implemented | `RuntimeControlService` (typed DTOs) and a FastAPI surface with session→principal auth let an out-of-process UI view and govern-flip gates |
+| Real local executors | Implemented (governed-flippable) | Tier 1 (approval relay, file write, patch apply, memory write/forget), Tier 2 (shell/process/web-fetch/network, sandboxed + egress-allowlisted), Tier 3 (graph indexing, semantic memory). See [`docs/RUNTIME_EXECUTORS_SPEC.md`](docs/RUNTIME_EXECUTORS_SPEC.md) |
+| Plugins / vector+embedding / hosted-model runtime | Fail-closed (not implemented) | Activation blocked (`no_executor`); flipping does not fake success |
+| Shell/network executors flippable but require confirm | Implemented (Tier 2) | Sandbox + egress allowlist + threat-model ack + human confirmation token to enable |
+| Remote/container/cloud + external channels | Fail-closed (not implemented) | No real executor; fails closed until isolation/egress/budget work lands |
+| Email/calendar/finance/medical/CCTV runtime | Fail-closed (not implemented) | No real integration; fails closed (never fabricates success) pending per-domain threat models |
 | Hosted/multi-user/cloud runtime | Future phase | Local single-user readiness does not cover hosted or multi-user deployment |
 
 ### Production-ready local runtime criteria (completed)
@@ -113,10 +116,9 @@ The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPL
 
 ### Current limitations
 
-- Approval execution relay remains metadata-only/deferred.
-- Shell/process/network/web-fetch runtime remains disabled/deferred.
-- Plugin execution remains disabled/deferred.
-- Remote/container/cloud runtime remains disabled/deferred.
+- Real executors exist only for the local Tier 1–3 set in `REAL_EXECUTOR_CAPABILITIES`; everything else fails closed (`not_implemented`) and cannot be flipped to a working state.
+- Plugins, vector/embedding and hosted/private model runtime, external channels, remote/container/cloud execution, scheduled routines, and all sensitive personal/physical domains (email/calendar/finance/medical/cctv/home-security/hardware) are not implemented yet — flipping them is blocked at activation.
+- Tier 2 executors (shell/process/network/web-fetch) require a threat-model ack and a human confirmation token to enable.
 - Email/calendar/finance/medical/CCTV runtime remains disabled/deferred.
 - Hosted/multi-user/cloud runtime is future implementation work.
 - Current production readiness applies only to local single-user runtime.

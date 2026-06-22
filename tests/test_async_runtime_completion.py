@@ -32,7 +32,9 @@ def test_real_httpx_and_dependencies() -> None:
         with open("pyproject.toml", "rb") as handle:
             deps = tomllib.loads(handle.read().decode())["project"]["dependencies"]
     assert any(d.startswith("httpx") for d in deps)
-    assert not any(d.startswith(("fastapi", "langchain", "llama-index")) for d in deps)
+    # fastapi is now an intentional dependency (the API/UI surface). langchain and
+    # llama-index remain disallowed: they would bypass Raiker contracts.
+    assert not any(d.startswith(("langchain", "llama-index")) for d in deps)
 
 
 @pytest.mark.parametrize(("base", "path", "expected"), [

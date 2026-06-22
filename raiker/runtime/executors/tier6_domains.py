@@ -3,148 +3,68 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from raiker.runtime.executors.base import ExecutionResult
+from raiker.runtime.executors.base import ExecutionResult, not_implemented
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
     from raiker.runtime.authority.router import GovernedAction
 
 
-class EmailRuntimeExecutor:
+class _DomainExecutorBase:
+    """Tier-6 sensitive-domain executor.
+
+    These domains (email, calendar, finance, medical, CCTV, home security,
+    hardware, …) require real external integrations plus a per-domain threat
+    model before they can perform any action. Until that work lands, they
+    **fail closed** rather than fabricating success — flipping the gate on must
+    never make the system claim a medical/finance/security action "completed"
+    when nothing happened.
+    """
+
+    capability = ""
+
+    def __init__(self, workspace_root: str | Path) -> None:
+        self._workspace_root = Path(workspace_root).resolve()
+
+    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        return not_implemented(self.capability, action.action_id)
+
+
+class EmailRuntimeExecutor(_DomainExecutorBase):
     capability = "email_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary="Email operation completed.",
-            artifacts={"domain": "email"},
-        )
-
-
-class CalendarRuntimeExecutor:
+class CalendarRuntimeExecutor(_DomainExecutorBase):
     capability = "calendar_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary="Calendar operation completed.",
-            artifacts={"domain": "calendar"},
-        )
-
-
-class ReminderRuntimeExecutor:
+class ReminderRuntimeExecutor(_DomainExecutorBase):
     capability = "reminder_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary="Reminder operation completed.",
-            artifacts={"domain": "reminders"},
-        )
-
-
-class FinanceRuntimeExecutor:
+class FinanceRuntimeExecutor(_DomainExecutorBase):
     capability = "finance_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary="Finance operation completed.",
-            artifacts={"domain": "finance"},
-        )
-
-
-class InvestmentRuntimeExecutor:
+class InvestmentRuntimeExecutor(_DomainExecutorBase):
     capability = "investment_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary="Investment operation completed.",
-            artifacts={"domain": "investments"},
-        )
-
-
-class MedicalRuntimeExecutor:
+class MedicalRuntimeExecutor(_DomainExecutorBase):
     capability = "medical_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary="Medical operation completed.",
-            artifacts={"domain": "medical"},
-        )
-
-
-class PregnancyBabyRuntimeExecutor:
+class PregnancyBabyRuntimeExecutor(_DomainExecutorBase):
     capability = "pregnancy_baby_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary="Pregnancy/baby operation completed.",
-            artifacts={"domain": "pregnancy_baby"},
-        )
-
-
-class CctvRuntimeExecutor:
+class CctvRuntimeExecutor(_DomainExecutorBase):
     capability = "cctv_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary="CCTV operation completed.",
-            artifacts={"domain": "cctv"},
-        )
-
-
-class HomeSecurityRuntimeExecutor:
+class HomeSecurityRuntimeExecutor(_DomainExecutorBase):
     capability = "home_security_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
 
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary="Home security operation completed.",
-            artifacts={"domain": "home_security"},
-        )
-
-
-class HardwareOperatorRuntimeExecutor:
+class HardwareOperatorRuntimeExecutor(_DomainExecutorBase):
     capability = "hardware_operator_runtime"
-
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
-
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
-            summary="Hardware operator operation completed.",
-            artifacts={"domain": "hardware"},
-        )

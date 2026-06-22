@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import difflib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -148,12 +148,34 @@ class ModelsView:
 
 
 @dataclass(frozen=True)
+class ProviderHealthView:
+    profile_id: str
+    provider: str
+    model: str
+    endpoint_kind: str
+    local_only: bool
+    requires_network: bool
+    selected: bool
+    # Derived from configuration only — reachability is NOT probed here (no network side effects
+    # on a read). Live reachability is checked on demand via the CLI (`/model-health`).
+    status: str
+    detail: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class DiagnosticsView:
     runtime_mode: str
     production_ready_local_single_user_runtime: bool
     summary: dict[str, Any]
     disabled_capabilities: tuple[str, ...]
     counts: dict[str, int]
+    # M6 additions — an honest readiness/diagnostics surface derived from stored state only.
+    readiness: dict[str, Any] = field(default_factory=dict)
+    missing_config: tuple[str, ...] = ()
+    provider_health: tuple[ProviderHealthView, ...] = ()
     scope_note: str = "Status reflects the local single-user runtime only."
 
     def to_dict(self) -> dict[str, Any]:
@@ -163,6 +185,9 @@ class DiagnosticsView:
             "summary": dict(self.summary),
             "disabled_capabilities": list(self.disabled_capabilities),
             "counts": dict(self.counts),
+            "readiness": dict(self.readiness),
+            "missing_config": list(self.missing_config),
+            "provider_health": [p.to_dict() for p in self.provider_health],
             "scope_note": self.scope_note,
         }
 
@@ -328,6 +353,9 @@ class DashboardService:
             "checkpoints": self.store.count_checkpoints(),
             "tasks": self.store.count_tasks(),
         }
+        models = self.get_models()
+        provider_health = self._provider_health(models)
+        missing_config = self._missing_config(readiness, models)
         return DiagnosticsView(
             runtime_mode=readiness.mode.mode_name,
             production_ready_local_single_user_runtime=bool(
@@ -336,7 +364,50 @@ class DashboardService:
             summary=readiness.summary,
             disabled_capabilities=disabled,
             counts=counts,
+            readiness=readiness.summary,
+            missing_config=missing_config,
+            provider_health=provider_health,
         )
+
+    @staticmethod
+    def _provider_health(models: ModelsView) -> tuple[ProviderHealthView, ...]:
+        """Configuration-derived provider status. Never probes the network on a read, and never
+        fabricates reachability — reachability is checked on demand via the CLI."""
+        return tuple(
+            ProviderHealthView(
+                profile_id=p.profile_id,
+                provider=p.provider,
+                model=p.model,
+                endpoint_kind=p.endpoint_kind,
+                local_only=p.local_only,
+                requires_network=p.requires_network,
+                selected=p.selected,
+                status="selected" if p.selected else "configured",
+                detail=(
+                    "local provider; reachability not probed here"
+                    if p.local_only
+                    else "remote/networked provider; reachability not probed here"
+                ),
+            )
+            for p in models.profiles
+        )
+
+    @staticmethod
+    def _missing_config(readiness: Any, models: ModelsView) -> tuple[str, ...]:
+        """Human-readable configuration gaps derived from stored readiness — no shell, no probing."""
+        s = readiness.summary
+        gaps: list[str] = []
+        if not s.get("owner_bootstrapped", False):
+            gaps.append("No owner principal is bootstrapped (run `raiker` → `/bootstrap-owner`).")
+        if not s.get("acting_principal_available", False):
+            gaps.append("No acting principal is available.")
+        if not s.get("runtime_gate_manager_available", False):
+            gaps.append("No runtime_gate_manager principal is available to change gates.")
+        if readiness.mode.status != "active":
+            gaps.append("No runtime mode is active.")
+        if models.current_profile_id is None:
+            gaps.append("No model profile is selected.")
+        return tuple(gaps)
 
     # ── Auth (local token mint) ─────────────────────────────────────────
     def mint_owner_session(self, as_principal: str | None = None) -> AuthSessionView | AuthError:
@@ -529,6 +600,7 @@ __all__ = [
     "EventView",
     "ModelProfileView",
     "ModelsView",
+    "ProviderHealthView",
     "SessionDetailView",
     "SessionView",
     "TaskView",

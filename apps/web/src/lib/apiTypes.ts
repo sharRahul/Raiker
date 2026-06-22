@@ -29,12 +29,27 @@ export interface RuntimeReadiness {
   summary: Record<string, unknown>;
 }
 
+export interface ProviderHealth {
+  profile_id: string;
+  provider: string;
+  model: string;
+  endpoint_kind: string;
+  local_only: boolean;
+  requires_network: boolean;
+  selected: boolean;
+  status: string; // "selected" | "configured" — config-derived, never probed here
+  detail: string;
+}
+
 export interface Diagnostics {
   runtime_mode: string;
   production_ready_local_single_user_runtime: boolean;
   summary: Record<string, unknown>;
   disabled_capabilities: string[];
   counts: Record<string, number>;
+  readiness: Record<string, boolean>;
+  missing_config: string[];
+  provider_health: ProviderHealth[];
   scope_note: string;
 }
 

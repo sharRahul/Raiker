@@ -121,7 +121,9 @@ GET-by-turn-id is semantically wrong.)
 **`GET /api/diagnostics`** — readiness + validator-status surface.
 - Service: `RuntimeControlService.get_runtime_readiness` + readiness reports. **Does not run shell**;
   returns stored/derived status only.
-- Response: `{readiness:{...}, disabled_capabilities:[...], missing_config:[...], provider_health:[...]}`.
+- Response (superset of M2): `{runtime_mode, production_ready_local_single_user_runtime, summary,
+  counts, scope_note, readiness:{...}, disabled_capabilities:[...], missing_config:[...],
+  provider_health:[...]}`. `provider_health` is config-derived (not probed); never fabricated.
 
 ### Tasks / Interrupts (STOP switch)
 **`GET /api/tasks`** — active/recent tasks.
@@ -259,11 +261,20 @@ Response `200`:
 Denied (AI principal) `403`: `{ "ok": false, "reason_code": "ai_cannot_manage_runtime_gates" }`
 
 ### `GET /api/diagnostics`
+Superset of the M2 shape (`runtime_mode`, `production_ready_local_single_user_runtime`, `summary`,
+`counts`, `scope_note` are still present). M6 adds `readiness`, `missing_config`, `provider_health`.
+`provider_health` is **configuration-derived only** — reachability is never probed on this read (no
+network side effects, no fabricated health); `status` is `selected`|`configured` and `detail` states
+that reachability is not probed here (the CLI `/model-health` probes on demand).
 ```json
 {
-  "readiness": { "production_ready_local_single_user_runtime": true, "owner_bootstrapped": true, "current_runtime_mode": "local_single_user_runtime" },
+  "runtime_mode": "local_single_user_runtime",
+  "production_ready_local_single_user_runtime": true,
+  "readiness": { "owner_bootstrapped": true, "runtime_gate_manager_available": true, "dangerous_capabilities_disabled": true, "production_ready_local_single_user_runtime": true },
   "disabled_capabilities": ["shell_execution","email_runtime","plugin_execution_cap"],
-  "missing_config": [],
-  "provider_health": [ { "profile_id": "raiker-local-llama-cpp", "status": "unavailable", "detail": "provider_connection_failed" } ]
+  "missing_config": ["No model profile is selected."],
+  "provider_health": [ { "profile_id": "raiker-local-llama-cpp", "provider": "llama.cpp", "requires_network": false, "local_only": true, "selected": true, "status": "selected", "detail": "local provider; reachability not probed here" } ],
+  "counts": { "sessions": 0, "events": 0, "checkpoints": 0, "tasks": 0 },
+  "scope_note": "Status reflects the local single-user runtime only."
 }
 ```

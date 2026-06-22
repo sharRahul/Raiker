@@ -30,6 +30,12 @@ class DisableCapabilityRequest:
     as_principal: str | None = None
 
 
+@dataclass
+class AuthSessionRequest:
+    # Optional explicit principal; defaults to the resolved local owner. Local-only, human-only.
+    as_principal: str | None = None
+
+
 def serialize_dto(dto: Any) -> Any:
     if hasattr(dto, "to_dict"):
         return dto.to_dict()

@@ -9,6 +9,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from raiker.api.redaction import redact_response_body
 from raiker.api.routes_control import router as control_router
+from raiker.api.routes_dashboard import router as dashboard_router
 from raiker.runtime.executors.registry import ExecutorRegistry
 
 
@@ -21,30 +22,49 @@ class RedactionMiddleware:
             await self.app(scope, receive, send)
             return
 
-        body_chunks: list[bytes] = []
-        send_wrapper = _make_send_wrapper(send, body_chunks)
-        await self.app(scope, receive, send_wrapper)
+        # The local token-mint endpoint must return the owner's bearer token to the loopback
+        # client; redacting it would defeat the endpoint. This is the only exemption — every other
+        # response is still scrubbed of secret-like fields.
+        if scope.get("path") == "/api/auth/session":
+            await self.app(scope, receive, send)
+            return
 
+        start_message: Message | None = None
+        body = bytearray()
 
-def _make_send_wrapper(send: Send, body_chunks: list[bytes]) -> Send:
-    async def send_wrapper(message: Message) -> None:
-        if message["type"] == "http.response.body":
-            chunk = message.get("body", b"")
-            if chunk:
-                body_chunks.append(chunk)
-            merged = b"".join(body_chunks)
-            body_chunks.clear()
-            redacted = _try_redact_json_body(merged)
-            if redacted is not None:
-                new_body = json.dumps(redacted, default=str).encode("utf-8")
-                await send({
-                    "type": "http.response.body",
-                    "body": new_body,
-                    "more_body": message.get("more_body", False),
-                })
+        async def capture(message: Message) -> None:
+            nonlocal start_message
+            if message["type"] == "http.response.start":
+                start_message = message
                 return
-        await send(message)
-    return send_wrapper
+            if message["type"] != "http.response.body":
+                await send(message)
+                return
+            body.extend(message.get("body", b""))
+            if message.get("more_body", False):
+                return
+            await _emit_redacted(send, start_message, bytes(body))
+
+        await self.app(scope, receive, capture)
+
+
+async def _emit_redacted(send: Send, start_message: Message | None, raw: bytes) -> None:
+    if start_message is None:
+        await send({"type": "http.response.body", "body": raw, "more_body": False})
+        return
+    redacted = _try_redact_json_body(raw)
+    out = json.dumps(redacted, default=str).encode("utf-8") if redacted is not None else raw
+    # Re-serialized JSON changes byte length; recompute Content-Length or the body is truncated
+    # over real HTTP (uvicorn). Other headers are preserved.
+    headers: list[tuple[bytes, bytes]] = [
+        (key, value)
+        for (key, value) in start_message.get("headers", [])
+        if key.lower() != b"content-length"
+    ]
+    headers.append((b"content-length", str(len(out)).encode("latin-1")))
+    new_start: dict[str, Any] = {**start_message, "headers": headers}
+    await send(new_start)
+    await send({"type": "http.response.body", "body": out, "more_body": False})
 
 
 def _try_redact_json_body(raw: bytes) -> Any | None:
@@ -71,4 +91,5 @@ def create_app(
         app.state.executor_registry = executor_registry
     app.add_middleware(RedactionMiddleware)
     app.include_router(control_router)
+    app.include_router(dashboard_router)
     return app

@@ -363,6 +363,33 @@ Tests must prove:
 9. response preserves client metadata;
 10. checkpoint manifests include `last_event_id` and `runtime_state`.
 
+## Local web dashboard API routes (`raiker-web`)
+
+The launchable local web dashboard (`apps/web`) talks only to the local governed API served by
+`raiker-web` (loopback `127.0.0.1`, single-user). These routes reuse the existing governed
+contracts above; the UI holds the bearer token in memory only and adds no authority of its own.
+Full request/response shapes and the `reason_code` → plain-English map live in
+[`docs/UI-implementation/03_API_CONTRACTS.md`](UI-implementation/03_API_CONTRACTS.md) and
+[`docs/UI-implementation/02_SECURITY_UX.md`](UI-implementation/02_SECURITY_UX.md).
+
+| Route | Method | Backing service | Notes |
+|---|---|---|---|
+| `/api/auth/session` | POST | local owner principal resolution | Loopback, human-only; mints an in-memory bearer token. AI principals cannot mint. |
+| `/api/sessions`, `/api/sessions/{id}`, `/api/turns/{id}` | GET | `DashboardService` | Read-only governed views. |
+| `/api/events`, `/api/checkpoints[/{id}]`, `/api/tasks` | GET | `DashboardService` | Read-only governed views. |
+| `/api/capability-gates[/{cap}]`, `/api/runtime-mode`, `/api/runtime-readiness`, `/api/models` | GET | `RuntimeControlService` | Read-only governed views. |
+| `/api/diagnostics` | GET | `DashboardService` | Adds `readiness`, `missing_config`, `provider_health` (config-derived; reachability not probed). |
+| `/api/prompts` | POST | `AgentGateway.submit_prompt_async` | Governed turn; returns `AgentResponse`. |
+| `/api/prompts/stream` | POST | `AgentGateway.astream_prompt` | SSE turn stream (lifecycle + text deltas + `FINAL`). |
+| `/api/interrupts` | POST | `InterruptController` / `TaskManager` | STOP switch; **human-only** (`human_principal_required`); cancel at next safe boundary, not force-kill. |
+| `/api/approvals[/{id}]` | GET | `DashboardService` / `ApprovalInbox` | Pending list + detail (redacted preview + diff). |
+| `/api/approvals/{id}/resolve` | POST | `ApprovalInbox.resolve` | **Metadata-only** (`executes_action=false`); unknown request fields rejected (`422`); tampered payload / already-resolved → `409`. |
+| `/api/runtime-mode/{activate,disable}`, `/api/capability-gates/{cap}/{set,disable}` | POST | `RuntimeControlService` / `RuntimeAuthority` | Governed mutations behind a step-up window; Tier-2 `set` accepts a forwarded `confirmation_token`. AI principals and non-`runtime_gate_manager` humans are denied (`403`). |
+
+All mutation routes are enforced server-side by `RuntimeAuthority`; the UI cannot bypass policy,
+authority, approvals, or the disabled-runtime gates. Approval resolution is metadata-only and does
+not execute the approved action.
+
 ## Persisted runtime mode and capability gate state
 
 Runtime mode state and capability gate state are persisted in SQLite tables (`runtime_mode_state`, `capability_gate_state`) and read by `RuntimeAuthority` on startup. All 47 capabilities default to disabled. State survives restarts and is governed via the `runtime_gate_manager` human-only role.

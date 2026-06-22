@@ -50,7 +50,7 @@ This installs the package in editable mode with the dev toolchain (`pytest`, `ru
 
 Raiker is local and needs **no credentials** to run. Behavior is controlled by a few environment variables and the bundled JSON config files — never by hard-coded secrets:
 
-- `RAIKER_TUI=plain` — keep the plain line-oriented shell path (the only launchable UI).
+- `RAIKER_TUI=plain` — keep the plain line-oriented shell path (the launchable terminal client; the local web dashboard is the other launchable surface).
 - `RAIKER_TEST_MODE=1` — enable the deterministic test provider (test/offline only; production CLI policy blocks it with `deterministic_test_provider_requires_test_mode`).
 - `--workspace <path>` — choose the workspace root that holds local runtime state (defaults to the current directory).
 - Model endpoints are declared in [`config/model-profiles.json`](config/model-profiles.json) (e.g. the llama.cpp profile’s `endpoint` is `http://127.0.0.1:8080`); channel connector profiles live in [`config/channel-connectors.json`](config/channel-connectors.json).
@@ -179,7 +179,7 @@ The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPL
 ### Detailed status
 
 - **All Phase 3 slices A through P are implemented, tested, and documented.** Phase 3 is `implemented_verified` only for the **safe foundation/readiness slices A-P**, and **Phase 4 memory MVP is implemented**.
-- The **current launchable UI is the plain local terminal client only**. **Rich/native TUI/Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred**: specified but not implemented as launchable apps.
+- The **launchable local UIs are the plain local terminal client and the local web dashboard** (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only). The web dashboard surfaces read-only governed views, the same governed prompt/turn/approval/runtime-mutation flows as the CLI (approval resolution stays metadata-only), and a step-up-gated Security Settings; it adds no authority of its own and talks only to the local governed API. **Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser-Extension, and hosted/multi-user REST clients remain Phase 8 deferred**: specified but not implemented as launchable apps.
 - **Approval resolution is metadata-only.** `/approve` and `/deny` update one pending approval record and do not execute the approved action. Approval execution relay remains disabled/deferred.
 - **Durable memory mutation is broker-governed.** `/memory-store` and `/memory-forget` are approval-required brokered requests by default; secret/credential-like content is denied before approval creation, and no CLI path bypasses policy or event logging.
 - **Backend capability labels are explicit:** `implemented_read_only`, `implemented_policy_gated`, `implemented_approval_required`, `metadata_only`, `readiness_only`, `dry_run_only`, `contract_only`, `disabled_deferred`, and `test_only`.

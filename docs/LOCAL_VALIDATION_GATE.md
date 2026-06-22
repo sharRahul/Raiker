@@ -5,7 +5,7 @@
 
 # Local Validation Gate while hosted CI quota is unreliable
 
-> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+> Current truth (2026-06-21): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
 
 
 ## Reason
@@ -44,6 +44,37 @@ raiker --workspace . --prompt "/memory-readiness"
 raiker --workspace . --prompt "/plugin-readiness"
 raiker --workspace . --prompt "/cleanup-readiness"
 ```
+
+## Local web dashboard validation (apps/web + raiker-web)
+
+The local web dashboard is a launchable surface (single-user, `127.0.0.1` only). Run the frontend
+gate from `apps/web` before merge:
+
+```bash
+npm --prefix apps/web ci            # or: npm --prefix apps/web install
+npm --prefix apps/web run lint
+npm --prefix apps/web run check     # svelte-check / tsc
+npm --prefix apps/web run test      # vitest (component, a11y, contract, security-regression UI guards)
+npm --prefix apps/web run build
+```
+
+Backend routes the dashboard depends on are covered by `pytest` (`tests/test_api_*.py`,
+`tests/test_security_regression_ui.py`, `tests/test_api_contract_schemas.py`). To smoke the running
+server locally (loopback only — never expose it):
+
+```bash
+raiker-web --workspace . --host 127.0.0.1 --port 8765   # serves the governed local API
+# then, in another shell, mint a token and read a governed view:
+curl -s -XPOST 127.0.0.1:8765/api/auth/session -H 'content-type: application/json' -d '{}'
+curl -s 127.0.0.1:8765/api/diagnostics -H "authorization: Bearer <token>"
+# serve the built SPA for a full UI smoke (read-only views, prompt stream, approvals, security settings):
+npm --prefix apps/web run preview
+```
+
+Web dashboard truths to keep honest during smoke: read views render real backend state only;
+approval resolution is metadata-only (`executes_action=false`); disabled/deferred and sensitive-domain
+capabilities are not enableable; runtime mutations go through step-up auth and the governed
+`RuntimeAuthority`; the STOP switch cancels at the next safe boundary and is human-only.
 
 For Phase 3 rollout branches, also run manual or scripted smoke coverage for:
 
@@ -170,8 +201,8 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
 | Rich TUI panels | Plain terminal shell/status rendering only; Rich/native TUI panels are Phase 8 deferred. | Plain-only | None. | Build panel framework only in a future approved slice. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
-| Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
-| Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
+| Web UI | Launchable local web dashboard: `apps/web` Svelte SPA over the `raiker-web` loopback API. Read-only governed views + governed prompt/turn/approval/runtime-mutation flows (approval resolution metadata-only); single-user, `127.0.0.1` only. | Yes | No direct tool authority; routes through gateway/RuntimeAuthority/broker exactly as the CLI. | Keep API-contract + frontend test parity; broader client surfaces stay deferred. |
+| Dashboard | Read-only governed views are part of the local web dashboard above (capabilities, runtime mode, models, diagnostics). Standalone native/mobile dashboards remain Phase 8 deferred. | Yes (web) | None beyond the governed API. | Implement standalone dashboard apps after explicit activation scope. |
 | IDE extension | Specified/deferred; no extension runtime. | No | None. | Define extension transport and auth. |
 | Mobile apps | Specified/deferred; no Apple/Android apps. | No | None. | Build mobile clients after explicit activation scope. |
 | Voice UI | Specified/deferred. | No | None. | Define voice contracts after explicit activation scope. |

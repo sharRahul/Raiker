@@ -5,7 +5,27 @@
 
 # Security Architecture
 
-Current launchable interface is the plain local terminal client only. Rich/native TUI, desktop, web, dashboard, mobile, IDE, voice, browser extension, and REST/API clients are Phase 8 deferred, specified/deferred, not active runtime.
+The launchable local interfaces are the plain local terminal client and the local web dashboard
+(`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only). The web
+dashboard adds no authority of its own: every read and mutation routes through the same Agent
+Gateway, RuntimeAuthority, PolicyEngine, ToolBroker, approval, and event-logging path as the CLI,
+and approval resolution is metadata-only. Rich/native TUI, desktop, mobile, IDE, voice, browser
+extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified/deferred, not
+active runtime.
+
+### Local web dashboard trust boundary
+
+- The API server binds to loopback (`127.0.0.1`) only and is single-user; it must not be exposed on
+  a public interface. The SPA obtains a bearer token from `POST /api/auth/session` for the local
+  owner principal and holds it **in memory only** (never `localStorage`/`sessionStorage`).
+- Session minting is human-only: AI principals cannot mint a session, interrupt tasks, or mutate
+  runtime gates (`human_principal_required` / authority denials still fire via the API).
+- Responses pass through the redaction middleware before leaving the server; secret-like strings are
+  redacted from API responses, event logs, and approval previews. There is no secret/credential
+  store — secret storage is not implemented (deferred).
+- Runtime mutations from the dashboard go through a step-up window that only *collects and forwards*
+  the backend-required `reason` / confirmation token / threat-model acknowledgement; it grants
+  nothing `RuntimeAuthority` would not already require.
 
 ## Local single-user production readiness
 

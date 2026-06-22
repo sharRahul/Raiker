@@ -5,7 +5,7 @@
 
 # Implementation Status
 
-> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Real local executors exist and are governed-flippable for: Tier 1 (`approval_execution_relay`, `file_write_execution`, `patch_apply_execution`, `memory_write_execution`, `memory_forget_execution`), Tier 2 (`shell_execution`, `process_execution`, `web_fetch`, `network_execution` — sandboxed/egress-allowlisted), and Tier 3 local code-intelligence (`graph_indexing_runtime`, `semantic_memory_runtime`). These are the only members of `REAL_EXECUTOR_CAPABILITIES`. Every other capability — plugins, vector/embedding and hosted/private model runtime, external channels/notifications, remote/container/cloud execution, scheduled routines, and all Tier-6 sensitive domains (email/calendar/finance/investment/medical/pregnancy/cctv/home-security/hardware) — has **no real executor and fails closed** (`not_implemented` / `activation_blocked:no_executor`); it cannot be flipped to a working state. All capability gates still ship `disabled` by default; enabling is owner/`runtime_gate_manager`-only, governed, reversible, and audited. Per-capability detail: [`docs/RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md).
+> Current truth (2026-06-22): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Real local executors exist and are governed-flippable for: Tier 1 (`approval_execution_relay`, `file_write_execution`, `patch_apply_execution`, `memory_write_execution`, `memory_forget_execution`), Tier 2 (`shell_execution`, `process_execution`, `web_fetch`, `network_execution` — sandboxed/egress-allowlisted), and Tier 3 local code-intelligence (`graph_indexing_runtime`, `semantic_memory_runtime`). These are the only members of `REAL_EXECUTOR_CAPABILITIES`. Every other capability — plugins, vector/embedding and hosted/private model runtime, external channels/notifications, remote/container/cloud execution, scheduled routines, and all Tier-6 sensitive domains (email/calendar/finance/investment/medical/pregnancy/cctv/home-security/hardware) — has **no real executor and fails closed** (`not_implemented` / `activation_blocked:no_executor`); it cannot be flipped to a working state. All capability gates still ship `disabled` by default; enabling is owner/`runtime_gate_manager`-only, governed, reversible, and audited. Per-capability detail: [`docs/RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md).
 
 
 Security architecture status and deferred-control gates are summarized in [`docs/SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md).
@@ -739,13 +739,17 @@ All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 
 
 ### Current launchable UI & runtime truth
 
-The current launchable UI is a local terminal client: a plain local terminal client only; Rich/native TUI is Phase 8 deferred. Previously this section referred to a Textual shell on an
-interactive TTY, with a plain line-oriented CLI shell as the fallback (`RAIKER_TUI=plain`,
-`--prompt`, or non-interactive stdin). Both route through the Agent Gateway, ToolBroker, and
-PolicyEngine and add no runtime authority of their own. Desktop/Web/Dashboard/Mobile apps, IDE
-extension, Voice, Browser Extension, and REST/API remain specified/deferred, not implemented as
-launchable apps. Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P;
-runtime execution remains disabled. Phase 4 memory MVP is implemented.
+The launchable local UIs are (1) the plain local terminal client (`RAIKER_TUI=plain`, `--prompt`,
+or non-interactive stdin; Rich/native TUI is Phase 8 deferred) and (2) the local web dashboard —
+the `apps/web` Svelte SPA served over the `raiker-web` loopback API (single-user, `127.0.0.1`
+only). The web dashboard provides read-only governed views, the same governed
+prompt/turn/approval/runtime-mutation flows as the CLI (approval resolution is metadata-only,
+`executes_action=false`), and a step-up-gated Security Settings. Both surfaces route through the
+Agent Gateway, ToolBroker, RuntimeAuthority, and PolicyEngine and add no runtime authority of their
+own. Desktop/Mobile apps, IDE extension, Voice, Browser Extension, and hosted/multi-user REST/API
+remain specified/deferred, not implemented as launchable apps. Phase 3 is `implemented_verified`
+only for safe foundation/readiness slices A-P; runtime execution remains disabled. Phase 4 memory
+MVP is implemented.
 
 Runtime execution remains disabled.
 
@@ -792,8 +796,8 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
 | Plain terminal client | Line-oriented terminal client with `/help`, `/commands`, slash-command routing, and prompt submission. Rich/native TUI is Phase 8 deferred. | Yes | No direct tool authority; prompts route through gateway/broker/policy. | Implement richer clients only in Phase 8. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
-| Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
-| Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
+| Web UI | Launchable local web dashboard: `apps/web` Svelte SPA over the `raiker-web` loopback API. Read-only governed views + governed prompt/turn/approval/runtime-mutation flows (approval resolution metadata-only); single-user, `127.0.0.1` only. | Yes | No direct tool authority; routes through gateway/RuntimeAuthority/broker exactly as the CLI. | Keep API-contract + frontend test parity; broader clients stay deferred. |
+| Dashboard | Read-only governed views are delivered as part of the local web dashboard above (capabilities, runtime mode, models, diagnostics). Standalone native/mobile dashboards remain Phase 8 deferred. | Yes (web) | None beyond the governed API. | Implement standalone dashboard apps after explicit activation scope. |
 | IDE extension | Specified/deferred; no extension runtime. | No | None. | Define extension transport and auth. |
 | Mobile apps | Specified/deferred; no Apple/Android apps. | No | None. | Build mobile clients after explicit activation scope. |
 | Voice UI | Specified/deferred. | No | None. | Define voice contracts after explicit activation scope. |

@@ -5,7 +5,7 @@
 
 # Raiker Architecture Blueprint
 
-> Current truth (2026-06-21): current launchable UI is the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+> Current truth (2026-06-22): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only). The web dashboard renders real governed backend state and drives the same governed prompt/turn/approval/runtime-mutation flows as the CLI (approval resolution stays metadata-only); it adds no authority of its own. Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
 
 
 Raiker is a local-first AI agent platform. It is designed as an operating layer for prompts, models, tools, policy, memory, plugins, hooks, subagents, channels, user interfaces, storage, search, graph context, checkpoints, and execution environments.
@@ -22,7 +22,10 @@ This document turns the high-level README into implementation-ready architecture
 | approval resolution | `metadata_only` | `/approve` and `/deny` do not execute actions. Approval resolution is metadata-only. |
 | graph plans, approval previews, rollback plans | `dry_run_only` | Planning/preview only. |
 | plugin/channel/remote/graph/semantic runtime execution | `disabled_deferred` | Readiness/records may exist, runtime remains off. |
-| desktop/web/dashboard/mobile/ide/api clients | `contract_only` | Phase 8 deferred. |
+| local web dashboard — read-only views (sessions, turns, events, checkpoints, tasks, capabilities, runtime mode, models, diagnostics) | `implemented_read_only` | `apps/web` over the `raiker-web` loopback API; renders real governed backend state only. |
+| local web dashboard — prompt/turn stream, runtime-mutation Security Settings (enable/disable gates, activate/disable runtime mode) | `implemented_policy_gated` | Same governed gateway/RuntimeAuthority path as the CLI; step-up auth collects reason/token/threat-ack and forwards only. Adds no authority. |
+| local web dashboard — approval queue resolution | `metadata_only` | Approve/deny records a decision and never executes the action (`executes_action=false`). |
+| desktop/mobile/ide/voice/browser-extension/hosted-REST clients | `contract_only` | Phase 8 deferred. |
 
 ---
 
@@ -431,7 +434,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | CLI / plain terminal | Implemented functional-test surface via `raiker` and slash commands. | Yes | No direct tool authority; routes through gateway/broker/policy where runtime paths exist. | Keep command/catalog parity and local smoke tests current. |
 | Rich TUI panels | Plain terminal shell/status rendering only; Rich/native TUI panels are Phase 8 deferred. | Plain-only | None. | Build panel framework only in a future approved slice. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
-| Web UI | Read-only shared contract/view foundation only; no launchable web app. | Contract-only | None. | Implement web client/API server after explicit activation scope. |
+| Web UI | Launchable local web dashboard: `apps/web` Svelte SPA over the `raiker-web` loopback API. Read-only governed views + governed prompt/turn/approval/runtime-mutation flows (approval resolution metadata-only); single-user, `127.0.0.1` only. | Yes | No direct tool authority; every read/mutation routes through the gateway/RuntimeAuthority/broker exactly as the CLI. | Keep API contract + frontend tests in parity; broader client surfaces stay deferred. |
 | Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
 | IDE extension | Specified/deferred; no extension runtime. | No | None. | Define extension transport and auth. |
 | Mobile apps | Specified/deferred; no Apple/Android apps. | No | None. | Build mobile clients after explicit activation scope. |

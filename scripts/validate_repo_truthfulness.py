@@ -189,7 +189,9 @@ def main() -> int:
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     for marker in (
-        "current launchable UI is the plain local terminal client only",
+        # Alignment (not loosening): the launchable local surfaces are BOTH the plain terminal
+        # client and the local web dashboard. Native/hosted clients stay Phase 8 deferred (below).
+        "launchable local UIs are the plain local terminal client and the local web dashboard",
         "Phase 8 deferred",
         "approval resolution is metadata-only",
         "durable memory mutation is broker-governed",

@@ -823,7 +823,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Voice UI | Specified/deferred. | No | None. | Define voice contracts after explicit activation scope. |
 | Browser extension | Specified/deferred. | No | None. | Define extension boundary after explicit activation scope. |
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
-| REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
+| REST/API | Single-user, internet-accessible REST API (`raiker-web` / `apps.api`): bearer-token owner auth, configurable bind behind an explicit `--allow-public` opt-in (requires `RAIKER_OWNER_TOKEN`; TLS via reverse proxy), security headers, per-IP rate limit, body-size limit. Prompts tagged `web_ui` (bundled SPA) or `rest` (external clients); a CLI turn and a REST prompt sharing a `session_id` land in the same session. **Not** multi-user/hosted — every request authenticates as the one owner. | Yes | No direct tool authority; routes through gateway/RuntimeAuthority/broker exactly as the CLI. | Hosted/multi-user/tenant isolation stays deferred. |
 
 
 

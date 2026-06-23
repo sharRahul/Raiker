@@ -13,6 +13,11 @@ from raiker.api.routes_approvals import router as approvals_router
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
 from raiker.api.routes_prompts import router as prompts_router
+from raiker.api.security import (
+    MaxBodySizeMiddleware,
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+)
 from raiker.runtime.executors.registry import ExecutorRegistry
 
 # Paths whose responses must not be buffered/redacted by RedactionMiddleware:
@@ -88,6 +93,10 @@ def create_app(
     workspace_root: str | Path = ".",
     executor_registry: ExecutorRegistry | None = None,
     ui_dir: str | Path | None = None,
+    *,
+    rate_limit_per_minute: int = 120,
+    max_body_bytes: int = 1_000_000,
+    hsts: bool = False,
 ) -> FastAPI:
     app = FastAPI(
         title="Raiker API",
@@ -100,6 +109,12 @@ def create_app(
     if executor_registry is not None:
         app.state.executor_registry = executor_registry
     app.add_middleware(RedactionMiddleware)
+    # Transport hardening for single-user internet exposure. Added after
+    # RedactionMiddleware so these wrap it (outermost = SecurityHeaders), and so
+    # a rate-limit/oversize rejection still carries the security headers.
+    app.add_middleware(MaxBodySizeMiddleware, max_bytes=max_body_bytes)
+    app.add_middleware(RateLimitMiddleware, max_requests=rate_limit_per_minute, window_seconds=60.0)
+    app.add_middleware(SecurityHeadersMiddleware, hsts=hsts)
     app.include_router(control_router)
     app.include_router(dashboard_router)
     app.include_router(prompts_router)

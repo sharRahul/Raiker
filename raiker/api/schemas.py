@@ -48,6 +48,10 @@ class PromptRequest:
     approval_mode: str | None = None
     model_profile: str | None = None
     max_tool_calls: int | None = None
+    # Origin of the prompt: the bundled SPA sends "web_ui"; external single-user
+    # REST clients (other machines/UIs) send "rest". Both land in the same
+    # session when they share session_id (Phase 8 same-session gate).
+    client_type: str | None = None
 
 
 @dataclass

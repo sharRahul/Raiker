@@ -135,7 +135,17 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
             test_ready=True,
         )
     for name in PHASE_4_DISABLED_CAPABILITIES:
-        gates[name] = CapabilityGate(name, 4, CapabilityState.DISABLED)
+        if name in ("subagents", "multi_agent_teams"):
+            # Real bounded/governed in-process executors exist (Phase 4 slice 1):
+            # readiness is complete, but the gate still defaults DISABLED and is
+            # owner/runtime_gate_manager-flippable only.
+            gates[name] = CapabilityGate(
+                name, 4, CapabilityState.DISABLED,
+                policy_ready=True, contract_ready=True, storage_ready=True,
+                event_ready=True, test_ready=True,
+            )
+        else:
+            gates[name] = CapabilityGate(name, 4, CapabilityState.DISABLED)
     _TIER1_EXECUTED_CAPS = ("approval_execution_relay", "file_write_execution", "patch_apply_execution",
                              "memory_write_execution", "memory_forget_execution")
     for name in _TIER1_EXECUTED_CAPS:

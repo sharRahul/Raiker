@@ -19,28 +19,61 @@ def _resolve_ui_dir(cli_value: str | None) -> Path:
     return Path(env_value) if env_value else _DEFAULT_UI_DIR
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Run the local Raiker API + web dashboard on loopback only.
+def _is_loopback(host: str) -> bool:
+    return host in {"127.0.0.1", "::1", "localhost"}
 
-    Local-first and single-user: the server binds to 127.0.0.1 by default and must not be exposed
-    on a public interface. When the built SPA (``apps/web/dist``) is present it is served from this
-    same origin, so the dashboard launches with one command and the UI's relative ``/api`` paths
-    resolve directly. The UI obtains a token from POST /api/auth/session for the local owner
-    principal; all governed reads/mutations go through the same contracts as the CLI.
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the single-user Raiker API + web dashboard.
+
+    Raiker is a single-user agent: every request authenticates as the one owner principal
+    (POST /api/auth/session issues the owner's bearer token; all governed reads/mutations go
+    through the same contracts as the CLI). It binds to 127.0.0.1 by default. Binding beyond
+    loopback (so the owner can reach Raiker from any machine/UI over the internet) is allowed
+    only with the explicit ``--allow-public`` opt-in, which also requires a hardened owner token
+    via ``RAIKER_OWNER_TOKEN`` and turns on transport guardrails (security headers, rate limit,
+    body-size limit, and HSTS). Put a TLS-terminating reverse proxy in front for real exposure.
     """
     parser = argparse.ArgumentParser(
         prog="raiker-web",
-        description="Run the local Raiker API + web dashboard (127.0.0.1 only).",
+        description="Run the single-user Raiker API + web dashboard (loopback by default).",
     )
     parser.add_argument("--workspace", default=".", help="Workspace root for local runtime state.")
     parser.add_argument("--host", default="127.0.0.1", help="Bind host (loopback by default).")
     parser.add_argument("--port", type=int, default=8765, help="Bind port.")
+    parser.add_argument(
+        "--allow-public",
+        action="store_true",
+        help="Permit binding to a non-loopback host for single-user internet access (requires RAIKER_OWNER_TOKEN).",
+    )
+    parser.add_argument(
+        "--rate-limit-per-minute", type=int, default=120, help="Per-IP request budget for /api.",
+    )
     parser.add_argument(
         "--ui-dir",
         default=None,
         help="Built web dashboard directory (default: apps/web/dist; env RAIKER_WEB_UI_DIR).",
     )
     args = parser.parse_args(argv)
+
+    public = not _is_loopback(args.host)
+    if public and not args.allow_public:
+        print(
+            f"[raiker-web] Refusing to bind to non-loopback host {args.host!r} without --allow-public. "
+            "Raiker stays single-user; pass --allow-public to expose it to your other devices.",
+        )
+        return 2
+    if public and not os.environ.get("RAIKER_OWNER_TOKEN", "").strip():
+        print(
+            "[raiker-web] --allow-public requires a hardened owner token in RAIKER_OWNER_TOKEN "
+            "(used to bind the owner session); refusing to expose an unhardened instance.",
+        )
+        return 2
+    if public:
+        print(
+            f"[raiker-web] Exposing single-user Raiker on {args.host}:{args.port}. "
+            "Front this with TLS (reverse proxy). Every request authenticates as the owner.",
+        )
 
     resolved = _resolve_ui_dir(args.ui_dir)
     ui_dir: Path | None = resolved
@@ -51,7 +84,12 @@ def main(argv: list[str] | None = None) -> int:
         )
         ui_dir = None
 
-    app = create_app(Path(args.workspace), ui_dir=ui_dir)
+    app = create_app(
+        Path(args.workspace),
+        ui_dir=ui_dir,
+        rate_limit_per_minute=args.rate_limit_per_minute,
+        hsts=public,
+    )
     uvicorn.run(app, host=args.host, port=args.port)
     return 0
 

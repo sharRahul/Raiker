@@ -9,6 +9,10 @@ from raiker.runtime.executors.sandbox import SandboxError
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
+from raiker.runtime.executors.channels import ChannelApprovalRelayExecutor, ExternalChannelExecutor
+from raiker.runtime.executors.containers import ContainerExecutionExecutor
+from raiker.runtime.executors.orchestration import MultiAgentTeamExecutor, SubagentExecutor
+from raiker.runtime.executors.scheduled import ScheduledRoutinesExecutor
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.runtime.executors.tier1_files import FileWriteExecutor, PatchApplyExecutor
 from raiker.runtime.executors.tier1_memory import MemoryForgetExecutor, MemoryWriteExecutor
@@ -22,14 +26,10 @@ from raiker.runtime.executors.tier3_core import (
 )
 from raiker.runtime.executors.tier4_plugins import PluginExecutionCapExecutor, PluginInstallExecutor
 from raiker.runtime.executors.tier5_network import (
-    ChannelApprovalRelayExecutor,
     CloudExecutionExecutor,
-    ContainerExecutionExecutor,
-    ExternalChannelExecutor,
     HostedModelExecutor,
     PrivateNetworkModelExecutor,
     RemoteExecutionExecutor,
-    ScheduledRoutinesExecutor,
 )
 from raiker.runtime.executors.tier6_domains import (
     CalendarRuntimeExecutor,
@@ -51,6 +51,7 @@ __all__ = [
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "NetworkExecutor",
     "GraphIndexingExecutor", "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
+    "SubagentExecutor", "MultiAgentTeamExecutor",
     "PluginInstallExecutor", "PluginExecutionCapExecutor",
     "ExternalChannelExecutor", "ChannelApprovalRelayExecutor",
     "RemoteExecutionExecutor", "ContainerExecutionExecutor", "CloudExecutionExecutor",
@@ -91,6 +92,16 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # Tier 3 — local code-intelligence runtime
     "graph_indexing_runtime",
     "semantic_memory_runtime",
+    # Phase 4 — bounded, governed, in-process orchestration (no network / no spawn-out)
+    "subagents",
+    "multi_agent_teams",
+    # Phase 4 — reference channel (bounded outbound webhook + metadata-only relay)
+    "external_channel_runtime",
+    "channel_approval_relay",
+    # Phase 4 — local sandboxed container execution (no network, no host mounts)
+    "container_execution_cap",
+    # Phase 4 — local on-demand scheduled routines (no daemon)
+    "scheduled_routines",
 })
 
 
@@ -118,6 +129,12 @@ def build_default_executor_registry(
     registry.register("network_execution", NetworkExecutor(ws))
     registry.register("graph_indexing_runtime", GraphIndexingExecutor(ws))
     registry.register("semantic_memory_runtime", SemanticMemoryExecutor(ws))
+    registry.register("subagents", SubagentExecutor(ws, store))
+    registry.register("multi_agent_teams", MultiAgentTeamExecutor(ws, store))
+    registry.register("external_channel_runtime", ExternalChannelExecutor(ws, store))
+    registry.register("channel_approval_relay", ChannelApprovalRelayExecutor(ws, store))
+    registry.register("container_execution_cap", ContainerExecutionExecutor(ws))
+    registry.register("scheduled_routines", ScheduledRoutinesExecutor(ws, store))
     assert registry.capabilities() == REAL_EXECUTOR_CAPABILITIES, (
         "default executor registry drifted from REAL_EXECUTOR_CAPABILITIES"
     )

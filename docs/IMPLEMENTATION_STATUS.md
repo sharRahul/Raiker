@@ -735,7 +735,79 @@ Executor enablement status: real local executors (Tier 1-3 local set in `REAL_EX
 
 ## Phase 3 Completion Status
 
-All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled. Phase 4 memory MVP is implemented. Remaining Phase 4 capabilities (external channels, subagents, multi-agent teams, remote/container/cloud execution) stay blocked: **Phase 4 remains blocked.**
+All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled by default. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Landed slices: Slice 1 — `subagents` and `multi_agent_teams` (bounded governed in-process executors); Slice 4 — `external_channel_runtime` and `channel_approval_relay` (one reference webhook channel + untrusted inbound receiver); Slice 3 — `container_execution_cap` (local sandboxed Docker); Slice 2 — `scheduled_routines` (local on-demand routine runner, no daemon); Slice 5 — REST API hardening for single-user internet access (see the REST/API row above). Their capability gates remain default-disabled and owner/`runtime_gate_manager`-flippable only. Slice 6: remote/cloud/hosted-model egress stay **fail-closed by design** with documented per-integration opt-in requirements (`docs/threat-models/remote-cloud.md`).
+
+## Phase 4 production rollout (sandboxed-first)
+
+Phase 4 is being brought to production-ready state in individually-validated slices. Each slice promotes a capability to a real executor only with a per-capability threat model (`docs/threat-models/`) + acceptance tests (executes-when-governed and fails-closed-when-disabled), and every promoted gate still ships **default-disabled** and owner-flippable only. All other disabled runtime flags remain false; runtime execution remains disabled by default.
+
+### Phase 4 Slice 1 — Subagents & Multi-Agent Teams (`implemented_verified`)
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `subagents` real executor (bounded, governed, read-only, in-process) | `implemented_policy_gated` | `raiker/agents/orchestration.py`, `raiker/runtime/executors/orchestration.py` | `tests/test_phase_4_subagent_orchestration.py` |
+| `multi_agent_teams` real executor (≤5 sequential subagents) | `implemented_policy_gated` | `raiker/agents/orchestration.py`, `raiker/runtime/executors/orchestration.py` | `tests/test_phase_4_subagent_orchestration.py` |
+
+Scope and boundaries (metadata-only events; this is bounded delegated execution, **not** autonomous model-driven recursion):
+
+- Subagents run a fixed caller-supplied list of **read-only** tool steps, each routed through the existing `ToolBroker → PolicyEngine` path; mutating/egress tools fail closed (`subagent_tool_not_allowed`).
+- Depth, step count, runtime, and team size are bounded; any breach fails closed and never fabricates success.
+- Gates default **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/subagents.md`), and a confirmation token. AI principals can never run or enable them.
+- No model calls, no OS process spawn, no network. No other disabled runtime flag changes; runtime execution remains disabled by default. Approval resolution remains metadata-only.
+
+Evidence: `tests/test_phase_4_subagent_orchestration.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
+
+### Phase 4 Slice 4 — Reference channel (`implemented_verified`)
+
+The single reference channel (webhook transport) for the sandboxed-first rollout. Other transports (Slack/Signal/Teams/Discord native) and multi-connector fan-out remain disabled/deferred.
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `external_channel_runtime` real executor (bounded outbound webhook) | `implemented_policy_gated` | `raiker/runtime/executors/channels.py`, `raiker/runtime/executors/sandbox.py` | `tests/test_phase_4_channels.py` |
+| `channel_approval_relay` real executor (metadata-only pending relay) | `implemented_policy_gated` | `raiker/runtime/executors/channels.py` | `tests/test_phase_4_channels.py` |
+| Inbound receiver (always untrusted, owner-secret-gated, quarantined) | `implemented_verified` | `raiker/api/routes_channels.py` | `tests/test_phase_4_channels.py` |
+
+Scope and boundaries:
+
+- Outbound delivery requires a paired+enabled connector and an owner-controlled egress allowlist (`RAIKER_CHANNEL_EGRESS_ALLOWLIST`); empty allowlist fails closed. Events are metadata-only — never the message text or target URL.
+- The approval relay records a `pending` relay only; approval resolution remains metadata-only/owner-only.
+- Inbound traffic (`POST /api/channels/{connector_id}/inbound`) is authenticated by an owner channel secret (`RAIKER_CHANNEL_INBOUND_SECRET`, fail-closed when unset), requires a sender on the pairing allowlist, and is **always** labelled `untrusted` + quarantined with instructions inert (the Phase 8 "webhook injection labelled untrusted" gate). It executes nothing.
+- Gates default **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/channels.md`), and a confirmation token. AI principals can never run or enable them. Runtime execution remains disabled by default; no other disabled runtime flag changes.
+
+Evidence: `tests/test_phase_4_channels.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
+
+### Phase 4 Slice 3 — Local container execution (`implemented_verified`)
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `container_execution_cap` real executor (local sandboxed Docker) | `implemented_policy_gated` | `raiker/runtime/executors/containers.py` | `tests/test_phase_4_container.py` |
+
+Scope and boundaries:
+
+- Runs an **owner-allowlisted** image (`RAIKER_CONTAINER_IMAGE_ALLOWLIST`; empty = fail closed) via `docker run` with `--network none`, no host mounts, `--cap-drop ALL`, `--security-opt no-new-privileges`, `--read-only`, memory/cpu/pid limits, `--rm`, and a capped timeout. The container runner's command allowlist is exactly `{docker}`.
+- Missing daemon fails closed (`docker_unavailable`); non-zero exit is reported as failure. Artifacts are metadata only (exit code + byte counts) — never stdout/stderr content.
+- Local only: remote/container-over-SSH/Kubernetes/cloud stay fail-closed. Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/container.md`), and a confirmation token. AI principals can never run or enable it.
+- CI exercises governance + fail-closed + flag-set construction via an injected runner; a live-daemon successful run is verified manually. Runtime execution remains disabled by default; no other disabled runtime flag changes.
+
+Evidence: `tests/test_phase_4_container.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
+
+### Phase 4 Slice 2 — Scheduled routines (`implemented_verified`)
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `scheduled_routines` real executor (local, on-demand, no daemon) | `implemented_policy_gated` | `raiker/runtime/executors/scheduled.py`, `raiker/storage/migrations.py` (`scheduled_routines` table) | `tests/test_phase_4_scheduled_routines.py` |
+
+Scope and boundaries:
+
+- A routine bundles an interval with a bounded **read-only** subagent payload. Operations: `define`, `run_due`, `run`. There is **no background daemon/thread/watcher** — routines run only when an explicit governed `run_due`/`run` action is invoked.
+- Routine work executes via the Slice 1 `SubagentExecutor`, so mutating/egress tools fail closed (`subagent_tool_not_allowed`). Minimum interval 60s; at most 50 routines per tick; malformed payload/op fails closed.
+- Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/scheduled-routines.md`), and a confirmation token. AI principals can never run or enable it. Runtime execution remains disabled by default.
+
+Evidence: `tests/test_phase_4_scheduled_routines.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
+
+### Phase 4 Slice 6 — Remote/cloud egress (fail-closed by design)
+
+`remote_execution_cap`, `cloud_execution_cap`, `hosted_model_runtime`, and `private_network_model_runtime` remain **fail-closed (no executor)** per the sandboxed-first decision. Their executors return `not_implemented:<capability>`, the registry refuses to register them, and activation is blocked with `activation_blocked:no_executor`. The per-integration opt-in requirements (credential injection, egress allowlist, budgets, threat model, tests) are documented in `docs/threat-models/remote-cloud.md`. Disabled/deferred. Remote/container/cloud execution remains disabled/deferred at runtime.
 
 ### Current launchable UI & runtime truth
 
@@ -803,7 +875,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Voice UI | Specified/deferred. | No | None. | Define voice contracts after explicit activation scope. |
 | Browser extension | Specified/deferred. | No | None. | Define extension boundary after explicit activation scope. |
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
-| REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
+| REST/API | Single-user, internet-accessible REST API (`raiker-web` / `apps.api`): bearer-token owner auth, configurable bind behind an explicit `--allow-public` opt-in (requires `RAIKER_OWNER_TOKEN`; TLS via reverse proxy), security headers, per-IP rate limit, body-size limit. Prompts tagged `web_ui` (bundled SPA) or `rest` (external clients); a CLI turn and a REST prompt sharing a `session_id` land in the same session. **Not** multi-user/hosted — every request authenticates as the one owner. | Yes | No direct tool authority; routes through gateway/RuntimeAuthority/broker exactly as the CLI. | Hosted/multi-user/tenant isolation stays deferred. |
 
 
 

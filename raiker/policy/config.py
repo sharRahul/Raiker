@@ -43,6 +43,7 @@ class StaticPolicyConfig:
             "external_channel_runtime", "channel_approval_relay",
             "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
             "hosted_model_runtime", "private_network_model_runtime", "scheduled_routines",
+            "subagents", "multi_agent_teams",
             "email_runtime", "calendar_runtime", "reminder_runtime",
             "finance_runtime", "investment_runtime", "medical_runtime",
             "pregnancy_baby_runtime", "cctv_runtime", "home_security_runtime",

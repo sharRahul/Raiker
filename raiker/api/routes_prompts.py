@@ -34,6 +34,10 @@ from raiker.tasks.manager import TaskManager
 router = APIRouter()
 
 WEB_UI_CLIENT = ClientMetadata(type="web_ui", name="raiker-web", version="0.0.0")
+REST_CLIENT = ClientMetadata(type="rest", name="raiker-rest", version="0.0.0")
+# Only these origins may be claimed over the API; both are governed identically
+# and both authenticate as the single owner. Anything else falls back to web_ui.
+_PROMPT_CLIENTS = {"web_ui": WEB_UI_CLIENT, "rest": REST_CLIENT}
 _ACTIVE_TASK_STATES = ("queued", "running", "paused")
 
 
@@ -52,13 +56,14 @@ def _build_envelope(body: PromptRequest) -> PromptEnvelope:
         model_profile=body.model_profile or "mock-test",
         max_tool_calls=body.max_tool_calls if body.max_tool_calls is not None else 10,
     )
+    client = _PROMPT_CLIENTS.get(body.client_type or "web_ui", WEB_UI_CLIENT)
     return PromptEnvelope(
         request_id=new_id("req_"),
         session_id=body.session_id or new_id("sess_"),
         turn_id=new_id("turn_"),
-        client=WEB_UI_CLIENT,
+        client=client,
         user=UserMetadata(),
-        prompt=PromptPayload(text=body.text, metadata={"entry_command": "web_ui"}),
+        prompt=PromptPayload(text=body.text, metadata={"entry_command": client.type}),
         options=options,
     )
 

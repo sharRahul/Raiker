@@ -99,9 +99,17 @@ def _build_registry() -> dict[str, ActivationRequirement]:
 
     # Tier 5
     for cap in ("external_channel_runtime", "channel_approval_relay"):
-        r[cap] = _req(cap, "5", mode=("multi_user_local_runtime",), threat_ack=True, human_confirm=True,
-                      notes="Connector auth + outbound allowlist.")
-    for cap in ("remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
+        # Raiker is single-user: the reference channel is a single-owner bridge,
+        # so it activates under local_single_user_runtime (not multi-user).
+        r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
+                      notes="Single-user reference channel: connector auth + owner egress allowlist.")
+    # Local sandboxed container execution activates under the single-user runtime
+    # (it is local Docker with no network / no host mounts). Remote/cloud egress
+    # stays gated to hosted_or_networked_runtime.
+    r["container_execution_cap"] = _req(
+        "container_execution_cap", "5", threat_ack=True, human_confirm=True,
+        notes="Local sandboxed container: no network, no mounts, owner image allowlist.")
+    for cap in ("remote_execution_cap", "cloud_execution_cap",
                 "hosted_model_runtime", "private_network_model_runtime"):
         r[cap] = _req(cap, "5", mode=("hosted_or_networked_runtime",), threat_ack=True, human_confirm=True,
                       notes="Isolation, secrets, egress, budget required.")

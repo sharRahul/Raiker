@@ -55,6 +55,13 @@ class PromptRequest:
 
 
 @dataclass
+class InboundChannelMessage:
+    # Inbound channel payload. Always treated as untrusted; never executed.
+    sender_id: str
+    text: str = ""
+
+
+@dataclass
 class InterruptRequest:
     session_id: str
     task_id: str | None = None

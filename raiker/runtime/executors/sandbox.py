@@ -103,3 +103,52 @@ _DEFAULT_EGRESS_ALLOWLIST: frozenset[str] = frozenset({
 
 def default_egress_allowlist() -> frozenset[str]:
     return _DEFAULT_EGRESS_ALLOWLIST
+
+
+def channel_egress_allowlist() -> frozenset[str]:
+    """Owner-controlled outbound host allowlist for channel delivery.
+
+    Read from ``RAIKER_CHANNEL_EGRESS_ALLOWLIST`` (comma-separated host globs,
+    e.g. ``hooks.slack.com,127.0.0.1:*``). Defaults to **empty** so a channel
+    cannot reach the network until the owner explicitly allowlists a host —
+    fail-closed by default even when the gate is on. Model-proposed URLs are
+    untrusted and can only resolve to allowlisted hosts.
+    """
+    import os
+    raw = os.environ.get("RAIKER_CHANNEL_EGRESS_ALLOWLIST", "")
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
+def post_url(
+    url: str,
+    payload: bytes,
+    *,
+    egress_allowlist: frozenset[str] | None = None,
+    content_type: str = "application/json",
+    max_bytes: int = 64_000,
+    timeout: float = 10.0,
+) -> dict:
+    """POST ``payload`` to ``url`` only if its host matches ``egress_allowlist``.
+
+    An empty/absent allowlist denies all egress (fail closed). Returns
+    response-size metadata only — never the response body.
+    """
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise SandboxError(f"invalid_url:{url}")
+    if not egress_allowlist:
+        raise SandboxError("egress_denied:no_allowlist")
+    if not any(fnmatch.fnmatch(parsed.netloc, pattern) for pattern in egress_allowlist):
+        raise SandboxError(f"egress_denied:{parsed.netloc}")
+    import urllib.request
+    request = urllib.request.Request(  # noqa: S310 - scheme checked above
+        url, data=payload, method="POST", headers={"Content-Type": content_type},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+            data = resp.read(max_bytes + 1)
+            status_code = resp.status if hasattr(resp, "status") else 200
+    except Exception as exc:
+        raise SandboxError(f"delivery_failed:{type(exc).__name__}") from None
+    return {"status": status_code, "sent_bytes": len(payload), "response_bytes": len(data[:max_bytes])}

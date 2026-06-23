@@ -64,6 +64,8 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 | `semantic_memory_runtime` | 3 | Local semantic memory search. |
 | `subagents` | 4 | Bounded, governed, in-process read-only subagent (no model/process/network). |
 | `multi_agent_teams` | 4 | Up to 5 bounded subagents in sequence; aggregates metadata-only outcomes. |
+| `external_channel_runtime` | 5 | Bounded outbound webhook delivery (owner egress allowlist); metadata-only events. |
+| `channel_approval_relay` | 5 | Metadata-only **pending** approval relay for a paired channel (never resolves). |
 
 Tier 2 capabilities additionally require a threat-model ack and a human confirmation
 token to enable (`--confirm <token>` / API `confirmation_token`).
@@ -76,13 +78,14 @@ integration + threat model + tests) before joining `REAL_EXECUTOR_CAPABILITIES`:
 
 - **Tier 3 (partial):** `vector_embedding_runtime`, `model_provider_runtime`
 - **Tier 4:** `plugin_install`, `plugin_execution_cap`
-- **Tier 5:** `external_channel_runtime`, `channel_approval_relay`,
-  `remote_execution_cap`, `container_execution_cap`, `cloud_execution_cap`,
-  `hosted_model_runtime`, `private_network_model_runtime`, `scheduled_routines`
+- **Tier 5:** `remote_execution_cap`, `container_execution_cap`,
+  `cloud_execution_cap`, `hosted_model_runtime`, `private_network_model_runtime`,
+  `scheduled_routines`
   (Phase 4 promotions tracked in `docs/IMPLEMENTATION_STATUS.md`; each leaves
-  this list only with a real integration + threat model + tests. `subagents`
-  and `multi_agent_teams` were the first Phase 4 promotion — see
-  `docs/threat-models/subagents.md`.)
+  this list only with a real integration + threat model + tests. Promoted so
+  far: `subagents` + `multi_agent_teams` — `docs/threat-models/subagents.md`;
+  `external_channel_runtime` + `channel_approval_relay` —
+  `docs/threat-models/channels.md`.)
 - **Tier 6 (sensitive domains):** `email_runtime`, `calendar_runtime`,
   `reminder_runtime`, `finance_runtime`, `investment_runtime`, `medical_runtime`,
   `pregnancy_baby_runtime`, `cctv_runtime`, `home_security_runtime`,

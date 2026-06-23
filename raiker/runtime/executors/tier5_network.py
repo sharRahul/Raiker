@@ -28,14 +28,6 @@ class _NetworkExecutorBase:
         return not_implemented(self.capability, action.action_id)
 
 
-class ExternalChannelExecutor(_NetworkExecutorBase):
-    capability = "external_channel_runtime"
-
-
-class ChannelApprovalRelayExecutor(_NetworkExecutorBase):
-    capability = "channel_approval_relay"
-
-
 class RemoteExecutionExecutor(_NetworkExecutorBase):
     capability = "remote_execution_cap"
 

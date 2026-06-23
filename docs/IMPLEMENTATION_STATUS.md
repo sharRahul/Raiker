@@ -735,7 +735,7 @@ Executor enablement status: real local executors (Tier 1-3 local set in `REAL_EX
 
 ## Phase 3 Completion Status
 
-All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled by default. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Slice 1 — `subagents` and `multi_agent_teams` — has real, bounded, governed in-process executors; their capability gates remain default-disabled and owner/`runtime_gate_manager`-flippable only. Remaining Phase 4 capabilities (external channels, remote/container/cloud execution, scheduled routines) stay disabled/deferred until their own slices land.
+All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled by default. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Landed slices: Slice 1 — `subagents` and `multi_agent_teams` (bounded governed in-process executors); Slice 4 — `external_channel_runtime` and `channel_approval_relay` (one reference webhook channel + untrusted inbound receiver). Their capability gates remain default-disabled and owner/`runtime_gate_manager`-flippable only. Remaining Phase 4 capabilities (scheduled routines, container execution, and remote/cloud execution) stay disabled/deferred until their own slices land; remote/cloud stay fail-closed by design.
 
 ## Phase 4 production rollout (sandboxed-first)
 
@@ -756,6 +756,25 @@ Scope and boundaries (metadata-only events; this is bounded delegated execution,
 - No model calls, no OS process spawn, no network. No other disabled runtime flag changes; runtime execution remains disabled by default. Approval resolution remains metadata-only.
 
 Evidence: `tests/test_phase_4_subagent_orchestration.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
+
+### Phase 4 Slice 4 — Reference channel (`implemented_verified`)
+
+The single reference channel (webhook transport) for the sandboxed-first rollout. Other transports (Slack/Signal/Teams/Discord native) and multi-connector fan-out remain disabled/deferred.
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `external_channel_runtime` real executor (bounded outbound webhook) | `implemented_policy_gated` | `raiker/runtime/executors/channels.py`, `raiker/runtime/executors/sandbox.py` | `tests/test_phase_4_channels.py` |
+| `channel_approval_relay` real executor (metadata-only pending relay) | `implemented_policy_gated` | `raiker/runtime/executors/channels.py` | `tests/test_phase_4_channels.py` |
+| Inbound receiver (always untrusted, owner-secret-gated, quarantined) | `implemented_verified` | `raiker/api/routes_channels.py` | `tests/test_phase_4_channels.py` |
+
+Scope and boundaries:
+
+- Outbound delivery requires a paired+enabled connector and an owner-controlled egress allowlist (`RAIKER_CHANNEL_EGRESS_ALLOWLIST`); empty allowlist fails closed. Events are metadata-only — never the message text or target URL.
+- The approval relay records a `pending` relay only; approval resolution remains metadata-only/owner-only.
+- Inbound traffic (`POST /api/channels/{connector_id}/inbound`) is authenticated by an owner channel secret (`RAIKER_CHANNEL_INBOUND_SECRET`, fail-closed when unset), requires a sender on the pairing allowlist, and is **always** labelled `untrusted` + quarantined with instructions inert (the Phase 8 "webhook injection labelled untrusted" gate). It executes nothing.
+- Gates default **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/channels.md`), and a confirmation token. AI principals can never run or enable them. Runtime execution remains disabled by default; no other disabled runtime flag changes.
+
+Evidence: `tests/test_phase_4_channels.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
 
 ### Current launchable UI & runtime truth
 

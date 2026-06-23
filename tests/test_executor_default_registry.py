@@ -20,7 +20,7 @@ from raiker.storage.sqlite import SQLiteStore
 _SENSITIVE = (
     "medical_runtime", "finance_runtime", "investment_runtime", "cctv_runtime",
     "home_security_runtime", "email_runtime", "remote_execution_cap",
-    "container_execution_cap", "cloud_execution_cap", "external_channel_runtime",
+    "container_execution_cap", "cloud_execution_cap",
     "plugin_execution_cap", "plugin_install", "hosted_model_runtime",
     "vector_embedding_runtime", "model_provider_runtime",
 )

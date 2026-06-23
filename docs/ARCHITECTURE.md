@@ -308,7 +308,7 @@ Raiker must install one human-facing global command named `raiker` as the local 
 raiker
 ```
 
-Running `raiker` launches the configured local terminal client. The default terminal client is currently the plain local terminal client only; Rich/native TUI is Phase 8 deferred.
+Running `raiker` launches the configured local terminal client. The default terminal client is currently the plain local terminal client only; Rich/native TUI is Phase 8 deferred. The local web dashboard (`raiker-web` + `apps/web`) is the second launchable surface and routes through the same governed core.
 
 Required terminal actions:
 

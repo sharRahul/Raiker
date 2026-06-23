@@ -735,7 +735,27 @@ Executor enablement status: real local executors (Tier 1-3 local set in `REAL_EX
 
 ## Phase 3 Completion Status
 
-All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled. Phase 4 memory MVP is implemented. Remaining Phase 4 capabilities (external channels, subagents, multi-agent teams, remote/container/cloud execution) stay blocked: **Phase 4 remains blocked.**
+All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled by default. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Slice 1 — `subagents` and `multi_agent_teams` — has real, bounded, governed in-process executors; their capability gates remain default-disabled and owner/`runtime_gate_manager`-flippable only. Remaining Phase 4 capabilities (external channels, remote/container/cloud execution, scheduled routines) stay disabled/deferred until their own slices land.
+
+## Phase 4 production rollout (sandboxed-first)
+
+Phase 4 is being brought to production-ready state in individually-validated slices. Each slice promotes a capability to a real executor only with a per-capability threat model (`docs/threat-models/`) + acceptance tests (executes-when-governed and fails-closed-when-disabled), and every promoted gate still ships **default-disabled** and owner-flippable only. All other disabled runtime flags remain false; runtime execution remains disabled by default.
+
+### Phase 4 Slice 1 — Subagents & Multi-Agent Teams (`implemented_verified`)
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `subagents` real executor (bounded, governed, read-only, in-process) | `implemented_policy_gated` | `raiker/agents/orchestration.py`, `raiker/runtime/executors/orchestration.py` | `tests/test_phase_4_subagent_orchestration.py` |
+| `multi_agent_teams` real executor (≤5 sequential subagents) | `implemented_policy_gated` | `raiker/agents/orchestration.py`, `raiker/runtime/executors/orchestration.py` | `tests/test_phase_4_subagent_orchestration.py` |
+
+Scope and boundaries (metadata-only events; this is bounded delegated execution, **not** autonomous model-driven recursion):
+
+- Subagents run a fixed caller-supplied list of **read-only** tool steps, each routed through the existing `ToolBroker → PolicyEngine` path; mutating/egress tools fail closed (`subagent_tool_not_allowed`).
+- Depth, step count, runtime, and team size are bounded; any breach fails closed and never fabricates success.
+- Gates default **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/subagents.md`), and a confirmation token. AI principals can never run or enable them.
+- No model calls, no OS process spawn, no network. No other disabled runtime flag changes; runtime execution remains disabled by default. Approval resolution remains metadata-only.
+
+Evidence: `tests/test_phase_4_subagent_orchestration.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
 
 ### Current launchable UI & runtime truth
 

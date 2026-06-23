@@ -63,6 +63,8 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "hosted_model_runtime": "hosted_model_runtime",
     "private_network_model_runtime": "private_network_model_runtime",
     "scheduled_routines": "scheduled_routines",
+    "subagents": "subagents",
+    "multi_agent_teams": "multi_agent_teams",
     "email_runtime": "email_runtime",
     "calendar_runtime": "calendar_runtime",
     "reminder_runtime": "reminder_runtime",

@@ -9,6 +9,7 @@ from raiker.runtime.executors.sandbox import SandboxError
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
+from raiker.runtime.executors.orchestration import MultiAgentTeamExecutor, SubagentExecutor
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.runtime.executors.tier1_files import FileWriteExecutor, PatchApplyExecutor
 from raiker.runtime.executors.tier1_memory import MemoryForgetExecutor, MemoryWriteExecutor
@@ -51,6 +52,7 @@ __all__ = [
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "NetworkExecutor",
     "GraphIndexingExecutor", "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
+    "SubagentExecutor", "MultiAgentTeamExecutor",
     "PluginInstallExecutor", "PluginExecutionCapExecutor",
     "ExternalChannelExecutor", "ChannelApprovalRelayExecutor",
     "RemoteExecutionExecutor", "ContainerExecutionExecutor", "CloudExecutionExecutor",
@@ -91,6 +93,9 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # Tier 3 — local code-intelligence runtime
     "graph_indexing_runtime",
     "semantic_memory_runtime",
+    # Phase 4 — bounded, governed, in-process orchestration (no network / no spawn-out)
+    "subagents",
+    "multi_agent_teams",
 })
 
 
@@ -118,6 +123,8 @@ def build_default_executor_registry(
     registry.register("network_execution", NetworkExecutor(ws))
     registry.register("graph_indexing_runtime", GraphIndexingExecutor(ws))
     registry.register("semantic_memory_runtime", SemanticMemoryExecutor(ws))
+    registry.register("subagents", SubagentExecutor(ws, store))
+    registry.register("multi_agent_teams", MultiAgentTeamExecutor(ws, store))
     assert registry.capabilities() == REAL_EXECUTOR_CAPABILITIES, (
         "default executor registry drifted from REAL_EXECUTOR_CAPABILITIES"
     )

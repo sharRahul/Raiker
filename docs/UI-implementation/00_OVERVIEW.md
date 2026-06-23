@@ -71,13 +71,14 @@ future/deferred.
 
 ## Truthfulness obligations when shipping
 
-Adding a launchable web UI changes the project's "launchable surface" truth. The validator marker
-`"current launchable UI is the plain local terminal client only"` and related docs
-(`README.md`, `docs/ARCHITECTURE.md`, `docs/IMPLEMENTATION_STATUS.md`,
+Adding the launchable web UI changed the project's "launchable surface" truth. The validator marker
+now reads `"launchable local UIs are the plain local terminal client and the local web dashboard"`,
+and related docs (`README.md`, `docs/ARCHITECTURE.md`, `docs/IMPLEMENTATION_STATUS.md`,
 `docs/SECURITY_ARCHITECTURE.md`, `docs/GAP_AND_TODO_ANALYSIS.md`,
-`docs/LOCAL_VALIDATION_GATE.md`, `scripts/validate_repo_truthfulness.py`) are updated to state
-both the terminal client **and** the local web dashboard are launchable. This is an **alignment**,
-not a loosening: every `metadata_only` / `disabled_deferred` / risk marker stays enforced.
+`docs/LOCAL_VALIDATION_GATE.md`, `SECURITY.md`, `scripts/validate_repo_truthfulness.py`) state
+that both the terminal client **and** the local web dashboard are launchable. This was an
+**alignment**, not a loosening: every `metadata_only` / `disabled_deferred` / risk marker stays
+enforced.
 
 ## Document map
 

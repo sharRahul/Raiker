@@ -17,7 +17,7 @@ Raiker must install one human-facing global command named `raiker` as the local 
 raiker
 ```
 
-Running `raiker` launches the plain local terminal client only. Rich/native TUI is Phase 8 deferred work. The terminal client is one primary interface, not the canonical place for normal user actions.
+Running `raiker` launches the plain local terminal client (Rich/native TUI is Phase 8 deferred work); the local web dashboard (`raiker-web` + `apps/web`) is the second launchable surface. The terminal client is one primary interface, not the canonical place for normal user actions.
 
 The global command must not require the user to choose separate primary modes such as ask/chat/tui. Those behaviours are actions inside Raiker clients. This rule does not reduce the equal primary status of Desktop, Web, IDE, Voice, Hotkeys, REST, Webhooks, chat channels, Email, Browser Extension, Apple mobile app, Android mobile app, or Mobile Companion.
 

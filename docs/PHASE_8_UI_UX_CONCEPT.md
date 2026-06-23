@@ -3,9 +3,10 @@
 > **Status: design concept — specified/deferred, not implemented.** This document is a forward-looking
 > Phase 8 ("UI and Channels") UX proposal derived from the foundation docs `docs/foundation/01_PRD.md`
 > through `docs/foundation/11_DIRECTORY_STRUCTURE.md`. It describes intended screens and behaviour; it
-> does not change current implementation status. The current launchable UI is a local terminal client
-> (plain local terminal client only; Rich/native TUI deferred to Phase 8); Desktop/Web/Dashboard/Mobile/IDE/REST surfaces remain
-> specified/deferred. Runtime execution remains disabled, and **no UI surface ever executes tools
+> does not change current implementation status. The launchable local UIs are the plain local
+> terminal client and the local web dashboard (`raiker-web` + `apps/web`, single-user/loopback;
+> Rich/native TUI deferred to Phase 8); native Desktop/Mobile/IDE/Voice/Browser-Extension and
+> hosted/multi-user REST surfaces remain specified/deferred. Runtime execution remains disabled, and **no UI surface ever executes tools
 > directly** — every client routes through the Agent Gateway → Session Manager → Agent Runtime → Tool
 > Broker → Policy Engine. Canonical status lives in `docs/IMPLEMENTATION_STATUS.md`.
 

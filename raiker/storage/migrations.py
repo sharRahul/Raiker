@@ -967,3 +967,22 @@ CREATE TABLE IF NOT EXISTS api_sessions (
   revoked INTEGER NOT NULL DEFAULT 0
 );
 """
+
+# ── Phase 4 slice 2: local scheduled routines (on-demand, no daemon) ─────────
+
+PHASE_4_SCHEDULED_ROUTINES_MIGRATION_ID = "RAIKER-2002-phase4-scheduled-routines"
+
+PHASE_4_SCHEDULED_ROUTINES_SQL = """
+CREATE TABLE IF NOT EXISTS scheduled_routines (
+  routine_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  interval_seconds INTEGER NOT NULL,
+  payload_json TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  next_run TEXT NOT NULL,
+  last_run TEXT,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'scheduled'
+);
+"""

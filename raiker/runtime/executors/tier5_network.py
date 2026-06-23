@@ -11,12 +11,13 @@ if TYPE_CHECKING:
 
 
 class _NetworkExecutorBase:
-    """Tier-5 outbound / remote executor.
+    """Tier-5 remote/cloud executor — deliberately fail-closed.
 
-    Channels, relay, remote/container/cloud execution, and hosted/private model
-    runtimes require real external infrastructure, secret injection, egress
-    allowlists, and budget controls. Until those land, they **fail closed**
-    instead of fabricating success.
+    Remote (SSH), cloud-provider, and hosted/private-network model execution
+    require real external infrastructure, secret injection, egress allowlists,
+    and budget controls, each with its own threat model. Per the sandboxed-first
+    Phase 4 decision they stay fail-closed (no executor) until an explicit
+    per-integration opt-in lands; see docs/threat-models/remote-cloud.md.
     """
 
     capability = ""
@@ -42,7 +43,3 @@ class HostedModelExecutor(_NetworkExecutorBase):
 
 class PrivateNetworkModelExecutor(_NetworkExecutorBase):
     capability = "private_network_model_runtime"
-
-
-class ScheduledRoutinesExecutor(_NetworkExecutorBase):
-    capability = "scheduled_routines"

@@ -735,7 +735,7 @@ Executor enablement status: real local executors (Tier 1-3 local set in `REAL_EX
 
 ## Phase 3 Completion Status
 
-All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled by default. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Landed slices: Slice 1 — `subagents` and `multi_agent_teams` (bounded governed in-process executors); Slice 4 — `external_channel_runtime` and `channel_approval_relay` (one reference webhook channel + untrusted inbound receiver); Slice 3 — `container_execution_cap` (local sandboxed Docker). Their capability gates remain default-disabled and owner/`runtime_gate_manager`-flippable only. Remaining Phase 4 capabilities (scheduled routines, and remote/cloud execution) stay disabled/deferred until their own slices land; remote/cloud stay fail-closed by design.
+All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled by default. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Landed slices: Slice 1 — `subagents` and `multi_agent_teams` (bounded governed in-process executors); Slice 4 — `external_channel_runtime` and `channel_approval_relay` (one reference webhook channel + untrusted inbound receiver); Slice 3 — `container_execution_cap` (local sandboxed Docker); Slice 2 — `scheduled_routines` (local on-demand routine runner, no daemon); Slice 5 — REST API hardening for single-user internet access (see the REST/API row above). Their capability gates remain default-disabled and owner/`runtime_gate_manager`-flippable only. Slice 6: remote/cloud/hosted-model egress stay **fail-closed by design** with documented per-integration opt-in requirements (`docs/threat-models/remote-cloud.md`).
 
 ## Phase 4 production rollout (sandboxed-first)
 
@@ -790,6 +790,24 @@ Scope and boundaries:
 - CI exercises governance + fail-closed + flag-set construction via an injected runner; a live-daemon successful run is verified manually. Runtime execution remains disabled by default; no other disabled runtime flag changes.
 
 Evidence: `tests/test_phase_4_container.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
+
+### Phase 4 Slice 2 — Scheduled routines (`implemented_verified`)
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `scheduled_routines` real executor (local, on-demand, no daemon) | `implemented_policy_gated` | `raiker/runtime/executors/scheduled.py`, `raiker/storage/migrations.py` (`scheduled_routines` table) | `tests/test_phase_4_scheduled_routines.py` |
+
+Scope and boundaries:
+
+- A routine bundles an interval with a bounded **read-only** subagent payload. Operations: `define`, `run_due`, `run`. There is **no background daemon/thread/watcher** — routines run only when an explicit governed `run_due`/`run` action is invoked.
+- Routine work executes via the Slice 1 `SubagentExecutor`, so mutating/egress tools fail closed (`subagent_tool_not_allowed`). Minimum interval 60s; at most 50 routines per tick; malformed payload/op fails closed.
+- Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/scheduled-routines.md`), and a confirmation token. AI principals can never run or enable it. Runtime execution remains disabled by default.
+
+Evidence: `tests/test_phase_4_scheduled_routines.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
+
+### Phase 4 Slice 6 — Remote/cloud egress (fail-closed by design)
+
+`remote_execution_cap`, `cloud_execution_cap`, `hosted_model_runtime`, and `private_network_model_runtime` remain **fail-closed (no executor)** per the sandboxed-first decision. Their executors return `not_implemented:<capability>`, the registry refuses to register them, and activation is blocked with `activation_blocked:no_executor`. The per-integration opt-in requirements (credential injection, egress allowlist, budgets, threat model, tests) are documented in `docs/threat-models/remote-cloud.md`. Disabled/deferred. Remote/container/cloud execution remains disabled/deferred at runtime.
 
 ### Current launchable UI & runtime truth
 

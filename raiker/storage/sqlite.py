@@ -80,6 +80,8 @@ from raiker.storage.migrations import (
     PHASE_4_MEMORY_GOVERNANCE_HARDENING_SQL,
     PHASE_4_MEMORY_MVP_MIGRATION_ID,
     PHASE_4_MEMORY_MVP_SQL,
+    PHASE_4_SCHEDULED_ROUTINES_MIGRATION_ID,
+    PHASE_4_SCHEDULED_ROUTINES_SQL,
     PHASE_5_AUDIT_EXPORT_MIGRATION_ID,
     PHASE_5_AUDIT_EXPORT_SQL,
     PHASE_5_BUDGET_RECORDS_MIGRATION_ID,
@@ -413,6 +415,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)")
             self._apply_migration(API_SESSIONS_MIGRATION_ID, API_SESSIONS_SQL, connection)
             self._apply_migration(THREAT_MODEL_ACKS_MIGRATION_ID, THREAT_MODEL_ACKS_SQL, connection)
+            self._apply_migration(
+                PHASE_4_SCHEDULED_ROUTINES_MIGRATION_ID, PHASE_4_SCHEDULED_ROUTINES_SQL, connection
+            )
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
         row = connection.execute(
@@ -1379,6 +1384,56 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (relay.relay_id, relay.pairing_id, relay.action_id, relay.status, relay.requested_at, relay.resolved_at, relay.resolved_by),
+            )
+
+    # ── Phase 4 slice 2: scheduled routines (on-demand; no daemon) ──
+
+    def insert_scheduled_routine(self, routine: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO scheduled_routines
+                (routine_id, name, interval_seconds, payload_json, enabled, next_run, last_run, created_by, created_at, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    routine["routine_id"], routine["name"], int(routine["interval_seconds"]),
+                    routine["payload_json"], int(routine.get("enabled", 0)), routine["next_run"],
+                    routine.get("last_run"), routine["created_by"], routine["created_at"],
+                    routine.get("status", "scheduled"),
+                ),
+            )
+
+    def get_scheduled_routine(self, routine_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM scheduled_routines WHERE routine_id = ?", (routine_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_scheduled_routines(
+        self, *, enabled_only: bool = False, due_before: str | None = None
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM scheduled_routines"
+        conditions: list[str] = []
+        params: list[Any] = []
+        if enabled_only:
+            conditions.append("enabled = 1")
+        if due_before is not None:
+            conditions.append("next_run <= ?")
+            params.append(due_before)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY next_run ASC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def update_scheduled_routine_run(self, routine_id: str, *, last_run: str, next_run: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE scheduled_routines SET last_run = ?, next_run = ? WHERE routine_id = ?",
+                (last_run, next_run, routine_id),
             )
 
     # ── Phase 6: Subagents ──

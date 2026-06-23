@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 from raiker.runtime.executors.channels import ChannelApprovalRelayExecutor, ExternalChannelExecutor
 from raiker.runtime.executors.containers import ContainerExecutionExecutor
 from raiker.runtime.executors.orchestration import MultiAgentTeamExecutor, SubagentExecutor
+from raiker.runtime.executors.scheduled import ScheduledRoutinesExecutor
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.runtime.executors.tier1_files import FileWriteExecutor, PatchApplyExecutor
 from raiker.runtime.executors.tier1_memory import MemoryForgetExecutor, MemoryWriteExecutor
@@ -29,7 +30,6 @@ from raiker.runtime.executors.tier5_network import (
     HostedModelExecutor,
     PrivateNetworkModelExecutor,
     RemoteExecutionExecutor,
-    ScheduledRoutinesExecutor,
 )
 from raiker.runtime.executors.tier6_domains import (
     CalendarRuntimeExecutor,
@@ -100,6 +100,8 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "channel_approval_relay",
     # Phase 4 — local sandboxed container execution (no network, no host mounts)
     "container_execution_cap",
+    # Phase 4 — local on-demand scheduled routines (no daemon)
+    "scheduled_routines",
 })
 
 
@@ -132,6 +134,7 @@ def build_default_executor_registry(
     registry.register("external_channel_runtime", ExternalChannelExecutor(ws, store))
     registry.register("channel_approval_relay", ChannelApprovalRelayExecutor(ws, store))
     registry.register("container_execution_cap", ContainerExecutionExecutor(ws))
+    registry.register("scheduled_routines", ScheduledRoutinesExecutor(ws, store))
     assert registry.capabilities() == REAL_EXECUTOR_CAPABILITIES, (
         "default executor registry drifted from REAL_EXECUTOR_CAPABILITIES"
     )

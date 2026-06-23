@@ -32,10 +32,6 @@ class RemoteExecutionExecutor(_NetworkExecutorBase):
     capability = "remote_execution_cap"
 
 
-class ContainerExecutionExecutor(_NetworkExecutorBase):
-    capability = "container_execution_cap"
-
-
 class CloudExecutionExecutor(_NetworkExecutorBase):
     capability = "cloud_execution_cap"
 

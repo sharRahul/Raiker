@@ -735,7 +735,7 @@ Executor enablement status: real local executors (Tier 1-3 local set in `REAL_EX
 
 ## Phase 3 Completion Status
 
-All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled by default. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Landed slices: Slice 1 — `subagents` and `multi_agent_teams` (bounded governed in-process executors); Slice 4 — `external_channel_runtime` and `channel_approval_relay` (one reference webhook channel + untrusted inbound receiver). Their capability gates remain default-disabled and owner/`runtime_gate_manager`-flippable only. Remaining Phase 4 capabilities (scheduled routines, container execution, and remote/cloud execution) stay disabled/deferred until their own slices land; remote/cloud stay fail-closed by design.
+All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled by default. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Landed slices: Slice 1 — `subagents` and `multi_agent_teams` (bounded governed in-process executors); Slice 4 — `external_channel_runtime` and `channel_approval_relay` (one reference webhook channel + untrusted inbound receiver); Slice 3 — `container_execution_cap` (local sandboxed Docker). Their capability gates remain default-disabled and owner/`runtime_gate_manager`-flippable only. Remaining Phase 4 capabilities (scheduled routines, and remote/cloud execution) stay disabled/deferred until their own slices land; remote/cloud stay fail-closed by design.
 
 ## Phase 4 production rollout (sandboxed-first)
 
@@ -775,6 +775,21 @@ Scope and boundaries:
 - Gates default **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/channels.md`), and a confirmation token. AI principals can never run or enable them. Runtime execution remains disabled by default; no other disabled runtime flag changes.
 
 Evidence: `tests/test_phase_4_channels.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
+
+### Phase 4 Slice 3 — Local container execution (`implemented_verified`)
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `container_execution_cap` real executor (local sandboxed Docker) | `implemented_policy_gated` | `raiker/runtime/executors/containers.py` | `tests/test_phase_4_container.py` |
+
+Scope and boundaries:
+
+- Runs an **owner-allowlisted** image (`RAIKER_CONTAINER_IMAGE_ALLOWLIST`; empty = fail closed) via `docker run` with `--network none`, no host mounts, `--cap-drop ALL`, `--security-opt no-new-privileges`, `--read-only`, memory/cpu/pid limits, `--rm`, and a capped timeout. The container runner's command allowlist is exactly `{docker}`.
+- Missing daemon fails closed (`docker_unavailable`); non-zero exit is reported as failure. Artifacts are metadata only (exit code + byte counts) — never stdout/stderr content.
+- Local only: remote/container-over-SSH/Kubernetes/cloud stay fail-closed. Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/container.md`), and a confirmation token. AI principals can never run or enable it.
+- CI exercises governance + fail-closed + flag-set construction via an injected runner; a live-daemon successful run is verified manually. Runtime execution remains disabled by default; no other disabled runtime flag changes.
+
+Evidence: `tests/test_phase_4_container.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
 
 ### Current launchable UI & runtime truth
 

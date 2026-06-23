@@ -252,14 +252,15 @@ def main() -> int:
         "email_runtime", "calendar_runtime", "finance_runtime", "investment_runtime",
         "medical_runtime", "pregnancy_baby_runtime", "cctv_runtime",
         "home_security_runtime", "hardware_operator_runtime",
-        "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
+        "remote_execution_cap", "cloud_execution_cap",
         "hosted_model_runtime",
         "private_network_model_runtime", "scheduled_routines",
         "plugin_execution_cap", "plugin_install",
     }
-    # external_channel_runtime and channel_approval_relay now have real,
-    # bounded, threat-modelled executors (Phase 4 slice 4: outbound webhook +
-    # metadata-only relay). Their gates remain default-disabled (checked above).
+    # external_channel_runtime, channel_approval_relay (slice 4) and
+    # container_execution_cap (slice 3) now have real, bounded, threat-modelled
+    # executors. Their gates remain default-disabled (checked above); only
+    # remote/cloud egress and the still-deferred caps must lack an executor.
     for cap in must_not_have_default_executor:
         if cap in REAL_EXECUTOR_CAPABILITIES:
             errors.append(f"sensitive_capability_has_default_executor:{cap}")

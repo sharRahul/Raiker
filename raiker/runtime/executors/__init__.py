@@ -10,6 +10,7 @@ from raiker.runtime.executors.sandbox import SandboxError
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 from raiker.runtime.executors.channels import ChannelApprovalRelayExecutor, ExternalChannelExecutor
+from raiker.runtime.executors.containers import ContainerExecutionExecutor
 from raiker.runtime.executors.orchestration import MultiAgentTeamExecutor, SubagentExecutor
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.runtime.executors.tier1_files import FileWriteExecutor, PatchApplyExecutor
@@ -25,7 +26,6 @@ from raiker.runtime.executors.tier3_core import (
 from raiker.runtime.executors.tier4_plugins import PluginExecutionCapExecutor, PluginInstallExecutor
 from raiker.runtime.executors.tier5_network import (
     CloudExecutionExecutor,
-    ContainerExecutionExecutor,
     HostedModelExecutor,
     PrivateNetworkModelExecutor,
     RemoteExecutionExecutor,
@@ -98,6 +98,8 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # Phase 4 — reference channel (bounded outbound webhook + metadata-only relay)
     "external_channel_runtime",
     "channel_approval_relay",
+    # Phase 4 — local sandboxed container execution (no network, no host mounts)
+    "container_execution_cap",
 })
 
 
@@ -129,6 +131,7 @@ def build_default_executor_registry(
     registry.register("multi_agent_teams", MultiAgentTeamExecutor(ws, store))
     registry.register("external_channel_runtime", ExternalChannelExecutor(ws, store))
     registry.register("channel_approval_relay", ChannelApprovalRelayExecutor(ws, store))
+    registry.register("container_execution_cap", ContainerExecutionExecutor(ws))
     assert registry.capabilities() == REAL_EXECUTOR_CAPABILITIES, (
         "default executor registry drifted from REAL_EXECUTOR_CAPABILITIES"
     )

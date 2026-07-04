@@ -5,7 +5,7 @@
   import StepUpAuthDialog from "./StepUpAuthDialog.svelte";
   import type { StepUpValues } from "./StepUpAuthDialog.svelte";
   import { api, ApiError } from "./api";
-  import type { CapabilityGate, RuntimeMode } from "./apiTypes";
+  import type { CapabilityGate, ModelsView as ModelsData, RuntimeMode } from "./apiTypes";
   import {
     canDisable,
     canEnable,
@@ -22,6 +22,7 @@
 
   let gates = $state<CapabilityGate[] | null>(null);
   let mode = $state<RuntimeMode | null>(null);
+  let models = $state<ModelsData | null>(null);
   let loadError = $state<string | null>(null);
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
   let modeChoice = $state("");
@@ -41,7 +42,11 @@
   async function load() {
     loadError = null;
     try {
-      [gates, mode] = await Promise.all([api.capabilityGates(), api.runtimeMode()]);
+      [gates, mode, models] = await Promise.all([
+        api.capabilityGates(),
+        api.runtimeMode(),
+        api.models(),
+      ]);
       if (mode && modeChoice === "") {
         modeChoice = mode.allowed_modes[0] ?? "";
       }
@@ -221,6 +226,30 @@
   {/if}
 </section>
 
+<section aria-labelledby="model-runtime-h" class="card">
+  <h2 id="model-runtime-h">Hosted Model Runtime</h2>
+  {#if loadError}
+    <p class="state-error">Unavailable: {loadError}</p>
+  {:else if models === null}
+    <p class="state-loading">Loading...</p>
+  {:else}
+    <div class="model-runtime-grid">
+      <p><span class="k">Hosted gate</span> <code>{models.hosted_model_gate_state}</code></p>
+      <p><span class="k">Private gate</span> <code>{models.private_network_model_gate_state}</code></p>
+      <p>
+        <span class="k">Egress allowlist</span>
+        <code>{models.model_egress_allowlist_configured ? "configured" : "not configured"}</code>
+      </p>
+      <p><span class="k">Off-machine profiles</span> <code>{models.remote_profile_count}</code></p>
+    </div>
+    <p class="sub">
+      This is read-only status. Allowlist values and API keys are intentionally not displayed; hosted
+      providers still fail closed unless the runtime gate, threat-model acknowledgement, confirmation
+      token, egress allowlist, and provider key are all present.
+    </p>
+  {/if}
+</section>
+
 <section aria-labelledby="ss-h" class="card">
   <h2 id="ss-h">Secret Settings</h2>
   <p class="deferred-notice" role="note">
@@ -286,6 +315,14 @@
     display: flex;
     gap: 0.5rem;
     align-items: center;
+  }
+  .model-runtime-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.45rem 0.9rem;
+  }
+  .model-runtime-grid p {
+    margin: 0;
   }
   .phase {
     font-size: 0.78rem;

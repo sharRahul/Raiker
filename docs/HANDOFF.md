@@ -48,6 +48,11 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
   localhost validation against `qwen3.5:9b` returned a native `list_directory`
   tool call, and Raiker's provider factory parsed the arguments as
   `{"path": "."}`.
+- **Web dashboard parity for hosted models complete:** `/api/models`,
+  `apps/web` Models, and Security Settings now surface hosted/private model
+  gate state, off-machine profile count, and whether
+  `RAIKER_MODEL_EGRESS_ALLOWLIST` is configured. The UI remains read-only for
+  this status and never displays allowlist values or API keys.
 
 ## How a user turns on a hosted provider (for reference / docs work)
 
@@ -84,9 +89,11 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
    area (`plugin_install`, `plugin_execution_cap`): sandboxed execution +
    signature verification + threat model, following the slice pattern
    (threat-model doc → executor → validator/guard-test lockstep → tests).
-5. **Web dashboard parity for slice 7/8:** surface hosted-model gate state,
+5. **Web dashboard parity for slice 7/8 - completed in this session:** surface hosted-model gate state,
    egress allowlist status, and hosted profiles in the Security Settings /
    models views of `apps/web`.
+   Implemented as read-only API/UI metadata with contract, backend, and Svelte
+   tests. Allowlist values and provider keys are intentionally not displayed.
 
 ## Slice discipline (repeat every slice)
 

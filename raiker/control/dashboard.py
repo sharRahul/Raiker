@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -9,6 +10,8 @@ from typing import Any
 
 from raiker.approval_previews import redact_secret_like_text
 from raiker.control.service import RuntimeControlService
+from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
+from raiker.models.policy_state import HOSTED_MODEL_GATE, PRIVATE_NETWORK_MODEL_GATE
 from raiker.models.registry import ModelProfileRegistry
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
 from raiker.runtime.authority.models import PrincipalType
@@ -126,6 +129,10 @@ class ModelProfileView:
     local_only: bool
     requires_network: bool
     endpoint_kind: str
+    requires_egress_policy: bool
+    requires_budget_policy: bool
+    runtime_gate: str | None
+    off_machine: bool
     selected: bool
 
     def to_dict(self) -> dict[str, Any]:
@@ -136,6 +143,10 @@ class ModelProfileView:
 class ModelsView:
     profiles: tuple[ModelProfileView, ...]
     current_profile_id: str | None
+    hosted_model_gate_state: str
+    private_network_model_gate_state: str
+    model_egress_allowlist_configured: bool
+    remote_profile_count: int
     # The runtime never silently falls back to hosted providers; hosted runtime is not enabled.
     no_silent_hosted_fallback: bool = True
 
@@ -143,6 +154,10 @@ class ModelsView:
         return {
             "profiles": [p.to_dict() for p in self.profiles],
             "current_profile_id": self.current_profile_id,
+            "hosted_model_gate_state": self.hosted_model_gate_state,
+            "private_network_model_gate_state": self.private_network_model_gate_state,
+            "model_egress_allowlist_configured": self.model_egress_allowlist_configured,
+            "remote_profile_count": self.remote_profile_count,
             "no_silent_hosted_fallback": self.no_silent_hosted_fallback,
         }
 
@@ -327,6 +342,8 @@ class DashboardService:
         registry = ModelProfileRegistry.load()
         state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
         current = state.profile_id if state is not None else None
+        hosted_gate = self.control.get_capability_gate(HOSTED_MODEL_GATE)
+        private_gate = self.control.get_capability_gate(PRIVATE_NETWORK_MODEL_GATE)
         profiles = tuple(
             ModelProfileView(
                 profile_id=p.profile_id,
@@ -336,11 +353,32 @@ class DashboardService:
                 local_only=p.local_only,
                 requires_network=p.requires_network,
                 endpoint_kind=str(p.raw.get("endpoint_kind", "unknown")),
+                requires_egress_policy=bool(p.raw.get("requires_egress_policy", False)),
+                requires_budget_policy=bool(p.raw.get("requires_budget_policy", False)),
+                runtime_gate=self._runtime_gate_for_profile(str(p.raw.get("endpoint_kind", "unknown"))),
+                off_machine=str(p.raw.get("endpoint_kind", "unknown")) in {"remote_hosted", "private_network"},
                 selected=(p.profile_id == current),
             )
             for p in registry.list_profiles()
         )
-        return ModelsView(profiles=profiles, current_profile_id=current)
+        return ModelsView(
+            profiles=profiles,
+            current_profile_id=current,
+            hosted_model_gate_state=hosted_gate.state if hosted_gate is not None else "unknown",
+            private_network_model_gate_state=private_gate.state if private_gate is not None else "unknown",
+            model_egress_allowlist_configured=bool(
+                os.environ.get(MODEL_EGRESS_ALLOWLIST_ENV, "").strip()
+            ),
+            remote_profile_count=sum(1 for p in profiles if p.off_machine),
+        )
+
+    @staticmethod
+    def _runtime_gate_for_profile(endpoint_kind: str) -> str | None:
+        if endpoint_kind == "remote_hosted":
+            return HOSTED_MODEL_GATE
+        if endpoint_kind == "private_network":
+            return PRIVATE_NETWORK_MODEL_GATE
+        return None
 
     def get_diagnostics(self, acting_principal_id: str | None = None) -> DiagnosticsView:
         readiness = self.control.get_runtime_readiness(acting_principal_id)

@@ -4,6 +4,7 @@ import type { CapabilityGate, RuntimeMode } from "./apiTypes";
 
 const capabilityGates = vi.fn();
 const runtimeMode = vi.fn();
+const models = vi.fn();
 const setCapabilityState = vi.fn();
 const disableCapability = vi.fn();
 const activateRuntimeMode = vi.fn();
@@ -13,6 +14,7 @@ vi.mock("./api", () => ({
   api: {
     capabilityGates: () => capabilityGates(),
     runtimeMode: () => runtimeMode(),
+    models: () => models(),
     setCapabilityState: (cap: string, body: unknown) => setCapabilityState(cap, body),
     disableCapability: (cap: string, reason: string) => disableCapability(cap, reason),
     activateRuntimeMode: (m: string, r: string) => activateRuntimeMode(m, r),
@@ -75,10 +77,21 @@ const GATES: CapabilityGate[] = [
   }),
 ];
 
+const MODELS = {
+  profiles: [],
+  current_profile_id: null,
+  hosted_model_gate_state: "disabled",
+  private_network_model_gate_state: "disabled",
+  model_egress_allowlist_configured: false,
+  remote_profile_count: 3,
+  no_silent_hosted_fallback: true,
+};
+
 describe("SecuritySettingsPanel", () => {
   beforeEach(() => {
     capabilityGates.mockReset().mockResolvedValue(GATES);
     runtimeMode.mockReset().mockResolvedValue(MODE);
+    models.mockReset().mockResolvedValue(MODELS);
     setCapabilityState.mockReset().mockResolvedValue({ ok: true });
     disableCapability.mockReset();
     activateRuntimeMode.mockReset();
@@ -96,6 +109,16 @@ describe("SecuritySettingsPanel", () => {
       'input[name*="secret" i], input[name*="password" i], input[name*="api" i], input[name*="token" i]',
     );
     expect(named.length).toBe(0);
+  });
+
+  it("shows hosted model gate and egress posture without exposing allowlist values", async () => {
+    const { default: Panel } = await import("./SecuritySettingsPanel.svelte");
+    render(Panel, { props: { principal: "principal_rahul" } });
+
+    expect(await screen.findByText(/Hosted Model Runtime/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Egress allowlist/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/not configured/i)).toBeInTheDocument();
+    expect(screen.queryByText(/api\.openai\.com/i)).not.toBeInTheDocument();
   });
 
   it("offers Enable for a supported gate and forwards reason via the step-up dialog", async () => {

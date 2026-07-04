@@ -835,7 +835,10 @@ only). The web dashboard provides read-only governed views, the same governed
 prompt/turn/approval/runtime-mutation flows as the CLI (approval resolution is metadata-only,
 `executes_action=false`), and a step-up-gated Security Settings. Both surfaces route through the
 Agent Gateway, ToolBroker, RuntimeAuthority, and PolicyEngine and add no runtime authority of their
-own. Desktop/Mobile apps, IDE extension, Voice, Browser Extension, and hosted/multi-user REST/API
+own. Web dashboard parity for hosted/private model runtime is implemented: `/api/models`, the
+Models view, and Security Settings surface hosted/private model gate state, off-machine profile
+count, and whether `RAIKER_MODEL_EGRESS_ALLOWLIST` is configured, while never displaying allowlist
+values or provider API keys and never probing network reachability on read. Desktop/Mobile apps, IDE extension, Voice, Browser Extension, and hosted/multi-user REST/API
 remain specified/deferred, not implemented as launchable apps. Phase 3 is `implemented_verified`
 only for safe foundation/readiness slices A-P; runtime execution remains disabled. Phase 4 memory
 MVP is implemented.

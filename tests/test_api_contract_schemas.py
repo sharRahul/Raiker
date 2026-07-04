@@ -32,10 +32,15 @@ PROVIDER_HEALTH = {
     "profile_id", "provider", "model", "endpoint_kind", "local_only", "requires_network",
     "selected", "status", "detail",
 }
-MODELS_VIEW = {"profiles", "current_profile_id", "no_silent_hosted_fallback"}
+MODELS_VIEW = {
+    "profiles", "current_profile_id", "hosted_model_gate_state",
+    "private_network_model_gate_state", "model_egress_allowlist_configured",
+    "remote_profile_count", "no_silent_hosted_fallback",
+}
 MODEL_PROFILE = {
     "profile_id", "provider", "model", "default_state", "local_only", "requires_network",
-    "endpoint_kind", "selected",
+    "endpoint_kind", "requires_egress_policy", "requires_budget_policy", "runtime_gate",
+    "off_machine", "selected",
 }
 EVENT_ENTRY = {"event_id", "session_id", "turn_id", "event_type", "actor", "timestamp", "risk_level", "summary"}
 CHECKPOINT = {

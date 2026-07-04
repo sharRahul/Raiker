@@ -110,14 +110,26 @@ class TestAuthRequired:
 
 
 class TestReads:
-    def test_models_lists_profiles_without_silent_hosted_fallback(self, client: TestClient) -> None:
+    def test_models_lists_profiles_without_silent_hosted_fallback(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.openai.com")
         resp = client.get("/api/models", headers=_auth_headers(_token(client)))
         assert resp.status_code == 200
         body = resp.json()
         assert body["no_silent_hosted_fallback"] is True
+        assert body["hosted_model_gate_state"] == "disabled"
+        assert body["private_network_model_gate_state"] == "disabled"
+        assert body["model_egress_allowlist_configured"] is True
+        assert "api.openai.com" not in resp.text
         ids = [p["profile_id"] for p in body["profiles"]]
         assert "raiker-local-llama-cpp" in ids
+        assert body["remote_profile_count"] >= 1
         assert all("selected" in p and "provider" in p for p in body["profiles"])
+        hosted = next(p for p in body["profiles"] if p["profile_id"] == "openai-hosted")
+        assert hosted["runtime_gate"] == "hosted_model_runtime"
+        assert hosted["requires_egress_policy"] is True
+        assert hosted["off_machine"] is True
 
     def test_diagnostics_reports_disabled_capabilities_and_scope(self, client: TestClient) -> None:
         resp = client.get("/api/diagnostics", headers=_auth_headers(_token(client)))

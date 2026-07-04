@@ -61,12 +61,20 @@ export interface ModelProfile {
   local_only: boolean;
   requires_network: boolean;
   endpoint_kind: string;
+  requires_egress_policy: boolean;
+  requires_budget_policy: boolean;
+  runtime_gate: string | null;
+  off_machine: boolean;
   selected: boolean;
 }
 
 export interface ModelsView {
   profiles: ModelProfile[];
   current_profile_id: string | null;
+  hosted_model_gate_state: string;
+  private_network_model_gate_state: string;
+  model_egress_allowlist_configured: boolean;
+  remote_profile_count: number;
   no_silent_hosted_fallback: boolean;
 }
 

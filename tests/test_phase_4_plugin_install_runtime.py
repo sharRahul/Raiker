@@ -85,13 +85,13 @@ def _action(principal_id: str, **args: object) -> GovernedAction:
     )
 
 
-def test_plugin_install_is_real_but_execution_stays_fail_closed(tmp_path: Path) -> None:
+def test_plugin_install_and_brokered_execution_are_real_executors(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     registry = build_default_executor_registry(ws, SQLiteStore(ws))
     assert _CAP in REAL_EXECUTOR_CAPABILITIES
     assert registry.has(_CAP)
-    assert _EXEC_CAP not in REAL_EXECUTOR_CAPABILITIES
-    assert not registry.has(_EXEC_CAP)
+    assert _EXEC_CAP in REAL_EXECUTOR_CAPABILITIES
+    assert registry.has(_EXEC_CAP)
 
 
 def test_plugin_install_gate_disabled_blocks_before_recording(tmp_path: Path) -> None:

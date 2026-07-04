@@ -4,7 +4,9 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from raiker.runtime.executors.base import ExecutionResult, not_implemented
+from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.models import PluginExecutionRecord, ToolAction
+from raiker.runtime.executors.base import ExecutionResult
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -12,6 +14,7 @@ if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
 _MAX_MANIFEST_BYTES = 1_000_000
+_BROKERED_PLUGIN_TOOLS = frozenset({"read_file", "list_directory", "glob", "grep"})
 
 
 class PluginInstallExecutor:
@@ -134,13 +137,211 @@ class PluginInstallExecutor:
 
 
 class PluginExecutionCapExecutor:
-    """Plugin code execution. Requires sandbox isolation + revocation before it
-    can run untrusted plugin code; fails closed until then."""
+    """Brokered read-only plugin tool invocation.
+
+    This is not arbitrary plugin code execution: it only lets an installed
+    plugin invoke a safe read-only broker tool that was present in its validated
+    install permissions. No plugin files are imported, no subprocesses are
+    launched, and no network or writes are allowed here.
+    """
 
     capability = "plugin_execution_cap"
 
-    def __init__(self, workspace_root: str | Path) -> None:
+    def __init__(self, workspace_root: str | Path, store: SQLiteStore) -> None:
         self._workspace_root = Path(workspace_root).resolve()
+        self._store = store
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        return not_implemented(self.capability, action.action_id)
+        from raiker.policy.config import StaticPolicyConfig
+        from raiker.policy.engine import PolicyEngine
+        from raiker.tools.broker import ToolBroker
+
+        plugin_id = action.arguments.get("plugin_id")
+        tool_name = action.arguments.get("tool_name")
+        tool_args = action.arguments.get("tool_args", {})
+        entrypoint = action.arguments.get("entrypoint")
+        if not isinstance(plugin_id, str) or not plugin_id.strip():
+            return self._record_and_fail(
+                action, principal, "", "", "missing_argument:plugin_id", tool_args={}
+            )
+        if not isinstance(tool_name, str) or not tool_name.strip():
+            return self._record_and_fail(
+                action, principal, plugin_id, "", "missing_argument:tool_name", tool_args={}
+            )
+        if not isinstance(tool_args, dict):
+            return self._record_and_fail(
+                action, principal, plugin_id, tool_name, "invalid_argument:tool_args", tool_args={}
+            )
+
+        install = self._latest_install(plugin_id)
+        if install is None:
+            return self._record_and_fail(
+                action, principal, plugin_id, tool_name, "plugin_not_installed", tool_args=tool_args
+            )
+
+        permissions = self._permissions(install)
+        if tool_name not in _BROKERED_PLUGIN_TOOLS:
+            return self._record_and_fail(
+                action,
+                principal,
+                plugin_id,
+                tool_name,
+                f"plugin_tool_not_brokered:{tool_name}",
+                tool_args=tool_args,
+                install=install,
+            )
+        if f"tool:{tool_name}" not in permissions:
+            return self._record_and_fail(
+                action,
+                principal,
+                plugin_id,
+                tool_name,
+                f"plugin_permission_not_granted:tool:{tool_name}",
+                tool_args=tool_args,
+                install=install,
+            )
+
+        tool_action = ToolAction(
+            action_id=new_id("tool_"),
+            tool_name=tool_name,
+            arguments=dict(tool_args),
+            risk_level="medium",
+            requires_approval=False,
+            proposed_by=principal.principal_id,
+        )
+        broker = ToolBroker(
+            workspace_root=self._workspace_root,
+            policy_engine=PolicyEngine(StaticPolicyConfig(self._workspace_root), store=self._store),
+            store=self._store,
+            writer=None,
+        )
+        tool_result, decision = broker.execute(
+            tool_action,
+            session_id=action.session_id or "plugin_execution",
+            turn_id=action.turn_id,
+        )
+        execution_status = (
+            "succeeded"
+            if tool_result.status == "success"
+            else ("denied" if decision.decision != "allow" or tool_result.status == "denied" else "failed")
+        )
+        record = self._record_execution(
+            principal=principal,
+            plugin_id=plugin_id,
+            tool_name=tool_name,
+            status=execution_status,
+            install=install,
+            entrypoint=entrypoint if isinstance(entrypoint, str) else f"tool:{tool_name}",
+        )
+        if tool_result.status != "success":
+            reason = (
+                "plugin_tool_policy_denied"
+                if decision.decision != "allow" or tool_result.status == "denied"
+                else "plugin_tool_failed"
+            )
+            return ExecutionResult(
+                ok=False,
+                capability=self.capability,
+                action_id=action.action_id,
+                reason_code=reason,
+                summary="Plugin brokered tool invocation failed closed.",
+                artifacts={
+                    "execution_id": record.execution_id,
+                    "plugin_id": plugin_id,
+                    "tool_name": tool_name,
+                    "tool_status": tool_result.status,
+                    "policy_decision": decision.decision,
+                },
+            )
+
+        return ExecutionResult(
+            ok=True,
+            capability=self.capability,
+            action_id=action.action_id,
+            summary="Installed plugin invoked a brokered read-only tool; output is not included in runtime artifacts.",
+            artifacts={
+                "execution_id": record.execution_id,
+                "plugin_id": plugin_id,
+                "tool_name": tool_name,
+                "tool_status": tool_result.status,
+                "policy_decision": decision.decision,
+                "output_redacted": True,
+            },
+        )
+
+    def _latest_install(self, plugin_id: str) -> dict[str, object] | None:
+        for record in self._store.list_plugin_install_records(status="installed"):
+            if record.get("plugin_id") == plugin_id:
+                return record
+        return None
+
+    def _permissions(self, install: dict[str, object]) -> set[str]:
+        raw = install.get("permissions_json")
+        if not isinstance(raw, str):
+            return set()
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return set()
+        if not isinstance(parsed, list):
+            return set()
+        return {value for value in parsed if isinstance(value, str)}
+
+    def _record_and_fail(
+        self,
+        action: GovernedAction,
+        principal: Principal,
+        plugin_id: str,
+        tool_name: str,
+        reason_code: str,
+        *,
+        tool_args: dict[str, object],
+        install: dict[str, object] | None = None,
+    ) -> ExecutionResult:
+        record = self._record_execution(
+            principal=principal,
+            plugin_id=plugin_id or "unknown",
+            tool_name=tool_name or "unknown",
+            status="denied",
+            install=install,
+            entrypoint=f"tool:{tool_name}" if tool_name else "unknown",
+        )
+        return ExecutionResult(
+            ok=False,
+            capability=self.capability,
+            action_id=action.action_id,
+            reason_code=reason_code,
+            summary="Plugin brokered tool invocation failed closed.",
+            artifacts={
+                "execution_id": record.execution_id,
+                "plugin_id": plugin_id or None,
+                "tool_name": tool_name or None,
+                "argument_count": len(tool_args),
+            },
+        )
+
+    def _record_execution(
+        self,
+        *,
+        principal: Principal,
+        plugin_id: str,
+        tool_name: str,
+        status: str,
+        install: dict[str, object] | None,
+        entrypoint: str,
+    ) -> PluginExecutionRecord:
+        now = utc_now()
+        record = PluginExecutionRecord(
+            execution_id=new_id("plgex_"),
+            plugin_id=plugin_id,
+            version=str(install.get("version", "")) if install else "",
+            trust_level=str(install.get("trust_level", "untrusted")) if install else "untrusted",
+            permissions_json=str(install.get("permissions_json", "[]")) if install else "[]",
+            entrypoint=entrypoint or f"tool:{tool_name}",
+            status=status,
+            started_at=now,
+            completed_at=now,
+            created_by=principal.principal_id,
+        )
+        self._store.insert_plugin_execution_record(record)
+        return record

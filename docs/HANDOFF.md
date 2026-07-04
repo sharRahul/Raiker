@@ -59,8 +59,14 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
   human `runtime_gate_manager`, confirmation token, and
   `docs/threat-models/plugins.md` ack. It verifies checksum, requires a
   signature presence marker, allows only safe read-only permissions, and writes
-  `plugin_install_records`. `plugin_execution_cap` remains fail-closed with no
-  executor.
+  `plugin_install_records`.
+- **Plugin brokered read-only execution slice complete:** `plugin_execution_cap`
+  is now a real governed executor only for installed plugins invoking
+  `read_file`, `list_directory`, `glob`, or `grep` through `ToolBroker` and
+  `PolicyEngine`. It requires `docs/threat-models/plugin-execution.md` ack and
+  records `plugin_execution_records`. It does not import plugin code, run
+  scripts, start processes, open network connections, write files, or activate
+  hooks/MCP/LSP/monitors/panels.
 
 ## How a user turns on a hosted provider (for reference / docs work)
 
@@ -94,10 +100,11 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
    Implemented as `supports_tool_calls=true`, `tool_call_mode=native_or_text_json`,
    with focused tests and live localhost evidence against `qwen3.5:9b`.
 4. **Plugin runtime promotion (Tier 4)** — the biggest remaining fail-closed
-   area (`plugin_execution_cap`): sandboxed execution +
-   signature verification + threat model, following the slice pattern.
-   `plugin_install` itself is already completed as manifest validation +
-   install-record creation only; do not reintroduce code execution there.
+   area after completed `plugin_install` and brokered read-only `plugin_execution_cap` slices:
+   arbitrary plugin code runtime still needs real sandbox/import/process isolation,
+   cryptographic signature verification, revocation, dependency controls,
+   runtime permission enforcement, and tests before plugin scripts/hooks/MCP/LSP/
+   monitors/panels can execute.
    (threat-model doc → executor → validator/guard-test lockstep → tests).
 5. **Web dashboard parity for slice 7/8 - completed in this session:** surface hosted-model gate state,
    egress allowlist status, and hosted profiles in the Security Settings /

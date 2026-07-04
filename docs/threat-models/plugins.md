@@ -2,8 +2,10 @@
 
 `plugin_install` may join `REAL_EXECUTOR_CAPABILITIES` for one narrow operation:
 recording a local plugin manifest after validation. This slice does not fetch,
-unpack, import, execute, enable, or sandbox plugin code. `plugin_execution_cap`
-remains fail-closed with no default executor.
+unpack, import, execute, enable, or sandbox plugin code. The follow-on
+`plugin_execution_cap` slice is documented separately in
+`docs/threat-models/plugin-execution.md` and is limited to brokered read-only
+tool invocation for installed plugins.
 
 ## Boundaries enforced (fail-closed)
 

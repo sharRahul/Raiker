@@ -109,9 +109,11 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # same allowlist in the provider factory)
     "hosted_model_runtime",
     "private_network_model_runtime",
-    # Tier 4 — local manifest validation + install-record creation only. Plugin
-    # code execution remains fail-closed as plugin_execution_cap.
+    # Tier 4 — local manifest validation + brokered read-only plugin tool
+    # invocation. Arbitrary plugin code/import/process/network execution remains
+    # out of scope.
     "plugin_install",
+    "plugin_execution_cap",
 })
 
 
@@ -148,6 +150,7 @@ def build_default_executor_registry(
     registry.register("hosted_model_runtime", HostedModelRuntimeExecutor(ws))
     registry.register("private_network_model_runtime", PrivateNetworkModelRuntimeExecutor(ws))
     registry.register("plugin_install", PluginInstallExecutor(ws, store))
+    registry.register("plugin_execution_cap", PluginExecutionCapExecutor(ws, store))
     assert registry.capabilities() == REAL_EXECUTOR_CAPABILITIES, (
         "default executor registry drifted from REAL_EXECUTOR_CAPABILITIES"
     )

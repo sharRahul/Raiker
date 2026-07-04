@@ -36,9 +36,16 @@ backlog.
 
 Executor implementation update (2026-07-04): `plugin_install` has moved out of
 the no-executor backlog as Phase 4 slice 8. It is a governed local manifest
-validation + install-record executor only. `plugin_execution_cap` remains
-fail-closed with no real executor; no plugin code execution, package fetch,
-archive extraction, or runtime permission grant exists.
+validation + install-record executor only. Arbitrary plugin code execution,
+package fetch, archive extraction, or runtime permission grant still does not
+exist.
+
+Executor implementation update (2026-07-04, slice 9): `plugin_execution_cap`
+has moved out of the no-executor backlog only for installed-plugin brokered
+read-only tool invocation (`read_file`, `list_directory`, `glob`, `grep`)
+through `ToolBroker` and `PolicyEngine`. Arbitrary plugin code/import/process,
+network, writes, hooks, MCP/LSP, monitors, panels, and runtime permission grants
+remain active gaps.
 
 Completed items (no longer active gaps):
 - strict runtime enforcement — completed

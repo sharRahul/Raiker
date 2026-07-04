@@ -19,10 +19,24 @@ class RegistryError(ValueError):
 
 
 def _config_path(path: str | Path) -> Path:
+    """Resolve a built-in config file.
+
+    Priority: an existing path as given (absolute, or relative to cwd), then
+    the repository/install root next to the ``raiker`` package. The fallback
+    makes the installed ``raiker`` command work from any working directory
+    (editable installs and repo checkouts), not just the repo root.
+    """
     candidate = Path(path)
     if candidate.exists():
         return candidate
-    return Path.cwd() / path
+    cwd_candidate = Path.cwd() / path
+    if cwd_candidate.exists():
+        return cwd_candidate
+    package_root = Path(__file__).resolve().parent.parent.parent
+    packaged = package_root / path
+    if packaged.exists():
+        return packaged
+    return cwd_candidate
 
 
 class ModelProfileRegistry:

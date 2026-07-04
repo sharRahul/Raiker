@@ -4,14 +4,7 @@ import json
 from pathlib import Path
 
 from raiker.contracts.models import ConnectorProfile
-from raiker.models.registry import RegistryError
-
-
-def _config_path(path: str | Path) -> Path:
-    candidate = Path(path)
-    if candidate.exists():
-        return candidate
-    return Path.cwd() / path
+from raiker.models.registry import RegistryError, _config_path
 
 
 class ConnectorRegistry:

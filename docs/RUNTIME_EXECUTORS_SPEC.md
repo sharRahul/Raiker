@@ -33,9 +33,9 @@ static allowlist. The default registry is built by
 - cannot be activated (`activation_blocked:no_executor`), and
 - if somehow reached at execution time, fails closed.
 
-This is enforced by `scripts/validate_runtime_enablement_readiness.py` (checks 13–14):
-no static `_SATISFIED_CAPS`, `has_executor` must be registry-backed, and no sensitive
-capability may have a default executor.
+This is enforced by `scripts/validate_runtime_enablement_readiness.py` (checks 13-14):
+no static `_SATISFIED_CAPS`, `has_executor` must be registry-backed, and deferred
+sensitive capabilities may not have a default executor.
 
 ## No silent runtime
 
@@ -70,6 +70,7 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 | `scheduled_routines` | 5 | Local on-demand routine runner (no daemon); runs bounded read-only subagent payloads when due. |
 | `hosted_model_runtime` | 5 | Owner-allowlisted HTTPS model endpoint: gate-derived provider policy on the chat path + metadata-only connectivity probe (`RAIKER_MODEL_EGRESS_ALLOWLIST`, empty = fail closed). |
 | `private_network_model_runtime` | 5 | Owner-allowlisted home-lab model endpoint (private network); same gate-derived policy + egress allowlist. |
+| `plugin_install` | 4 | Local manifest validation + install-record creation only; verifies checksum/signature presence marker and safe read-only permissions, never runs plugin code. |
 
 Tier 2 capabilities additionally require a threat-model ack and a human confirmation
 token to enable (`--confirm <token>` / API `confirmation_token`).
@@ -81,7 +82,7 @@ execution (if forced) fails closed. Each needs its own implementation task (real
 integration + threat model + tests) before joining `REAL_EXECUTOR_CAPABILITIES`:
 
 - **Tier 3 (partial):** `vector_embedding_runtime`, `model_provider_runtime`
-- **Tier 4:** `plugin_install`, `plugin_execution_cap`
+- **Tier 4:** `plugin_execution_cap`
 - **Tier 5:** `remote_execution_cap`, `cloud_execution_cap`
   (Phase 4 promotions tracked in `docs/IMPLEMENTATION_STATUS.md`; each leaves
   this list only with a real integration + threat model + tests. Promoted so
@@ -90,7 +91,8 @@ integration + threat model + tests) before joining `REAL_EXECUTOR_CAPABILITIES`:
   `docs/threat-models/channels.md`; `container_execution_cap` —
   `docs/threat-models/container.md`; `scheduled_routines` —
   `docs/threat-models/scheduled-routines.md`; `hosted_model_runtime` +
-  `private_network_model_runtime` — `docs/threat-models/hosted-models.md`.
+  `private_network_model_runtime` — `docs/threat-models/hosted-models.md`;
+  `plugin_install` — `docs/threat-models/plugins.md`.
   Remote/cloud command execution stays fail-closed by design — see
   `docs/threat-models/remote-cloud.md`.)
 - **Tier 6 (sensitive domains):** `email_runtime`, `calendar_runtime`,

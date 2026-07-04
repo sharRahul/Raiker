@@ -21,7 +21,7 @@ _SENSITIVE = (
     "medical_runtime", "finance_runtime", "investment_runtime", "cctv_runtime",
     "home_security_runtime", "email_runtime", "remote_execution_cap",
     "cloud_execution_cap",
-    "plugin_execution_cap", "plugin_install",
+    "plugin_execution_cap",
     "vector_embedding_runtime", "model_provider_runtime",
 )
 
@@ -46,6 +46,16 @@ def test_sensitive_caps_not_registered(tmp_path: Path) -> None:
     for cap in _SENSITIVE:
         assert not registry.has(cap), f"{cap} must not have a default executor"
         assert cap not in REAL_EXECUTOR_CAPABILITIES
+
+
+def test_plugin_install_is_real_but_plugin_execution_is_not(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    store = SQLiteStore(ws)
+    registry = build_default_executor_registry(ws, store)
+    assert registry.has("plugin_install")
+    assert "plugin_install" in REAL_EXECUTOR_CAPABILITIES
+    assert not registry.has("plugin_execution_cap")
+    assert "plugin_execution_cap" not in REAL_EXECUTOR_CAPABILITIES
 
 
 def test_stub_executors_fail_closed(tmp_path: Path) -> None:

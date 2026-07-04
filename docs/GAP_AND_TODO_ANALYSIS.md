@@ -34,6 +34,12 @@ fabricate success. `has_executor` is registry-backed (no static allowlist), enfo
 `docs/RUNTIME_EXECUTORS_SPEC.md`. The remaining (fail-closed) executors are the active
 backlog.
 
+Executor implementation update (2026-07-04): `plugin_install` has moved out of
+the no-executor backlog as Phase 4 slice 8. It is a governed local manifest
+validation + install-record executor only. `plugin_execution_cap` remains
+fail-closed with no real executor; no plugin code execution, package fetch,
+archive extraction, or runtime permission grant exists.
+
 Completed items (no longer active gaps):
 - strict runtime enforcement — completed
 - controlled runtime mode activation — implemented

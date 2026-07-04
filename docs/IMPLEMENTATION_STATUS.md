@@ -5,6 +5,13 @@
 
 # Implementation Status
 
+> Current truth update (2026-07-04): Phase 4 slice 8 promotes `plugin_install`
+> to a real governed executor for local manifest validation and install-record
+> creation only. `plugin_execution_cap` still has no real executor and remains
+> fail-closed. Where the older 2026-06-22 paragraph below says "plugins" have no
+> executor, read that as "plugin execution"; the per-capability source of truth
+> is `docs/RUNTIME_EXECUTORS_SPEC.md`.
+
 > Current truth (2026-06-22): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Real local executors exist and are governed-flippable for: Tier 1 (`approval_execution_relay`, `file_write_execution`, `patch_apply_execution`, `memory_write_execution`, `memory_forget_execution`), Tier 2 (`shell_execution`, `process_execution`, `web_fetch`, `network_execution` — sandboxed/egress-allowlisted), Tier 3 local code-intelligence (`graph_indexing_runtime`, `semantic_memory_runtime`), the Phase 4 promoted slices (`subagents`, `multi_agent_teams`, `external_channel_runtime`, `channel_approval_relay`, `container_execution_cap`, `scheduled_routines`), and — Phase 4 slice 7 — `hosted_model_runtime` / `private_network_model_runtime` (owner egress allowlist `RAIKER_MODEL_EGRESS_ALLOWLIST`, empty = fail closed; gate-derived provider policy on the chat path). These are the only members of `REAL_EXECUTOR_CAPABILITIES`. Every other capability — plugins, vector/embedding runtime, remote/cloud command execution, and all Tier-6 sensitive domains (email/calendar/finance/investment/medical/pregnancy/cctv/home-security/hardware) — has **no real executor and fails closed** (`not_implemented` / `activation_blocked:no_executor`); it cannot be flipped to a working state. All capability gates still ship `disabled` by default; enabling is owner/`runtime_gate_manager`-only, governed, reversible, and audited. Per-capability detail: [`docs/RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md).
 
 
@@ -731,11 +738,11 @@ Phase 6 adds external channel profiles, approval relay, subagent contracts, mult
 | RAIKER-6501 Execution budget | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_6_channels_subagents_remote.py` |
 
 Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
-Executor enablement status: real local executors (Tier 1-3 local set in `REAL_EXECUTOR_CAPABILITIES`) are governed-flippable; all sensitive/external capabilities fail closed. See `docs/RUNTIME_EXECUTORS_SPEC.md`.
+Executor enablement status: real local executors in `REAL_EXECUTOR_CAPABILITIES` are governed-flippable; deferred sensitive/external capabilities fail closed. See `docs/RUNTIME_EXECUTORS_SPEC.md`.
 
 ## Phase 3 Completion Status
 
-All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled by default. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Landed slices: Slice 1 — `subagents` and `multi_agent_teams` (bounded governed in-process executors); Slice 4 — `external_channel_runtime` and `channel_approval_relay` (one reference webhook channel + untrusted inbound receiver); Slice 3 — `container_execution_cap` (local sandboxed Docker); Slice 2 — `scheduled_routines` (local on-demand routine runner, no daemon); Slice 5 — REST API hardening for single-user internet access (see the REST/API row above); Slice 7 — `hosted_model_runtime` + `private_network_model_runtime` (owner-allowlisted off-machine model endpoints with gate-derived chat-path policy). Their capability gates remain default-disabled and owner/`runtime_gate_manager`-flippable only. Slice 6: remote/cloud command execution stays **fail-closed by design** with documented per-integration opt-in requirements (`docs/threat-models/remote-cloud.md`).
+All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled by default. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Landed slices: Slice 1 — `subagents` and `multi_agent_teams` (bounded governed in-process executors); Slice 4 — `external_channel_runtime` and `channel_approval_relay` (one reference webhook channel + untrusted inbound receiver); Slice 3 — `container_execution_cap` (local sandboxed Docker); Slice 2 — `scheduled_routines` (local on-demand routine runner, no daemon); Slice 5 — REST API hardening for single-user internet access (see the REST/API row above); Slice 7 — `hosted_model_runtime` + `private_network_model_runtime` (owner-allowlisted off-machine model endpoints with gate-derived chat-path policy); Slice 8 — `plugin_install` (local plugin manifest validation + install-record creation only). Their capability gates remain default-disabled and owner/`runtime_gate_manager`-flippable only. Slice 6: remote/cloud command execution stays **fail-closed by design** with documented per-integration opt-in requirements (`docs/threat-models/remote-cloud.md`). `plugin_execution_cap` stays fail-closed.
 
 ## Phase 4 production rollout (sandboxed-first)
 
@@ -826,6 +833,23 @@ Scope and boundaries:
 
 Evidence: `tests/test_phase_4_hosted_model_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
 
+### Phase 4 Slice 8 — Plugin manifest install (`implemented_verified`)
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `plugin_install` real executor (local manifest validation + install-record creation only) | `implemented_policy_gated` | `raiker/runtime/executors/tier4_plugins.py`, `raiker/plugins/policy.py`, `raiker/plugins/verify.py`, `raiker/plugins/registry.py` | `tests/test_phase_4_plugin_install_runtime.py` |
+
+Scope and boundaries:
+
+- This slice records a validated local plugin manifest in `plugin_install_records`. It does not fetch, unpack, import, execute, enable, or sandbox plugin code.
+- The action accepts `manifest_path` only and requires the manifest to resolve inside the workspace. Escapes fail closed (`outside_workspace:manifest_path`).
+- The plugin registration policy must return `planned`: checksum verification must pass, the signature field must be present, trust level must be known, and permissions must be safe read-only. Risky/unknown permissions and invalid supply-chain metadata fail closed and create no install record.
+- The signature check is currently a presence marker, not cryptographic signature validation. That is intentional for this manifest-recording slice and is documented in `docs/threat-models/plugins.md`.
+- Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugins.md`), and a confirmation token. AI principals can never run or enable it.
+- `plugin_execution_cap` remains **fail-closed (no executor)**. Plugin tools, hooks, MCP servers, agents, panels, and code execution remain disabled/deferred.
+
+Evidence: `tests/test_phase_4_plugin_install_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
+
 ### Current launchable UI & runtime truth
 
 The launchable local UIs are (1) the plain local terminal client (`RAIKER_TUI=plain`, `--prompt`,
@@ -904,7 +928,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 
 Disabled runtime flags remain false: plugin_execution_enabled, graph_indexing_enabled, semantic_memory_writes_enabled, vector_writes_enabled, embedding_creation_enabled, cleanup_execution_enabled, rollback_execution_enabled, external_channels_enabled, notifications_enabled, remote_execution_enabled, container_execution_enabled, cloud_execution_enabled, process_execution_enabled, shell_execution_enabled, network_execution_enabled, runtime_execution_enabled.
-Executor enablement status: real local executors (Tier 1-3 local set in `REAL_EXECUTOR_CAPABILITIES`) are governed-flippable; all sensitive/external capabilities fail closed. See `docs/RUNTIME_EXECUTORS_SPEC.md`.
+Executor enablement status: real local executors in `REAL_EXECUTOR_CAPABILITIES` are governed-flippable; deferred sensitive/external capabilities fail closed. See `docs/RUNTIME_EXECUTORS_SPEC.md`.
 
 
 ## Plain terminal client (implemented); Rich/native TUI deferred

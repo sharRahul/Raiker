@@ -75,9 +75,9 @@ __all__ = [
 # from this set cannot be flipped to a runtime-enabled state through the
 # governed control plane.
 #
-# Sensitive/external domains (finance, medical, cctv, remote/container/cloud,
-# channels, hosted models, plugins, …) are deliberately excluded until each has
-# a real executor plus a per-domain threat model.
+# Sensitive/external domains (finance, medical, cctv, remote/cloud, plugin
+# execution, …) are deliberately excluded until each has a real executor plus a
+# per-domain threat model.
 
 REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # Tier 1 — local, reversible
@@ -109,6 +109,9 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # same allowlist in the provider factory)
     "hosted_model_runtime",
     "private_network_model_runtime",
+    # Tier 4 — local manifest validation + install-record creation only. Plugin
+    # code execution remains fail-closed as plugin_execution_cap.
+    "plugin_install",
 })
 
 
@@ -144,6 +147,7 @@ def build_default_executor_registry(
     registry.register("scheduled_routines", ScheduledRoutinesExecutor(ws, store))
     registry.register("hosted_model_runtime", HostedModelRuntimeExecutor(ws))
     registry.register("private_network_model_runtime", PrivateNetworkModelRuntimeExecutor(ws))
+    registry.register("plugin_install", PluginInstallExecutor(ws, store))
     assert registry.capabilities() == REAL_EXECUTOR_CAPABILITIES, (
         "default executor registry drifted from REAL_EXECUTOR_CAPABILITIES"
     )

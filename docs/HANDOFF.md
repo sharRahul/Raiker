@@ -42,6 +42,12 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
   `raiker/config/model-profiles.json` and
   `raiker/config/channel-connectors.json`; focused tests cover foreign cwd,
   packaged-resource fallback, and resource drift.
+- **Ollama tool calls enabled and live-verified:** `ollama-local-openai-compatible`
+  now advertises native OpenAI tool calls with text-JSON fallback
+  (`supports_tool_calls=true`, `tool_call_mode=native_or_text_json`). Live
+  localhost validation against `qwen3.5:9b` returned a native `list_directory`
+  tool call, and Raiker's provider factory parsed the arguments as
+  `{"path": "."}`.
 
 ## How a user turns on a hosted provider (for reference / docs work)
 
@@ -67,11 +73,13 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
 2. **Live hosted-provider verification.** With an operator key, run one
    governed turn on `anthropic-hosted` and flip its status note from
    `implemented_unverified` to verified. No code expected — evidence only.
-3. **Tool calls on Ollama models.** `ollama-local-openai-compatible` ships
+3. **Tool calls on Ollama models - completed in this session.** `ollama-local-openai-compatible` shipped
    `supports_tool_calls: false` / `text_json`. Modern Ollama models (qwen3,
    gemma4) support native OpenAI tool calls — test against the live server,
    then flip the profile (or add per-model detection) so the agentic loop can
    act with local models, not just llama.cpp.
+   Implemented as `supports_tool_calls=true`, `tool_call_mode=native_or_text_json`,
+   with focused tests and live localhost evidence against `qwen3.5:9b`.
 4. **Plugin runtime promotion (Tier 4)** — the biggest remaining fail-closed
    area (`plugin_install`, `plugin_execution_cap`): sandboxed execution +
    signature verification + threat model, following the slice pattern

@@ -84,11 +84,12 @@
       "requires_egress_policy": false,
       "supports_streaming": true,
       "supports_embeddings": true,
-      "supports_tool_calls": false,
+      "supports_tool_calls": true,
       "supports_json_schema": false,
       "supports_reasoning": false,
       "reasoning_trace_visible": false,
-      "tool_call_mode": "text_json"
+      "tool_call_mode": "native_or_text_json",
+      "tool_call_protocol": "openai"
     },
     {
       "profile_id": "lm-studio-local-openai-compatible",

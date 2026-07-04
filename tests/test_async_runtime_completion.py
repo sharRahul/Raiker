@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import importlib.metadata
+import json
 import tomllib
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
@@ -15,7 +17,7 @@ from raiker.cli.commands import (
     handle_reasoning_command,
     render_models,
 )
-from raiker.models.contracts import ModelCapabilities, ModelMessage, ModelRequest
+from raiker.models.contracts import ModelCapabilities, ModelMessage, ModelRequest, ToolSpec
 from raiker.models.exceptions import ProviderConfigurationError, ProviderPolicyError
 from raiker.models.factory import ModelProviderFactory, ProviderRuntimePolicy
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider, _join
@@ -105,6 +107,68 @@ def test_async_openai_success_and_live_urls() -> None:
         assert models[0].id == "m"
     asyncio.run(main())
     assert seen == ["http://127.0.0.1:8080/v1/chat/completions", "http://127.0.0.1:8080/v1/models"]
+
+
+def test_ollama_profile_advertises_native_tool_calls() -> None:
+    profile = ModelProfileRegistry.load().resolve_profile_id("ollama-local-openai-compatible")
+    assert profile.raw["supports_tool_calls"] is True
+    assert profile.raw["tool_call_mode"] == "native_or_text_json"
+    assert profile.raw["tool_call_protocol"] == "openai"
+
+
+def test_ollama_factory_sends_tools_and_parses_native_tool_call() -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(json.loads(request.content.decode()))
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": "call_ollama_ls",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "list_directory",
+                                        "arguments": "{\"path\":\".\"}",
+                                    },
+                                }
+                            ],
+                        },
+                        "finish_reason": "tool_calls",
+                    }
+                ]
+            },
+        )
+
+    profile = ModelProfileRegistry.load().resolve_profile_id("ollama-local-openai-compatible")
+    configured = replace(profile, model="qwen3.5:9b", raw={**profile.raw, "model": "qwen3.5:9b"})
+    provider = ModelProviderFactory(client=httpx.AsyncClient(transport=httpx.MockTransport(handler))).create(
+        configured
+    )
+
+    response = asyncio.run(
+        provider.chat(
+            ModelRequest(
+                configured.profile_id,
+                "ollama",
+                "qwen3.5:9b",
+                [ModelMessage("user", "list files")],
+                [ToolSpec("list_directory", "List a directory")],
+            )
+        )
+    )
+
+    assert seen["tools"] == [ToolSpec("list_directory", "List a directory").to_openai_tool()]
+    assert seen["tool_choice"] == "auto"
+    assert response.finish_reason == "tool_calls"
+    assert response.tool_calls[0].call_id == "call_ollama_ls"
+    assert response.tool_calls[0].tool_name == "list_directory"
+    assert response.tool_calls[0].arguments == {"path": "."}
 
 
 def test_stream_cancellation_preserves_cancelled_error() -> None:

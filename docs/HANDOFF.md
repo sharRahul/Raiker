@@ -67,6 +67,18 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
   records `plugin_execution_records`. It does not import plugin code, run
   scripts, start processes, open network connections, write files, or activate
   hooks/MCP/LSP/monitors/panels.
+- **Plugin revocation slice complete (slice 10):** `plugin_revocation_cap` is now
+  a real governed executor and the fail-closed off-switch for the install/
+  execution slices. A HUMAN `runtime_gate_manager` revokes an installed plugin
+  (requires the default-disabled gate, `local_single_user_runtime`, a
+  `docs/threat-models/plugin-revocation.md` ack, and a confirmation token). It
+  flips the latest install record's status `installed` → `revoked` via
+  `SQLiteStore.revoke_plugin_install_record` (never deletes records, edits
+  permissions, or runs plugin code). After revocation, `plugin_execution_cap`
+  fails closed with `plugin_revoked` before any broker call. Second revocation
+  is an idempotent no-op (`plugin_already_revoked`). Runtime artifacts stay
+  metadata-only (no reason label or permission payload leaked). Evidence:
+  `tests/test_phase_4_plugin_revocation_runtime.py`.
 
 ## How a user turns on a hosted provider (for reference / docs work)
 
@@ -100,11 +112,16 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
    Implemented as `supports_tool_calls=true`, `tool_call_mode=native_or_text_json`,
    with focused tests and live localhost evidence against `qwen3.5:9b`.
 4. **Plugin runtime promotion (Tier 4)** — the biggest remaining fail-closed
-   area after completed `plugin_install` and brokered read-only `plugin_execution_cap` slices:
-   arbitrary plugin code runtime still needs real sandbox/import/process isolation,
-   cryptographic signature verification, revocation, dependency controls,
-   runtime permission enforcement, and tests before plugin scripts/hooks/MCP/LSP/
-   monitors/panels can execute.
+   area. Completed so far: `plugin_install`, brokered read-only
+   `plugin_execution_cap`, and now `plugin_revocation_cap` (the off-switch,
+   slice 10). Still deferred, in suggested slice order:
+   (a) **cryptographic signature verification** — install currently only checks a
+   signature *presence* marker; add real detached-signature verification against
+   an owner-trusted public key (needs a key-management decision + likely a crypto
+   dep). (b) **dependency controls** — declare/pin/validate plugin dependencies
+   without installing them. (c) arbitrary plugin **code runtime** with real
+   sandbox/import/process isolation, runtime permission enforcement, and tests
+   before plugin scripts/hooks/MCP/LSP/monitors/panels can execute.
    (threat-model doc → executor → validator/guard-test lockstep → tests).
 5. **Web dashboard parity for slice 7/8 - completed in this session:** surface hosted-model gate state,
    egress allowlist status, and hosted profiles in the Security Settings /

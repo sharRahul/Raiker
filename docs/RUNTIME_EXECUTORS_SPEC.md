@@ -72,6 +72,7 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 | `private_network_model_runtime` | 5 | Owner-allowlisted home-lab model endpoint (private network); same gate-derived policy + egress allowlist. |
 | `plugin_install` | 4 | Local manifest validation + install-record creation only; verifies checksum/signature presence marker and safe read-only permissions, never runs plugin code. |
 | `plugin_execution_cap` | 4 | Installed-plugin brokered read-only tool invocation (`read_file`, `list_directory`, `glob`, `grep`) through ToolBroker/PolicyEngine; no plugin imports, scripts, process, network, or writes. |
+| `plugin_revocation_cap` | 4 | Owner revocation off-switch: flips an installed plugin's record status to `revoked` so `plugin_execution_cap` fails closed for it; never deletes records, edits permissions, or runs plugin code. |
 
 Tier 2 capabilities additionally require a threat-model ack and a human confirmation
 token to enable (`--confirm <token>` / API `confirmation_token`).
@@ -93,7 +94,8 @@ integration + threat model + tests) before joining `REAL_EXECUTOR_CAPABILITIES`:
   `docs/threat-models/scheduled-routines.md`; `hosted_model_runtime` +
   `private_network_model_runtime` — `docs/threat-models/hosted-models.md`;
   `plugin_install` — `docs/threat-models/plugins.md`;
-  `plugin_execution_cap` — `docs/threat-models/plugin-execution.md`.
+  `plugin_execution_cap` — `docs/threat-models/plugin-execution.md`;
+  `plugin_revocation_cap` — `docs/threat-models/plugin-revocation.md`.
   Remote/cloud command execution stays fail-closed by design — see
   `docs/threat-models/remote-cloud.md`.)
 - **Tier 6 (sensitive domains):** `email_runtime`, `calendar_runtime`,

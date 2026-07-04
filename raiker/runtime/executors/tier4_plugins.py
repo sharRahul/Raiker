@@ -175,8 +175,13 @@ class PluginExecutionCapExecutor:
 
         install = self._latest_install(plugin_id)
         if install is None:
+            reason = (
+                "plugin_revoked"
+                if self._latest_record_status(plugin_id) == "revoked"
+                else "plugin_not_installed"
+            )
             return self._record_and_fail(
-                action, principal, plugin_id, tool_name, "plugin_not_installed", tool_args=tool_args
+                action, principal, plugin_id, tool_name, reason, tool_args=tool_args
             )
 
         permissions = self._permissions(install)
@@ -275,6 +280,13 @@ class PluginExecutionCapExecutor:
                 return record
         return None
 
+    def _latest_record_status(self, plugin_id: str) -> str | None:
+        for record in self._store.list_plugin_install_records():
+            if record.get("plugin_id") == plugin_id:
+                status = record.get("status")
+                return status if isinstance(status, str) else None
+        return None
+
     def _permissions(self, install: dict[str, object]) -> set[str]:
         raw = install.get("permissions_json")
         if not isinstance(raw, str):
@@ -345,3 +357,69 @@ class PluginExecutionCapExecutor:
         )
         self._store.insert_plugin_execution_record(record)
         return record
+
+
+class PluginRevocationExecutor:
+    """Governed revocation of an installed plugin.
+
+    This is the fail-closed off-switch for the plugin install/execution slices.
+    It flips the latest install record's status from ``installed`` to
+    ``revoked`` so the plugin can no longer broker read-only tools through
+    ``plugin_execution_cap``. It never deletes records, edits permissions,
+    imports plugin code, runs scripts, opens the network, or writes files.
+    """
+
+    capability = "plugin_revocation_cap"
+
+    def __init__(self, workspace_root: str | Path, store: SQLiteStore) -> None:
+        self._workspace_root = Path(workspace_root).resolve()
+        self._store = store
+
+    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        plugin_id = action.arguments.get("plugin_id")
+        reason = action.arguments.get("reason")
+        if not isinstance(plugin_id, str) or not plugin_id.strip():
+            return self._failed(action.action_id, "missing_argument:plugin_id")
+
+        latest = self._latest_record(plugin_id)
+        if latest is None:
+            return self._failed(action.action_id, "plugin_not_installed")
+        if latest.get("status") == "revoked":
+            return self._failed(action.action_id, "plugin_already_revoked")
+        if latest.get("status") != "installed":
+            return self._failed(action.action_id, "plugin_not_installed")
+
+        record_id = latest.get("record_id")
+        if not isinstance(record_id, str) or not self._store.revoke_plugin_install_record(record_id):
+            return self._failed(action.action_id, "plugin_revocation_failed")
+
+        return ExecutionResult(
+            ok=True,
+            capability=self.capability,
+            action_id=action.action_id,
+            summary="Installed plugin revoked; brokered read-only execution is now denied for it.",
+            artifacts={
+                "record_id": record_id,
+                "plugin_id": plugin_id,
+                "previous_status": "installed",
+                "new_status": "revoked",
+                "reason_provided": isinstance(reason, str) and bool(reason.strip()),
+                "execution_enabled": False,
+            },
+        )
+
+    def _latest_record(self, plugin_id: str) -> dict[str, object] | None:
+        for record in self._store.list_plugin_install_records():
+            if record.get("plugin_id") == plugin_id:
+                return record
+        return None
+
+    def _failed(self, action_id: str, reason_code: str) -> ExecutionResult:
+        return ExecutionResult(
+            ok=False,
+            capability=self.capability,
+            action_id=action_id,
+            reason_code=reason_code,
+            summary="Plugin revocation failed closed.",
+            artifacts={},
+        )

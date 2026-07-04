@@ -55,6 +55,7 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "model_provider": "model_provider_runtime",
     "plugin_install": "plugin_install",
     "plugin_execution_cap": "plugin_execution_cap",
+    "plugin_revocation_cap": "plugin_revocation_cap",
     "external_channel_runtime": "external_channel_runtime",
     "channel_approval_relay": "channel_approval_relay",
     "remote_execution_cap": "remote_execution_cap",

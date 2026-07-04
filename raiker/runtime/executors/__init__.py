@@ -28,7 +28,11 @@ from raiker.runtime.executors.tier3_core import (
     SemanticMemoryExecutor,
     VectorEmbeddingExecutor,
 )
-from raiker.runtime.executors.tier4_plugins import PluginExecutionCapExecutor, PluginInstallExecutor
+from raiker.runtime.executors.tier4_plugins import (
+    PluginExecutionCapExecutor,
+    PluginInstallExecutor,
+    PluginRevocationExecutor,
+)
 from raiker.runtime.executors.tier5_network import (
     CloudExecutionExecutor,
     RemoteExecutionExecutor,
@@ -54,7 +58,7 @@ __all__ = [
     "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "NetworkExecutor",
     "GraphIndexingExecutor", "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
     "SubagentExecutor", "MultiAgentTeamExecutor",
-    "PluginInstallExecutor", "PluginExecutionCapExecutor",
+    "PluginInstallExecutor", "PluginExecutionCapExecutor", "PluginRevocationExecutor",
     "ExternalChannelExecutor", "ChannelApprovalRelayExecutor",
     "RemoteExecutionExecutor", "ContainerExecutionExecutor", "CloudExecutionExecutor",
     "HostedModelRuntimeExecutor", "PrivateNetworkModelRuntimeExecutor", "ScheduledRoutinesExecutor",
@@ -110,10 +114,11 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "hosted_model_runtime",
     "private_network_model_runtime",
     # Tier 4 — local manifest validation + brokered read-only plugin tool
-    # invocation. Arbitrary plugin code/import/process/network execution remains
-    # out of scope.
+    # invocation + revocation off-switch. Arbitrary plugin code/import/process/
+    # network execution remains out of scope.
     "plugin_install",
     "plugin_execution_cap",
+    "plugin_revocation_cap",
 })
 
 
@@ -151,6 +156,7 @@ def build_default_executor_registry(
     registry.register("private_network_model_runtime", PrivateNetworkModelRuntimeExecutor(ws))
     registry.register("plugin_install", PluginInstallExecutor(ws, store))
     registry.register("plugin_execution_cap", PluginExecutionCapExecutor(ws, store))
+    registry.register("plugin_revocation_cap", PluginRevocationExecutor(ws, store))
     assert registry.capabilities() == REAL_EXECUTOR_CAPABILITIES, (
         "default executor registry drifted from REAL_EXECUTOR_CAPABILITIES"
     )

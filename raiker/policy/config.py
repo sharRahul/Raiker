@@ -39,7 +39,7 @@ class StaticPolicyConfig:
             "memory_write", "memory_forget",
             "process", "network", "web_fetch",
             "graph_indexing", "semantic_memory", "vector_embedding", "model_provider",
-            "plugin_install", "plugin_execution_cap",
+            "plugin_install", "plugin_execution_cap", "plugin_revocation_cap",
             "external_channel_runtime", "channel_approval_relay",
             "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
             "hosted_model_runtime", "private_network_model_runtime", "scheduled_routines",

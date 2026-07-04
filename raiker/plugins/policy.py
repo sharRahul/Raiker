@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from raiker.plugins.dependencies import (
+    plugin_dependency_allowlist,
+    validate_plugin_dependencies,
+)
 from raiker.plugins.manifest import PluginManifestValidation, validate_plugin_manifest
 from raiker.plugins.verify import validate_supply_chain
 
@@ -61,6 +65,10 @@ def plan_plugin_registration(manifest: dict[str, Any]) -> PluginRegistrationPlan
     permissions = validation.permissions
     supply_chain_reasons = validate_supply_chain(manifest)
     reasons.extend(supply_chain_reasons)
+    dependency_reasons = validate_plugin_dependencies(
+        manifest, allowlist=plugin_dependency_allowlist()
+    )
+    reasons.extend(dependency_reasons)
     for permission in permissions:
         if permission.startswith(DENIED_PREFIXES) or any(
             token in permission for token in ("..", "$(", "`;", "__import__")

@@ -1249,6 +1249,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
+    def revoke_plugin_install_record(self, record_id: str) -> bool:
+        """Flip an install record's status from ``installed`` to ``revoked``.
+
+        Returns True only if a currently-installed record was updated. This is
+        the fail-closed off-switch for the plugin install/execution slices; it
+        never deletes the record or touches permissions.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE plugin_install_records SET status = 'revoked' "
+                "WHERE record_id = ? AND status = 'installed'",
+                (record_id,),
+            )
+        return cursor.rowcount > 0
+
     def insert_hosted_routine(self, routine: HostedRoutine) -> None:
         with self.connect() as connection:
             connection.execute(

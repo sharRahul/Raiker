@@ -164,6 +164,16 @@ Secret-like values must be redacted in events, plugin details, permission diffs,
 
 `dependencies` must declare plugin IDs and compatible version ranges. Enabling dependencies must create a transitive permission diff.
 
+**Install-time enforcement (Phase 4 slice 11):** the governed `plugin_install`
+path validates declared dependencies statically and fails closed before writing
+an install record. Each dependency must be an **exact pin** — object form
+`{"plugin_id": "...", "version": "1.2.3"}` or string form `"dep.id==1.2.3"` /
+`"dep.id@1.2.3"`; ranges, wildcards, and `latest` are rejected as
+`dependency_unpinned`. Each dependency plugin id must be on the owner allowlist
+`RAIKER_PLUGIN_DEPENDENCY_ALLOWLIST` (comma-separated; empty = fail closed for
+any declared dependency), otherwise `dependency_not_allowlisted`. Raiker does not
+download, resolve transitively, or install a dependency in this slice.
+
 A dependency cannot silently enable:
 
 - shell/PowerShell/Python execution;
@@ -173,6 +183,30 @@ A dependency cannot silently enable:
 - subagents or workflows;
 - network access;
 - memory writes.
+
+---
+
+## Supply-Chain Signature Rules
+
+`supply_chain.checksum` must be the SHA-256 of the canonical manifest body
+(manifest minus its `supply_chain` block, JSON with sorted keys and compact
+separators).
+
+`supply_chain.signature` verification (Phase 4 slice 12) depends on whether the
+owner has configured a signing key:
+
+- **`RAIKER_PLUGIN_SIGNING_KEY` set:** `signature` must be a valid HMAC-SHA256
+  hex digest over the same canonical manifest body using that key. A wrong,
+  missing, or non-string signature fails the governed install closed
+  (`signature_invalid` / `no_signature_in_manifest`), and no install record is
+  written.
+- **`RAIKER_PLUGIN_SIGNING_KEY` unset (default):** `signature` is treated as a
+  presence marker for the local-dev baseline — a non-empty value passes, an
+  empty/absent value still fails.
+
+Trust-model limit: HMAC is a symmetric (owner-held key) integrity+authenticity
+check, not third-party asymmetric supply-chain signing. Ed25519 verification
+against an owner-trusted public key is future work.
 
 ---
 

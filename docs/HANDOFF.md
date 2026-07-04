@@ -15,9 +15,19 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-04 (session end)
 
-Previous pushed anchors: slice 8 `c8ce3d5`, slice 7 `c571c9c`; config cwd
-fallback `29ec83a`. Full suite was green before the config packaging follow-up
-(1060 passed, 2 skipped); ruff/mypy/all validators passed.
+> **Where this session's work lives (read first):** Phase 4 slices 10–12
+> (plugin revocation, dependency controls, signature verification) are on branch
+> `claude/handoff-document-review-bgrpwt`, **open in draft-then-ready PR #93**
+> (base `main`), **not yet merged**. Anchors: slice 10 `da3ea8e`, slice 11
+> `e4b5ce3`, slice 12 `dfd4ec5`. CI (Python 3.11 + 3.12) is green on `dfd4ec5`.
+> If PR #93 has since merged, start the next slice fresh from `origin/main`; if it
+> is still open, continue on this branch. Do **not** re-do slices 10–12.
+
+Previous pushed anchors (earlier sessions): slice 8 `c8ce3d5`, slice 7
+`c571c9c`; config cwd fallback `29ec83a`.
+
+Full suite green after slice 12: **1116 passed, 1 warning**; ruff, mypy (313
+files), and all five `scripts/validate_*.py` validators passed.
 
 - **Phase 4 slices 1–8 done.** Real governed executors now include
   `hosted_model_runtime` + `private_network_model_runtime` (slice 7): the
@@ -67,6 +77,41 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
   records `plugin_execution_records`. It does not import plugin code, run
   scripts, start processes, open network connections, write files, or activate
   hooks/MCP/LSP/monitors/panels.
+- **Plugin revocation slice complete (slice 10):** `plugin_revocation_cap` is now
+  a real governed executor and the fail-closed off-switch for the install/
+  execution slices. A HUMAN `runtime_gate_manager` revokes an installed plugin
+  (requires the default-disabled gate, `local_single_user_runtime`, a
+  `docs/threat-models/plugin-revocation.md` ack, and a confirmation token). It
+  flips the latest install record's status `installed` → `revoked` via
+  `SQLiteStore.revoke_plugin_install_record` (never deletes records, edits
+  permissions, or runs plugin code). After revocation, `plugin_execution_cap`
+  fails closed with `plugin_revoked` before any broker call. Second revocation
+  is an idempotent no-op (`plugin_already_revoked`). Runtime artifacts stay
+  metadata-only (no reason label or permission payload leaked). Evidence:
+  `tests/test_phase_4_plugin_revocation_runtime.py`.
+- **Plugin dependency controls slice complete (slice 11):** the governed
+  `plugin_install` path now validates declared manifest `dependencies` statically
+  and fails closed before writing an install record. Each dependency must be an
+  exact `(plugin_id, version)` pin (ranges/wildcards/`latest` → `dependency_unpinned`)
+  and each dependency plugin id must be on the owner allowlist
+  `RAIKER_PLUGIN_DEPENDENCY_ALLOWLIST` (comma-separated; empty = fail closed for
+  any declared dependency → `dependency_not_allowlisted`). A dependency-free
+  manifest is unaffected. Pure static validation in `raiker/plugins/dependencies.py`
+  wired through `plan_plugin_registration`; no download, transitive resolution, or
+  install. Evidence: `tests/test_phase_4_plugin_dependency_controls.py`.
+- **Plugin signature verification slice complete (slice 12):** the governed
+  `plugin_install` path now cryptographically verifies the manifest `signature`
+  when the owner sets `RAIKER_PLUGIN_SIGNING_KEY` — the `signature` must be a
+  valid HMAC-SHA256 over the canonical manifest body (same body the checksum
+  covers) or the install fails closed (`signature_invalid` /
+  `no_signature_in_manifest`, no record written). With no key set, the presence
+  marker remains for local dev (unchanged, existing tests green). Trust-model
+  limit: symmetric owner-held key, NOT asymmetric Ed25519 supply-chain signing —
+  chosen because `cryptography`'s Ed25519 bindings panic on import in this
+  environment, so Ed25519 against an owner-trusted public key stays future work.
+  `raiker/plugins/verify.py` (`plugin_signing_key`, `expected_plugin_signature`,
+  upgraded `verify_plugin_signature`). Evidence:
+  `tests/test_phase_4_plugin_signature_verification.py`.
 
 ## How a user turns on a hosted provider (for reference / docs work)
 
@@ -100,11 +145,16 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
    Implemented as `supports_tool_calls=true`, `tool_call_mode=native_or_text_json`,
    with focused tests and live localhost evidence against `qwen3.5:9b`.
 4. **Plugin runtime promotion (Tier 4)** — the biggest remaining fail-closed
-   area after completed `plugin_install` and brokered read-only `plugin_execution_cap` slices:
-   arbitrary plugin code runtime still needs real sandbox/import/process isolation,
-   cryptographic signature verification, revocation, dependency controls,
-   runtime permission enforcement, and tests before plugin scripts/hooks/MCP/LSP/
-   monitors/panels can execute.
+   area. Completed so far: `plugin_install`, brokered read-only
+   `plugin_execution_cap`, `plugin_revocation_cap` (the off-switch, slice 10),
+   install-time dependency controls (slice 11), and HMAC manifest signature
+   verification (slice 12). Still deferred:
+   (a) **asymmetric (Ed25519) signature verification** against an owner-trusted
+   PUBLIC key — the current slice-12 signing is symmetric (owner-held HMAC key).
+   Blocked until a usable crypto dep exists in the env (`cryptography`'s Ed25519
+   bindings currently panic on import here). (b) arbitrary plugin **code runtime**
+   with real sandbox/import/process isolation, runtime permission enforcement,
+   and tests before plugin scripts/hooks/MCP/LSP/monitors/panels can execute.
    (threat-model doc → executor → validator/guard-test lockstep → tests).
 5. **Web dashboard parity for slice 7/8 - completed in this session:** surface hosted-model gate state,
    egress allowlist status, and hosted profiles in the Security Settings /

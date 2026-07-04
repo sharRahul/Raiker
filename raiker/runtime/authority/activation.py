@@ -93,7 +93,7 @@ def _build_registry() -> dict[str, ActivationRequirement]:
         r[cap] = _req(cap, "3", notes="Indexing / embedding / model runtime; executor pending.")
 
     # Tier 4
-    for cap in ("plugin_execution_cap", "plugin_install"):
+    for cap in ("plugin_execution_cap", "plugin_install", "plugin_revocation_cap"):
         r[cap] = _req(cap, "4", threat_ack=True, human_confirm=True,
                       notes="Plugin sandbox; signature verify.")
 

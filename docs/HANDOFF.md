@@ -15,18 +15,28 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-04 (session end)
 
-> **Where this session's work lives (read first):** Phase 4 slices 10–12
-> (plugin revocation, dependency controls, signature verification) are on branch
-> `claude/handoff-document-review-bgrpwt`, **open in draft-then-ready PR #93**
-> (base `main`), **not yet merged**. Anchors: slice 10 `da3ea8e`, slice 11
-> `e4b5ce3`, slice 12 `dfd4ec5`. CI (Python 3.11 + 3.12) is green on `dfd4ec5`.
-> If PR #93 has since merged, start the next slice fresh from `origin/main`; if it
-> is still open, continue on this branch. Do **not** re-do slices 10–12.
+> **Where this session's work lives (read first):** Phase 4 **slice 13**
+> (Ed25519 asymmetric plugin-manifest signatures) is on branch
+> `claude/ed25519-asymmetric-signatures-qv6ffa`, started fresh from `origin/main`
+> after PR #93 merged (merge commit `bcaf1ac`). Do **not** stack on the merged
+> `claude/handoff-document-review-bgrpwt` branch. Slices 10–12 (plugin revocation,
+> dependency controls, HMAC signature verification) merged via PR #93 — do **not**
+> re-do them.
+>
+> **Environment unblock (important):** the previous "Ed25519 bindings panic on
+> import" blocker was a **missing `cffi`** (`ModuleNotFoundError: No module named
+> '_cffi_backend'`), not a fundamentally broken `cryptography`. Root-caused this
+> session: `pip install cffi` (or, as now shipped, declaring `cryptography>=41` in
+> `pyproject.toml`, which pulls `cffi`) makes Ed25519 sign/verify work here. CI's
+> `pip install -e ".[dev]"` on a fresh runner installs `cffi` transitively, so no
+> extra CI step is needed. Local runs use the system Python 3.11 (`/usr/bin/
+> python3.11`); `pip install -e ".[dev]"` into it gives pytest/ruff/mypy alongside
+> the distro `cryptography`.
 
 Previous pushed anchors (earlier sessions): slice 8 `c8ce3d5`, slice 7
 `c571c9c`; config cwd fallback `29ec83a`.
 
-Full suite green after slice 12: **1116 passed, 1 warning**; ruff, mypy (313
+Full suite green after slice 13: **1132 passed, 1 warning**; ruff, mypy (314
 files), and all five `scripts/validate_*.py` validators passed.
 
 - **Phase 4 slices 1–8 done.** Real governed executors now include
@@ -106,12 +116,27 @@ files), and all five `scripts/validate_*.py` validators passed.
   covers) or the install fails closed (`signature_invalid` /
   `no_signature_in_manifest`, no record written). With no key set, the presence
   marker remains for local dev (unchanged, existing tests green). Trust-model
-  limit: symmetric owner-held key, NOT asymmetric Ed25519 supply-chain signing —
-  chosen because `cryptography`'s Ed25519 bindings panic on import in this
-  environment, so Ed25519 against an owner-trusted public key stays future work.
+  limit: symmetric owner-held key (integrity + authenticity), complemented by the
+  asymmetric Ed25519 scheme in slice 13.
   `raiker/plugins/verify.py` (`plugin_signing_key`, `expected_plugin_signature`,
   upgraded `verify_plugin_signature`). Evidence:
   `tests/test_phase_4_plugin_signature_verification.py`.
+- **Ed25519 asymmetric signature verification slice complete (slice 13):** the
+  governed `plugin_install` path now also verifies an asymmetric supply-chain
+  signature when the owner sets `RAIKER_PLUGIN_ED25519_PUBLIC_KEY` (hex 32-byte
+  public key) — the manifest `supply_chain.ed25519_signature` must be a valid
+  Ed25519 signature (hex) over the same canonical body the checksum/HMAC cover,
+  verified against that owner-trusted public key, or the install fails closed
+  (`asymmetric_signature_invalid` / `no_asymmetric_signature_in_manifest` /
+  `asymmetric_public_key_invalid` / `asymmetric_backend_unavailable` — never fails
+  open) and writes no record. Unset → skipped (`asymmetric_not_configured`), so
+  existing manifests are unaffected. Author signs off-machine with a private key
+  Raiker never holds; owner configures only the trusted public key. HMAC and
+  Ed25519 are enforced independently. `raiker/plugins/verify.py`
+  (`plugin_ed25519_public_key`, `ed25519_signature_hex`,
+  `verify_plugin_asymmetric_signature`, wired into `validate_supply_chain`);
+  `cryptography>=41` added to `pyproject.toml` dependencies. Evidence:
+  `tests/test_phase_4_plugin_asymmetric_signature.py`.
 
 ## How a user turns on a hosted provider (for reference / docs work)
 
@@ -147,15 +172,14 @@ files), and all five `scripts/validate_*.py` validators passed.
 4. **Plugin runtime promotion (Tier 4)** — the biggest remaining fail-closed
    area. Completed so far: `plugin_install`, brokered read-only
    `plugin_execution_cap`, `plugin_revocation_cap` (the off-switch, slice 10),
-   install-time dependency controls (slice 11), and HMAC manifest signature
-   verification (slice 12). Still deferred:
-   (a) **asymmetric (Ed25519) signature verification** against an owner-trusted
-   PUBLIC key — the current slice-12 signing is symmetric (owner-held HMAC key).
-   Blocked until a usable crypto dep exists in the env (`cryptography`'s Ed25519
-   bindings currently panic on import here). (b) arbitrary plugin **code runtime**
-   with real sandbox/import/process isolation, runtime permission enforcement,
-   and tests before plugin scripts/hooks/MCP/LSP/monitors/panels can execute.
-   (threat-model doc → executor → validator/guard-test lockstep → tests).
+   install-time dependency controls (slice 11), HMAC manifest signature
+   verification (slice 12), and **asymmetric Ed25519 signature verification
+   against an owner-trusted public key (slice 13, done this session)**. Still
+   deferred: arbitrary plugin **code runtime** with real sandbox/import/process
+   isolation, runtime permission enforcement, and tests before plugin
+   scripts/hooks/MCP/LSP/monitors/panels can execute (threat-model doc → executor
+   → validator/guard-test lockstep → tests). This is now the single largest
+   remaining fail-closed area.
 5. **Web dashboard parity for slice 7/8 - completed in this session:** surface hosted-model gate state,
    egress allowlist status, and hosted profiles in the Security Settings /
    models views of `apps/web`.

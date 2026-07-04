@@ -20,6 +20,9 @@ raiker-web = "apps.api.main:main"
 [tool.setuptools.packages.find]
 include = ["raiker*", "apps*"]
 
+[tool.setuptools.package-data]
+"raiker.config" = ["*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

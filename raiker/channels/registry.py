@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from raiker.contracts.models import ConnectorProfile
-from raiker.models.registry import RegistryError, _config_path
+from raiker.models.registry import RegistryError, _read_config_text
 
 
 class ConnectorRegistry:
@@ -13,7 +13,7 @@ class ConnectorRegistry:
 
     @classmethod
     def load(cls, path: str | Path = "config/channel-connectors.json") -> ConnectorRegistry:
-        data = json.loads(_config_path(path).read_text(encoding="utf-8"))
+        data = json.loads(_read_config_text(path))
         if data.get("schema_version") != "1.0" or not isinstance(data.get("connectors"), list):
             raise RegistryError("invalid_connector_registry")
         required = {

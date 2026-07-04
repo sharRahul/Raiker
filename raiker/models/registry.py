@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
@@ -18,13 +19,21 @@ class RegistryError(ValueError):
         self.entry = entry
 
 
+_BUILTIN_CONFIG_PACKAGE = "raiker.config"
+_BUILTIN_CONFIG_RESOURCES = {
+    "config/model-profiles.json": "model-profiles.json",
+    "model-profiles.json": "model-profiles.json",
+    "config/channel-connectors.json": "channel-connectors.json",
+    "channel-connectors.json": "channel-connectors.json",
+}
+
+
 def _config_path(path: str | Path) -> Path:
-    """Resolve a built-in config file.
+    """Resolve a filesystem config file.
 
     Priority: an existing path as given (absolute, or relative to cwd), then
-    the repository/install root next to the ``raiker`` package. The fallback
-    makes the installed ``raiker`` command work from any working directory
-    (editable installs and repo checkouts), not just the repo root.
+    the repository root next to the ``raiker`` package for editable installs
+    and repo checkouts.
     """
     candidate = Path(path)
     if candidate.exists():
@@ -39,13 +48,31 @@ def _config_path(path: str | Path) -> Path:
     return cwd_candidate
 
 
+def _read_config_text(path: str | Path) -> str:
+    """Read built-in config with workspace overrides and packaged fallback."""
+    config_path = _config_path(path)
+    if config_path.exists():
+        return config_path.read_text(encoding="utf-8")
+
+    resource_name = _BUILTIN_CONFIG_RESOURCES.get(Path(path).as_posix())
+    if resource_name is not None:
+        try:
+            resource = resources.files(_BUILTIN_CONFIG_PACKAGE).joinpath(resource_name)
+            if resource.is_file():
+                return resource.read_text(encoding="utf-8")
+        except ModuleNotFoundError:
+            pass
+
+    return config_path.read_text(encoding="utf-8")
+
+
 class ModelProfileRegistry:
     def __init__(self, profiles: list[ModelProfile]) -> None:
         self.profiles = profiles
 
     @classmethod
     def load(cls, path: str | Path = "config/model-profiles.json") -> ModelProfileRegistry:
-        data = json.loads(_config_path(path).read_text(encoding="utf-8"))
+        data = json.loads(_read_config_text(path))
         if data.get("schema_version") != "1.0" or not isinstance(data.get("profiles"), list):
             raise RegistryError("invalid_model_registry")
         profiles: list[ModelProfile] = []

@@ -865,7 +865,7 @@ Validation commands: `python -m pytest`, `python -m ruff check .`, and `python -
 
 Manual e2e evidence (2026-07-04, local machine): `/model use --provider ollama --model gemma4:31b-cloud` persisted the selection and `raiker --prompt` completed a real gateway turn on that model (response returned; session events JSONL + checkpoint written). Hosted profiles (`anthropic-hosted`, `openai-hosted`, `gemini-hosted-openai-compatible`) are offline/mock-verified only — `implemented_unverified` against live keys until an operator supplies one.
 
-Known gap (recorded 2026-07-04): `ModelProfileRegistry.load()` and `ConnectorRegistry.load()` resolve `config/*.json` relative to the current working directory, so the installed `raiker` command only finds built-in profiles when run from the repo root (or a workspace carrying a `config/` copy). Fix: package-relative fallback via `importlib.resources`. Tracked in `docs/HANDOFF.md`.
+Config packaging fix (verified 2026-07-04): `ModelProfileRegistry.load()` and `ConnectorRegistry.load()` preserve workspace-local `config/` overrides, then fall back to bundled `raiker.config` JSON resources for non-editable installs and foreign working directories. `pyproject.toml` ships the packaged JSON as package data. Evidence: `tests/test_config_path_resolution.py` covers foreign cwd loading, packaged-resource fallback, and top-level/package resource drift; a local `pip wheel --no-deps --no-build-isolation` check confirmed the wheel contains `raiker/config/model-profiles.json` and `raiker/config/channel-connectors.json`.
 
 
 ## Async model runtime status (verified)

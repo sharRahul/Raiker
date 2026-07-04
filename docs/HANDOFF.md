@@ -11,11 +11,13 @@ backend LLM — local (llama.cpp/Ollama/LM Studio), home-lab (vLLM), or hosted
 API provider (Anthropic/OpenAI/Gemini/OpenRouter) — with the choice belonging
 to the user, and every capability governed, default-disabled, and fail-closed.
 
+Be mind full of token usage if needed do it in batches. Keep committing after every phase and then push to origin main before the token limit is ended for the session. Plan and implement it in such a way that anyone can pick it up after your session token are over even though the goal is not complete. In next session review where you are and then start from next phase.
+
 ## State as of 2026-07-04 (session end)
 
-All committed and pushed to `origin/main` (latest: slice 8 `c8ce3d5`, slice 7
-`c571c9c`). Full suite green (1060 passed, 2 skipped); ruff/mypy/all
-validators pass.
+Previous pushed anchors: slice 8 `c8ce3d5`, slice 7 `c571c9c`; config cwd
+fallback `29ec83a`. Full suite was green before the config packaging follow-up
+(1060 passed, 2 skipped); ruff/mypy/all validators passed.
 
 - **Phase 4 slices 1–8 done.** Real governed executors now include
   `hosted_model_runtime` + `private_network_model_runtime` (slice 7): the
@@ -34,6 +36,12 @@ validators pass.
   Ollama testing (owner preference — faster).
 - Hosted profiles are offline/mock-verified only (`implemented_unverified`
   against live keys).
+- **Config packaging follow-up complete:** `ModelProfileRegistry.load()` and
+  `ConnectorRegistry.load()` keep workspace-local `config/` overrides, then
+  fall back to bundled `raiker.config` JSON resources. The wheel now includes
+  `raiker/config/model-profiles.json` and
+  `raiker/config/channel-connectors.json`; focused tests cover foreign cwd,
+  packaged-resource fallback, and resource drift.
 
 ## How a user turns on a hosted provider (for reference / docs work)
 
@@ -48,12 +56,14 @@ validators pass.
 
 ## Next work, in priority order
 
-1. **Config path resolution bug (small, high value).**
+1. **Config path resolution bug - completed in this session.**
    `ModelProfileRegistry.load()` / `ConnectorRegistry.load()` read
    `config/*.json` relative to cwd — installed `raiker` fails outside the
    repo root (`FileNotFoundError`). Add a package-relative fallback
    (`importlib.resources` or anchored on `raiker.__file__`), ship the JSON as
    package data, and add a test that loads the registry from a foreign cwd.
+   Implemented with bundled `raiker.config` resources, drift tests, and a
+   wheel-content check; do not redo this item unless it regresses.
 2. **Live hosted-provider verification.** With an operator key, run one
    governed turn on `anthropic-hosted` and flip its status note from
    `implemented_unverified` to verified. No code expected — evidence only.

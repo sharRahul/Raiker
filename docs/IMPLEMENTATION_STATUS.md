@@ -863,6 +863,10 @@ Security rules: `local_only=true` allows only local-machine endpoints. Private h
 
 Validation commands: `python -m pytest`, `python -m ruff check .`, and `python -m mypy raiker apps tests`.
 
+Manual e2e evidence (2026-07-04, local machine): `/model use --provider ollama --model gemma4:31b-cloud` persisted the selection and `raiker --prompt` completed a real gateway turn on that model (response returned; session events JSONL + checkpoint written). Hosted profiles (`anthropic-hosted`, `openai-hosted`, `gemini-hosted-openai-compatible`) are offline/mock-verified only — `implemented_unverified` against live keys until an operator supplies one.
+
+Known gap (recorded 2026-07-04): `ModelProfileRegistry.load()` and `ConnectorRegistry.load()` resolve `config/*.json` relative to the current working directory, so the installed `raiker` command only finds built-in profiles when run from the repo root (or a workspace carrying a `config/` copy). Fix: package-relative fallback via `importlib.resources`. Tracked in `docs/HANDOFF.md`.
+
 
 ## Async model runtime status (verified)
 

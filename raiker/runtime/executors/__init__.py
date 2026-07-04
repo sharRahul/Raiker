@@ -11,6 +11,10 @@ if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 from raiker.runtime.executors.channels import ChannelApprovalRelayExecutor, ExternalChannelExecutor
 from raiker.runtime.executors.containers import ContainerExecutionExecutor
+from raiker.runtime.executors.models_runtime import (
+    HostedModelRuntimeExecutor,
+    PrivateNetworkModelRuntimeExecutor,
+)
 from raiker.runtime.executors.orchestration import MultiAgentTeamExecutor, SubagentExecutor
 from raiker.runtime.executors.scheduled import ScheduledRoutinesExecutor
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
@@ -27,8 +31,6 @@ from raiker.runtime.executors.tier3_core import (
 from raiker.runtime.executors.tier4_plugins import PluginExecutionCapExecutor, PluginInstallExecutor
 from raiker.runtime.executors.tier5_network import (
     CloudExecutionExecutor,
-    HostedModelExecutor,
-    PrivateNetworkModelExecutor,
     RemoteExecutionExecutor,
 )
 from raiker.runtime.executors.tier6_domains import (
@@ -55,7 +57,7 @@ __all__ = [
     "PluginInstallExecutor", "PluginExecutionCapExecutor",
     "ExternalChannelExecutor", "ChannelApprovalRelayExecutor",
     "RemoteExecutionExecutor", "ContainerExecutionExecutor", "CloudExecutionExecutor",
-    "HostedModelExecutor", "PrivateNetworkModelExecutor", "ScheduledRoutinesExecutor",
+    "HostedModelRuntimeExecutor", "PrivateNetworkModelRuntimeExecutor", "ScheduledRoutinesExecutor",
     "EmailRuntimeExecutor", "CalendarRuntimeExecutor", "ReminderRuntimeExecutor",
     "FinanceRuntimeExecutor", "InvestmentRuntimeExecutor", "MedicalRuntimeExecutor",
     "PregnancyBabyRuntimeExecutor", "CctvRuntimeExecutor", "HomeSecurityRuntimeExecutor",
@@ -102,6 +104,11 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "container_execution_cap",
     # Phase 4 — local on-demand scheduled routines (no daemon)
     "scheduled_routines",
+    # Phase 4 slice 7 — hosted / private-network model runtime (owner egress
+    # allowlist, metadata-only connectivity probe; chat path re-checks the
+    # same allowlist in the provider factory)
+    "hosted_model_runtime",
+    "private_network_model_runtime",
 })
 
 
@@ -135,6 +142,8 @@ def build_default_executor_registry(
     registry.register("channel_approval_relay", ChannelApprovalRelayExecutor(ws, store))
     registry.register("container_execution_cap", ContainerExecutionExecutor(ws))
     registry.register("scheduled_routines", ScheduledRoutinesExecutor(ws, store))
+    registry.register("hosted_model_runtime", HostedModelRuntimeExecutor(ws))
+    registry.register("private_network_model_runtime", PrivateNetworkModelRuntimeExecutor(ws))
     assert registry.capabilities() == REAL_EXECUTOR_CAPABILITIES, (
         "default executor registry drifted from REAL_EXECUTOR_CAPABILITIES"
     )

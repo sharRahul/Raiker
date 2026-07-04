@@ -1,12 +1,45 @@
 from __future__ import annotations
 
+import fnmatch
 import ipaddress
+import os
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
 from raiker.models.exceptions import ProviderPolicyError
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
+
+MODEL_EGRESS_ALLOWLIST_ENV = "RAIKER_MODEL_EGRESS_ALLOWLIST"
+
+
+def model_egress_allowlist() -> frozenset[str]:
+    """Owner-controlled host allowlist for off-machine model endpoints.
+
+    Read from ``RAIKER_MODEL_EGRESS_ALLOWLIST`` (comma-separated host globs,
+    e.g. ``api.openai.com,openrouter.ai,192.168.1.*``). Defaults to **empty**
+    so no hosted/private-network model endpoint is reachable until the owner
+    explicitly allowlists its host — fail-closed even when the capability gate
+    is on. Local-machine endpoints are never subject to this allowlist.
+    """
+    raw = os.environ.get(MODEL_EGRESS_ALLOWLIST_ENV, "")
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
+def enforce_model_egress(endpoint: str, *, kind: str) -> None:
+    """Fail closed unless *endpoint*'s host is on the model egress allowlist.
+
+    Applies only to off-machine endpoint kinds (``remote_hosted`` /
+    ``private_network``); local endpoints pass through untouched.
+    """
+    if kind not in {"remote_hosted", "private_network"}:
+        return
+    allowlist = model_egress_allowlist()
+    if not allowlist:
+        raise ProviderPolicyError("model_egress_denied:no_allowlist")
+    host = urlparse(endpoint).netloc
+    if not any(fnmatch.fnmatch(host, pattern) for pattern in allowlist):
+        raise ProviderPolicyError(f"model_egress_denied:{host}")
 
 
 @dataclass(frozen=True)

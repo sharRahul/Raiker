@@ -109,10 +109,16 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     r["container_execution_cap"] = _req(
         "container_execution_cap", "5", threat_ack=True, human_confirm=True,
         notes="Local sandboxed container: no network, no mounts, owner image allowlist.")
-    for cap in ("remote_execution_cap", "cloud_execution_cap",
-                "hosted_model_runtime", "private_network_model_runtime"):
+    for cap in ("remote_execution_cap", "cloud_execution_cap"):
         r[cap] = _req(cap, "5", mode=("hosted_or_networked_runtime",), threat_ack=True, human_confirm=True,
                       notes="Isolation, secrets, egress, budget required.")
+    # Hosted / private-network model APIs are called *from* the local
+    # single-user machine (like the reference channel): owner egress
+    # allowlist + env-only credentials, so they activate under
+    # local_single_user_runtime. See docs/threat-models/hosted-models.md.
+    for cap in ("hosted_model_runtime", "private_network_model_runtime"):
+        r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
+                      notes="Owner egress allowlist, env-only credentials, metadata-only events.")
     for cap in ("scheduled_routines",):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Scheduler storage, owner consent, budget.")

@@ -253,15 +253,15 @@ def main() -> int:
         "medical_runtime", "pregnancy_baby_runtime", "cctv_runtime",
         "home_security_runtime", "hardware_operator_runtime",
         "remote_execution_cap", "cloud_execution_cap",
-        "hosted_model_runtime",
-        "private_network_model_runtime",
         "plugin_execution_cap", "plugin_install",
     }
     # Promoted in Phase 4 (real, bounded, threat-modelled executors; gates remain
     # default-disabled, checked above): external_channel_runtime,
-    # channel_approval_relay (slice 4), container_execution_cap (slice 3), and
-    # scheduled_routines (slice 2). Only remote/cloud egress, hosted/private
-    # model runtimes, and plugins must still lack a default executor (fail-closed).
+    # channel_approval_relay (slice 4), container_execution_cap (slice 3),
+    # scheduled_routines (slice 2), and hosted_model_runtime /
+    # private_network_model_runtime (slice 7 — owner egress allowlist,
+    # env-only credentials). Only remote/cloud execution and plugins must
+    # still lack a default executor (fail-closed).
     for cap in must_not_have_default_executor:
         if cap in REAL_EXECUTOR_CAPABILITIES:
             errors.append(f"sensitive_capability_has_default_executor:{cap}")

@@ -4,12 +4,17 @@
 > role revoke governed, capability gate per action. Runtime execution remains
 > disabled/deferred. Approval resolution is metadata-only.
 
-Per the **sandboxed-first** Phase 4 decision, the off-machine egress
+Per the **sandboxed-first** Phase 4 decision, the off-machine command-execution
 capabilities stay **fail-closed (no executor)**:
 
 - `remote_execution_cap` (SSH/VPS remote command execution)
 - `cloud_execution_cap` (cloud-provider execution)
-- `hosted_model_runtime`, `private_network_model_runtime` (off-machine models)
+
+> Update (Phase 4 slice 7): `hosted_model_runtime` and
+> `private_network_model_runtime` completed the per-integration opt-in below
+> and were promoted to real governed executors — see
+> [`hosted-models.md`](hosted-models.md). Remote/cloud **command execution**
+> remains fail-closed as documented here.
 
 These are **not** in `REAL_EXECUTOR_CAPABILITIES`; their executors return
 `not_implemented:<capability>` (`raiker/runtime/executors/tier5_network.py`),

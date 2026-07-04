@@ -9,7 +9,11 @@ import httpx
 
 from raiker.contracts.models import ModelProfile
 from raiker.models.contracts import ModelCapabilities
-from raiker.models.endpoint_policy import EndpointPolicy, validate_endpoint_policy
+from raiker.models.endpoint_policy import (
+    EndpointPolicy,
+    enforce_model_egress,
+    validate_endpoint_policy,
+)
 from raiker.models.exceptions import ProviderConfigurationError, ProviderPolicyError
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
 from raiker.models.providers.test_provider import DeterministicTestProvider
@@ -98,6 +102,9 @@ class ModelProviderFactory:
             raise ProviderPolicyError("private_network_provider_requires_explicit_policy")
         if endpoint_kind == "remote_hosted" and not self.allow_hosted_provider:
             raise ProviderPolicyError("hosted_provider_requires_explicit_policy")
+        # Off-machine endpoints must also be on the owner egress allowlist —
+        # fail closed even when the capability gate / runtime policy allows them.
+        enforce_model_egress(endpoint, kind=endpoint_kind)
         if provider == "openrouter" and raw.get("default_state") == "enabled":
             raise ProviderPolicyError("openrouter_must_not_be_enabled_by_default")
         headers: dict[str, str] = {}

@@ -73,6 +73,12 @@ def test_factory_policy_openrouter(monkeypatch: pytest.MonkeyPatch) -> None:
         ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True)).create(profile)
     monkeypatch.setenv("OPENROUTER_API_KEY", "secret")
     configured = type(profile)(**{**profile.__dict__, "model": "openrouter-model"})
+    # Phase 4 slice 7: off-machine model endpoints also require the owner
+    # egress allowlist — empty allowlist fails closed even with hosted policy.
+    monkeypatch.delenv("RAIKER_MODEL_EGRESS_ALLOWLIST", raising=False)
+    with pytest.raises(ProviderPolicyError, match="model_egress_denied:no_allowlist"):
+        ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True)).create(configured)
+    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "openrouter.ai")
     provider = ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True, allow_hosted_provider=True)).create(configured)
     assert provider.provider == "openrouter"
 
@@ -116,8 +122,10 @@ def test_cli_persists_model_state(tmp_path: Path) -> None:
     assert "raiker-local-llama-cpp" in handle_model_command("/model current", workspace_root=tmp_path)
     # A placeholder-model profile now attempts auto-detection; with no server reachable it reports a
     # connection error and does not persist the selection (the native default stays active).
+    # A developer machine may have a live local Ollama serving multiple models; then the CLI asks
+    # for an explicit --model instead. Either way the placeholder selection must not persist.
     out = handle_model_command("/model use ollama-local-openai-compatible", workspace_root=tmp_path)
-    assert "Could not reach ollama" in out
+    assert "Could not reach ollama" in out or "Select one with /model use --provider ollama" in out
     assert "raiker-local-llama-cpp" in handle_model_command("/model current", workspace_root=tmp_path)
     assert "(selected)" in render_models(workspace_root=tmp_path)
     assert "does not support reasoning" in handle_reasoning_command("/reasoning set high", workspace_root=tmp_path)

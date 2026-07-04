@@ -37,9 +37,7 @@ class CloudExecutionExecutor(_NetworkExecutorBase):
     capability = "cloud_execution_cap"
 
 
-class HostedModelExecutor(_NetworkExecutorBase):
-    capability = "hosted_model_runtime"
-
-
-class PrivateNetworkModelExecutor(_NetworkExecutorBase):
-    capability = "private_network_model_runtime"
+# hosted_model_runtime / private_network_model_runtime were promoted to real
+# executors in Phase 4 slice 7 — see raiker/runtime/executors/models_runtime.py
+# and docs/threat-models/hosted-models.md. Remote/cloud execution above stays
+# fail-closed per docs/threat-models/remote-cloud.md.

@@ -67,6 +67,7 @@ from raiker.memory.review import MemoryReviewQueue
 from raiker.memory.semantic import semantic_memory_status
 from raiker.models.exceptions import ModelProviderError, ProviderPolicyError, safe_error
 from raiker.models.factory import ModelProviderFactory, capabilities_from_profile
+from raiker.models.policy_state import provider_runtime_policy_from_gates
 from raiker.models.registry import ModelProfileRegistry, RegistryError, profile_with_model
 from raiker.models.router import ModelRouter
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
@@ -1556,8 +1557,8 @@ def _profile_event_payload(profile: ModelProfile) -> dict[str, object]:
 async def handle_model_command_async(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     registry = ModelProfileRegistry.load()
-    router = ModelRouter(registry)
     store = SQLiteStore(workspace_root)
+    router = ModelRouter(registry, runtime_policy=provider_runtime_policy_from_gates(store))
     selected = _selected_profile(registry, workspace_root)
     if len(parts) == 1 or parts[1] == "current":
         return _render_profile_current(selected)

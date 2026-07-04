@@ -26,6 +26,15 @@ tool invocation for installed plugins.
   `tool:list_directory`, `tool:glob`, `tool:grep`, `event:read`, `ui:panel`,
   `memory:read`). Network, write, shell, filesystem-write, import, eval, exec,
   path escape, and unknown permissions do not install.
+- **Dependency controls (slice 11):** any declared `dependencies` are validated
+  statically and fail closed before an install record is written. Each
+  dependency must resolve to an exact `(plugin_id, version)` pin — ranges,
+  wildcards, and `latest` are rejected as `dependency_unpinned` — and each
+  dependency plugin id must be on the owner allowlist
+  `RAIKER_PLUGIN_DEPENDENCY_ALLOWLIST` (comma-separated; empty = fail closed for
+  any declared dependency). A manifest with no dependencies is unaffected. This
+  is pure static validation: Raiker never downloads, resolves transitively, or
+  installs a dependency in this slice.
 - Events and executor artifacts are metadata only: record id, plugin id, version,
   trust level, permission count, and `execution_enabled=false`. Manifest content,
   permission bodies beyond count, and file contents are not emitted.
@@ -43,6 +52,10 @@ tool invocation for installed plugins.
 - `tests/test_phase_4_plugin_install_runtime.py` proves default-disabled
   blocking, threat-model-ack activation, safe manifest install recording, risky
   permission rejection, bad checksum rejection, and workspace path rejection.
+- `tests/test_phase_4_plugin_dependency_controls.py` proves unpinned/unallowlisted
+  dependencies fail closed at both the plan and governed-install layers, that
+  pinned+allowlisted dependencies install, and that a dependency-free manifest is
+  unaffected.
 - `tests/test_executor_default_registry.py` proves `plugin_install` is registered
   while `plugin_execution_cap` remains absent from `REAL_EXECUTOR_CAPABILITIES`.
 - `scripts/validate_runtime_enablement_readiness.py` continues to require

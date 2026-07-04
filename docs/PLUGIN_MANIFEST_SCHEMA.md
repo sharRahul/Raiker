@@ -164,6 +164,16 @@ Secret-like values must be redacted in events, plugin details, permission diffs,
 
 `dependencies` must declare plugin IDs and compatible version ranges. Enabling dependencies must create a transitive permission diff.
 
+**Install-time enforcement (Phase 4 slice 11):** the governed `plugin_install`
+path validates declared dependencies statically and fails closed before writing
+an install record. Each dependency must be an **exact pin** — object form
+`{"plugin_id": "...", "version": "1.2.3"}` or string form `"dep.id==1.2.3"` /
+`"dep.id@1.2.3"`; ranges, wildcards, and `latest` are rejected as
+`dependency_unpinned`. Each dependency plugin id must be on the owner allowlist
+`RAIKER_PLUGIN_DEPENDENCY_ALLOWLIST` (comma-separated; empty = fail closed for
+any declared dependency), otherwise `dependency_not_allowlisted`. Raiker does not
+download, resolve transitively, or install a dependency in this slice.
+
 A dependency cannot silently enable:
 
 - shell/PowerShell/Python execution;

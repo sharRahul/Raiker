@@ -79,6 +79,16 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
   is an idempotent no-op (`plugin_already_revoked`). Runtime artifacts stay
   metadata-only (no reason label or permission payload leaked). Evidence:
   `tests/test_phase_4_plugin_revocation_runtime.py`.
+- **Plugin dependency controls slice complete (slice 11):** the governed
+  `plugin_install` path now validates declared manifest `dependencies` statically
+  and fails closed before writing an install record. Each dependency must be an
+  exact `(plugin_id, version)` pin (ranges/wildcards/`latest` → `dependency_unpinned`)
+  and each dependency plugin id must be on the owner allowlist
+  `RAIKER_PLUGIN_DEPENDENCY_ALLOWLIST` (comma-separated; empty = fail closed for
+  any declared dependency → `dependency_not_allowlisted`). A dependency-free
+  manifest is unaffected. Pure static validation in `raiker/plugins/dependencies.py`
+  wired through `plan_plugin_registration`; no download, transitive resolution, or
+  install. Evidence: `tests/test_phase_4_plugin_dependency_controls.py`.
 
 ## How a user turns on a hosted provider (for reference / docs work)
 
@@ -113,15 +123,16 @@ fallback `29ec83a`. Full suite was green before the config packaging follow-up
    with focused tests and live localhost evidence against `qwen3.5:9b`.
 4. **Plugin runtime promotion (Tier 4)** — the biggest remaining fail-closed
    area. Completed so far: `plugin_install`, brokered read-only
-   `plugin_execution_cap`, and now `plugin_revocation_cap` (the off-switch,
-   slice 10). Still deferred, in suggested slice order:
+   `plugin_execution_cap`, `plugin_revocation_cap` (the off-switch, slice 10),
+   and install-time dependency controls (slice 11). Still deferred, in suggested
+   slice order:
    (a) **cryptographic signature verification** — install currently only checks a
    signature *presence* marker; add real detached-signature verification against
-   an owner-trusted public key (needs a key-management decision + likely a crypto
-   dep). (b) **dependency controls** — declare/pin/validate plugin dependencies
-   without installing them. (c) arbitrary plugin **code runtime** with real
-   sandbox/import/process isolation, runtime permission enforcement, and tests
-   before plugin scripts/hooks/MCP/LSP/monitors/panels can execute.
+   an owner-trusted public key (needs a key-management decision + likely the
+   `cryptography` Ed25519 dep, or a stdlib HMAC fallback). (b) arbitrary plugin
+   **code runtime** with real sandbox/import/process isolation, runtime
+   permission enforcement, and tests before plugin scripts/hooks/MCP/LSP/monitors/
+   panels can execute.
    (threat-model doc → executor → validator/guard-test lockstep → tests).
 5. **Web dashboard parity for slice 7/8 - completed in this session:** surface hosted-model gate state,
    egress allowlist status, and hosted profiles in the Security Settings /

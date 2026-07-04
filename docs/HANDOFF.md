@@ -15,9 +15,19 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-04 (session end)
 
-Previous pushed anchors: slice 8 `c8ce3d5`, slice 7 `c571c9c`; config cwd
-fallback `29ec83a`. Full suite was green before the config packaging follow-up
-(1060 passed, 2 skipped); ruff/mypy/all validators passed.
+> **Where this session's work lives (read first):** Phase 4 slices 10–12
+> (plugin revocation, dependency controls, signature verification) are on branch
+> `claude/handoff-document-review-bgrpwt`, **open in draft-then-ready PR #93**
+> (base `main`), **not yet merged**. Anchors: slice 10 `da3ea8e`, slice 11
+> `e4b5ce3`, slice 12 `dfd4ec5`. CI (Python 3.11 + 3.12) is green on `dfd4ec5`.
+> If PR #93 has since merged, start the next slice fresh from `origin/main`; if it
+> is still open, continue on this branch. Do **not** re-do slices 10–12.
+
+Previous pushed anchors (earlier sessions): slice 8 `c8ce3d5`, slice 7
+`c571c9c`; config cwd fallback `29ec83a`.
+
+Full suite green after slice 12: **1116 passed, 1 warning**; ruff, mypy (313
+files), and all five `scripts/validate_*.py` validators passed.
 
 - **Phase 4 slices 1–8 done.** Real governed executors now include
   `hosted_model_runtime` + `private_network_model_runtime` (slice 7): the

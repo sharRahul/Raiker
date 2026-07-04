@@ -20,8 +20,15 @@
 > verification: when the owner sets `RAIKER_PLUGIN_SIGNING_KEY`, the manifest
 > `signature` must be a valid HMAC-SHA256 over the canonical manifest body or the
 > governed install fails closed (`signature_invalid`); when unset, the presence
-> marker remains for local dev. This is a symmetric owner-key check, not Ed25519
-> asymmetric signing (future work). Arbitrary plugin code/import/process/network/
+> marker remains for local dev. Phase 4 slice 13 adds asymmetric supply-chain
+> signing: when the owner sets `RAIKER_PLUGIN_ED25519_PUBLIC_KEY` (hex), the
+> manifest `supply_chain.ed25519_signature` must be a valid Ed25519 signature over
+> the same canonical body verified against that owner-trusted public key or the
+> governed install fails closed (`asymmetric_signature_invalid` and peers;
+> `asymmetric_backend_unavailable` never fails open); unset skips the check so
+> existing manifests are unaffected. The HMAC (symmetric owner key) and Ed25519
+> (asymmetric author-signed against an owner-trusted public key) checks are
+> enforced independently. Arbitrary plugin code/import/process/network/
 > write execution remains deferred. Where the older 2026-06-22 paragraph below
 > says "plugins" have no executor, read that as "arbitrary plugin code
 > execution"; the per-capability source of truth is
@@ -859,7 +866,7 @@ Scope and boundaries:
 - This slice records a validated local plugin manifest in `plugin_install_records`. It does not fetch, unpack, import, execute, enable, or sandbox plugin code.
 - The action accepts `manifest_path` only and requires the manifest to resolve inside the workspace. Escapes fail closed (`outside_workspace:manifest_path`).
 - The plugin registration policy must return `planned`: checksum verification must pass, the signature field must be present, trust level must be known, and permissions must be safe read-only. Risky/unknown permissions and invalid supply-chain metadata fail closed and create no install record.
-- The signature check is currently a presence marker, not cryptographic signature validation. That is intentional for this manifest-recording slice and is documented in `docs/threat-models/plugins.md`.
+- Signature verification is layered (see the current-truth banner at the top and `docs/threat-models/plugins.md`): a presence marker in the local-dev baseline, cryptographic HMAC-SHA256 when the owner sets `RAIKER_PLUGIN_SIGNING_KEY` (slice 12), and asymmetric Ed25519 against an owner-trusted `RAIKER_PLUGIN_ED25519_PUBLIC_KEY` (slice 13). Each configured check fails closed and creates no install record on failure.
 - Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugins.md`), and a confirmation token. AI principals can never run or enable it.
 - `plugin_execution_cap` remains **fail-closed (no executor)**. Plugin tools, hooks, MCP servers, agents, panels, and code execution remain disabled/deferred.
 
@@ -878,7 +885,7 @@ Scope and boundaries:
 - The executor never imports plugin files, runs plugin scripts, starts processes, opens network connections, writes files, enables hooks, starts MCP/LSP/monitors, or activates UI panels.
 - The broker is created without an event writer so plugin read outputs are not emitted into plugin-execution runtime events. Executor artifacts are metadata only and include `output_redacted=true` on success.
 - Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugin-execution.md`), and a confirmation token. AI principals can never run or enable it.
-- Arbitrary plugin code execution remains deferred until a separate sandbox/import/process model, cryptographic signature validation, revocation, and runtime permission enforcement exist.
+- Arbitrary plugin code execution remains deferred until a separate sandbox/import/process model and runtime permission enforcement exist. Cryptographic signature validation (HMAC slice 12, Ed25519 slice 13) and revocation (slice 10) are now implemented, but code execution stays fail-closed pending the sandbox/import/process model.
 
 Evidence: `tests/test_phase_4_plugin_execution_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
 

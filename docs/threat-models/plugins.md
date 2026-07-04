@@ -26,10 +26,23 @@ tool invocation for installed plugins.
   (`signature_invalid` / `no_signature_in_manifest`) and no install record is
   written. When the key is unset, the signature remains a presence marker for
   the local-dev baseline (unchanged). Trust-model limit: this is a symmetric
-  (owner-held key) integrity+authenticity check, not third-party asymmetric
-  supply-chain signing; Ed25519 verification against an owner-trusted public key
-  is tracked as future work (blocked on a usable crypto dependency in this
-  environment).
+  (owner-held key) integrity+authenticity check.
+- **Asymmetric supply-chain signing (slice 13):** when the owner sets
+  `RAIKER_PLUGIN_ED25519_PUBLIC_KEY` (hex-encoded 32-byte public key), the
+  manifest `supply_chain.ed25519_signature` must be a valid Ed25519 signature
+  (hex) over the same canonical manifest body, verified against that public key,
+  or the install fails closed and writes no record. This is a true asymmetric
+  trust model: the author signs off-machine with a private key Raiker never
+  holds, and the owner only configures the trusted public key. Every failure mode
+  fails closed with a distinct reason — missing/non-string signature
+  (`no_asymmetric_signature_in_manifest`), malformed public key
+  (`asymmetric_public_key_invalid`), malformed or non-verifying signature
+  (`asymmetric_signature_invalid`), or an unavailable crypto backend
+  (`asymmetric_backend_unavailable`, never fails open). When the public key is
+  unset the asymmetric check is skipped (`asymmetric_not_configured`) and
+  existing manifests are unaffected. The HMAC and Ed25519 checks are independent:
+  each is enforced only when its own key/env is configured, and when both are set
+  both must pass.
 - Safe install permissions are read-only only (`tool:read_file`,
   `tool:list_directory`, `tool:glob`, `tool:grep`, `event:read`, `ui:panel`,
   `memory:read`). Network, write, shell, filesystem-write, import, eval, exec,
@@ -69,6 +82,12 @@ tool invocation for installed plugins.
   set, fail-closed on wrong/other-key/tampered signatures, and that the governed
   install fails closed on a bad signature while installing a validly-signed
   manifest.
+- `tests/test_phase_4_plugin_asymmetric_signature.py` proves the Ed25519 path:
+  skipped when no public key is configured, verified against the owner-trusted
+  public key when set, fail-closed on missing/non-string/malformed/other-key/
+  tampered signatures and malformed public keys, that HMAC and Ed25519 are
+  enforced independently, and that the governed install fails closed on a missing
+  Ed25519 signature while installing a validly-signed manifest.
 - `tests/test_executor_default_registry.py` proves `plugin_install` is registered
   while `plugin_execution_cap` remains absent from `REAL_EXECUTOR_CAPABILITIES`.
 - `scripts/validate_runtime_enablement_readiness.py` continues to require

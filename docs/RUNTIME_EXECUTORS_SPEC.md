@@ -70,7 +70,7 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 | `scheduled_routines` | 5 | Local on-demand routine runner (no daemon); runs bounded read-only subagent payloads when due. |
 | `hosted_model_runtime` | 5 | Owner-allowlisted HTTPS model endpoint: gate-derived provider policy on the chat path + metadata-only connectivity probe (`RAIKER_MODEL_EGRESS_ALLOWLIST`, empty = fail closed). |
 | `private_network_model_runtime` | 5 | Owner-allowlisted home-lab model endpoint (private network); same gate-derived policy + egress allowlist. |
-| `plugin_install` | 4 | Local manifest validation + install-record creation only; verifies checksum, safe read-only permissions, dependency pins + owner allowlist (`RAIKER_PLUGIN_DEPENDENCY_ALLOWLIST`), and manifest signature (HMAC-SHA256 vs `RAIKER_PLUGIN_SIGNING_KEY` when set, else presence marker), never runs plugin code. |
+| `plugin_install` | 4 | Local manifest validation + install-record creation only; verifies checksum, safe read-only permissions, dependency pins + owner allowlist (`RAIKER_PLUGIN_DEPENDENCY_ALLOWLIST`), and manifest signature (HMAC-SHA256 vs `RAIKER_PLUGIN_SIGNING_KEY` when set, else presence marker; plus asymmetric Ed25519 vs owner-trusted `RAIKER_PLUGIN_ED25519_PUBLIC_KEY` when set, fail-closed), never runs plugin code. |
 | `plugin_execution_cap` | 4 | Installed-plugin brokered read-only tool invocation (`read_file`, `list_directory`, `glob`, `grep`) through ToolBroker/PolicyEngine; no plugin imports, scripts, process, network, or writes. |
 | `plugin_revocation_cap` | 4 | Owner revocation off-switch: flips an installed plugin's record status to `revoked` so `plugin_execution_cap` fails closed for it; never deletes records, edits permissions, or runs plugin code. |
 

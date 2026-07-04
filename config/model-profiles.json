@@ -176,6 +176,92 @@
         "api_key_env",
         "extra_headers.Authorization"
       ]
+    },
+    {
+      "profile_id": "anthropic-hosted",
+      "provider": "anthropic",
+      "backend": "anthropic_messages",
+      "model": "claude-opus-4-8",
+      "endpoint": "https://api.anthropic.com",
+      "build_phase": "phase_4",
+      "default_state": "disabled_until_policy_approved",
+      "tui_launch_action": "/model use anthropic-hosted",
+      "local_only": false,
+      "requires_network": true,
+      "requires_egress_policy": true,
+      "requires_budget_policy": true,
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "supports_streaming": true,
+      "supports_embeddings": false,
+      "supports_tool_calls": true,
+      "supports_json_schema": false,
+      "supports_reasoning": true,
+      "supports_reasoning_summary": true,
+      "reasoning_modes": ["adaptive"],
+      "reasoning_trace_visible": false,
+      "tool_call_mode": "native",
+      "models_path": "/v1/models",
+      "chat_path": "/v1/messages",
+      "timeout_seconds": 300.0,
+      "max_tokens": 16000,
+      "redact_from_logs": [
+        "api_key_env",
+        "extra_headers.x-api-key"
+      ]
+    },
+    {
+      "profile_id": "openai-hosted",
+      "provider": "openai",
+      "backend": "openai_compatible",
+      "model": "<model>",
+      "endpoint": "https://api.openai.com/v1",
+      "build_phase": "phase_4",
+      "default_state": "disabled_until_policy_approved",
+      "tui_launch_action": "/model use openai-hosted",
+      "local_only": false,
+      "requires_network": true,
+      "requires_egress_policy": true,
+      "requires_budget_policy": true,
+      "api_key_env": "OPENAI_API_KEY",
+      "supports_streaming": true,
+      "supports_embeddings": true,
+      "supports_tool_calls": true,
+      "supports_json_schema": true,
+      "supports_reasoning": true,
+      "supports_reasoning_effort": true,
+      "reasoning_effort_values": ["low", "medium", "high"],
+      "reasoning_trace_visible": false,
+      "tool_call_mode": "native_or_text_json",
+      "redact_from_logs": [
+        "api_key_env",
+        "extra_headers.Authorization"
+      ]
+    },
+    {
+      "profile_id": "gemini-hosted-openai-compatible",
+      "provider": "gemini",
+      "backend": "openai_compatible",
+      "model": "<model>",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "build_phase": "phase_4",
+      "default_state": "disabled_until_policy_approved",
+      "tui_launch_action": "/model use gemini-hosted-openai-compatible",
+      "local_only": false,
+      "requires_network": true,
+      "requires_egress_policy": true,
+      "requires_budget_policy": true,
+      "api_key_env": "GEMINI_API_KEY",
+      "supports_streaming": true,
+      "supports_embeddings": true,
+      "supports_tool_calls": true,
+      "supports_json_schema": false,
+      "supports_reasoning": false,
+      "reasoning_trace_visible": false,
+      "tool_call_mode": "native_or_text_json",
+      "redact_from_logs": [
+        "api_key_env",
+        "extra_headers.Authorization"
+      ]
     }
   ]
 }

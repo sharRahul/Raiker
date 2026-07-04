@@ -15,6 +15,7 @@ from raiker.models.endpoint_policy import (
     validate_endpoint_policy,
 )
 from raiker.models.exceptions import ProviderConfigurationError, ProviderPolicyError
+from raiker.models.providers.anthropic_messages import AsyncAnthropicMessagesProvider
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
 from raiker.models.providers.test_provider import DeterministicTestProvider
 
@@ -75,7 +76,13 @@ class ModelProviderFactory:
             if not (self.allow_test_provider or self.test_mode or os.environ.get("RAIKER_TEST_MODE") == "1"):
                 raise ProviderPolicyError("deterministic_test_provider_requires_test_mode")
             return DeterministicTestProvider(provider="test", model=profile.model, profile_id=profile.profile_id)
-        aliases = {"llama-cpp", "llama.cpp", "llama-cpp-server", "ollama", "lm-studio", "vllm", "openai-compatible", "openrouter"}
+        aliases = {
+            "llama-cpp", "llama.cpp", "llama-cpp-server", "ollama", "lm-studio", "vllm",
+            "openai-compatible", "openrouter",
+            # Hosted providers: OpenAI + Gemini speak the OpenAI-compatible
+            # protocol; Anthropic uses the native Messages API adapter.
+            "openai", "gemini", "anthropic",
+        }
         if provider not in aliases:
             raise ProviderConfigurationError(f"unknown_provider:{profile.provider}")
         state = str(raw.get("default_state", ""))
@@ -116,8 +123,31 @@ class ModelProviderFactory:
                 raise ProviderPolicyError("openrouter_requires_https")
             if not isinstance(api_key_env, str) or not os.environ.get(api_key_env):
                 raise ProviderConfigurationError("openrouter_api_key_missing")
-        if isinstance(api_key_env, str) and os.environ.get(api_key_env):
-            headers["Authorization"] = f"Bearer {os.environ[api_key_env]}"
+        if (
+            endpoint_kind == "remote_hosted"
+            and self.require_api_key_for_hosted
+            and (not isinstance(api_key_env, str) or not os.environ.get(api_key_env))
+        ):
+            raise ProviderConfigurationError("hosted_api_key_missing")
+        api_key = os.environ.get(api_key_env, "") if isinstance(api_key_env, str) else ""
+        if provider == "anthropic":
+            if api_key:
+                headers["x-api-key"] = api_key
+            return AsyncAnthropicMessagesProvider(
+                profile_id=profile.profile_id,
+                provider=profile.provider,
+                model=str(raw.get("served_model_name", profile.model)),
+                endpoint=endpoint,
+                capabilities=capabilities_from_profile(profile),
+                timeout=float(raw.get("timeout_seconds", 120.0)),
+                max_tokens=int(raw.get("max_tokens", 1024)),
+                models_path=str(raw.get("models_path", "/v1/models")),
+                chat_path=str(raw.get("chat_path", "/v1/messages")),
+                extra_headers=headers,
+                client=self.client,
+            )
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         raw_extra = raw.get("extra_headers")
         extra: dict[Any, Any] = raw_extra if isinstance(raw_extra, dict) else {}
         for key, value in extra.items():

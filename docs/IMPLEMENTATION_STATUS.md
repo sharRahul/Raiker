@@ -16,10 +16,16 @@
 > dependency controls: the governed `plugin_install` path fails closed on any
 > declared dependency that is not an exact pin or not on the owner allowlist
 > `RAIKER_PLUGIN_DEPENDENCY_ALLOWLIST` (empty = fail closed), and never downloads
-> or resolves dependencies. Arbitrary plugin code/import/process/network/write
-> execution remains deferred. Where the older 2026-06-22 paragraph below says
-> "plugins" have no executor, read that as "arbitrary plugin code execution"; the
-> per-capability source of truth is `docs/RUNTIME_EXECUTORS_SPEC.md`.
+> or resolves dependencies. Phase 4 slice 12 adds plugin manifest signature
+> verification: when the owner sets `RAIKER_PLUGIN_SIGNING_KEY`, the manifest
+> `signature` must be a valid HMAC-SHA256 over the canonical manifest body or the
+> governed install fails closed (`signature_invalid`); when unset, the presence
+> marker remains for local dev. This is a symmetric owner-key check, not Ed25519
+> asymmetric signing (future work). Arbitrary plugin code/import/process/network/
+> write execution remains deferred. Where the older 2026-06-22 paragraph below
+> says "plugins" have no executor, read that as "arbitrary plugin code
+> execution"; the per-capability source of truth is
+> `docs/RUNTIME_EXECUTORS_SPEC.md`.
 
 > Current truth (2026-06-22): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Real local executors exist and are governed-flippable for: Tier 1 (`approval_execution_relay`, `file_write_execution`, `patch_apply_execution`, `memory_write_execution`, `memory_forget_execution`), Tier 2 (`shell_execution`, `process_execution`, `web_fetch`, `network_execution` — sandboxed/egress-allowlisted), Tier 3 local code-intelligence (`graph_indexing_runtime`, `semantic_memory_runtime`), the Phase 4 promoted slices (`subagents`, `multi_agent_teams`, `external_channel_runtime`, `channel_approval_relay`, `container_execution_cap`, `scheduled_routines`), and — Phase 4 slice 7 — `hosted_model_runtime` / `private_network_model_runtime` (owner egress allowlist `RAIKER_MODEL_EGRESS_ALLOWLIST`, empty = fail closed; gate-derived provider policy on the chat path). These are the only members of `REAL_EXECUTOR_CAPABILITIES`. Every other capability — plugins, vector/embedding runtime, remote/cloud command execution, and all Tier-6 sensitive domains (email/calendar/finance/investment/medical/pregnancy/cctv/home-security/hardware) — has **no real executor and fails closed** (`not_implemented` / `activation_blocked:no_executor`); it cannot be flipped to a working state. All capability gates still ship `disabled` by default; enabling is owner/`runtime_gate_manager`-only, governed, reversible, and audited. Per-capability detail: [`docs/RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md).
 

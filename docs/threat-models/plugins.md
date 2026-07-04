@@ -18,10 +18,18 @@ tool invocation for installed plugins.
 - Manifest files are local JSON objects only and are capped at 1 MB.
 - The existing plugin registration policy must return `planned`. Denied or
   pending-approval manifests fail closed and create no install record.
-- Supply-chain checks are current repository checks: checksum verification over
-  canonical manifest JSON plus required signature field presence. The signature
-  field is a presence marker in this slice, not cryptographic signature
-  validation.
+- Supply-chain checks are checksum verification over canonical manifest JSON
+  plus signature verification. **Signature verification (slice 12):** when the
+  owner sets `RAIKER_PLUGIN_SIGNING_KEY`, the manifest `signature` must be a
+  valid HMAC-SHA256 over the canonical manifest content (the same body the
+  checksum covers); a wrong, missing, or non-string signature fails closed
+  (`signature_invalid` / `no_signature_in_manifest`) and no install record is
+  written. When the key is unset, the signature remains a presence marker for
+  the local-dev baseline (unchanged). Trust-model limit: this is a symmetric
+  (owner-held key) integrity+authenticity check, not third-party asymmetric
+  supply-chain signing; Ed25519 verification against an owner-trusted public key
+  is tracked as future work (blocked on a usable crypto dependency in this
+  environment).
 - Safe install permissions are read-only only (`tool:read_file`,
   `tool:list_directory`, `tool:glob`, `tool:grep`, `event:read`, `ui:panel`,
   `memory:read`). Network, write, shell, filesystem-write, import, eval, exec,
@@ -56,6 +64,11 @@ tool invocation for installed plugins.
   dependencies fail closed at both the plan and governed-install layers, that
   pinned+allowlisted dependencies install, and that a dependency-free manifest is
   unaffected.
+- `tests/test_phase_4_plugin_signature_verification.py` proves the presence-marker
+  baseline when no signing key is set, HMAC verification when the owner key is
+  set, fail-closed on wrong/other-key/tampered signatures, and that the governed
+  install fails closed on a bad signature while installing a validly-signed
+  manifest.
 - `tests/test_executor_default_registry.py` proves `plugin_install` is registered
   while `plugin_execution_cap` remains absent from `REAL_EXECUTOR_CAPABILITIES`.
 - `scripts/validate_runtime_enablement_readiness.py` continues to require

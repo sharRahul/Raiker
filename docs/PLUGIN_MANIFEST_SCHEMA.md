@@ -186,6 +186,30 @@ A dependency cannot silently enable:
 
 ---
 
+## Supply-Chain Signature Rules
+
+`supply_chain.checksum` must be the SHA-256 of the canonical manifest body
+(manifest minus its `supply_chain` block, JSON with sorted keys and compact
+separators).
+
+`supply_chain.signature` verification (Phase 4 slice 12) depends on whether the
+owner has configured a signing key:
+
+- **`RAIKER_PLUGIN_SIGNING_KEY` set:** `signature` must be a valid HMAC-SHA256
+  hex digest over the same canonical manifest body using that key. A wrong,
+  missing, or non-string signature fails the governed install closed
+  (`signature_invalid` / `no_signature_in_manifest`), and no install record is
+  written.
+- **`RAIKER_PLUGIN_SIGNING_KEY` unset (default):** `signature` is treated as a
+  presence marker for the local-dev baseline — a non-empty value passes, an
+  empty/absent value still fails.
+
+Trust-model limit: HMAC is a symmetric (owner-held key) integrity+authenticity
+check, not third-party asymmetric supply-chain signing. Ed25519 verification
+against an owner-trusted public key is future work.
+
+---
+
 ## Trust Rules
 
 Allowed trust levels:

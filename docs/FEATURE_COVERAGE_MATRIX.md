@@ -200,7 +200,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 - Approval execution relay remains metadata-only/deferred.
 - Shell/process/network/web-fetch runtime remains disabled/deferred.
-- Plugin execution remains disabled/deferred.
+- Plugin execution: install, brokered read-only, revocation, and code runtime (bounded subprocess + no-network container) executors are implemented; gates remain default-disabled.
 - Remote/container/cloud runtime remains disabled/deferred.
 - Email/calendar/finance/medical/CCTV runtime remains disabled/deferred.
 - Hosted/multi-user/cloud runtime is future implementation work.

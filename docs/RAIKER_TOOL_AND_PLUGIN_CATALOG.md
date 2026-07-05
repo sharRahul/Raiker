@@ -217,7 +217,7 @@ These permission labels are used in the inventory below so coding agents know wh
 | `lsp:server_start` | Start language servers; disabled until workspace/plugin trust gates. |
 | `plugin:validate` | Validate plugin metadata without executing code. |
 | `plugin:register` | Register plugin metadata/plans; no code execution. |
-| `plugin:execute` | Execute plugin code/entrypoints; disabled until explicit gates. |
+| `plugin:execute` | Execute plugin code/entrypoints; governed by the default-disabled `plugin_runtime_cap` (subprocess) / `plugin_sandboxed_runtime_cap` (no-network container) gates. |
 | `channel:read` | Read/list configured channel profiles/status. |
 | `channel:activate` | Activate external transports; disabled until Phase 4 pairing and trust. |
 | `agent:plan` | Plan subagent/team work without spawning. |
@@ -380,7 +380,7 @@ These permission labels are used in the inventory below so coding agents know wh
 | `plugin_enable` | Enable plugin components after policy/trust approval. | `plugin:register`, `approval:resolve`; later `plugin:execute` if runtime code | No — runtime execution disabled |
 | `plugin_disable` | Disable plugin components. | `plugin:register` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
 | `plugin_remove` | Remove plugin metadata/package. | `plugin:register`, `workspace:write`, `approval:resolve` | No — Phase 3/5 planned |
-| `plugin_execute` | Execute plugin code/entrypoint. | `plugin:execute` plus target permissions | No — disabled until explicit Phase 3+ execution gates |
+| `plugin_execute` | Execute plugin code/entrypoint. | `plugin:execute` plus target permissions | Governed — via `plugin_runtime_cap` (bounded subprocess) or `plugin_sandboxed_runtime_cap` (no-network container), owner plugin allowlist, gates default-disabled |
 
 ## Phase 9 Advanced Memory and Graph Tools
 
@@ -490,7 +490,7 @@ The following items must be picked up by later implementation plans:
 
 Until the relevant phase gates are fully implemented and verified:
 
-- plugin code execution remains disabled;
+- plugin code execution executors are implemented (subprocess + no-network container); their gates remain default-disabled;
 - graph/codemap runtime indexing remains disabled;
 - graph node/edge writes remain disabled;
 - semantic/vector memory writes remain disabled;

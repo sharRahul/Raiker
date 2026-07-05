@@ -70,7 +70,7 @@ The following remain disabled/deferred and are not covered by the local producti
 | Durable memory governed write contract | `implemented_policy_gated` | Available only through the broker-governed path with provenance, retention, approval state, and event logging. |
 | Approval resolution | `metadata_only` | `/approve` and `/deny` resolve one immutable approval record; they do not execute actions. |
 | Semantic/vector writes, embeddings, graph indexing | `disabled_deferred` | Readiness/preview only; runtime execution disabled. |
-| Plugin execution | `disabled_deferred` | Planning/readiness only. |
+| Plugin execution | `implemented_policy_gated` | Real governed executors exist — install, brokered read-only, revocation, and code runtime (bounded subprocess + no-network container); gates default-disabled. See `docs/RUNTIME_EXECUTORS_SPEC.md`. |
 | External channels | `disabled_deferred` | Metadata/readiness only; no relay/runtime transport. |
 | Remote/container/cloud execution | `disabled_deferred` | Profiles and readiness records may exist; execution remains off. |
 | Hosted providers | `implemented_policy_gated` | Explicit policy, API key, and egress/budget controls required. |

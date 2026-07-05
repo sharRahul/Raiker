@@ -37,12 +37,15 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 > executors. (B) live provider verification; (C) reach/multi-user surface;
 > (D) security hardening; (E) plugin-runtime remainder.
 >
-> **Docs migration (Claude-Code-style IA) — 4 of 7 sections done:** Getting
-> Started, Core Concepts, Use Raiker, Platform & Integrations are migrated
-> (`docs/README.md` is the home/index). **Remaining: Capabilities, Implementation,
-> Best Practices** — migrate incrementally, keeping the validator truthfulness
-> markers intact (the truthfulness validator only scans a fixed doc allowlist, so
-> new section files are additive/safe).
+> **Docs migration (Claude-Code-style IA) — COMPLETE, all 7 sections done:**
+> Getting Started, Core Concepts, Use Raiker, Platform & Integrations,
+> Capabilities, Implementation, Best Practices — each has a landing page under
+> `docs/` and `docs/README.md` is the home/index. The canonical detailed docs
+> (`RUNTIME_EXECUTORS_SPEC`, `IMPLEMENTATION_STATUS`, `GAP_AND_TODO_ANALYSIS`,
+> `SECURITY_ARCHITECTURE`, `threat-models/`, …) are retained and linked as the
+> source of truth. Next docs work (optional): fold the older standalone specs
+> into their sections and prune duplicates. The truthfulness validator only
+> scans a fixed doc allowlist, so the new section files are additive/safe.
 >
 > **How the local Tier-6 pattern works (reuse for future local domains):** a
 > table migration + store insert/list methods + a small executor with

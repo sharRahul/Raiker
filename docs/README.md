@@ -4,9 +4,10 @@ Raiker is a security-first AI agent that connects to any backend LLM — local,
 home-lab, or hosted — while keeping every capability governed, default-disabled,
 and fail-closed. This is the documentation home.
 
-The docs are being reorganized into seven sections (Claude-Code-docs style).
-Sections migrate incrementally; until a section's dedicated page lands, the
-"Sources" column points at the existing detailed documents.
+The docs are organized into seven sections (Claude-Code-docs style). Each section
+below has a dedicated landing page that orients you and links the canonical
+detailed documents (executor spec, threat models, implementation ledger, etc.),
+which remain the source of truth.
 
 | Section | Status | Read |
 |---|---|---|
@@ -14,9 +15,9 @@ Sections migrate incrementally; until a section's dedicated page lands, the
 | **Core Concepts** | ✅ migrated | [core-concepts.md](core-concepts.md) |
 | **Use Raiker** | ✅ migrated | [use-raiker.md](use-raiker.md) |
 | **Platform & Integrations** | ✅ migrated | [platform-integrations.md](platform-integrations.md) |
-| **Capabilities** | ⏳ migrating | [RUNTIME_EXECUTORS_SPEC.md](RUNTIME_EXECUTORS_SPEC.md), `RAIKER_TOOL_AND_PLUGIN_CATALOG.md`, `PLUGIN_SYSTEM_SPEC.md`, [DECISION_MODES_SPEC.md](DECISION_MODES_SPEC.md) |
-| **Implementation** | ⏳ migrating | [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), `GAP_AND_TODO_ANALYSIS.md`, `VERIFICATION_PLAN.md`, `threat-models/` |
-| **Best Practices** | ⏳ migrating | [SECURITY_ARCHITECTURE.md](SECURITY_ARCHITECTURE.md), `LOCAL_VALIDATION_GATE.md` |
+| **Capabilities** | ✅ migrated | [capabilities.md](capabilities.md) |
+| **Implementation** | ✅ migrated | [implementation.md](implementation.md) |
+| **Best Practices** | ✅ migrated | [best-practices.md](best-practices.md) |
 
 ## Start here
 

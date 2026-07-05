@@ -15,12 +15,17 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-05 (session end)
 
-> **Where this session's work lives (read first):** Phase 4 **slices 14–16**
-> (plugin **code runtime** `plugin_runtime_cap`, per-plugin scopes, and
-> network-isolated `plugin_sandboxed_runtime_cap`) are on branch
-> `claude/handoff-document-review-jusao0`, started from `origin/main` after PR #94
-> (slice 13, Ed25519) merged (merge commit `deaab72`). All three ride PR #95.
-> Slice 13 and everything before it are merged — do **not** re-do them.
+> **Where this session's work lives (read first):** Phase 4 slices 14–16 (plugin
+> code runtime) merged via PR #95; doc-accuracy fixes merged via PR #96/#97. The
+> current in-flight work is **Phase 5 slice 1 — capability decision modes
+> (`ask`/`deny`/`always_allow`/`auto`)** on branch
+> `claude/handoff-document-review-jusao0` (restarted from `origin/main` after #97
+> merged). This is the first slice of a new prioritized program (A–E, see "Next
+> work"): (A) Tier-6/remaining executors, (B) live provider verification,
+> (C) reach/multi-user surface, (D) security hardening, (E) plugin-runtime
+> remainder — plus a full `docs/*` rewrite into a Claude-Code-style IA (Getting
+> Started / Core Concepts / Use Raiker / Platform & Integrations / Capabilities /
+> Implementation / Best Practices), to be migrated incrementally.
 >
 > **Environment unblock (still relevant):** the "Ed25519/cffi bindings panic on
 > import" blocker is a **missing `cffi`** (`ModuleNotFoundError: No module named

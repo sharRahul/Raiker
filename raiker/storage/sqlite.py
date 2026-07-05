@@ -46,6 +46,8 @@ from raiker.models.session_state import ModelSessionState
 from raiker.storage.migrations import (
     API_SESSIONS_MIGRATION_ID,
     API_SESSIONS_SQL,
+    CAPABILITY_DECISION_MODE_MIGRATION_ID,
+    CAPABILITY_DECISION_MODE_SQL,
     MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
     MODEL_SESSION_RESOLVED_MODEL_SQL,
     PHASE_1_MIGRATION_ID,
@@ -413,6 +415,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection.execute("ALTER TABLE events_index ADD COLUMN prev_event_sha256 TEXT")
             with contextlib.suppress(sqlite3.OperationalError):
                 connection.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)")
+            self._apply_migration(
+                CAPABILITY_DECISION_MODE_MIGRATION_ID, CAPABILITY_DECISION_MODE_SQL, connection
+            )
             self._apply_migration(API_SESSIONS_MIGRATION_ID, API_SESSIONS_SQL, connection)
             self._apply_migration(THREAT_MODEL_ACKS_MIGRATION_ID, THREAT_MODEL_ACKS_SQL, connection)
             self._apply_migration(
@@ -1995,4 +2000,42 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 "DELETE FROM capability_gate_state WHERE capability = ?",
                 (capability,),
+            )
+
+    # ── Capability decision modes (ask / deny / always_allow / auto) ──────────
+
+    def get_capability_decision_mode(self, capability: str) -> str | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT decision_mode FROM capability_decision_mode WHERE capability = ?",
+                (capability,),
+            ).fetchone()
+        return str(row["decision_mode"]) if row else None
+
+    def list_capability_decision_modes(self) -> dict[str, str]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT capability, decision_mode FROM capability_decision_mode"
+            ).fetchall()
+        return {str(r["capability"]): str(r["decision_mode"]) for r in rows}
+
+    def upsert_capability_decision_mode(self, record: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO capability_decision_mode
+                  (capability, decision_mode, set_by, set_at, reason, event_id,
+                   created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["capability"],
+                    record["decision_mode"],
+                    record.get("set_by"),
+                    record.get("set_at"),
+                    record.get("reason"),
+                    record.get("event_id"),
+                    record["created_at"],
+                    record["updated_at"],
+                ),
             )

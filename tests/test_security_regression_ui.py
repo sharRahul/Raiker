@@ -24,10 +24,12 @@ from raiker.events.writer import EventLogWriter
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
 
+# Domains that stay fail-closed/unenableable (no real executor). reminder,
+# calendar, and email are now real local-only executors, so they are governed-
+# enableable and no longer belong in this "stays blocked" list.
 SENSITIVE_DOMAIN_CAPS = [
-    "email_runtime",
-    "calendar_runtime",
     "finance_runtime",
+    "investment_runtime",
     "medical_runtime",
     "cctv_runtime",
     "home_security_runtime",

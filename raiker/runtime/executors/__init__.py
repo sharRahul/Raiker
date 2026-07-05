@@ -41,15 +41,17 @@ from raiker.runtime.executors.tier5_network import (
     RemoteExecutionExecutor,
 )
 from raiker.runtime.executors.tier6_domains import (
-    CalendarRuntimeExecutor,
     CctvRuntimeExecutor,
-    EmailRuntimeExecutor,
     FinanceRuntimeExecutor,
     HardwareOperatorRuntimeExecutor,
     HomeSecurityRuntimeExecutor,
     InvestmentRuntimeExecutor,
     MedicalRuntimeExecutor,
     PregnancyBabyRuntimeExecutor,
+)
+from raiker.runtime.executors.tier6_local import (
+    CalendarRuntimeExecutor,
+    EmailRuntimeExecutor,
 )
 
 __all__ = [
@@ -125,9 +127,14 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "plugin_revocation_cap",
     "plugin_runtime_cap",
     "plugin_sandboxed_runtime_cap",
-    # Tier 6 — local-only reminder store (no network / no external integration).
-    # Every other Tier-6 domain stays fail-closed until a real integration lands.
+    # Tier 6 — local-only personal-data stores (no network / no external
+    # integration): reminders, a local calendar (no external sync/invites), and
+    # local email drafts (never sends). The remaining Tier-6 domains
+    # (finance/investment/medical/pregnancy/cctv/home-security/hardware) stay
+    # fail-closed until a real integration + threat model lands.
     "reminder_runtime",
+    "calendar_runtime",
+    "email_runtime",
 })
 
 
@@ -169,6 +176,8 @@ def build_default_executor_registry(
     registry.register("plugin_runtime_cap", PluginRuntimeExecutor(ws, store))
     registry.register("plugin_sandboxed_runtime_cap", PluginSandboxedRuntimeExecutor(ws, store))
     registry.register("reminder_runtime", ReminderRuntimeExecutor(ws, store))
+    registry.register("calendar_runtime", CalendarRuntimeExecutor(ws, store))
+    registry.register("email_runtime", EmailRuntimeExecutor(ws, store))
     assert registry.capabilities() == REAL_EXECUTOR_CAPABILITIES, (
         "default executor registry drifted from REAL_EXECUTOR_CAPABILITIES"
     )

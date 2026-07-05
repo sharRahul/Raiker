@@ -47,6 +47,8 @@ _PREFIXES = {
     "plgex_",
     "plgrt_",
     "rem_",
+    "cal_",
+    "eml_",
     "gix_",
     "smw_",
     "ide_",

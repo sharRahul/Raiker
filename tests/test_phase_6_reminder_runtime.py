@@ -64,7 +64,7 @@ def test_reminder_is_real_executor_others_are_not(tmp_path: Path) -> None:
     registry = build_default_executor_registry(ws, SQLiteStore(ws))
     assert _CAP in REAL_EXECUTOR_CAPABILITIES
     assert registry.has(_CAP)
-    for other in ("email_runtime", "calendar_runtime", "medical_runtime", "cctv_runtime"):
+    for other in ("finance_runtime", "medical_runtime", "cctv_runtime", "hardware_operator_runtime"):
         assert other not in REAL_EXECUTOR_CAPABILITIES
         assert not registry.has(other)
 

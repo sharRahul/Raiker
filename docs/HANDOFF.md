@@ -28,14 +28,31 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 > docs).
 >
 > This is part of the prioritized program (A–E): (A) Tier-6/remaining executors —
-> reminder done; **next: `calendar_runtime` then `email_runtime`** (both local
-> first, external delivery deferred), plus `vector_embedding_runtime`,
-> `model_provider_runtime`, graph/semantic runtimes; (B) live provider
-> verification; (C) reach/multi-user surface; (D) security hardening; (E)
-> plugin-runtime remainder. Docs migration continues incrementally (Use Raiker →
-> Platform & Integrations → Capabilities → Implementation → Best Practices).
-> **Sensitive real-world domains (finance/medical/cctv/home-security/hardware)
-> stay fail-closed until they have real integrations — no fake executors.**
+> **reminder + calendar + email all done** (local-only: reminders, calendar
+> events, email drafts; email never sends). Next real-executor targets:
+> `vector_embedding_runtime`, `model_provider_runtime`, and the graph/semantic
+> runtimes; the remaining sensitive Tier-6 domains
+> (finance/investment/medical/pregnancy/cctv/home-security/hardware) stay
+> **fail-closed** until real integrations + threat models exist — no fake
+> executors. (B) live provider verification; (C) reach/multi-user surface;
+> (D) security hardening; (E) plugin-runtime remainder.
+>
+> **Docs migration (Claude-Code-style IA) — 4 of 7 sections done:** Getting
+> Started, Core Concepts, Use Raiker, Platform & Integrations are migrated
+> (`docs/README.md` is the home/index). **Remaining: Capabilities, Implementation,
+> Best Practices** — migrate incrementally, keeping the validator truthfulness
+> markers intact (the truthfulness validator only scans a fixed doc allowlist, so
+> new section files are additive/safe).
+>
+> **How the local Tier-6 pattern works (reuse for future local domains):** a
+> table migration + store insert/list methods + a small executor with
+> `create`/`list` (metadata-only artifacts, content never in events) + threat
+> model + register in `REAL_EXECUTOR_CAPABILITIES` + default registry. When
+> promoting a domain that other tests assert is "unenableable/no-executor", also
+> update: `scripts/validate_runtime_enablement_readiness.py`
+> (`must_not_have_default_executor`), `tests/test_executor_default_registry.py`
+> (`_SENSITIVE`), and `tests/test_security_regression_ui.py`
+> (`SENSITIVE_DOMAIN_CAPS`).
 >
 > **Environment unblock (still relevant):** the "Ed25519/cffi bindings panic on
 > import" blocker is a **missing `cffi`** (`ModuleNotFoundError: No module named
@@ -47,8 +64,9 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 Previous pushed anchors (earlier sessions): slice 13 merge `deaab72`, slice 8
 `c8ce3d5`, slice 7 `c571c9c`; config cwd fallback `29ec83a`.
 
-Full suite green after the reminder + docs work: **1171 passed, 1 warning**
-(decision modes added 9, reminder added 7); ruff clean, mypy clean on changed
+Full suite green after reminder/calendar/email + docs work: **1178 passed, 1
+warning** (decision modes +9, reminder +7, calendar/email +8); ruff clean, mypy
+clean on changed
 sources (remaining mypy output is environmental missing-stub noise for
 `pytest`/`fastapi`/`httpx`/`cryptography` plus one pre-existing
 `test_runtime_authority.py` item), and all five `scripts/validate_*.py`

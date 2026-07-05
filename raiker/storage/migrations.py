@@ -939,6 +939,40 @@ CREATE TABLE IF NOT EXISTS capability_gate_state (
 );
 """
 
+# ── Calendar events & email drafts (Tier-6, local-only) ──────────────────────
+
+CALENDAR_EVENTS_MIGRATION_ID = "RAIKER-6003-calendar-events"
+
+CALENDAR_EVENTS_SQL = """
+CREATE TABLE IF NOT EXISTS calendar_events (
+  event_id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  starts_at TEXT,
+  ends_at TEXT,
+  location TEXT,
+  notes TEXT,
+  status TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
+EMAIL_DRAFTS_MIGRATION_ID = "RAIKER-6004-email-drafts"
+
+EMAIL_DRAFTS_SQL = """
+CREATE TABLE IF NOT EXISTS email_drafts (
+  draft_id TEXT PRIMARY KEY,
+  subject TEXT NOT NULL,
+  recipients TEXT,
+  body TEXT,
+  status TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
 # ── Reminders (Tier-6 reminder_runtime, local-only) ──────────────────────────
 
 REMINDERS_MIGRATION_ID = "RAIKER-6002-reminders"

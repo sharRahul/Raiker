@@ -16,6 +16,7 @@ from raiker.runtime.executors.models_runtime import (
     PrivateNetworkModelRuntimeExecutor,
 )
 from raiker.runtime.executors.orchestration import MultiAgentTeamExecutor, SubagentExecutor
+from raiker.runtime.executors.reminders import ReminderRuntimeExecutor
 from raiker.runtime.executors.scheduled import ScheduledRoutinesExecutor
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.runtime.executors.tier1_files import FileWriteExecutor, PatchApplyExecutor
@@ -49,7 +50,6 @@ from raiker.runtime.executors.tier6_domains import (
     InvestmentRuntimeExecutor,
     MedicalRuntimeExecutor,
     PregnancyBabyRuntimeExecutor,
-    ReminderRuntimeExecutor,
 )
 
 __all__ = [
@@ -125,6 +125,9 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "plugin_revocation_cap",
     "plugin_runtime_cap",
     "plugin_sandboxed_runtime_cap",
+    # Tier 6 — local-only reminder store (no network / no external integration).
+    # Every other Tier-6 domain stays fail-closed until a real integration lands.
+    "reminder_runtime",
 })
 
 
@@ -165,6 +168,7 @@ def build_default_executor_registry(
     registry.register("plugin_revocation_cap", PluginRevocationExecutor(ws, store))
     registry.register("plugin_runtime_cap", PluginRuntimeExecutor(ws, store))
     registry.register("plugin_sandboxed_runtime_cap", PluginSandboxedRuntimeExecutor(ws, store))
+    registry.register("reminder_runtime", ReminderRuntimeExecutor(ws, store))
     assert registry.capabilities() == REAL_EXECUTOR_CAPABILITIES, (
         "default executor registry drifted from REAL_EXECUTOR_CAPABILITIES"
     )

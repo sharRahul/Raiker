@@ -38,10 +38,6 @@ class CalendarRuntimeExecutor(_DomainExecutorBase):
     capability = "calendar_runtime"
 
 
-class ReminderRuntimeExecutor(_DomainExecutorBase):
-    capability = "reminder_runtime"
-
-
 class FinanceRuntimeExecutor(_DomainExecutorBase):
     capability = "finance_runtime"
 

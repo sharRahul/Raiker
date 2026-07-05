@@ -16,16 +16,26 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 ## State as of 2026-07-05 (session end)
 
 > **Where this session's work lives (read first):** Phase 4 slices 14–16 (plugin
-> code runtime) merged via PR #95; doc-accuracy fixes merged via PR #96/#97. The
-> current in-flight work is **Phase 5 slice 1 — capability decision modes
-> (`ask`/`deny`/`always_allow`/`auto`)** on branch
-> `claude/handoff-document-review-jusao0` (restarted from `origin/main` after #97
-> merged). This is the first slice of a new prioritized program (A–E, see "Next
-> work"): (A) Tier-6/remaining executors, (B) live provider verification,
-> (C) reach/multi-user surface, (D) security hardening, (E) plugin-runtime
-> remainder — plus a full `docs/*` rewrite into a Claude-Code-style IA (Getting
-> Started / Core Concepts / Use Raiker / Platform & Integrations / Capabilities /
-> Implementation / Best Practices), to be migrated incrementally.
+> code runtime) merged via PR #95; doc-accuracy fixes merged via PR #96/#97;
+> **Phase 5 slice 1 — capability decision modes (`ask`/`deny`/`always_allow`/
+> `auto`)** merged via PR #98. The current in-flight branch
+> `claude/handoff-document-review-jusao0` (restarted from `origin/main` after #98
+> merged) carries **two things in one PR**: (1) the first **real Tier-6 executor**
+> `reminder_runtime` (local-only reminder store — create/list; every other Tier-6
+> domain stays fail-closed), and (2) the **start of the `docs/*` migration** into
+> the Claude-Code-style IA (`docs/README.md` home + `docs/getting-started.md` +
+> `docs/core-concepts.md`; remaining sections still point at existing detailed
+> docs).
+>
+> This is part of the prioritized program (A–E): (A) Tier-6/remaining executors —
+> reminder done; **next: `calendar_runtime` then `email_runtime`** (both local
+> first, external delivery deferred), plus `vector_embedding_runtime`,
+> `model_provider_runtime`, graph/semantic runtimes; (B) live provider
+> verification; (C) reach/multi-user surface; (D) security hardening; (E)
+> plugin-runtime remainder. Docs migration continues incrementally (Use Raiker →
+> Platform & Integrations → Capabilities → Implementation → Best Practices).
+> **Sensitive real-world domains (finance/medical/cctv/home-security/hardware)
+> stay fail-closed until they have real integrations — no fake executors.**
 >
 > **Environment unblock (still relevant):** the "Ed25519/cffi bindings panic on
 > import" blocker is a **missing `cffi`** (`ModuleNotFoundError: No module named
@@ -37,9 +47,10 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 Previous pushed anchors (earlier sessions): slice 13 merge `deaab72`, slice 8
 `c8ce3d5`, slice 7 `c571c9c`; config cwd fallback `29ec83a`.
 
-Full suite green after slice 16: **1155 passed, 1 warning**; ruff clean, mypy
-clean on changed sources (remaining mypy output is environmental missing-stub
-noise for `pytest`/`fastapi`/`httpx`/`cryptography` plus one pre-existing
+Full suite green after the reminder + docs work: **1171 passed, 1 warning**
+(decision modes added 9, reminder added 7); ruff clean, mypy clean on changed
+sources (remaining mypy output is environmental missing-stub noise for
+`pytest`/`fastapi`/`httpx`/`cryptography` plus one pre-existing
 `test_runtime_authority.py` item), and all five `scripts/validate_*.py`
 validators passed.
 

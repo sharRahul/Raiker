@@ -46,6 +46,7 @@ _PREFIXES = {
     "mob_",
     "plgex_",
     "plgrt_",
+    "rem_",
     "gix_",
     "smw_",
     "ide_",

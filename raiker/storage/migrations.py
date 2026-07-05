@@ -939,6 +939,23 @@ CREATE TABLE IF NOT EXISTS capability_gate_state (
 );
 """
 
+# ── Reminders (Tier-6 reminder_runtime, local-only) ──────────────────────────
+
+REMINDERS_MIGRATION_ID = "RAIKER-6002-reminders"
+
+REMINDERS_SQL = """
+CREATE TABLE IF NOT EXISTS reminders (
+  reminder_id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  due_at TEXT,
+  notes TEXT,
+  status TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
 # ── Capability Decision Modes (Ask / Deny / Always Allow / Auto) ─────────────
 
 CAPABILITY_DECISION_MODE_MIGRATION_ID = "RAIKER-1003-capability-decision-mode"

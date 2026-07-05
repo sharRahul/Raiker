@@ -134,6 +134,8 @@ from raiker.storage.migrations import (
     PHASE_10_RUNTIME_AUTHORITY_SQL,
     PHASE_10_RUNTIME_MODE_STATE_MIGRATION_ID,
     PHASE_10_RUNTIME_MODE_STATE_SQL,
+    REMINDERS_MIGRATION_ID,
+    REMINDERS_SQL,
     THREAT_MODEL_ACKS_MIGRATION_ID,
     THREAT_MODEL_ACKS_SQL,
 )
@@ -418,6 +420,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 CAPABILITY_DECISION_MODE_MIGRATION_ID, CAPABILITY_DECISION_MODE_SQL, connection
             )
+            self._apply_migration(REMINDERS_MIGRATION_ID, REMINDERS_SQL, connection)
             self._apply_migration(API_SESSIONS_MIGRATION_ID, API_SESSIONS_SQL, connection)
             self._apply_migration(THREAT_MODEL_ACKS_MIGRATION_ID, THREAT_MODEL_ACKS_SQL, connection)
             self._apply_migration(
@@ -2039,3 +2042,39 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     record["updated_at"],
                 ),
             )
+
+    # ── Reminders (local-only Tier-6 reminder_runtime) ────────────────────────
+
+    def insert_reminder(self, record: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO reminders
+                  (reminder_id, title, due_at, notes, status, created_by,
+                   created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["reminder_id"],
+                    record["title"],
+                    record.get("due_at"),
+                    record.get("notes"),
+                    record["status"],
+                    record["created_by"],
+                    record["created_at"],
+                    record["updated_at"],
+                ),
+            )
+
+    def list_reminders(self, *, status: str | None = None) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            if status is None:
+                rows = connection.execute(
+                    "SELECT * FROM reminders ORDER BY created_at"
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM reminders WHERE status = ? ORDER BY created_at",
+                    (status,),
+                ).fetchall()
+        return [dict(row) for row in rows]

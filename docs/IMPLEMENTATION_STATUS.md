@@ -960,6 +960,18 @@ Evidence: `tests/test_phase_4_plugin_sandboxed_runtime.py`, `tests/test_executor
 
 Evidence: `tests/test_phase_5_decision_modes.py`, `scripts/validate_repo_truthfulness.py`.
 
+### Phase 6 Slice 1 — Reminder runtime (first real Tier-6 executor, `implemented_verified`)
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `reminder_runtime` real executor (local-only reminder store: create/list) | `implemented_policy_gated` | `raiker/runtime/executors/reminders.py`, `raiker/storage/migrations.py` (`reminders` table) | `tests/test_phase_6_reminder_runtime.py` |
+
+- The first Tier-6 domain promoted to a real executor — promoted **because** a reminder is purely local state (create/list rows in the workspace `reminders` table) with no network, no external notification, and no device/hardware access. See `docs/threat-models/reminders.md`.
+- **Every other Tier-6 domain (email, calendar, finance, investment, medical, pregnancy/baby, cctv, home security, hardware) stays fail-closed** (`not_implemented`) until it has a real external integration and its own threat model — no fake executors.
+- Fails closed on `missing_argument:title`, `title_too_long`, `invalid_argument:*`, and `unknown_action:<op>`. Supports `create` (default) and `list` only; no edit/delete, no outbound delivery, no OS scheduler registration. Runtime artifacts are metadata-only (ids/counts/flags); reminder titles and notes are never emitted into events. Gate defaults **disabled**; enabling requires HUMAN `runtime_gate_manager` + `local_single_user_runtime` + a `threat_model_acks` row + a confirmation token, and AI-proposed actions are further governed by the capability decision mode (default `ask`).
+
+Evidence: `tests/test_phase_6_reminder_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`.
+
 ### Current launchable UI & runtime truth
 
 The launchable local UIs are (1) the plain local terminal client (`RAIKER_TUI=plain`, `--prompt`,

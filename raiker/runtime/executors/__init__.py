@@ -32,6 +32,7 @@ from raiker.runtime.executors.tier4_plugins import (
     PluginExecutionCapExecutor,
     PluginInstallExecutor,
     PluginRevocationExecutor,
+    PluginRuntimeExecutor,
 )
 from raiker.runtime.executors.tier5_network import (
     CloudExecutionExecutor,
@@ -59,6 +60,7 @@ __all__ = [
     "GraphIndexingExecutor", "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
     "SubagentExecutor", "MultiAgentTeamExecutor",
     "PluginInstallExecutor", "PluginExecutionCapExecutor", "PluginRevocationExecutor",
+    "PluginRuntimeExecutor",
     "ExternalChannelExecutor", "ChannelApprovalRelayExecutor",
     "RemoteExecutionExecutor", "ContainerExecutionExecutor", "CloudExecutionExecutor",
     "HostedModelRuntimeExecutor", "PrivateNetworkModelRuntimeExecutor", "ScheduledRoutinesExecutor",
@@ -114,11 +116,13 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "hosted_model_runtime",
     "private_network_model_runtime",
     # Tier 4 — local manifest validation + brokered read-only plugin tool
-    # invocation + revocation off-switch. Arbitrary plugin code/import/process/
-    # network execution remains out of scope.
+    # invocation + revocation off-switch + bounded subprocess code runtime for an
+    # owner-allowlisted installed plugin (slice 14). In-process import and
+    # network-namespace isolation remain out of scope.
     "plugin_install",
     "plugin_execution_cap",
     "plugin_revocation_cap",
+    "plugin_runtime_cap",
 })
 
 
@@ -157,6 +161,7 @@ def build_default_executor_registry(
     registry.register("plugin_install", PluginInstallExecutor(ws, store))
     registry.register("plugin_execution_cap", PluginExecutionCapExecutor(ws, store))
     registry.register("plugin_revocation_cap", PluginRevocationExecutor(ws, store))
+    registry.register("plugin_runtime_cap", PluginRuntimeExecutor(ws, store))
     assert registry.capabilities() == REAL_EXECUTOR_CAPABILITIES, (
         "default executor registry drifted from REAL_EXECUTOR_CAPABILITIES"
     )

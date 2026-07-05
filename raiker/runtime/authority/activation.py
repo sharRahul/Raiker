@@ -96,6 +96,9 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     for cap in ("plugin_execution_cap", "plugin_install", "plugin_revocation_cap"):
         r[cap] = _req(cap, "4", threat_ack=True, human_confirm=True,
                       notes="Plugin sandbox; signature verify.")
+    r["plugin_runtime_cap"] = _req(
+        "plugin_runtime_cap", "4", threat_ack=True, human_confirm=True,
+        notes="Bounded subprocess plugin code runtime; owner plugin allowlist, interpreter allowlist.")
 
     # Tier 5
     for cap in ("external_channel_runtime", "channel_approval_relay"):

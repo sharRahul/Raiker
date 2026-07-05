@@ -129,7 +129,7 @@ Action received
   -> Principal validation (active, not expired)
   -> Role classification (AI role or human-only role)
   -> Domain scope boundary check
-  -> Capability gate check (registry of 47 capabilities)
+  -> Capability gate check (registry of 53 capabilities)
   -> Risk classification (low / medium / high / critical)
   -> PolicyEngine decision (allow / deny / needs_approval)
   -> Approval or risk acceptance where required

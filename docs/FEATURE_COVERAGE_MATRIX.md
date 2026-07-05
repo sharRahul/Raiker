@@ -66,7 +66,7 @@ Current backend implementation labels used across the hardening pass:
 | Human-only role protection | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/runtime/authority/models.py`, `docs/SECURITY_ARCHITECTURE.md` |
 | Domain scopes (16 domains) | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/runtime/authority/models.py`, `docs/SECURITY_ARCHITECTURE.md` |
 | Risk acceptance model | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/runtime/authority/models.py`, `docs/SECURITY_ARCHITECTURE.md` |
-| Expanded capability registry (47 capabilities) | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/phase_gates.py`, `docs/SECURITY_ARCHITECTURE.md` |
+| Expanded capability registry (53 capabilities) | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/phase_gates.py`, `docs/SECURITY_ARCHITECTURE.md` |
 | Event redaction (bank/card/medical IDs) | fully-specified | phase-1-build | `implemented_policy_gated` | `raiker/context/redaction.py` |
 | Runtime enablement validator | fully-specified | phase-1-build | `implemented_verified` | `scripts/validate_runtime_enablement_readiness.py` |
 | Equal primary interface invariant | fully-specified | phase-1-to-5-build | see status ledger for current implementation | `README.md`, `docs/ARCHITECTURE.md`, `docs/UI_UX_DESIGN_SPEC.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |

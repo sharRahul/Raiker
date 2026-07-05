@@ -91,7 +91,8 @@ def main() -> int:
         "admin_mutation", "policy_mutation", "role_mutation",
         "email_runtime", "finance_runtime", "investment_runtime",
         "medical_runtime", "cctv_runtime", "plugin_execution_cap",
-        "plugin_install", "plugin_revocation_cap", "remote_execution_cap",
+        "plugin_install", "plugin_revocation_cap", "plugin_runtime_cap",
+        "plugin_sandboxed_runtime_cap", "remote_execution_cap",
         "external_channel_runtime",
     }
     for cap in runtime_high_risk:
@@ -189,7 +190,7 @@ def main() -> int:
         "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
         "cctv_runtime", "home_security_runtime", "hardware_operator_runtime",
         "plugin_execution_cap", "plugin_install", "plugin_revocation_cap",
-        "external_channel_runtime",
+        "plugin_runtime_cap", "plugin_sandboxed_runtime_cap", "external_channel_runtime",
         "channel_approval_relay", "remote_execution_cap", "container_execution_cap",
         "cloud_execution_cap", "approval_execution_relay", "scheduled_routines",
         "graph_indexing_runtime", "semantic_memory_runtime",

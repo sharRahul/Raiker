@@ -13,31 +13,30 @@ to the user, and every capability governed, default-disabled, and fail-closed.
 
 Be mind full of token usage if needed do it in batches. Keep committing after every phase and then push to origin main before the token limit is ended for the session. Plan and implement it in such a way that anyone can pick it up after your session token are over even though the goal is not complete. In next session review where you are and then start from next phase.
 
-## State as of 2026-07-04 (session end)
+## State as of 2026-07-05 (session end)
 
-> **Where this session's work lives (read first):** Phase 4 **slice 13**
-> (Ed25519 asymmetric plugin-manifest signatures) is on branch
-> `claude/ed25519-asymmetric-signatures-qv6ffa`, started fresh from `origin/main`
-> after PR #93 merged (merge commit `bcaf1ac`). Do **not** stack on the merged
-> `claude/handoff-document-review-bgrpwt` branch. Slices 10–12 (plugin revocation,
-> dependency controls, HMAC signature verification) merged via PR #93 — do **not**
-> re-do them.
+> **Where this session's work lives (read first):** Phase 4 **slices 14–16**
+> (plugin **code runtime** `plugin_runtime_cap`, per-plugin scopes, and
+> network-isolated `plugin_sandboxed_runtime_cap`) are on branch
+> `claude/handoff-document-review-jusao0`, started from `origin/main` after PR #94
+> (slice 13, Ed25519) merged (merge commit `deaab72`). All three ride PR #95.
+> Slice 13 and everything before it are merged — do **not** re-do them.
 >
-> **Environment unblock (important):** the previous "Ed25519 bindings panic on
-> import" blocker was a **missing `cffi`** (`ModuleNotFoundError: No module named
-> '_cffi_backend'`), not a fundamentally broken `cryptography`. Root-caused this
-> session: `pip install cffi` (or, as now shipped, declaring `cryptography>=41` in
-> `pyproject.toml`, which pulls `cffi`) makes Ed25519 sign/verify work here. CI's
-> `pip install -e ".[dev]"` on a fresh runner installs `cffi` transitively, so no
-> extra CI step is needed. Local runs use the system Python 3.11 (`/usr/bin/
-> python3.11`); `pip install -e ".[dev]"` into it gives pytest/ruff/mypy alongside
-> the distro `cryptography`.
+> **Environment unblock (still relevant):** the "Ed25519/cffi bindings panic on
+> import" blocker is a **missing `cffi`** (`ModuleNotFoundError: No module named
+> '_cffi_backend'`). Fix locally with `pip install cffi` after
+> `pip install -e ".[dev]"`. CI's fresh-runner install pulls `cffi` transitively.
+> This session's runtime uses `/usr/local/bin/python3` (3.11); `pip install -e
+> ".[dev]"` then `pip install cffi` gives a green full suite.
 
-Previous pushed anchors (earlier sessions): slice 8 `c8ce3d5`, slice 7
-`c571c9c`; config cwd fallback `29ec83a`.
+Previous pushed anchors (earlier sessions): slice 13 merge `deaab72`, slice 8
+`c8ce3d5`, slice 7 `c571c9c`; config cwd fallback `29ec83a`.
 
-Full suite green after slice 13: **1132 passed, 1 warning**; ruff, mypy (314
-files), and all five `scripts/validate_*.py` validators passed.
+Full suite green after slice 16: **1155 passed, 1 warning**; ruff clean, mypy
+clean on changed sources (remaining mypy output is environmental missing-stub
+noise for `pytest`/`fastapi`/`httpx`/`cryptography` plus one pre-existing
+`test_runtime_authority.py` item), and all five `scripts/validate_*.py`
+validators passed.
 
 - **Phase 4 slices 1–8 done.** Real governed executors now include
   `hosted_model_runtime` + `private_network_model_runtime` (slice 7): the
@@ -137,6 +136,53 @@ files), and all five `scripts/validate_*.py` validators passed.
   `verify_plugin_asymmetric_signature`, wired into `validate_supply_chain`);
   `cryptography>=41` added to `pyproject.toml` dependencies. Evidence:
   `tests/test_phase_4_plugin_asymmetric_signature.py`.
+- **Plugin code runtime slice complete (slice 14, done this session):** the first
+  capability that runs **arbitrary plugin code**. `plugin_runtime_cap` is a real
+  governed executor (`PluginRuntimeExecutor` in
+  `raiker/runtime/executors/tier4_plugins.py`) that runs an installed plugin's
+  declared entrypoint as a **bounded subprocess** through the shared sandbox
+  (`run_command`): interpreter allowlist (`python3`/`python`/`node`),
+  workspace-scoped script path, default 30s / max 120s timeout, 200 KB output
+  caps, argv-only (no shell). It fails closed unless the plugin has a non-revoked
+  `installed` record **and** the owner names it in `RAIKER_PLUGIN_RUNTIME_ALLOWLIST`
+  (empty = fail closed) — the owner grant, not the manifest, authorizes code
+  execution (install still only records safe read-only perms). Fail-closed reason
+  codes: `plugin_not_installed`, `plugin_revoked`,
+  `plugin_runtime_not_allowlisted`, `interpreter_not_allowed:*`,
+  `outside_workspace:entrypoint`, `entrypoint_not_found`, `too_many_args`,
+  `plugin_runtime_sandbox:*`, `plugin_runtime_exit:<code>`. Artifacts are
+  metadata-only (`output_redacted=true`); stdout/stderr never leak into events.
+  Every attempt writes a `plugin_execution_records` row (new id prefix `plgrt_`).
+  **Isolation limit (honest):** posture equals `shell_execution`/`process_execution`
+  — separate process + resource/timeout bounds, but **no** in-process import
+  isolation and **no** network-namespace jail (ambient host network); the
+  `container_execution_cap` path is the stronger-isolation option. Threat model:
+  `docs/threat-models/plugin-runtime.md`. Evidence:
+  `tests/test_phase_4_plugin_runtime.py`.
+- **Per-plugin runtime scope (slice 15, done this session):** extends
+  `plugin_runtime_cap` (no new capability). `RAIKER_PLUGIN_RUNTIME_SCOPES`
+  (`<plugin_id>:<subpath>`, comma-separated) narrows a plugin's entrypoint reach
+  to `<workspace>/<subpath>` so the owner grant is not all-or-nothing
+  (`entrypoint_outside_plugin_scope`; escaping subpath →`plugin_scope_invalid`;
+  no entry → slice-14 behavior). `plugin_runtime_scopes()` +
+  `_check_plugin_scope`. It constrains which entrypoint path may run, not the
+  subprocess's own OS-level filesystem access.
+- **Sandboxed network-isolated plugin runtime (slice 16, done this session):**
+  new capability `plugin_sandboxed_runtime_cap` (`PluginSandboxedRuntimeExecutor`
+  in `raiker/runtime/executors/tier4_plugins.py`). Runs the entrypoint **inside a
+  container** with `--network none`, read-only rootfs, dropped caps, and only the
+  single entrypoint file bind-mounted read-only at `/plugin` (workspace never
+  mounted). Reuses the owner plugin allowlist + per-plugin scopes and adds an
+  owner image requirement: `RAIKER_PLUGIN_RUNTIME_IMAGE` must be set **and** in
+  `container_image_allowlist()` (`RAIKER_CONTAINER_IMAGE_ALLOWLIST`). Fail-closed
+  codes add `plugin_runtime_image_unset`, `image_not_allowed`, `plugin_sandbox:*`
+  (e.g. `docker_unavailable`), `plugin_sandbox_exit:<code>`. Injectable `runner`
+  for daemon-free tests (mirrors `ContainerExecutionExecutor`). Metadata-only
+  artifacts (`network_isolated=true`). Threat model:
+  `docs/threat-models/plugin-sandboxed-runtime.md`. Evidence:
+  `tests/test_phase_4_plugin_sandboxed_runtime.py`. **Still deferred:**
+  in-process import isolation of plugin code in the host, and image build/pull
+  management.
 
 ## How a user turns on a hosted provider (for reference / docs work)
 
@@ -169,17 +215,25 @@ files), and all five `scripts/validate_*.py` validators passed.
    act with local models, not just llama.cpp.
    Implemented as `supports_tool_calls=true`, `tool_call_mode=native_or_text_json`,
    with focused tests and live localhost evidence against `qwen3.5:9b`.
-4. **Plugin runtime promotion (Tier 4)** — the biggest remaining fail-closed
-   area. Completed so far: `plugin_install`, brokered read-only
-   `plugin_execution_cap`, `plugin_revocation_cap` (the off-switch, slice 10),
-   install-time dependency controls (slice 11), HMAC manifest signature
-   verification (slice 12), and **asymmetric Ed25519 signature verification
-   against an owner-trusted public key (slice 13, done this session)**. Still
-   deferred: arbitrary plugin **code runtime** with real sandbox/import/process
-   isolation, runtime permission enforcement, and tests before plugin
-   scripts/hooks/MCP/LSP/monitors/panels can execute (threat-model doc → executor
-   → validator/guard-test lockstep → tests). This is now the single largest
-   remaining fail-closed area.
+4. **Plugin runtime promotion (Tier 4).** Completed so far: `plugin_install`,
+   brokered read-only `plugin_execution_cap`, `plugin_revocation_cap` (the
+   off-switch, slice 10), install-time dependency controls (slice 11), HMAC
+   manifest signature verification (slice 12), asymmetric Ed25519 signature
+   verification (slice 13), **bounded-subprocess plugin code runtime
+   `plugin_runtime_cap` (slice 14)**, **per-plugin filesystem scopes (slice 15)**,
+   and **network-isolated container runtime `plugin_sandboxed_runtime_cap`
+   (slice 16)** — slices 14–16 done this session. Plugin code now runs either as a
+   bounded subprocess (ambient network) or fully network-isolated inside an
+   owner-allowlisted container, both gated on the owner plugin allowlist +
+   interpreter allowlist + workspace/subpath-scoped entrypoint. Still deferred, in
+   likely-next order: (a) **in-process import isolation** of plugin code in the
+   host (both runtimes execute out-of-process; there is still no governed path to
+   `import` a plugin module into Raiker itself); (b) **image build/pull
+   management** for the sandboxed runtime (owner currently supplies + allowlists
+   the image out of band) and per-plugin **network egress** allowlisting for the
+   bare-subprocess runtime; (c) plugin **hooks/MCP/LSP/monitors/panels**
+   activation (each its own threat-model → executor → validator/guard-test →
+   tests slice). Follow the slice discipline below for each.
 5. **Web dashboard parity for slice 7/8 - completed in this session:** surface hosted-model gate state,
    egress allowlist status, and hosted profiles in the Security Settings /
    models views of `apps/web`.

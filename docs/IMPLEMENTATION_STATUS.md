@@ -28,10 +28,30 @@
 > `asymmetric_backend_unavailable` never fails open); unset skips the check so
 > existing manifests are unaffected. The HMAC (symmetric owner key) and Ed25519
 > (asymmetric author-signed against an owner-trusted public key) checks are
-> enforced independently. Arbitrary plugin code/import/process/network/
-> write execution remains deferred. Where the older 2026-06-22 paragraph below
-> says "plugins" have no executor, read that as "arbitrary plugin code
-> execution"; the per-capability source of truth is
+> enforced independently. Phase 4 slice 14 promotes `plugin_runtime_cap`: the
+> first capability that runs **arbitrary plugin code**, executing an installed
+> plugin's declared entrypoint as a bounded subprocess (interpreter allowlist
+> `python3`/`python`/`node`, workspace-scoped script, timeout + output caps,
+> metadata-only artifacts). It fails closed unless the plugin has a non-revoked
+> `installed` record **and** the owner names it in the allowlist
+> `RAIKER_PLUGIN_RUNTIME_ALLOWLIST` (empty = fail closed) — the owner grant, not
+> the manifest, authorizes code execution. Its isolation posture equals
+> `shell_execution`/`process_execution`; in-process import isolation and a
+> network-namespace jail remain deferred (the `container_execution_cap` path is
+> the stronger-isolation option today). See
+> `docs/threat-models/plugin-runtime.md`. Phase 4 slice 15 adds an optional
+> per-plugin workspace subpath scope (`RAIKER_PLUGIN_RUNTIME_SCOPES`) so the owner
+> grant to `plugin_runtime_cap` is not all-or-nothing
+> (`entrypoint_outside_plugin_scope` / `plugin_scope_invalid`). Phase 4 slice 16
+> adds `plugin_sandboxed_runtime_cap`: the network-isolated variant that runs the
+> entrypoint inside an owner-allowlisted container
+> (`RAIKER_PLUGIN_RUNTIME_IMAGE` in `container_image_allowlist()`) with
+> `--network none`, a read-only rootfs, dropped capabilities, and only the single
+> entrypoint file bind-mounted read-only — the workspace is never mounted. See
+> `docs/threat-models/plugin-sandboxed-runtime.md`. In-process import isolation
+> of plugin code in the host remains deferred. Where the older 2026-06-22
+> paragraph below says "plugins" have no executor, read that as the not-yet-built
+> import/in-process model; the per-capability source of truth is
 > `docs/RUNTIME_EXECUTORS_SPEC.md`.
 
 > Current truth (2026-06-22): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Real local executors exist and are governed-flippable for: Tier 1 (`approval_execution_relay`, `file_write_execution`, `patch_apply_execution`, `memory_write_execution`, `memory_forget_execution`), Tier 2 (`shell_execution`, `process_execution`, `web_fetch`, `network_execution` — sandboxed/egress-allowlisted), Tier 3 local code-intelligence (`graph_indexing_runtime`, `semantic_memory_runtime`), the Phase 4 promoted slices (`subagents`, `multi_agent_teams`, `external_channel_runtime`, `channel_approval_relay`, `container_execution_cap`, `scheduled_routines`), and — Phase 4 slice 7 — `hosted_model_runtime` / `private_network_model_runtime` (owner egress allowlist `RAIKER_MODEL_EGRESS_ALLOWLIST`, empty = fail closed; gate-derived provider policy on the chat path). These are the only members of `REAL_EXECUTOR_CAPABILITIES`. Every other capability — plugins, vector/embedding runtime, remote/cloud command execution, and all Tier-6 sensitive domains (email/calendar/finance/investment/medical/pregnancy/cctv/home-security/hardware) — has **no real executor and fails closed** (`not_implemented` / `activation_blocked:no_executor`); it cannot be flipped to a working state. All capability gates still ship `disabled` by default; enabling is owner/`runtime_gate_manager`-only, governed, reversible, and audited. Per-capability detail: [`docs/RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md).
@@ -888,6 +908,44 @@ Scope and boundaries:
 - Arbitrary plugin code execution remains deferred until a separate sandbox/import/process model and runtime permission enforcement exist. Cryptographic signature validation (HMAC slice 12, Ed25519 slice 13) and revocation (slice 10) are now implemented, but code execution stays fail-closed pending the sandbox/import/process model.
 
 Evidence: `tests/test_phase_4_plugin_execution_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
+
+### Phase 4 Slice 14 — Plugin code runtime (`implemented_verified`)
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `plugin_runtime_cap` real executor (bounded subprocess execution of an installed, owner-allowlisted plugin entrypoint) | `implemented_policy_gated` | `raiker/runtime/executors/tier4_plugins.py`, `raiker/runtime/executors/sandbox.py` | `tests/test_phase_4_plugin_runtime.py` |
+
+Scope and boundaries:
+
+- This is the first capability that runs **arbitrary plugin code**. It executes an installed plugin's declared entrypoint as a bounded subprocess via the shared sandbox (`run_command`): interpreter allowlist (`python3`/`python`/`node`), workspace-scoped script path, default 30s / max 120s timeout, 200 KB output caps.
+- Runtime authorization comes from the **owner**, not the manifest: the plugin must have a non-revoked `installed` record **and** be named in `RAIKER_PLUGIN_RUNTIME_ALLOWLIST` (comma-separated; empty = fail closed). The install slice only records safe read-only permissions, so the owner allowlist is the separate, explicit grant for code execution.
+- Fails closed on: missing/invalid `plugin_id` or `entrypoint`, disallowed interpreter (`interpreter_not_allowed`), non-list/oversized args, uninstalled (`plugin_not_installed`) or revoked (`plugin_revoked`) plugin, un-allowlisted plugin (`plugin_runtime_not_allowlisted`), workspace escape (`outside_workspace:entrypoint`), missing script (`entrypoint_not_found`), and sandbox/timeout errors (`plugin_runtime_sandbox:*`). Non-zero exit surfaces as `plugin_runtime_exit:<code>`.
+- Commands run as an argv list (never a shell), so shell metacharacters are inert. Runtime artifacts are metadata only (execution id, plugin id, interpreter, return code, byte counts, `output_redacted=true`); plugin stdout/stderr is never captured into events or artifacts. Every attempt writes a `plugin_execution_records` row.
+- Isolation posture equals `shell_execution`/`process_execution` (separate process, resource + timeout bounds). It does **not** import plugin modules in-process and does **not** provide a network-namespace jail — a plugin subprocess has the host's ambient network, so the owner allowlist is the trust anchor. Kernel-isolated network-off execution stays in the `container_execution_cap` path.
+- Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugin-runtime.md`), and a confirmation token. AI principals can never run or enable it.
+- Deferred: in-process import isolation, runtime permission enforcement beyond the owner allowlist, and network-namespace/kernel sandboxing for plugin code.
+
+Evidence: `tests/test_phase_4_plugin_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_local_single_user_runtime.py`.
+
+### Phase 4 Slice 15 — Per-plugin runtime scope (`implemented_verified`)
+
+Extends `plugin_runtime_cap` (no new capability). The owner may narrow a plugin's filesystem reach below the whole workspace with `RAIKER_PLUGIN_RUNTIME_SCOPES` (comma-separated `<plugin_id>:<subpath>`), so the owner grant is not all-or-nothing. A scoped plugin's entrypoint must resolve inside `<workspace>/<subpath>` or fail closed (`entrypoint_outside_plugin_scope`); a subpath that escapes the workspace fails closed (`plugin_scope_invalid`); a plugin without an entry keeps slice-14 behavior. The scope constrains which entrypoint path may run — it does not OS-jail the subprocess's own filesystem access (that is slice 16). Evidence: `tests/test_phase_4_plugin_runtime.py` (scope cases), `docs/threat-models/plugin-runtime.md`.
+
+### Phase 4 Slice 16 — Sandboxed (network-isolated) plugin runtime (`implemented_verified`)
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| `plugin_sandboxed_runtime_cap` real executor (network-isolated container plugin runtime) | `implemented_policy_gated` | `raiker/runtime/executors/tier4_plugins.py`, `raiker/runtime/executors/containers.py`, `raiker/runtime/executors/sandbox.py` | `tests/test_phase_4_plugin_sandboxed_runtime.py` |
+
+Scope and boundaries:
+
+- The stronger-isolation counterpart to `plugin_runtime_cap`: runs the installed plugin's entrypoint **inside a container** with `--network none`, `--read-only`, `--cap-drop ALL`, `--security-opt no-new-privileges`, and memory/cpu/pid limits. Only the single entrypoint file is bind-mounted read-only at `/plugin/<name>`; the workspace is never mounted.
+- Reuses the owner plugin allowlist (`RAIKER_PLUGIN_RUNTIME_ALLOWLIST`) and per-plugin scopes, and additionally requires an owner-selected image `RAIKER_PLUGIN_RUNTIME_IMAGE` that is also in the shared `container_image_allowlist()` (`RAIKER_CONTAINER_IMAGE_ALLOWLIST`). Fails closed on `plugin_not_installed`, `plugin_revoked`, `plugin_runtime_not_allowlisted`, `plugin_runtime_image_unset`, `image_not_allowed`, `interpreter_not_allowed:*`, workspace/scope escapes, `plugin_sandbox:*` (e.g. `docker_unavailable`), and `plugin_sandbox_exit:<code>`.
+- Artifacts are metadata only (execution id, plugin id, image, interpreter, `network_isolated=true`, return code, byte counts, `output_redacted=true`); container stdout/stderr never leaks. Every attempt records a `plugin_execution_records` row.
+- Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime`, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugin-sandboxed-runtime.md`), and a confirmation token.
+- Deferred: in-process import isolation of plugin code in the host, and image build/pull management (the owner supplies and allowlists the image out of band).
+
+Evidence: `tests/test_phase_4_plugin_sandboxed_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_local_single_user_runtime.py`.
 
 ### Current launchable UI & runtime truth
 

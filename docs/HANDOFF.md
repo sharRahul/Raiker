@@ -15,11 +15,12 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-05 (session end)
 
-> **Where this session's work lives (read first):** Phase 4 **slice 14**
-> (plugin **code runtime** — `plugin_runtime_cap`) is on branch
+> **Where this session's work lives (read first):** Phase 4 **slices 14–16**
+> (plugin **code runtime** `plugin_runtime_cap`, per-plugin scopes, and
+> network-isolated `plugin_sandboxed_runtime_cap`) are on branch
 > `claude/handoff-document-review-jusao0`, started from `origin/main` after PR #94
-> (slice 13, Ed25519) merged (merge commit `deaab72`). Slice 13 and everything
-> before it are merged — do **not** re-do them.
+> (slice 13, Ed25519) merged (merge commit `deaab72`). All three ride PR #95.
+> Slice 13 and everything before it are merged — do **not** re-do them.
 >
 > **Environment unblock (still relevant):** the "Ed25519/cffi bindings panic on
 > import" blocker is a **missing `cffi`** (`ModuleNotFoundError: No module named
@@ -31,7 +32,7 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 Previous pushed anchors (earlier sessions): slice 13 merge `deaab72`, slice 8
 `c8ce3d5`, slice 7 `c571c9c`; config cwd fallback `29ec83a`.
 
-Full suite green after slice 14: **1142 passed, 1 warning**; ruff clean, mypy
+Full suite green after slice 16: **1155 passed, 1 warning**; ruff clean, mypy
 clean on changed sources (remaining mypy output is environmental missing-stub
 noise for `pytest`/`fastapi`/`httpx`/`cryptography` plus one pre-existing
 `test_runtime_authority.py` item), and all five `scripts/validate_*.py`
@@ -158,6 +159,30 @@ validators passed.
   `container_execution_cap` path is the stronger-isolation option. Threat model:
   `docs/threat-models/plugin-runtime.md`. Evidence:
   `tests/test_phase_4_plugin_runtime.py`.
+- **Per-plugin runtime scope (slice 15, done this session):** extends
+  `plugin_runtime_cap` (no new capability). `RAIKER_PLUGIN_RUNTIME_SCOPES`
+  (`<plugin_id>:<subpath>`, comma-separated) narrows a plugin's entrypoint reach
+  to `<workspace>/<subpath>` so the owner grant is not all-or-nothing
+  (`entrypoint_outside_plugin_scope`; escaping subpath →`plugin_scope_invalid`;
+  no entry → slice-14 behavior). `plugin_runtime_scopes()` +
+  `_check_plugin_scope`. It constrains which entrypoint path may run, not the
+  subprocess's own OS-level filesystem access.
+- **Sandboxed network-isolated plugin runtime (slice 16, done this session):**
+  new capability `plugin_sandboxed_runtime_cap` (`PluginSandboxedRuntimeExecutor`
+  in `raiker/runtime/executors/tier4_plugins.py`). Runs the entrypoint **inside a
+  container** with `--network none`, read-only rootfs, dropped caps, and only the
+  single entrypoint file bind-mounted read-only at `/plugin` (workspace never
+  mounted). Reuses the owner plugin allowlist + per-plugin scopes and adds an
+  owner image requirement: `RAIKER_PLUGIN_RUNTIME_IMAGE` must be set **and** in
+  `container_image_allowlist()` (`RAIKER_CONTAINER_IMAGE_ALLOWLIST`). Fail-closed
+  codes add `plugin_runtime_image_unset`, `image_not_allowed`, `plugin_sandbox:*`
+  (e.g. `docker_unavailable`), `plugin_sandbox_exit:<code>`. Injectable `runner`
+  for daemon-free tests (mirrors `ContainerExecutionExecutor`). Metadata-only
+  artifacts (`network_isolated=true`). Threat model:
+  `docs/threat-models/plugin-sandboxed-runtime.md`. Evidence:
+  `tests/test_phase_4_plugin_sandboxed_runtime.py`. **Still deferred:**
+  in-process import isolation of plugin code in the host, and image build/pull
+  management.
 
 ## How a user turns on a hosted provider (for reference / docs work)
 
@@ -194,20 +219,21 @@ validators passed.
    brokered read-only `plugin_execution_cap`, `plugin_revocation_cap` (the
    off-switch, slice 10), install-time dependency controls (slice 11), HMAC
    manifest signature verification (slice 12), asymmetric Ed25519 signature
-   verification (slice 13), and **bounded-subprocess plugin code runtime
-   `plugin_runtime_cap` (slice 14, done this session)** — the first capability
-   that actually runs plugin code, gated on an owner plugin allowlist +
-   interpreter allowlist + workspace-scoped entrypoint. Still deferred, in
-   likely-next order: (a) **in-process import isolation** and a
-   **network-namespace jail** for plugin code (today `plugin_runtime_cap` shares
-   `shell_execution`'s posture — ambient host network; the
-   `container_execution_cap` path is the stronger option and a natural home for
-   a "run plugin entrypoint inside a no-network container image" slice);
-   (b) **runtime permission enforcement** finer than the owner allowlist (e.g.
-   per-plugin filesystem/network scopes checked around the subprocess);
-   (c) plugin **hooks/MCP/LSP/monitors/panels** activation (each its own
-   threat-model → executor → validator/guard-test → tests slice). Follow the
-   slice discipline below for each.
+   verification (slice 13), **bounded-subprocess plugin code runtime
+   `plugin_runtime_cap` (slice 14)**, **per-plugin filesystem scopes (slice 15)**,
+   and **network-isolated container runtime `plugin_sandboxed_runtime_cap`
+   (slice 16)** — slices 14–16 done this session. Plugin code now runs either as a
+   bounded subprocess (ambient network) or fully network-isolated inside an
+   owner-allowlisted container, both gated on the owner plugin allowlist +
+   interpreter allowlist + workspace/subpath-scoped entrypoint. Still deferred, in
+   likely-next order: (a) **in-process import isolation** of plugin code in the
+   host (both runtimes execute out-of-process; there is still no governed path to
+   `import` a plugin module into Raiker itself); (b) **image build/pull
+   management** for the sandboxed runtime (owner currently supplies + allowlists
+   the image out of band) and per-plugin **network egress** allowlisting for the
+   bare-subprocess runtime; (c) plugin **hooks/MCP/LSP/monitors/panels**
+   activation (each its own threat-model → executor → validator/guard-test →
+   tests slice). Follow the slice discipline below for each.
 5. **Web dashboard parity for slice 7/8 - completed in this session:** surface hosted-model gate state,
    egress allowlist status, and hosted profiles in the Security Settings /
    models views of `apps/web`.

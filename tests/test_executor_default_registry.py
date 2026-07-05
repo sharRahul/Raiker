@@ -59,6 +59,8 @@ def test_plugin_caps_are_real_but_bounded(tmp_path: Path) -> None:
     assert "plugin_revocation_cap" in REAL_EXECUTOR_CAPABILITIES
     assert registry.has("plugin_runtime_cap")
     assert "plugin_runtime_cap" in REAL_EXECUTOR_CAPABILITIES
+    assert registry.has("plugin_sandboxed_runtime_cap")
+    assert "plugin_sandboxed_runtime_cap" in REAL_EXECUTOR_CAPABILITIES
 
 
 def test_stub_executors_fail_closed(tmp_path: Path) -> None:

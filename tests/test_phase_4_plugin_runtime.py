@@ -22,6 +22,7 @@ _REVOKE_CAP = "plugin_revocation_cap"
 _REVOKE_DOC = "docs/threat-models/plugin-revocation.md"
 _PLUGIN = "local.runner"
 _ALLOWLIST_ENV = "RAIKER_PLUGIN_RUNTIME_ALLOWLIST"
+_SCOPES_ENV = "RAIKER_PLUGIN_RUNTIME_SCOPES"
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -231,6 +232,59 @@ def test_runtime_reports_nonzero_exit(tmp_path: Path, monkeypatch: pytest.Monkey
     )
     assert result.error == "plugin_runtime_exit:3"
     assert store.list_plugin_execution_records()[0]["status"] == "failed"
+
+
+def test_runtime_allows_entrypoint_within_plugin_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    monkeypatch.setenv(_ALLOWLIST_ENV, _PLUGIN)
+    monkeypatch.setenv(_SCOPES_ENV, f"{_PLUGIN}:plugins/runner")
+    store = SQLiteStore(ws)
+    _install(store)
+    (ws / "plugins" / "runner").mkdir(parents=True)
+    _write_entry(ws, "plugins/runner/entry.py", "print('ok')\n")
+    authority, principal = _authority(ws)
+    result = authority.route_action(
+        _run_action(principal.principal_id, plugin_id=_PLUGIN, entrypoint="plugins/runner/entry.py"),
+        principal,
+    )
+    assert result.decision == "allow"
+    assert result.message == "executed"
+    assert store.list_plugin_execution_records()[0]["status"] == "succeeded"
+
+
+def test_runtime_denies_entrypoint_outside_plugin_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    monkeypatch.setenv(_ALLOWLIST_ENV, _PLUGIN)
+    monkeypatch.setenv(_SCOPES_ENV, f"{_PLUGIN}:plugins/runner")
+    store = SQLiteStore(ws)
+    _install(store)
+    # In the workspace but outside the plugin's scoped subdirectory.
+    _write_entry(ws, "elsewhere.py", "print('nope')\n")
+    authority, principal = _authority(ws)
+    result = authority.route_action(
+        _run_action(principal.principal_id, plugin_id=_PLUGIN, entrypoint="elsewhere.py"),
+        principal,
+    )
+    assert result.error == "entrypoint_outside_plugin_scope"
+    assert store.list_plugin_execution_records()[0]["status"] == "denied"
+
+
+def test_runtime_scope_that_escapes_workspace_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    monkeypatch.setenv(_ALLOWLIST_ENV, _PLUGIN)
+    monkeypatch.setenv(_SCOPES_ENV, f"{_PLUGIN}:../outside")
+    store = SQLiteStore(ws)
+    _install(store)
+    _write_entry(ws, "entry.py", "print('hi')\n")
+    authority, principal = _authority(ws)
+    result = authority.route_action(
+        _run_action(principal.principal_id, plugin_id=_PLUGIN, entrypoint="entry.py"),
+        principal,
+    )
+    assert result.error == "plugin_scope_invalid"
 
 
 def test_runtime_fails_closed_after_revocation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

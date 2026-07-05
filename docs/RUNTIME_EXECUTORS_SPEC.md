@@ -73,7 +73,8 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 | `plugin_install` | 4 | Local manifest validation + install-record creation only; verifies checksum, safe read-only permissions, dependency pins + owner allowlist (`RAIKER_PLUGIN_DEPENDENCY_ALLOWLIST`), and manifest signature (HMAC-SHA256 vs `RAIKER_PLUGIN_SIGNING_KEY` when set, else presence marker; plus asymmetric Ed25519 vs owner-trusted `RAIKER_PLUGIN_ED25519_PUBLIC_KEY` when set, fail-closed), never runs plugin code. |
 | `plugin_execution_cap` | 4 | Installed-plugin brokered read-only tool invocation (`read_file`, `list_directory`, `glob`, `grep`) through ToolBroker/PolicyEngine; no plugin imports, scripts, process, network, or writes. |
 | `plugin_revocation_cap` | 4 | Owner revocation off-switch: flips an installed plugin's record status to `revoked` so `plugin_execution_cap` fails closed for it; never deletes records, edits permissions, or runs plugin code. |
-| `plugin_runtime_cap` | 4 | Bounded subprocess execution of an installed, owner-allowlisted plugin's entrypoint (`RAIKER_PLUGIN_RUNTIME_ALLOWLIST`, empty = fail closed); interpreter allowlist (`python3`/`python`/`node`), workspace-scoped script, timeout + output caps, metadata-only artifacts. No in-process import, no network-namespace jail, no stdout/stderr leakage. |
+| `plugin_runtime_cap` | 4 | Bounded subprocess execution of an installed, owner-allowlisted plugin's entrypoint (`RAIKER_PLUGIN_RUNTIME_ALLOWLIST`, empty = fail closed); interpreter allowlist (`python3`/`python`/`node`), workspace-scoped script + optional per-plugin subpath scope (`RAIKER_PLUGIN_RUNTIME_SCOPES`), timeout + output caps, metadata-only artifacts. No in-process import, no network-namespace jail, no stdout/stderr leakage. |
+| `plugin_sandboxed_runtime_cap` | 4 | Network-isolated variant of the above: runs the entrypoint inside an owner-allowlisted container (`RAIKER_PLUGIN_RUNTIME_IMAGE` ∈ `container_image_allowlist()`) with `--network none`, read-only rootfs, dropped caps, and only the single entrypoint file bind-mounted read-only. Same owner plugin allowlist + per-plugin scope; workspace is never mounted; metadata-only artifacts. |
 
 Tier 2 capabilities additionally require a threat-model ack and a human confirmation
 token to enable (`--confirm <token>` / API `confirmation_token`).
@@ -97,7 +98,8 @@ integration + threat model + tests) before joining `REAL_EXECUTOR_CAPABILITIES`:
   `plugin_install` — `docs/threat-models/plugins.md`;
   `plugin_execution_cap` — `docs/threat-models/plugin-execution.md`;
   `plugin_revocation_cap` — `docs/threat-models/plugin-revocation.md`;
-  `plugin_runtime_cap` — `docs/threat-models/plugin-runtime.md`.
+  `plugin_runtime_cap` — `docs/threat-models/plugin-runtime.md`;
+  `plugin_sandboxed_runtime_cap` — `docs/threat-models/plugin-sandboxed-runtime.md`.
   Remote/cloud command execution stays fail-closed by design — see
   `docs/threat-models/remote-cloud.md`.)
 - **Tier 6 (sensitive domains):** `email_runtime`, `calendar_runtime`,

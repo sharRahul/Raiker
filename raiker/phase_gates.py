@@ -75,6 +75,7 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "plugin_install",
     "plugin_revocation_cap",
     "plugin_runtime_cap",
+    "plugin_sandboxed_runtime_cap",
     "external_channel_runtime",
     "channel_approval_relay",
     "remote_execution_cap",
@@ -167,7 +168,7 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
     _TIER3_EXECUTED_CAPS = ("graph_indexing_runtime", "semantic_memory_runtime",
                              "vector_embedding_runtime", "model_provider_runtime")
     _TIER4_EXECUTED_CAPS = ("plugin_install", "plugin_execution_cap", "plugin_revocation_cap",
-                            "plugin_runtime_cap")
+                            "plugin_runtime_cap", "plugin_sandboxed_runtime_cap")
     _TIER5_EXECUTED_CAPS = ("external_channel_runtime", "channel_approval_relay",
                              "remote_execution_cap", "container_execution_cap",
                              "cloud_execution_cap", "hosted_model_runtime",

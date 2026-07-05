@@ -99,6 +99,9 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     r["plugin_runtime_cap"] = _req(
         "plugin_runtime_cap", "4", threat_ack=True, human_confirm=True,
         notes="Bounded subprocess plugin code runtime; owner plugin allowlist, interpreter allowlist.")
+    r["plugin_sandboxed_runtime_cap"] = _req(
+        "plugin_sandboxed_runtime_cap", "4", threat_ack=True, human_confirm=True,
+        notes="Network-isolated container plugin runtime; owner plugin + image allowlist.")
 
     # Tier 5
     for cap in ("external_channel_runtime", "channel_approval_relay"):

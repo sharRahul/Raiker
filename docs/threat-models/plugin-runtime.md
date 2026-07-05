@@ -46,6 +46,26 @@ remain deferred to a future "sandboxed plugin runtime" slice (the
 - Every attempt records a `plugin_execution_records` row with status
   `succeeded`, `failed`, or `denied`.
 
+## Per-plugin scope (slice 15)
+
+The owner may narrow a plugin's filesystem reach below the whole workspace with
+`RAIKER_PLUGIN_RUNTIME_SCOPES` (comma-separated `<plugin_id>:<subpath>` entries,
+e.g. `local.runner:plugins/runner`). This makes the owner grant *not*
+all-or-nothing:
+
+- When a plugin has a scope entry, its entrypoint must resolve inside
+  `<workspace>/<subpath>` or the run fails closed with
+  `entrypoint_outside_plugin_scope`.
+- A configured subpath that escapes the workspace (e.g. `../outside`) fails
+  closed with `plugin_scope_invalid` — a misconfiguration never widens reach.
+- A plugin with no entry keeps the slice-14 behavior (entrypoint anywhere inside
+  the workspace root). Malformed or empty entries are ignored.
+
+The scope constrains only which entrypoint path may run; it does not sandbox the
+subprocess's own filesystem access at the OS level (a scoped script can still
+read the workspace like any other process). OS-level filesystem/network jailing
+is the sandboxed-runtime path (`plugin_sandboxed_runtime_cap`).
+
 ## Explicit non-goals
 
 - No in-process import or dynamic module loading of plugin code.

@@ -947,6 +947,19 @@ Scope and boundaries:
 
 Evidence: `tests/test_phase_4_plugin_sandboxed_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_local_single_user_runtime.py`.
 
+### Phase 5 Slice 1 — Capability decision modes (`implemented_verified`)
+
+| Capability | Status | Source | Tests |
+|---|---|---|---|
+| Ask / Deny / Always Allow / Auto decision modes (per-capability, layered on gates) | `implemented_policy_gated` | `raiker/runtime/authority/decision_modes.py`, `raiker/runtime/authority/router.py`, `raiker/control/service.py`, `raiker/storage/migrations.py` (`capability_decision_mode`), `raiker/cli/commands.py` (`/capability-mode`) | `tests/test_phase_5_decision_modes.py` |
+
+- Adds a per-capability decision mode — **`ask` (default) / `deny` / `always_allow` / `auto`** — layered on top of the existing capability gate. The gate still governs *whether* a capability is enabled (default-disabled, fail-closed); the mode governs *how* an AI-proposed action on an enabled capability is treated. See `docs/DECISION_MODES_SPEC.md`.
+- **Safety floors preserved:** PolicyEngine hard-denies still block first; critical-risk actions always require a human (`always_allow`/`auto` can never let an AI take a critical action); `auto` is deterministic and auditable (risk-keyed, no opaque model call in the trust decision); human principals self-authorize as before.
+- **Governance:** setting a mode is human `runtime_gate_manager`-only (AI refused), audited via `capability_decision_mode_set`, persisted in the `capability_decision_mode` table (separate from `capability_gate_state`, so gate transitions never clobber the mode). Permissive modes (`always_allow`/`auto`) require a real executor — sensitive/no-executor domains are refused with `decision_mode_requires_executor` and can never be relaxed into acting.
+- Approval resolution remains metadata-only; this slice adds no new capability and no new executor.
+
+Evidence: `tests/test_phase_5_decision_modes.py`, `scripts/validate_repo_truthfulness.py`.
+
 ### Current launchable UI & runtime truth
 
 The launchable local UIs are (1) the plain local terminal client (`RAIKER_TUI=plain`, `--prompt`,

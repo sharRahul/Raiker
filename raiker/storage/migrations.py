@@ -939,6 +939,23 @@ CREATE TABLE IF NOT EXISTS capability_gate_state (
 );
 """
 
+# ── Capability Decision Modes (Ask / Deny / Always Allow / Auto) ─────────────
+
+CAPABILITY_DECISION_MODE_MIGRATION_ID = "RAIKER-1003-capability-decision-mode"
+
+CAPABILITY_DECISION_MODE_SQL = """
+CREATE TABLE IF NOT EXISTS capability_decision_mode (
+  capability TEXT PRIMARY KEY,
+  decision_mode TEXT NOT NULL,
+  set_by TEXT,
+  set_at TEXT,
+  reason TEXT,
+  event_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
 # ── Threat Model Acks (Workstream C) ─────────────────────────────────────────
 
 THREAT_MODEL_ACKS_MIGRATION_ID = "RAIKER-11002-threat-model-acks"

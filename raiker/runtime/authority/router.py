@@ -11,6 +11,13 @@ from raiker.events.writer import EventLogWriter
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.authority.activation import evaluate_activation_requirement
+from raiker.runtime.authority.decision_modes import (
+    DEFAULT_DECISION_MODE,
+    PERMISSIVE_MODES,
+    DecisionMode,
+    auto_requires_approval,
+    parse_decision_mode,
+)
 from raiker.runtime.authority.models import (
     AI_ROLE_NAMES,
     HUMAN_ONLY_ROLES,
@@ -246,6 +253,61 @@ class RuntimeAuthority:
             return {"capability": cap_name, "state": CapabilityState.DISABLED, "source": "unknown"}
         return {"capability": cap_name, "state": gate.state.value, "source": "static_default"}
 
+    def _resolve_decision_mode(self, capability: str) -> DecisionMode:
+        persisted = self.store.get_capability_decision_mode(capability)
+        mode = parse_decision_mode(persisted) if persisted else None
+        return mode or DEFAULT_DECISION_MODE
+
+    def get_capability_decision_mode(self, capability: str) -> str:
+        return self._resolve_decision_mode(capability).value
+
+    def set_capability_decision_mode(
+        self, capability: str, mode: str, principal: Principal, reason: str = "",
+    ) -> str | None:
+        """Governed, human-only change of a capability's decision mode.
+
+        Returns None on success or a reason-code string when refused. Permissive
+        modes (``always_allow``/``auto``) may only be set on capabilities with a
+        real executor, so a sensitive/no-executor domain can never be relaxed
+        into acting.
+        """
+        from raiker.phase_gates import ALL_CAPABILITIES
+        from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
+        gate_check = self._check_human_runtime_gate_manager(principal)
+        if gate_check:
+            self._event("capability_decision_mode_set", principal.principal_id, {
+                "capability": capability, "requested_mode": mode,
+                "status": "denied", "reason": gate_check,
+            })
+            return gate_check
+        if capability not in ALL_CAPABILITIES:
+            return f"unknown_capability:{capability}"
+        parsed = parse_decision_mode(mode)
+        if parsed is None:
+            return f"invalid_decision_mode:{mode}"
+        if parsed in PERMISSIVE_MODES and capability not in REAL_EXECUTOR_CAPABILITIES:
+            self._event("capability_decision_mode_set", principal.principal_id, {
+                "capability": capability, "requested_mode": parsed.value,
+                "status": "denied", "reason": "decision_mode_requires_executor",
+            })
+            return f"decision_mode_requires_executor:{capability}"
+        now = utc_now()
+        self.store.upsert_capability_decision_mode({
+            "capability": capability,
+            "decision_mode": parsed.value,
+            "set_by": principal.principal_id,
+            "set_at": now,
+            "reason": reason,
+            "event_id": "",
+            "created_at": now,
+            "updated_at": now,
+        })
+        self._event("capability_decision_mode_set", principal.principal_id, {
+            "capability": capability, "decision_mode": parsed.value, "reason": reason,
+        })
+        return None
+
     def get_runtime_mode(self) -> dict[str, Any]:
         active = self.store.get_active_runtime_mode()
         if active is not None:
@@ -475,6 +537,23 @@ class RuntimeAuthority:
                 message="denied_by_policy",
             )
 
+        # Per-capability decision mode (ask / deny / always_allow / auto) is
+        # resolved only for governed capabilities; unmapped action types keep
+        # their pre-existing behavior.
+        cap_for_mode = CAPABILITY_GATE_MAP.get(action.action_type) or CAPABILITY_GATE_MAP.get(
+            action.tool_or_service_name
+        )
+        mode = self._resolve_decision_mode(cap_for_mode) if cap_for_mode else None
+        if mode == DecisionMode.DENY:
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="deny",
+                policy_decision=decision,
+                message="denied_by_decision_mode",
+            )
+
+        # Critical-risk actions always require a human, regardless of decision
+        # mode — always_allow/auto can never let an AI take a critical action.
         if action.risk_level == RiskLevelValue.CRITICAL:
             if principal.principal_type != PrincipalType.HUMAN:
                 return GovernedActionResult(
@@ -490,7 +569,19 @@ class RuntimeAuthority:
                 message="critical_action_requires_human_confirmation",
             )
 
-        if (action.requires_approval or decision.decision == "needs_approval") and principal.principal_type != PrincipalType.HUMAN:
+        raw_needs_approval = action.requires_approval or decision.decision == "needs_approval"
+        if mode is None:
+            effective_needs_approval = raw_needs_approval
+        elif mode == DecisionMode.ALWAYS_ALLOW:
+            effective_needs_approval = False
+        elif mode == DecisionMode.AUTO:
+            # Owner delegated the decision to Raiker's deterministic risk policy;
+            # policy hard-denies already returned above, and critical is floored.
+            effective_needs_approval = auto_requires_approval(action.risk_level)
+        else:  # ASK (default) forces approval for AI-proposed actions
+            effective_needs_approval = True
+
+        if effective_needs_approval and principal.principal_type != PrincipalType.HUMAN:
             return GovernedActionResult(
                     action_id=action.action_id,
                     decision="needs_approval",

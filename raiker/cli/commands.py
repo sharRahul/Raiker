@@ -2141,6 +2141,40 @@ def handle_capability_gate_disable(command: str, *, workspace_root: str | Path =
     )
 
 
+def handle_capability_mode(command: str, *, workspace_root: str | Path = ".") -> str:
+    """`/capability-mode <capability> [ask|deny|always_allow|auto] [--reason r] [--as p]`.
+
+    With no mode argument, prints the capability's current decision mode; with a
+    mode, sets it (human `runtime_gate_manager` only). Permissive modes
+    (always_allow/auto) require a real executor.
+    """
+    parts = shlex.split(command)
+    if len(parts) < 2:
+        return "Usage: /capability-mode <capability> [ask|deny|always_allow|auto] [--reason <reason>] [--as <principal_id>]"
+    capability = parts[1]
+    service = RuntimeControlService(workspace_root)
+    mode = ""
+    if len(parts) >= 3 and not parts[2].startswith("--"):
+        mode = parts[2]
+    if not mode:
+        current = service.get_capability_decision_mode(capability)
+        return f"Capability '{capability}' decision mode: {current.data['decision_mode']}"
+    reason = ""
+    explicit_principal = None
+    if "--reason" in parts:
+        ridx = parts.index("--reason")
+        if ridx + 1 < len(parts):
+            reason = parts[ridx + 1]
+    if "--as" in parts:
+        aidx = parts.index("--as")
+        if aidx + 1 < len(parts):
+            explicit_principal = parts[aidx + 1]
+    result = service.set_capability_decision_mode(capability, mode, explicit_principal, reason)
+    if not result.ok:
+        return f"Decision mode change denied: {result.reason_code}"
+    return f"Capability '{capability}' decision mode set to '{mode}'."
+
+
 def handle_runtime_readiness(*, workspace_root: str | Path = ".") -> str:
     from raiker.phase_gates import RUNTIME_DOMAIN_CAPABILITIES, CapabilityState
 
@@ -2698,6 +2732,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_capability_gate_enable(command, workspace_root=workspace_root)
     if command.startswith("/capability-gate disable "):
         return handle_capability_gate_disable(command, workspace_root=workspace_root)
+    if command == "/capability-mode" or command.startswith("/capability-mode "):
+        return handle_capability_mode(command, workspace_root=workspace_root)
     if command == "/runtime-readiness":
         return handle_runtime_readiness(workspace_root=workspace_root)
     if command == "/routines":

@@ -79,6 +79,7 @@ currently exposes. It is the source of truth checked by `scripts/validate_repo_t
 /capability-gate <capability>
 /capability-gate enable <capability> --state <state> [--reason <reason>]
 /capability-gate disable <capability> [--reason <reason>]
+/capability-mode <capability> [ask|deny|always_allow|auto] [--reason <reason>] [--as <principal_id>]
 /runtime-readiness
 /bootstrap-owner [--display <name>] [--email <email>] [--force-recover] [--confirm-local-recovery] [--reason <reason>]
 /whoami
@@ -101,6 +102,7 @@ currently exposes. It is the source of truth checked by `scripts/validate_repo_t
 | `/capability-gate <cap>` | implemented | low | RuntimeAuthority.get_effective_capability_gate() | read-only | no | after bootstrap |
 | `/capability-gate enable` | implemented | high | RuntimeAuthority.enable_capability_gate(); persisted in capability_gate_state table | sets gate state; appends event | owner or rl_rgm | after bootstrap |
 | `/capability-gate disable` | implemented | high | RuntimeAuthority.disable_capability_gate(); persisted in capability_gate_state table | sets gate state; appends event | owner or rl_rgm | after bootstrap |
+| `/capability-mode` | implemented | high | RuntimeAuthority.set/get_capability_decision_mode(); persisted in capability_decision_mode table | sets/reads ask\|deny\|always_allow\|auto; appends event | owner or rl_rgm | after bootstrap |
 | `/runtime-readiness` | implemented | low | reads runtime mode, owner status, gate manager, principal, dangerous gates | read-only | no | after bootstrap |
 
 /semantic-memory

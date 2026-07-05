@@ -296,6 +296,25 @@ class RuntimeControlService:
             return ControlResult(ok=False, reason_code=denial)
         return ControlResult(ok=True, data={"capability": capability, "target_state": target_state})
 
+    def set_capability_decision_mode(
+        self,
+        capability: str,
+        mode: str,
+        acting_principal_id: str | None,
+        reason: str = "",
+    ) -> ControlResult:
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        denial = self._authority.set_capability_decision_mode(capability, mode, principal, reason)
+        if denial is not None:
+            return ControlResult(ok=False, reason_code=denial)
+        return ControlResult(ok=True, data={"capability": capability, "decision_mode": mode})
+
+    def get_capability_decision_mode(self, capability: str) -> ControlResult:
+        mode = self._authority.get_capability_decision_mode(capability)
+        return ControlResult(ok=True, data={"capability": capability, "decision_mode": mode})
+
     def disable_capability(
         self,
         capability: str,

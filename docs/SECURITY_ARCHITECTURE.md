@@ -185,7 +185,7 @@ Model output is always untrusted. No tool, plugin, channel, subagent, remote, me
 
 ## Runtime Mode and Capability Gate Activation
 
-Runtime mode and capability gate activation is governed by `RuntimeAuthority`. Only the human `runtime_gate_manager` role can activate `local_single_user_runtime` or enable `admin_mutation`/`role_mutation` capability gates. AI principals cannot activate runtime modes or capability gates. Activation events are audited via the event log. Runtime mode state is persisted in the `runtime_mode_state` table; capability gate state is persisted in the `capability_gate_state` table. All 47 capabilities remain default-disabled.
+Runtime mode and capability gate activation is governed by `RuntimeAuthority`. Only the human `runtime_gate_manager` role can activate `local_single_user_runtime` or enable `admin_mutation`/`role_mutation` capability gates. AI principals cannot activate runtime modes or capability gates. Activation events are audited via the event log. Runtime mode state is persisted in the `runtime_mode_state` table; capability gate state is persisted in the `capability_gate_state` table. All 53 capabilities remain default-disabled.
 
 ## Disabled Capabilities
 

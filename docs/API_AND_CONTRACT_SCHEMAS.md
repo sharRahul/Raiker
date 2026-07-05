@@ -392,7 +392,7 @@ not execute the approved action.
 
 ## Persisted runtime mode and capability gate state
 
-Runtime mode state and capability gate state are persisted in SQLite tables (`runtime_mode_state`, `capability_gate_state`) and read by `RuntimeAuthority` on startup. All 47 capabilities default to disabled. State survives restarts and is governed via the `runtime_gate_manager` human-only role.
+Runtime mode state and capability gate state are persisted in SQLite tables (`runtime_mode_state`, `capability_gate_state`) and read by `RuntimeAuthority` on startup. All 53 capabilities default to disabled. State survives restarts and is governed via the `runtime_gate_manager` human-only role.
 
 ## Phase 3 workspace inspection contract
 

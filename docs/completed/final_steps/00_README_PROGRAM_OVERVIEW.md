@@ -59,7 +59,7 @@ These must remain true at every commit. A task that breaks one is rejected.
 | Area | File(s) | Reality |
 |---|---|---|
 | Governance core | `raiker/runtime/authority/router.py` (`RuntimeAuthority`, `ActionRouter`) | Implemented, persisted, governed, audited. Clean primitives exist. |
-| Capability model | `raiker/phase_gates.py` (`ALL_CAPABILITIES`, `CapabilityState`, `default_capability_gates()`) | ~47 capabilities, all default-disabled. |
+| Capability model | `raiker/phase_gates.py` (`ALL_CAPABILITIES`, `CapabilityState`, `default_capability_gates()`) | ~53 capabilities, all default-disabled. |
 | Gate/mode persistence | `raiker/storage/sqlite.py` (`upsert_capability_gate_state`, `get_active_runtime_mode`, …) | Persisted + reversible. |
 | Toggle logic | `raiker/cli/commands.py` (`handle_capability_gate_enable`, `handle_runtime_mode_*`, …) | **String-in / string-out CLI handlers only.** No interface-agnostic facade. |
 | Prompt path | `raiker/gateway/agent_gateway.py` (`submit_prompt`, `astream_prompt`) | Prompt turns only; **no control-plane methods**. |

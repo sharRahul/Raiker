@@ -47,6 +47,23 @@ through `ToolBroker` and `PolicyEngine`. Arbitrary plugin code/import/process,
 network, writes, hooks, MCP/LSP, monitors, panels, and runtime permission grants
 remain active gaps.
 
+Executor implementation update (2026-07-04/05, slices 10-16): the Tier-4 plugin
+path is now substantially implemented and out of the no-executor backlog, all
+default-disabled and governed. `plugin_revocation_cap` (slice 10) is the
+fail-closed off-switch. Install-time supply-chain controls: dependency pins +
+owner allowlist (slice 11), HMAC-SHA256 manifest signatures (slice 12), and
+asymmetric Ed25519 signatures against an owner-trusted key (slice 13). **Plugin
+code execution now exists** (previously the largest gap): `plugin_runtime_cap`
+(slice 14) runs an installed, owner-allowlisted plugin's entrypoint as a bounded
+subprocess (interpreter allowlist, workspace-scoped, timeout/output caps,
+metadata-only); slice 15 adds optional per-plugin workspace subpath scopes; and
+`plugin_sandboxed_runtime_cap` (slice 16) runs the entrypoint inside a
+no-network container (read-only rootfs, dropped caps, only the entrypoint file
+mounted) for kernel-level isolation. Still active gaps: in-process import of
+plugin modules into the host, plugin hooks/MCP/LSP/monitors/panels activation,
+per-plugin network-egress allowlisting for the bare-subprocess runtime, and
+image build/pull management for the sandboxed runtime.
+
 Completed items (no longer active gaps):
 - strict runtime enforcement — completed
 - controlled runtime mode activation — implemented
@@ -123,7 +140,7 @@ All items below are specified but not implemented unless explicitly marked other
 | Voice UI and Browser Extension | Spec only. | UI/UX | phase8_deferred | RAIKER-8601 | Consent, transcript redaction, extension permissions tests. | external_channels_enabled=false | No microphone/browser access before explicit enablement. |
 | Hook handler types http/mcp_tool/prompt/agent | Hook specs exist; handlers missing. | HOOKS_SPEC | specified_not_implemented | RAIKER-8701 | Handler policy, audit events, dry-run tests. | network_execution_enabled=false, plugin_execution_enabled=false | Unsupported hook types fail closed with clear errors. |
 | Subagent spawning/team execution | Strategy docs/contracts only. | MULTI_AGENT_AND_SUBAGENT_STRATEGY | specified_not_implemented | RAIKER-8702 | Agent identity, budgets, event causality, cancellation tests. | runtime_execution_enabled=false | No subagent runtime until isolation and policy tests exist. |
-| Plugin code execution | Manifest planning/validation only. | Tool/plugin catalog | readiness_only | RAIKER-8703 | Sandboxing, signatures, permission prompts, event logs. | plugin_execution_enabled=false | Plugin code cannot execute until isolated and approved. |
+| Plugin code execution | **Implemented (default-disabled, governed)**: `plugin_runtime_cap` (bounded subprocess, slice 14) and `plugin_sandboxed_runtime_cap` (no-network container, slice 16), gated on an owner plugin allowlist + interpreter allowlist + workspace/subpath scope, with HMAC/Ed25519 install signatures and revocation. | Tool/plugin catalog, `docs/RUNTIME_EXECUTORS_SPEC.md` | implemented (`implemented_policy_gated`) | RAIKER-8703 | Remaining: in-process module import, hooks/MCP/LSP/monitors/panels, per-plugin network egress, image build/pull. | plugin_runtime gates default-disabled | Plugin code runs only when the owner enables the gate and allowlists the plugin; otherwise fails closed. |
 | Graph/codemap runtime indexing | Readiness/dry-run only. | Architecture, memory specs | readiness_only | RAIKER-9001 | Index storage migrations, redaction, incremental tests. | graph_indexing_enabled=false | Index writes occur only after explicit opt-in and tests. |
 | Semantic/vector writes and embeddings | Status/readiness only. | Memory specs | readiness_only | RAIKER-9002 | Vector store policy, retention, embedding-provider tests. | semantic_memory_writes_enabled=false, vector_writes_enabled=false, embedding_creation_enabled=false | No embedding/vector writes before policy and storage gates. |
 | External transports and notifications | Registry/readiness only. | Channels specs | readiness_only | RAIKER-8704 | Connector auth, outbound allowlist, redacted event tests. | external_channels_enabled=false, notifications_enabled=false | Outbound messages disabled until explicit connector approval. |
@@ -144,7 +161,7 @@ All items below are specified but not implemented unless explicitly marked other
 | Formal threat model review per deferred capability | missing/deferred | Run and record a threat-model review before enabling each Phase 8 client, plugin runtime, channel transport, remote execution adapter, shell/process/network tool, graph indexer, semantic/vector writer, subagent/team runtime, approval relay, or scheduler. |
 | Authentication/authorization model for future Web/API clients | missing/deferred | Define identities, roles, sessions, tokens/cookies, CSRF/CORS, rate limits, admin boundaries, and API authorization tests before any Web/API server is runtime-enabled. |
 | Secure session isolation for future multi-client interfaces | missing/deferred | Bind client identity, session scope, approval authority, event subscriptions, and redaction policy before Desktop/Web/Mobile/IDE/API clients can share sessions. |
-| Plugin sandboxing model | missing/deferred | Define sandbox/runtime isolation, signatures, permission diffs, install/activate approval flow, revocation, event logging, and abuse tests before plugin execution is enabled. |
+| Plugin sandboxing model | **largely implemented** (slices 12-16) | Signatures (HMAC + Ed25519), install/activate governance, revocation off-switch, event logging, and abuse/fail-closed tests exist; plugin code runs as a bounded subprocess or in a no-network container with an owner plugin/image allowlist and per-plugin subpath scope. Remaining: in-process module import isolation, per-plugin network-egress allowlisting for the subprocess runtime, and image build/pull management. |
 | Remote execution sandboxing model | missing/deferred | Define container/remote/cloud isolation, secret injection, egress limits, artifact handling, cost/budget policy, cancellation, and audit records before remote execution is enabled. |
 | Secret storage and redaction design | missing/deferred | Add API-key/connector-token storage, rotation, masking, export redaction, provider prompt redaction, and regression tests before broader hosted/external integrations. |
 | Log integrity/tamper evidence | missing/deferred | Add hash chaining, verification/export semantics, retention policy, and tamper-evidence tests if Raiker needs stronger audit guarantees than local append-style logs. |

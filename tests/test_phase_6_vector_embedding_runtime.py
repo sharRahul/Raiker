@@ -88,9 +88,8 @@ def test_vector_embedding_is_real_executor(tmp_path: Path) -> None:
     registry = build_default_executor_registry(ws, SQLiteStore(ws))
     assert _CAP in REAL_EXECUTOR_CAPABILITIES
     assert registry.has(_CAP)
-    # The provider-backed sibling stays fail-closed.
-    assert "model_provider_runtime" not in REAL_EXECUTOR_CAPABILITIES
-    assert not registry.has("model_provider_runtime")
+    # The provider-backed sibling is a separate real executor (egress-gated).
+    assert "model_provider_runtime" in REAL_EXECUTOR_CAPABILITIES
 
 
 # ── Fails closed when the gate is disabled ───────────────────────────────────

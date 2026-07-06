@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from raiker.graph.indexer import GraphIndexer
-from raiker.runtime.executors.base import ExecutionResult, not_implemented
+from raiker.runtime.executors.base import ExecutionResult
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -160,15 +160,3 @@ class VectorEmbeddingExecutor:
             summary="Vector embedding runtime failed closed.",
             artifacts={},
         )
-
-
-class ModelProviderExecutor:
-    capability = "model_provider_runtime"
-
-    def __init__(self, workspace_root: str | Path) -> None:
-        self._workspace_root = Path(workspace_root).resolve()
-
-    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        # Real provider dispatch is owned by the gateway/provider layer; this
-        # executor does not perform a model call, so it fails closed.
-        return not_implemented(self.capability, action.action_id)

@@ -4,9 +4,9 @@
 a genuine embedding **entirely locally** — no embedding-model download, no
 network call, no external service. It computes a deterministic embedding with the
 hashing trick (`raiker.vector.embed_text`) and persists a `vector_records` row.
-The provider-backed sibling `model_provider_runtime` (learned semantic embeddings
-or generation through an LLM provider) stays **fail-closed** until its own
-egress-gated slice lands.
+The provider-backed sibling `model_provider_runtime` (semantic embeddings through
+an LLM provider) is a **separate, egress-gated executor** — see
+[`model-provider.md`](model-provider.md).
 
 ## What the embedding is (honest scope)
 
@@ -54,4 +54,4 @@ egress-gated slice lands.
   missing-text fail-closed, unknown-action fail-closed, list-returns-count, and
   that source text never appears in runtime event payloads.
 - `tests/test_executor_default_registry.py` proves `vector_embedding_runtime` is
-  in `REAL_EXECUTOR_CAPABILITIES` while `model_provider_runtime` is not.
+  in `REAL_EXECUTOR_CAPABILITIES` while the sensitive/no-executor domains are not.

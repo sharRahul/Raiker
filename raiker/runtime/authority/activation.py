@@ -91,7 +91,8 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     for cap in ("graph_indexing_runtime", "semantic_memory_runtime", "vector_embedding_runtime"):
         r[cap] = _req(cap, "3", notes="Local indexing / embedding runtime; executor registered.")
     r["model_provider_runtime"] = _req(
-        "model_provider_runtime", "3", notes="Provider-backed model runtime; executor pending.")
+        "model_provider_runtime", "3", threat_ack=True, human_confirm=True,
+        notes="Provider-backed embedding; egress + hosted/private gate + API-key gated; executor registered.")
 
     # Tier 4
     for cap in ("plugin_execution_cap", "plugin_install", "plugin_revocation_cap"):

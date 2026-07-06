@@ -15,6 +15,38 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-06 (session end)
 
+> **This session — part 3 (next real executor: `model_provider_runtime`):**
+> promoted `model_provider_runtime` from a fail-closed stub to a **real,
+> egress-gated, provider-backed embedding executor** (`ModelProviderExecutor` in
+> `raiker/runtime/executors/models_runtime.py`; the stub left `tier3_core.py`). It
+> calls a real LLM provider's embedding endpoint via `ModelRouter.aembed` and
+> persists the returned **semantic** vector to the shared `vector_records` table
+> (`embedding_model=<provider>:<model>`), complementing the local hashing
+> embedding. Layered fail-closed gating: owner egress allowlist
+> (`RAIKER_MODEL_EGRESS_ALLOWLIST`, empty = closed, checked before any call) +
+> hosted/private gate state (`provider_runtime_policy_from_gates`) + API-key from
+> owner env only (never from args, never in events). `operation: embed` only.
+> Provider client is **injectable** (`embedder=`) so tests exercise the governed
+> persistence path with no live provider/credentials/network.
+> - Enabling now requires threat-model ack + confirmation token (added to
+>   `_DANGEROUS_CAPS` and `activation.py` `threat_ack/human_confirm`); doc
+>   `docs/threat-models/model-provider.md`.
+> - Registered in `REAL_EXECUTOR_CAPABILITIES` + default registry. Lockstep test
+>   updates: removed `model_provider_runtime` from
+>   `test_executor_default_registry.py::_SENSITIVE`; the "no-executor deferred cap"
+>   examples in `test_security_regression_ui.py` + `test_api_m5_security_settings.py`
+>   now use `hardware_operator_runtime` (a durable no-executor domain); fixed the
+>   sibling assertion in `test_phase_6_vector_embedding_runtime.py`. Docs updated:
+>   `IMPLEMENTATION_STATUS.md`, `RUNTIME_EXECUTORS_SPEC.md`,
+>   `guide/capabilities-deferred.md`, and the vector-embedding threat model.
+>   Evidence: `tests/test_phase_7_model_provider_runtime.py` (8 tests).
+> - Full suite **1205 passed**; ruff + mypy clean on changed sources; all five
+>   validators pass.
+> - **Honest limit:** only `embed` is implemented; generation/chat stays in the
+>   gateway/provider layer. **Next real-executor targets:** live hosted-provider
+>   verification (evidence only — run one governed `anthropic-hosted` turn with an
+>   operator key), then the remaining graph/semantic promotions.
+
 > **This session — part 2 (next real executor: `vector_embedding_runtime`):**
 > promoted the Tier-3 `vector_embedding_runtime` from a fail-closed stub to a
 > **real, local-only executor** (next target named in the handoff). It computes a

@@ -60,9 +60,9 @@ class TestRuntimeMutations:
     def test_fail_closed_cap_cannot_be_enabled(self, workspace: Path, client: TestClient) -> None:
         headers = _owner_headers(workspace)
         _activate(client, headers)
-        # model_provider_runtime has no registered executor → fail-closed / deferred.
+        # hardware_operator_runtime has no registered executor → fail-closed / deferred.
         resp = client.post(
-            "/api/capability-gates/model_provider_runtime/set",
+            "/api/capability-gates/hardware_operator_runtime/set",
             json={"target_state": "enabled_runtime", "reason": "try"},
             headers=headers,
         )
@@ -75,7 +75,7 @@ class TestRuntimeMutations:
         headers = _owner_headers(workspace)
         _activate(client, headers)
         gate = client.get(
-            "/api/capability-gates/model_provider_runtime", headers=headers
+            "/api/capability-gates/hardware_operator_runtime", headers=headers
         ).json()
         # The UI uses allowed_transitions to decide enableability: no-executor caps expose no
         # enabled_policy_gated / enabled_runtime target.

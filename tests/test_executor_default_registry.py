@@ -21,9 +21,8 @@ _SENSITIVE = (
     "medical_runtime", "finance_runtime", "investment_runtime", "cctv_runtime",
     "home_security_runtime", "hardware_operator_runtime", "remote_execution_cap",
     "cloud_execution_cap",
-    # model_provider_runtime (provider-backed embeddings/generation) stays
-    # executor-less; vector_embedding_runtime is now a real local executor.
-    "model_provider_runtime",
+    # vector_embedding_runtime (local) and model_provider_runtime (provider-backed)
+    # are now real executors; the sensitive/no-executor domains above stay stubbed.
 )
 
 

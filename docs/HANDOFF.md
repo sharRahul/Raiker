@@ -195,8 +195,13 @@ validators passed.
   --model gemma4:31b-cloud` + `raiker --prompt` completed a live gateway turn
   (events + checkpoint persisted). Use `gemma4:31b-cloud` for future manual
   Ollama testing (owner preference — faster).
-- Hosted profiles are offline/mock-verified only (`implemented_unverified`
-  against live keys).
+- `anthropic-hosted` is **live-verified** (2026-07-06, operator key): a governed
+  turn ran through the real path (gate enabled via control plane → gate-derived
+  policy → owner egress allowlist enforced) and returned `finish_reason=stop`
+  (usage input=29/output=17); the egress guard was confirmed fail-closed
+  (`model_egress_denied` when the host is not allowlisted). `openai-hosted` /
+  `gemini-hosted-openai-compatible` remain offline/mock-verified
+  (`implemented_unverified`) until an operator supplies their keys.
 - **Config packaging follow-up complete:** `ModelProfileRegistry.load()` and
   `ConnectorRegistry.load()` keep workspace-local `config/` overrides, then
   fall back to bundled `raiker.config` JSON resources. The wheel now includes
@@ -347,9 +352,13 @@ validators passed.
    package data, and add a test that loads the registry from a foreign cwd.
    Implemented with bundled `raiker.config` resources, drift tests, and a
    wheel-content check; do not redo this item unless it regresses.
-2. **Live hosted-provider verification.** With an operator key, run one
-   governed turn on `anthropic-hosted` and flip its status note from
-   `implemented_unverified` to verified. No code expected — evidence only.
+2. **Live hosted-provider verification — DONE for `anthropic-hosted` (2026-07-06).**
+   Ran one governed turn on `anthropic-hosted` (`claude-opus-4-8`) with an
+   operator key through the real path (gate → gate-derived policy → egress
+   allowlist), returned `finish_reason=stop`; egress guard confirmed fail-closed.
+   Status flipped to `implemented_verified` in `IMPLEMENTATION_STATUS.md`. No code
+   changed — evidence only. `openai-hosted` / `gemini-hosted-openai-compatible`
+   remain to verify when their operator keys are available.
 3. **Tool calls on Ollama models - completed in this session.** `ollama-local-openai-compatible` shipped
    `supports_tool_calls: false` / `text_json`. Modern Ollama models (qwen3,
    gemma4) support native OpenAI tool calls — test against the live server,

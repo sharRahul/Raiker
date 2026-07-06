@@ -289,6 +289,6 @@ Tests must prove:
 
 ## Phase 3 rollout slice A validation boundary
 
-The implementation accepts the legacy compact test shape (`id`, `name`, `version`, `permissions`) and the canonical `plugin_id` field for validation/planning compatibility. Entrypoints are metadata only. Unknown trust levels, missing required fields, unsupported permission prefixes, and unsafe permission strings are denied during planning. Runtime execution remains disabled.
+The implementation accepts the legacy compact test shape (`id`, `name`, `version`, `permissions`) and the canonical `plugin_id` field for validation/planning compatibility. Entrypoints are metadata only during manifest planning. Unknown trust levels, missing required fields, unsupported permission prefixes, and unsafe permission strings are denied during planning. Runtime plugin code execution uses separate governed plugin runtime capabilities; broader plugin extensions remain deferred/fail-closed.
 
 The expanded Raiker plugin component set added in this document is phase-scheduled only. It must not activate MCP servers, LSP servers, monitors, channels, subagents, hosted marketplace behavior, output styles, themes, or runtime plugin execution until their explicit implementation tasks and tests exist.

@@ -110,7 +110,7 @@ def test_truthfulness_validator_detects_known_overclaim_patterns() -> None:
 
     errors = validator._validate_snippet(  # type: ignore[attr-defined]
         "docs/SECURITY_ARCHITECTURE.md",
-        "Approval resolution executes actions. Runtime execution remains disabled. plugin execution enabled.",
+        "Approval resolution executes actions. no-executor domains work. plugin execution enabled.",
     )
     joined = "\n".join(errors).lower()
     assert "forbidden overclaim" in joined

@@ -2,8 +2,8 @@
 
 The executor computes a deterministic, offline embedding (the hashing trick) and
 persists a ``vector_records`` row. These tests pin the slice contract:
-executes-when-governed (embed + list, real persistence, deterministic, no text
-leakage) AND fails-closed-when-disabled / on bad input.
+executes-when-governed (embed + list + search, real persistence, deterministic,
+no text leakage) AND fails-closed-when-disabled / on bad input.
 """
 
 from __future__ import annotations
@@ -12,7 +12,8 @@ import json
 from pathlib import Path
 
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.ids import new_id
+from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.models import VectorRecord
 from raiker.control.service import RuntimeControlService
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
@@ -176,3 +177,112 @@ def test_list_returns_count_only(tmp_path: Path) -> None:
     assert list_artifacts is not None
     assert list_artifacts["count"] == 2
     assert list_artifacts["content_redacted"] is True
+
+
+# ── Retrieval (search) closes the embed -> store -> retrieve loop ─────────────
+
+
+def _embed_doc(authority: RuntimeAuthority, principal: Principal, ws: Path, text: str) -> str:
+    authority.route_action(_action(principal.principal_id, text=text), principal)
+    # list_vector_records is newest-first, so [0] is the row just written.
+    return str(SQLiteStore(ws).list_vector_records()[0]["vector_id"])
+
+
+def _search_artifacts(authority: RuntimeAuthority, principal: Principal, ws: Path, **args: object) -> dict:
+    result = authority.route_action(_action(principal.principal_id, action="search", **args), principal)
+    assert result.decision == "allow", getattr(result, "error", result.decision)
+    viewer = EventViewer(SQLiteStore(ws))
+    found = None
+    for ev in viewer.list_events(event_type="action_executed"):
+        payload = viewer.read_event_payload(ev["event_id"])
+        artifacts = (payload or {}).get("payload", {}).get("artifacts", {})
+        if "results" in artifacts:
+            found = artifacts
+    assert found is not None
+    return found
+
+
+def test_search_ranks_exact_match_first_without_leaking_query(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    id1 = _embed_doc(authority, principal, ws, "alpha beta QUERYLEAKZ")
+    _embed_doc(authority, principal, ws, "delta epsilon zeta")
+    _embed_doc(authority, principal, ws, "eta theta iota")
+
+    art = _search_artifacts(authority, principal, ws, query="alpha beta QUERYLEAKZ", top_k=3)
+    assert art["count"] == 3
+    assert art["embedding_model"] == LOCAL_EMBEDDING_MODEL
+    assert art["content_redacted"] is True
+    # The identical document ranks first with cosine ~1.0.
+    assert art["results"][0]["vector_id"] == id1
+    assert art["results"][0]["score"] >= 0.999
+
+    # The query text must never leak into the search event payload.
+    viewer = EventViewer(SQLiteStore(ws))
+    for ev in viewer.list_events(event_type="action_executed"):
+        payload = viewer.read_event_payload(ev["event_id"])
+        if "results" in (payload or {}).get("payload", {}).get("artifacts", {}):
+            assert "QUERYLEAKZ" not in json.dumps(payload)
+
+
+def test_search_respects_top_k(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    for text in ("one apple", "two banana", "three cherry"):
+        _embed_doc(authority, principal, ws, text)
+    art = _search_artifacts(authority, principal, ws, query="apple", top_k=1)
+    assert art["count"] == 1
+    assert len(art["results"]) == 1
+
+
+def test_search_ignores_other_embedding_models(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    local_id = _embed_doc(authority, principal, ws, "local hashing document")
+    # A provider-model vector in the same table must NOT be returned by local search.
+    store = SQLiteStore(ws)
+    store.insert_vector_record(VectorRecord(
+        vector_id="vec_provider_x",
+        content_hash="deadbeef",
+        content_preview="provider doc",
+        embedding_model="openai:text-embedding-3-small",
+        dimensions=384,
+        scope="default",
+        sensitivity="public",
+        created_at=utc_now(),
+        embedding=json.dumps([0.5] * 384),
+    ))
+    art = _search_artifacts(authority, principal, ws, query="local hashing document", top_k=5)
+    returned = {r["vector_id"] for r in art["results"]}
+    assert returned == {local_id}
+    assert "vec_provider_x" not in returned
+
+
+def test_search_empty_store_returns_zero(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    art = _search_artifacts(authority, principal, ws, query="nothing stored yet")
+    assert art["count"] == 0
+    assert art["results"] == []
+
+
+def test_search_missing_query_fails_closed(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    result = authority.route_action(_action(principal.principal_id, action="search"), principal)
+    assert result.error == "missing_argument:query"
+
+
+def test_search_invalid_top_k_fails_closed(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    result = authority.route_action(
+        _action(principal.principal_id, action="search", query="x", top_k=0), principal
+    )
+    assert result.error == "invalid_argument:top_k"

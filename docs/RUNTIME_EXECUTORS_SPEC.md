@@ -62,7 +62,7 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 | `network_execution` | 2 | Network call over the egress allowlist. |
 | `graph_indexing_runtime` | 3 | Builds the local code graph index. |
 | `semantic_memory_runtime` | 3 | Local semantic memory search. |
-| `vector_embedding_runtime` | 3 | Local deterministic embedding (hashing trick; no model download / no network); persists a `vector_records` row. Metadata-only artifacts; source text never emitted. |
+| `vector_embedding_runtime` | 3 | Local deterministic embedding (hashing trick; no model download / no network): `embed` persists a `vector_records` row, `list` counts, `search` ranks stored local-model vectors by cosine (returns ids+scores). Metadata-only artifacts; source text/query never emitted. |
 | `model_provider_runtime` | 3 | Provider-backed **semantic** embedding via an LLM provider; layered gating (owner egress allowlist + hosted/private gate state + API-key-from-env); persists a `vector_records` row (`embedding_model=<provider>:<model>`). Metadata-only artifacts; text/credentials never emitted. `embed` only. |
 | `subagents` | 4 | Bounded, governed, in-process read-only subagent (no model/process/network). |
 | `multi_agent_teams` | 4 | Up to 5 bounded subagents in sequence; aggregates metadata-only outcomes. |

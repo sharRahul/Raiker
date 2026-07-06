@@ -15,6 +15,31 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-06 (session end)
 
+> **This session — part 5 (vector retrieval: close the embed→store→retrieve loop):**
+> Added a `search` operation to `vector_embedding_runtime` (no new capability, no
+> new gate) so the local embeddings the agent creates become usable for retrieval
+> (RAG). `search` embeds the query with the same local hashing model
+> (`raiker.vector.embed_text`), ranks stored vectors by cosine via the existing
+> in-memory `VectorIndex`, and returns the top-k as `{vector_id, score}` pairs.
+> - **Same-space only:** new store method `SQLiteStore.list_vector_embeddings(
+>   embedding_model, scope=None)` returns just the local-model vectors (uncapped,
+>   `embedding IS NOT NULL`); provider-model (`model_provider_runtime`) vectors are
+>   never ranked (cross-space cosine is meaningless). Read-only — writes nothing.
+> - **Metadata-only / read-only:** artifacts are `count` + `results`
+>   (`{vector_id, score}`) + `embedding_model` + `content_redacted=true`. The query
+>   text, source text, and stored previews never enter events. Fail-closed:
+>   `missing_argument:query`, `query_too_long`, `invalid_argument:top_k` (1–100),
+>   `invalid_argument:scope`. Distinct from `semantic_memory_runtime` (memory store).
+> - Evidence: `tests/test_phase_6_vector_embedding_runtime.py` search tests
+>   (exact-match ranks first ~1.0 w/o leaking query; top_k honored; other embedding
+>   models excluded; empty corpus → 0; missing-query / bad-top_k fail closed).
+> - Full suite **1217 passed**; ruff + mypy (incl. `tests/`) clean; all validators
+>   pass. Branch restarted from merged `main` (PR #100); this is a **new PR**.
+> - **Next natural step:** wire embed+search into the agentic loop (retrieval-
+>   augmented turns), and/or a governed "get preview by vector_id" read so retrieved
+>   ids resolve to content for the human. Provider-space (semantic) search would be
+>   an egress-gated extension of `model_provider_runtime`.
+
 > **This session — part 4 (make hosted providers usable: OpenRouter/OpenAI):**
 > Fixed a real latent gap so a human/agent can actually use OpenRouter, OpenAI,
 > Gemini (and every OpenAI-compatible provider) from any entry point.

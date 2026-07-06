@@ -1643,6 +1643,29 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
+    def list_vector_embeddings(
+        self, embedding_model: str, scope: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Return ``(vector_id, embedding)`` rows for one embedding model.
+
+        Cosine similarity is only meaningful within a single embedding space, so
+        retrieval fetches vectors for exactly one ``embedding_model`` (optionally
+        narrowed to a ``scope``). Rows with no stored embedding are excluded. No
+        row limit — the caller ranks the full corpus for that model.
+        """
+        query = (
+            "SELECT vector_id, embedding FROM vector_records "
+            "WHERE embedding_model = ? AND embedding IS NOT NULL"
+        )
+        params: list[Any] = [embedding_model]
+        if scope:
+            query += " AND scope = ?"
+            params.append(scope)
+        query += " ORDER BY created_at"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
     # ── Phase 9: Symbol Nodes & Dependency Edges ──
 
     def insert_symbol_node(self, node: SymbolNode) -> None:

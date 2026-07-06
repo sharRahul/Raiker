@@ -13,6 +13,40 @@ to the user, and every capability governed, default-ask human/humam governed, an
 
 Be mind full of token usage if needed do it in batches. Keep committing after every phase and then push to origin main before the token limit is ended for the session. Plan and implement it in such a way that anyone can pick it up after your session token are over even though the goal is not complete. In next session review where you are and then start from next phase.
 
+## State as of 2026-07-06 (session end)
+
+> **This session (decision-mode API + human-in-control audit):** verified the
+> per-capability decision-mode surface is complete and human-controlled, and
+> closed the gaps found.
+>
+> - **`/ask`, `/allow`, `/auto`, `/deny` REST routes already existed** and are
+>   wired in (`raiker/api/routes_control.py` — `GET /api/capability-modes/{cap}`
+>   + four setters `.../{ask,allow,auto,deny}`). They had **no API-level test
+>   coverage** (only the service layer was tested); added
+>   `tests/test_api_decision_modes.py` (12 tests): default `ask`, owner sets all
+>   four modes + round-trip, permissive-requires-executor `403`, `deny` always
+>   selectable, AI principal refused `403` (mode unchanged), auth required.
+> - **Default is `ask`** for every capability (`DEFAULT_DECISION_MODE`), confirmed.
+> - **`/approve` is NOT the same function as `/allow`, so it was kept** (per the
+>   task's own "if it serves the same function" condition). `/approve <id>` /
+>   `/deny <id>` (approval inbox, `routes_approvals.py` `/resolve`) resolve **one
+>   pending action**; `/allow` (decision mode `always_allow`) sets a **standing
+>   per-capability policy**. They are near-opposites (one is the human-in-control
+>   gate, the other relaxes prompting), so merging them would be wrong. Documented
+>   the distinction in `DECISION_MODES_SPEC.md` and the command reference.
+> - **Naming: canonical mode is `allow`** (`always_allow` kept as a legacy alias).
+>   Aligned CLI `/capability-mode` help + `use-raiker-command-reference.md` +
+>   `DECISION_MODES_SPEC.md` to say `allow`. **Fixed a pre-existing broken test**:
+>   the earlier rename commit (`68a1ddd`) changed the enum value to `allow` but
+>   left `test_phase_5_decision_modes.py::test_owner_can_set_mode_ai_cannot`
+>   asserting the old `always_allow` read-back — it was failing on `main`; now
+>   asserts canonical `allow`.
+> - Full suite **1190 passed, 1 warning**; ruff + mypy clean on changed sources;
+>   all five `scripts/validate_*.py` pass.
+> - **Still open toward "full-fledged AI agent" (next real-executor targets,
+>   unchanged):** `vector_embedding_runtime`, `model_provider_runtime`, the
+>   graph/semantic runtimes; live hosted-provider verification (evidence only).
+
 ## State as of 2026-07-05 (session end)
 
 > **Where this session's work lives (read first):** Phase 4 slices 14–16 (plugin

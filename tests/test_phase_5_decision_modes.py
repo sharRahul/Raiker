@@ -79,9 +79,10 @@ def test_owner_can_set_mode_ai_cannot(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     bootstrap_owner("rahul", "Rahul", workspace_root=ws)
     svc = RuntimeControlService(ws)
+    # "always_allow" is accepted as a legacy alias; it normalizes to canonical "allow".
     ok = svc.set_capability_decision_mode(_CAP, "always_allow", None, "test")
     assert ok.ok is True, ok.reason_code
-    assert _authority(ws).get_capability_decision_mode(_CAP) == "always_allow"
+    assert _authority(ws).get_capability_decision_mode(_CAP) == "allow"
 
     # An AI principal cannot change decision modes.
     authority = _authority(ws)

@@ -13,7 +13,7 @@ The runtime-governance commands:
 | `/capability-gate <cap>` | Show one capability's gate detail |
 | `/capability-gate enable <cap> --state <state> --confirm <token>` | Enable a capability (human gate manager only) |
 | `/capability-gate disable <cap>` | Disable a capability |
-| `/capability-mode <cap> [ask\|deny\|always_allow\|auto]` | View or set a capability's decision mode |
+| `/capability-mode <cap> [ask\|deny\|allow\|auto]` | View or set a capability's standing decision mode (`ask` is the default; `always_allow` accepted as a legacy alias for `allow`) |
 | `/runtime-readiness` | Summarize runtime mode, owner, gates |
 | `/model use --provider <p> --model <m>` | Select the active model backend |
-| `/approve`, `/deny` | Resolve an approval (metadata-only) |
+| `/approve <id>`, `/deny <id>` | Resolve one pending approval by id (metadata-only). Distinct from the per-capability decision modes above: this approves/rejects a single queued action, `/capability-mode` sets the standing policy |

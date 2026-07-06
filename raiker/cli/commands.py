@@ -2142,15 +2142,16 @@ def handle_capability_gate_disable(command: str, *, workspace_root: str | Path =
 
 
 def handle_capability_mode(command: str, *, workspace_root: str | Path = ".") -> str:
-    """`/capability-mode <capability> [ask|deny|always_allow|auto] [--reason r] [--as p]`.
+    """`/capability-mode <capability> [ask|deny|allow|auto] [--reason r] [--as p]`.
 
     With no mode argument, prints the capability's current decision mode; with a
-    mode, sets it (human `runtime_gate_manager` only). Permissive modes
-    (always_allow/auto) require a real executor.
+    mode, sets it (human `runtime_gate_manager` only). `ask` is the default for
+    every capability. Permissive modes (`allow`/`auto`) require a real executor.
+    (`always_allow` is still accepted as a legacy alias for `allow`.)
     """
     parts = shlex.split(command)
     if len(parts) < 2:
-        return "Usage: /capability-mode <capability> [ask|deny|always_allow|auto] [--reason <reason>] [--as <principal_id>]"
+        return "Usage: /capability-mode <capability> [ask|deny|allow|auto] [--reason <reason>] [--as <principal_id>]"
     capability = parts[1]
     service = RuntimeControlService(workspace_root)
     mode = ""

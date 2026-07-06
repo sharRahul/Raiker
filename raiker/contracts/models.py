@@ -43,6 +43,7 @@ EVENT_TYPES = {
     "intent_classified",
     "risk_classified",
     "context_gathered",
+    "retrieval_augmentation",
     "plan_created",
     "plan_skipped",
     "action_proposed",

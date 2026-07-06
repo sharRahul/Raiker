@@ -47,6 +47,25 @@ an LLM provider) is a **separate, egress-gated executor** — see
   120-char preview is stored in the local table only (mirrors how reminder titles
   are stored locally).
 
+## Retrieval augmentation in the agent turn (default-ask)
+
+The turn orchestrator can inject retrieved local context into the model prompt
+(RAG), governed by `RetrievalAugmentor` (`raiker/runtime/retrieval.py`). It adds
+**no new governance surface** — it reuses this capability's gate + decision mode:
+
+- **Gate disabled** (the universal fail-closed default) → no-op, nothing emitted;
+  the default turn is unchanged.
+- **Gate enabled + decision mode `ask`** (the default once enabled) → **withheld**:
+  no injection. The turn emits a `retrieval_augmentation` event with
+  `decision=ask, augmented=false` so the owner sees retrieval is available and must
+  opt in. This is the human-in-control default (ask, don't auto-inject).
+- **Gate enabled + `allow`/`auto`** → the prompt is embedded locally, the local
+  vectors are searched, and the top-k previews are injected as an untrusted-data
+  system message. The event stays metadata-only (`decision`, `augmented`, `count`,
+  `vector_ids`); the preview text goes into the model prompt (the point of RAG) but
+  never into the event payload.
+- **`deny`** → never augments.
+
 ## Explicit non-goals
 
 - No provider/API embedding call (that is `model_provider_runtime`, egress-gated).

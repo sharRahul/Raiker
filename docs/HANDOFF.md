@@ -15,6 +15,34 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-06 (session end)
 
+> **This session — part 7 (agentic loop wiring: default-ask retrieval augmentation):**
+> Wired embed+search+resolve into the turn as **retrieval-augmented generation**,
+> governed **default-ask** (owner's explicit choice — not default-off). New
+> `RetrievalAugmentor` (`raiker/runtime/retrieval.py`), constructed by
+> `RuntimeOrchestrator` from the broker's store, runs at `CONTEXT_READY`. It adds
+> **no new governance surface** — it reuses the `vector_embedding_runtime` gate +
+> decision mode: gate disabled → no-op (default turn unchanged, nothing emitted);
+> gate enabled + mode `ask` (default) → **withheld** (emits
+> `retrieval_augmentation` `decision=ask, augmented=false`, no injection); mode
+> `allow`/`auto` → embeds the prompt locally, searches local vectors, injects the
+> top-k previews as an untrusted-data system message into the model prompt. Event
+> stays metadata-only (`decision`/`augmented`/`count`/`vector_ids`); preview text
+> reaches the model prompt (the point of RAG) but never the event payload. New
+> event type `retrieval_augmentation` registered in `EVENT_TYPES` + `EVENT_CATALOG`.
+> - **Honest note on "not default-off":** the *behaviour* is default-ask as
+>   requested. It still sits behind the standing `vector_embedding_runtime` gate
+>   (default-disabled), which is the universal fail-closed capability invariant —
+>   not special to this feature. Enabling that gate is the one-time owner step;
+>   thereafter each turn's auto-retrieval is default-ask.
+> - Evidence: `tests/test_retrieval_augmentation.py` (8 tests: gate-disabled no-op,
+>   default-ask withheld, deny, allow-injects, empty-store, + 3 orchestrator turn
+>   tests asserting the event + whether the preview reached the model prompt).
+> - Full suite **1230 passed**; ruff + mypy (incl. `tests/`) clean; validators pass.
+> - **RAG loop is now complete end-to-end:** embed → store → search → resolve →
+>   (default-ask) inject into the turn. Possible next: expose retrieval toggles/
+>   status in the web dashboard; provider-space (semantic) retrieval as an
+>   egress-gated extension; a CLI to inspect/preview retrieval decisions.
+
 > **This session — part 6 (resolve vector_id → content: `vector_get` read):**
 > Added the read half so ranked ids from `search` become usable. `vector_get` is a
 > governed **read tool** (`raiker/tools/vector_tools.py`), registered in the

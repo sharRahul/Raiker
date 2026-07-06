@@ -143,7 +143,9 @@ def test_email_send_queues_for_human_without_transmitting(tmp_path: Path) -> Non
     assert result.decision == "allow"
     assert result.message == "executed"
     # The draft is queued for a human to send; nothing was transmitted.
-    assert store.get_email_draft(draft_id)["status"] == "queued_for_send"
+    queued = store.get_email_draft(draft_id)
+    assert queued is not None
+    assert queued["status"] == "queued_for_send"
     events = EventViewer(store).list_events(event_type="action_executed")
     payload = None
     for ev in events:

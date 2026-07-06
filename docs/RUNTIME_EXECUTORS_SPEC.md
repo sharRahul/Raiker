@@ -62,6 +62,7 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 | `network_execution` | 2 | Network call over the egress allowlist. |
 | `graph_indexing_runtime` | 3 | Builds the local code graph index. |
 | `semantic_memory_runtime` | 3 | Local semantic memory search. |
+| `vector_embedding_runtime` | 3 | Local deterministic embedding (hashing trick; no model download / no network); persists a `vector_records` row. Metadata-only artifacts; source text never emitted. `model_provider_runtime` (provider-backed) stays fail-closed. |
 | `subagents` | 4 | Bounded, governed, in-process read-only subagent (no model/process/network). |
 | `multi_agent_teams` | 4 | Up to 5 bounded subagents in sequence; aggregates metadata-only outcomes. |
 | `external_channel_runtime` | 5 | Bounded outbound webhook delivery (owner egress allowlist); metadata-only events. |

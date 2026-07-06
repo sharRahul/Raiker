@@ -15,7 +15,39 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-06 (session end)
 
-> **This session (decision-mode API + human-in-control audit):** verified the
+> **This session — part 2 (next real executor: `vector_embedding_runtime`):**
+> promoted the Tier-3 `vector_embedding_runtime` from a fail-closed stub to a
+> **real, local-only executor** (next target named in the handoff). It computes a
+> **deterministic local embedding** via the hashing trick
+> (`raiker/vector/embed_text` + `LOCAL_EMBEDDING_MODEL = "raiker-local-hash-v1"`)
+> — no model download, no network, no external call — and persists a real 384-d
+> vector to the existing `vector_records` table (added an `embedding` JSON column
+> + `embedding` field on the `VectorRecord` contract; reused the existing
+> `insert_vector_record`/`list_vector_records`). `action`: `embed` (default) /
+> `list`; fail-closed codes `missing_argument:text`, `text_too_long`,
+> `invalid_argument:scope_or_sensitivity`, `unknown_action:<op>`. Artifacts are
+> metadata-only (vector_id/model/dims/hash); **source text never enters events**
+> (a 120-char preview is stored locally only, like reminder titles).
+> - Registered in `REAL_EXECUTOR_CAPABILITIES` + `build_default_executor_registry`
+>   (needs the store). Gate still ships **disabled**; enabling needs runtime mode
+>   + confirmation token (Tier-3, no threat-ack, matching graph/semantic siblings).
+> - **Honest scope:** lexical feature-hashing embedding, NOT learned semantics.
+>   The provider-backed `model_provider_runtime` (semantic embeddings/generation
+>   via an LLM provider) stays **fail-closed** until its own egress-gated slice.
+> - Lockstep updates: `activation.py` note; removed vector_embedding from the
+>   no-executor examples in `tests/test_executor_default_registry.py::_SENSITIVE`,
+>   `tests/test_security_regression_ui.py`, `tests/test_api_m5_security_settings.py`
+>   (all now use `model_provider_runtime` as the still-fail-closed example);
+>   `docs/threat-models/vector-embedding.md` (new); `RUNTIME_EXECUTORS_SPEC.md`;
+>   `IMPLEMENTATION_STATUS.md`. Evidence:
+>   `tests/test_phase_6_vector_embedding_runtime.py` (7 tests).
+> - Full suite **1197 passed**; ruff + mypy clean on changed sources; all five
+>   validators pass.
+> - **Next real-executor target:** `model_provider_runtime` (provider-backed,
+>   egress-gated — reuse the `hosted_model_runtime` egress-allowlist pattern), then
+>   the remaining graph/semantic promotions and live hosted-provider verification.
+
+> **This session — part 1 (decision-mode API + human-in-control audit):** verified the
 > per-capability decision-mode surface is complete and human-controlled, and
 > closed the gaps found.
 >

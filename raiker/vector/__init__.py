@@ -2,7 +2,40 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 from typing import Any
+
+# Name recorded on every locally-created embedding record. Bump the suffix if the
+# embedding function below changes, so stored vectors stay attributable to the
+# exact algorithm that produced them.
+LOCAL_EMBEDDING_MODEL = "raiker-local-hash-v1"
+
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
+
+
+def embed_text(text: str, dimensions: int = 384) -> list[float]:
+    """Deterministic, local, dependency-free text embedding (the hashing trick).
+
+    Tokens are lowercased alphanumeric runs; each token is hashed to a bucket in
+    ``[0, dimensions)`` with a sign bit, and its contribution accumulates into
+    that bucket. The resulting vector is L2-normalized. This is a genuine,
+    reproducible embedding (a feature-hashing / bag-of-tokens vector) computed
+    entirely offline — no model download, no network, no external call. It
+    captures **lexical** overlap, not learned semantics; a model-backed semantic
+    embedding is a separate, egress-gated slice (``model_provider_runtime``).
+    """
+    if dimensions <= 0:
+        raise ValueError("dimensions must be positive")
+    vector = [0.0] * dimensions
+    for token in _TOKEN_RE.findall(text.lower()):
+        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        bucket = int.from_bytes(digest[:4], "big") % dimensions
+        sign = 1.0 if digest[4] & 1 else -1.0
+        vector[bucket] += sign
+    norm = math.sqrt(sum(v * v for v in vector))
+    if norm > 0.0:
+        vector = [v / norm for v in vector]
+    return vector
 
 
 class VectorIndex:

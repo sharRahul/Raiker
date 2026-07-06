@@ -418,6 +418,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection,
             )
             with contextlib.suppress(sqlite3.OperationalError):
+                connection.execute("ALTER TABLE vector_records ADD COLUMN embedding TEXT")
+            with contextlib.suppress(sqlite3.OperationalError):
                 connection.execute("ALTER TABLE events_index ADD COLUMN prev_event_sha256 TEXT")
             with contextlib.suppress(sqlite3.OperationalError):
                 connection.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)")
@@ -1623,10 +1625,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO vector_records
-                (vector_id, content_hash, content_preview, embedding_model, dimensions, scope, sensitivity, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (vector_id, content_hash, content_preview, embedding_model, dimensions, scope, sensitivity, embedding, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (record.vector_id, record.content_hash, record.content_preview, record.embedding_model, record.dimensions, record.scope, record.sensitivity, record.created_at),
+                (record.vector_id, record.content_hash, record.content_preview, record.embedding_model, record.dimensions, record.scope, record.sensitivity, record.embedding, record.created_at),
             )
 
     def list_vector_records(self, scope: str | None = None, limit: int = 50) -> list[dict[str, Any]]:

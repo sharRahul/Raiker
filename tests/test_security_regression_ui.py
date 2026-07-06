@@ -122,11 +122,11 @@ class TestDeferredCapsNotEnableable:
     def test_no_executor_cap_cannot_be_enabled(self, workspace: Path, client: TestClient) -> None:
         headers = _owner(workspace)
         _activate(client, headers)
-        gate = client.get("/api/capability-gates/vector_embedding_runtime", headers=headers).json()
+        gate = client.get("/api/capability-gates/model_provider_runtime", headers=headers).json()
         assert "enabled_runtime" not in gate["allowed_transitions"]
         assert "enabled_policy_gated" not in gate["allowed_transitions"]
         resp = client.post(
-            "/api/capability-gates/vector_embedding_runtime/set",
+            "/api/capability-gates/model_provider_runtime/set",
             json={"target_state": "enabled_runtime", "reason": "try"},
             headers=headers,
         )

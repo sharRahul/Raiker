@@ -9,6 +9,10 @@ from raiker.runtime.executors.base import ExecutionResult, not_implemented
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
     from raiker.runtime.authority.router import GovernedAction
+    from raiker.storage.sqlite import SQLiteStore
+
+_MAX_EMBED_TEXT_LEN = 20000
+_PREVIEW_LEN = 120
 
 
 class GraphIndexingExecutor:
@@ -59,15 +63,103 @@ class SemanticMemoryExecutor:
 
 
 class VectorEmbeddingExecutor:
+    """Real, local-only executor for ``vector_embedding_runtime``.
+
+    Computes a **deterministic, local, dependency-free** embedding (the hashing
+    trick, ``raiker.vector.embed_text``) and persists a ``vector_records`` row —
+    no embedding-model download, no network, no external call. This is a genuine
+    local runtime, not a stub: it captures lexical overlap and supports offline
+    cosine search, but is **not** a learned semantic model (that is the separate,
+    egress-gated ``model_provider_runtime`` slice).
+
+    Supported ``action`` argument values: ``embed`` (default) and ``list``.
+    Artifacts are metadata only (ids/counts/hash), never the source text, so
+    embedded content is not emitted into runtime events.
+    """
+
     capability = "vector_embedding_runtime"
 
-    def __init__(self, workspace_root: str | Path) -> None:
+    def __init__(self, workspace_root: str | Path, store: SQLiteStore) -> None:
         self._workspace_root = Path(workspace_root).resolve()
+        self._store = store
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        # No embedding model or vector store is wired yet; reporting success
-        # while persisting nothing would be a silent fake. Fail closed.
-        return not_implemented(self.capability, action.action_id)
+        op = action.arguments.get("action", "embed")
+        if op == "embed":
+            return self._embed(action)
+        if op == "list":
+            return self._list(action)
+        return self._failed(action.action_id, f"unknown_action:{op}")
+
+    def _embed(self, action: GovernedAction) -> ExecutionResult:
+        import json
+
+        from raiker.contracts.ids import new_id, utc_now
+        from raiker.contracts.models import VectorRecord
+        from raiker.vector import LOCAL_EMBEDDING_MODEL, VectorIndex, embed_text
+
+        text = action.arguments.get("text")
+        if not isinstance(text, str) or not text.strip():
+            return self._failed(action.action_id, "missing_argument:text")
+        if len(text) > _MAX_EMBED_TEXT_LEN:
+            return self._failed(action.action_id, "text_too_long")
+        scope = action.arguments.get("scope", "default")
+        sensitivity = action.arguments.get("sensitivity", "public")
+        if not isinstance(scope, str) or not isinstance(sensitivity, str):
+            return self._failed(action.action_id, "invalid_argument:scope_or_sensitivity")
+
+        dimensions = 384
+        vector = embed_text(text, dimensions)
+        vector_id = new_id("vec_")
+        content_hash = VectorIndex.compute_content_hash(text)
+        self._store.insert_vector_record(VectorRecord(
+            vector_id=vector_id,
+            content_hash=content_hash,
+            content_preview=text[:_PREVIEW_LEN],
+            embedding_model=LOCAL_EMBEDDING_MODEL,
+            dimensions=dimensions,
+            scope=scope,
+            sensitivity=sensitivity,
+            created_at=utc_now(),
+            embedding=json.dumps(vector),
+        ))
+        return ExecutionResult(
+            ok=True,
+            capability=self.capability,
+            action_id=action.action_id,
+            summary="Embedding computed locally and stored; source text not emitted.",
+            artifacts={
+                "vector_id": vector_id,
+                "embedding_model": LOCAL_EMBEDDING_MODEL,
+                "dimensions": dimensions,
+                "content_hash": content_hash,
+                "content_redacted": True,
+            },
+        )
+
+    def _list(self, action: GovernedAction) -> ExecutionResult:
+        records = self._store.list_vector_records()
+        return ExecutionResult(
+            ok=True,
+            capability=self.capability,
+            action_id=action.action_id,
+            summary="Listed local vector records; previews/text are not included in runtime artifacts.",
+            artifacts={
+                "count": len(records),
+                "vector_ids": [str(r["vector_id"]) for r in records],
+                "content_redacted": True,
+            },
+        )
+
+    def _failed(self, action_id: str, reason_code: str) -> ExecutionResult:
+        return ExecutionResult(
+            ok=False,
+            capability=self.capability,
+            action_id=action_id,
+            reason_code=reason_code,
+            summary="Vector embedding runtime failed closed.",
+            artifacts={},
+        )
 
 
 class ModelProviderExecutor:

@@ -21,6 +21,7 @@ from raiker.tools.broker import ToolBroker
 DELEGABLE_TOOLS: frozenset[str] = frozenset({
     "read_file", "list_directory", "glob", "grep", "stat_path", "diff_files",
     "git_status", "git_diff", "git_log", "memory_search", "memory_list", "memory_get",
+    "vector_get",
 })
 
 # Hard caps independent of any caller-supplied budget. Caller budgets may only

@@ -1643,6 +1643,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
+    def get_vector_record(self, vector_id: str) -> dict[str, Any] | None:
+        """Return one vector record by id (or ``None``). Includes the stored preview."""
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM vector_records WHERE vector_id = ?", (vector_id,)
+            ).fetchone()
+        return dict(row) if row is not None else None
+
     def list_vector_embeddings(
         self, embedding_model: str, scope: str | None = None
     ) -> list[dict[str, Any]]:

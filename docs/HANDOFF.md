@@ -15,6 +15,25 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-06 (session end)
 
+> **This session — part 6 (resolve vector_id → content: `vector_get` read):**
+> Added the read half so ranked ids from `search` become usable. `vector_get` is a
+> governed **read tool** (`raiker/tools/vector_tools.py`), registered in the
+> `ToolBroker` and the PolicyEngine read allowlist (`allowed_read_actions`) + the
+> agent `DELEGABLE_TOOLS` set — it mirrors `memory_get`. It resolves a `vector_id`
+> to the stored 120-char `content_preview` + metadata via new
+> `SQLiteStore.get_vector_record`; it never returns the raw embedding vector, and
+> fails closed `missing_argument` / `not_found`. **Design boundary (documented):**
+> the vector table only persists a bounded preview, so `vector_get` returns that;
+> and as a *read* its output is auditable like `read_file`/`memory_get` — the
+> deliberate counterpart to the metadata-only *executor* path (embed/search).
+> Evidence: `tests/test_vector_get_read.py` (direct + through-broker allow/notfound).
+> - This completes the RAG data plumbing: **embed → store → search → resolve**.
+>   **Next (the remaining ordered item): wire it into the agentic loop** —
+>   retrieval-augmented turns. That is architecturally significant (auto-injecting
+>   retrieved content into the model turn touches governance/default-ask/audit), so
+>   scope/design it with the owner before building.
+> - Full suite **1222 passed**; ruff + mypy (incl. `tests/`) clean; validators pass.
+
 > **This session — part 5 (vector retrieval: close the embed→store→retrieve loop):**
 > Added a `search` operation to `vector_embedding_runtime` (no new capability, no
 > new gate) so the local embeddings the agent creates become usable for retrieval

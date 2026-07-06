@@ -55,8 +55,15 @@ an LLM provider) is a **separate, egress-gated executor** — see
 - `search` only retrieves within the **local hashing-embedding space**; it never
   ranks provider-model vectors (cosine across different embedding spaces is
   meaningless) and never returns document content — only ranked ids + scores.
-  Fetching the underlying content is a separate governed read, out of scope here.
   This is distinct from `semantic_memory_runtime`, which searches the memory store.
+- **Resolving ids to content is a separate governed read: `vector_get`.** Ranked
+  ids from `search` are turned back into content by the `vector_get` tool, routed
+  through the ToolBroker + PolicyEngine read allowlist (mirrors `memory_get`).
+  Because the vector table only persists a bounded 120-char `content_preview` (not
+  the full source text), `vector_get` returns that preview + metadata (never the
+  raw embedding vector). As a read, its output is auditable like `read_file` /
+  `memory_get` — this is the deliberate boundary between the metadata-only
+  *executor* path (embed/search) and the content-returning *read* path.
 - No deletion/update of vector records in this slice (embed + list + search only).
 
 ## Acceptance evidence

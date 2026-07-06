@@ -298,7 +298,7 @@ Safety status:
 - Lifecycle records do not execute graph indexing.
 - Lifecycle records do not write semantic memory.
 - Lifecycle records do not create embeddings or vectors.
-- Graph indexing remains disabled.
+- Legacy lifecycle/preview surfaces do not write graph data directly; current graph indexing is a governed real executor.
 - Legacy preview surfaces do not write semantic memory; current semantic/vector runtimes are governed real executors.
 - Rollback execution remains disabled.
 - Plugin slices, the reference external channel, subagent/team executors, and local container runtime are governed real executors; remote/cloud command execution remains no-executor/fail-closed.

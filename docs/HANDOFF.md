@@ -15,6 +15,33 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-06 (session end)
 
+> **This session — part 4 (make hosted providers usable: OpenRouter/OpenAI):**
+> Fixed a real latent gap so a human/agent can actually use OpenRouter, OpenAI,
+> Gemini (and every OpenAI-compatible provider) from any entry point.
+> `ModelProfileRegistry.resolve(provider, model)` required an *exact* model match,
+> but those providers ship a placeholder `<model>` — so the direct
+> `ModelRouter.achat`/`aembed` path failed with `unknown_model_profile` unless the
+> CLI/gateway pre-registered a concrete-model profile. This also broke part-3's
+> `model_provider_runtime` default embedder (it calls `router.aembed(provider,
+> model)` → resolve) before it ever reached the egress/key checks. `resolve` now
+> falls back to a provider's placeholder profile and fills in the concrete model
+> (exact match still wins; unknown providers still fail closed). Provider policy
+> (gate + egress allowlist + API key) is unchanged — still enforced by the factory.
+> Evidence: `tests/test_model_registry_resolve_fallback.py` (6 tests).
+> - Verified the **governed human config flow** end-to-end offline: with the
+>   `hosted_model_runtime` gate enabled, `/model use --provider openrouter --model
+>   openai/gpt-4o-mini` and `--provider openai --model gpt-4o-mini` both select
+>   successfully through the real gate-derived-policy path.
+> - **Live turn for OpenRouter/OpenAI is NOT verifiable from the cloud session:**
+>   this environment's egress proxy denies `openrouter.ai` and `api.openai.com`
+>   (403 CONNECT, org policy — `anthropic.com` is on the allowlist, which is why
+>   the part-2 Anthropic turn worked). This is infra policy, not a Raiker bug, and
+>   must not be routed around. To live-verify: run on a machine where those hosts
+>   are reachable (owner's local machine), or have an admin add them to the cloud
+>   session egress policy. Anthropic (`anthropic-hosted`) remains the one
+>   `implemented_verified` hosted provider.
+> - Full suite **1211 passed**; ruff + mypy (incl. `tests/`) clean; all validators pass.
+
 > **This session — part 3 (next real executor: `model_provider_runtime`):**
 > promoted `model_provider_runtime` from a fail-closed stub to a **real,
 > egress-gated, provider-backed embedding executor** (`ModelProviderExecutor` in
@@ -337,10 +364,21 @@ validators passed.
 2. Record a threat-model ack for `hosted_model_runtime`
    (`docs/threat-models/hosted-models.md`) and enable the gate with a
    confirmation token.
-3. Set `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com` (or provider host)
-   and the provider key env (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` /
-   `GEMINI_API_KEY` / `OPENROUTER_API_KEY`).
-4. `/model use anthropic-hosted` (or `--provider openai --model gpt-4o`, …).
+3. Set `RAIKER_MODEL_EGRESS_ALLOWLIST` to the provider host
+   (`api.anthropic.com` / `api.openai.com` / `openrouter.ai` /
+   `generativelanguage.googleapis.com`) and the provider key env
+   (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `GEMINI_API_KEY`).
+4. Select a concrete model:
+   - `/model use anthropic-hosted` (concrete model in the profile), or
+   - `/model use --provider openai --model gpt-4o-mini`, or
+   - `/model use --provider openrouter --model openai/gpt-4o-mini`, or
+   - `/model use --provider gemini --model gemini-2.0-flash`.
+   These providers ship a placeholder `<model>`; the concrete model is supplied at
+   selection time. `ModelProfileRegistry.resolve(provider, model)` now falls back
+   to the provider's placeholder profile (filling in the model), so the CLI, the
+   gateway turn path, and the direct `ModelRouter.achat`/`aembed` path are all
+   consistent. Provider policy (gate + egress allowlist + API key) is still
+   enforced by the provider factory regardless of how the model is selected.
 
 ## Next work, in priority order
 

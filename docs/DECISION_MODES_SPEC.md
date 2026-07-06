@@ -16,8 +16,12 @@ permission policy, with an owner-controlled four-way choice.
 |---|---|---|
 | **`ask`** (default) | Prompt the owner before acting | Requires human approval (`needs_approval`) |
 | **`deny`** | Never allowed | Blocked (`denied_by_decision_mode`) |
-| **`always_allow`** | Run without prompting | Executes — subject to the safety floors below |
+| **`allow`** | Run without prompting | Executes — subject to the safety floors below |
 | **`auto`** | "Let Raiker decide" | Deterministic by risk: low runs, medium/high ask, critical floored |
+
+> The canonical mode name is **`allow`** (enum `DecisionMode.ALWAYS_ALLOW = "allow"`).
+> `always_allow` is still accepted everywhere as a backward-compatible alias
+> (`parse_decision_mode`).
 
 `ask` is the default for every capability, so enabling a gate does **not** by
 itself let an AI act unattended — the owner must explicitly choose `always_allow`
@@ -40,9 +44,17 @@ or `auto`.
 
 - Set via `RuntimeControlService.set_capability_decision_mode(...)` /
   `RuntimeAuthority.set_capability_decision_mode(...)` / the `/capability-mode`
-  CLI command. **Human `runtime_gate_manager` only** — AI principals are refused
-  (`ai_cannot_manage_runtime_gates`). Every change appends a
+  CLI command, or over REST. **Human `runtime_gate_manager` only** — AI principals
+  are refused (at the API this is the gate-operation authorization boundary; at
+  the service layer `ai_cannot_manage_runtime_gates`). Every change appends a
   `capability_decision_mode_set` event.
+- **REST surface** (`raiker/api/routes_control.py`): `GET
+  /api/capability-modes/{capability}` reads the current mode; the four setters
+  `POST /api/capability-modes/{capability}/{ask|allow|auto|deny}` set it (body:
+  optional `{"reason": ...}`). These are distinct from the approval-inbox routes
+  `GET/POST /api/approvals/...`: the approval routes resolve **one pending
+  action** (a single queued proposal), while the decision-mode routes set the
+  **standing per-capability policy** that shapes every future AI-proposed action.
 - **Permissive modes require a real executor.** `always_allow` and `auto` may only
   be set on a capability in `REAL_EXECUTOR_CAPABILITIES`; a sensitive/no-executor
   domain (medical, cctv, finance, home-security, hardware, remote/cloud, …) is
@@ -64,6 +76,12 @@ execution regardless of mode.
 
 `tests/test_phase_5_decision_modes.py`: default `ask`; human-only setter and AI
 refusal; permissive-mode-requires-executor; invalid mode / unknown capability;
-and the four router behaviors — `ask` → approval, `always_allow` → executes,
-`deny` → blocked, `auto` → runs low / asks high — plus the critical-risk floor
-that `always_allow` cannot bypass.
+and the four router behaviors — `ask` → approval, `allow` → executes, `deny` →
+blocked, `auto` → runs low / asks high — plus the critical-risk floor that
+`allow` cannot bypass.
+
+`tests/test_api_decision_modes.py`: the REST surface — default `ask` on read,
+owner can set all four modes (`ask`/`allow`/`auto`/`deny`) and they round-trip,
+permissive-mode-requires-executor returns `403`, `deny` is always selectable on a
+no-executor domain, an AI principal is refused `403` (mode unchanged), and both
+read and set require authentication.

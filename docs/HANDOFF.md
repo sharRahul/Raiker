@@ -13,6 +13,131 @@ to the user, and every capability governed, default-ask human/humam governed, an
 
 Be mind full of token usage if needed do it in batches. Keep committing after every phase and then push to origin main before the token limit is ended for the session. Plan and implement it in such a way that anyone can pick it up after your session token are over even though the goal is not complete. In next session review where you are and then start from next phase.
 
+## State as of 2026-07-06 (session end)
+
+> **This session — part 4 (make hosted providers usable: OpenRouter/OpenAI):**
+> Fixed a real latent gap so a human/agent can actually use OpenRouter, OpenAI,
+> Gemini (and every OpenAI-compatible provider) from any entry point.
+> `ModelProfileRegistry.resolve(provider, model)` required an *exact* model match,
+> but those providers ship a placeholder `<model>` — so the direct
+> `ModelRouter.achat`/`aembed` path failed with `unknown_model_profile` unless the
+> CLI/gateway pre-registered a concrete-model profile. This also broke part-3's
+> `model_provider_runtime` default embedder (it calls `router.aembed(provider,
+> model)` → resolve) before it ever reached the egress/key checks. `resolve` now
+> falls back to a provider's placeholder profile and fills in the concrete model
+> (exact match still wins; unknown providers still fail closed). Provider policy
+> (gate + egress allowlist + API key) is unchanged — still enforced by the factory.
+> Evidence: `tests/test_model_registry_resolve_fallback.py` (6 tests).
+> - Verified the **governed human config flow** end-to-end offline: with the
+>   `hosted_model_runtime` gate enabled, `/model use --provider openrouter --model
+>   openai/gpt-4o-mini` and `--provider openai --model gpt-4o-mini` both select
+>   successfully through the real gate-derived-policy path.
+> - **Live turn for OpenRouter/OpenAI is NOT verifiable from the cloud session:**
+>   this environment's egress proxy denies `openrouter.ai` and `api.openai.com`
+>   (403 CONNECT, org policy — `anthropic.com` is on the allowlist, which is why
+>   the part-2 Anthropic turn worked). This is infra policy, not a Raiker bug, and
+>   must not be routed around. To live-verify: run on a machine where those hosts
+>   are reachable (owner's local machine), or have an admin add them to the cloud
+>   session egress policy. Anthropic (`anthropic-hosted`) remains the one
+>   `implemented_verified` hosted provider.
+> - Full suite **1211 passed**; ruff + mypy (incl. `tests/`) clean; all validators pass.
+
+> **This session — part 3 (next real executor: `model_provider_runtime`):**
+> promoted `model_provider_runtime` from a fail-closed stub to a **real,
+> egress-gated, provider-backed embedding executor** (`ModelProviderExecutor` in
+> `raiker/runtime/executors/models_runtime.py`; the stub left `tier3_core.py`). It
+> calls a real LLM provider's embedding endpoint via `ModelRouter.aembed` and
+> persists the returned **semantic** vector to the shared `vector_records` table
+> (`embedding_model=<provider>:<model>`), complementing the local hashing
+> embedding. Layered fail-closed gating: owner egress allowlist
+> (`RAIKER_MODEL_EGRESS_ALLOWLIST`, empty = closed, checked before any call) +
+> hosted/private gate state (`provider_runtime_policy_from_gates`) + API-key from
+> owner env only (never from args, never in events). `operation: embed` only.
+> Provider client is **injectable** (`embedder=`) so tests exercise the governed
+> persistence path with no live provider/credentials/network.
+> - Enabling now requires threat-model ack + confirmation token (added to
+>   `_DANGEROUS_CAPS` and `activation.py` `threat_ack/human_confirm`); doc
+>   `docs/threat-models/model-provider.md`.
+> - Registered in `REAL_EXECUTOR_CAPABILITIES` + default registry. Lockstep test
+>   updates: removed `model_provider_runtime` from
+>   `test_executor_default_registry.py::_SENSITIVE`; the "no-executor deferred cap"
+>   examples in `test_security_regression_ui.py` + `test_api_m5_security_settings.py`
+>   now use `hardware_operator_runtime` (a durable no-executor domain); fixed the
+>   sibling assertion in `test_phase_6_vector_embedding_runtime.py`. Docs updated:
+>   `IMPLEMENTATION_STATUS.md`, `RUNTIME_EXECUTORS_SPEC.md`,
+>   `guide/capabilities-deferred.md`, and the vector-embedding threat model.
+>   Evidence: `tests/test_phase_7_model_provider_runtime.py` (8 tests).
+> - Full suite **1205 passed**; ruff + mypy clean on changed sources; all five
+>   validators pass.
+> - **Honest limit:** only `embed` is implemented; generation/chat stays in the
+>   gateway/provider layer. **Next real-executor targets:** live hosted-provider
+>   verification (evidence only — run one governed `anthropic-hosted` turn with an
+>   operator key), then the remaining graph/semantic promotions.
+
+> **This session — part 2 (next real executor: `vector_embedding_runtime`):**
+> promoted the Tier-3 `vector_embedding_runtime` from a fail-closed stub to a
+> **real, local-only executor** (next target named in the handoff). It computes a
+> **deterministic local embedding** via the hashing trick
+> (`raiker/vector/embed_text` + `LOCAL_EMBEDDING_MODEL = "raiker-local-hash-v1"`)
+> — no model download, no network, no external call — and persists a real 384-d
+> vector to the existing `vector_records` table (added an `embedding` JSON column
+> + `embedding` field on the `VectorRecord` contract; reused the existing
+> `insert_vector_record`/`list_vector_records`). `action`: `embed` (default) /
+> `list`; fail-closed codes `missing_argument:text`, `text_too_long`,
+> `invalid_argument:scope_or_sensitivity`, `unknown_action:<op>`. Artifacts are
+> metadata-only (vector_id/model/dims/hash); **source text never enters events**
+> (a 120-char preview is stored locally only, like reminder titles).
+> - Registered in `REAL_EXECUTOR_CAPABILITIES` + `build_default_executor_registry`
+>   (needs the store). Gate still ships **disabled**; enabling needs runtime mode
+>   + confirmation token (Tier-3, no threat-ack, matching graph/semantic siblings).
+> - **Honest scope:** lexical feature-hashing embedding, NOT learned semantics.
+>   The provider-backed `model_provider_runtime` (semantic embeddings/generation
+>   via an LLM provider) stays **fail-closed** until its own egress-gated slice.
+> - Lockstep updates: `activation.py` note; removed vector_embedding from the
+>   no-executor examples in `tests/test_executor_default_registry.py::_SENSITIVE`,
+>   `tests/test_security_regression_ui.py`, `tests/test_api_m5_security_settings.py`
+>   (all now use `model_provider_runtime` as the still-fail-closed example);
+>   `docs/threat-models/vector-embedding.md` (new); `RUNTIME_EXECUTORS_SPEC.md`;
+>   `IMPLEMENTATION_STATUS.md`. Evidence:
+>   `tests/test_phase_6_vector_embedding_runtime.py` (7 tests).
+> - Full suite **1197 passed**; ruff + mypy clean on changed sources; all five
+>   validators pass.
+> - **Next real-executor target:** `model_provider_runtime` (provider-backed,
+>   egress-gated — reuse the `hosted_model_runtime` egress-allowlist pattern), then
+>   the remaining graph/semantic promotions and live hosted-provider verification.
+
+> **This session — part 1 (decision-mode API + human-in-control audit):** verified the
+> per-capability decision-mode surface is complete and human-controlled, and
+> closed the gaps found.
+>
+> - **`/ask`, `/allow`, `/auto`, `/deny` REST routes already existed** and are
+>   wired in (`raiker/api/routes_control.py` — `GET /api/capability-modes/{cap}`
+>   + four setters `.../{ask,allow,auto,deny}`). They had **no API-level test
+>   coverage** (only the service layer was tested); added
+>   `tests/test_api_decision_modes.py` (12 tests): default `ask`, owner sets all
+>   four modes + round-trip, permissive-requires-executor `403`, `deny` always
+>   selectable, AI principal refused `403` (mode unchanged), auth required.
+> - **Default is `ask`** for every capability (`DEFAULT_DECISION_MODE`), confirmed.
+> - **`/approve` is NOT the same function as `/allow`, so it was kept** (per the
+>   task's own "if it serves the same function" condition). `/approve <id>` /
+>   `/deny <id>` (approval inbox, `routes_approvals.py` `/resolve`) resolve **one
+>   pending action**; `/allow` (decision mode `always_allow`) sets a **standing
+>   per-capability policy**. They are near-opposites (one is the human-in-control
+>   gate, the other relaxes prompting), so merging them would be wrong. Documented
+>   the distinction in `DECISION_MODES_SPEC.md` and the command reference.
+> - **Naming: canonical mode is `allow`** (`always_allow` kept as a legacy alias).
+>   Aligned CLI `/capability-mode` help + `use-raiker-command-reference.md` +
+>   `DECISION_MODES_SPEC.md` to say `allow`. **Fixed a pre-existing broken test**:
+>   the earlier rename commit (`68a1ddd`) changed the enum value to `allow` but
+>   left `test_phase_5_decision_modes.py::test_owner_can_set_mode_ai_cannot`
+>   asserting the old `always_allow` read-back — it was failing on `main`; now
+>   asserts canonical `allow`.
+> - Full suite **1190 passed, 1 warning**; ruff + mypy clean on changed sources;
+>   all five `scripts/validate_*.py` pass.
+> - **Still open toward "full-fledged AI agent" (next real-executor targets,
+>   unchanged):** `vector_embedding_runtime`, `model_provider_runtime`, the
+>   graph/semantic runtimes; live hosted-provider verification (evidence only).
+
 ## State as of 2026-07-05 (session end)
 
 > **Where this session's work lives (read first):** Phase 4 slices 14–16 (plugin
@@ -97,8 +222,13 @@ validators passed.
   --model gemma4:31b-cloud` + `raiker --prompt` completed a live gateway turn
   (events + checkpoint persisted). Use `gemma4:31b-cloud` for future manual
   Ollama testing (owner preference — faster).
-- Hosted profiles are offline/mock-verified only (`implemented_unverified`
-  against live keys).
+- `anthropic-hosted` is **live-verified** (2026-07-06, operator key): a governed
+  turn ran through the real path (gate enabled via control plane → gate-derived
+  policy → owner egress allowlist enforced) and returned `finish_reason=stop`
+  (usage input=29/output=17); the egress guard was confirmed fail-closed
+  (`model_egress_denied` when the host is not allowlisted). `openai-hosted` /
+  `gemini-hosted-openai-compatible` remain offline/mock-verified
+  (`implemented_unverified`) until an operator supplies their keys.
 - **Config packaging follow-up complete:** `ModelProfileRegistry.load()` and
   `ConnectorRegistry.load()` keep workspace-local `config/` overrides, then
   fall back to bundled `raiker.config` JSON resources. The wheel now includes
@@ -234,10 +364,21 @@ validators passed.
 2. Record a threat-model ack for `hosted_model_runtime`
    (`docs/threat-models/hosted-models.md`) and enable the gate with a
    confirmation token.
-3. Set `RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com` (or provider host)
-   and the provider key env (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` /
-   `GEMINI_API_KEY` / `OPENROUTER_API_KEY`).
-4. `/model use anthropic-hosted` (or `--provider openai --model gpt-4o`, …).
+3. Set `RAIKER_MODEL_EGRESS_ALLOWLIST` to the provider host
+   (`api.anthropic.com` / `api.openai.com` / `openrouter.ai` /
+   `generativelanguage.googleapis.com`) and the provider key env
+   (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `GEMINI_API_KEY`).
+4. Select a concrete model:
+   - `/model use anthropic-hosted` (concrete model in the profile), or
+   - `/model use --provider openai --model gpt-4o-mini`, or
+   - `/model use --provider openrouter --model openai/gpt-4o-mini`, or
+   - `/model use --provider gemini --model gemini-2.0-flash`.
+   These providers ship a placeholder `<model>`; the concrete model is supplied at
+   selection time. `ModelProfileRegistry.resolve(provider, model)` now falls back
+   to the provider's placeholder profile (filling in the model), so the CLI, the
+   gateway turn path, and the direct `ModelRouter.achat`/`aembed` path are all
+   consistent. Provider policy (gate + egress allowlist + API key) is still
+   enforced by the provider factory regardless of how the model is selected.
 
 ## Next work, in priority order
 
@@ -249,9 +390,13 @@ validators passed.
    package data, and add a test that loads the registry from a foreign cwd.
    Implemented with bundled `raiker.config` resources, drift tests, and a
    wheel-content check; do not redo this item unless it regresses.
-2. **Live hosted-provider verification.** With an operator key, run one
-   governed turn on `anthropic-hosted` and flip its status note from
-   `implemented_unverified` to verified. No code expected — evidence only.
+2. **Live hosted-provider verification — DONE for `anthropic-hosted` (2026-07-06).**
+   Ran one governed turn on `anthropic-hosted` (`claude-opus-4-8`) with an
+   operator key through the real path (gate → gate-derived policy → egress
+   allowlist), returned `finish_reason=stop`; egress guard confirmed fail-closed.
+   Status flipped to `implemented_verified` in `IMPLEMENTATION_STATUS.md`. No code
+   changed — evidence only. `openai-hosted` / `gemini-hosted-openai-compatible`
+   remain to verify when their operator keys are available.
 3. **Tool calls on Ollama models - completed in this session.** `ollama-local-openai-compatible` shipped
    `supports_tool_calls: false` / `text_json`. Modern Ollama models (qwen3,
    gemma4) support native OpenAI tool calls — test against the live server,

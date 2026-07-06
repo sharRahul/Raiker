@@ -38,7 +38,7 @@ _DANGEROUS_CAPS = frozenset({
     "external_channel_runtime", "channel_approval_relay",
     "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
     "approval_execution_relay", "scheduled_routines", "graph_indexing_runtime",
-    "semantic_memory_runtime", "vector_embedding_runtime",
+    "semantic_memory_runtime", "vector_embedding_runtime", "model_provider_runtime",
     "hosted_model_runtime", "private_network_model_runtime",
 })
 

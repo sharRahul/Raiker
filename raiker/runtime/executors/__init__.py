@@ -13,6 +13,7 @@ from raiker.runtime.executors.channels import ChannelApprovalRelayExecutor, Exte
 from raiker.runtime.executors.containers import ContainerExecutionExecutor
 from raiker.runtime.executors.models_runtime import (
     HostedModelRuntimeExecutor,
+    ModelProviderExecutor,
     PrivateNetworkModelRuntimeExecutor,
 )
 from raiker.runtime.executors.orchestration import MultiAgentTeamExecutor, SubagentExecutor
@@ -25,7 +26,6 @@ from raiker.runtime.executors.tier2_shell import ProcessExecutor, ShellExecutor
 from raiker.runtime.executors.tier2_web import NetworkExecutor, WebFetchExecutor
 from raiker.runtime.executors.tier3_core import (
     GraphIndexingExecutor,
-    ModelProviderExecutor,
     SemanticMemoryExecutor,
     VectorEmbeddingExecutor,
 )
@@ -103,6 +103,12 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # Tier 3 — local code-intelligence runtime
     "graph_indexing_runtime",
     "semantic_memory_runtime",
+    # Tier 3 — local deterministic embedding (hashing trick; no model download /
+    # no network).
+    "vector_embedding_runtime",
+    # Tier 3 — provider-backed semantic embedding through an LLM provider; layered
+    # egress + hosted/private gate + API-key gating (owner env creds only).
+    "model_provider_runtime",
     # Phase 4 — bounded, governed, in-process orchestration (no network / no spawn-out)
     "subagents",
     "multi_agent_teams",
@@ -162,6 +168,8 @@ def build_default_executor_registry(
     registry.register("network_execution", NetworkExecutor(ws))
     registry.register("graph_indexing_runtime", GraphIndexingExecutor(ws))
     registry.register("semantic_memory_runtime", SemanticMemoryExecutor(ws))
+    registry.register("vector_embedding_runtime", VectorEmbeddingExecutor(ws, store))
+    registry.register("model_provider_runtime", ModelProviderExecutor(ws, store))
     registry.register("subagents", SubagentExecutor(ws, store))
     registry.register("multi_agent_teams", MultiAgentTeamExecutor(ws, store))
     registry.register("external_channel_runtime", ExternalChannelExecutor(ws, store))

@@ -1150,6 +1150,9 @@ class VectorRecord:
     scope: str
     sensitivity: str
     created_at: str
+    # JSON-encoded list[float] of the embedding vector; None for legacy/metadata-
+    # only records that store no vector.
+    embedding: str | None = None
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:

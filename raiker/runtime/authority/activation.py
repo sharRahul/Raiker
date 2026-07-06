@@ -88,9 +88,11 @@ def _build_registry() -> dict[str, ActivationRequirement]:
                       notes="Sandbox, allowlist, budget required.")
 
     # Tier 3
-    for cap in ("graph_indexing_runtime", "semantic_memory_runtime", "vector_embedding_runtime",
-                "model_provider_runtime"):
-        r[cap] = _req(cap, "3", notes="Indexing / embedding / model runtime; executor pending.")
+    for cap in ("graph_indexing_runtime", "semantic_memory_runtime", "vector_embedding_runtime"):
+        r[cap] = _req(cap, "3", notes="Local indexing / embedding runtime; executor registered.")
+    r["model_provider_runtime"] = _req(
+        "model_provider_runtime", "3", threat_ack=True, human_confirm=True,
+        notes="Provider-backed embedding; egress + hosted/private gate + API-key gated; executor registered.")
 
     # Tier 4
     for cap in ("plugin_execution_cap", "plugin_install", "plugin_revocation_cap"):

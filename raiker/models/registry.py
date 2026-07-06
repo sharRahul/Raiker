@@ -124,9 +124,21 @@ class ModelProfileRegistry:
         normal_provider = provider.replace("_", "-")
         aliases = {"llama-cpp": "llama.cpp"}
         normal_provider = aliases.get(normal_provider, normal_provider)
+        # 1) Exact (provider, model) match wins.
         for profile in self.profiles:
             if profile.provider == normal_provider and profile.model == model:
                 return profile
+        # 2) Fall back to a provider profile that ships a placeholder model
+        #    (openrouter/openai/gemini/ollama/vllm/lm-studio/openai-compatible all
+        #    pick the concrete model at selection time). This makes the direct
+        #    ModelRouter path (achat/aembed) consistent with the CLI `/model use`
+        #    + gateway path, which already substitute the concrete model. Provider
+        #    policy (gate, egress allowlist, API key) is still enforced later by
+        #    the provider factory, so this only fills in the model name.
+        if model and "<" not in model and ">" not in model:
+            for profile in self.profiles:
+                if profile.provider == normal_provider and _is_placeholder_model(profile.model):
+                    return profile_with_model(profile, model)
         raise RegistryError(f"unknown_model_profile:{provider}:{model}")
 
     def resolve_profile_id(self, profile_id: str) -> ModelProfile:
@@ -148,6 +160,11 @@ class ModelProfileRegistry:
     def register(self, profile: ModelProfile) -> None:
         """Add a runtime-resolved profile so ``resolve(provider, model)`` can find it."""
         self.profiles.append(profile)
+
+
+def _is_placeholder_model(model: str) -> bool:
+    """A profile ships a placeholder model when the concrete name is chosen later."""
+    return not model or "<" in model or ">" in model
 
 
 def profile_with_model(profile: ModelProfile, model: str) -> ModelProfile:

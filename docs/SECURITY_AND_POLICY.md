@@ -32,7 +32,7 @@ Clients, runtime modules, plugins, models, channels, and subagents must never ex
 
 The `RuntimeAuthority` (`raiker/runtime/authority/router.py`) enforces principal validity, domain scoping, AI role restrictions (no self-approval, no self-grant, no gate enablement), human-only role protections, risk level escalation, and risk acceptance validation.
 
-Current backend truth: approval resolution is metadata-only and does not execute approved actions; approval resolution is metadata-only; integrated executors are governed per action while deferred no-executor capabilities remain disabled/fail-closed. Runtime readiness: runtime_enablement_candidate — controlled_runtime_mode_activation_implemented. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Human runtime_gate_manager can activate local_single_user_runtime and enable admin_mutation/role_mutation; AI cannot activate runtime modes or capability gates. Owner bootstrap flow implemented via `/bootstrap-owner` with recovery support. Local single-user production hardening implemented: first-run owner bootstrap, persisted owner principal, acting-principal resolution, runtime-gate-manager authorization, recovery/break-glass flow. Production-ready local single-user runtime: ready. Current production readiness applies only to local single-user runtime.
+Current backend truth: Approval resolution is metadata-only and does not execute approved actions; integrated executors are governed per action while deferred no-executor capabilities remain disabled/fail-closed. Runtime readiness: runtime_enablement_candidate — controlled_runtime_mode_activation_implemented. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Human runtime_gate_manager can activate local_single_user_runtime and enable admin_mutation/role_mutation; AI cannot activate runtime modes or capability gates. Owner bootstrap flow implemented via `/bootstrap-owner` with recovery support. Local single-user production hardening implemented: first-run owner bootstrap, persisted owner principal, acting-principal resolution, runtime-gate-manager authorization, recovery/break-glass flow. Production-ready local single-user runtime: ready. Current production readiness applies only to local single-user runtime.
 
 ### AI-Executable Roles
 
@@ -286,10 +286,10 @@ Event/status labels distinguish `implemented_verified`, `implemented_unverified`
 
 ## Current limitations
 
-- Approval execution relay remains metadata-only/deferred.
-- Shell/process/network/web-fetch runtime remains disabled/deferred.
-- Plugin execution remains disabled/deferred.
-- Remote/container/cloud runtime remains disabled/deferred.
-- Email/calendar/finance/medical/CCTV runtime remains disabled/deferred.
-- Hosted/multi-user/cloud runtime is future implementation work.
+- Approval resolution remains metadata-only and never executes actions; `approval_execution_relay` is a separate integrated governed executor for approved file-write proposals.
+- Shell/process/network/web-fetch, plugin slices, external channel, local container, graph/semantic/vector/model-provider, and local email/calendar/reminder runtimes are integrated real executors and remain governed per action with independent fail-closed controls.
+- Remote/cloud command execution remains no-executor/fail-closed.
+- Finance/investment/medical/pregnancy/CCTV/home-security/hardware runtime remains no-executor/fail-closed.
+- Email/calendar/reminder are local-only stores/drafts; no external send/sync/invites.
+- Hosted/multi-user/cloud production runtime is future implementation work.
 - Current production readiness applies only to local single-user runtime.

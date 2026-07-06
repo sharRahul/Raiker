@@ -560,7 +560,7 @@ Safety status:
 - Lifecycle records do not write semantic memory.
 - Lifecycle records do not create embeddings or vectors.
 - Graph indexing remains disabled.
-- Semantic/vector memory writes remain disabled.
+- Legacy preview surfaces do not write semantic memory; current semantic/vector runtimes are governed real executors.
 - Rollback execution remains disabled.
 - Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
 - GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.

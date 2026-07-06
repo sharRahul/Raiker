@@ -2257,9 +2257,10 @@ def handle_runtime_readiness(*, workspace_root: str | Path = ".") -> str:
         blockers.append("No acting principal available")
     if not dangerous_caps_disabled:
         blockers.append("Some dangerous capabilities are not disabled")
-    blockers.append("Approval execution relay remains metadata-only/deferred")
-    blockers.append("Shell/network/plugin/remote/container/cloud remain disabled")
-    blockers.append("Email/calendar/finance/medical/CCTV remain disabled")
+    blockers.append("Approval resolution remains metadata-only and never executes actions")
+    blockers.append("Integrated real executors are governed per action (default ask)")
+    blockers.append("Remote/cloud and sensitive no-executor domains remain disabled/fail-closed")
+    blockers.append("Email/calendar/reminder are local-only stores/drafts")
     if not blockers:
         lines.append("  (none)")
     else:
@@ -2585,7 +2586,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
     if command == "/help":
         return (
             "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /approval-previews [--json] [--status <status>] [--limit <n>], /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-preview <preview_id> [--json], /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only] [--save-proposals], /proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] [--limit <number>], /proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>] [--approval-preview], /doctor, /channels, /launch --provider mock --model mock-deterministic (test-only; policy-blocked in normal CLI), /quit\n"
-            "Status: Phase 3 Slice B approval planning preview is implemented. Phase 3 is complete for safe foundation/readiness slices A-P; Phase 4 is blocked; runtime execution remains disabled. Current launchable UI is the plain local terminal client only (RAIKER_TUI=plain, --prompt, or interactive stdin). Rich/native TUI and Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred work, not launchable apps. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
+            "Status: Phase 3 Slice B approval planning preview is implemented. Phase 3 is complete for safe foundation/readiness slices A-P; integrated real executors are governed per action; no-executor capabilities remain disabled/fail-closed. Current launchable UI is the plain local terminal client only (RAIKER_TUI=plain, --prompt, or interactive stdin). Rich/native TUI and Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred work, not launchable apps. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
         )
     if command == "/providers":
         return handle_providers()

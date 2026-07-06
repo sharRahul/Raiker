@@ -117,7 +117,7 @@ Current high-signal truth:
 - **Owner bootstrap flow**: `implemented_verified` — `/bootstrap-owner` creates owner principal, role, events; recovery flow with `--force-recover` supported; `resolve_local_principal()` replaces synthetic `cli_local` for all production-path principal resolution. Tests: `tests/test_local_single_user_runtime.py`.
 - **Local single-user production hardening**: `implemented_verified` — first-run owner bootstrap, persisted owner principal, acting-principal resolution, runtime-gate-manager authorization, recovery/break-glass flow, AI principal denial for runtime mode/capability gate changes.
 - **Production-ready local single-user runtime**: `ready` — all production readiness criteria completed and validated. See validation evidence below.
-- **Deferred runtimes** remain disabled. **Approval execution relay** remains metadata-only/deferred. Integrated real-executor capabilities default enabled; no-executor capabilities remain disabled/fail-closed.
+- **Deferred runtimes** remain disabled. Approval resolution remains metadata-only and never executes actions; `approval_execution_relay` is a separate integrated governed executor for approved file-write proposals. Integrated real-executor capabilities default enabled; no-executor capabilities remain disabled/fail-closed.
 
 ---
 
@@ -642,18 +642,16 @@ Preserved disabled gates: plugin execution, graph/codemap runtime indexing, sema
 
 ## Phase 3 Slice C/D governance update (local validation required)
 
-Full Phase 3 is not complete. Slice C adds graph/codemap governance and dry-run planning only: graph/codemap runtime indexing remains disabled, no background indexer is started, and no durable graph nodes or edges are written. Slice D adds semantic memory governance and a review queue only: semantic/vector memory writes remain disabled, no embeddings are created, and no vector records are written.
+The older Phase 3 Slice C/D governance note is superseded by the current executor posture: graph indexing, semantic memory, local vector embedding/search, and provider-backed embedding now have real governed executors. Broader graph query/planning automation, learned semantics, external sync, and no-executor extensions remain deferred/fail-closed.
 
 Safety status for this slice:
 
 - GitHub Actions remain paused due quota exhaustion; do not claim GitHub CI passed while paused.
 - Local validation evidence remains mandatory under `docs/LOCAL_VALIDATION_GATE.md`.
-- Plugin execution remains disabled.
-- Graph/codemap runtime indexing remains disabled.
-- Semantic/vector memory writes remain disabled.
-- External channels remain disabled.
-- Subagents and multi-agent teams remain disabled.
-- Remote/container execution remains disabled.
+- Plugin execution slices are integrated governed executors; broader plugin extensions remain deferred/fail-closed.
+- Graph indexing, semantic memory, local vector embedding/search, and provider-backed embedding are integrated governed executors; broader graph/memory extensions remain deferred/fail-closed.
+- The reference external channel runtime, subagent/team executors, and local container executor are integrated and governed.
+- Remote/cloud command execution remains no-executor/fail-closed.
 
 New planning/review-only surfaces:
 
@@ -671,8 +669,8 @@ Slice E adds preview-only approval contracts for future graph/codemap indexing a
 
 Safety status:
 
-- Graph/codemap runtime indexing remains disabled.
-- Semantic/vector memory writes remain disabled.
+- Legacy preview surfaces do not execute graph writes; the current graph indexing runtime is a separate governed real executor.
+- Legacy preview surfaces do not write semantic memory; current semantic/vector runtimes are governed real executors.
 - Previews are not approvals to execute; approving for later does not write memory or run indexing.
 - No embeddings, vectors, background indexers, watchers, daemons, plugins, channels, remote execution, or container execution are activated.
 - GitHub Actions remain paused due quota exhaustion; local validation evidence is mandatory and full CI must be re-enabled later when quota is available.
@@ -685,9 +683,9 @@ Safety invariants for this slice:
 
 - Approval audit records do not execute actions.
 - Rollback plans do not execute rollback.
-- Graph/codemap runtime indexing remains disabled.
-- Semantic/vector memory writes remain disabled; no embeddings or vectors are created.
-- Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
+- Legacy preview surfaces do not execute graph writes; the current graph indexing runtime is a separate governed real executor.
+- Legacy preview surfaces do not write semantic memory; current semantic memory and vector embedding/search runtimes are separate governed real executors.
+- Plugin slices, the reference external channel, subagent/team executors, and local container runtime are governed real executors; remote/cloud command execution remains no-executor/fail-closed.
 - GitHub Actions remain paused due quota exhaustion; local/cloud validation evidence is mandatory.
 - CI must be re-enabled later when quota is available and must not be claimed as passed while Actions are paused.
 
@@ -703,9 +701,9 @@ Safety status:
 - Lifecycle records do not write semantic memory.
 - Lifecycle records do not create embeddings or vectors.
 - Graph indexing remains disabled.
-- Semantic/vector memory writes remain disabled.
+- Legacy preview surfaces do not write semantic memory; current semantic/vector runtimes are governed real executors.
 - Rollback execution remains disabled.
-- Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
+- Plugin slices, the reference external channel, subagent/team executors, and local container runtime are governed real executors; remote/cloud command execution remains no-executor/fail-closed.
 - GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.
 
 ## Phase 3 Slice H lifecycle retention status
@@ -867,7 +865,7 @@ Evidence: `tests/test_phase_4_scheduled_routines.py`, `tests/test_executor_defau
 
 Scope and boundaries:
 
-- The production `ModelRouter` (gateway + `/model` CLI) derives its `ProviderRuntimePolicy` from the persisted capability gates (`raiker/models/policy_state.py`). Both gates disabled (the default) ⇒ hosted/private model profiles cannot be constructed at all; no silent local→hosted fallback exists.
+- The production `ModelRouter` (gateway + `/model` CLI) derives its `ProviderRuntimePolicy` from the persisted capability gates (`raiker/models/policy_state.py`). If either gate is deliberately disabled, the corresponding hosted/private model profile cannot be constructed at all; no silent local→hosted fallback exists.
 - Every off-machine provider construction re-checks the owner egress allowlist (`RAIKER_MODEL_EGRESS_ALLOWLIST`, comma-separated host globs); empty allowlist fails closed (`model_egress_denied:no_allowlist`) even when the gate is enabled. Local endpoints are never subject to this allowlist.
 - Credentials come only from owner env vars named by the profile's `api_key_env` — never from model/action arguments; never written to storage, events, or artifacts.
 - The executors support a single bounded operation, `connectivity_check`: an allowlisted, size/time-capped reachability probe. Artifacts are metadata only (endpoint kind, HTTP status, byte counts) — never URLs, hosts, response bodies, headers, or keys. Hosted probes require HTTPS and `remote_hosted` endpoints; private probes require `private_network` endpoints.

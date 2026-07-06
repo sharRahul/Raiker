@@ -219,7 +219,7 @@ These permission labels are used in the inventory below so coding agents know wh
 | `lsp:server_start` | Start language servers; disabled until workspace/plugin trust gates. |
 | `plugin:validate` | Validate plugin metadata without executing code. |
 | `plugin:register` | Register plugin metadata/plans; no code execution. |
-| `plugin:execute` | Execute plugin code/entrypoints; governed by the default-disabled `plugin_runtime_cap` (subprocess) / `plugin_sandboxed_runtime_cap` (no-network container) gates. |
+| `plugin:execute` | Execute plugin code/entrypoints; governed by the integrated `plugin_runtime_cap` (subprocess) / `plugin_sandboxed_runtime_cap` (no-network container) gates plus default-ask decision mode and owner allowlists. |
 | `channel:read` | Read/list configured channel profiles/status. |
 | `channel:activate` | Activate external transports; disabled until Phase 4 pairing and trust. |
 | `agent:plan` | Plan subagent/team work without spawning. |
@@ -493,16 +493,19 @@ The following items must be picked up by later implementation plans:
 Until the relevant phase gates are fully implemented and verified:
 
 - plugin code execution executors are implemented (subprocess + no-network container); their gates default `enabled_runtime` and remain governed/default-ask;
-- graph/codemap runtime indexing remains disabled;
-- graph node/edge writes remain disabled;
-- semantic/vector memory writes remain disabled;
-- embedding creation/storage remains disabled;
+- graph indexing has a real governed executor; broader/unrestricted graph query,
+  planning automation, and graph extensions remain deferred/fail-closed;
+- semantic memory plus local vector embedding/search have real governed executors;
+  broader learned semantics, external sync, and unrestricted memory automation remain
+  deferred/fail-closed;
+- provider-backed embedding has a real governed executor; additional provider/runtime
+  extensions remain policy-gated or deferred as documented;
 - rollback execution remains disabled;
-- external channels remain disabled;
+- the reference external channel runtime and channel approval relay are integrated and governed; broader native transports/notifications remain deferred/fail-closed;
 - MCP/LSP/plugin server startup remains disabled unless explicitly trusted and approved;
 - monitors/watchers remain disabled;
-- subagent and multi-agent runtime execution remains disabled;
-- remote/container/cloud execution remains disabled;
+- subagent and multi-agent bounded executors are integrated and governed; broader autonomous team/spawn extensions remain deferred;
+- local container execution is integrated and governed; remote/cloud command execution remains no-executor/fail-closed;
 - hosted routines, marketplace installs, hosted push notifications, and share links remain disabled.
 
 ## Phase 3 Slice H Lifecycle Retention, Cleanup, and Handoff Commands

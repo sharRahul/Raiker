@@ -6,7 +6,7 @@
 Raiker is a **security-first AI agent**: it can connect to any backend LLM —
 local (llama.cpp / Ollama / LM Studio), home-lab (vLLM), or hosted API
 (Anthropic / OpenAI / Gemini / OpenRouter) — and every capability it can perform
-is **governed, default-disabled, and fail-closed**. Nothing runs until you, the
+is **governed, default-ask for AI-proposed actions, and fail-closed for no-executor capabilities**. Nothing runs without the relevant gate, policy, and decision-mode checks; you, the
 human owner, explicitly turn it on.
 
 This page gets you from a clean checkout to your first governed action.

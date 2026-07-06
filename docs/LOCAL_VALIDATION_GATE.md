@@ -137,7 +137,7 @@ Required Slice G smoke assertions:
 
 - `/storage-lifecycle` renders read-only lifecycle metadata.
 - `/storage-lifecycle --summary` renders aggregate counts and disabled runtime write flags.
-- `/storage-lifecycle --graph` states graph/codemap runtime indexing remains disabled.
+- `/storage-lifecycle --graph` must not overclaim unrestricted graph automation; current graph indexing is a governed real executor while broader graph query/planning extensions remain deferred/fail-closed.
 - `/storage-lifecycle --memory` states semantic/vector writes and embeddings remain disabled.
 - SQLite migrations create only metadata lifecycle tables and lifecycle metadata event tables.
 - No graph node/edge tables are introduced by Slice G.

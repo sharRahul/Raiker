@@ -82,7 +82,7 @@ plan with execution disabled).
 
 - Manifests are explicit and declare every permission they want.
 - A **permission diff** is shown before enable/update.
-- Plugins are **disabled by default**; enabling requires approval.
+- Plugin execution slices are **governed/default-ask** and require owner trust/allowlists; broader plugin extensions remain deferred/fail-closed.
 - Recommended (not yet implemented): manifest signing/checksums and provenance, plus a managed
   allowlist of trusted publishers (LLM03, `docs/OWASP_GENAI_SECURITY_MAPPING.md`).
 

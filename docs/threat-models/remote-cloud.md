@@ -41,4 +41,4 @@ Promoting any of these to a real executor (the documented process in
    the guard test's `_SENSITIVE` tuple, in lockstep with the above.
 
 Until all of that lands for a given capability, it remains fail-closed and
-default-disabled, and AI principals can never run or enable it.
+disabled/fail-closed by design, and AI principals can never run or enable it.

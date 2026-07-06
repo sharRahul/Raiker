@@ -968,7 +968,7 @@ CLI surfaces:
 
 Workspace surfaces include `approval_preview_summary` with graph/memory preview availability, pending/denied counts, `preview_only_mode=true`, and `runtime_execution_enabled=false`.
 
-These previews are not executable approvals. Graph indexing and semantic/vector memory writes remain disabled; no plugin, external channel, remote execution, container execution, subagent, or multi-agent path is activated.
+These previews are not executable approvals. Graph indexing, semantic memory, local vector embedding/search, provider-backed embedding, plugin slices, external channel, local container, subagent, and multi-agent bounded executors are now governed real executors where listed in `REAL_EXECUTOR_CAPABILITIES`; remote/cloud command execution and broader/no-executor extensions remain disabled/fail-closed.
 
 ## Phase 3 Slice F — Approval Audit and Rollback Planning
 
@@ -978,9 +978,9 @@ Safety invariants for this slice:
 
 - Approval audit records do not execute actions.
 - Rollback plans do not execute rollback.
-- Graph/codemap runtime indexing remains disabled.
-- Semantic/vector memory writes remain disabled; no embeddings or vectors are created.
-- Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
+- Legacy preview surfaces do not execute graph writes; the current graph indexing runtime is a separate governed real executor.
+- Legacy preview surfaces do not write semantic memory; current semantic memory and vector embedding/search runtimes are separate governed real executors.
+- Plugin slices, the reference external channel, subagent/team executors, and local container runtime are governed real executors; remote/cloud command execution remains no-executor/fail-closed.
 - GitHub Actions remain paused due quota exhaustion; local/cloud validation evidence is mandatory.
 - CI must be re-enabled later when quota is available and must not be claimed as passed while Actions are paused.
 
@@ -996,9 +996,9 @@ Safety status:
 - Lifecycle records do not write semantic memory.
 - Lifecycle records do not create embeddings or vectors.
 - Graph indexing remains disabled.
-- Semantic/vector memory writes remain disabled.
+- Legacy preview surfaces do not write semantic memory; current semantic/vector runtimes are governed real executors.
 - Rollback execution remains disabled.
-- Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
+- Plugin slices, the reference external channel, subagent/team executors, and local container runtime are governed real executors; remote/cloud command execution remains no-executor/fail-closed.
 - GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.
 
 ## Implementation Phases (UX Scope)

@@ -48,7 +48,7 @@ neutralised without deleting audit trail.
 
 ## Acceptance evidence
 
-- `tests/test_phase_4_plugin_revocation_runtime.py` proves default-disabled
+- `tests/test_phase_4_plugin_revocation_runtime.py` proves disabled-gate
   blocking, threat-model-ack activation, installed-plugin requirement,
   successful revocation, idempotent already-revoked handling, no plugin content
   in runtime artifacts, and that `plugin_execution_cap` fails closed with

@@ -302,10 +302,10 @@ class RuntimeOrchestrator:
         )
         self._event(envelope, "context_gathered", bundle.event_payload())
 
-        # Governed, default-ask retrieval augmentation. When the vector_embedding_runtime
-        # gate is disabled (the default) this is a no-op and emits nothing, so existing
-        # turn behaviour is unchanged. Only when the owner has enabled the gate AND raised
-        # the decision mode to allow/auto is retrieved context injected into the prompt.
+        # Governed, default-ask retrieval augmentation. The vector_embedding_runtime
+        # gate is integrated and defaults enabled, but decision mode defaults to ask;
+        # retrieved context is injected only when the owner changes the standing
+        # decision mode to allow/auto.
         retrieval_context: str | None = None
         if self.retrieval is not None:
             retrieval_plan = self.retrieval.plan(envelope.prompt.text)

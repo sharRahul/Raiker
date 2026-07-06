@@ -70,7 +70,7 @@ tool invocation for installed plugins.
 
 ## Acceptance evidence
 
-- `tests/test_phase_4_plugin_install_runtime.py` proves default-disabled
+- `tests/test_phase_4_plugin_install_runtime.py` proves disabled-gate
   blocking, threat-model-ack activation, safe manifest install recording, risky
   permission rejection, bad checksum rejection, and workspace path rejection.
 - `tests/test_phase_4_plugin_dependency_controls.py` proves unpinned/unallowlisted

@@ -96,8 +96,8 @@ class TestTerminalCommands:
         assert "/events" in result
         assert "/checkpoints" in result
         assert "Phase 3 is complete" in result
-        assert "Phase 4 is blocked" in result
-        assert "runtime execution remains disabled" in result
+        assert "integrated real executors are governed per action" in result
+        assert "no-executor capabilities remain disabled/fail-closed" in result
 
     def test_slash_unknown(self, tmp_path: Path) -> None:
         result = handle_slash_command("/bogus", workspace_root=str(tmp_path))

@@ -1,9 +1,9 @@
 # Threat Model — Scheduled Routines (Phase 4, slice 2)
 
 > Status marker: runtime_enablement_candidate — strict non-allow blocking,
-> role revoke governed, capability gate per action. Runtime execution remains
-> disabled by default (gate is default-disabled / disabled/deferred until an
-> owner flips it). Approval resolution is metadata-only.
+> role revoke governed, capability gate per action. The capability is now
+> integrated and governed/default-ask; it was historically disabled/deferred
+> before its executor landed. Approval resolution is metadata-only.
 
 Per-capability threat model required by
 [`docs/RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md) before

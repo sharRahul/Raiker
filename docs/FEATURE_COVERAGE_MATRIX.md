@@ -32,7 +32,7 @@ A feature must never be marked as merely "future" without a full specification.
 
 Specification status and implementation status are separate: `fully-specified` means the contract is complete enough to build, not that runtime/app behavior is currently shipped. Rows marked `phase-3-build` may still be contract-only, readiness-only, metadata-only, or deferred in the current implementation status column.
 
-Runtime readiness decision: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Approval execution relay remains metadata-only/deferred. Broad runtime execution remains disabled. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Owner bootstrap flow implemented (`/bootstrap-owner`, recovery, tests). Local single-user production hardening implemented: first-run owner bootstrap, persisted owner principal, acting-principal resolution, runtime-gate-manager authorization. Production-ready local single-user runtime: `ready`. Current production readiness applies only to local single-user runtime.
+Runtime readiness decision: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Approval resolution remains metadata-only and never executes actions; `approval_execution_relay` is a separate integrated governed executor for approved file-write proposals. Integrated real executors are governed per action; no-executor capabilities remain disabled/fail-closed. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Owner bootstrap flow implemented (`/bootstrap-owner`, recovery, tests). Local single-user production hardening implemented: first-run owner bootstrap, persisted owner principal, acting-principal resolution, runtime-gate-manager authorization. Production-ready local single-user runtime: `ready`. Current production readiness applies only to local single-user runtime.
 
 Current backend implementation labels used across the hardening pass:
 
@@ -162,7 +162,7 @@ Current backend implementation labels used across the hardening pass:
 5. No model output is trusted until validated.
 6. All tool actions are policy-reviewed.
 7. Hooks may influence decisions but may not silently bypass policy.
-8. Plugins are disabled by default unless trusted or explicitly enabled.
+8. Plugin execution slices are governed/default-ask and require owner trust/allowlists; broader plugin extensions remain deferred/fail-closed.
 9. Channels are untrusted input surfaces.
 10. Memory writes are governed and auditable.
 11. Checkpoints are not a Git replacement.
@@ -198,11 +198,11 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 
 ## Current limitations
 
-- Approval execution relay remains metadata-only/deferred.
-- Shell/process/network/web-fetch runtime remains disabled/deferred.
-- Plugin execution: install, brokered read-only, revocation, and code runtime (bounded subprocess + no-network container) executors are implemented; gates remain default-disabled.
-- Remote/container/cloud runtime remains disabled/deferred.
-- Email/calendar/finance/medical/CCTV runtime remains disabled/deferred.
+- Approval resolution remains metadata-only and never executes actions; `approval_execution_relay` is a separate integrated governed executor for approved file-write proposals.
+- Shell/process/network/web-fetch runtime is integrated and governed per action with sandbox/egress controls.
+- Plugin execution: install, brokered read-only, revocation, and code runtime (bounded subprocess + no-network container) executors are integrated and governed/default-ask; broader plugin extensions remain deferred/fail-closed.
+- Local container runtime is integrated and governed; remote/cloud command execution remains no-executor/fail-closed.
+- Email/calendar/reminder are local-only stores/drafts; finance/investment/medical/pregnancy/CCTV/home-security/hardware runtime remains no-executor/fail-closed.
 - Hosted/multi-user/cloud runtime is future implementation work.
 - Current production readiness applies only to local single-user runtime.
 

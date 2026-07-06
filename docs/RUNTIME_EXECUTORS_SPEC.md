@@ -10,8 +10,13 @@ executor/activation model added on top of `RuntimeAuthority`.
 
 ## Model
 
-1. **Gate state** (`capability_gate_state`, default `disabled`) — what the owner /
-   `runtime_gate_manager` has turned on. AI principals can never flip a gate.
+1. **Gate state** (`capability_gate_state`) — what the owner / `runtime_gate_manager`
+   has turned on. Default posture: **integrated capabilities (those in
+   `REAL_EXECUTOR_CAPABILITIES`) default to `enabled_runtime`**; capabilities that are
+   not integrated yet (no real executor) default to `disabled` and fail closed. AI
+   principals can never flip a gate (enable or disable). An enabled gate does not by
+   itself let an AI act — the decision mode (default `ask`), critical-risk human floor,
+   PolicyEngine hard-denies, and executor-level env allowlists still apply.
 2. **Activation requirement** (`raiker/runtime/authority/activation.py`) — a gate can
    only transition to an enabled state when its `ActivationRequirement` is satisfied:
    acting principal is HUMAN, the required runtime mode is active, a **real executor is
@@ -62,7 +67,7 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 | `network_execution` | 2 | Network call over the egress allowlist. |
 | `graph_indexing_runtime` | 3 | Builds the local code graph index. |
 | `semantic_memory_runtime` | 3 | Local semantic memory search. |
-| `vector_embedding_runtime` | 3 | Local deterministic embedding (hashing trick; no model download / no network); persists a `vector_records` row. Metadata-only artifacts; source text never emitted. |
+| `vector_embedding_runtime` | 3 | Local deterministic embedding (hashing trick; no model download / no network): `embed` persists a `vector_records` row, `list` counts, `search` ranks stored local-model vectors by cosine (returns ids+scores). Metadata-only artifacts; source text/query never emitted. |
 | `model_provider_runtime` | 3 | Provider-backed **semantic** embedding via an LLM provider; layered gating (owner egress allowlist + hosted/private gate state + API-key-from-env); persists a `vector_records` row (`embedding_model=<provider>:<model>`). Metadata-only artifacts; text/credentials never emitted. `embed` only. |
 | `subagents` | 4 | Bounded, governed, in-process read-only subagent (no model/process/network). |
 | `multi_agent_teams` | 4 | Up to 5 bounded subagents in sequence; aggregates metadata-only outcomes. |

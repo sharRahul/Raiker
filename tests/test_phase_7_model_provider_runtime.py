@@ -104,6 +104,8 @@ def test_gate_disabled_blocks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
     bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
+    RuntimeControlService(ws).disable_capability("model_provider_runtime", None, "test")
     authority, principal = _authority(ws, embedder=_fake_embedder([0.1, 0.2, 0.3]))
     result = authority.route_action(_action(principal.principal_id, text="hello", provider="openai", model="m"), principal)
     assert result.decision == "disabled_by_capability_gate"

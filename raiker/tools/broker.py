@@ -29,6 +29,7 @@ from raiker.tools.memory_tools import (
     memory_search,
 )
 from raiker.tools.search import glob, grep
+from raiker.tools.vector_tools import vector_get
 
 
 class ToolBroker:
@@ -106,6 +107,10 @@ class ToolBroker:
             "memory_get": lambda args: memory_get(
                 self.workspace_root,
                 str(args.get("memory_id", "")),
+            ),
+            "vector_get": lambda args: vector_get(
+                self.workspace_root,
+                str(args.get("vector_id", "")),
             ),
         }
 

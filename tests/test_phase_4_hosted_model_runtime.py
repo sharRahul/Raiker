@@ -89,6 +89,8 @@ def test_model_runtime_caps_are_real_executors(tmp_path: Path) -> None:
 def test_fail_closed_when_gate_disabled(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
+    RuntimeControlService(ws).disable_capability("hosted_model_runtime", None, "test")
     authority, principal = _authority(ws)
     result = authority.route_action(
         _action(principal.principal_id, _HOSTED, operation="connectivity_check",

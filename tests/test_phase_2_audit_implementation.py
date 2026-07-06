@@ -120,7 +120,9 @@ def test_memory_candidate_listing_and_status(tmp_path: Path) -> None:
 def test_phase_3_and_phase_4_gates_are_listable_and_disabled() -> None:
     disabled = list_disabled_capabilities()
     assert "desktop_ui" in disabled["phase_3"]
-    assert "subagents" in disabled["phase_4"]
+    # subagents/multi_agent_teams are integrated now (enabled); external_channels
+    # is a phase-4 alias with no real executor and stays disabled.
+    assert "external_channels" in disabled["phase_4"]
     with pytest.raises(PermissionError):
         assert_capability_disabled("remote_execution")
 

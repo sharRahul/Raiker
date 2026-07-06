@@ -99,13 +99,28 @@ def main() -> int:
         if cap not in ALL_CAPABILITIES:
             errors.append(f"missing_high_risk_capability:{cap}")
 
-    # 2. All high-risk capabilities must default to disabled
+    # 2. Default gate posture. Integrated capabilities (those with a real
+    #    executor) ship ENABLED by default — governed by the per-capability
+    #    decision mode (default `ask`), the critical-risk human floor, PolicyEngine
+    #    hard-denies, and executor-level env allowlists, which are independent of
+    #    the gate. Capabilities that are not integrated yet (no real executor) must
+    #    still ship DISABLED and fail closed.
     gates = default_capability_gates()
+    try:
+        from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES as _REAL_CAPS
+    except Exception as exc:  # pragma: no cover - import guard
+        _REAL_CAPS = frozenset()
+        errors.append(f"cannot_import_real_executor_capabilities:{exc}")
+    for cap, gate in gates.items():
+        if cap in _REAL_CAPS and gate.state != CapabilityState.ENABLED_RUNTIME:
+            errors.append(f"integrated_capability_not_enabled_by_default:{cap}")
     for cap in runtime_high_risk:
+        if cap in _REAL_CAPS:
+            continue  # integrated -> enabled by default (checked above)
         if cap in gates:
             gate = gates[cap]
             if gate.state not in (CapabilityState.DISABLED, CapabilityState.PLANNED):
-                errors.append(f"high_risk_capability_not_disabled:{cap}")
+                errors.append(f"not_integrated_high_risk_capability_not_disabled:{cap}")
         else:
             errors.append(f"high_risk_capability_not_in_gates:{cap}")
 
@@ -183,26 +198,20 @@ def main() -> int:
             except PermissionError:
                 errors.append(f"unknown_capability_in_transition:{cap}")
 
-    # 10. Controlled runtime mode activation checks
-    runtime_high_risk_remain_disabled = {
-        "shell_execution", "process_execution", "network_execution",
-        "web_fetch", "email_runtime", "calendar_runtime", "finance_runtime",
-        "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
-        "cctv_runtime", "home_security_runtime", "hardware_operator_runtime",
-        "plugin_execution_cap", "plugin_install", "plugin_revocation_cap",
-        "plugin_runtime_cap", "plugin_sandboxed_runtime_cap", "external_channel_runtime",
-        "channel_approval_relay", "remote_execution_cap", "container_execution_cap",
-        "cloud_execution_cap", "approval_execution_relay", "scheduled_routines",
-        "graph_indexing_runtime", "semantic_memory_runtime",
-        "vector_embedding_runtime", "hosted_model_runtime",
-        "private_network_model_runtime",
+    # 10. Not-yet-integrated (no real executor) high-risk capabilities must stay
+    #     disabled by default and fail closed. (Integrated capabilities ship
+    #     enabled — verified in check 2 above.)
+    not_integrated_remain_disabled = {
+        "finance_runtime", "investment_runtime", "medical_runtime",
+        "pregnancy_baby_runtime", "cctv_runtime", "home_security_runtime",
+        "hardware_operator_runtime", "remote_execution_cap", "cloud_execution_cap",
     }
-    for cap in runtime_high_risk_remain_disabled:
+    for cap in not_integrated_remain_disabled:
         remain_gate = gates.get(cap)
         if remain_gate is None:
             errors.append(f"runtime_activation_cap_not_in_gates:{cap}")
         elif remain_gate.state not in (CapabilityState.DISABLED, CapabilityState.PLANNED):
-            errors.append(f"runtime_activation_cap_not_disabled:{cap}")
+            errors.append(f"not_integrated_cap_not_disabled:{cap}")
 
     # 11. CLI commands for runtime mode/capability must exist in commands.py
     commands_path = repo_root / "raiker" / "cli" / "commands.py"

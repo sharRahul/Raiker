@@ -183,10 +183,15 @@ class TestListCapabilityGates:
             raw = authority.get_effective_capability_gate(v.capability)
             assert v.state == raw["state"]
 
-    def test_runtime_enabled_false_by_default(self, service: RuntimeControlService) -> None:
-        views = service.list_capability_gates()
-        for v in views:
-            assert v.runtime_enabled is False
+    def test_runtime_enabled_true_for_integrated_false_otherwise(
+        self, service: RuntimeControlService
+    ) -> None:
+        from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
+        views = {v.capability: v for v in service.list_capability_gates()}
+        # Integrated (real-executor) capabilities ship enabled; everything else stays disabled.
+        for cap, v in views.items():
+            assert v.runtime_enabled is (cap in REAL_EXECUTOR_CAPABILITIES)
 
     def test_can_current_principal_change_false_when_no_principal(
         self, service: RuntimeControlService,

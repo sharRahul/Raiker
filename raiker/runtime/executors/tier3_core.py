@@ -72,9 +72,10 @@ class VectorEmbeddingExecutor:
     cosine search, but is **not** a learned semantic model (that is the separate,
     egress-gated ``model_provider_runtime`` slice).
 
-    Supported ``action`` argument values: ``embed`` (default) and ``list``.
-    Artifacts are metadata only (ids/counts/hash), never the source text, so
-    embedded content is not emitted into runtime events.
+    Supported ``action`` argument values: ``embed`` (default), ``list``, and
+    ``search`` (cosine retrieval over the locally-stored embeddings). Artifacts
+    are metadata only (ids/counts/hash/scores), never the source text or stored
+    previews, so embedded content is not emitted into runtime events.
     """
 
     capability = "vector_embedding_runtime"
@@ -89,6 +90,8 @@ class VectorEmbeddingExecutor:
             return self._embed(action)
         if op == "list":
             return self._list(action)
+        if op == "search":
+            return self._search(action)
         return self._failed(action.action_id, f"unknown_action:{op}")
 
     def _embed(self, action: GovernedAction) -> ExecutionResult:
@@ -147,6 +150,54 @@ class VectorEmbeddingExecutor:
             artifacts={
                 "count": len(records),
                 "vector_ids": [str(r["vector_id"]) for r in records],
+                "content_redacted": True,
+            },
+        )
+
+    def _search(self, action: GovernedAction) -> ExecutionResult:
+        import json
+
+        from raiker.vector import LOCAL_EMBEDDING_MODEL, VectorIndex, embed_text
+
+        query = action.arguments.get("query")
+        if not isinstance(query, str) or not query.strip():
+            return self._failed(action.action_id, "missing_argument:query")
+        if len(query) > _MAX_EMBED_TEXT_LEN:
+            return self._failed(action.action_id, "query_too_long")
+        top_k = action.arguments.get("top_k", 5)
+        if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k <= 0 or top_k > 100:
+            return self._failed(action.action_id, "invalid_argument:top_k")
+        scope = action.arguments.get("scope")
+        if scope is not None and not isinstance(scope, str):
+            return self._failed(action.action_id, "invalid_argument:scope")
+
+        dimensions = 384
+        # Retrieval only compares within the local hashing-embedding space; the
+        # query is embedded with the same deterministic local model the stored
+        # vectors were created with. Provider-model vectors are not searched here.
+        query_vector = embed_text(query, dimensions)
+        index = VectorIndex(dimensions)
+        for row in self._store.list_vector_embeddings(LOCAL_EMBEDDING_MODEL, scope=scope):
+            raw = row.get("embedding")
+            if not raw:
+                continue
+            try:
+                vector = json.loads(raw)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(vector, list) and len(vector) == dimensions:
+                index.upsert(str(row["vector_id"]), vector)
+        results = index.search(query_vector, top_k=top_k)
+        return ExecutionResult(
+            ok=True,
+            capability=self.capability,
+            action_id=action.action_id,
+            summary="Vector search returned ranked ids/scores; query text and previews are not emitted.",
+            artifacts={
+                "count": len(results),
+                # Ranked ids + similarity scores only — never the query or stored text.
+                "results": [{"vector_id": r["vector_id"], "score": r["score"]} for r in results],
+                "embedding_model": LOCAL_EMBEDDING_MODEL,
                 "content_redacted": True,
             },
         )

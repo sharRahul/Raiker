@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 
@@ -189,7 +189,27 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
     for name in RUNTIME_DOMAIN_CAPABILITIES:
         if name not in _EXECUTED_CAPS_ALL:
             gates[name] = CapabilityGate(name, 5, CapabilityState.DISABLED)
+
+    # Integrated capabilities — those with a real executor — ship ENABLED by
+    # default. Default-disabled is reserved for capabilities that are not
+    # integrated yet (no real executor; they fail closed regardless). Enabling the
+    # gate does NOT by itself let an AI act unattended: AI-proposed actions are
+    # still governed by the per-capability decision mode (default `ask`), the
+    # critical-risk human-confirmation floor, PolicyEngine hard-denies, and
+    # executor-level env allowlists (model egress / plugin / container image),
+    # which are independent of the gate and remain fail-closed.
+    for name in _real_executor_capabilities():
+        existing = gates.get(name)
+        if existing is not None:
+            gates[name] = replace(existing, state=CapabilityState.ENABLED_RUNTIME)
     return gates
+
+
+def _real_executor_capabilities() -> frozenset[str]:
+    # Lazy import avoids a module-load cycle (executors import phase_gates).
+    from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
+    return REAL_EXECUTOR_CAPABILITIES
 
 
 def transition_capability(gate: CapabilityGate, target: CapabilityState) -> CapabilityGate:

@@ -414,14 +414,17 @@ def test_all_runtime_domain_capabilities_in_registry() -> None:
 
 
 def test_high_risk_capabilities_default_disabled() -> None:
+    from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
     gates = default_capability_gates()
-    high_risk = ["shell_execution", "network_execution", "email_runtime",
-                 "finance_runtime", "medical_runtime", "cctv_runtime",
-                 "remote_execution_cap", "plugin_execution_cap"]
-    for cap in high_risk:
-        gate = gates.get(cap)
-        assert gate is not None, f"missing gate: {cap}"
-        assert gate.state in (CapabilityState.DISABLED, CapabilityState.PLANNED), f"{cap} not disabled"
+    # Integrated (real-executor) capabilities ship ENABLED (governed by default-ask).
+    for cap in ("shell_execution", "network_execution", "email_runtime", "plugin_execution_cap"):
+        assert cap in REAL_EXECUTOR_CAPABILITIES
+        assert gates[cap].state == CapabilityState.ENABLED_RUNTIME, f"{cap} not enabled"
+    # Not-yet-integrated (no-executor) capabilities stay DISABLED / fail closed.
+    for cap in ("finance_runtime", "medical_runtime", "cctv_runtime", "remote_execution_cap"):
+        assert cap not in REAL_EXECUTOR_CAPABILITIES
+        assert gates[cap].state in (CapabilityState.DISABLED, CapabilityState.PLANNED), f"{cap} not disabled"
 
 
 def test_invalid_transitions_fail_closed() -> None:
@@ -1171,16 +1174,22 @@ def test_disabled_capability_blocks_after_disable(tmp_path: Path) -> None:
 
 
 def test_dangerous_capabilities_remain_disabled_by_default(authority: RuntimeAuthority) -> None:
-    dangerous = [
-        "shell_execution", "process_execution", "network_execution",
-        "web_fetch", "email_runtime", "calendar_runtime", "finance_runtime",
-        "investment_runtime", "medical_runtime", "cctv_runtime",
-        "plugin_execution_cap", "remote_execution_cap", "container_execution_cap",
-        "cloud_execution_cap", "approval_execution_relay",
+    from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
+    # Not-yet-integrated (no real executor) dangerous capabilities must stay disabled.
+    not_integrated = [
+        "finance_runtime", "investment_runtime", "medical_runtime", "cctv_runtime",
+        "remote_execution_cap", "cloud_execution_cap",
     ]
-    for cap in dangerous:
+    for cap in not_integrated:
+        assert cap not in REAL_EXECUTOR_CAPABILITIES
         gate = authority.get_effective_capability_gate(cap)
         assert gate["state"] == "disabled", f"{cap} should be disabled, got {gate['state']}"
+    # Integrated dangerous capabilities ship enabled (governed by default-ask + env allowlists).
+    for cap in ("shell_execution", "process_execution", "network_execution", "container_execution_cap"):
+        assert cap in REAL_EXECUTOR_CAPABILITIES
+        gate = authority.get_effective_capability_gate(cap)
+        assert gate["state"] == "enabled_runtime", f"{cap} should be enabled, got {gate['state']}"
 
 
 def test_dangerous_capability_transition_blocked(tmp_path: Path) -> None:

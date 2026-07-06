@@ -89,6 +89,8 @@ def test_plugin_execution_cap_is_real_executor(tmp_path: Path) -> None:
 def test_plugin_execution_gate_disabled_blocks_before_recording(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
+    RuntimeControlService(ws).disable_capability("plugin_execution_cap", None, "test")
     store = SQLiteStore(ws)
     _install(store, permissions=["tool:list_directory"])
     authority, principal = _authority(ws)

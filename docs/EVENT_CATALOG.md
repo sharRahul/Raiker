@@ -114,6 +114,7 @@ Phase 1 local actions must pause at approval. The sequence must not include `too
 | `intent_classified` | `runtime` | `intent`, `confidence`, `requires_tools` | Must match allowed intent enum. |
 | `risk_classified` | `runtime` | `risk_level`, `reasons`, `requires_approval` | Must match risk enum. |
 | `context_gathered` | `context_gatherer` | `sources`, `context_bundle_id` | Sources include provenance and sensitivity. |
+| `retrieval_augmentation` | `runtime` | `decision`, `augmented`, `count`, `vector_ids` | Governed default-ask RAG step (reuses `vector_embedding_runtime` gate + decision mode). Metadata only — retrieved preview text is injected into the model prompt, never into this payload. Emitted only when the gate is enabled. |
 | `plan_created` | `planner` | `plan_id`, `steps`, `requires_approval` | Required for risky/multi-step/code-changing tasks. |
 | `plan_skipped` | `planner` | `reason` | Required when no plan is created. |
 | `action_proposed` | `runtime` or `model_router` | `action_id`, `tool_name`, `arguments_summary` | Model output is still untrusted. |

@@ -220,8 +220,13 @@ class RuntimeControlService:
         acting_ok = check_acting_principal_available(self._workspace_root)
         gm_ok = check_runtime_gate_manager_available(self._workspace_root)
 
+        # Integrated capabilities now ship enabled (governed by default-ask); the
+        # readiness signal is that no *not-yet-integrated* dangerous capability is
+        # enabled — those must stay fail-closed.
+        from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
         dangerous_caps_disabled = True
-        for cap in _DANGEROUS_CAPS:
+        for cap in _DANGEROUS_CAPS - REAL_EXECUTOR_CAPABILITIES:
             g = self._authority.get_effective_capability_gate(cap)
             if g["state"] not in ("disabled", "planned"):
                 dangerous_caps_disabled = False

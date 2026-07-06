@@ -15,6 +15,111 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-06 (session end)
 
+> **This session — part 8 (default gate posture flip: integrated = enabled):**
+> Reversed the foundational "every capability gate ships disabled by default"
+> invariant per owner directive. Now **integrated capabilities (those in
+> `REAL_EXECUTOR_CAPABILITIES`, 29 of them) default to `enabled_runtime`**;
+> capabilities that are not integrated yet (no real executor) stay `disabled` and
+> fail closed. Implemented in `raiker/phase_gates.py::default_capability_gates()`
+> (flips the real-executor set to `ENABLED_RUNTIME` via `replace`; lazy import of
+> `REAL_EXECUTOR_CAPABILITIES` to avoid a cycle).
+> - **Safety model (unchanged floors):** there is NO runtime-mode master switch on
+>   the execution path — the gate is the per-capability switch — but enabling it
+>   does not let an AI act unattended. AI-proposed actions still hit the
+>   per-capability **decision mode (default `ask`)**, the **critical-risk human
+>   floor**, **PolicyEngine hard-denies**, and **executor-level env allowlists**
+>   (model egress / plugin / container image), which are independent of the gate and
+>   remain fail-closed. Human principals self-authorize (the UX win: no enable-dance
+>   for integrated caps).
+> - **Readiness redefined:** `get_runtime_readiness`'s `dangerous_capabilities_disabled`
+>   / `production_ready` now check only the **not-yet-integrated** dangerous caps
+>   (integrated-and-enabled is the norm). Two validators updated in lockstep
+>   (`validate_runtime_enablement_readiness.py`, `validate_local_single_user_runtime.py`):
+>   integrated caps must be enabled, non-integrated must be disabled.
+> - **Tests (26 updated):** ~14 "gate_disabled_blocks" acceptance tests now
+>   explicitly `disable_capability(...)` first (default is enabled); ~12
+>   default-disabled invariant tests updated to the new posture (integrated enabled,
+>   non-integrated disabled; `subagents`/`multi_agent_teams` flip to enabled in the
+>   phase-3 governance surfaces). Full suite **1230 passed**; ruff + mypy (incl.
+>   `tests/`) clean; all five validators pass.
+> - **Docs:** canonical posture statements updated (`IMPLEMENTATION_STATUS`,
+>   `README` ×2, `SECURITY_ARCHITECTURE` ×2, `RUNTIME_EXECUTORS_SPEC`). **Follow-up
+>   (not done):** a broader sweep of ~15 remaining spec/historical/guide docs still
+>   says "disabled by default" in places — update opportunistically; the truthfulness
+>   validators pass, but those prose mentions are now stale.
+
+> **This session — part 7 (agentic loop wiring: default-ask retrieval augmentation):**
+> Wired embed+search+resolve into the turn as **retrieval-augmented generation**,
+> governed **default-ask** (owner's explicit choice — not default-off). New
+> `RetrievalAugmentor` (`raiker/runtime/retrieval.py`), constructed by
+> `RuntimeOrchestrator` from the broker's store, runs at `CONTEXT_READY`. It adds
+> **no new governance surface** — it reuses the `vector_embedding_runtime` gate +
+> decision mode: gate disabled → no-op (default turn unchanged, nothing emitted);
+> gate enabled + mode `ask` (default) → **withheld** (emits
+> `retrieval_augmentation` `decision=ask, augmented=false`, no injection); mode
+> `allow`/`auto` → embeds the prompt locally, searches local vectors, injects the
+> top-k previews as an untrusted-data system message into the model prompt. Event
+> stays metadata-only (`decision`/`augmented`/`count`/`vector_ids`); preview text
+> reaches the model prompt (the point of RAG) but never the event payload. New
+> event type `retrieval_augmentation` registered in `EVENT_TYPES` + `EVENT_CATALOG`.
+> - **Honest note on "not default-off":** the *behaviour* is default-ask as
+>   requested. It still sits behind the standing `vector_embedding_runtime` gate
+>   (default-disabled), which is the universal fail-closed capability invariant —
+>   not special to this feature. Enabling that gate is the one-time owner step;
+>   thereafter each turn's auto-retrieval is default-ask.
+> - Evidence: `tests/test_retrieval_augmentation.py` (8 tests: gate-disabled no-op,
+>   default-ask withheld, deny, allow-injects, empty-store, + 3 orchestrator turn
+>   tests asserting the event + whether the preview reached the model prompt).
+> - Full suite **1230 passed**; ruff + mypy (incl. `tests/`) clean; validators pass.
+> - **RAG loop is now complete end-to-end:** embed → store → search → resolve →
+>   (default-ask) inject into the turn. Possible next: expose retrieval toggles/
+>   status in the web dashboard; provider-space (semantic) retrieval as an
+>   egress-gated extension; a CLI to inspect/preview retrieval decisions.
+
+> **This session — part 6 (resolve vector_id → content: `vector_get` read):**
+> Added the read half so ranked ids from `search` become usable. `vector_get` is a
+> governed **read tool** (`raiker/tools/vector_tools.py`), registered in the
+> `ToolBroker` and the PolicyEngine read allowlist (`allowed_read_actions`) + the
+> agent `DELEGABLE_TOOLS` set — it mirrors `memory_get`. It resolves a `vector_id`
+> to the stored 120-char `content_preview` + metadata via new
+> `SQLiteStore.get_vector_record`; it never returns the raw embedding vector, and
+> fails closed `missing_argument` / `not_found`. **Design boundary (documented):**
+> the vector table only persists a bounded preview, so `vector_get` returns that;
+> and as a *read* its output is auditable like `read_file`/`memory_get` — the
+> deliberate counterpart to the metadata-only *executor* path (embed/search).
+> Evidence: `tests/test_vector_get_read.py` (direct + through-broker allow/notfound).
+> - This completes the RAG data plumbing: **embed → store → search → resolve**.
+>   **Next (the remaining ordered item): wire it into the agentic loop** —
+>   retrieval-augmented turns. That is architecturally significant (auto-injecting
+>   retrieved content into the model turn touches governance/default-ask/audit), so
+>   scope/design it with the owner before building.
+> - Full suite **1222 passed**; ruff + mypy (incl. `tests/`) clean; validators pass.
+
+> **This session — part 5 (vector retrieval: close the embed→store→retrieve loop):**
+> Added a `search` operation to `vector_embedding_runtime` (no new capability, no
+> new gate) so the local embeddings the agent creates become usable for retrieval
+> (RAG). `search` embeds the query with the same local hashing model
+> (`raiker.vector.embed_text`), ranks stored vectors by cosine via the existing
+> in-memory `VectorIndex`, and returns the top-k as `{vector_id, score}` pairs.
+> - **Same-space only:** new store method `SQLiteStore.list_vector_embeddings(
+>   embedding_model, scope=None)` returns just the local-model vectors (uncapped,
+>   `embedding IS NOT NULL`); provider-model (`model_provider_runtime`) vectors are
+>   never ranked (cross-space cosine is meaningless). Read-only — writes nothing.
+> - **Metadata-only / read-only:** artifacts are `count` + `results`
+>   (`{vector_id, score}`) + `embedding_model` + `content_redacted=true`. The query
+>   text, source text, and stored previews never enter events. Fail-closed:
+>   `missing_argument:query`, `query_too_long`, `invalid_argument:top_k` (1–100),
+>   `invalid_argument:scope`. Distinct from `semantic_memory_runtime` (memory store).
+> - Evidence: `tests/test_phase_6_vector_embedding_runtime.py` search tests
+>   (exact-match ranks first ~1.0 w/o leaking query; top_k honored; other embedding
+>   models excluded; empty corpus → 0; missing-query / bad-top_k fail closed).
+> - Full suite **1217 passed**; ruff + mypy (incl. `tests/`) clean; all validators
+>   pass. Branch restarted from merged `main` (PR #100); this is a **new PR**.
+> - **Next natural step:** wire embed+search into the agentic loop (retrieval-
+>   augmented turns), and/or a governed "get preview by vector_id" read so retrieved
+>   ids resolve to content for the human. Provider-space (semantic) search would be
+>   an egress-gated extension of `model_provider_runtime`.
+
 > **This session — part 4 (make hosted providers usable: OpenRouter/OpenAI):**
 > Fixed a real latent gap so a human/agent can actually use OpenRouter, OpenAI,
 > Gemini (and every OpenAI-compatible provider) from any entry point.

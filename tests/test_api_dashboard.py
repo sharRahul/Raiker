@@ -118,8 +118,9 @@ class TestReads:
         assert resp.status_code == 200
         body = resp.json()
         assert body["no_silent_hosted_fallback"] is True
-        assert body["hosted_model_gate_state"] == "disabled"
-        assert body["private_network_model_gate_state"] == "disabled"
+        # hosted / private model runtimes are integrated (real executors) -> enabled by default.
+        assert body["hosted_model_gate_state"] == "enabled_runtime"
+        assert body["private_network_model_gate_state"] == "enabled_runtime"
         assert body["model_egress_allowlist_configured"] is True
         assert "api.openai.com" not in resp.text
         ids = [p["profile_id"] for p in body["profiles"]]

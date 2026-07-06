@@ -101,6 +101,8 @@ def test_sandboxed_cap_is_real_executor(tmp_path: Path) -> None:
 def test_sandboxed_gate_disabled_blocks(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
+    RuntimeControlService(ws).disable_capability("plugin_sandboxed_runtime_cap", None, "test")
     _install(SQLiteStore(ws))
     authority, principal = _authority(ws)
     result = authority.route_action(

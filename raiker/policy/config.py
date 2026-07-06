@@ -24,6 +24,7 @@ class StaticPolicyConfig:
                 "memory_search",
                 "memory_list",
                 "memory_get",
+                "vector_get",
                 "user_create",
                 "user_deactivate",
                 "role_create",

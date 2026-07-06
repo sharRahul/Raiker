@@ -98,6 +98,8 @@ def test_plugin_install_gate_disabled_blocks_before_recording(tmp_path: Path) ->
     ws = _ws(tmp_path)
     manifest_path = _write_manifest(ws, _manifest())
     bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
+    RuntimeControlService(ws).disable_capability("plugin_install", None, "test")
     authority, principal = _authority(ws)
     result = authority.route_action(
         _action(principal.principal_id, manifest_path=str(manifest_path.relative_to(ws))),

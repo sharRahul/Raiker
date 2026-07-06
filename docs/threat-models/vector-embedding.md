@@ -24,34 +24,75 @@ an LLM provider) is a **separate, egress-gated executor** — see
   `local_single_user_runtime`, and a confirmation token (the capability is in the
   dangerous-caps set). AI-proposed actions are further governed by the capability
   decision mode (default `ask`).
-- Supported `action` values are `embed` (default) and `list`; anything else fails
-  closed with `unknown_action:<op>`.
+- Supported `action` values are `embed` (default), `list`, and `search`; anything
+  else fails closed with `unknown_action:<op>`.
 - `embed` requires a non-empty `text` (`missing_argument:text`), caps text length
   at 20000 chars (`text_too_long`), and validates optional `scope`/`sensitivity`
   types (`invalid_argument:scope_or_sensitivity`). It writes a single row to the
   local `vector_records` table.
+- `search` requires a non-empty `query` (`missing_argument:query`), caps its length
+  at 20000 chars (`query_too_long`), and validates `top_k` (1–100 integer,
+  `invalid_argument:top_k`) and optional `scope` (`invalid_argument:scope`). It
+  embeds the query with the **same local model**, then ranks by cosine similarity
+  over stored vectors of that model only (`raiker.vector.VectorIndex`). Read-only:
+  it writes nothing.
 - **No network, no model download.** The executor imports no ML framework, opens
-  no socket, and fetches no weights. The embedding is pure Python over the input
-  string.
-- **Metadata-only artifacts.** Runtime artifacts contain ids/model/dims/hash only
-  (`vector_id`, `embedding_model`, `dimensions`, `content_hash`,
-  `content_redacted=true`, and for `list`: `count`, `vector_ids`) — the source
-  text is never emitted into runtime events. A bounded 120-char preview is stored
-  in the local table only (mirrors how reminder titles are stored locally).
+  no socket, and fetches no weights. Both embedding and search are pure Python over
+  the input string(s).
+- **Metadata-only artifacts.** Runtime artifacts contain ids/model/dims/hash/scores
+  only (`vector_id`, `embedding_model`, `dimensions`, `content_hash`,
+  `content_redacted=true`; for `list`: `count`, `vector_ids`; for `search`:
+  `count` and `results` as `{vector_id, score}` pairs) — the source text, the
+  query, and stored previews are never emitted into runtime events. A bounded
+  120-char preview is stored in the local table only (mirrors how reminder titles
+  are stored locally).
+
+## Retrieval augmentation in the agent turn (default-ask)
+
+The turn orchestrator can inject retrieved local context into the model prompt
+(RAG), governed by `RetrievalAugmentor` (`raiker/runtime/retrieval.py`). It adds
+**no new governance surface** — it reuses this capability's gate + decision mode:
+
+- **Gate disabled** (the universal fail-closed default) → no-op, nothing emitted;
+  the default turn is unchanged.
+- **Gate enabled + decision mode `ask`** (the default once enabled) → **withheld**:
+  no injection. The turn emits a `retrieval_augmentation` event with
+  `decision=ask, augmented=false` so the owner sees retrieval is available and must
+  opt in. This is the human-in-control default (ask, don't auto-inject).
+- **Gate enabled + `allow`/`auto`** → the prompt is embedded locally, the local
+  vectors are searched, and the top-k previews are injected as an untrusted-data
+  system message. The event stays metadata-only (`decision`, `augmented`, `count`,
+  `vector_ids`); the preview text goes into the model prompt (the point of RAG) but
+  never into the event payload.
+- **`deny`** → never augments.
 
 ## Explicit non-goals
 
 - No provider/API embedding call (that is `model_provider_runtime`, egress-gated).
-- No semantic/neural embedding quality — lexical hashing only.
-- No similarity **search** here — retrieval is `semantic_memory_runtime`'s job.
-  This slice only creates and lists embedding records.
-- No deletion/update of vector records in this slice (embed + list only).
+- No semantic/neural embedding quality — lexical hashing only, so `search` ranks
+  by lexical overlap, not meaning.
+- `search` only retrieves within the **local hashing-embedding space**; it never
+  ranks provider-model vectors (cosine across different embedding spaces is
+  meaningless) and never returns document content — only ranked ids + scores.
+  This is distinct from `semantic_memory_runtime`, which searches the memory store.
+- **Resolving ids to content is a separate governed read: `vector_get`.** Ranked
+  ids from `search` are turned back into content by the `vector_get` tool, routed
+  through the ToolBroker + PolicyEngine read allowlist (mirrors `memory_get`).
+  Because the vector table only persists a bounded 120-char `content_preview` (not
+  the full source text), `vector_get` returns that preview + metadata (never the
+  raw embedding vector). As a read, its output is auditable like `read_file` /
+  `memory_get` — this is the deliberate boundary between the metadata-only
+  *executor* path (embed/search) and the content-returning *read* path.
+- No deletion/update of vector records in this slice (embed + list + search only).
 
 ## Acceptance evidence
 
 - `tests/test_phase_6_vector_embedding_runtime.py` proves deterministic/normalized
   embeddings, default-disabled blocking, embed-writes-a-real-vector-row,
   missing-text fail-closed, unknown-action fail-closed, list-returns-count, and
-  that source text never appears in runtime event payloads.
+  that source text never appears in runtime event payloads. For `search` it proves
+  exact-match ranks first (cosine ~1.0) without leaking the query, `top_k` is
+  honored, other embedding models are excluded, an empty corpus returns `count=0`,
+  and missing-query / invalid-`top_k` fail closed.
 - `tests/test_executor_default_registry.py` proves `vector_embedding_runtime` is
   in `REAL_EXECUTOR_CAPABILITIES` while the sensitive/no-executor domains are not.

@@ -246,8 +246,8 @@ Slash commands are terminal syntax for interface-neutral actions. Every command 
 | `/graph` | Query graph/codemap context. |
 | `/storage-lifecycle` | Inspect metadata-only lifecycle records. |
 | `/storage-lifecycle --summary` | Inspect aggregate metadata-only lifecycle counts and disabled runtime write flags. |
-| `/storage-lifecycle --graph` | Inspect graph/codemap lifecycle metadata only; graph runtime indexing remains disabled. |
-| `/storage-lifecycle --memory` | Inspect semantic-memory lifecycle metadata only; semantic/vector writes and embeddings remain disabled. |
+| `/storage-lifecycle --graph` | Inspect graph/codemap lifecycle metadata only; does not overclaim unrestricted graph automation. |
+| `/storage-lifecycle --memory` | Inspect semantic-memory lifecycle metadata only; does not overclaim unrestricted semantic/vector automation. |
 | `/compact` | Compact context. |
 | `/export` | Export session/task/events. |
 | `/doctor` | Run diagnostics. |

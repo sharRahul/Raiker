@@ -5,7 +5,7 @@
 
 # Raiker Tool and Plugin Catalog
 
-> Current truth (2026-06-21): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+> Current truth (2026-06-21): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Integrated real executors in `REAL_EXECUTOR_CAPABILITIES` are governed per action and default-ask; no-executor capabilities remain disabled/fail-closed.
 
 
 This catalog is the Raiker-native inventory of tools and plugin components that must be tracked across implementation stages.
@@ -79,7 +79,7 @@ currently exposes. It is the source of truth checked by `scripts/validate_repo_t
 /capability-gate <capability>
 /capability-gate enable <capability> --state <state> [--reason <reason>]
 /capability-gate disable <capability> [--reason <reason>]
-/capability-mode <capability> [ask|deny|always_allow|auto] [--reason <reason>] [--as <principal_id>]
+/capability-mode <capability> [ask|deny|allow|auto] [--reason <reason>] [--as <principal_id>]
 /runtime-readiness
 /bootstrap-owner [--display <name>] [--email <email>] [--force-recover] [--confirm-local-recovery] [--reason <reason>]
 /whoami
@@ -102,7 +102,7 @@ currently exposes. It is the source of truth checked by `scripts/validate_repo_t
 | `/capability-gate <cap>` | implemented | low | RuntimeAuthority.get_effective_capability_gate() | read-only | no | after bootstrap |
 | `/capability-gate enable` | implemented | high | RuntimeAuthority.enable_capability_gate(); persisted in capability_gate_state table | sets gate state; appends event | owner or rl_rgm | after bootstrap |
 | `/capability-gate disable` | implemented | high | RuntimeAuthority.disable_capability_gate(); persisted in capability_gate_state table | sets gate state; appends event | owner or rl_rgm | after bootstrap |
-| `/capability-mode` | implemented | high | RuntimeAuthority.set/get_capability_decision_mode(); persisted in capability_decision_mode table | sets/reads ask\|deny\|always_allow\|auto; appends event | owner or rl_rgm | after bootstrap |
+| `/capability-mode` | implemented | high | RuntimeAuthority.set/get_capability_decision_mode(); persisted in capability_decision_mode table | sets/reads ask\|deny\|allow\|auto (`always_allow` accepted as legacy alias); appends event | owner or rl_rgm | after bootstrap |
 | `/runtime-readiness` | implemented | low | reads runtime mode, owner status, gate manager, principal, dangerous gates | read-only | no | after bootstrap |
 
 /semantic-memory
@@ -219,7 +219,7 @@ These permission labels are used in the inventory below so coding agents know wh
 | `lsp:server_start` | Start language servers; disabled until workspace/plugin trust gates. |
 | `plugin:validate` | Validate plugin metadata without executing code. |
 | `plugin:register` | Register plugin metadata/plans; no code execution. |
-| `plugin:execute` | Execute plugin code/entrypoints; governed by the default-disabled `plugin_runtime_cap` (subprocess) / `plugin_sandboxed_runtime_cap` (no-network container) gates. |
+| `plugin:execute` | Execute plugin code/entrypoints; governed by the integrated `plugin_runtime_cap` (subprocess) / `plugin_sandboxed_runtime_cap` (no-network container) gates plus default-ask decision mode and owner allowlists. |
 | `channel:read` | Read/list configured channel profiles/status. |
 | `channel:activate` | Activate external transports; disabled until Phase 4 pairing and trust. |
 | `agent:plan` | Plan subagent/team work without spawning. |
@@ -379,10 +379,10 @@ These permission labels are used in the inventory below so coding agents know wh
 | `plugin_supply_chain_metadata` | Track source URL, commit, checksum, signature. | `plugin:validate`, `marketplace:read` | Partial — schema documented; full verification Phase 5 |
 | `plugin_marketplace` | Discover/install/update plugins from registries. | `marketplace:read`, `marketplace:install`, `network:egress` | No — disabled until Phase 5 |
 | `plugin_reload` | Reload changed plugin metadata/components. | `plugin:register` | No — Phase 3/4 planned; must not auto-enable code |
-| `plugin_enable` | Enable plugin components after policy/trust approval. | `plugin:register`, `approval:resolve`; later `plugin:execute` if runtime code | No — runtime execution disabled |
+| `plugin_enable` | Enable plugin components after policy/trust approval. | `plugin:register`, `approval:resolve`; later `plugin:execute` if runtime code | Partial/deferred — metadata/trust enablement only; runtime code execution uses the separate governed plugin execution/runtime capabilities and broader plugin extensions remain deferred/fail-closed. |
 | `plugin_disable` | Disable plugin components. | `plugin:register` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
 | `plugin_remove` | Remove plugin metadata/package. | `plugin:register`, `workspace:write`, `approval:resolve` | No — Phase 3/5 planned |
-| `plugin_execute` | Execute plugin code/entrypoint. | `plugin:execute` plus target permissions | Governed — via `plugin_runtime_cap` (bounded subprocess) or `plugin_sandboxed_runtime_cap` (no-network container), owner plugin allowlist, gates default-disabled |
+| `plugin_execute` | Execute plugin code/entrypoint. | `plugin:execute` plus target permissions | Governed — via `plugin_runtime_cap` (bounded subprocess) or `plugin_sandboxed_runtime_cap` (no-network container), owner plugin allowlist, gates default `enabled_runtime` but owner allowlists fail closed |
 
 ## Phase 9 Advanced Memory and Graph Tools
 
@@ -492,17 +492,20 @@ The following items must be picked up by later implementation plans:
 
 Until the relevant phase gates are fully implemented and verified:
 
-- plugin code execution executors are implemented (subprocess + no-network container); their gates remain default-disabled;
-- graph/codemap runtime indexing remains disabled;
-- graph node/edge writes remain disabled;
-- semantic/vector memory writes remain disabled;
-- embedding creation/storage remains disabled;
+- plugin code execution executors are implemented (subprocess + no-network container); their gates default `enabled_runtime` and remain governed/default-ask;
+- graph indexing has a real governed executor; broader/unrestricted graph query,
+  planning automation, and graph extensions remain deferred/fail-closed;
+- semantic memory plus local vector embedding/search have real governed executors;
+  broader learned semantics, external sync, and unrestricted memory automation remain
+  deferred/fail-closed;
+- provider-backed embedding has a real governed executor; additional provider/runtime
+  extensions remain policy-gated or deferred as documented;
 - rollback execution remains disabled;
-- external channels remain disabled;
+- the reference external channel runtime and channel approval relay are integrated and governed; broader native transports/notifications remain deferred/fail-closed;
 - MCP/LSP/plugin server startup remains disabled unless explicitly trusted and approved;
 - monitors/watchers remain disabled;
-- subagent and multi-agent runtime execution remains disabled;
-- remote/container/cloud execution remains disabled;
+- subagent and multi-agent bounded executors are integrated and governed; broader autonomous team/spawn extensions remain deferred;
+- local container execution is integrated and governed; remote/cloud command execution remains no-executor/fail-closed;
 - hosted routines, marketplace installs, hosted push notifications, and share links remain disabled.
 
 ## Phase 3 Slice H Lifecycle Retention, Cleanup, and Handoff Commands

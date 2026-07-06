@@ -38,7 +38,7 @@ and therefore stays fail-closed (`not_implemented`).
 
 ## Acceptance evidence
 
-- `tests/test_phase_6_reminder_runtime.py` proves default-disabled blocking,
+- `tests/test_phase_6_reminder_runtime.py` proves disabled-gate blocking,
   threat-model-ack activation, create-writes-a-row, missing-title fail-closed,
   unknown-action fail-closed, list-returns-count, and that titles/notes never
   appear in runtime event payloads.

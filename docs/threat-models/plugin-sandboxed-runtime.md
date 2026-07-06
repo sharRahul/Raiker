@@ -58,7 +58,7 @@ untrusted plugin code to run with kernel-level network and filesystem isolation.
 
 ## Acceptance evidence
 
-- `tests/test_phase_4_plugin_sandboxed_runtime.py` proves default-disabled
+- `tests/test_phase_4_plugin_sandboxed_runtime.py` proves disabled-gate
   blocking, threat-model-ack activation, installed-plugin requirement, owner
   plugin-allowlist requirement, image-unset and image-not-allowlisted
   fail-closed, interpreter allowlist, workspace-escape denial, the no-network /

@@ -81,7 +81,7 @@ is the sandboxed-runtime path (`plugin_sandboxed_runtime_cap`).
 
 ## Acceptance evidence
 
-- `tests/test_phase_4_plugin_runtime.py` proves default-disabled blocking,
+- `tests/test_phase_4_plugin_runtime.py` proves disabled-gate blocking,
   threat-model-ack activation, installed-plugin requirement, owner-allowlist
   requirement (empty = fail closed), interpreter allowlist, workspace-escape
   denial, successful bounded execution, non-zero exit reporting, no

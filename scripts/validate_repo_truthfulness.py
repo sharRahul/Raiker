@@ -162,8 +162,13 @@ def _validate_snippet(name: str, text: str) -> list[str]:
         and "does not execute approved action" not in lowered
     ):
         errors.append(f"{name} missing approval metadata-only wording")
-    if "runtime execution remains disabled" not in lowered and "disabled/deferred" not in lowered:
-        errors.append(f"{name} missing runtime-disabled wording")
+    if (
+        "no-executor" not in lowered
+        and "fail closed" not in lowered
+        and "fail-closed" not in lowered
+        and "disabled/deferred" not in lowered
+    ):
+        errors.append(f"{name} missing fail-closed/deferred wording")
     for phrase in FORBIDDEN_GLOBAL:
         if phrase in lowered:
             errors.append(f"{name} contains forbidden overclaim: {phrase}")
@@ -210,9 +215,9 @@ def main() -> int:
 
     security_arch = (ROOT / "docs/SECURITY_ARCHITECTURE.md").read_text(encoding="utf-8")
     for marker in (
-        "shell/process execution | disabled/deferred",
-        "plugin execution | disabled/deferred",
-        "remote/container/cloud execution | disabled/deferred",
+        "remote execution | disabled/fail-closed",
+        "cloud execution | disabled/fail-closed",
+        "finance/investment/medical/pregnancy/CCTV/home-security/hardware domains | disabled/fail-closed",
         "approval resolution is metadata-only",
         "no tamper-proof logging is implemented",
     ):

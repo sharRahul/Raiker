@@ -32,4 +32,4 @@ The canonical status ledger is `docs/IMPLEMENTATION_STATUS.md`; the missing-work
   modified; preview commands run no tests; GitHub PR automation is not implemented.
 - Desktop/Web/Dashboard/Mobile/IDE/REST apps are specified/deferred, not implemented.
 - Phase 4 memory MVP is implemented; remaining Phase 4 capabilities remain blocked.
-- All disabled runtime flags remain false; runtime execution remains disabled.
+- Integrated real executors are governed per action; no-executor runtime flags remain false/disabled and fail closed.

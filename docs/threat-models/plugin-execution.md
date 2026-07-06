@@ -45,7 +45,7 @@ slice.
 
 ## Acceptance evidence
 
-- `tests/test_phase_4_plugin_execution_runtime.py` proves default-disabled
+- `tests/test_phase_4_plugin_execution_runtime.py` proves disabled-gate
   blocking, threat-model-ack activation, installed-plugin requirement, allowed
   read-only broker invocation, no output leakage in runtime artifacts,
   permission denial, write-tool denial, and workspace-policy preservation.

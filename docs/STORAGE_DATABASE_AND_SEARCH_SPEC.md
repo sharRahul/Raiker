@@ -556,13 +556,12 @@ Slice G adds policy-gated storage lifecycle preparation only. Full Phase 3 is no
 
 Safety status:
 
-- Lifecycle records do not execute graph indexing.
-- Lifecycle records do not write semantic memory.
-- Lifecycle records do not create embeddings or vectors.
-- Graph indexing remains disabled.
-- Semantic/vector memory writes remain disabled.
+- Legacy lifecycle/preview surfaces do not write graph data or semantic memory directly.
+- Current graph indexing is a governed real executor.
+- Current semantic memory and vector embedding/search runtimes are governed real executors.
+- Plugin slices, the reference external channel, subagent/team executors, and local container runtime are governed real executors.
+- Remote/cloud command execution remains no-executor/fail-closed.
 - Rollback execution remains disabled.
-- Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
 - GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.
 
 ## Phase 3 Slice H Lifecycle Retention Metadata Tables

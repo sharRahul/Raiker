@@ -1,12 +1,13 @@
-# Capability Decision Modes (Ask / Deny / Always Allow / Auto)
+# Capability Decision Modes (Ask / Deny / Allow / Auto)
 
 > Runtime enablement candidate. Enforcement: strict non-allow blocking, role
 > revoke governed, capability gate per action. Approval resolution is
 > metadata-only.
 
 Decision modes are a per-capability control layered **on top of** the capability
-gate. The gate still governs *whether* a capability is enabled at all (default
-disabled, fail-closed); the decision mode governs *how* an AI-proposed action on
+gate. The gate still governs *whether* a capability is enabled at all: integrated
+real-executor capabilities default to `enabled_runtime`, while no-executor
+capabilities default to `disabled` and fail closed; the decision mode governs *how* an AI-proposed action on
 an enabled capability is treated. This is Raiker's equivalent of a per-tool
 permission policy, with an owner-controlled four-way choice.
 
@@ -24,14 +25,14 @@ permission policy, with an owner-controlled four-way choice.
 > (`parse_decision_mode`).
 
 `ask` is the default for every capability, so enabling a gate does **not** by
-itself let an AI act unattended — the owner must explicitly choose `always_allow`
+itself let an AI act unattended — the owner must explicitly choose `allow`
 or `auto`.
 
 ## Safety floors (always enforced, regardless of mode)
 
 - **PolicyEngine hard-denies** are evaluated first; a denied action never reaches
   the decision-mode layer.
-- **Critical-risk actions always require a human.** `always_allow`/`auto` can
+- **Critical-risk actions always require a human.** `allow`/`auto` can
   never let an AI principal take a `critical`-risk action — it is denied for AI
   and requires human confirmation otherwise.
 - **`auto` is deterministic and auditable** — it keys off the action's risk level
@@ -55,7 +56,7 @@ or `auto`.
   `GET/POST /api/approvals/...`: the approval routes resolve **one pending
   action** (a single queued proposal), while the decision-mode routes set the
   **standing per-capability policy** that shapes every future AI-proposed action.
-- **Permissive modes require a real executor.** `always_allow` and `auto` may only
+- **Permissive modes require a real executor.** `allow` and `auto` may only
   be set on a capability in `REAL_EXECUTOR_CAPABILITIES`; a sensitive/no-executor
   domain (medical, cctv, finance, home-security, hardware, remote/cloud, …) is
   refused with `decision_mode_requires_executor:<cap>` and can never be relaxed
@@ -67,8 +68,10 @@ or `auto`.
 ## Interaction with capability gates
 
 Decision mode is orthogonal to the gate: a capability must still be enabled to
-runtime through the normal governed activation path (human gate manager, runtime
-mode, threat-model ack, confirmation token) before any action runs. The decision
+runtime before any action runs. Integrated real-executor gates may already be
+`enabled_runtime` by default; explicit activation is still used to re-enable a
+disabled/persisted non-default gate and for requirements such as runtime mode,
+threat-model ack, or confirmation token where applicable. The decision
 mode then shapes each subsequent AI-proposed action. Disabling the gate stops all
 execution regardless of mode.
 

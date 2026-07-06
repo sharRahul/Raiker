@@ -329,18 +329,16 @@ Tests must prove:
 
 ## Phase 3 Slice C/D governance update (local validation required)
 
-Full Phase 3 is not complete. Slice C adds graph/codemap governance and dry-run planning only: graph/codemap runtime indexing remains disabled, no background indexer is started, and no durable graph nodes or edges are written. Slice D adds semantic memory governance and a review queue only: semantic/vector memory writes remain disabled, no embeddings are created, and no vector records are written.
+Current runtime posture update: graph indexing, semantic memory, local vector embedding/search, and provider-backed embedding now have real governed executors; broader graph query/planning automation, learned semantics, external sync, and no-executor extensions remain deferred/fail-closed.
 
 Safety status for this slice:
 
 - GitHub Actions remain paused due quota exhaustion; do not claim GitHub CI passed while paused.
 - Local validation evidence remains mandatory under `docs/LOCAL_VALIDATION_GATE.md`.
-- Plugin execution remains disabled.
-- Graph/codemap runtime indexing remains disabled.
-- Semantic/vector memory writes remain disabled.
-- External channels remain disabled.
-- Subagents and multi-agent teams remain disabled.
-- Remote/container execution remains disabled.
+- Plugin execution slices are integrated governed executors; broader plugin extensions remain deferred/fail-closed.
+- Graph indexing, semantic memory, local vector embedding/search, and provider-backed embedding are integrated governed executors; broader graph/memory extensions remain deferred/fail-closed.
+- The reference external channel runtime, subagent/team executors, and local container executor are integrated and governed.
+- Remote/cloud command execution remains no-executor/fail-closed.
 
 New planning/review-only surfaces:
 

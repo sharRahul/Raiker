@@ -34,7 +34,7 @@ Runtime governance is driven by slash commands (full list in
 | `/capability-gate <cap>` | Show one capability's gate detail |
 | `/capability-gate enable <cap> --state <state> --confirm <token>` | Enable a capability (human gate manager only) |
 | `/capability-gate disable <cap>` | Disable a capability |
-| `/capability-mode <cap> [ask\|deny\|always_allow\|auto]` | View or set a capability's decision mode |
+| `/capability-mode <cap> [ask\|deny\|allow\|auto]` | View or set a capability's decision mode |
 | `/runtime-readiness` | Summarize runtime mode, owner, gates |
 | `/model use --provider <p> --model <m>` | Select the active model backend |
 | `/approve`, `/deny` | Resolve an approval (metadata-only; does not itself execute) |
@@ -46,7 +46,7 @@ Runtime governance is driven by slash commands (full list in
 1. `/runtime-mode activate local_single_user_runtime`
 2. For higher-risk capabilities, record the threat-model acknowledgement.
 3. `/capability-gate enable <cap> --state enabled_runtime --confirm <token>`
-4. Choose how the AI may act: `/capability-mode <cap> ask|auto|always_allow|deny`.
+4. Choose how the AI may act: `/capability-mode <cap> ask|auto|allow|deny`.
 5. Run a prompt; AI-proposed actions are handled per the decision mode.
 
 ### Approvals

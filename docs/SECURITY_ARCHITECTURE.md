@@ -46,16 +46,18 @@ The local single-user runtime is production-ready because privileged local actio
 ### Deferred execution domains
 
 The following remain disabled/deferred and are not covered by the local production readiness declaration:
-- Approval execution relay
-- Shell/process execution
-- Network/web fetch
-- Plugin execution
-- Graph/codemap runtime indexing
-- Semantic/vector writes
-- External channels
-- Remote/container/cloud execution
-- Hosted routines/schedulers
-- Desktop/web/mobile/dashboard/ide/api runtime clients
+- Remote/cloud command execution
+- Sensitive finance, investment, medical, pregnancy/baby, CCTV, home-security, and hardware-operator domains
+- Hosted/multi-user/cloud production runtime
+- Rich/native TUI, desktop, mobile, IDE, voice, browser-extension, and hosted/multi-user REST/API clients
+
+Integrated real executors (approval execution relay, shell/process, web-fetch/network,
+plugin runtime slices, graph indexing, semantic/vector/model-provider runtimes,
+external channel relay, container execution, scheduled routines, hosted/private model
+connectivity, and local email/calendar/reminder stores) are not unrestricted: they are
+governed per action, default `ask` for AI-proposed actions, and still subject to
+PolicyEngine hard-denies, critical-risk human floors, and independent executor
+allowlists/threat acknowledgements.
 
 ---
 
@@ -69,10 +71,10 @@ The following remain disabled/deferred and are not covered by the local producti
 | Durable memory CLI mutation | `implemented_approval_required` | `/memory-store` and `/memory-forget` are brokered approval requests only by default. |
 | Durable memory governed write contract | `implemented_policy_gated` | Available only through the broker-governed path with provenance, retention, approval state, and event logging. |
 | Approval resolution | `metadata_only` | `/approve` and `/deny` resolve one immutable approval record; they do not execute actions. |
-| Semantic/vector writes, embeddings, graph indexing | `disabled_deferred` | Readiness/preview only; runtime execution disabled. |
+| Semantic/vector writes, embeddings, graph indexing | `implemented_policy_gated` | Real governed executors exist for local graph indexing, semantic memory, local deterministic vector embedding/search, and provider-backed embedding; integrated gates default enabled but AI actions default to `ask` and provider egress/API-key controls fail closed. |
 | Plugin execution | `implemented_policy_gated` | Real governed executors exist — install, brokered read-only, revocation, and code runtime (bounded subprocess + no-network container); integrated, so gates default `enabled_runtime` and are governed per action (default-ask) plus the owner plugin/interpreter allowlists (fail-closed, independent of the gate). See `docs/RUNTIME_EXECUTORS_SPEC.md`. |
-| External channels | `disabled_deferred` | Metadata/readiness only; no relay/runtime transport. |
-| Remote/container/cloud execution | `disabled_deferred` | Profiles and readiness records may exist; execution remains off. |
+| External channels | `implemented_policy_gated` | One bounded webhook channel and metadata-only channel approval relay exist; owner egress allowlist and pairing rules remain independent fail-closed controls. |
+| Remote/container/cloud execution | split | Local container execution is a real governed executor with owner image allowlist/no-network/no-host-mount controls; remote/cloud command execution remains disabled/fail-closed with no real executor. |
 | Hosted providers | `implemented_policy_gated` | Explicit policy, API key, and egress/budget controls required. |
 | Deterministic/mock providers | `test_only` | Never a silent production fallback. |
 
@@ -179,23 +181,18 @@ Model output is always untrusted. No tool, plugin, channel, subagent, remote, me
 
 - No cryptographic immutability or non-repudiation is implemented.
 - No tamper-proof logging is implemented.
-- No approval execution relay is implemented.
-- No plugin runtime, channel runtime, remote execution runtime, graph runtime indexing, semantic/vector write runtime, or UI/API client runtime is enabled.
-- No provider health-checked default selection is implemented; the current default is a static local-first profile choice.
+- Approval resolution is metadata-only and never executes actions; the integrated approval execution relay is a separate governed executor path.
+- No remote/cloud command execution runtime, sensitive finance/medical/CCTV/home-security/hardware runtime, hosted/multi-user/cloud production runtime, or Phase 8 rich/native/mobile/IDE/browser-extension client runtime is implemented.
+- No secret/credential store is implemented; provider credentials come from owner environment variables and must pass egress/policy gates.
 
 ## Runtime Mode and Capability Gate Activation
 
-Runtime mode and capability gate activation is governed by `RuntimeAuthority`. Only the human `runtime_gate_manager` role can activate `local_single_user_runtime` or enable `admin_mutation`/`role_mutation` capability gates. AI principals cannot activate runtime modes or capability gates. Activation events are audited via the event log. Runtime mode state is persisted in the `runtime_mode_state` table; capability gate state is persisted in the `capability_gate_state` table. Default gate posture: integrated capabilities (those with a real executor, `REAL_EXECUTOR_CAPABILITIES`) ship `enabled_runtime` and are governed per action by the decision mode (default `ask`), the critical-risk human floor, PolicyEngine hard-denies, and executor-level env allowlists; capabilities that are not integrated yet (no real executor) remain default-disabled and fail closed. Only the human `runtime_gate_manager` can change a gate (including disabling an integrated one), and AI principals never can.
+Runtime mode and capability gate activation is governed by `RuntimeAuthority`. Only the human `runtime_gate_manager` role can activate `local_single_user_runtime` or enable `admin_mutation`/`role_mutation` capability gates. AI principals cannot activate runtime modes or capability gates. Activation events are audited via the event log. Runtime mode state is persisted in the `runtime_mode_state` table; capability gate state is persisted in the `capability_gate_state` table. Default gate posture: integrated capabilities (those with a real executor, `REAL_EXECUTOR_CAPABILITIES`) ship `enabled_runtime` and are governed per action by the decision mode (default `ask`), the critical-risk human floor, PolicyEngine hard-denies, and executor-level env allowlists; capabilities that are not integrated yet (no real executor) remain disabled by default and fail closed. Only the human `runtime_gate_manager` can change a gate (including disabling an integrated one), and AI principals never can.
 
 ## Disabled Capabilities
 
-- shell/process execution | disabled/deferred
-- network/web fetch | disabled/deferred
-- plugin execution | disabled/deferred
-- graph runtime indexing | disabled/deferred
-- semantic/vector writes | disabled/deferred
-- approval execution relay | disabled/deferred
-- external channels | disabled/deferred
-- remote/container/cloud execution | disabled/deferred
-- hosted routines/schedulers | disabled/deferred
-- desktop/web/mobile/dashboard/ide/api runtime clients | disabled/deferred
+- remote execution | disabled/fail-closed (`remote_execution_cap`, no real executor)
+- cloud execution | disabled/fail-closed (`cloud_execution_cap`, no real executor)
+- finance/investment/medical/pregnancy/CCTV/home-security/hardware domains | disabled/fail-closed (no real executor)
+- hosted/multi-user/cloud production runtime | deferred (not production-ready)
+- rich/native TUI, desktop, mobile, IDE, voice, browser-extension, hosted/multi-user REST/API clients | Phase 8 deferred

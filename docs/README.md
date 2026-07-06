@@ -1,8 +1,8 @@
 # Raiker Documentation
 
 Raiker is a security-first AI agent that connects to any backend LLM — local,
-home-lab, or hosted — while keeping every capability governed, default-disabled,
-and fail-closed. This is the documentation home.
+home-lab, or hosted — while keeping every capability governed, integrated gates default-ask,
+and no-executor capabilities fail-closed. This is the documentation home.
 
 The user-facing guide lives under [`guide/`](guide/) and is organized into seven
 sections (Claude-Code-docs style). Each section has an index page plus focused

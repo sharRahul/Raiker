@@ -139,11 +139,13 @@ The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPL
 | `production_ready_local_single_user_runtime` | Ready | Local single-user terminal/runtime foundation |
 | Control plane + governed API | Implemented | `RuntimeControlService` (typed DTOs) and a FastAPI surface with session→principal auth let an out-of-process UI view and govern-flip gates |
 | Local web dashboard (`apps/web`) | Implemented | Launchable single-user dashboard over the governed API: read-only views, prompt/turn stream, approval queue (metadata-only), step-up-gated Security Settings, diagnostics, STOP |
-| Real local executors | Implemented (governed-flippable) | Tier 1 (approval relay, file write, patch apply, memory write/forget), Tier 2 (shell/process/web-fetch/network, sandboxed + egress-allowlisted), Tier 3 (graph indexing, semantic memory). See [`docs/RUNTIME_EXECUTORS_SPEC.md`](docs/RUNTIME_EXECUTORS_SPEC.md) |
-| Plugins / vector+embedding / hosted-model runtime | Fail-closed (not implemented) | Activation blocked (`no_executor`); flipping does not fake success |
+| Real local executors | Implemented (integrated + governed) | Exactly `REAL_EXECUTOR_CAPABILITIES`: Tier 1, Tier 2, Tier 3 graph/semantic/vector/model-provider, orchestration/channel/container/scheduled/model/plugin slices, and local email/calendar/reminder stores. Integrated gates default `enabled_runtime` but AI-proposed actions default to `ask` and independent allowlists/threat-acks remain fail-closed. See [`docs/RUNTIME_EXECUTORS_SPEC.md`](docs/RUNTIME_EXECUTORS_SPEC.md) |
+| Plugins / vector+embedding / hosted/private model runtime | Implemented (bounded/governed slices) | Real executors exist for the documented bounded slices; no unrestricted plugin import/network, no secret store, and provider egress/API-key controls fail closed. |
 | Shell/network executors flippable but require confirm | Implemented (Tier 2) | Sandbox + egress allowlist + threat-model ack + human confirmation token to enable |
-| Remote/container/cloud + external channels | Fail-closed (not implemented) | No real executor; fails closed until isolation/egress/budget work lands |
-| Email/calendar/finance/medical/CCTV runtime | Fail-closed (not implemented) | No real integration; fails closed (never fabricates success) pending per-domain threat models |
+| Container + external channels | Implemented (bounded/governed slices) | Local container execution and one webhook channel/approval relay are real governed executors with independent allowlists. |
+| Remote/cloud command execution | Fail-closed (not implemented) | No real executor; activation blocked (`no_executor`). |
+| Email/calendar/reminder stores | Implemented (local-only) | Local stores/drafts only; no external send/sync/invites. |
+| Finance/investment/medical/pregnancy/CCTV/home-security/hardware runtime | Fail-closed (not implemented) | No real executor; fails closed pending per-domain threat models. |
 | Hosted/multi-user/cloud runtime | Future phase | Local single-user readiness does not cover hosted or multi-user deployment |
 
 ### Production-ready local runtime criteria (completed)
@@ -165,10 +167,11 @@ The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPL
 
 ### Current limitations
 
-- Real executors exist only for the local Tier 1–3 set in `REAL_EXECUTOR_CAPABILITIES`; everything else fails closed (`not_implemented`) and cannot be flipped to a working state.
-- Plugins, vector/embedding and hosted/private model runtime, external channels, remote/container/cloud execution, scheduled routines, and all sensitive personal/physical domains (email/calendar/finance/medical/cctv/home-security/hardware) are not implemented yet — flipping them is blocked at activation.
+- Real executors are exactly the capabilities in `REAL_EXECUTOR_CAPABILITIES`; those integrated gates default `enabled_runtime` and are governed per action (decision mode default `ask`).
+- No-executor capabilities fail closed (`not_implemented` / `activation_blocked:no_executor`) and cannot be flipped to a working state; this includes finance/investment/medical/pregnancy/CCTV/home-security/hardware and remote/cloud command execution.
+- Email/calendar/reminder capabilities are local-only stores/drafts; they do not send email, sync external calendars, create invites, or call external reminder services.
 - Tier 2 executors (shell/process/network/web-fetch) require a threat-model ack and a human confirmation token to enable.
-- Email/calendar/finance/medical/CCTV runtime remains disabled/deferred.
+- Finance/investment/medical/pregnancy/CCTV/home-security/hardware runtime remains disabled/deferred; email/calendar/reminder are local-only stores/drafts.
 - The web dashboard is single-user and loopback-only; there is no secret/credential store (secret storage is deferred).
 - Hosted/multi-user/cloud runtime is future implementation work, and current production readiness applies only to the local single-user runtime.
 

@@ -69,7 +69,7 @@ def create_graph_rollback_plan(preview: ApprovalPreview) -> RollbackPlan:
         ],
         safety_notes=[
             "Preview only: no graph data is created or deleted.",
-            "Graph/codemap runtime indexing remains disabled.",
+            "Legacy rollback preview only: graph indexing runtime is governed separately.",
         ],
         can_execute_rollback_now=False,
         rollback_execution_enabled=False,
@@ -97,7 +97,7 @@ def create_memory_rollback_plan(preview: ApprovalPreview) -> RollbackPlan:
         ],
         safety_notes=[
             "Preview only: no semantic memory records, embeddings, or vectors are created or deleted.",
-            "Semantic/vector memory writes remain disabled.",
+            "Legacy rollback preview only: semantic/vector runtimes are governed separately.",
         ],
         can_execute_rollback_now=False,
         rollback_execution_enabled=False,

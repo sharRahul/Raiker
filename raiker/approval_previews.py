@@ -130,7 +130,7 @@ def create_graph_indexing_approval_preview(
         affected_paths=list(plan.included_paths),
         affected_records=[],
         safety_notes=[
-            "Graph/codemap runtime indexing remains disabled.",
+            "Legacy preview only: no graph data is written; graph indexing runtime is governed separately.",
             "Preview creation does not start background indexers, watchers, or daemons.",
         ],
     )
@@ -185,7 +185,7 @@ def create_semantic_memory_write_approval_preview(
         affected_paths=[],
         affected_records=[item.candidate_id],
         safety_notes=[
-            "Semantic/vector memory writes remain disabled.",
+            "Legacy preview only: no semantic memory is written; semantic/vector runtimes are governed separately.",
             "Preview creation does not create embeddings or vectors.",
         ],
     )

@@ -267,8 +267,9 @@ def main() -> int:
         "home_security_runtime", "hardware_operator_runtime",
         "remote_execution_cap", "cloud_execution_cap",
     }
-    # Promoted in Phase 4 (real, bounded, threat-modelled executors; gates remain
-    # default-disabled, checked above): external_channel_runtime,
+    # Promoted/integrated capabilities are real, bounded, threat-modelled executors;
+    # they default enabled and are governed per action (checked above):
+    # external_channel_runtime,
     # channel_approval_relay (slice 4), container_execution_cap (slice 3),
     # scheduled_routines (slice 2), and hosted_model_runtime /
     # private_network_model_runtime (slice 7 — owner egress allowlist,

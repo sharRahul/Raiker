@@ -94,7 +94,8 @@ def test_architecture_and_security_docs_state_current_truth() -> None:
     assert "gateway finalisation events" in architecture
     assert "no `/sessions` command is currently implemented" in architecture
     assert "approval resolution is metadata-only" in security.lower()
-    assert "plugin execution | disabled/deferred" in security.lower()
+    assert "remote execution | disabled/fail-closed" in security.lower()
+    assert "plugin runtime slices" in security.lower()
 
 
 def test_catalog_marks_memory_and_approval_semantics_precisely() -> None:
@@ -109,7 +110,7 @@ def test_truthfulness_validator_detects_known_overclaim_patterns() -> None:
 
     errors = validator._validate_snippet(  # type: ignore[attr-defined]
         "docs/SECURITY_ARCHITECTURE.md",
-        "Approval resolution executes actions. Runtime execution remains disabled. plugin execution enabled.",
+        "Approval resolution executes actions. no-executor domains work. plugin execution enabled.",
     )
     joined = "\n".join(errors).lower()
     assert "forbidden overclaim" in joined

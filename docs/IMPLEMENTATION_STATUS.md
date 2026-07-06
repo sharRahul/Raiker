@@ -83,13 +83,13 @@ Current high-signal truth:
 - Approval resolution is metadata-only.
 - CLI durable memory mutation is `implemented_approval_required`: requests are brokered and approval-required by default.
 - Governed durable memory writes are `implemented_policy_gated`: they require provenance, retention, approval_state, confidence, trust_score, and event logging on the governed path.
-- Semantic/vector writes, graph indexing, plugin execution, channel runtime, and remote execution remain `disabled_deferred`.
+- Integrated real executors (including graph indexing, semantic/vector runtimes, plugin execution slices, channel runtime, container, scheduled routines, model-provider runtime, and local email/calendar/reminder stores) are `implemented_policy_gated`/governed per action; remote/cloud command execution and sensitive finance/investment/medical/pregnancy/CCTV/home-security/hardware domains remain `disabled_deferred` and fail closed.
 - **Runtime Authority / Action Router** (`raiker/runtime/authority/`) is `implemented_policy_gated` — governs all mutation actions through capability gates, policy engine, risk classification, approval/risk acceptance, and event logging.
 - **AI-executable role model** is `implemented_policy_gated` — defines `assistant`, `automation`, `operator`, `developer` roles with per-role permissions, denied capabilities, and self-approval/self-grant restrictions.
 - **Human-only role protection** is `implemented_policy_gated` — `owner`, `admin`, `approver`, `security_admin`, `finance_approver`, `medical_decision_maker`, `runtime_gate_manager` cannot be assigned to AI principals.
 - **Domain scopes** are `implemented_policy_gated` — 16 domain scopes enforced at the authority level.
 - **Risk acceptance model** is `implemented_policy_gated` — risk acceptance records with required fields, expiry, one-time/reusable, and event logging.
-- **Capability registry** is `implemented_policy_gated` — expanded to 53 capabilities covering all domain runtimes, all default-disabled.
+- **Capability registry** is `implemented_policy_gated` — expanded to 53 capabilities; integrated real-executor capabilities default `enabled_runtime`, while no-executor capabilities remain disabled/fail-closed.
 - **Event redaction** is `implemented_policy_gated` — extended with bank/card/medical ID patterns.
 - **Runtime enablement validator** is `implemented_verified` — `scripts/validate_runtime_enablement_readiness.py`.
 
@@ -109,15 +109,15 @@ Current high-signal truth:
 
 - **Controlled runtime mode activation**: `controlled_runtime_mode_activation_implemented` — RuntimeAuthority governs activation of runtime modes and capability gates through persisted state.
 - **Runtime mode state persistence**: `runtime_mode_state` table stores the current runtime mode (`local_single_user_runtime`, `deferred_runtime`, etc.) and is read by RuntimeAuthority at startup.
-- **Capability gate state persistence**: `capability_gate_state` table stores enabled/disabled state for all 53 capability gates, all default-disabled. Persisted state survives restarts.
-- **RuntimeAuthority integration**: `RuntimeAuthority.check_runtime_mode()` and `RuntimeAuthority.enforce_capability_gate_state()` read from persisted SQLite state rather than in-memory defaults. All 53 capabilities remain default-disabled.
+- **Capability gate state persistence**: `capability_gate_state` table stores enabled/disabled state for all 53 capability gates; integrated real-executor gates default enabled and no-executor gates default disabled. Persisted state survives restarts.
+- **RuntimeAuthority integration**: `RuntimeAuthority.check_runtime_mode()` and `RuntimeAuthority.enforce_capability_gate_state()` read from persisted SQLite state rather than in-memory defaults. Integrated real-executor capabilities default enabled; no-executor capabilities remain disabled/fail-closed.
 - **CLI commands**: `/runtime-mode status|activate|disable`, `/capability-gates`, `/capability-gate detail|enable|disable`, `/runtime-readiness` are implemented and route through RuntimeAuthority governance.
 - **Human-only activation**: `runtime_gate_manager` role (human-only) can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation` capability gates. AI principals cannot activate runtime modes or capability gates.
 - **Tests**: `tests/test_runtime_mode_activation.py`, `tests/test_capability_gate_persistence.py`, `tests/test_runtime_authority_mode_gate.py`.
 - **Owner bootstrap flow**: `implemented_verified` — `/bootstrap-owner` creates owner principal, role, events; recovery flow with `--force-recover` supported; `resolve_local_principal()` replaces synthetic `cli_local` for all production-path principal resolution. Tests: `tests/test_local_single_user_runtime.py`.
 - **Local single-user production hardening**: `implemented_verified` — first-run owner bootstrap, persisted owner principal, acting-principal resolution, runtime-gate-manager authorization, recovery/break-glass flow, AI principal denial for runtime mode/capability gate changes.
 - **Production-ready local single-user runtime**: `ready` — all production readiness criteria completed and validated. See validation evidence below.
-- **Deferred runtimes** remain disabled. **Approval execution relay** remains metadata-only/deferred. All 53 capabilities remain default-disabled.
+- **Deferred runtimes** remain disabled. Approval resolution remains metadata-only and never executes actions; `approval_execution_relay` is a separate integrated governed executor for approved file-write proposals. Integrated real-executor capabilities default enabled; no-executor capabilities remain disabled/fail-closed.
 
 ---
 
@@ -642,18 +642,16 @@ Preserved disabled gates: plugin execution, graph/codemap runtime indexing, sema
 
 ## Phase 3 Slice C/D governance update (local validation required)
 
-Full Phase 3 is not complete. Slice C adds graph/codemap governance and dry-run planning only: graph/codemap runtime indexing remains disabled, no background indexer is started, and no durable graph nodes or edges are written. Slice D adds semantic memory governance and a review queue only: semantic/vector memory writes remain disabled, no embeddings are created, and no vector records are written.
+The older Phase 3 Slice C/D governance note is superseded by the current executor posture: graph indexing, semantic memory, local vector embedding/search, and provider-backed embedding now have real governed executors. Broader graph query/planning automation, learned semantics, external sync, and no-executor extensions remain deferred/fail-closed.
 
 Safety status for this slice:
 
 - GitHub Actions remain paused due quota exhaustion; do not claim GitHub CI passed while paused.
 - Local validation evidence remains mandatory under `docs/LOCAL_VALIDATION_GATE.md`.
-- Plugin execution remains disabled.
-- Graph/codemap runtime indexing remains disabled.
-- Semantic/vector memory writes remain disabled.
-- External channels remain disabled.
-- Subagents and multi-agent teams remain disabled.
-- Remote/container execution remains disabled.
+- Plugin execution slices are integrated governed executors; broader plugin extensions remain deferred/fail-closed.
+- Graph indexing, semantic memory, local vector embedding/search, and provider-backed embedding are integrated governed executors; broader graph/memory extensions remain deferred/fail-closed.
+- The reference external channel runtime, subagent/team executors, and local container executor are integrated and governed.
+- Remote/cloud command execution remains no-executor/fail-closed.
 
 New planning/review-only surfaces:
 
@@ -671,8 +669,8 @@ Slice E adds preview-only approval contracts for future graph/codemap indexing a
 
 Safety status:
 
-- Graph/codemap runtime indexing remains disabled.
-- Semantic/vector memory writes remain disabled.
+- Legacy preview surfaces do not execute graph writes; the current graph indexing runtime is a separate governed real executor.
+- Legacy preview surfaces do not write semantic memory; current semantic/vector runtimes are governed real executors.
 - Previews are not approvals to execute; approving for later does not write memory or run indexing.
 - No embeddings, vectors, background indexers, watchers, daemons, plugins, channels, remote execution, or container execution are activated.
 - GitHub Actions remain paused due quota exhaustion; local validation evidence is mandatory and full CI must be re-enabled later when quota is available.
@@ -685,9 +683,9 @@ Safety invariants for this slice:
 
 - Approval audit records do not execute actions.
 - Rollback plans do not execute rollback.
-- Graph/codemap runtime indexing remains disabled.
-- Semantic/vector memory writes remain disabled; no embeddings or vectors are created.
-- Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
+- Legacy preview surfaces do not execute graph writes; the current graph indexing runtime is a separate governed real executor.
+- Legacy preview surfaces do not write semantic memory; current semantic memory and vector embedding/search runtimes are separate governed real executors.
+- Plugin slices, the reference external channel, subagent/team executors, and local container runtime are governed real executors; remote/cloud command execution remains no-executor/fail-closed.
 - GitHub Actions remain paused due quota exhaustion; local/cloud validation evidence is mandatory.
 - CI must be re-enabled later when quota is available and must not be claimed as passed while Actions are paused.
 
@@ -702,10 +700,10 @@ Safety status:
 - Lifecycle records do not execute graph indexing.
 - Lifecycle records do not write semantic memory.
 - Lifecycle records do not create embeddings or vectors.
-- Graph indexing remains disabled.
-- Semantic/vector memory writes remain disabled.
+- Legacy lifecycle/preview surfaces do not write graph data directly; current graph indexing is a governed real executor.
+- Legacy preview surfaces do not write semantic memory; current semantic/vector runtimes are governed real executors.
 - Rollback execution remains disabled.
-- Plugin execution, external channels, subagents, multi-agent teams, remote execution, and container execution remain disabled.
+- Plugin slices, the reference external channel, subagent/team executors, and local container runtime are governed real executors; remote/cloud command execution remains no-executor/fail-closed.
 - GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.
 
 ## Phase 3 Slice H lifecycle retention status
@@ -752,7 +750,7 @@ Added metadata-only readiness contracts, registry operations, optional SQLite pe
 
 ## Phase 5 Governed Enterprise Status
 
-Phase 5 adds managed governance, org roles, audit export, plugin marketplace, hosted routines, budget controls, retention, and backup. All runtime execution remains disabled.
+Phase 5 adds managed governance, org roles, audit export, plugin marketplace, hosted routines, budget controls, retention, and backup. Integrated real-executor capabilities are governed runtime; no-executor capabilities remain disabled/fail-closed.
 
 | Task | Status | Source | Tests |
 |---|---|---|---|
@@ -764,11 +762,11 @@ Phase 5 adds managed governance, org roles, audit export, plugin marketplace, ho
 | RAIKER-5501 Budget records | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_5_hosted_budget_retention.py` |
 | RAIKER-5601 Retention and backup | `implemented_verified` | `raiker/contracts/models.py`, `raiker/storage/sqlite.py`, `raiker/cli/commands.py` | `tests/test_phase_5_hosted_budget_retention.py` |
 
-All runtime execution remains disabled.
+Integrated real-executor capabilities are governed runtime; no-executor capabilities remain disabled/fail-closed.
 
 ## Phase 6 Channels, Subagents, Remote Execution Status
 
-Phase 6 adds external channel profiles, approval relay, subagent contracts, multi-agent team ledgers, remote execution profiles, and execution budgets. All execution remains disabled by default.
+Phase 6 adds external channel profiles, approval relay, subagent contracts, multi-agent team ledgers, remote execution profiles, and execution budgets. Integrated real-executor capabilities default enabled and governed per action; no-executor capabilities remain disabled/fail-closed.
 
 | Task | Status | Source | Tests |
 |---|---|---|---|
@@ -784,11 +782,11 @@ Executor enablement status: real local executors in `REAL_EXECUTOR_CAPABILITIES`
 
 ## Phase 3 Completion Status
 
-All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** All runtime execution remains disabled by default. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Landed slices: Slice 1 — `subagents` and `multi_agent_teams` (bounded governed in-process executors); Slice 4 — `external_channel_runtime` and `channel_approval_relay` (one reference webhook channel + untrusted inbound receiver); Slice 3 — `container_execution_cap` (local sandboxed Docker); Slice 2 — `scheduled_routines` (local on-demand routine runner, no daemon); Slice 5 — REST API hardening for single-user internet access (see the REST/API row above); Slice 7 — `hosted_model_runtime` + `private_network_model_runtime` (owner-allowlisted off-machine model endpoints with gate-derived chat-path policy); Slice 8 — `plugin_install` (local plugin manifest validation + install-record creation only); Slice 9 — `plugin_execution_cap` (installed-plugin brokered read-only ToolBroker invocation only). Their capability gates remain default-disabled and owner/`runtime_gate_manager`-flippable only. Slice 6: remote/cloud command execution stays **fail-closed by design** with documented per-integration opt-in requirements (`docs/threat-models/remote-cloud.md`). Arbitrary plugin code execution stays deferred.
+All Phase 3 slices A through P are implemented, tested, and documented. Phase 3 is now marked `implemented_verified` (this ledger is the canonical completion record; the former standalone `PHASE_3_COMPLETION_AUDIT.md` has been folded in here). **Phase 3 can be marked complete.** Integrated real-executor capabilities default enabled and governed per action; no-executor capabilities remain disabled/fail-closed. Phase 4 memory MVP is implemented. Phase 4 production rollout is now in progress under the sandboxed-first plan (see "Phase 4 production rollout" below). Landed slices: Slice 1 — `subagents` and `multi_agent_teams` (bounded governed in-process executors); Slice 4 — `external_channel_runtime` and `channel_approval_relay` (one reference webhook channel + untrusted inbound receiver); Slice 3 — `container_execution_cap` (local sandboxed Docker); Slice 2 — `scheduled_routines` (local on-demand routine runner, no daemon); Slice 5 — REST API hardening for single-user internet access (see the REST/API row above); Slice 7 — `hosted_model_runtime` + `private_network_model_runtime` (owner-allowlisted off-machine model endpoints with gate-derived chat-path policy); Slice 8 — `plugin_install` (local plugin manifest validation + install-record creation only); Slice 9 — `plugin_execution_cap` (installed-plugin brokered read-only ToolBroker invocation only). Their capability gates are integrated real-executor gates: default `enabled_runtime`, owner/`runtime_gate_manager`-changeable only, and governed per action (default `ask`). Slice 6: remote/cloud command execution stays **fail-closed by design** with documented per-integration opt-in requirements (`docs/threat-models/remote-cloud.md`). Unrestricted/in-process plugin code execution and broader plugin automation stay deferred/fail-closed.
 
 ## Phase 4 production rollout (sandboxed-first)
 
-Phase 4 is being brought to production-ready state in individually-validated slices. Each slice promotes a capability to a real executor only with a per-capability threat model (`docs/threat-models/`) + acceptance tests (executes-when-governed and fails-closed-when-disabled), and every promoted gate still ships **default-disabled** and owner-flippable only. All other disabled runtime flags remain false; runtime execution remains disabled by default.
+Phase 4 is being brought to production-ready state in individually-validated slices. Each slice promotes a capability to a real executor only with a per-capability threat model (`docs/threat-models/`) + acceptance tests (executes-when-governed and fails-closed-when-disabled), and every promoted gate now defaults `enabled_runtime` when integrated and remains owner/`runtime_gate_manager`-changeable only. All no-executor runtime flags remain false; integrated executors are governed per action (default `ask`).
 
 ### Phase 4 Slice 1 — Subagents & Multi-Agent Teams (`implemented_verified`)
 
@@ -801,8 +799,8 @@ Scope and boundaries (metadata-only events; this is bounded delegated execution,
 
 - Subagents run a fixed caller-supplied list of **read-only** tool steps, each routed through the existing `ToolBroker → PolicyEngine` path; mutating/egress tools fail closed (`subagent_tool_not_allowed`).
 - Depth, step count, runtime, and team size are bounded; any breach fails closed and never fabricates success.
-- Gates default **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/subagents.md`), and a confirmation token. AI principals can never run or enable them.
-- No model calls, no OS process spawn, no network. No other disabled runtime flag changes; runtime execution remains disabled by default. Approval resolution remains metadata-only.
+- Gates default `enabled_runtime`; re-enabling from a disabled/persisted non-default state requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/subagents.md`), and a confirmation token. AI principals can never run or enable them.
+- No model calls, no OS process spawn, no network. No no-executor runtime flag changes. Approval resolution remains metadata-only.
 
 Evidence: `tests/test_phase_4_subagent_orchestration.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
 
@@ -821,7 +819,7 @@ Scope and boundaries:
 - Outbound delivery requires a paired+enabled connector and an owner-controlled egress allowlist (`RAIKER_CHANNEL_EGRESS_ALLOWLIST`); empty allowlist fails closed. Events are metadata-only — never the message text or target URL.
 - The approval relay records a `pending` relay only; approval resolution remains metadata-only/owner-only.
 - Inbound traffic (`POST /api/channels/{connector_id}/inbound`) is authenticated by an owner channel secret (`RAIKER_CHANNEL_INBOUND_SECRET`, fail-closed when unset), requires a sender on the pairing allowlist, and is **always** labelled `untrusted` + quarantined with instructions inert (the Phase 8 "webhook injection labelled untrusted" gate). It executes nothing.
-- Gates default **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/channels.md`), and a confirmation token. AI principals can never run or enable them. Runtime execution remains disabled by default; no other disabled runtime flag changes.
+- Gates default `enabled_runtime`; re-enabling from a disabled/persisted non-default state requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/channels.md`), and a confirmation token. AI principals can never run or enable them. No no-executor runtime flag changes; the integrated executor remains governed per action.
 
 Evidence: `tests/test_phase_4_channels.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
 
@@ -835,8 +833,8 @@ Scope and boundaries:
 
 - Runs an **owner-allowlisted** image (`RAIKER_CONTAINER_IMAGE_ALLOWLIST`; empty = fail closed) via `docker run` with `--network none`, no host mounts, `--cap-drop ALL`, `--security-opt no-new-privileges`, `--read-only`, memory/cpu/pid limits, `--rm`, and a capped timeout. The container runner's command allowlist is exactly `{docker}`.
 - Missing daemon fails closed (`docker_unavailable`); non-zero exit is reported as failure. Artifacts are metadata only (exit code + byte counts) — never stdout/stderr content.
-- Local only: remote/container-over-SSH/Kubernetes/cloud stay fail-closed. Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/container.md`), and a confirmation token. AI principals can never run or enable it.
-- CI exercises governance + fail-closed + flag-set construction via an injected runner; a live-daemon successful run is verified manually. Runtime execution remains disabled by default; no other disabled runtime flag changes.
+- Local only: remote/container-over-SSH/Kubernetes/cloud stay fail-closed. Gate defaults `enabled_runtime`; re-enabling from a disabled/persisted non-default state requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/container.md`), and a confirmation token. AI principals can never run or enable it.
+- CI exercises governance + fail-closed + flag-set construction via an injected runner; a live-daemon successful run is verified manually. No no-executor runtime flag changes; the integrated executor remains governed per action.
 
 Evidence: `tests/test_phase_4_container.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
 
@@ -850,7 +848,7 @@ Scope and boundaries:
 
 - A routine bundles an interval with a bounded **read-only** subagent payload. Operations: `define`, `run_due`, `run`. There is **no background daemon/thread/watcher** — routines run only when an explicit governed `run_due`/`run` action is invoked.
 - Routine work executes via the Slice 1 `SubagentExecutor`, so mutating/egress tools fail closed (`subagent_tool_not_allowed`). Minimum interval 60s; at most 50 routines per tick; malformed payload/op fails closed.
-- Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/scheduled-routines.md`), and a confirmation token. AI principals can never run or enable it. Runtime execution remains disabled by default.
+- Gate defaults `enabled_runtime`; re-enabling from a disabled/persisted non-default state requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/scheduled-routines.md`), and a confirmation token. AI principals can never run or enable it. The integrated executor remains governed per action (default `ask`).
 
 Evidence: `tests/test_phase_4_scheduled_routines.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
 
@@ -867,11 +865,11 @@ Evidence: `tests/test_phase_4_scheduled_routines.py`, `tests/test_executor_defau
 
 Scope and boundaries:
 
-- The production `ModelRouter` (gateway + `/model` CLI) derives its `ProviderRuntimePolicy` from the persisted capability gates (`raiker/models/policy_state.py`). Both gates disabled (the default) ⇒ hosted/private model profiles cannot be constructed at all; no silent local→hosted fallback exists.
+- The production `ModelRouter` (gateway + `/model` CLI) derives its `ProviderRuntimePolicy` from the persisted capability gates (`raiker/models/policy_state.py`). If either gate is deliberately disabled, the corresponding hosted/private model profile cannot be constructed at all; no silent local→hosted fallback exists.
 - Every off-machine provider construction re-checks the owner egress allowlist (`RAIKER_MODEL_EGRESS_ALLOWLIST`, comma-separated host globs); empty allowlist fails closed (`model_egress_denied:no_allowlist`) even when the gate is enabled. Local endpoints are never subject to this allowlist.
 - Credentials come only from owner env vars named by the profile's `api_key_env` — never from model/action arguments; never written to storage, events, or artifacts.
 - The executors support a single bounded operation, `connectivity_check`: an allowlisted, size/time-capped reachability probe. Artifacts are metadata only (endpoint kind, HTTP status, byte counts) — never URLs, hosts, response bodies, headers, or keys. Hosted probes require HTTPS and `remote_hosted` endpoints; private probes require `private_network` endpoints.
-- Gates default **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/hosted-models.md`), and a confirmation token. AI principals can never run or enable them. Remote/cloud command execution stays fail-closed (Slice 6). Runtime execution remains disabled by default; no other disabled runtime flag changes.
+- Gates default `enabled_runtime`; re-enabling from a disabled/persisted non-default state requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/hosted-models.md`), and a confirmation token. AI principals can never run or enable them. Remote/cloud command execution stays fail-closed (Slice 6). No no-executor runtime flag changes; the integrated executor remains governed per action.
 
 Evidence: `tests/test_phase_4_hosted_model_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
 
@@ -887,8 +885,8 @@ Scope and boundaries:
 - The action accepts `manifest_path` only and requires the manifest to resolve inside the workspace. Escapes fail closed (`outside_workspace:manifest_path`).
 - The plugin registration policy must return `planned`: checksum verification must pass, the signature field must be present, trust level must be known, and permissions must be safe read-only. Risky/unknown permissions and invalid supply-chain metadata fail closed and create no install record.
 - Signature verification is layered (see the current-truth banner at the top and `docs/threat-models/plugins.md`): a presence marker in the local-dev baseline, cryptographic HMAC-SHA256 when the owner sets `RAIKER_PLUGIN_SIGNING_KEY` (slice 12), and asymmetric Ed25519 against an owner-trusted `RAIKER_PLUGIN_ED25519_PUBLIC_KEY` (slice 13). Each configured check fails closed and creates no install record on failure.
-- Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugins.md`), and a confirmation token. AI principals can never run or enable it.
-- `plugin_execution_cap` remains **fail-closed (no executor)**. Plugin tools, hooks, MCP servers, agents, panels, and code execution remain disabled/deferred.
+- Gate defaults `enabled_runtime`; re-enabling from a disabled/persisted non-default state requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugins.md`), and a confirmation token. AI principals can never run or enable it.
+- `plugin_execution_cap` is a separate implemented governed executor for installed-plugin brokered read-only ToolBroker invocation only. Plugin install itself only validates and records a local manifest; it does not execute plugin code. Broader plugin tools/hooks/MCP/LSP/monitors/panels, unrestricted imports/network, and unrestricted plugin automation remain deferred/fail-closed.
 
 Evidence: `tests/test_phase_4_plugin_install_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
 
@@ -904,7 +902,7 @@ Scope and boundaries:
 - It requires an `installed` plugin record and the exact installed permission (`tool:<tool_name>`). Missing install records, missing permissions, unknown tools, write tools, shell/process/network tools, and memory mutation fail closed before invocation.
 - The executor never imports plugin files, runs plugin scripts, starts processes, opens network connections, writes files, enables hooks, starts MCP/LSP/monitors, or activates UI panels.
 - The broker is created without an event writer so plugin read outputs are not emitted into plugin-execution runtime events. Executor artifacts are metadata only and include `output_redacted=true` on success.
-- Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugin-execution.md`), and a confirmation token. AI principals can never run or enable it.
+- Gate defaults `enabled_runtime`; re-enabling from a disabled/persisted non-default state requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugin-execution.md`), and a confirmation token. AI principals can never run or enable it.
 - Arbitrary plugin code execution remains deferred until a separate sandbox/import/process model and runtime permission enforcement exist. Cryptographic signature validation (HMAC slice 12, Ed25519 slice 13) and revocation (slice 10) are now implemented, but code execution stays fail-closed pending the sandbox/import/process model.
 
 Evidence: `tests/test_phase_4_plugin_execution_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_repo_truthfulness.py`.
@@ -922,7 +920,7 @@ Scope and boundaries:
 - Fails closed on: missing/invalid `plugin_id` or `entrypoint`, disallowed interpreter (`interpreter_not_allowed`), non-list/oversized args, uninstalled (`plugin_not_installed`) or revoked (`plugin_revoked`) plugin, un-allowlisted plugin (`plugin_runtime_not_allowlisted`), workspace escape (`outside_workspace:entrypoint`), missing script (`entrypoint_not_found`), and sandbox/timeout errors (`plugin_runtime_sandbox:*`). Non-zero exit surfaces as `plugin_runtime_exit:<code>`.
 - Commands run as an argv list (never a shell), so shell metacharacters are inert. Runtime artifacts are metadata only (execution id, plugin id, interpreter, return code, byte counts, `output_redacted=true`); plugin stdout/stderr is never captured into events or artifacts. Every attempt writes a `plugin_execution_records` row.
 - Isolation posture equals `shell_execution`/`process_execution` (separate process, resource + timeout bounds). It does **not** import plugin modules in-process and does **not** provide a network-namespace jail — a plugin subprocess has the host's ambient network, so the owner allowlist is the trust anchor. Kernel-isolated network-off execution stays in the `container_execution_cap` path.
-- Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugin-runtime.md`), and a confirmation token. AI principals can never run or enable it.
+- Gate defaults `enabled_runtime`; re-enabling from a disabled/persisted non-default state requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime` mode, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugin-runtime.md`), and a confirmation token. AI principals can never run or enable it.
 - Deferred: in-process import isolation, runtime permission enforcement beyond the owner allowlist, and network-namespace/kernel sandboxing for plugin code.
 
 Evidence: `tests/test_phase_4_plugin_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_local_single_user_runtime.py`.
@@ -942,7 +940,7 @@ Scope and boundaries:
 - The stronger-isolation counterpart to `plugin_runtime_cap`: runs the installed plugin's entrypoint **inside a container** with `--network none`, `--read-only`, `--cap-drop ALL`, `--security-opt no-new-privileges`, and memory/cpu/pid limits. Only the single entrypoint file is bind-mounted read-only at `/plugin/<name>`; the workspace is never mounted.
 - Reuses the owner plugin allowlist (`RAIKER_PLUGIN_RUNTIME_ALLOWLIST`) and per-plugin scopes, and additionally requires an owner-selected image `RAIKER_PLUGIN_RUNTIME_IMAGE` that is also in the shared `container_image_allowlist()` (`RAIKER_CONTAINER_IMAGE_ALLOWLIST`). Fails closed on `plugin_not_installed`, `plugin_revoked`, `plugin_runtime_not_allowlisted`, `plugin_runtime_image_unset`, `image_not_allowed`, `interpreter_not_allowed:*`, workspace/scope escapes, `plugin_sandbox:*` (e.g. `docker_unavailable`), and `plugin_sandbox_exit:<code>`.
 - Artifacts are metadata only (execution id, plugin id, image, interpreter, `network_isolated=true`, return code, byte counts, `output_redacted=true`); container stdout/stderr never leaks. Every attempt records a `plugin_execution_records` row.
-- Gate defaults **disabled**; enabling requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime`, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugin-sandboxed-runtime.md`), and a confirmation token.
+- Gate defaults `enabled_runtime`; re-enabling from a disabled/persisted non-default state requires a HUMAN `runtime_gate_manager`, `local_single_user_runtime`, the registered executor, a `threat_model_acks` row (`docs/threat-models/plugin-sandboxed-runtime.md`), and a confirmation token.
 - Deferred: in-process import isolation of plugin code in the host, and image build/pull management (the owner supplies and allowlists the image out of band).
 
 Evidence: `tests/test_phase_4_plugin_sandboxed_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`, `scripts/validate_local_single_user_runtime.py`.
@@ -951,11 +949,11 @@ Evidence: `tests/test_phase_4_plugin_sandboxed_runtime.py`, `tests/test_executor
 
 | Capability | Status | Source | Tests |
 |---|---|---|---|
-| Ask / Deny / Always Allow / Auto decision modes (per-capability, layered on gates) | `implemented_policy_gated` | `raiker/runtime/authority/decision_modes.py`, `raiker/runtime/authority/router.py`, `raiker/control/service.py`, `raiker/storage/migrations.py` (`capability_decision_mode`), `raiker/cli/commands.py` (`/capability-mode`) | `tests/test_phase_5_decision_modes.py` |
+| Ask / Deny / Allow / Auto decision modes (per-capability, layered on gates) | `implemented_policy_gated` | `raiker/runtime/authority/decision_modes.py`, `raiker/runtime/authority/router.py`, `raiker/control/service.py`, `raiker/storage/migrations.py` (`capability_decision_mode`), `raiker/cli/commands.py` (`/capability-mode`) | `tests/test_phase_5_decision_modes.py` |
 
-- Adds a per-capability decision mode — **`ask` (default) / `deny` / `always_allow` / `auto`** — layered on top of the existing capability gate. The gate still governs *whether* a capability is enabled (default-disabled, fail-closed); the mode governs *how* an AI-proposed action on an enabled capability is treated. See `docs/DECISION_MODES_SPEC.md`.
-- **Safety floors preserved:** PolicyEngine hard-denies still block first; critical-risk actions always require a human (`always_allow`/`auto` can never let an AI take a critical action); `auto` is deterministic and auditable (risk-keyed, no opaque model call in the trust decision); human principals self-authorize as before.
-- **Governance:** setting a mode is human `runtime_gate_manager`-only (AI refused), audited via `capability_decision_mode_set`, persisted in the `capability_decision_mode` table (separate from `capability_gate_state`, so gate transitions never clobber the mode). Permissive modes (`always_allow`/`auto`) require a real executor — sensitive/no-executor domains are refused with `decision_mode_requires_executor` and can never be relaxed into acting.
+- Adds a per-capability decision mode — **`ask` (default) / `deny` / `allow` / `auto`** — layered on top of the existing capability gate. The gate still governs *whether* a capability is enabled (integrated gates default enabled; no-executor gates disabled/fail-closed); the mode governs *how* an AI-proposed action on an enabled capability is treated. See `docs/DECISION_MODES_SPEC.md`.
+- **Safety floors preserved:** PolicyEngine hard-denies still block first; critical-risk actions always require a human (`allow`/`auto` can never let an AI take a critical action); `auto` is deterministic and auditable (risk-keyed, no opaque model call in the trust decision); human principals self-authorize as before.
+- **Governance:** setting a mode is human `runtime_gate_manager`-only (AI refused), audited via `capability_decision_mode_set`, persisted in the `capability_decision_mode` table (separate from `capability_gate_state`, so gate transitions never clobber the mode). Permissive modes (`allow`/`auto`) require a real executor — sensitive/no-executor domains are refused with `decision_mode_requires_executor` and can never be relaxed into acting.
 - Approval resolution remains metadata-only; this slice adds no new capability and no new executor.
 
 Evidence: `tests/test_phase_5_decision_modes.py`, `scripts/validate_repo_truthfulness.py`.
@@ -970,7 +968,7 @@ Evidence: `tests/test_phase_5_decision_modes.py`, `scripts/validate_repo_truthfu
 
 - The first Tier-6 domains promoted to real executors — promoted **because** they are purely local personal-data stores (rows in the workspace `reminders` / `calendar_events` / `email_drafts` tables) with no network, no external sync/notification/delivery, and no device/hardware access. `email_runtime` **never transmits** — a `send` action only marks a draft `queued_for_send` (default `ask` mode asks the human first) so a human sends it; nothing leaves the machine. See `docs/threat-models/reminders.md`, `calendar.md`, `email.md`.
 - **The remaining Tier-6 domains (finance, investment, medical, pregnancy/baby, cctv, home security, hardware) stay fail-closed** (`not_implemented`) until each has a real external integration and its own threat model — no fake executors.
-- Each fails closed on missing/oversized required fields, bad argument types, and unknown actions. Create/list (and draft/list) only — no edit/delete, no outbound delivery, no OS scheduler/calendar registration. Runtime artifacts are metadata-only (ids/counts/flags); titles, locations, notes, subjects, recipients, and bodies are never emitted into events. Gates default **disabled**; enabling requires HUMAN `runtime_gate_manager` + `local_single_user_runtime` + a `threat_model_acks` row + a confirmation token, and AI-proposed actions are further governed by the capability decision mode (default `ask`).
+- Each fails closed on missing/oversized required fields, bad argument types, and unknown actions. Create/list (and draft/list) only — no edit/delete, no outbound delivery, no OS scheduler/calendar registration. Runtime artifacts are metadata-only (ids/counts/flags); titles, locations, notes, subjects, recipients, and bodies are never emitted into events. Gates default `enabled_runtime`; re-enabling from a disabled/persisted non-default state requires HUMAN `runtime_gate_manager` + `local_single_user_runtime` + a `threat_model_acks` row + a confirmation token, and AI-proposed actions are further governed by the capability decision mode (default `ask`).
 
 Evidence: `tests/test_phase_6_reminder_runtime.py`, `tests/test_phase_6_calendar_email_runtime.py`, `tests/test_executor_default_registry.py`, `scripts/validate_runtime_enablement_readiness.py`.
 
@@ -988,10 +986,10 @@ Models view, and Security Settings surface hosted/private model gate state, off-
 count, and whether `RAIKER_MODEL_EGRESS_ALLOWLIST` is configured, while never displaying allowlist
 values or provider API keys and never probing network reachability on read. Desktop/Mobile apps, IDE extension, Voice, Browser Extension, and hosted/multi-user REST/API
 remain specified/deferred, not implemented as launchable apps. Phase 3 is `implemented_verified`
-only for safe foundation/readiness slices A-P; runtime execution remains disabled. Phase 4 memory
+only for safe foundation/readiness slices A-P; integrated real executors are governed per action and no-executor capabilities remain disabled/fail-closed. Phase 4 memory
 MVP is implemented.
 
-Runtime execution remains disabled.
+Integrated real executors are governed per action and default-ask; no-executor capabilities remain disabled/fail-closed.
 
 ### Phase 3 Slice A & B consolidated safety markers
 
@@ -1010,7 +1008,7 @@ Provider matrix: llama.cpp server is Raiker's native local-first OpenAI-compatib
 
 UI commands now include `/providers`, `/models`, `/model current`, `/model use <profile_id>`, `/model use --provider <provider> --model <model>`, `/model health`, `/model capabilities`, `/reasoning`, `/reasoning status`, `/reasoning set <mode-or-effort>`, and `/reasoning off`. Reasoning controls are model/profile-dependent, unsupported values are rejected, and private chain-of-thought is never exposed. Reasoning summaries, when supported by metadata, are safe summaries rather than raw chain-of-thought.
 
-Security rules: `local_only=true` allows only local-machine endpoints. Private home-lab endpoints require `local_only=false`, network permission, and egress policy. Hosted/VPS endpoints require network and egress policy; paid hosted providers also require budget policy. OpenRouter always requires egress and budget policy and is disabled by default. There is no silent fallback from local to hosted or from production to deterministic test provider. Events and errors must not include raw prompts, completions, streamed chunks, API keys, Authorization headers, sensitive extra headers, file contents, or tool output contents.
+Security rules: `local_only=true` allows only local-machine endpoints. Private home-lab endpoints require `local_only=false`, network permission, and egress policy. Hosted/VPS endpoints require network and egress policy; paid hosted providers also require budget policy. OpenRouter always requires egress and budget policy and is disabled unless explicitly policy-enabled. There is no silent fallback from local to hosted or from production to deterministic test provider. Events and errors must not include raw prompts, completions, streamed chunks, API keys, Authorization headers, sensitive extra headers, file contents, or tool output contents.
 
 Validation commands: `python -m pytest`, `python -m ruff check .`, and `python -m mypy raiker apps tests`.
 
@@ -1063,7 +1061,7 @@ Plain terminal client is `implemented_verified`: `raiker`, `raiker --prompt`, an
 
 ## Phase 9 Advanced Memory & Graph Status
 
-Phase 9 adds advanced memory and graph features: vector index, AST-based symbol extraction and dependency discovery, project-level graph extraction, and procedural-memory-to-skill-candidate conversion. All execution remains policy-gated and disabled by default.
+Phase 9 adds advanced memory and graph features: vector index, AST-based symbol extraction and dependency discovery, project-level graph extraction, and procedural-memory-to-skill-candidate conversion. Integrated execution remains policy-gated/default-ask; no-executor capabilities remain disabled/fail-closed.
 
 | Task | Status | Source | Tests |
 |---|---|---|---|

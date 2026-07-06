@@ -5,7 +5,7 @@
 `scripts/validate_*.py` encode the project's non-negotiable invariants and run in
 CI and locally (see [`LOCAL_VALIDATION_GATE.md`](../LOCAL_VALIDATION_GATE.md)):
 
-- Gates default-disabled; high-risk capabilities stay disabled.
+- Integrated gates default enabled and governed per action; no-executor/high-risk deferred capabilities stay disabled/fail-closed.
 - Executor availability is **registry-backed**, not a static allowlist.
 - No ungoverned CLI mutation paths.
 - Documentation truthfulness and command-catalog completeness.

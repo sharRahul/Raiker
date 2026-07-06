@@ -2,7 +2,7 @@
 
 Raiker plugins package reusable platform extensions. Plugins may provide commands, hooks, skills, subagents, channels, MCP servers, LSP servers, monitors, tool adapters, themes, output styles, TUI panels, web/dashboard panels, mobile panels, memory adapters, model providers, user-configurable settings, dependency metadata, and policy fragments.
 
-Plugins are disabled by default unless explicitly enabled by user, project, or managed policy.
+Plugin execution slices are governed/default-ask unless explicitly tightened or disabled by user, project, or managed policy; broader plugin extensions remain deferred/fail-closed.
 
 The Raiker-native plugin component inventory and phase placement is tracked in [`docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md`](RAIKER_TOOL_AND_PLUGIN_CATALOG.md). Future builders must update that catalog when adding or changing plugin component types.
 
@@ -250,7 +250,7 @@ Plugins may declare background monitors/watchers. Monitors are high risk because
 
 Required controls:
 
-- disabled by default;
+- governed/default-ask unless explicitly disabled or tightened;
 - explicit enablement and approval;
 - command policy equivalent to `shell`/`powershell`;
 - event rate limiting;

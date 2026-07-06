@@ -6,7 +6,7 @@
 Raiker is a **security-first AI agent**: it can connect to any backend LLM —
 local (llama.cpp / Ollama / LM Studio), home-lab (vLLM), or hosted API
 (Anthropic / OpenAI / Gemini / OpenRouter) — and every capability it can perform
-is **governed, default-disabled, and fail-closed**. Nothing runs until you, the
+is **governed, default-ask for AI-proposed actions, and fail-closed for no-executor capabilities**. Nothing runs without the relevant gate, policy, and decision-mode checks; you, the
 human owner, explicitly turn it on.
 
 This page gets you from a clean checkout to your first governed action.
@@ -62,14 +62,14 @@ acknowledgement** before they can be enabled.
 ## 5. Choose how the AI may act on it
 
 Once a capability is enabled, its **decision mode** controls how AI-proposed
-actions are treated — `ask` (the default), `deny`, `always_allow`, or `auto`:
+actions are treated — `ask` (the default), `deny`, `allow`, or `auto`:
 
 ```bash
 raiker /capability-mode file_write_execution auto
 ```
 
 `ask` means every AI-proposed action waits for your approval; `auto` lets Raiker
-decide by risk; `always_allow` runs without prompting (critical-risk actions
+decide by risk; `allow` runs without prompting (critical-risk actions
 still require you). See [Core Concepts › Decision modes](core-concepts.md#decision-modes).
 
 ## 6. Run

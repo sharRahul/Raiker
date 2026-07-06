@@ -14,7 +14,7 @@ REQUIRED_MARKERS = {
         "Canonical Backend Capability Statuses",
         "Approval resolution is `metadata_only`",
         "CLI durable memory mutation is `implemented_approval_required`",
-        "Semantic/vector writes, graph indexing, plugin execution, channel runtime, and remote execution remain `disabled_deferred`.",
+        "Integrated real executors (including graph indexing, semantic/vector runtimes, plugin execution slices, channel runtime, container, scheduled routines, model-provider runtime, and local email/calendar/reminder stores) are `implemented_policy_gated`/governed per action; remote/cloud command execution and sensitive finance/investment/medical/pregnancy/CCTV/home-security/hardware domains remain `disabled_deferred` and fail closed.",
         "Phase 4 memory MVP is implemented",
     ],
     Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"): [
@@ -30,8 +30,8 @@ REQUIRED_MARKERS = {
     ],
     Path("docs/SECURITY_ARCHITECTURE.md"): [
         "approval resolution is metadata-only",
-        "plugin execution | disabled/deferred",
-        "remote/container/cloud execution | disabled/deferred",
+        "remote execution | disabled/fail-closed",
+        "cloud execution | disabled/fail-closed",
     ],
 }
 

@@ -61,7 +61,7 @@ sandbox transport codes surfaced by egress enforcement.
 ## Acceptance evidence
 
 - `tests/test_phase_7_model_provider_runtime.py` proves registry membership,
-  default-disabled blocking, threat-model-ack activation, empty-allowlist
+  disabled-gate blocking, threat-model-ack activation, empty-allowlist
   fail-closed (before any provider call), missing-text / unknown-operation
   fail-closed, provider-error fail-closed, and the governed success path that
   persists a provider vector without leaking the source text. The provider call

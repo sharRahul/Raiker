@@ -88,7 +88,7 @@ The turn orchestrator can inject retrieved local context into the model prompt
 ## Acceptance evidence
 
 - `tests/test_phase_6_vector_embedding_runtime.py` proves deterministic/normalized
-  embeddings, default-disabled blocking, embed-writes-a-real-vector-row,
+  embeddings, disabled-gate blocking, embed-writes-a-real-vector-row,
   missing-text fail-closed, unknown-action fail-closed, list-returns-count, and
   that source text never appears in runtime event payloads. For `search` it proves
   exact-match ranks first (cosine ~1.0) without leaking the query, `top_k` is

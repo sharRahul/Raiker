@@ -5,7 +5,7 @@
 
 # Raiker Architecture Blueprint
 
-> Current truth (2026-06-22): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only). The web dashboard renders real governed backend state and drives the same governed prompt/turn/approval/runtime-mutation flows as the CLI (approval resolution stays metadata-only); it adds no authority of its own. Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+> Current truth (2026-06-22): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only). The web dashboard renders real governed backend state and drives the same governed prompt/turn/approval/runtime-mutation flows as the CLI (approval resolution stays metadata-only); it adds no authority of its own. Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Current runtime truth: capabilities in `REAL_EXECUTOR_CAPABILITIES` have real governed executors and default to `enabled_runtime` (AI-proposed actions still default to `ask`); capabilities without a real executor — including finance/investment/medical/pregnancy/CCTV/home-security/hardware plus remote/cloud command execution — stay disabled/fail-closed.
 
 
 Raiker is a local-first AI agent platform. It is designed as an operating layer for prompts, models, tools, policy, memory, plugins, hooks, subagents, channels, user interfaces, storage, search, graph context, checkpoints, and execution environments.
@@ -21,7 +21,8 @@ This document turns the high-level README into implementation-ready architecture
 | governed durable memory write contract | `implemented_policy_gated` | Provenance, retention, approval state, and event logging enforced on the governed path. |
 | approval resolution | `metadata_only` | `/approve` and `/deny` do not execute actions. Approval resolution is metadata-only. |
 | graph plans, approval previews, rollback plans | `dry_run_only` | Planning/preview only. |
-| plugin/channel/remote/graph/semantic runtime execution | `disabled_deferred` | Readiness/records may exist, runtime remains off. |
+| integrated real executors (plugin slices, graph/semantic/vector/model-provider, shell/process/web-fetch/network, channel/container/scheduled/model runtimes, local email/calendar/reminder stores) | `implemented_policy_gated` | Present in `REAL_EXECUTOR_CAPABILITIES`, default `enabled_runtime`, and governed per action (decision mode default `ask`, PolicyEngine, critical-risk floor, and executor allowlists). |
+| no-executor domains (remote/cloud command execution; finance/investment/medical/pregnancy/CCTV/home-security/hardware) | `disabled_deferred` | No real executor; activation blocked and execution fails closed. |
 | local web dashboard — read-only views (sessions, turns, events, checkpoints, tasks, capabilities, runtime mode, models, diagnostics) | `implemented_read_only` | `apps/web` over the `raiker-web` loopback API; renders real governed backend state only. |
 | local web dashboard — prompt/turn stream, runtime-mutation Security Settings (enable/disable gates, activate/disable runtime mode) | `implemented_policy_gated` | Same governed gateway/RuntimeAuthority path as the CLI; step-up auth collects reason/token/threat-ack and forwards only. Adds no authority. |
 | local web dashboard — approval queue resolution | `metadata_only` | Approve/deny records a decision and never executes the action (`executes_action=false`). |
@@ -190,7 +191,7 @@ effective_permissions =
 - Runtime readiness: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`.
 - Runtime mode state persisted in `runtime_mode_state` table; capability gate state persisted in `capability_gate_state` table. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation` capability gates; AI cannot activate runtime modes or gates.
 - Production-ready local single-user runtime: `ready`. Owner bootstrap flow (`/bootstrap-owner`) implemented; `resolve_local_principal()` replaces synthetic `cli_local` for all production-path principal resolution.
-- Non-goals: approval execution relay remains metadata-only/deferred; broad runtime execution remains disabled.
+- Non-goals: approval resolution remains metadata-only and never executes actions; remote/cloud command execution, sensitive no-executor domains, and hosted/multi-user/cloud production runtime remain deferred/fail-closed.
 
 ---
 

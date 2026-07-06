@@ -226,7 +226,7 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 > - **`/approve` is NOT the same function as `/allow`, so it was kept** (per the
 >   task's own "if it serves the same function" condition). `/approve <id>` /
 >   `/deny <id>` (approval inbox, `routes_approvals.py` `/resolve`) resolve **one
->   pending action**; `/allow` (decision mode `always_allow`) sets a **standing
+>   pending action**; `/allow` (canonical decision mode `allow`) sets a **standing
 >   per-capability policy**. They are near-opposites (one is the human-in-control
 >   gate, the other relaxes prompting), so merging them would be wrong. Documented
 >   the distinction in `DECISION_MODES_SPEC.md` and the command reference.
@@ -247,7 +247,7 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 > **Where this session's work lives (read first):** Phase 4 slices 14–16 (plugin
 > code runtime) merged via PR #95; doc-accuracy fixes merged via PR #96/#97;
-> **Phase 5 slice 1 — capability decision modes (`ask`/`deny`/`always_allow`/
+> **Phase 5 slice 1 — capability decision modes (`ask`/`deny`/`allow`/
 > `auto`)** merged via PR #98. The current in-flight branch
 > `claude/handoff-document-review-jusao0` (restarted from `origin/main` after #98
 > merged) carries **two things in one PR**: (1) the first **real Tier-6 executor**
@@ -353,7 +353,7 @@ validators passed.
   this status and never displays allowlist values or API keys.
 - **Plugin manifest install slice complete:** `plugin_install` is now a real
   governed executor for local manifest validation + install-record creation
-  only. It requires the default-disabled gate, `local_single_user_runtime`, a
+  only. It requires the integrated gate (default enabled, re-enable if disabled), `local_single_user_runtime`, a
   human `runtime_gate_manager`, confirmation token, and
   `docs/threat-models/plugins.md` ack. It verifies checksum, requires a
   signature presence marker, allows only safe read-only permissions, and writes
@@ -368,7 +368,7 @@ validators passed.
 - **Plugin revocation slice complete (slice 10):** `plugin_revocation_cap` is now
   a real governed executor and the fail-closed off-switch for the install/
   execution slices. A HUMAN `runtime_gate_manager` revokes an installed plugin
-  (requires the default-disabled gate, `local_single_user_runtime`, a
+  (requires the integrated gate (default enabled, re-enable if disabled), `local_single_user_runtime`, a
   `docs/threat-models/plugin-revocation.md` ack, and a confirmation token). It
   flips the latest install record's status `installed` → `revoked` via
   `SQLiteStore.revoke_plugin_install_record` (never deletes records, edits

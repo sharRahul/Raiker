@@ -28,6 +28,7 @@ from raiker.runtime.executors import (
     ModelProviderExecutor,
     build_default_executor_registry,
 )
+from raiker.runtime.executors.models_runtime import Embedder
 from raiker.storage.sqlite import SQLiteStore
 
 _CAP = "model_provider_runtime"
@@ -56,14 +57,14 @@ def _enable(ws: Path) -> None:
     assert result.ok is True, result.reason_code
 
 
-def _fake_embedder(vector: list[float]):
+def _fake_embedder(vector: list[float]) -> Embedder:
     def embed(provider: str, model: str, text: str) -> EmbeddingResponse:
         return EmbeddingResponse(vector=vector, model=model, usage={"tokens": len(text)})
 
     return embed
 
 
-def _authority(ws: Path, *, embedder=None) -> tuple[RuntimeAuthority, Principal]:
+def _authority(ws: Path, *, embedder: Embedder | None = None) -> tuple[RuntimeAuthority, Principal]:
     store = SQLiteStore(ws)
     registry = build_default_executor_registry(ws, store)
     if embedder is not None:

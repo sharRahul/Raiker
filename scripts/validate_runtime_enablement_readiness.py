@@ -250,8 +250,10 @@ def main() -> int:
     except Exception as exc:  # pragma: no cover - import guard
         REAL_EXECUTOR_CAPABILITIES = frozenset()
         errors.append(f"cannot_import_real_executor_capabilities:{exc}")
+    # reminder/calendar/email are local-only Tier-6 executors (no network / no
+    # external delivery); the remaining sensitive domains stay executor-less.
     must_not_have_default_executor = {
-        "email_runtime", "calendar_runtime", "finance_runtime", "investment_runtime",
+        "finance_runtime", "investment_runtime",
         "medical_runtime", "pregnancy_baby_runtime", "cctv_runtime",
         "home_security_runtime", "hardware_operator_runtime",
         "remote_execution_cap", "cloud_execution_cap",

@@ -16,16 +16,53 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 ## State as of 2026-07-05 (session end)
 
 > **Where this session's work lives (read first):** Phase 4 slices 14–16 (plugin
-> code runtime) merged via PR #95; doc-accuracy fixes merged via PR #96/#97. The
-> current in-flight work is **Phase 5 slice 1 — capability decision modes
-> (`ask`/`deny`/`always_allow`/`auto`)** on branch
-> `claude/handoff-document-review-jusao0` (restarted from `origin/main` after #97
-> merged). This is the first slice of a new prioritized program (A–E, see "Next
-> work"): (A) Tier-6/remaining executors, (B) live provider verification,
-> (C) reach/multi-user surface, (D) security hardening, (E) plugin-runtime
-> remainder — plus a full `docs/*` rewrite into a Claude-Code-style IA (Getting
-> Started / Core Concepts / Use Raiker / Platform & Integrations / Capabilities /
-> Implementation / Best Practices), to be migrated incrementally.
+> code runtime) merged via PR #95; doc-accuracy fixes merged via PR #96/#97;
+> **Phase 5 slice 1 — capability decision modes (`ask`/`deny`/`always_allow`/
+> `auto`)** merged via PR #98. The current in-flight branch
+> `claude/handoff-document-review-jusao0` (restarted from `origin/main` after #98
+> merged) carries **two things in one PR**: (1) the first **real Tier-6 executor**
+> `reminder_runtime` (local-only reminder store — create/list; every other Tier-6
+> domain stays fail-closed), and (2) the **start of the `docs/*` migration** into
+> the Claude-Code-style IA (`docs/README.md` home + `docs/getting-started.md` +
+> `docs/core-concepts.md`; remaining sections still point at existing detailed
+> docs).
+>
+> This is part of the prioritized program (A–E): (A) Tier-6/remaining executors —
+> **reminder + calendar + email all done** (local-only: reminders, calendar
+> events, email drafts; email never sends). Next real-executor targets:
+> `vector_embedding_runtime`, `model_provider_runtime`, and the graph/semantic
+> runtimes; the remaining sensitive Tier-6 domains
+> (finance/investment/medical/pregnancy/cctv/home-security/hardware) stay
+> **fail-closed** until real integrations + threat models exist — no fake
+> executors. (B) live provider verification; (C) reach/multi-user surface;
+> (D) security hardening; (E) plugin-runtime remainder.
+>
+> **Docs guide (Claude-Code-style IA) — COMPLETE with sub-sections:** the seven
+> section pages now live under **`docs/guide/`** (moved from `docs/`), each with
+> an index + focused child pages (26 child pages total), plus a machine-readable
+> **`docs/guide/manifest.json`** nav tree the future web Docs/Help panel can
+> render. `docs/README.md` is the home/index and points into `guide/`. Canonical
+> detailed specs stay at the `docs/` root as the source of truth (validators pin
+> those paths, so they must NOT move). **Next docs step (planned, not done):** an
+> `apps/web` "Raiker Docs / Help" panel — a read-only `GET /api/docs` +
+> `/api/docs/{slug}` serving the manifest + rendered markdown, and a Svelte view.
+>
+> **Email `send` behavior (updated this session):** `email_runtime`'s `send` no
+> longer hard-refuses. It now marks a draft `queued_for_send` (requires
+> `draft_id`; `transmitted=false`) so a human sends it — and because the gate
+> defaults to the `ask` decision mode, an AI-proposed `send` asks the human
+> first. Raiker still never transmits (no SMTP/connector). See
+> `docs/threat-models/email.md`.
+>
+> **How the local Tier-6 pattern works (reuse for future local domains):** a
+> table migration + store insert/list methods + a small executor with
+> `create`/`list` (metadata-only artifacts, content never in events) + threat
+> model + register in `REAL_EXECUTOR_CAPABILITIES` + default registry. When
+> promoting a domain that other tests assert is "unenableable/no-executor", also
+> update: `scripts/validate_runtime_enablement_readiness.py`
+> (`must_not_have_default_executor`), `tests/test_executor_default_registry.py`
+> (`_SENSITIVE`), and `tests/test_security_regression_ui.py`
+> (`SENSITIVE_DOMAIN_CAPS`).
 >
 > **Environment unblock (still relevant):** the "Ed25519/cffi bindings panic on
 > import" blocker is a **missing `cffi`** (`ModuleNotFoundError: No module named
@@ -37,9 +74,11 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 Previous pushed anchors (earlier sessions): slice 13 merge `deaab72`, slice 8
 `c8ce3d5`, slice 7 `c571c9c`; config cwd fallback `29ec83a`.
 
-Full suite green after slice 16: **1155 passed, 1 warning**; ruff clean, mypy
-clean on changed sources (remaining mypy output is environmental missing-stub
-noise for `pytest`/`fastapi`/`httpx`/`cryptography` plus one pre-existing
+Full suite green after reminder/calendar/email + docs work: **1178 passed, 1
+warning** (decision modes +9, reminder +7, calendar/email +8); ruff clean, mypy
+clean on changed
+sources (remaining mypy output is environmental missing-stub noise for
+`pytest`/`fastapi`/`httpx`/`cryptography` plus one pre-existing
 `test_runtime_authority.py` item), and all five `scripts/validate_*.py`
 validators passed.
 

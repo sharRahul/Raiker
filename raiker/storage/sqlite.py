@@ -46,8 +46,12 @@ from raiker.models.session_state import ModelSessionState
 from raiker.storage.migrations import (
     API_SESSIONS_MIGRATION_ID,
     API_SESSIONS_SQL,
+    CALENDAR_EVENTS_MIGRATION_ID,
+    CALENDAR_EVENTS_SQL,
     CAPABILITY_DECISION_MODE_MIGRATION_ID,
     CAPABILITY_DECISION_MODE_SQL,
+    EMAIL_DRAFTS_MIGRATION_ID,
+    EMAIL_DRAFTS_SQL,
     MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
     MODEL_SESSION_RESOLVED_MODEL_SQL,
     PHASE_1_MIGRATION_ID,
@@ -134,6 +138,8 @@ from raiker.storage.migrations import (
     PHASE_10_RUNTIME_AUTHORITY_SQL,
     PHASE_10_RUNTIME_MODE_STATE_MIGRATION_ID,
     PHASE_10_RUNTIME_MODE_STATE_SQL,
+    REMINDERS_MIGRATION_ID,
+    REMINDERS_SQL,
     THREAT_MODEL_ACKS_MIGRATION_ID,
     THREAT_MODEL_ACKS_SQL,
 )
@@ -418,6 +424,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 CAPABILITY_DECISION_MODE_MIGRATION_ID, CAPABILITY_DECISION_MODE_SQL, connection
             )
+            self._apply_migration(REMINDERS_MIGRATION_ID, REMINDERS_SQL, connection)
+            self._apply_migration(CALENDAR_EVENTS_MIGRATION_ID, CALENDAR_EVENTS_SQL, connection)
+            self._apply_migration(EMAIL_DRAFTS_MIGRATION_ID, EMAIL_DRAFTS_SQL, connection)
             self._apply_migration(API_SESSIONS_MIGRATION_ID, API_SESSIONS_SQL, connection)
             self._apply_migration(THREAT_MODEL_ACKS_MIGRATION_ID, THREAT_MODEL_ACKS_SQL, connection)
             self._apply_migration(
@@ -2039,3 +2048,117 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     record["updated_at"],
                 ),
             )
+
+    # ── Reminders (local-only Tier-6 reminder_runtime) ────────────────────────
+
+    def insert_reminder(self, record: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO reminders
+                  (reminder_id, title, due_at, notes, status, created_by,
+                   created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["reminder_id"],
+                    record["title"],
+                    record.get("due_at"),
+                    record.get("notes"),
+                    record["status"],
+                    record["created_by"],
+                    record["created_at"],
+                    record["updated_at"],
+                ),
+            )
+
+    def list_reminders(self, *, status: str | None = None) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            if status is None:
+                rows = connection.execute(
+                    "SELECT * FROM reminders ORDER BY created_at"
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM reminders WHERE status = ? ORDER BY created_at",
+                    (status,),
+                ).fetchall()
+        return [dict(row) for row in rows]
+
+    # ── Calendar events (local-only calendar_runtime) ─────────────────────────
+
+    def insert_calendar_event(self, record: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO calendar_events
+                  (event_id, title, starts_at, ends_at, location, notes, status,
+                   created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["event_id"], record["title"], record.get("starts_at"),
+                    record.get("ends_at"), record.get("location"), record.get("notes"),
+                    record["status"], record["created_by"], record["created_at"],
+                    record["updated_at"],
+                ),
+            )
+
+    def list_calendar_events(self, *, status: str | None = None) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            if status is None:
+                rows = connection.execute(
+                    "SELECT * FROM calendar_events ORDER BY created_at"
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM calendar_events WHERE status = ? ORDER BY created_at",
+                    (status,),
+                ).fetchall()
+        return [dict(row) for row in rows]
+
+    # ── Email drafts (local-only email_runtime; never sends) ──────────────────
+
+    def insert_email_draft(self, record: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO email_drafts
+                  (draft_id, subject, recipients, body, status, created_by,
+                   created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record["draft_id"], record["subject"], record.get("recipients"),
+                    record.get("body"), record["status"], record["created_by"],
+                    record["created_at"], record["updated_at"],
+                ),
+            )
+
+    def list_email_drafts(self, *, status: str | None = None) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            if status is None:
+                rows = connection.execute(
+                    "SELECT * FROM email_drafts ORDER BY created_at"
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM email_drafts WHERE status = ? ORDER BY created_at",
+                    (status,),
+                ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_email_draft(self, draft_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM email_drafts WHERE draft_id = ?", (draft_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def update_email_draft_status(self, draft_id: str, status: str, *, updated_at: str) -> bool:
+        with self.connect() as connection:
+            cur = connection.execute(
+                "UPDATE email_drafts SET status = ?, updated_at = ? WHERE draft_id = ?",
+                (status, updated_at, draft_id),
+            )
+        return cur.rowcount > 0

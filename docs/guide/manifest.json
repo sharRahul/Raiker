@@ -1,0 +1,81 @@
+{
+  "title": "Raiker Docs",
+  "description": "The Raiker user guide: install, concepts, usage, integrations, capabilities, implementation, and best practices.",
+  "sections": [
+    {
+      "slug": "getting-started",
+      "title": "Getting Started",
+      "index": "getting-started.md",
+      "pages": [
+        { "slug": "installation", "title": "Installation", "file": "getting-started-installation.md" },
+        { "slug": "bootstrap-owner", "title": "Bootstrap the Owner", "file": "getting-started-bootstrap-owner.md" },
+        { "slug": "connect-a-model", "title": "Connect a Model", "file": "getting-started-connect-a-model.md" },
+        { "slug": "first-action", "title": "Your First Governed Action", "file": "getting-started-first-action.md" }
+      ]
+    },
+    {
+      "slug": "core-concepts",
+      "title": "Core Concepts",
+      "index": "core-concepts.md",
+      "pages": [
+        { "slug": "governed-action-path", "title": "The Governed Action Path", "file": "core-concepts-governed-action-path.md" },
+        { "slug": "principals-and-roles", "title": "Principals & Roles", "file": "core-concepts-principals-and-roles.md" },
+        { "slug": "capability-gates", "title": "Capability Gates", "file": "core-concepts-capability-gates.md" },
+        { "slug": "decision-modes", "title": "Decision Modes", "file": "core-concepts-decision-modes.md" },
+        { "slug": "events-and-audit", "title": "Events & Audit", "file": "core-concepts-events-and-audit.md" }
+      ]
+    },
+    {
+      "slug": "use-raiker",
+      "title": "Use Raiker",
+      "index": "use-raiker.md",
+      "pages": [
+        { "slug": "surfaces", "title": "Surfaces", "file": "use-raiker-surfaces.md" },
+        { "slug": "command-reference", "title": "Command Reference", "file": "use-raiker-command-reference.md" },
+        { "slug": "approvals", "title": "Approvals", "file": "use-raiker-approvals.md" },
+        { "slug": "local-data", "title": "Reminders, Calendar & Email", "file": "use-raiker-local-data.md" }
+      ]
+    },
+    {
+      "slug": "platform-integrations",
+      "title": "Platform & Integrations",
+      "index": "platform-integrations.md",
+      "pages": [
+        { "slug": "model-backends", "title": "Model Backends", "file": "platform-integrations-model-backends.md" },
+        { "slug": "execution-environments", "title": "Execution Environments", "file": "platform-integrations-execution-environments.md" },
+        { "slug": "plugins", "title": "Plugins", "file": "platform-integrations-plugins.md" },
+        { "slug": "channels", "title": "Channels", "file": "platform-integrations-channels.md" }
+      ]
+    },
+    {
+      "slug": "capabilities",
+      "title": "Capabilities",
+      "index": "capabilities.md",
+      "pages": [
+        { "slug": "capability-model", "title": "The Capability Model", "file": "capabilities-capability-model.md" },
+        { "slug": "tiers", "title": "Capability Tiers", "file": "capabilities-tiers.md" },
+        { "slug": "deferred", "title": "What Is Not Available", "file": "capabilities-deferred.md" }
+      ]
+    },
+    {
+      "slug": "implementation",
+      "title": "Implementation",
+      "index": "implementation.md",
+      "pages": [
+        { "slug": "slice-discipline", "title": "The Slice Discipline", "file": "implementation-slice-discipline.md" },
+        { "slug": "validation-gate", "title": "The Validation Gate", "file": "implementation-validation-gate.md" },
+        { "slug": "verification", "title": "Verification", "file": "implementation-verification.md" }
+      ]
+    },
+    {
+      "slug": "best-practices",
+      "title": "Best Practices",
+      "index": "best-practices.md",
+      "pages": [
+        { "slug": "least-capability", "title": "Grant the Least Capability", "file": "best-practices-least-capability.md" },
+        { "slug": "egress-and-inputs", "title": "Constrain Egress & Inputs", "file": "best-practices-egress-and-inputs.md" },
+        { "slug": "isolating-untrusted-code", "title": "Isolate Untrusted Code", "file": "best-practices-isolating-untrusted-code.md" }
+      ]
+    }
+  ]
+}

@@ -30,18 +30,6 @@ class _DomainExecutorBase:
         return not_implemented(self.capability, action.action_id)
 
 
-class EmailRuntimeExecutor(_DomainExecutorBase):
-    capability = "email_runtime"
-
-
-class CalendarRuntimeExecutor(_DomainExecutorBase):
-    capability = "calendar_runtime"
-
-
-class ReminderRuntimeExecutor(_DomainExecutorBase):
-    capability = "reminder_runtime"
-
-
 class FinanceRuntimeExecutor(_DomainExecutorBase):
     capability = "finance_runtime"
 

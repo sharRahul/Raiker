@@ -35,6 +35,12 @@ class DisableCapabilityRequest:
 
 
 @dataclass
+class SetCapabilityDecisionModeRequest:
+    reason: str = ""
+    as_principal: str | None = None
+
+
+@dataclass
 class AuthSessionRequest:
     # Optional explicit principal; defaults to the resolved local owner. Local-only, human-only.
     as_principal: str | None = None
@@ -77,6 +83,13 @@ class ResolveApprovalRequest(BaseModel):
 
     approve: bool
     reason: str
+
+
+class ApprovalDecisionRequest(BaseModel):
+    # Explicit allow/deny endpoints only accept an optional human reason; no payload edits.
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = ""
 
 
 def serialize_dto(dto: Any) -> Any:

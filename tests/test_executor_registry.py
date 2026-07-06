@@ -229,6 +229,14 @@ def test_executor_not_called_on_disabled_by_capability_gate(tmp_path: Path) -> N
         store, writer, executor_registry=registry,
     )
     principal = _make_human_principal(store)
+    # file_write_execution is integrated, so it ships enabled by default; disable it
+    # here to exercise the disabled-gate path.
+    store.upsert_capability_gate_state({
+        "capability": "file_write_execution",
+        "state": "disabled",
+        "created_at": utc_now(),
+        "updated_at": utc_now(),
+    })
     action = _make_action(
         principal_id=principal.principal_id,
         action_type="write_file",

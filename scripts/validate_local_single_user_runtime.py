@@ -73,13 +73,23 @@ def check_dangerous_capabilities_disabled_by_default() -> list[str]:
         if cap not in RUNTIME_DOMAIN_CAPABILITIES:
             errors.append(f"dangerous_capability_not_in_runtime_domain:{cap}")
 
+    # Posture: integrated (real-executor) capabilities ship ENABLED by default —
+    # governed by the per-capability decision mode (default `ask`), the critical-risk
+    # human floor, PolicyEngine hard-denies, and executor-level env allowlists.
+    # Capabilities that are not integrated yet (no real executor) must stay DISABLED.
+    from raiker.phase_gates import CapabilityState
+    from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
     gates = default_capability_gates()
     for cap in dangerous:
         gate = gates.get(cap)
-        if gate is not None:
-            from raiker.phase_gates import CapabilityState
-            if gate.state not in (CapabilityState.DISABLED, CapabilityState.PLANNED):
-                errors.append(f"dangerous_capability_not_disabled_by_default:{cap}={gate.state}")
+        if gate is None:
+            continue
+        if cap in REAL_EXECUTOR_CAPABILITIES:
+            if gate.state != CapabilityState.ENABLED_RUNTIME:
+                errors.append(f"integrated_dangerous_capability_not_enabled:{cap}={gate.state}")
+        elif gate.state not in (CapabilityState.DISABLED, CapabilityState.PLANNED):
+            errors.append(f"not_integrated_dangerous_capability_not_disabled:{cap}={gate.state}")
 
     return errors
 

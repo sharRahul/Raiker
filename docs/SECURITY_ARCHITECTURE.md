@@ -70,7 +70,7 @@ The following remain disabled/deferred and are not covered by the local producti
 | Durable memory governed write contract | `implemented_policy_gated` | Available only through the broker-governed path with provenance, retention, approval state, and event logging. |
 | Approval resolution | `metadata_only` | `/approve` and `/deny` resolve one immutable approval record; they do not execute actions. |
 | Semantic/vector writes, embeddings, graph indexing | `disabled_deferred` | Readiness/preview only; runtime execution disabled. |
-| Plugin execution | `implemented_policy_gated` | Real governed executors exist — install, brokered read-only, revocation, and code runtime (bounded subprocess + no-network container); gates default-disabled. See `docs/RUNTIME_EXECUTORS_SPEC.md`. |
+| Plugin execution | `implemented_policy_gated` | Real governed executors exist — install, brokered read-only, revocation, and code runtime (bounded subprocess + no-network container); integrated, so gates default `enabled_runtime` and are governed per action (default-ask) plus the owner plugin/interpreter allowlists (fail-closed, independent of the gate). See `docs/RUNTIME_EXECUTORS_SPEC.md`. |
 | External channels | `disabled_deferred` | Metadata/readiness only; no relay/runtime transport. |
 | Remote/container/cloud execution | `disabled_deferred` | Profiles and readiness records may exist; execution remains off. |
 | Hosted providers | `implemented_policy_gated` | Explicit policy, API key, and egress/budget controls required. |
@@ -185,7 +185,7 @@ Model output is always untrusted. No tool, plugin, channel, subagent, remote, me
 
 ## Runtime Mode and Capability Gate Activation
 
-Runtime mode and capability gate activation is governed by `RuntimeAuthority`. Only the human `runtime_gate_manager` role can activate `local_single_user_runtime` or enable `admin_mutation`/`role_mutation` capability gates. AI principals cannot activate runtime modes or capability gates. Activation events are audited via the event log. Runtime mode state is persisted in the `runtime_mode_state` table; capability gate state is persisted in the `capability_gate_state` table. All 53 capabilities remain default-disabled.
+Runtime mode and capability gate activation is governed by `RuntimeAuthority`. Only the human `runtime_gate_manager` role can activate `local_single_user_runtime` or enable `admin_mutation`/`role_mutation` capability gates. AI principals cannot activate runtime modes or capability gates. Activation events are audited via the event log. Runtime mode state is persisted in the `runtime_mode_state` table; capability gate state is persisted in the `capability_gate_state` table. Default gate posture: integrated capabilities (those with a real executor, `REAL_EXECUTOR_CAPABILITIES`) ship `enabled_runtime` and are governed per action by the decision mode (default `ask`), the critical-risk human floor, PolicyEngine hard-denies, and executor-level env allowlists; capabilities that are not integrated yet (no real executor) remain default-disabled and fail closed. Only the human `runtime_gate_manager` can change a gate (including disabling an integrated one), and AI principals never can.
 
 ## Disabled Capabilities
 

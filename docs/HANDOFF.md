@@ -15,6 +15,39 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 
 ## State as of 2026-07-06 (session end)
 
+> **This session — part 8 (default gate posture flip: integrated = enabled):**
+> Reversed the foundational "every capability gate ships disabled by default"
+> invariant per owner directive. Now **integrated capabilities (those in
+> `REAL_EXECUTOR_CAPABILITIES`, 29 of them) default to `enabled_runtime`**;
+> capabilities that are not integrated yet (no real executor) stay `disabled` and
+> fail closed. Implemented in `raiker/phase_gates.py::default_capability_gates()`
+> (flips the real-executor set to `ENABLED_RUNTIME` via `replace`; lazy import of
+> `REAL_EXECUTOR_CAPABILITIES` to avoid a cycle).
+> - **Safety model (unchanged floors):** there is NO runtime-mode master switch on
+>   the execution path — the gate is the per-capability switch — but enabling it
+>   does not let an AI act unattended. AI-proposed actions still hit the
+>   per-capability **decision mode (default `ask`)**, the **critical-risk human
+>   floor**, **PolicyEngine hard-denies**, and **executor-level env allowlists**
+>   (model egress / plugin / container image), which are independent of the gate and
+>   remain fail-closed. Human principals self-authorize (the UX win: no enable-dance
+>   for integrated caps).
+> - **Readiness redefined:** `get_runtime_readiness`'s `dangerous_capabilities_disabled`
+>   / `production_ready` now check only the **not-yet-integrated** dangerous caps
+>   (integrated-and-enabled is the norm). Two validators updated in lockstep
+>   (`validate_runtime_enablement_readiness.py`, `validate_local_single_user_runtime.py`):
+>   integrated caps must be enabled, non-integrated must be disabled.
+> - **Tests (26 updated):** ~14 "gate_disabled_blocks" acceptance tests now
+>   explicitly `disable_capability(...)` first (default is enabled); ~12
+>   default-disabled invariant tests updated to the new posture (integrated enabled,
+>   non-integrated disabled; `subagents`/`multi_agent_teams` flip to enabled in the
+>   phase-3 governance surfaces). Full suite **1230 passed**; ruff + mypy (incl.
+>   `tests/`) clean; all five validators pass.
+> - **Docs:** canonical posture statements updated (`IMPLEMENTATION_STATUS`,
+>   `README` ×2, `SECURITY_ARCHITECTURE` ×2, `RUNTIME_EXECUTORS_SPEC`). **Follow-up
+>   (not done):** a broader sweep of ~15 remaining spec/historical/guide docs still
+>   says "disabled by default" in places — update opportunistically; the truthfulness
+>   validators pass, but those prose mentions are now stale.
+
 > **This session — part 7 (agentic loop wiring: default-ask retrieval augmentation):**
 > Wired embed+search+resolve into the turn as **retrieval-augmented generation**,
 > governed **default-ask** (owner's explicit choice — not default-off). New

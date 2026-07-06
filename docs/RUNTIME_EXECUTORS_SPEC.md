@@ -10,8 +10,13 @@ executor/activation model added on top of `RuntimeAuthority`.
 
 ## Model
 
-1. **Gate state** (`capability_gate_state`, default `disabled`) — what the owner /
-   `runtime_gate_manager` has turned on. AI principals can never flip a gate.
+1. **Gate state** (`capability_gate_state`) — what the owner / `runtime_gate_manager`
+   has turned on. Default posture: **integrated capabilities (those in
+   `REAL_EXECUTOR_CAPABILITIES`) default to `enabled_runtime`**; capabilities that are
+   not integrated yet (no real executor) default to `disabled` and fail closed. AI
+   principals can never flip a gate (enable or disable). An enabled gate does not by
+   itself let an AI act — the decision mode (default `ask`), critical-risk human floor,
+   PolicyEngine hard-denies, and executor-level env allowlists still apply.
 2. **Activation requirement** (`raiker/runtime/authority/activation.py`) — a gate can
    only transition to an enabled state when its `ActivationRequirement` is satisfied:
    acting principal is HUMAN, the required runtime mode is active, a **real executor is

@@ -157,6 +157,8 @@ def test_outbound_egress_denied_without_allowlist(
 def test_outbound_fail_closed_when_gate_disabled(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
+    RuntimeControlService(ws).disable_capability("external_channel_runtime", None, "test")
     _pairing(ws)
     authority, principal = _authority(ws)
     result = authority.route_action(

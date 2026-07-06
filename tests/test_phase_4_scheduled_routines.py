@@ -67,6 +67,8 @@ def test_scheduled_cap_is_real_executor(tmp_path: Path) -> None:
 def test_scheduled_fail_closed_when_gate_disabled(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
+    RuntimeControlService(ws).disable_capability("scheduled_routines", None, "test")
     authority, principal = _authority(ws)
     result = authority.route_action(_action(principal.principal_id, operation="run_due"), principal)
     assert result.decision == "disabled_by_capability_gate"

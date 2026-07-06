@@ -84,6 +84,8 @@ def test_orchestration_caps_are_real_executors(tmp_path: Path) -> None:
 def test_subagents_fail_closed_when_gate_disabled(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
+    RuntimeControlService(ws).disable_capability("subagents", None, "test")
     authority, principal = _authority(ws)
     result = authority.route_action(_subagent_action(principal.principal_id), principal)
     assert result.decision == "disabled_by_capability_gate"

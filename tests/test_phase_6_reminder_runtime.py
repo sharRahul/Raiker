@@ -72,6 +72,8 @@ def test_reminder_is_real_executor_others_are_not(tmp_path: Path) -> None:
 def test_reminder_gate_disabled_blocks(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    # reminder_runtime is integrated (enabled by default); disable it to test the fail-closed path.
+    RuntimeControlService(ws).disable_capability("reminder_runtime", None, "test")
     authority, principal = _authority(ws)
     result = authority.route_action(_action(principal.principal_id, title="Call bank"), principal)
     assert result.decision == "disabled_by_capability_gate"

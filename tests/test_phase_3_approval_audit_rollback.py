@@ -94,8 +94,9 @@ def test_disabled_runtime_surfaces_remain_disabled(tmp_path: Path) -> None:
     assert gates["graph_codemap_indexing"]["runtime_enabled"] is False
     assert gates["semantic_memory_writes"]["runtime_enabled"] is False
     assert gates["external_channels"]["runtime_enabled"] is False
-    assert gates["subagents"]["runtime_enabled"] is False
-    assert gates["multi_agent_teams"]["runtime_enabled"] is False
+    # subagents / multi_agent_teams are integrated (real executors) -> enabled by default.
+    assert gates["subagents"]["runtime_enabled"] is True
+    assert gates["multi_agent_teams"]["runtime_enabled"] is True
     assert gates["remote_execution"]["runtime_enabled"] is False
     assert gates["container_execution"]["runtime_enabled"] is False
     assert graph_governance_status()["runtime_indexing_enabled"] is False

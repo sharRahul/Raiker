@@ -69,6 +69,8 @@ def test_calendar_is_real_executor(tmp_path: Path) -> None:
 def test_calendar_gate_disabled_blocks(tmp_path: Path) -> None:
     ws = _ws(tmp_path, "cal-gate")
     bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
+    RuntimeControlService(ws).disable_capability("calendar_runtime", None, "test")
     authority, principal = _authority(ws)
     result = authority.route_action(_action("calendar_runtime", principal.principal_id, title="Standup"), principal)
     assert result.decision == "disabled_by_capability_gate"

@@ -58,8 +58,9 @@ def test_workspace_view_does_not_mutate_or_activate_unsafe_runtime_paths(tmp_pat
     assert after["capability_gates"]["graph_codemap_indexing"]["runtime_enabled"] is False
     assert after["capability_gates"]["semantic_memory_writes"]["runtime_enabled"] is False
     assert after["capability_gates"]["external_channels"]["runtime_enabled"] is False
-    assert after["capability_gates"]["subagents"]["runtime_enabled"] is False
-    assert after["capability_gates"]["multi_agent_teams"]["runtime_enabled"] is False
+    # subagents / multi_agent_teams are integrated (real executors) -> enabled by default.
+    assert after["capability_gates"]["subagents"]["runtime_enabled"] is True
+    assert after["capability_gates"]["multi_agent_teams"]["runtime_enabled"] is True
     assert after["capability_gates"]["remote_execution"]["runtime_enabled"] is False
     assert after["capability_gates"]["container_execution"]["runtime_enabled"] is False
     assert all(

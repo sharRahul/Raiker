@@ -1,7 +1,7 @@
 # Best Practices
 
 > Part of the Raiker documentation set. See also: [Core Concepts](core-concepts.md),
-> [Use Raiker](use-raiker.md), [Security Architecture](SECURITY_ARCHITECTURE.md).
+> [Use Raiker](use-raiker.md), [Security Architecture](../SECURITY_ARCHITECTURE.md).
 
 Raiker is safe by default. These practices keep it that way as you grant it more
 power.
@@ -53,12 +53,18 @@ power.
 ## Verify before you trust a status
 
 - A capability is not "done" until it is `implemented_verified` with real
-  evidence. Run the [local validation gate](LOCAL_VALIDATION_GATE.md) and the
+  evidence. Run the [local validation gate](../LOCAL_VALIDATION_GATE.md) and the
   full test suite before relying on a change.
 
 ## Where to go next
 
-- **[Security Architecture](SECURITY_ARCHITECTURE.md)** — the deeper posture and
+- **[Security Architecture](../SECURITY_ARCHITECTURE.md)** — the deeper posture and
   deferred-control gaps.
 - **[Implementation](implementation.md)** — the slice discipline and validation
   gate.
+
+## In this section
+
+- [Grant the Least Capability](best-practices-least-capability.md)
+- [Constrain Egress & Inputs](best-practices-egress-and-inputs.md)
+- [Isolate Untrusted Code](best-practices-isolating-untrusted-code.md)

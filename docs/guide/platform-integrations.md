@@ -1,7 +1,7 @@
 # Platform & Integrations
 
 > Part of the Raiker documentation set. See also: [Use Raiker](use-raiker.md),
-> [Core Concepts](core-concepts.md), [Capabilities](RUNTIME_EXECUTORS_SPEC.md).
+> [Core Concepts](core-concepts.md), [Capabilities](../RUNTIME_EXECUTORS_SPEC.md).
 
 Raiker is backend-agnostic: you choose the LLM, and every off-machine
 integration is governed by an owner allowlist and fails closed by default.
@@ -69,6 +69,13 @@ threat models.
 
 ## Where to go next
 
-- **[Capabilities](RUNTIME_EXECUTORS_SPEC.md)** — the authoritative per-capability
+- **[Capabilities](../RUNTIME_EXECUTORS_SPEC.md)** — the authoritative per-capability
   catalog of what executes today.
-- **[Implementation](IMPLEMENTATION_STATUS.md)** — build/verify/deferred ledger.
+- **[Implementation](../IMPLEMENTATION_STATUS.md)** — build/verify/deferred ledger.
+
+## In this section
+
+- [Model Backends](platform-integrations-model-backends.md)
+- [Execution Environments](platform-integrations-execution-environments.md)
+- [Plugins](platform-integrations-plugins.md)
+- [Channels](platform-integrations-channels.md)

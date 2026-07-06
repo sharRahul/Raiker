@@ -2147,3 +2147,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     (status,),
                 ).fetchall()
         return [dict(row) for row in rows]
+
+    def get_email_draft(self, draft_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM email_drafts WHERE draft_id = ?", (draft_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def update_email_draft_status(self, draft_id: str, status: str, *, updated_at: str) -> bool:
+        with self.connect() as connection:
+            cur = connection.execute(
+                "UPDATE email_drafts SET status = ?, updated_at = ? WHERE draft_id = ?",
+                (status, updated_at, draft_id),
+            )
+        return cur.rowcount > 0

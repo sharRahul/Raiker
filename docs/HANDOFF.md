@@ -37,15 +37,22 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 > executors. (B) live provider verification; (C) reach/multi-user surface;
 > (D) security hardening; (E) plugin-runtime remainder.
 >
-> **Docs migration (Claude-Code-style IA) — COMPLETE, all 7 sections done:**
-> Getting Started, Core Concepts, Use Raiker, Platform & Integrations,
-> Capabilities, Implementation, Best Practices — each has a landing page under
-> `docs/` and `docs/README.md` is the home/index. The canonical detailed docs
-> (`RUNTIME_EXECUTORS_SPEC`, `IMPLEMENTATION_STATUS`, `GAP_AND_TODO_ANALYSIS`,
-> `SECURITY_ARCHITECTURE`, `threat-models/`, …) are retained and linked as the
-> source of truth. Next docs work (optional): fold the older standalone specs
-> into their sections and prune duplicates. The truthfulness validator only
-> scans a fixed doc allowlist, so the new section files are additive/safe.
+> **Docs guide (Claude-Code-style IA) — COMPLETE with sub-sections:** the seven
+> section pages now live under **`docs/guide/`** (moved from `docs/`), each with
+> an index + focused child pages (26 child pages total), plus a machine-readable
+> **`docs/guide/manifest.json`** nav tree the future web Docs/Help panel can
+> render. `docs/README.md` is the home/index and points into `guide/`. Canonical
+> detailed specs stay at the `docs/` root as the source of truth (validators pin
+> those paths, so they must NOT move). **Next docs step (planned, not done):** an
+> `apps/web` "Raiker Docs / Help" panel — a read-only `GET /api/docs` +
+> `/api/docs/{slug}` serving the manifest + rendered markdown, and a Svelte view.
+>
+> **Email `send` behavior (updated this session):** `email_runtime`'s `send` no
+> longer hard-refuses. It now marks a draft `queued_for_send` (requires
+> `draft_id`; `transmitted=false`) so a human sends it — and because the gate
+> defaults to the `ask` decision mode, an AI-proposed `send` asks the human
+> first. Raiker still never transmits (no SMTP/connector). See
+> `docs/threat-models/email.md`.
 >
 > **How the local Tier-6 pattern works (reuse for future local domains):** a
 > table migration + store insert/list methods + a small executor with

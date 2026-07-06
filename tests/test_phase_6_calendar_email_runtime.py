@@ -125,15 +125,46 @@ def test_email_drafts_locally_never_sends(tmp_path: Path) -> None:
     assert "SECRETSUBJ" not in dumped and "SECRETBODY" not in dumped
 
 
-def test_email_send_is_refused(tmp_path: Path) -> None:
+def test_email_send_queues_for_human_without_transmitting(tmp_path: Path) -> None:
     ws = _ws(tmp_path, "eml-send")
     _enable(ws, "email_runtime", "docs/threat-models/email.md")
     authority, principal = _authority(ws)
-    result = authority.route_action(
-        _action("email_runtime", principal.principal_id, action="send", subject="hi"),
+    # Draft first, then queue it for send.
+    authority.route_action(
+        _action("email_runtime", principal.principal_id, subject="Hello", recipients="a@b.com"),
         principal,
     )
-    assert result.error == "send_not_supported:local_draft_only"
+    store = SQLiteStore(ws)
+    draft_id = store.list_email_drafts()[0]["draft_id"]
+    result = authority.route_action(
+        _action("email_runtime", principal.principal_id, action="send", draft_id=draft_id),
+        principal,
+    )
+    assert result.decision == "allow"
+    assert result.message == "executed"
+    # The draft is queued for a human to send; nothing was transmitted.
+    assert store.get_email_draft(draft_id)["status"] == "queued_for_send"
+    events = EventViewer(store).list_events(event_type="action_executed")
+    payload = None
+    for ev in events:
+        p = EventViewer(store).read_event_payload(ev["event_id"])
+        arts = (p or {}).get("payload", {}).get("artifacts", {})
+        if arts.get("status") == "queued_for_send":
+            payload = arts
+    assert payload is not None
+    assert payload["transmitted"] is False
+
+
+def test_email_send_requires_draft_id(tmp_path: Path) -> None:
+    ws = _ws(tmp_path, "eml-send-noid")
+    _enable(ws, "email_runtime", "docs/threat-models/email.md")
+    authority, principal = _authority(ws)
+    assert authority.route_action(
+        _action("email_runtime", principal.principal_id, action="send"), principal
+    ).error == "missing_argument:draft_id"
+    assert authority.route_action(
+        _action("email_runtime", principal.principal_id, action="send", draft_id="eml_nope"), principal
+    ).error == "draft_not_found"
 
 
 def test_email_missing_subject_fails_closed(tmp_path: Path) -> None:

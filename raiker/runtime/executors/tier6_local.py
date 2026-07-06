@@ -93,12 +93,22 @@ class CalendarRuntimeExecutor:
 class EmailRuntimeExecutor:
     """Real, local-only executor for ``email_runtime``.
 
-    Creates or lists rows in the workspace ``email_drafts`` table. It **never
-    sends**: composing/saving a draft is local state only. Actual delivery is an
-    outbound-network action requiring a connector + owner egress allowlist + its
-    own threat model, and stays fail-closed/out of scope. Actions: ``draft``
-    (default), ``list``. Artifacts are metadata only — subject/recipients/body
-    never enter runtime events.
+    Composes/lists drafts in the workspace ``email_drafts`` table and lets a
+    human *queue* a draft to be sent. It **never transmits email itself** — there
+    is no SMTP/provider call — because delivery is an outbound-network action
+    that needs a connector + owner egress allowlist + its own threat model.
+
+    Actions:
+
+    - ``draft`` (default) / ``list`` — local draft state.
+    - ``send`` — does **not** deliver; it marks a draft ``queued_for_send`` so a
+      human can send it (from their own mail client, or via a future governed
+      connector). Because ``email_runtime`` defaults to the ``ask`` decision
+      mode, an AI-proposed ``send`` first asks the human for approval — so the
+      two paths are "Raiker asks before queuing a send" and "the human sends it
+      when they want". No message leaves the machine here.
+
+    Artifacts are metadata only — subject/recipients/body never enter events.
     """
 
     capability = "email_runtime"
@@ -123,9 +133,35 @@ class EmailRuntimeExecutor:
                 },
             )
         if op == "send":
-            # Delivery is an outbound-network action; not implemented here.
-            return self._failed(action.action_id, "send_not_supported:local_draft_only")
+            return self._queue_send(action)
         return self._failed(action.action_id, f"unknown_action:{op}")
+
+    def _queue_send(self, action: GovernedAction) -> ExecutionResult:
+        draft_id = action.arguments.get("draft_id")
+        if not isinstance(draft_id, str) or not draft_id.strip():
+            return self._failed(action.action_id, "missing_argument:draft_id")
+        draft = self._store.get_email_draft(draft_id)
+        if draft is None:
+            return self._failed(action.action_id, "draft_not_found")
+        if draft.get("status") == "queued_for_send":
+            return self._failed(action.action_id, "already_queued")
+        updated = self._store.update_email_draft_status(
+            draft_id, "queued_for_send", updated_at=utc_now()
+        )
+        if not updated:
+            return self._failed(action.action_id, "draft_not_found")
+        return ExecutionResult(
+            ok=True, capability=self.capability, action_id=action.action_id,
+            summary=(
+                "Draft queued for sending. Raiker did not transmit anything — email delivery "
+                "requires a mail connector (not yet integrated); a human sends the queued draft."
+            ),
+            artifacts={
+                "draft_id": draft_id,
+                "status": "queued_for_send",
+                "transmitted": False,
+            },
+        )
 
     def _draft(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         subject = action.arguments.get("subject")

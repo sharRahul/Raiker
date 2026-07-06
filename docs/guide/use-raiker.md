@@ -1,7 +1,7 @@
 # Use Raiker
 
 > Part of the Raiker documentation set. See also: [Getting Started](getting-started.md),
-> [Core Concepts](core-concepts.md), [Capabilities](RUNTIME_EXECUTORS_SPEC.md).
+> [Core Concepts](core-concepts.md), [Capabilities](../RUNTIME_EXECUTORS_SPEC.md).
 
 This page is the task-oriented reference for driving Raiker day to day: the
 surfaces you interact with, the command surface, and the everyday workflows.
@@ -24,7 +24,7 @@ deferred.
 ## Command surface
 
 Runtime governance is driven by slash commands (full list in
-[`RAIKER_TOOL_AND_PLUGIN_CATALOG.md`](RAIKER_TOOL_AND_PLUGIN_CATALOG.md)):
+[`RAIKER_TOOL_AND_PLUGIN_CATALOG.md`](../RAIKER_TOOL_AND_PLUGIN_CATALOG.md)):
 
 | Command | What it does |
 |---|---|
@@ -63,8 +63,9 @@ external side effects:
 
 - `reminder_runtime` — create/list reminders (no notification is sent).
 - `calendar_runtime` — create/list local calendar events (no external sync/invite).
-- `email_runtime` — draft/list emails locally; it **never sends** (a `send`
-  action is refused).
+- `email_runtime` — draft/list emails locally; Raiker **never transmits**. A
+  `send` marks a draft `queued_for_send` (and, in the default `ask` mode, first
+  asks you) so a human sends it from their own client.
 
 ### Inspect what happened
 
@@ -77,4 +78,11 @@ content.
 
 - **[Platform & Integrations](platform-integrations.md)** — models, channels,
   and execution environments.
-- **[Capabilities](RUNTIME_EXECUTORS_SPEC.md)** — the full per-capability catalog.
+- **[Capabilities](../RUNTIME_EXECUTORS_SPEC.md)** — the full per-capability catalog.
+
+## In this section
+
+- [Surfaces](use-raiker-surfaces.md)
+- [Command Reference](use-raiker-command-reference.md)
+- [Approvals](use-raiker-approvals.md)
+- [Reminders, Calendar & Email](use-raiker-local-data.md)

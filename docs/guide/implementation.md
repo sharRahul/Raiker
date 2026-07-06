@@ -8,15 +8,15 @@ sequenced, and where the authoritative status lives.
 
 ## Source of truth
 
-- **[`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md)** — the control ledger.
+- **[`IMPLEMENTATION_STATUS.md`](../IMPLEMENTATION_STATUS.md)** — the control ledger.
   Every capability/feature is marked `implemented_verified`,
   `implemented_policy_gated`, `readiness_only`, `specified_not_implemented`, or
   `disabled_deferred`. If code and docs disagree, the ledger + the validators win.
-- **[`GAP_AND_TODO_ANALYSIS.md`](GAP_AND_TODO_ANALYSIS.md)** — what is still
+- **[`GAP_AND_TODO_ANALYSIS.md`](../GAP_AND_TODO_ANALYSIS.md)** — what is still
   missing (missing docs vs. missing code), with the active backlog.
-- **[`RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md)** — per-capability
+- **[`RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md)** — per-capability
   executor truth.
-- **[`docs/threat-models/`](threat-models/)** — one document per governed
+- **[`docs/threat-models/`](../threat-models/)** — one document per governed
   capability; a recorded acknowledgement of the relevant doc is required before a
   higher-risk capability can be enabled.
 
@@ -42,11 +42,11 @@ Every capability lands as a self-contained slice, in this order:
 `scripts/validate_*.py` encode the project's non-negotiable invariants
 (default-disabled gates, registry-backed executor availability, no ungoverned
 mutation, documentation truthfulness, command-catalog completeness). They run in
-CI and locally; see [`LOCAL_VALIDATION_GATE.md`](LOCAL_VALIDATION_GATE.md).
+CI and locally; see [`LOCAL_VALIDATION_GATE.md`](../LOCAL_VALIDATION_GATE.md).
 
 ## Verification
 
-[`VERIFICATION_PLAN.md`](VERIFICATION_PLAN.md) describes how behavior is
+[`VERIFICATION_PLAN.md`](../VERIFICATION_PLAN.md) describes how behavior is
 exercised end-to-end. A capability is `implemented_unverified` until it has real
 evidence (e.g. a hosted provider verified against a live key rather than a mock).
 
@@ -58,6 +58,12 @@ evidence (e.g. a hosted provider verified against a live key rather than a mock)
 
 ## Where to go next
 
-- **[Handoff](HANDOFF.md)** — where the current build effort stands and what's
+- **[Handoff](../HANDOFF.md)** — where the current build effort stands and what's
   next.
 - **[Best Practices](best-practices.md)** — security and operational guidance.
+
+## In this section
+
+- [The Slice Discipline](implementation-slice-discipline.md)
+- [The Validation Gate](implementation-validation-gate.md)
+- [Verification](implementation-verification.md)

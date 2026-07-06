@@ -1,7 +1,7 @@
 # Core Concepts
 
 > Part of the Raiker documentation set. See also: [Getting Started](getting-started.md),
-> [Capabilities](RUNTIME_EXECUTORS_SPEC.md), [Security Architecture](SECURITY_ARCHITECTURE.md).
+> [Capabilities](../RUNTIME_EXECUTORS_SPEC.md), [Security Architecture](../SECURITY_ARCHITECTURE.md).
 
 Raiker is built around one idea: **an AI agent should be able to do a great deal,
 but only what its human owner has explicitly, auditably allowed.** Everything
@@ -50,7 +50,7 @@ on — it fails closed rather than fabricating success.
 Capabilities are organized in tiers by blast radius: Tier 1 (local, reversible)
 → Tier 2 (sandboxed execution) → Tier 3 (code intelligence) → Tier 4 (plugins) →
 Tier 5 (channels, containers, models) → Tier 6 (sensitive real-world domains).
-See [Capabilities](RUNTIME_EXECUTORS_SPEC.md) for the current, per-capability
+See [Capabilities](../RUNTIME_EXECUTORS_SPEC.md) for the current, per-capability
 truth.
 
 ## Decision modes
@@ -69,7 +69,7 @@ Two floors always hold regardless of mode: PolicyEngine hard-denies block first,
 and **critical-risk actions always require a human** — `always_allow`/`auto` can
 never let an AI take a critical action. Permissive modes (`always_allow`/`auto`)
 can only be set on capabilities that have a real executor. Full detail:
-[Decision Modes Spec](DECISION_MODES_SPEC.md).
+[Decision Modes Spec](../DECISION_MODES_SPEC.md).
 
 ## Executors
 
@@ -105,6 +105,14 @@ path — it is not a formality the code can skip.
 ## Where to go next
 
 - **[Getting Started](getting-started.md)** — install, bootstrap, first action.
-- **[Capabilities](RUNTIME_EXECUTORS_SPEC.md)** — the per-capability catalog.
-- **[Security Architecture](SECURITY_ARCHITECTURE.md)** — the deeper security
+- **[Capabilities](../RUNTIME_EXECUTORS_SPEC.md)** — the per-capability catalog.
+- **[Security Architecture](../SECURITY_ARCHITECTURE.md)** — the deeper security
   posture and deferred-control gaps.
+
+## In this section
+
+- [The Governed Action Path](core-concepts-governed-action-path.md)
+- [Principals & Roles](core-concepts-principals-and-roles.md)
+- [Capability Gates](core-concepts-capability-gates.md)
+- [Decision Modes](core-concepts-decision-modes.md)
+- [Events & Audit](core-concepts-events-and-audit.md)

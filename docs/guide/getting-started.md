@@ -1,7 +1,7 @@
 # Getting Started
 
 > Part of the Raiker documentation set. See also: [Core Concepts](core-concepts.md),
-> [Capabilities](RUNTIME_EXECUTORS_SPEC.md), [Implementation](IMPLEMENTATION_STATUS.md).
+> [Capabilities](../RUNTIME_EXECUTORS_SPEC.md), [Implementation](../IMPLEMENTATION_STATUS.md).
 
 Raiker is a **security-first AI agent**: it can connect to any backend LLM —
 local (llama.cpp / Ollama / LM Studio), home-lab (vLLM), or hosted API
@@ -43,7 +43,7 @@ raiker /model use --provider ollama --model gemma4:31b-cloud
 ```
 
 For a hosted provider, set the owner egress allowlist and the provider key, then
-select a hosted profile — see [Platform & Integrations](CONTRACTS.md) and
+select a hosted profile — see [Platform & Integrations](../CONTRACTS.md) and
 `docs/threat-models/hosted-models.md` for the full flow.
 
 ## 4. Turn on a capability (governed)
@@ -87,7 +87,14 @@ not itself execute anything.
 
 - **[Core Concepts](core-concepts.md)** — the governance model, principals,
   runtime modes, capability gates, decision modes, and the governed action path.
-- **[Capabilities](RUNTIME_EXECUTORS_SPEC.md)** — what Raiker can actually do
+- **[Capabilities](../RUNTIME_EXECUTORS_SPEC.md)** — what Raiker can actually do
   today and what is still fail-closed.
-- **[Implementation](IMPLEMENTATION_STATUS.md)** — the control ledger of what is
+- **[Implementation](../IMPLEMENTATION_STATUS.md)** — the control ledger of what is
   built, verified, or deferred.
+
+## In this section
+
+- [Installation](getting-started-installation.md)
+- [Bootstrap the Owner](getting-started-bootstrap-owner.md)
+- [Connect a Model](getting-started-connect-a-model.md)
+- [Your First Governed Action](getting-started-first-action.md)

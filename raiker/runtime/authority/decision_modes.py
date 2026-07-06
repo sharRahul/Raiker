@@ -14,7 +14,7 @@ class DecisionMode(StrEnum):
 
     - ``ask`` (default): the action requires human approval before it runs.
     - ``deny``: the action is always blocked.
-    - ``always_allow``: the action runs without prompting — but the critical-risk
+    - ``allow``: the action runs without prompting — but the critical-risk
       human-confirmation floor and every PolicyEngine hard-deny still apply.
     - ``auto`` ("let Raiker decide"): a deterministic, auditable choice keyed off
       the action's risk level — low runs, medium/high ask, critical stays on the
@@ -24,7 +24,7 @@ class DecisionMode(StrEnum):
 
     ASK = "ask"
     DENY = "deny"
-    ALWAYS_ALLOW = "always_allow"
+    ALWAYS_ALLOW = "allow"
     AUTO = "auto"
 
 
@@ -32,15 +32,17 @@ DEFAULT_DECISION_MODE = DecisionMode.ASK
 
 # Modes that let an action run more freely than the fail-closed default require a
 # real executor behind the capability. ``ask``/``deny`` are always selectable
-# (they only ever tighten behavior); ``always_allow``/``auto`` may only be set on
+# (they only ever tighten behavior); ``allow``/``auto`` may only be set on
 # capabilities that can actually execute, so a sensitive/no-executor domain can
 # never be relaxed into acting.
 PERMISSIVE_MODES = frozenset({DecisionMode.ALWAYS_ALLOW, DecisionMode.AUTO})
 
 
 def parse_decision_mode(value: str) -> DecisionMode | None:
+    # Backward-compatible config/database alias from the earlier internal name.
+    aliases = {"always_allow": DecisionMode.ALWAYS_ALLOW.value}
     try:
-        return DecisionMode(value)
+        return DecisionMode(aliases.get(value, value))
     except ValueError:
         return None
 

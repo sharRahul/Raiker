@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
@@ -10,6 +10,7 @@ from raiker.api.schemas import (
     ActivateRuntimeModeRequest,
     DisableCapabilityRequest,
     DisableRuntimeModeRequest,
+    SetCapabilityDecisionModeRequest,
     SetCapabilityStateRequest,
     serialize_dto,
 )
@@ -36,6 +37,34 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
     return _get_auth(request).authenticate(request)
 
 
+def _deny(result_reason: str | None = None) -> NoReturn:
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={"ok": False, "reason_code": result_reason or "denied"},
+    )
+
+
+def _set_capability_decision_mode(
+    capability: str,
+    mode: str,
+    body: SetCapabilityDecisionModeRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal],
+) -> dict[str, Any]:
+    session, _principal = auth_data
+    service = _get_service(request)
+    result = service.set_capability_decision_mode(
+        capability,
+        mode,
+        session.principal_id,
+        body.reason,
+    )
+    if not result.ok:
+        _deny(result.reason_code)
+    decision_mode = result.data.get("decision_mode", mode)
+    return {"ok": True, "capability": capability, "decision_mode": decision_mode}
+
+
 @router.get("/api/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -60,10 +89,7 @@ async def activate_runtime_mode(
     service = _get_service(request)
     result = service.activate_runtime_mode(body.mode_name, session.principal_id, body.reason)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code or "denied"},
-        )
+        _deny(result.reason_code)
     return {"ok": True, "mode_name": body.mode_name}
 
 
@@ -77,10 +103,7 @@ async def disable_runtime_mode(
     service = _get_service(request)
     result = service.disable_runtime_mode(session.principal_id, body.reason)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code or "denied"},
-        )
+        _deny(result.reason_code)
     return {"ok": True}
 
 
@@ -89,7 +112,7 @@ async def list_capability_gates(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
-    session, principal = _auth_data
+    _session, principal = _auth_data
     service = _get_service(request)
     gates = service.list_capability_gates(principal.principal_id)
     return serialize_dto(gates)
@@ -101,7 +124,7 @@ async def get_capability_gate(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    session, principal = _auth_data
+    _session, principal = _auth_data
     service = _get_service(request)
     gate = service.get_capability_gate(capability, principal.principal_id)
     if gate is None:
@@ -126,10 +149,7 @@ async def set_capability_state(
         confirmation_token=body.confirmation_token,
     )
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code or "denied"},
-        )
+        _deny(result.reason_code)
     return {"ok": True, "capability": capability, "target_state": body.target_state}
 
 
@@ -144,11 +164,59 @@ async def disable_capability(
     service = _get_service(request)
     result = service.disable_capability(capability, session.principal_id, body.reason)
     if not result.ok:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"ok": False, "reason_code": result.reason_code or "denied"},
-        )
+        _deny(result.reason_code)
     return {"ok": True, "capability": capability}
+
+
+@router.get("/api/capability-modes/{capability}")
+async def get_capability_decision_mode(
+    capability: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    service = _get_service(request)
+    result = service.get_capability_decision_mode(capability)
+    return {"ok": result.ok, **result.data}
+
+
+@router.post("/api/capability-modes/{capability}/ask")
+async def ask_for_capability(
+    capability: str,
+    body: SetCapabilityDecisionModeRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _set_capability_decision_mode(capability, "ask", body, request, _auth_data)
+
+
+@router.post("/api/capability-modes/{capability}/allow")
+async def allow_capability(
+    capability: str,
+    body: SetCapabilityDecisionModeRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _set_capability_decision_mode(capability, "allow", body, request, _auth_data)
+
+
+@router.post("/api/capability-modes/{capability}/auto")
+async def auto_capability(
+    capability: str,
+    body: SetCapabilityDecisionModeRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _set_capability_decision_mode(capability, "auto", body, request, _auth_data)
+
+
+@router.post("/api/capability-modes/{capability}/deny")
+async def deny_capability(
+    capability: str,
+    body: SetCapabilityDecisionModeRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _set_capability_decision_mode(capability, "deny", body, request, _auth_data)
 
 
 @router.get("/api/runtime-readiness")
@@ -156,7 +224,7 @@ async def get_runtime_readiness(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    session, principal = _auth_data
+    _session, principal = _auth_data
     service = _get_service(request)
     readiness = service.get_runtime_readiness(principal.principal_id)
     return serialize_dto(readiness)

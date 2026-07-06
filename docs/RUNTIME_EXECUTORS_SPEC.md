@@ -92,7 +92,6 @@ These have an `ActivationRequirement` but **no real executor**. Activation is bl
 execution (if forced) fails closed. Each needs its own implementation task (real
 integration + threat model + tests) before joining `REAL_EXECUTOR_CAPABILITIES`:
 
-- **Tier 3 (partial):** `vector_embedding_runtime`, `model_provider_runtime`
 - **Tier 5:** `remote_execution_cap`, `cloud_execution_cap`
   (Phase 4 promotions tracked in `docs/IMPLEMENTATION_STATUS.md`; each leaves
   this list only with a real integration + threat model + tests. Promoted so
@@ -109,10 +108,9 @@ integration + threat model + tests) before joining `REAL_EXECUTOR_CAPABILITIES`:
   `plugin_sandboxed_runtime_cap` — `docs/threat-models/plugin-sandboxed-runtime.md`.
   Remote/cloud command execution stays fail-closed by design — see
   `docs/threat-models/remote-cloud.md`.)
-- **Tier 6 (sensitive domains):** `email_runtime`, `calendar_runtime`,
-  `reminder_runtime`, `finance_runtime`, `investment_runtime`, `medical_runtime`,
-  `pregnancy_baby_runtime`, `cctv_runtime`, `home_security_runtime`,
-  `hardware_operator_runtime`
+- **Tier 6 (sensitive domains):** `finance_runtime`, `investment_runtime`,
+  `medical_runtime`, `pregnancy_baby_runtime`, `cctv_runtime`,
+  `home_security_runtime`, `hardware_operator_runtime`
 
 ### Governance capabilities
 
@@ -125,8 +123,11 @@ executor; they are governed mutations handled through the authority path.
    `can_current_principal_change`.
 2. (If needed) `POST /api/runtime-mode/activate` → `local_single_user_runtime`.
 3. (Sensitive tiers) record a threat-model ack; supply `confirmation_token`.
-4. `POST /api/capability-gates/{cap}/set` → `enabled_runtime`. Real-executor caps
-   succeed; fail-closed caps return `activation_blocked:no_executor`.
+4. `POST /api/capability-gates/{cap}/set` → `enabled_runtime` when a gate was
+   explicitly disabled or persisted in a non-default state. Integrated real-executor
+   caps may already be `enabled_runtime` by default; the explicit enable flow still
+   applies for re-enabling or migrated state where activation requirements are met.
+   Fail-closed caps return `activation_blocked:no_executor`.
 5. Actions then route through `route_action`; the registered executor runs and emits a
    redacted `action_executed` / `action_failed` event.
 

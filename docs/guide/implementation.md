@@ -40,7 +40,7 @@ Every capability lands as a self-contained slice, in this order:
 ## Local validation gate
 
 `scripts/validate_*.py` encode the project's non-negotiable invariants
-(default-disabled gates, registry-backed executor availability, no ungoverned
+(integrated-enabled gates, registry-backed executor availability, no ungoverned
 mutation, documentation truthfulness, command-catalog completeness). They run in
 CI and locally; see [`LOCAL_VALIDATION_GATE.md`](../LOCAL_VALIDATION_GATE.md).
 

@@ -94,7 +94,8 @@ def test_architecture_and_security_docs_state_current_truth() -> None:
     assert "gateway finalisation events" in architecture
     assert "no `/sessions` command is currently implemented" in architecture
     assert "approval resolution is metadata-only" in security.lower()
-    assert "plugin execution | disabled/deferred" in security.lower()
+    assert "remote execution | disabled/fail-closed" in security.lower()
+    assert "plugin runtime slices" in security.lower()
 
 
 def test_catalog_marks_memory_and_approval_semantics_precisely() -> None:

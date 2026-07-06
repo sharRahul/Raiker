@@ -37,7 +37,7 @@ all — from `development_preview` (nothing executes) up through
 `runtime_gate_manager` can activate a mode, and the choice is persisted and
 audited.
 
-## Capability gates (default-disabled, fail-closed)
+## Capability gates (integrated-enabled, no-executor fail-closed)
 
 Raiker's abilities are enumerated as ~53 **capabilities**, each with a **gate**.
 Every gate ships **disabled**. A capability can only execute after its gate is
@@ -61,13 +61,13 @@ owner-chosen modes:
 
 - **`ask`** (default) — the action requires human approval before it runs.
 - **`deny`** — the action is always blocked.
-- **`always_allow`** — the action runs without prompting.
+- **`allow`** — standing permission to run without prompting.
 - **`auto`** — Raiker decides deterministically by risk (low runs, medium/high
   ask, critical always requires a human).
 
 Two floors always hold regardless of mode: PolicyEngine hard-denies block first,
-and **critical-risk actions always require a human** — `always_allow`/`auto` can
-never let an AI take a critical action. Permissive modes (`always_allow`/`auto`)
+and **critical-risk actions always require a human** — `allow`/`auto` can
+never let an AI take a critical action. Permissive modes (`allow`/`auto`)
 can only be set on capabilities that have a real executor. Full detail:
 [Decision Modes Spec](../DECISION_MODES_SPEC.md).
 

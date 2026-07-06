@@ -62,14 +62,14 @@ acknowledgement** before they can be enabled.
 ## 5. Choose how the AI may act on it
 
 Once a capability is enabled, its **decision mode** controls how AI-proposed
-actions are treated — `ask` (the default), `deny`, `always_allow`, or `auto`:
+actions are treated — `ask` (the default), `deny`, `allow`, or `auto`:
 
 ```bash
 raiker /capability-mode file_write_execution auto
 ```
 
 `ask` means every AI-proposed action waits for your approval; `auto` lets Raiker
-decide by risk; `always_allow` runs without prompting (critical-risk actions
+decide by risk; `allow` runs without prompting (critical-risk actions
 still require you). See [Core Concepts › Decision modes](core-concepts.md#decision-modes).
 
 ## 6. Run

@@ -11,8 +11,7 @@ Current backend truth (2026-06-21):
 - `/approve` and `/deny` are metadata-only and do not execute pending memory mutations.
 - Secret/credential-like durable memory content is denied before approval creation.
 - The governed durable-memory write contract exists for broker/policy-gated execution paths and tests; it is not a broad user-enabled runtime write path.
-- Semantic/vector writes remain disabled.
-- Runtime execution remains disabled for deferred capabilities.
+- Semantic/vector runtimes are integrated real executors and governed per action; no-executor deferred capabilities remain disabled/fail-closed.
 
 ---
 

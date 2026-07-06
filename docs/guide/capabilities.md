@@ -20,7 +20,7 @@ The authoritative, per-capability source of truth is
   audited transition (runtime mode + registered executor + threat-model ack for
   higher-risk caps + confirmation token). See [Core Concepts](core-concepts.md).
 
-Once enabled, a capability's **decision mode** (`ask` / `deny` / `always_allow` /
+Once enabled, a capability's **decision mode** (`ask` / `deny` / `allow` /
 `auto`) shapes how AI-proposed actions on it are treated — see
 [Decision Modes](../DECISION_MODES_SPEC.md).
 

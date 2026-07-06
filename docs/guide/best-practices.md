@@ -12,7 +12,7 @@ power.
   disabled (the default).
 - Keep the **decision mode** as tight as the task allows. `ask` (the default) is
   the safe choice; move to `auto` for low-risk, well-scoped capabilities; reserve
-  `always_allow` for capabilities you fully trust, and remember it still can't
+  `allow` for capabilities you fully trust, and remember it still can't
   bypass the critical-risk human floor.
 - Prefer `deny` to leaving a capability enabled-but-unused.
 

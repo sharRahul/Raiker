@@ -8,7 +8,7 @@ These remain **fail-closed** (no executor) by design:
 - Sensitive Tier-6 domains: finance, investment, medical, pregnancy/baby, cctv,
   home security, hardware.
 
-Now available as real, governed executors (default-disabled gate; enable through
+Now available as real, governed executors (integrated gate defaults enabled; govern through
 the governed path): local embeddings (`vector_embedding_runtime`) and
 provider-backed semantic embeddings (`model_provider_runtime`, egress-gated).
 

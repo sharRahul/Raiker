@@ -16,23 +16,24 @@ It replaces the older `REPOSITORY_REVIEW_AND_GAP_ANALYSIS.md`. It separates two 
 
 The implementation control ledger is `docs/IMPLEMENTATION_STATUS.md`; this file only tracks gaps.
 
-Backend hardening note (2026-06-21): direct CLI durable-memory mutation bypass is closed via `_govern_admin_mutation`; Runtime Authority / Action Router governs all mutation actions through capability gates, policy engine, risk classification, approval/risk acceptance, and event logging; AI-executable roles, human-only protections, and domain scopes are enforced at the authority level. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Runtime readiness: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Approval resolution is metadata-only; runtime execution remains disabled.
+Backend hardening note (2026-06-21): direct CLI durable-memory mutation bypass is closed via `_govern_admin_mutation`; Runtime Authority / Action Router governs all mutation actions through capability gates, policy engine, risk classification, approval/risk acceptance, and event logging; AI-executable roles, human-only protections, and domain scopes are enforced at the authority level. Enforcement: strict non-allow blocking, role revoke governed, capability gate per action, and risk acceptance enforced before mutation. Runtime readiness: `runtime_enablement_candidate` — `controlled_runtime_mode_activation_implemented`. Human `runtime_gate_manager` can activate `local_single_user_runtime` and enable `admin_mutation`/`role_mutation`; AI cannot activate runtime modes or capability gates. Approval resolution is metadata-only; integrated real executors are governed per action, while no-executor capabilities remain disabled/fail-closed.
 
-Executor implementation update (2026-06-21): the control plane (`raiker/control/`),
+Executor implementation update (2026-07-06): the control plane (`raiker/control/`),
 the API + session→principal auth surface (`raiker/api/`), the per-capability
-`ActivationRequirement` model (`raiker/runtime/authority/activation.py`), and a real
-executor registry (`raiker/runtime/executors/`) are now implemented. **Real local
-executors** exist and are governed-flippable for the Tier 1–3 local set in
-`REAL_EXECUTOR_CAPABILITIES` (file write/patch/approval-relay/memory, sandboxed
-shell/process/web-fetch/network, graph indexing, semantic memory). All other
-capabilities — plugins, vector/embedding and hosted/private model runtime, external
-channels, remote/container/cloud execution, scheduled routines, and every Tier-6
-sensitive domain — have **no real executor and fail closed** (`not_implemented` /
-`activation_blocked:no_executor`); they cannot be flipped to a working state and never
-fabricate success. `has_executor` is registry-backed (no static allowlist), enforced by
+`ActivationRequirement` model (`raiker/runtime/authority/activation.py`), and the
+executor registry (`raiker/runtime/executors/`) are implemented.
+`REAL_EXECUTOR_CAPABILITIES` is the exact source of truth for integrated executors:
+Tier 1, Tier 2, graph/semantic/vector/model-provider runtimes, orchestration/channel/
+container/scheduled/model/plugin slices, and local email/calendar/reminder stores.
+Those gates default `enabled_runtime` and are governed per action (decision mode
+default `ask`, PolicyEngine, critical-risk floor, and independent allowlists).
+Capabilities outside that set — notably finance/investment/medical/pregnancy/CCTV/
+home-security/hardware plus remote/cloud command execution — have **no real executor
+and fail closed** (`not_implemented` / `activation_blocked:no_executor`); they cannot
+be flipped to a working state and never fabricate success. `has_executor` is
+registry-backed (no static allowlist), enforced by
 `scripts/validate_runtime_enablement_readiness.py`. Per-capability detail:
-`docs/RUNTIME_EXECUTORS_SPEC.md`. The remaining (fail-closed) executors are the active
-backlog.
+`docs/RUNTIME_EXECUTORS_SPEC.md`.
 
 Executor implementation update (2026-07-04): `plugin_install` has moved out of
 the no-executor backlog as Phase 4 slice 8. It is a governed local manifest
@@ -48,8 +49,8 @@ network, writes, hooks, MCP/LSP, monitors, panels, and runtime permission grants
 remain active gaps.
 
 Executor implementation update (2026-07-04/05, slices 10-16): the Tier-4 plugin
-path is now substantially implemented and out of the no-executor backlog, all
-default-disabled and governed. `plugin_revocation_cap` (slice 10) is the
+path is now substantially implemented and out of the no-executor backlog,
+integrated and governed. `plugin_revocation_cap` (slice 10) is the
 fail-closed off-switch. Install-time supply-chain controls: dependency pins +
 owner allowlist (slice 11), HMAC-SHA256 manifest signatures (slice 12), and
 asymmetric Ed25519 signatures against an owner-trusted key (slice 13). **Plugin
@@ -99,16 +100,16 @@ approval, audit, and acceptance tests before it can be enabled.
 | Feature | Spec | Current code reality | Status |
 |---|---|---|---|
 | Hook handler types `http` / `mcp_tool` / `prompt` / `agent` | `docs/HOOKS_SPEC.md` | `raiker/hooks/` implements only `builtin` + `command` handlers. | `specified_not_implemented` |
-| Subagent spawning & multi-agent team execution | `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` | Contracts/ledgers only; `raiker/agents/subagents.py` cannot spawn. | `phase_scheduled_disabled` |
-| Plugin code execution | `docs/PLUGIN_SYSTEM_SPEC.md` | Manifest validation + install records only; no execution. | `phase_scheduled_disabled` |
-| Graph/codemap runtime indexing | `docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md` | Indexer/project-graph modules exist (Phase 9 records) but runtime indexing flags are off. | `phase_scheduled_disabled` |
-| Semantic/vector memory writes & embeddings | `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/MEMORY_GOVERNANCE_RULES.md` | Status/governance/readiness only; no writes or embeddings. | `phase_scheduled_disabled` |
-| External channel transports & notifications | `docs/CHANNELS_SPEC.md` | Connector registry + readiness only; transports inactive. | `phase_scheduled_disabled` |
-| Remote/container/cloud execution | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` | Profiles + readiness only; execution disabled. | `phase_scheduled_disabled` |
-| Approval execution / approval relay runtime | `docs/CONTRACTS.md`, `docs/SECURITY_AND_POLICY.md` | Approval inbox + previews only; execution disabled. | `phase_scheduled_disabled` |
+| Subagent spawning & multi-agent team execution | `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` | Real bounded/governed in-process executors exist in `REAL_EXECUTOR_CAPABILITIES`; the older planning helper in `raiker/agents/subagents.py` remains a non-runtime stub and broader autonomous spawning extensions are deferred. | `implemented_policy_gated` (bounded slice); broader extensions `phase_scheduled_disabled` |
+| Plugin code execution | `docs/PLUGIN_SYSTEM_SPEC.md` | Bounded subprocess runtime and no-network container runtime exist for installed owner-allowlisted plugins; in-process import isolation, hooks/MCP/LSP/monitors/panels, per-plugin network egress, and image build/pull management remain deferred. | `implemented_policy_gated` (bounded slice); broader extensions `phase_scheduled_disabled` |
+| Graph/codemap runtime indexing | `docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md` | Real governed local graph indexing executor exists; broader graph query/planning extensions remain deferred. | `implemented_policy_gated` (bounded slice); extensions `phase_scheduled_disabled` |
+| Semantic/vector memory writes & embeddings | `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/MEMORY_GOVERNANCE_RULES.md` | Real governed semantic memory, local deterministic vector embedding/search, and provider-backed embedding executors exist; broader learned semantics, external sync, and unrestricted memory automation remain deferred. | `implemented_policy_gated` (bounded slices); extensions `phase_scheduled_disabled` |
+| External channel transports & notifications | `docs/CHANNELS_SPEC.md` | One bounded webhook transport and metadata-only channel approval relay exist with owner egress/pairing controls; broader channels/notifications remain deferred. | `implemented_policy_gated` (reference slice); extensions `phase_scheduled_disabled` |
+| Remote/container/cloud execution | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` | Local container execution exists as a governed no-network/no-host-mount executor; remote/cloud command execution has no real executor and fails closed. | container `implemented_policy_gated`; remote/cloud `phase_scheduled_disabled` |
+| Approval execution / approval relay runtime | `docs/CONTRACTS.md`, `docs/SECURITY_AND_POLICY.md` | Approval inbox resolution remains metadata-only; the separate `approval_execution_relay` executor exists for governed approved file-write proposals and does not make `/approve` execute actions. | `metadata_only` for resolution; relay `implemented_policy_gated` |
 | Launchable Desktop / Mobile / IDE apps and hosted/multi-user REST API | `docs/UI_UX_DESIGN_SPEC.md` | Session-model records and read-only contracts only; no launchable apps. | `specified_not_implemented` |
 | Local web dashboard (`apps/web` + `raiker-web` loopback API) | `docs/UI-implementation/` | **Implemented and launchable** (single-user, `127.0.0.1`): read-only governed views, governed prompt/turn/approval/runtime-mutation flows (approval resolution metadata-only), step-up-gated Security Settings; adds no authority. | `implemented_read_only` / `implemented_policy_gated` / `metadata_only` |
-| Scheduled automations / hosted routines runtime | `docs/IMPLEMENTATION_STATUS.md` (Phase 5) | Metadata-only routine records; no execution. | `phase_scheduled_disabled` |
+| Scheduled automations / hosted routines runtime | `docs/IMPLEMENTATION_STATUS.md` (Phase 5) | Local on-demand scheduled routines executor exists (no daemon); hosted/background routine platform remains deferred. | local slice `implemented_policy_gated`; hosted/background `phase_scheduled_disabled` |
 
 The full list of disabled runtime flags (all `False`) is enforced by
 `scripts/validate_repo_truthfulness.py` and documented in `docs/IMPLEMENTATION_STATUS.md`.
@@ -140,13 +141,13 @@ All items below are specified but not implemented unless explicitly marked other
 | Voice UI and Browser Extension | Spec only. | UI/UX | phase8_deferred | RAIKER-8601 | Consent, transcript redaction, extension permissions tests. | external_channels_enabled=false | No microphone/browser access before explicit enablement. |
 | Hook handler types http/mcp_tool/prompt/agent | Hook specs exist; handlers missing. | HOOKS_SPEC | specified_not_implemented | RAIKER-8701 | Handler policy, audit events, dry-run tests. | network_execution_enabled=false, plugin_execution_enabled=false | Unsupported hook types fail closed with clear errors. |
 | Subagent spawning/team execution | Strategy docs/contracts only. | MULTI_AGENT_AND_SUBAGENT_STRATEGY | specified_not_implemented | RAIKER-8702 | Agent identity, budgets, event causality, cancellation tests. | runtime_execution_enabled=false | No subagent runtime until isolation and policy tests exist. |
-| Plugin code execution | **Implemented (default-disabled, governed)**: `plugin_runtime_cap` (bounded subprocess, slice 14) and `plugin_sandboxed_runtime_cap` (no-network container, slice 16), gated on an owner plugin allowlist + interpreter allowlist + workspace/subpath scope, with HMAC/Ed25519 install signatures and revocation. | Tool/plugin catalog, `docs/RUNTIME_EXECUTORS_SPEC.md` | implemented (`implemented_policy_gated`) | RAIKER-8703 | Remaining: in-process module import, hooks/MCP/LSP/monitors/panels, per-plugin network egress, image build/pull. | plugin_runtime gates default-disabled | Plugin code runs only when the owner enables the gate and allowlists the plugin; otherwise fails closed. |
-| Graph/codemap runtime indexing | Readiness/dry-run only. | Architecture, memory specs | readiness_only | RAIKER-9001 | Index storage migrations, redaction, incremental tests. | graph_indexing_enabled=false | Index writes occur only after explicit opt-in and tests. |
-| Semantic/vector writes and embeddings | Status/readiness only. | Memory specs | readiness_only | RAIKER-9002 | Vector store policy, retention, embedding-provider tests. | semantic_memory_writes_enabled=false, vector_writes_enabled=false, embedding_creation_enabled=false | No embedding/vector writes before policy and storage gates. |
-| External transports and notifications | Registry/readiness only. | Channels specs | readiness_only | RAIKER-8704 | Connector auth, outbound allowlist, redacted event tests. | external_channels_enabled=false, notifications_enabled=false | Outbound messages disabled until explicit connector approval. |
-| Remote/container/cloud execution | Profiles/readiness only. | Runtime orchestration | readiness_only | RAIKER-8705 | Isolation, secrets, artifact storage, egress tests. | remote_execution_enabled=false, container_execution_enabled=false, cloud_execution_enabled=false | Remote execution impossible until policies pass. |
-| Approval execution and relay runtime | Approval preview/audit only. | Approval specs | readiness_only | RAIKER-8706 | Human binding, replay protection, audit events, rollback tests. | approval_execution_enabled=false, approval_relay_runtime_enabled=false | Approval actions remain metadata-only until safe execution exists. |
-| Scheduled automations/hosted routines | Specs only. | Runtime specs | specified_not_implemented | RAIKER-8707 | Scheduler storage, owner consent, budget/egress tests. | runtime_execution_enabled=false | No background hosted routines before explicit enablement. |
+| Plugin code execution | **Implemented (integrated, governed)**: `plugin_runtime_cap` (bounded subprocess, slice 14) and `plugin_sandboxed_runtime_cap` (no-network container, slice 16), gated on an owner plugin allowlist + interpreter allowlist + workspace/subpath scope, with HMAC/Ed25519 install signatures and revocation. | Tool/plugin catalog, `docs/RUNTIME_EXECUTORS_SPEC.md` | implemented (`implemented_policy_gated`) | RAIKER-8703 | Remaining: in-process module import, hooks/MCP/LSP/monitors/panels, per-plugin network egress, image build/pull. | plugin runtime gates default `enabled_runtime` but executor allowlists fail closed | Plugin code runs only when the integrated gate is enabled, the standing decision/risk policy allows execution, and the owner allowlists the plugin; otherwise it fails closed. |
+| Graph/codemap runtime indexing | Real bounded local executor exists; richer graph query/planning remains deferred. | Architecture, memory specs | implemented_policy_gated (bounded); extensions deferred | RAIKER-9001 | Index storage migrations, redaction, incremental tests. | graph_indexing_enabled=false | Index writes occur only through the governed real executor; broader graph extensions require explicit opt-in and tests. |
+| Semantic/vector writes and embeddings | Real bounded semantic memory, local vector embedding/search, and provider embedding executors exist; broader external/learned-memory extensions remain deferred. | Memory specs | implemented_policy_gated (bounded); extensions deferred | RAIKER-9002 | Vector store policy, retention, embedding-provider tests. | semantic_memory_writes_enabled=false, vector_writes_enabled=false, embedding_creation_enabled=false | Embedding/vector operations occur only through the governed real executors; broader memory extensions require policy and storage gates. |
+| External transports and notifications | One reference webhook transport and metadata-only relay exist; additional transports/notifications remain deferred. | Channels specs | implemented_policy_gated (reference); extensions deferred | RAIKER-8704 | Connector auth, outbound allowlist, redacted event tests. | external_channels_enabled=false, notifications_enabled=false | Outbound messages require explicit connector pairing and owner egress allowlist. |
+| Remote/container/cloud execution | Local container executor exists; remote/cloud command execution remains no-executor/fail-closed. | Runtime orchestration | container implemented_policy_gated; remote/cloud deferred | RAIKER-8705 | Isolation, secrets, artifact storage, egress tests. | remote_execution_enabled=false, container_execution_enabled=false, cloud_execution_enabled=false | Remote execution impossible until policies pass. |
+| Approval execution and relay runtime | Approval resolution remains metadata-only; separate approval execution relay exists for governed approved file-write proposals. | Approval specs | metadata_only + implemented_policy_gated relay | RAIKER-8706 | Human binding, replay protection, audit events, rollback tests. | approval_execution_enabled=false, approval_relay_runtime_enabled=false | Approval actions remain metadata-only until safe execution exists. |
+| Scheduled automations/hosted routines | Local on-demand scheduled routines executor exists; hosted/background scheduler remains deferred. | Runtime specs | implemented_policy_gated local; hosted deferred | RAIKER-8707 | Scheduler storage, owner consent, budget/egress tests. | runtime_execution_enabled=false | No background hosted routines before explicit enablement. |
 | Deferred filesystem/code tools delete/copy/move, PowerShell/Python execution, web search/fetch, LSP | Not implemented as executable tools. | Tool catalog | specified_not_implemented | RAIKER-8708 | ToolBroker policy, previews, approvals, sandbox tests. | process_execution_enabled=false, shell_execution_enabled=false, network_execution_enabled=false | Tools appear only as disabled/deferred until tests and approvals exist. |
 | `/sessions` command | No safe session-listing slash command is currently dispatched. | Command catalog | missing_deferred | RAIKER-8709 | Read-only session query, redacted output, command/help tests. | runtime_execution_enabled=false | Either implement read-only listing or keep omitted from help/catalog. |
 

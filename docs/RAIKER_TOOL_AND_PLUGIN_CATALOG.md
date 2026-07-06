@@ -79,7 +79,7 @@ currently exposes. It is the source of truth checked by `scripts/validate_repo_t
 /capability-gate <capability>
 /capability-gate enable <capability> --state <state> [--reason <reason>]
 /capability-gate disable <capability> [--reason <reason>]
-/capability-mode <capability> [ask|deny|always_allow|auto] [--reason <reason>] [--as <principal_id>]
+/capability-mode <capability> [ask|deny|allow|auto] [--reason <reason>] [--as <principal_id>]
 /runtime-readiness
 /bootstrap-owner [--display <name>] [--email <email>] [--force-recover] [--confirm-local-recovery] [--reason <reason>]
 /whoami
@@ -102,7 +102,7 @@ currently exposes. It is the source of truth checked by `scripts/validate_repo_t
 | `/capability-gate <cap>` | implemented | low | RuntimeAuthority.get_effective_capability_gate() | read-only | no | after bootstrap |
 | `/capability-gate enable` | implemented | high | RuntimeAuthority.enable_capability_gate(); persisted in capability_gate_state table | sets gate state; appends event | owner or rl_rgm | after bootstrap |
 | `/capability-gate disable` | implemented | high | RuntimeAuthority.disable_capability_gate(); persisted in capability_gate_state table | sets gate state; appends event | owner or rl_rgm | after bootstrap |
-| `/capability-mode` | implemented | high | RuntimeAuthority.set/get_capability_decision_mode(); persisted in capability_decision_mode table | sets/reads ask\|deny\|always_allow\|auto; appends event | owner or rl_rgm | after bootstrap |
+| `/capability-mode` | implemented | high | RuntimeAuthority.set/get_capability_decision_mode(); persisted in capability_decision_mode table | sets/reads ask\|deny\|allow\|auto (`always_allow` accepted as legacy alias); appends event | owner or rl_rgm | after bootstrap |
 | `/runtime-readiness` | implemented | low | reads runtime mode, owner status, gate manager, principal, dangerous gates | read-only | no | after bootstrap |
 
 /semantic-memory
@@ -382,7 +382,7 @@ These permission labels are used in the inventory below so coding agents know wh
 | `plugin_enable` | Enable plugin components after policy/trust approval. | `plugin:register`, `approval:resolve`; later `plugin:execute` if runtime code | No — runtime execution disabled |
 | `plugin_disable` | Disable plugin components. | `plugin:register` | `deferred_after_phase_3` — outside completed Phase 3 slices A-P |
 | `plugin_remove` | Remove plugin metadata/package. | `plugin:register`, `workspace:write`, `approval:resolve` | No — Phase 3/5 planned |
-| `plugin_execute` | Execute plugin code/entrypoint. | `plugin:execute` plus target permissions | Governed — via `plugin_runtime_cap` (bounded subprocess) or `plugin_sandboxed_runtime_cap` (no-network container), owner plugin allowlist, gates default-disabled |
+| `plugin_execute` | Execute plugin code/entrypoint. | `plugin:execute` plus target permissions | Governed — via `plugin_runtime_cap` (bounded subprocess) or `plugin_sandboxed_runtime_cap` (no-network container), owner plugin allowlist, gates default `enabled_runtime` but owner allowlists fail closed |
 
 ## Phase 9 Advanced Memory and Graph Tools
 
@@ -492,7 +492,7 @@ The following items must be picked up by later implementation plans:
 
 Until the relevant phase gates are fully implemented and verified:
 
-- plugin code execution executors are implemented (subprocess + no-network container); their gates remain default-disabled;
+- plugin code execution executors are implemented (subprocess + no-network container); their gates default `enabled_runtime` and remain governed/default-ask;
 - graph/codemap runtime indexing remains disabled;
 - graph node/edge writes remain disabled;
 - semantic/vector memory writes remain disabled;

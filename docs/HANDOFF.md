@@ -9,7 +9,7 @@
 Make Raiker a full-fledged, secure AI agent that can connect to **any**
 backend LLM — local (llama.cpp/Ollama/LM Studio), home-lab (vLLM), or hosted
 API provider (Anthropic/OpenAI/Gemini/OpenRouter) — with the choice belonging
-to the user, and every capability governed, default-disabled, and fail-closed.
+to the user, and every capability governed, default-ask human/humam governed, and fail-closed.
 
 Be mind full of token usage if needed do it in batches. Keep committing after every phase and then push to origin main before the token limit is ended for the session. Plan and implement it in such a way that anyone can pick it up after your session token are over even though the goal is not complete. In next session review where you are and then start from next phase.
 

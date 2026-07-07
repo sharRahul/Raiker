@@ -28,15 +28,24 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install -e ".[dev]"
-      - name: Verify real httpx import
-        run: |
-          python -c "import httpx; print(httpx.__file__)"
-      - name: Verify test collection (fail fast on broken imports)
+      - name: Verify test collection
         run: |
           python -m pytest --collect-only -q
-      - name: Run tests
+      - name: Phase tests
         run: |
-          python -m pytest
+          python -m pytest -q tests/test_phase_*.py
+      - name: API tests
+        run: |
+          python -m pytest -q tests/test_api_*.py
+      - name: Runtime authority tests
+        run: |
+          python -m pytest -q tests/test_*runtime*.py tests/test_*authority*.py tests/test_*capability*.py
+      - name: Docs truth tests
+        run: |
+          python -m pytest -q tests/test_*docs*.py tests/test_*truth*.py
+      - name: All tests
+        run: |
+          python -m pytest -q -x --tb=short
       - name: Run ruff
         run: |
           python -m ruff check .

@@ -5,6 +5,8 @@
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
   import type { ModelsView as ModelsData } from "../apiTypes";
+  import { capabilityLabel } from "../capabilityModel";
+  import { humanize } from "../format";
 
   let models = $state<ModelsData | null>(null);
   let loadError = $state<string | null>(null);
@@ -85,7 +87,9 @@
               <span class="chip chip-warn">Budget-gated</span>
             {/if}
             {#if p.runtime_gate}
-              <span class="chip" title="Runtime gate that must be enabled">{p.runtime_gate}</span>
+              <span class="chip" title="Runtime gate that must be enabled">
+                {capabilityLabel(p.runtime_gate)}
+              </span>
             {/if}
           </div>
         </article>
@@ -98,11 +102,11 @@
     <dl class="gates">
       <div>
         <dt>Hosted model gate</dt>
-        <dd><code>{models.hosted_model_gate_state}</code></dd>
+        <dd>{humanize(models.hosted_model_gate_state)}</dd>
       </div>
       <div>
         <dt>Private-network gate</dt>
-        <dd><code>{models.private_network_model_gate_state}</code></dd>
+        <dd>{humanize(models.private_network_model_gate_state)}</dd>
       </div>
       <div>
         <dt>Egress allowlist</dt>

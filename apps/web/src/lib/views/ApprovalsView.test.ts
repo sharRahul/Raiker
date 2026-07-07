@@ -36,9 +36,11 @@ describe("ApprovalsView", () => {
   it("lists pending approvals with their capability and risk", async () => {
     stubFetch({ "GET /api/approvals": [PENDING] });
     render(ApprovalsView);
+    // The raw tool identifier "write_file" is shown as a plain-English name, not a code.
     await waitFor(() => {
-      expect(screen.getByText("write_file")).toBeInTheDocument();
+      expect(screen.getByText("Write file")).toBeInTheDocument();
     });
+    expect(screen.queryByText("write_file")).not.toBeInTheDocument();
     expect(screen.getByText("File writes")).toBeInTheDocument();
     expect(screen.getByText("medium")).toBeInTheDocument();
   });

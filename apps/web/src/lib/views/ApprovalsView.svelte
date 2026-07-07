@@ -7,7 +7,7 @@
   import type { ApprovalDetailView, ApprovalView } from "../apiTypes";
   import { approvalBadge } from "../statusMaps";
   import { capabilityLabel } from "../capabilityModel";
-  import { relativeTime, shortId } from "../format";
+  import { humanize, relativeTime, shortId } from "../format";
   import { explainReasonCode } from "../reasonCodes";
 
   const FILTERS = ["pending", "approved", "denied"] as const;
@@ -139,7 +139,7 @@
       <tbody>
         {#each approvals as a (a.approval_id)}
           <tr>
-            <td><code>{a.tool_name}</code></td>
+            <td>{humanize(a.tool_name)}</td>
             <td>{capabilityLabel(a.capability)}</td>
             <td><Badge variant={a.risk_level === "critical" || a.risk_level === "high" ? "blocked" : "metadata-only"} label={a.risk_level} /></td>
             <td><Badge variant={approvalBadge(a.status)} label={a.status} /></td>
@@ -164,7 +164,7 @@
   <section class="card detail" aria-labelledby="approval-detail-h">
     <div class="detail-head">
       <h2 id="approval-detail-h">
-        Review <code>{selected.approval.tool_name}</code>
+        Review {humanize(selected.approval.tool_name)}
       </h2>
       <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selected = null)}>
         <Icon name="x" size={14} />

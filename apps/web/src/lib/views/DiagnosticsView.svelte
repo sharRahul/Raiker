@@ -5,6 +5,7 @@
   import { api, ApiError } from "../api";
   import type { Diagnostics } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
+  import { humanize } from "../format";
 
   let diag = $state<Diagnostics | null>(null);
   let loadError = $state<string | null>(null);
@@ -55,9 +56,9 @@
         />
       </p>
       <dl class="kv">
-        <div><dt>Mode</dt><dd><code>{diag.runtime_mode}</code></dd></div>
+        <div><dt>Mode</dt><dd>{humanize(diag.runtime_mode)}</dd></div>
         {#each Object.entries(diag.counts) as [key, value] (key)}
-          <div><dt>{key}</dt><dd>{value}</dd></div>
+          <div><dt>{humanize(key)}</dt><dd>{value}</dd></div>
         {/each}
       </dl>
       <p class="sub">{diag.scope_note}</p>

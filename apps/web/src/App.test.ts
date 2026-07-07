@@ -32,9 +32,10 @@ describe("App shell", () => {
     ]) {
       expect(screen.getByRole("link", { name: new RegExp(label, "i") })).toBeInTheDocument();
     }
-    // The acting principal and mode are surfaced, honestly, from the API.
+    // The acting principal and mode are surfaced, honestly, from the API — the runtime
+    // mode identifier is shown as a plain-English name, not the raw code.
     expect(screen.getByText("prin_owner")).toBeInTheDocument();
-    expect(screen.getByText("local_single_user_runtime")).toBeInTheDocument();
+    expect(screen.getByText("Local single user runtime")).toBeInTheDocument();
   });
 
   it("shows an honest connection error when the local API is unreachable", async () => {

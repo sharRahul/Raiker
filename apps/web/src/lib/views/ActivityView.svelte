@@ -4,7 +4,7 @@
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
   import type { EventEntry } from "../apiTypes";
-  import { relativeTime, shortId } from "../format";
+  import { humanize, relativeTime, shortId } from "../format";
 
   let events = $state<EventEntry[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -60,7 +60,7 @@
   </div>
   <div>
     <label class="field-label" for="ev-type">Event type</label>
-    <input id="ev-type" class="input mono" type="text" placeholder="e.g. policy_decision" bind:value={typeFilter} />
+    <input id="ev-type" class="input" type="text" placeholder="Filter by type…" bind:value={typeFilter} />
   </div>
   <div>
     <label class="field-label" for="ev-limit">Limit</label>
@@ -98,7 +98,7 @@
       <tbody>
         {#each events as ev (ev.event_id)}
           <tr>
-            <td><code>{ev.event_type}</code></td>
+            <td title={ev.event_type}>{humanize(ev.event_type)}</td>
             <td class="mono actor">{ev.actor}</td>
             <td>
               <span class={`risk ${riskTone(ev.risk_level)}`}>{ev.risk_level ?? "—"}</span>

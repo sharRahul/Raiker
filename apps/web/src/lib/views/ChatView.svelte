@@ -8,6 +8,7 @@
   import { groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { responseBadge } from "../statusMaps";
   import { collectText } from "../turnPhases";
+  import { humanize } from "../format";
 
   interface ChatTurn {
     id: number;
@@ -175,7 +176,7 @@
                   This action is waiting for your approval
                 </p>
                 <p class="approval-body">
-                  <code>{turn.response.approval.tool_name}</code> — risk
+                  <strong>{humanize(turn.response.approval.tool_name)}</strong> — risk
                   <strong>{turn.response.approval.risk_level}</strong>.
                   {turn.response.approval.message}
                 </p>
@@ -208,7 +209,7 @@
                 {/each}
               </ol>
               {#each turn.events.filter((e) => e.kind === "tool") as ev, i (i)}
-                <p class="tool-line"><code>{ev.event_type}</code> {ev.text}</p>
+                <p class="tool-line">{humanize(ev.event_type)} {ev.text}</p>
               {/each}
             </details>
           {/if}

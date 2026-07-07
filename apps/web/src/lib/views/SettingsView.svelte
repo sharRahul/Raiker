@@ -5,6 +5,7 @@
   import type { StepUpValues } from "../components/StepUpDialog.svelte";
   import { api, ApiError } from "../api";
   import type { RuntimeMode } from "../apiTypes";
+  import { humanize } from "../format";
   import { explainReasonCode } from "../reasonCodes";
   import {
     applyTheme,
@@ -59,7 +60,7 @@
     try {
       if (pending.kind === "activate_mode") {
         await api.activateRuntimeMode(pending.mode_name, values.reason);
-        notice = { kind: "ok", text: `Activated runtime mode ${pending.mode_name}.` };
+        notice = { kind: "ok", text: `Activated runtime mode ${humanize(pending.mode_name)}.` };
       } else {
         await api.disableRuntimeMode(values.reason);
         notice = { kind: "ok", text: "Disabled the runtime mode." };
@@ -122,7 +123,7 @@
     <div class="mode-row">
       <div>
         <p class="mode-current">
-          <code>{mode.mode_name}</code> · {mode.status}
+          <strong>{humanize(mode.mode_name)}</strong> · {mode.status}
         </p>
         <p class="sub">Activated by {mode.activated_by || "—"}{mode.reason ? ` — ${mode.reason}` : ""}</p>
       </div>
@@ -130,7 +131,7 @@
         <label class="sr-only" for="mode-select">Mode to activate</label>
         <select id="mode-select" class="select" bind:value={modeChoice}>
           {#each mode.allowed_modes as m (m)}
-            <option value={m}>{m}</option>
+            <option value={m}>{humanize(m)}</option>
           {/each}
         </select>
         <button
@@ -193,7 +194,7 @@
 
 {#if pending !== null}
   <StepUpDialog
-    title={pending.kind === "activate_mode" ? `Activate ${pending.mode_name}` : "Disable runtime mode"}
+    title={pending.kind === "activate_mode" ? `Activate ${humanize(pending.mode_name)}` : "Disable runtime mode"}
     {principal}
     requireToken={false}
     requireThreatAck={false}

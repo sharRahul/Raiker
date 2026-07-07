@@ -245,7 +245,6 @@
               </span>
               <span class="cap-name">
                 <span class="cap-label">{capabilityLabel(gate.capability)}</span>
-                <code class="cap-code">{gate.capability}</code>
               </span>
             </button>
 
@@ -411,10 +410,6 @@
   }
   .cap-label {
     font-weight: 600;
-  }
-  .cap-code {
-    color: var(--text-3);
-    font-size: 0.74rem;
   }
   .mode-seg {
     display: inline-flex;

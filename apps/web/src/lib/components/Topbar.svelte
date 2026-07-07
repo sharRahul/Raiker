@@ -2,6 +2,7 @@
   import Icon from "./Icon.svelte";
   import StopSwitch from "./StopSwitch.svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
+  import { humanize } from "../format";
 
   let {
     title,
@@ -36,7 +37,7 @@
       </span>
       <span class="pill pill-muted" title="Active runtime mode">
         <Icon name="shield" size={13} />
-        {runtimeMode}
+        {humanize(runtimeMode)}
       </span>
       <span class="pill pill-muted mono" title="Acting principal">{principal}</span>
     {/if}

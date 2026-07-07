@@ -3,6 +3,7 @@
   // cancellation of all active tasks at the next safe boundary — NOT an instant force-kill.
   import Icon from "./Icon.svelte";
   import { api, ApiError } from "../api";
+  import { humanize } from "../format";
   import type { EventEntry } from "../apiTypes";
 
   type Phase = "confirm" | "working" | "done" | "empty" | "error";
@@ -124,7 +125,7 @@
         {#if resultEvents.length > 0}
           <ul class="events">
             {#each resultEvents as ev (ev.event_id)}
-              <li><code>{ev.event_type}</code> {ev.summary ?? ""}</li>
+              <li><strong>{humanize(ev.event_type)}</strong> {ev.summary ?? ""}</li>
             {/each}
           </ul>
         {/if}

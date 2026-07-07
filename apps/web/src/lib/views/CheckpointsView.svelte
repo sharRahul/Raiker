@@ -5,7 +5,7 @@
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
   import type { Checkpoint } from "../apiTypes";
-  import { relativeTime, shortId } from "../format";
+  import { humanize, relativeTime, shortId } from "../format";
 
   let checkpoints = $state<Checkpoint[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -74,7 +74,7 @@
         {#each checkpoints as cp (cp.checkpoint_id)}
           <tr>
             <td class="mono">{shortId(cp.checkpoint_id)}</td>
-            <td><code>{cp.checkpoint_type}</code></td>
+            <td>{humanize(cp.checkpoint_type)}</td>
             <td class="mono">{shortId(cp.session_id)}</td>
             <td class="summary-cell">{cp.summary ?? "—"}</td>
             <td>

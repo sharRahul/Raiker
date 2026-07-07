@@ -6,7 +6,7 @@
   import { api, ApiError } from "../api";
   import type { SessionDetail, SessionSummary, TurnDetail } from "../apiTypes";
   import { responseBadge } from "../statusMaps";
-  import { relativeTime, shortId } from "../format";
+  import { humanize, relativeTime, shortId } from "../format";
 
   let sessions = $state<SessionSummary[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -146,7 +146,7 @@
             <ul class="events">
               {#each turnDetail.events as ev (ev.event_id)}
                 <li>
-                  <code>{ev.event_type}</code>
+                  <span class="ev-type">{humanize(ev.event_type)}</span>
                   <span class="ev-summary">{ev.summary ?? ""}</span>
                   <span class="ev-time" title={ev.timestamp}>{relativeTime(ev.timestamp)}</span>
                 </li>
@@ -259,6 +259,11 @@
     align-items: baseline;
     border-bottom: 1px dashed var(--border);
     padding-bottom: 0.3rem;
+  }
+  .ev-type {
+    font-weight: 600;
+    color: var(--text-1);
+    white-space: nowrap;
   }
   .ev-summary {
     color: var(--text-2);

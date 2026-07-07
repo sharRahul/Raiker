@@ -1,27 +1,54 @@
-import { fireEvent, render, screen } from "@testing-library/svelte";
-import { describe, expect, it } from "vitest";
+import { render, screen, waitFor } from "@testing-library/svelte";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
-import { NAV_ITEMS } from "./lib/nav";
+import { BOOTSTRAP_ROUTES, stubFetch } from "./lib/test-helpers";
 
-// These tests exercise the always-rendered chrome (nav, top bar, STOP). The data-bound screens
-// have their own tests; here the API is not mocked, so the app settles into the connection-error
-// state — the chrome must still render and the STOP control must still work.
+afterEach(() => {
+  vi.unstubAllGlobals();
+  window.location.hash = "";
+});
+
 describe("App shell", () => {
-  it("renders left-nav links for every IA section", () => {
+  it("connects, then shows the runtime status and grouped navigation", async () => {
+    stubFetch(BOOTSTRAP_ROUTES);
     render(App);
-    for (const item of NAV_ITEMS) {
-      expect(screen.getByRole("link", { name: item.label })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Runtime ready")).toBeInTheDocument();
+    });
+    // Grouped nav with every governed surface reachable.
+    const nav = screen.getByRole("navigation", { name: /primary/i });
+    expect(nav).toBeInTheDocument();
+    for (const label of [
+      "Chat",
+      "Approvals",
+      "Tasks",
+      "Sessions",
+      "Capabilities",
+      "Models",
+      "Checkpoints",
+      "Audit log",
+      "Diagnostics",
+      "Settings",
+    ]) {
+      expect(screen.getByRole("link", { name: new RegExp(label, "i") })).toBeInTheDocument();
     }
+    // The acting principal and mode are surfaced, honestly, from the API — the runtime
+    // mode identifier is shown as a plain-English name, not the raw code.
+    expect(screen.getByText("prin_owner")).toBeInTheDocument();
+    expect(screen.getByText("Local single user runtime")).toBeInTheDocument();
   });
 
-  it("opens the STOP confirm dialog with a wired, enabled confirm action", async () => {
+  it("shows an honest connection error when the local API is unreachable", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("connection refused");
+      }),
+    );
     render(App);
-    expect(screen.queryByRole("dialog")).toBeNull();
-    await fireEvent.click(screen.getByRole("button", { name: /stop all tasks/i }));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-    // Wired in M3: the confirm action is enabled and the copy is safe-boundary, not force-kill.
-    const confirm = screen.getByRole("button", { name: /stop at safe boundary/i });
-    expect(confirm).toBeEnabled();
-    expect(screen.getByText(/next safe boundary/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/cannot reach the local raiker api/i);
+    });
+    expect(screen.getByText(/never fabricates data/i)).toBeInTheDocument();
   });
 });

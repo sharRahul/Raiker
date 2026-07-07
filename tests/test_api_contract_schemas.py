@@ -21,6 +21,7 @@ AUTH_SESSION = {"token", "session_id", "principal_id", "expires_at"}
 CAPABILITY_GATE = {
     "capability", "phase", "state", "default_state", "source", "runtime_enabled",
     "allowed_transitions", "can_current_principal_change", "blocked_reason_code", "readiness",
+    "decision_mode",
 }
 RUNTIME_MODE = {"mode_name", "status", "activated_by", "activated_at", "reason", "allowed_modes"}
 RUNTIME_READINESS = {"mode", "gates", "summary"}

@@ -5,7 +5,7 @@ describe("explainReasonCode", () => {
   it("resolves an exact code to plain English with remediation", () => {
     const r = explainReasonCode("disabled_by_capability_gate");
     expect(r?.plain).toMatch(/turned off/i);
-    expect(r?.remediation).toMatch(/Security Settings/);
+    expect(r?.remediation).toMatch(/Capabilities page/);
   });
 
   it("resolves prefixed codes with a variable suffix", () => {

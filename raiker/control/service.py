@@ -147,6 +147,7 @@ class RuntimeControlService:
             can_current_principal_change=can_change,
             blocked_reason_code=blocked_reason,
             readiness=readiness,
+            decision_mode=self._authority.get_capability_decision_mode(capability),
         )
 
     # -- read methods -------------------------------------------------------

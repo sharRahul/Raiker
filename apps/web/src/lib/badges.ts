@@ -11,7 +11,8 @@ export interface BadgeMeta {
   description: string;
 }
 
-// Mirrors the badge table in docs/UI-implementation/02_SECURITY_UX.md.
+// The security-UX badge set mirrors the governed-runtime status labels; the lifecycle set
+// (active/done/stopped/idle) is generic and usually rendered with a raw-status label override.
 export const BADGES: Record<BadgeVariant, BadgeMeta> = {
   safe: {
     label: "Safe",
@@ -72,6 +73,30 @@ export const BADGES: Record<BadgeVariant, BadgeMeta> = {
     symbol: "‼",
     tone: "tone-danger",
     description: "A one-time/reusable risk acceptance is required first.",
+  },
+  active: {
+    label: "Active",
+    symbol: "►",
+    tone: "tone-accent",
+    description: "In flight.",
+  },
+  done: {
+    label: "Done",
+    symbol: "✓",
+    tone: "tone-ok",
+    description: "Finished successfully.",
+  },
+  stopped: {
+    label: "Stopped",
+    symbol: "✕",
+    tone: "tone-danger",
+    description: "Failed, denied, or cancelled.",
+  },
+  idle: {
+    label: "Idle",
+    symbol: "◌",
+    tone: "tone-muted",
+    description: "No current activity.",
   },
 };
 

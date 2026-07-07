@@ -1,5 +1,6 @@
 // Response shapes from the governed read API (see raiker/control/dashboard.py and
 // raiker/control/dtos.py). These mirror the backend DTOs; the backend remains the source of truth.
+// tests/test_api_contract_schemas.py guards the backend against dropping keys the UI reads.
 
 export interface CapabilityGate {
   capability: string;
@@ -12,6 +13,8 @@ export interface CapabilityGate {
   can_current_principal_change: boolean;
   blocked_reason_code: string | null;
   readiness: Record<string, boolean>;
+  // Per-capability decision mode for AI-proposed actions (ask|allow|auto|deny).
+  decision_mode: string;
 }
 
 export interface RuntimeMode {
@@ -27,6 +30,14 @@ export interface RuntimeReadiness {
   mode: RuntimeMode;
   gates: CapabilityGate[];
   summary: Record<string, unknown>;
+}
+
+// GET /api/capability-modes/{capability} — the per-capability decision mode
+// (ask | allow | auto | deny) governing AI-proposed actions for that capability.
+export interface CapabilityDecisionMode {
+  ok: boolean;
+  capability: string;
+  decision_mode: string;
 }
 
 export interface ProviderHealth {
@@ -109,6 +120,29 @@ export interface SessionSummary {
   created_at: string;
   updated_at: string;
   turn_count: number;
+}
+
+export interface TurnSummary {
+  turn_id: string;
+  session_id: string;
+  turn_type: string;
+  status: string;
+  prompt_text: string | null;
+  created_at: string;
+  completed_at: string | null;
+  summary: string | null;
+}
+
+// GET /api/sessions/{id} — raiker/control/dashboard.py SessionDetailView.to_dict()
+export interface SessionDetail {
+  session: SessionSummary;
+  turns: TurnSummary[];
+}
+
+// GET /api/turns/{id} — raiker/control/dashboard.py TurnDetailView.to_dict()
+export interface TurnDetail {
+  turn: TurnSummary;
+  events: EventEntry[];
 }
 
 export interface AuthSession {

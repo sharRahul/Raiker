@@ -1,5 +1,5 @@
-// Plain-English copy for backend machine reason_codes, transcribed from
-// docs/UI-implementation/02_SECURITY_UX.md (which is itself transcribed verbatim from source).
+// Plain-English copy for backend machine reason_codes (transcribed from the runtime
+// authority sources, e.g. raiker/runtime/authority/router.py and routes_prompts.py).
 // Never hide an unknown code — fall back to the raw code plus a generic explanation.
 
 interface ReasonCopy {
@@ -36,7 +36,7 @@ const REASON_CODES: Record<string, ReasonCopy> = {
   // Capability-gate / mode / transition denials (router.py).
   disabled_by_capability_gate: {
     plain: "This capability is turned off.",
-    remediation: "Enable it in Security Settings → Runtime Mutations (if supported).",
+    remediation: "Enable it on the Capabilities page (if supported).",
   },
   unknown_capability_gate: {
     plain: "This capability isn't recognised.",

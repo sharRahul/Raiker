@@ -3,6 +3,7 @@ import type {
   ApprovalDetailView,
   ApprovalView,
   AuthSession,
+  CapabilityDecisionMode,
   CapabilityGate,
   Checkpoint,
   Diagnostics,
@@ -14,9 +15,11 @@ import type {
   ResolveApprovalResult,
   RuntimeMode,
   RuntimeReadiness,
+  SessionDetail,
   SessionSummary,
   StreamEvent,
   TaskView,
+  TurnDetail,
 } from "./apiTypes";
 
 // Bearer token held in memory only — never localStorage/sessionStorage (security requirement).
@@ -61,99 +64,90 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await resp.json()) as T;
 }
 
-/** Mint a bearer token for the local owner principal and hold it in memory. */
-export async function connect(): Promise<AuthSession> {
-  const session = await request<AuthSession>("/api/auth/session", {
+function withQuery(path: string, params: Record<string, string | number | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") q.set(key, String(value));
+  }
+  const suffix = q.toString();
+  return suffix ? `${path}?${suffix}` : path;
+}
+
+function postJson<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ as_principal: null }),
+    body: JSON.stringify(body),
   });
+}
+
+/** Mint a bearer token for the local owner principal and hold it in memory. */
+export async function connect(): Promise<AuthSession> {
+  const session = await postJson<AuthSession>("/api/auth/session", { as_principal: null });
   setToken(session.token);
   return session;
 }
 
 export const api = {
+  // ── Read-only governed views ──
   capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),
+  capabilityGate: (capability: string) =>
+    request<CapabilityGate>(`/api/capability-gates/${encodeURIComponent(capability)}`),
   runtimeMode: () => request<RuntimeMode>("/api/runtime-mode"),
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   models: () => request<ModelsView>("/api/models"),
-  events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) => {
-    const q = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) {
-      if (v !== undefined && v !== "") q.set(k, String(v));
-    }
-    const suffix = q.toString() ? `?${q.toString()}` : "";
-    return request<EventEntry[]>(`/api/events${suffix}`);
-  },
+  events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
+    request<EventEntry[]>(withQuery("/api/events", params)),
   checkpoints: (sessionId?: string) =>
-    request<Checkpoint[]>(`/api/checkpoints${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`),
+    request<Checkpoint[]>(withQuery("/api/checkpoints", { session_id: sessionId })),
+  checkpoint: (id: string) => request<Checkpoint>(`/api/checkpoints/${encodeURIComponent(id)}`),
   sessions: () => request<SessionSummary[]>("/api/sessions"),
-  tasks: (params: { session_id?: string; status?: string } = {}) => {
-    const q = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) {
-      if (v !== undefined && v !== "") q.set(k, String(v));
-    }
-    const suffix = q.toString() ? `?${q.toString()}` : "";
-    return request<TaskView[]>(`/api/tasks${suffix}`);
-  },
+  session: (id: string) => request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
+  turn: (id: string) => request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
+  tasks: (params: { session_id?: string; status?: string } = {}) =>
+    request<TaskView[]>(withQuery("/api/tasks", params)),
+
+  // ── Prompts / interrupts ──
   // Non-streaming prompt submit; returns the final governed AgentResponse.
-  submitPrompt: (body: PromptRequestBody) =>
-    request<AgentResponse>("/api/prompts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
+  submitPrompt: (body: PromptRequestBody) => postJson<AgentResponse>("/api/prompts", body),
   // Issue a governed safe-boundary interrupt for one task or all active tasks in a session.
-  interrupt: (body: InterruptRequestBody) =>
-    request<InterruptResult>("/api/interrupts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-  approvals: () => request<ApprovalView[]>("/api/approvals"),
+  interrupt: (body: InterruptRequestBody) => postJson<InterruptResult>("/api/interrupts", body),
+
+  // ── Approvals (resolution is metadata-only: records a decision, never executes) ──
+  approvals: (statusFilter = "pending") =>
+    request<ApprovalView[]>(withQuery("/api/approvals", { status_filter: statusFilter })),
   approval: (id: string) => request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(id)}`),
-  // Resolution is metadata-only — it records a decision and never executes the action.
   resolveApproval: (id: string, body: { approve: boolean; reason: string }) =>
-    request<ResolveApprovalResult>(`/api/approvals/${encodeURIComponent(id)}/resolve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-  // ── Runtime mutations (Security Settings). These reuse the existing governed control routes;
-  // the UI adds no authority. Every call is enforced server-side by RuntimeAuthority. ──
+    postJson<ResolveApprovalResult>(`/api/approvals/${encodeURIComponent(id)}/resolve`, body),
+
+  // ── Runtime mutations. These reuse the existing governed control routes; the UI adds no
+  // authority. Every call is enforced server-side by RuntimeAuthority. ──
   activateRuntimeMode: (mode_name: string, reason: string) =>
-    request<{ ok: boolean }>("/api/runtime-mode/activate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode_name, reason }),
-    }),
+    postJson<{ ok: boolean }>("/api/runtime-mode/activate", { mode_name, reason }),
   disableRuntimeMode: (reason: string) =>
-    request<{ ok: boolean }>("/api/runtime-mode/disable", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason }),
-    }),
+    postJson<{ ok: boolean }>("/api/runtime-mode/disable", { reason }),
   setCapabilityState: (
     capability: string,
     body: { target_state: string; reason: string; confirmation_token?: string },
   ) =>
-    request<{ ok: boolean; capability: string; target_state: string }>(
+    postJson<{ ok: boolean; capability: string; target_state: string }>(
       `/api/capability-gates/${encodeURIComponent(capability)}/set`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      },
+      body,
     ),
   disableCapability: (capability: string, reason: string) =>
-    request<{ ok: boolean; capability: string }>(
+    postJson<{ ok: boolean; capability: string }>(
       `/api/capability-gates/${encodeURIComponent(capability)}/disable`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
-      },
+      { reason },
+    ),
+
+  // ── Per-capability decision modes (ask | allow | auto | deny) ──
+  capabilityDecisionMode: (capability: string) =>
+    request<CapabilityDecisionMode>(`/api/capability-modes/${encodeURIComponent(capability)}`),
+  setCapabilityDecisionMode: (capability: string, mode: "ask" | "allow" | "auto" | "deny", reason: string) =>
+    postJson<{ ok: boolean; capability: string; decision_mode: string }>(
+      `/api/capability-modes/${encodeURIComponent(capability)}/${mode}`,
+      { reason },
     ),
 };
 

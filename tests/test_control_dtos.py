@@ -101,6 +101,7 @@ class TestCapabilityGateView:
             can_current_principal_change=True,
             blocked_reason_code=None,
             readiness={"policy_ready": True, "contract_ready": False},
+            decision_mode="ask",
         )
         d = dto.to_dict()
         assert d == {
@@ -114,6 +115,7 @@ class TestCapabilityGateView:
             "can_current_principal_change": True,
             "blocked_reason_code": None,
             "readiness": {"policy_ready": True, "contract_ready": False},
+            "decision_mode": "ask",
         }
 
     def test_to_dict_no_secrets(self) -> None:
@@ -243,6 +245,7 @@ class TestRuntimeReadinessView:
                     "can_current_principal_change": False,
                     "blocked_reason_code": None,
                     "readiness": {},
+                    "decision_mode": "ask",
                 },
             ],
             "summary": {"owner_bootstrapped": True, "dangerous_caps_disabled": True},

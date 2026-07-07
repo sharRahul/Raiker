@@ -1,26 +1,56 @@
-# Raiker Web UI (`apps/web`)
+# Raiker Web App (`apps/web`)
 
-Local-first "mission control" web UI for Raiker's governed agent runtime — a view/controller over
-the existing governed backend, never a privileged interface. See the plan and contracts under
-[`docs/UI-implementation/`](../../docs/UI-implementation/).
+The local web app for Raiker's governed agent runtime — a professional, pastel-themed
+view/controller over the existing governed backend, never a privileged interface. It is
+single-user and loopback-only: `raiker-web` serves the built SPA and the governed API from one
+`127.0.0.1` origin, and every read and mutation flows through the same contracts, policy engine,
+RuntimeAuthority, and append-only audit log as the terminal client.
 
-## Status: Milestone 1 (skeleton)
+## Design
 
-This is the **M1 skeleton only**: app shell, left-nav for every IA section, the runtime status
-banner, the STOP switch (a no-op placeholder until M3), and the status-badge system. It renders
-**clearly-labelled fixture data** and makes **no backend calls** — nothing here reflects a real
-runtime. Backend wiring lands in later milestones (M2+).
+- **Pastel design system, dual theme** — light and dark themes built from one token set in
+  `src/app.css` (iris/mint/peach/rose/sky accents). The default follows the OS
+  (`prefers-color-scheme`); an explicit choice is applied via `data-theme` and persisted in
+  `localStorage` (a UI preference, unlike the bearer token, which is memory-only).
+- **Calm by default, audit on demand** — Chat is the front door and shows the conversation, not
+  the machinery. Each turn's governed gather → plan → act → verify record sits behind a
+  "How this turn was governed" disclosure, and the full event record lives on the Audit log page.
+- **Honest, fail-closed UX** — badges/copy always state what is real (`metadata-only`,
+  `deferred`, `fails closed`); unknown backend codes and capabilities are surfaced raw, never
+  hidden; the UI adds no authority of its own.
+
+## Surfaces
+
+| Page | What it covers |
+| --- | --- |
+| Chat | Streaming governed turns (SSE), per-prompt options (model profile, planning, tool budget), inline needs-approval hand-off |
+| Approvals | Pending/approved/denied inbox, redacted diff/argument previews, metadata-only resolution |
+| Tasks | Active tasks with progress + safe-boundary stop, task history |
+| Sessions | Session browser → turns → per-turn governed events |
+| Capabilities | All capability gates (per phase), friendly labels, gate enable/disable with step-up (reason, Tier-2 confirmation token, threat ack), per-capability decision modes (`ask`/`allow`/`auto`/`deny`) |
+| Models | Model profiles and selection status, hosted/private gate + egress allowlist posture (read-only; no keys, no allowlist values) |
+| Checkpoints | Rewind metadata per session (restore flags are metadata only) |
+| Audit log | The append-only event record with session/type filters |
+| Diagnostics | Readiness checks, configuration gaps, counts, config-derived provider status |
+| Settings | Runtime mode activate/disable (step-up gated), appearance (light/dark/system), secrets & redaction posture |
+
+A top-bar **STOP** switch requests safe-boundary cancellation of all active tasks via the governed
+interrupt path.
 
 ## Develop
 
 ```bash
 npm install
-npm run dev      # local dev server on http://127.0.0.1:5174
+npm run dev      # local dev server on http://127.0.0.1:5174 (proxies /api to raiker-web)
 npm run lint     # eslint
 npm run check    # svelte-check / tsc type-check
 npm run test     # vitest
-npm run build    # production build to dist/
+npm run build    # production build to dist/ (served by raiker-web)
 ```
 
-Stack: Vite + Svelte 5 + TypeScript, Vitest + Testing Library for component tests. The JS toolchain
-is isolated here and does not affect the Python package or its `ruff`/`mypy`/`pytest` gate.
+Stack: Vite + Svelte 5 + TypeScript, Vitest + Testing Library for component tests; no runtime
+dependencies beyond Svelte, no external fonts/CDNs (works fully offline). The JS toolchain is
+isolated here and does not affect the Python package or its `ruff`/`mypy`/`pytest` gate.
+
+The typed API client lives in `src/lib/api.ts` / `src/lib/apiTypes.ts`; the backend contract test
+`tests/test_api_contract_schemas.py` guards the response keys the client reads.

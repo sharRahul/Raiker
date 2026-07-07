@@ -8,7 +8,8 @@ REQUIRED_DOCS = [
     Path("docs/IMPLEMENTATION_STATUS.md"),
     Path("docs/EVENT_CATALOG.md"),
     Path("docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md"),
-    Path("docs/UI_UX_DESIGN_SPEC.md"),
+    # docs/UI_UX_DESIGN_SPEC.md was deliberately removed (superseded by apps/web/README.md).
+    Path("apps/web/README.md"),
     Path("docs/API_AND_CONTRACT_SCHEMAS.md"),
     Path("docs/SECURITY_AND_POLICY.md"),
     Path("docs/RUNTIME_ORCHESTRATION_SPEC.md"),

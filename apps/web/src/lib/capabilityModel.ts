@@ -1,5 +1,6 @@
 import type { CapabilityGate } from "./apiTypes";
 import type { BadgeVariant } from "./types";
+import { humanize } from "./format";
 
 // Capability gate states that mean the gate is enabled (anything else is off / not yet enabled).
 const ENABLED_STATES = new Set(["enabled_read_only", "enabled_policy_gated", "enabled_runtime"]);
@@ -15,7 +16,7 @@ export function isDeferred(gate: CapabilityGate): boolean {
   return reason.includes("no_executor") || reason.includes("no_requirement_entry");
 }
 
-// The meaningful "enable" target states a Security Settings control may offer.
+// The meaningful "enable" target states a capability control may offer.
 const ENABLE_TARGETS = ["enabled_policy_gated", "enabled_runtime"] as const;
 
 /**
@@ -91,7 +92,7 @@ const REASON_TEXT: Record<string, string> = {
   disabled_by_capability_gate: "The capability gate is turned off.",
 };
 
-/** Plain-English explanation for the DisabledCapabilityExplainer. */
+/** Plain-English explanation for a disabled/deferred capability row. */
 export function explainCapability(gate: CapabilityGate): CapabilityExplanation {
   if (ENABLED_STATES.has(gate.state)) {
     return { status: gate.state, why: "Enabled.", requirement: "—", kind: "enabled" };
@@ -106,11 +107,232 @@ export function explainCapability(gate: CapabilityGate): CapabilityExplanation {
     ? "Not available in the local single-user runtime (no executor)."
     : notReady.length > 0
       ? `Pending readiness: ${notReady.join(", ")}.`
-      : "Enable via Security Settings → Runtime Mutations (if your principal is authorised).";
+      : "Enable it from this page (if your principal is authorised).";
   return {
     status: gate.state,
     why,
     requirement,
     kind: deferred ? "deferred" : "gated",
   };
+}
+
+// ── Decision modes (per-capability policy for AI-proposed actions) ──────────
+
+export type DecisionMode = "ask" | "allow" | "auto" | "deny";
+
+export const DECISION_MODES: readonly DecisionMode[] = ["ask", "allow", "auto", "deny"];
+
+export const DECISION_MODE_COPY: Record<DecisionMode, { label: string; hint: string }> = {
+  ask: { label: "Ask", hint: "Every AI-proposed action pauses for your approval (default)." },
+  allow: { label: "Allow", hint: "AI-proposed actions run without prompting, within policy." },
+  auto: { label: "Auto", hint: "Fully automatic within policy — the most permissive mode." },
+  deny: { label: "Deny", hint: "Every AI-proposed action for this capability is refused." },
+};
+
+export function isDecisionMode(value: unknown): value is DecisionMode {
+  return typeof value === "string" && (DECISION_MODES as readonly string[]).includes(value);
+}
+
+// ── Friendly copy for every registered capability ────────────────────────────
+// Descriptions are transcribed from docs/RUNTIME_EXECUTORS_SPEC.md and
+// docs/IMPLEMENTATION_STATUS.md. Unknown capabilities fall back to a humanised
+// name so a new backend capability is never hidden.
+
+interface CapabilityCopy {
+  label: string;
+  description: string;
+}
+
+const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
+  // Phase 3 — UI contracts and memory/graph foundations.
+  desktop_ui: { label: "Desktop app", description: "Native desktop client contract (deferred surface)." },
+  web_ui: { label: "Web dashboard", description: "This local web app's read/contract capability." },
+  dashboard: { label: "Dashboard views", description: "Read-only governed dashboard view contract." },
+  plugin_execution: {
+    label: "Plugin execution (legacy gate)",
+    description: "Phase-3 plugin execution contract gate.",
+  },
+  graph_codemap_indexing: {
+    label: "Code map indexing",
+    description: "Build a graph index of the workspace codebase.",
+  },
+  graph_codemap_planning: {
+    label: "Code map planning",
+    description: "Use the code graph to inform plans.",
+  },
+  semantic_memory_writes: {
+    label: "Semantic memory writes",
+    description: "Write durable semantic memories (approval-governed).",
+  },
+  semantic_memory_review_queue: {
+    label: "Memory review queue",
+    description: "Human review queue for proposed memories.",
+  },
+  // Phase 4 — orchestration and execution surfaces.
+  external_channels: {
+    label: "External channels (legacy gate)",
+    description: "Phase-4 external channel contract gate.",
+  },
+  subagents: { label: "Subagents", description: "Delegate bounded work to governed in-process subagents." },
+  multi_agent_teams: {
+    label: "Multi-agent teams",
+    description: "Coordinate several governed agents on one objective.",
+  },
+  remote_execution: {
+    label: "Remote execution (legacy gate)",
+    description: "Phase-4 remote execution contract gate.",
+  },
+  container_execution: {
+    label: "Container execution (legacy gate)",
+    description: "Phase-4 container execution contract gate.",
+  },
+  // Runtime domains — Tier 1/2 execution.
+  shell_execution: {
+    label: "Shell commands",
+    description: "Run sandboxed shell commands with output caps and timeouts.",
+  },
+  process_execution: {
+    label: "Processes",
+    description: "Start bounded local processes through the sandbox.",
+  },
+  network_execution: {
+    label: "Network requests",
+    description: "Open network connections, restricted by the owner egress allowlist.",
+  },
+  web_fetch: { label: "Web fetch", description: "Fetch web pages, restricted by the owner egress allowlist." },
+  file_write_execution: {
+    label: "File writes",
+    description: "Write files in the workspace (approval-gated proposals).",
+  },
+  patch_apply_execution: {
+    label: "Patch apply",
+    description: "Apply unified-diff patches to workspace files (approval-gated).",
+  },
+  memory_write_execution: {
+    label: "Memory store",
+    description: "Persist durable memories through the governed broker.",
+  },
+  memory_forget_execution: {
+    label: "Memory forget",
+    description: "Delete durable memories through the governed broker.",
+  },
+  approval_execution_relay: {
+    label: "Approval execution relay",
+    description: "Execute an action after approval (disabled: approvals stay metadata-only).",
+  },
+  admin_mutation: { label: "Admin mutations", description: "Administrative changes to runtime records." },
+  policy_mutation: { label: "Policy mutations", description: "Change policy rules (owner-only, off by default)." },
+  role_mutation: { label: "Role mutations", description: "Grant or revoke principal roles (human-only)." },
+  // Models.
+  model_provider_runtime: {
+    label: "Provider embeddings",
+    description: "Call a provider's embedding endpoint and store semantic vectors (egress-gated).",
+  },
+  hosted_model_runtime: {
+    label: "Hosted models",
+    description: "Talk to hosted LLM APIs (Anthropic, OpenAI, Gemini, OpenRouter) behind the egress allowlist.",
+  },
+  private_network_model_runtime: {
+    label: "Home-lab models",
+    description: "Talk to private-network inference servers such as vLLM.",
+  },
+  // Personal-domain local stores.
+  email_runtime: {
+    label: "Email drafts (local)",
+    description: "Local email drafts only — queued for a human to send; Raiker never transmits.",
+  },
+  calendar_runtime: {
+    label: "Calendar (local)",
+    description: "Local calendar events only — no external calendar sync or invites.",
+  },
+  reminder_runtime: { label: "Reminders (local)", description: "Local reminder store — create and list." },
+  // Sensitive domains — fail closed, no executor.
+  finance_runtime: { label: "Finance", description: "No executor; fails closed pending a per-domain threat model." },
+  investment_runtime: {
+    label: "Investments",
+    description: "No executor; fails closed pending a per-domain threat model.",
+  },
+  medical_runtime: { label: "Medical", description: "No executor; fails closed pending a per-domain threat model." },
+  pregnancy_baby_runtime: {
+    label: "Pregnancy & baby",
+    description: "No executor; fails closed pending a per-domain threat model.",
+  },
+  cctv_runtime: { label: "CCTV", description: "No executor; fails closed pending a per-domain threat model." },
+  home_security_runtime: {
+    label: "Home security",
+    description: "No executor; fails closed pending a per-domain threat model.",
+  },
+  hardware_operator_runtime: {
+    label: "Hardware operator",
+    description: "No executor; fails closed pending a per-domain threat model.",
+  },
+  // Plugins.
+  plugin_install: {
+    label: "Plugin install",
+    description: "Validate a plugin manifest (checksum + signatures) and record the install.",
+  },
+  plugin_execution_cap: {
+    label: "Plugin reads",
+    description: "Installed plugins may call read-only tools through the broker.",
+  },
+  plugin_revocation_cap: {
+    label: "Plugin revocation",
+    description: "The off-switch: revoke an installed plugin so it fails closed.",
+  },
+  plugin_runtime_cap: {
+    label: "Plugin runtime",
+    description: "Run an allowlisted plugin's entrypoint as a bounded subprocess.",
+  },
+  plugin_sandboxed_runtime_cap: {
+    label: "Plugin sandbox runtime",
+    description: "Run a plugin inside a network-isolated container.",
+  },
+  // Channels / execution environments.
+  external_channel_runtime: {
+    label: "External channels",
+    description: "One governed webhook channel for inbound messages.",
+  },
+  channel_approval_relay: {
+    label: "Channel approval relay",
+    description: "Relay approval requests over a governed channel.",
+  },
+  remote_execution_cap: {
+    label: "Remote execution",
+    description: "No executor; remote command execution stays fail-closed.",
+  },
+  container_execution_cap: {
+    label: "Container execution",
+    description: "Run commands in an owner-allowlisted local container.",
+  },
+  cloud_execution_cap: {
+    label: "Cloud execution",
+    description: "No executor; cloud execution stays fail-closed.",
+  },
+  // Memory / retrieval runtimes.
+  graph_indexing_runtime: {
+    label: "Graph indexing runtime",
+    description: "Maintain the workspace graph index as a governed runtime.",
+  },
+  semantic_memory_runtime: {
+    label: "Semantic memory runtime",
+    description: "Governed semantic memory store operations.",
+  },
+  vector_embedding_runtime: {
+    label: "Vector embeddings",
+    description: "Local embeddings + vector search; also gates retrieval-augmented turns (default-ask).",
+  },
+  // Automation / audit.
+  scheduled_routines: {
+    label: "Scheduled routines",
+    description: "Time-based routine metadata (no unattended execution).",
+  },
+  audit_export: { label: "Audit export", description: "Export the append-only audit record." },
+};
+
+export function capabilityLabel(capability: string): string {
+  return CAPABILITY_COPY[capability]?.label ?? humanize(capability);
+}
+
+export function capabilityDescription(capability: string): string {
+  return CAPABILITY_COPY[capability]?.description ?? "Governed capability.";
 }

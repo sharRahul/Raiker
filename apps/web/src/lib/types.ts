@@ -1,5 +1,7 @@
-// Status badge variants — one per label defined in docs/UI-implementation/02_SECURITY_UX.md.
-// Each variant must convey meaning by text + shape, never colour alone (see badges.ts).
+// Status badge variants. The security-UX set (safe/needs-approval/…) is defined by the
+// governed-runtime status labels; the generic lifecycle set (active/done/stopped/idle)
+// covers task, turn, and approval statuses. Each variant conveys meaning by text + shape,
+// never colour alone (see badges.ts).
 export type BadgeVariant =
   | "safe"
   | "needs-approval"
@@ -10,4 +12,8 @@ export type BadgeVariant =
   | "implemented"
   | "metadata-only"
   | "read-only"
-  | "risk-acceptance-required";
+  | "risk-acceptance-required"
+  | "active"
+  | "done"
+  | "stopped"
+  | "idle";

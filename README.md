@@ -21,7 +21,7 @@
 - **Storage/State:** SQLite (`raiker/storage/sqlite.py`) for runtime state, tasks, sessions, approvals, checkpoints, memory candidates, and metadata records; append-only JSONL for the event log.
 - **Inference:** Local LLM runtimes via an async OpenAI-compatible adapter — **llama.cpp** server is the native local default (`http://127.0.0.1:8080`); Ollama, LM Studio, and vLLM are local/home-lab profiles; OpenRouter is hosted and policy/budget-gated; a deterministic provider powers offline tests.
 
-Component-by-component responsibilities live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the design foundations are under [`docs/foundation/`](docs/foundation/); the web dashboard's API contracts and security UX are in [`docs/UI-implementation/`](docs/UI-implementation/).
+Component-by-component responsibilities live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the design foundations are under [`docs/foundation/`](docs/foundation/); the web app's design system, surfaces, and security UX are described in [`apps/web/README.md`](apps/web/README.md).
 
 ---
 

@@ -27,6 +27,9 @@ Use `raiker --help` after installing the project.
 - Approval resolution is metadata-only.
 - Durable memory mutation is broker-governed.
 - Capabilities without real executors remain disabled/deferred and fail closed.
+- Local single-user hardening includes owner bootstrap, persisted owner principal, acting-principal resolution, runtime_gate_manager authorization, and recovery flow.
+- Deferred dangerous capabilities stay fail-closed unless their real executor, policy, storage, audit, and tests exist.
+- Approval execution relay is a separate governed capability; approval resolution itself remains metadata-only.
 
 ## Contributing & Workflow
 

@@ -64,6 +64,10 @@ class CapabilityGateView:
     can_current_principal_change: bool = False
     blocked_reason_code: str | None = None
     readiness: dict[str, Any] = field(default_factory=dict)
+    # Per-capability decision mode for AI-proposed actions (ask|allow|auto|deny).
+    # Included here so a UI can render the whole capability matrix in one read
+    # instead of a per-capability fan-out.
+    decision_mode: str = "ask"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -77,6 +81,7 @@ class CapabilityGateView:
             "can_current_principal_change": self.can_current_principal_change,
             "blocked_reason_code": self.blocked_reason_code,
             "readiness": dict(self.readiness),
+            "decision_mode": self.decision_mode,
         }
 
 

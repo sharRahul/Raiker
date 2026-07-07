@@ -67,6 +67,7 @@ export function makeGate(partial: Partial<CapabilityGate>): CapabilityGate {
     can_current_principal_change: false,
     blocked_reason_code: null,
     readiness: {},
+    decision_mode: "ask",
     ...partial,
   };
 }

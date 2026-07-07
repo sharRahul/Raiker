@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import Badge from "../components/Badge.svelte";
   import Icon from "../components/Icon.svelte";
   import StepUpDialog from "../components/StepUpDialog.svelte";
   import type { StepUpValues } from "../components/StepUpDialog.svelte";
@@ -14,8 +13,6 @@
     DECISION_MODE_COPY,
     DECISION_MODES,
     enableableTargets,
-    explainCapability,
-    gateBadge,
     groupByPhase,
     isDecisionMode,
     requiresStepUpToken,
@@ -31,10 +28,18 @@
   let expanded = $state<string | null>(null);
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
 
-  // Decision modes are fetched lazily per expanded capability (53 caps × eager
-  // fetches would trip the API rate limit for no benefit).
-  let decisionModes = $state<Record<string, DecisionMode | "unknown">>({});
-  let modeBusy = $state(false);
+  // The per-capability decision mode is the primary control here. It arrives inline
+  // on each gate (gate.decision_mode) from the single /api/capability-gates read, so
+  // there is no per-capability fan-out. Local overrides after a successful set are
+  // kept here so the segmented control updates without a full reload.
+  let modeOverrides = $state<Record<string, DecisionMode>>({});
+  let modeBusyCap = $state<string | null>(null);
+
+  function modeFor(gate: CapabilityGate): DecisionMode | "unknown" {
+    const override = modeOverrides[gate.capability];
+    if (override !== undefined) return override;
+    return isDecisionMode(gate.decision_mode) ? gate.decision_mode : "unknown";
+  }
 
   // The pending mutation awaiting step-up confirmation.
   type Pending =
@@ -49,6 +54,7 @@
     loadError = null;
     try {
       gates = await api.capabilityGates();
+      modeOverrides = {};
     } catch (e) {
       gates = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
@@ -68,24 +74,42 @@
     return groupByPhase(matches);
   });
 
-  async function toggleExpand(capability: string) {
+  function toggleExpand(capability: string) {
     expanded = expanded === capability ? null : capability;
-    if (expanded !== null && decisionModes[capability] === undefined) {
-      try {
-        const result = await api.capabilityDecisionMode(capability);
-        decisionModes = {
-          ...decisionModes,
-          [capability]: isDecisionMode(result.decision_mode) ? result.decision_mode : "unknown",
-        };
-      } catch {
-        decisionModes = { ...decisionModes, [capability]: "unknown" };
-      }
+  }
+
+  async function setMode(gate: CapabilityGate, mode: DecisionMode) {
+    const capability = gate.capability;
+    if (modeFor(gate) === mode || modeBusyCap !== null) return;
+    // Tightening modes (ask/deny) apply immediately; loosening modes (allow/auto)
+    // require the step-up window with an explicit reason.
+    if (mode === "allow" || mode === "auto") {
+      pending = { kind: "set_mode", capability, mode };
+      dialogError = null;
+      return;
+    }
+    modeBusyCap = capability;
+    notice = null;
+    try {
+      await api.setCapabilityDecisionMode(capability, mode, "set via web UI");
+      modeOverrides = { ...modeOverrides, [capability]: mode };
+      notice = {
+        kind: "ok",
+        text: `${capabilityLabel(capability)} is now set to “${DECISION_MODE_COPY[mode].label}”.`,
+      };
+    } catch (e) {
+      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      notice = {
+        kind: "error",
+        text: explained ? `${explained.plain} ${explained.remediation ?? ""}` : "The change was rejected.",
+      };
+    } finally {
+      modeBusyCap = null;
     }
   }
 
   function startEnable(gate: CapabilityGate) {
     const targets = enableableTargets(gate);
-    // Prefer the strongest enabled state the backend offers.
     const target = targets.includes("enabled_runtime") ? "enabled_runtime" : targets[0];
     pending = {
       kind: "enable",
@@ -94,32 +118,6 @@
       requireToken: requiresStepUpToken(gate.capability),
     };
     dialogError = null;
-  }
-
-  async function setMode(capability: string, mode: DecisionMode) {
-    if (decisionModes[capability] === mode) return;
-    // Tightening modes (ask/deny) apply immediately; loosening modes (allow/auto)
-    // require the step-up window with an explicit reason.
-    if (mode === "allow" || mode === "auto") {
-      pending = { kind: "set_mode", capability, mode };
-      dialogError = null;
-      return;
-    }
-    modeBusy = true;
-    notice = null;
-    try {
-      await api.setCapabilityDecisionMode(capability, mode, "set via web UI");
-      decisionModes = { ...decisionModes, [capability]: mode };
-      notice = { kind: "ok", text: `Decision mode for ${capabilityLabel(capability)} is now “${mode}”.` };
-    } catch (e) {
-      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
-      notice = {
-        kind: "error",
-        text: explained ? `${explained.plain} ${explained.remediation ?? ""}` : "The change was rejected.",
-      };
-    } finally {
-      modeBusy = false;
-    }
   }
 
   function stepUpProps() {
@@ -139,7 +137,7 @@
         };
       case "set_mode":
         return {
-          title: `Set ${capabilityLabel(pending.capability)} to “${pending.mode}”`,
+          title: `Set ${capabilityLabel(pending.capability)} to “${DECISION_MODE_COPY[pending.mode].label}”`,
           requireToken: false,
           requireThreatAck: false,
         };
@@ -151,13 +149,16 @@
     busy = true;
     dialogError = null;
     try {
-      await runMutation(pending, values);
-      notice = { kind: "ok", text: describeSuccess(pending) };
-      if (pending.kind === "set_mode") {
-        decisionModes = { ...decisionModes, [pending.capability]: pending.mode };
-      }
+      const p = pending;
+      await runMutation(p, values);
+      notice = { kind: "ok", text: describeSuccess(p) };
       pending = null;
       await load();
+      // load() clears overrides; re-apply the just-set mode so the control reflects it
+      // even if the persisted read lags (the set itself is authoritative).
+      if (p.kind === "set_mode") {
+        modeOverrides = { [p.capability]: p.mode };
+      }
     } catch (e) {
       const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
       // Keep the dialog open so the user can supply what the backend says is missing.
@@ -184,19 +185,19 @@
   }
 
   function describeSuccess(p: Pending): string {
-    if (p.kind === "enable") return `Enabled ${capabilityLabel(p.capability)} (${p.target}).`;
+    if (p.kind === "enable") return `Enabled ${capabilityLabel(p.capability)}.`;
     if (p.kind === "disable_cap") return `Disabled ${capabilityLabel(p.capability)}.`;
-    return `Decision mode for ${capabilityLabel(p.capability)} is now “${p.mode}”.`;
+    return `${capabilityLabel(p.capability)} is now set to “${DECISION_MODE_COPY[p.mode].label}”.`;
   }
 
   onMount(load);
 </script>
 
 <p class="page-lead">
-  Everything the agent can do, and the rules for doing it. Each capability has a
-  <strong>gate</strong> (on/off) and a <strong>decision mode</strong> — how AI-proposed actions are
-  handled: ask you first (default), allow, run automatically, or always deny. Changes are enforced
-  server-side; this page adds no authority of its own.
+  Choose how the agent should handle each thing it can do. For every capability, pick whether an
+  AI-proposed action should <strong>ask you first</strong> (the default), be <strong>allowed</strong>
+  without prompting, run <strong>automatically</strong>, or always be <strong>denied</strong>. Every
+  choice is enforced server-side — this page adds no authority of its own.
 </p>
 
 {#if notice}
@@ -227,77 +228,59 @@
   <p class="loading">Loading…</p>
 {:else}
   {#each filtered as group (group.phase)}
-    <h2 class="phase-h">Phase {group.phase}</h2>
     <div class="cap-list">
       {#each group.gates as gate (gate.capability)}
         {@const isOpen = expanded === gate.capability}
-        {@const explanation = explainCapability(gate)}
+        {@const mode = modeFor(gate)}
         <div class="cap card" class:open={isOpen}>
-          <button
-            type="button"
-            class="cap-row"
-            aria-expanded={isOpen}
-            onclick={() => toggleExpand(gate.capability)}
-          >
-            <span class="chev" aria-hidden="true">
-              <Icon name={isOpen ? "chevron-down" : "chevron-right"} size={15} />
-            </span>
-            <span class="cap-name">
-              <span class="cap-label">{capabilityLabel(gate.capability)}</span>
-              <code class="cap-code">{gate.capability}</code>
-            </span>
-            <Badge variant={gateBadge(gate)} />
-          </button>
+          <div class="cap-row">
+            <button
+              type="button"
+              class="cap-toggle"
+              aria-expanded={isOpen}
+              onclick={() => toggleExpand(gate.capability)}
+            >
+              <span class="chev" aria-hidden="true">
+                <Icon name={isOpen ? "chevron-down" : "chevron-right"} size={15} />
+              </span>
+              <span class="cap-name">
+                <span class="cap-label">{capabilityLabel(gate.capability)}</span>
+                <code class="cap-code">{gate.capability}</code>
+              </span>
+            </button>
+
+            <div
+              class="mode-seg"
+              role="group"
+              aria-label={`Decision mode for ${capabilityLabel(gate.capability)}`}
+            >
+              {#each DECISION_MODES as m (m)}
+                <button
+                  type="button"
+                  class="mode-btn"
+                  class:selected={mode === m}
+                  title={DECISION_MODE_COPY[m].hint}
+                  aria-pressed={mode === m}
+                  onclick={() => setMode(gate, m)}
+                  disabled={modeBusyCap === gate.capability}
+                >
+                  {DECISION_MODE_COPY[m].label}
+                </button>
+              {/each}
+            </div>
+          </div>
 
           {#if isOpen}
             <div class="cap-detail">
               <p class="cap-desc">{capabilityDescription(gate.capability)}</p>
-
-              {#if explanation.kind !== "enabled"}
-                <p class="cap-why">
-                  <Icon name="info" size={14} />
-                  {explanation.why} {explanation.requirement}
-                </p>
+              {#if isDecisionMode(mode)}
+                <p class="mode-hint">{DECISION_MODE_COPY[mode].hint}</p>
               {/if}
-
-              <dl class="cap-meta">
-                <div><dt>State</dt><dd><code>{gate.state}</code></dd></div>
-                <div><dt>Default</dt><dd><code>{gate.default_state}</code></dd></div>
-                <div><dt>Source</dt><dd><code>{gate.source}</code></dd></div>
-              </dl>
-
-              <div class="mode-block">
-                <p class="field-label">Decision mode for AI-proposed actions</p>
-                {#if decisionModes[gate.capability] === undefined}
-                  <p class="loading">Loading mode…</p>
-                {:else}
-                  <div class="mode-seg" role="group" aria-label={`Decision mode for ${gate.capability}`}>
-                    {#each DECISION_MODES as mode (mode)}
-                      <button
-                        type="button"
-                        class="mode-btn"
-                        class:selected={decisionModes[gate.capability] === mode}
-                        title={DECISION_MODE_COPY[mode].hint}
-                        aria-pressed={decisionModes[gate.capability] === mode}
-                        onclick={() => setMode(gate.capability, mode)}
-                        disabled={modeBusy}
-                      >
-                        {DECISION_MODE_COPY[mode].label}
-                      </button>
-                    {/each}
-                  </div>
-                  <p class="mode-hint">
-                    {isDecisionMode(decisionModes[gate.capability])
-                      ? DECISION_MODE_COPY[decisionModes[gate.capability] as DecisionMode].hint
-                      : "Current mode could not be read."}
-                  </p>
-                {/if}
-              </div>
 
               <div class="cap-actions">
                 {#if canEnable(gate)}
                   <button type="button" class="btn btn-soft btn-sm" onclick={() => startEnable(gate)}>
-                    Enable gate
+                    Turn on
                   </button>
                 {/if}
                 {#if canDisable(gate)}
@@ -309,11 +292,11 @@
                       dialogError = null;
                     }}
                   >
-                    Disable gate
+                    Turn off
                   </button>
                 {/if}
                 {#if !gate.can_current_principal_change}
-                  <span class="muted">Gate changes are not permitted for your principal.</span>
+                  <span class="muted">On/off changes are not permitted for your principal.</span>
                 {/if}
               </div>
             </div>
@@ -377,17 +360,11 @@
   .search-input:focus {
     outline: none;
   }
-  .phase-h {
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--text-3);
-    margin: var(--space-4) 0 var(--space-2);
-  }
   .cap-list {
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
+    margin-bottom: var(--space-2);
   }
   .cap {
     padding: 0;
@@ -399,18 +376,26 @@
   .cap-row {
     display: flex;
     align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.9rem;
+    flex-wrap: wrap;
+  }
+  .cap-toggle {
+    display: flex;
+    align-items: center;
     gap: 0.6rem;
-    width: 100%;
+    flex: 1;
+    min-width: 12rem;
     font: inherit;
     text-align: left;
     background: transparent;
     border: none;
-    padding: 0.6rem 0.9rem;
+    padding: 0.15rem 0;
     cursor: pointer;
     color: var(--text-1);
   }
-  .cap-row:hover {
-    background: var(--sunken);
+  .cap-toggle:hover {
+    color: var(--accent);
   }
   .chev {
     color: var(--text-3);
@@ -418,7 +403,6 @@
     place-items: center;
   }
   .cap-name {
-    flex: 1;
     display: flex;
     align-items: baseline;
     gap: 0.6rem;
@@ -432,67 +416,28 @@
     color: var(--text-3);
     font-size: 0.74rem;
   }
-  .cap-detail {
-    border-top: 1px solid var(--border);
-    padding: var(--space-3) var(--space-4) var(--space-4);
-    background: var(--sunken);
-  }
-  .cap-desc {
-    font-size: 0.88rem;
-    color: var(--text-2);
-    margin: 0 0 0.5rem;
-  }
-  .cap-why {
-    display: flex;
-    gap: 0.4rem;
-    align-items: flex-start;
-    font-size: 0.82rem;
-    color: var(--info);
-    margin: 0 0 0.6rem;
-  }
-  .cap-meta {
-    display: flex;
-    gap: 1.2rem;
-    flex-wrap: wrap;
-    margin: 0 0 var(--space-3);
-  }
-  .cap-meta div {
-    display: flex;
-    gap: 0.35rem;
-    align-items: baseline;
-  }
-  .cap-meta dt {
-    font-size: 0.7rem;
-    font-weight: 650;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-3);
-  }
-  .cap-meta dd {
-    margin: 0;
-    font-size: 0.8rem;
-  }
-  .mode-block {
-    margin-bottom: var(--space-3);
-  }
   .mode-seg {
     display: inline-flex;
     gap: 2px;
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
+    background: var(--sunken);
+    border: 1px solid var(--border);
     border-radius: var(--r-pill);
     padding: 3px;
+    flex-shrink: 0;
   }
   .mode-btn {
     font: inherit;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 600;
     color: var(--text-2);
     background: transparent;
     border: none;
     border-radius: var(--r-pill);
-    padding: 0.22rem 0.8rem;
+    padding: 0.2rem 0.7rem;
     cursor: pointer;
+  }
+  .mode-btn:hover:not(:disabled):not(.selected) {
+    color: var(--text-1);
   }
   .mode-btn:disabled {
     opacity: 0.5;
@@ -501,11 +446,22 @@
   .mode-btn.selected {
     background: var(--accent-soft);
     color: var(--accent);
+    box-shadow: var(--shadow-1);
+  }
+  .cap-detail {
+    border-top: 1px solid var(--border);
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    background: var(--sunken);
+  }
+  .cap-desc {
+    font-size: 0.88rem;
+    color: var(--text-2);
+    margin: 0 0 0.4rem;
   }
   .mode-hint {
-    font-size: 0.76rem;
+    font-size: 0.8rem;
     color: var(--text-3);
-    margin: 0.35rem 0 0;
+    margin: 0 0 var(--space-3);
   }
   .cap-actions {
     display: flex;

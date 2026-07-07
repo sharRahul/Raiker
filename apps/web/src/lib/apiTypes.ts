@@ -13,6 +13,8 @@ export interface CapabilityGate {
   can_current_principal_change: boolean;
   blocked_reason_code: string | null;
   readiness: Record<string, boolean>;
+  // Per-capability decision mode for AI-proposed actions (ask|allow|auto|deny).
+  decision_mode: string;
 }
 
 export interface RuntimeMode {

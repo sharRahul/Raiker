@@ -3,7 +3,7 @@ export interface NavItem {
   label: string;
 }
 
-// Left-nav information architecture (docs/UI-implementation/01_INFORMATION_ARCHITECTURE.md).
+// Left-nav items for the launchable local web dashboard.
 export const NAV_ITEMS: NavItem[] = [
   { id: "home", label: "Home" },
   { id: "tasks", label: "Tasks & Plans" },

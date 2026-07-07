@@ -19,6 +19,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Debug deleted UI doc references
+        run: |
+          git grep -n "UI-implementation\|PHASE_8_UI_UX_CONCEPT\|FLIGHT_DECK_UI_UX_PLAN" || true
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

@@ -36,7 +36,7 @@ jobs:
           python -m pytest --collect-only -q
       - name: Run tests
         run: |
-          python -m pytest
+          python -m pytest -q -x --tb=short
       - name: Run ruff
         run: |
           python -m ruff check .

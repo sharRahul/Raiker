@@ -13,6 +13,59 @@ to the user, and every capability governed, default-ask human/humam governed, an
 
 Be mind full of token usage if needed do it in batches. Keep committing after every phase and then push to origin main before the token limit is ended for the session. Plan and implement it in such a way that anyone can pick it up after your session token are over even though the goal is not complete. In next session review where you are and then start from next phase.
 
+## State as of 2026-07-07 (session end) — web app rebuild
+
+> **Web UI rebuilt from scratch (open in PR #104, branch
+> `claude/raiker-web-ui-redesign-2u052u`; frontend-only, no backend behaviour
+> change).** The old `apps/web` dashboard is replaced by a professional pastel UI:
+> - **Design:** one design-token set in `apps/web/src/app.css` (iris/mint/peach/
+>   rose/sky accents), **dark + light + system themes** (default follows
+>   `prefers-color-scheme`; explicit choice persisted in `localStorage` — the
+>   bearer token stays memory-only). Shield-R logo + inline SVG icon set; no
+>   external fonts/CDNs (fully offline). Nav grouped Work / Governance / System.
+> - **Surfaces (full capability + settings coverage):** Chat (SSE turn stream;
+>   the gather→plan→act→verify detail is tucked behind a per-turn disclosure so
+>   background machinery never crowds the view), Approvals (metadata-only),
+>   Tasks, Sessions, Capabilities, Models, Checkpoints, Audit log, Diagnostics,
+>   Settings.
+> - **Capabilities page:** per-owner request, the **Ask/Allow/Auto/Deny decision
+>   mode** is the primary inline control on every capability; implementation-status
+>   badges (Implemented/Deferred/Disabled) were removed. To make inline modes
+>   robust the decision mode now rides on the single `/api/capability-gates` read
+>   (new `decision_mode` field on `CapabilityGateView` — the only backend change),
+>   avoiding a 53-request fan-out that tripped the 120/min API rate limit.
+> - **Plain-English UI:** raw internal identifiers (`shell_execution`, `write_file`,
+>   `policy_decision`, runtime-mode codes, gate-state codes) are humanised for
+>   display; the "Raiker" product name is kept. Literal strings that are meant to
+>   be read/typed verbatim (`[REDACTED]`, `127.0.0.1`, CLI commands) stay as code.
+>
+> **Web app + server health check (2026-07-07, this session):** stood up
+> `raiker-web` against a bootstrapped-owner workspace and verified end to end.
+> - **All good:** `/api/health` + SPA index 200; all read endpoints
+>   (capability-gates, runtime-mode, diagnostics, models, approvals, tasks,
+>   events, checkpoints, sessions, runtime-readiness) return 200; owner session
+>   mint + decision-mode writes work; **no browser console errors across all ten
+>   views**; `npm run lint`/`check`/`test` (57 vitest) + `build` green; full
+>   `pytest`, `ruff`, `mypy raiker apps tests`, and all five validators pass.
+> - **One issue found and fixed:** the browser auto-requested `/favicon.ico` and
+>   got a 404 (no favicon bundled, no `<link rel="icon">`). Added
+>   `apps/web/public/favicon.svg` (shield-R) + the icon link in `index.html`;
+>   console is now clean. `favicon.ico` still 404s if requested directly, but
+>   browsers use the linked SVG so it is never requested.
+> - **Known web-app limitations (by design, NOT bugs — do not "fix"):**
+>   1. **Chat needs a running local model server.** With no reachable model,
+>      prompts fail closed with `model_unavailable: provider_connection_failed`
+>      (Raiker never fabricates output). Point it at llama.cpp/Ollama/LM Studio and
+>      select a profile (`/model use …`) first.
+>   2. **API rate limit is 120 req/min per IP** (`RateLimitMiddleware`). The UI is
+>      designed to stay well under it; a burst of rapid manual refreshes can still
+>      surface `429 rate_limited` (shown honestly). Keep new views single-request
+>      where possible (see the `decision_mode`-on-gates change above).
+>   3. **No secret/credential store (deferred).** Settings shows redaction posture
+>      only; provider API keys are read from the owner's env and never displayed.
+>   4. Single-user, loopback-only (`127.0.0.1`); approval resolution is
+>      metadata-only (records a decision, never executes).
+
 ## State as of 2026-07-06 (session end)
 
 > **This session — part 8 (default gate posture flip: integrated = enabled):**
@@ -487,29 +540,16 @@ validators passed.
 
 ## Next work, in priority order
 
-1. **Config path resolution bug - completed in this session.**
-   `ModelProfileRegistry.load()` / `ConnectorRegistry.load()` read
-   `config/*.json` relative to cwd — installed `raiker` fails outside the
-   repo root (`FileNotFoundError`). Add a package-relative fallback
-   (`importlib.resources` or anchored on `raiker.__file__`), ship the JSON as
-   package data, and add a test that loads the registry from a foreign cwd.
-   Implemented with bundled `raiker.config` resources, drift tests, and a
-   wheel-content check; do not redo this item unless it regresses.
-2. **Live hosted-provider verification — DONE for `anthropic-hosted` (2026-07-06).**
-   Ran one governed turn on `anthropic-hosted` (`claude-opus-4-8`) with an
-   operator key through the real path (gate → gate-derived policy → egress
-   allowlist), returned `finish_reason=stop`; egress guard confirmed fail-closed.
-   Status flipped to `implemented_verified` in `IMPLEMENTATION_STATUS.md`. No code
-   changed — evidence only. `openai-hosted` / `gemini-hosted-openai-compatible`
-   remain to verify when their operator keys are available.
-3. **Tool calls on Ollama models - completed in this session.** `ollama-local-openai-compatible` shipped
-   `supports_tool_calls: false` / `text_json`. Modern Ollama models (qwen3,
-   gemma4) support native OpenAI tool calls — test against the live server,
-   then flip the profile (or add per-model detection) so the agentic loop can
-   act with local models, not just llama.cpp.
-   Implemented as `supports_tool_calls=true`, `tool_call_mode=native_or_text_json`,
-   with focused tests and live localhost evidence against `qwen3.5:9b`.
-4. **Plugin runtime promotion (Tier 4).** Completed so far: `plugin_install`,
+> Completed items from earlier sessions were removed from this list to keep it
+> actionable (config path resolution, `anthropic-hosted` live verification, Ollama
+> tool-call support, the slice-7/8 web dashboard parity, and the web-app rebuild
+> are all done — see the state sections above and `IMPLEMENTATION_STATUS.md`).
+
+1. **Open hosted-provider verification (evidence only).** `anthropic-hosted` is
+   `implemented_verified`. `openai-hosted` / `gemini-hosted-openai-compatible`
+   remain to verify with a governed live turn when their operator keys are
+   available (this cloud session's egress proxy blocks those hosts).
+2. **Plugin runtime promotion (Tier 4).** Completed so far: `plugin_install`,
    brokered read-only `plugin_execution_cap`, `plugin_revocation_cap` (the
    off-switch, slice 10), install-time dependency controls (slice 11), HMAC
    manifest signature verification (slice 12), asymmetric Ed25519 signature
@@ -528,11 +568,11 @@ validators passed.
    bare-subprocess runtime; (c) plugin **hooks/MCP/LSP/monitors/panels**
    activation (each its own threat-model → executor → validator/guard-test →
    tests slice). Follow the slice discipline below for each.
-5. **Web dashboard parity for slice 7/8 - completed in this session:** surface hosted-model gate state,
-   egress allowlist status, and hosted profiles in the Security Settings /
-   models views of `apps/web`.
-   Implemented as read-only API/UI metadata with contract, backend, and Svelte
-   tests. Allowlist values and provider keys are intentionally not displayed.
+3. **Web app follow-ups (optional, non-blocking).** The rebuild (PR #104) is
+   complete and green. Nice-to-haves if revisited: a live model-reachability
+   indicator on the Models page (the CLI has `/model health`; the web read
+   deliberately does not probe the network), and surfacing retrieval/RAG toggles
+   once that loop is exposed. None are required for the app to be usable.
 
 ## Slice discipline (repeat every slice)
 

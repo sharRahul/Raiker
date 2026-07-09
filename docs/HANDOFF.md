@@ -4,12 +4,13 @@
 > without re-deriving state. Read this + `docs/IMPLEMENTATION_STATUS.md` first.
 > Update this file at the end of every working session.
 
-## Goal (unchanged)
+## Goal
 
-Make Raiker a full-fledged, secure AI agent that can connect to **any**
-backend LLM — local (llama.cpp/Ollama/LM Studio), home-lab (vLLM), or hosted
-API provider (Anthropic/OpenAI/Gemini/OpenRouter) — with the choice belonging
-to the user, and every capability governed, default-ask human/humam governed, and fail-closed.
+Make Raiker a secure AI product that combines an AI assistant, a governed AI agent, and an extensible agent platform.
+
+As an assistant, Raiker should help users understand, reason, decide, and communicate through a polished conversational experience. As an agent, Raiker should be able to plan tasks, gather context, use tools, execute approved actions, verify outcomes, and explain what it did. As a platform, Raiker should provide the governed runtime foundation for models, tools, plugins, interfaces, memory, approvals, audit events, checkpoints, and integrations.
+
+Raiker must support user-owned model choice across LLM backends — local models such as llama.cpp, Ollama, and LM Studio; home-lab runtimes such as vLLM; private-network providers; and hosted API providers such as Anthropic, OpenAI, Gemini, and OpenRouter. No model, interface, plugin, or capability should bypass governance. Every action must remain policy-aware, observable, auditable, approval-driven where required, human-governed, user-controlled, and fail-closed by design.
 
 Be mind full of token usage if needed do it in batches. Keep committing after every phase and then push to origin main before the token limit is ended for the session. Plan and implement it in such a way that anyone can pick it up after your session token are over even though the goal is not complete. In next session review where you are and then start from next phase.
 

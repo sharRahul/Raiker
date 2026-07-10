@@ -46,6 +46,14 @@ class AuthSessionRequest:
     as_principal: str | None = None
 
 
+class SetModelFallbackRequest(BaseModel):
+    # Ordered list of model profile ids to try (in order) when the selected
+    # provider is unavailable. extra="forbid" rejects unknown fields.
+    model_config = ConfigDict(extra="forbid")
+
+    profile_ids: list[str]
+
+
 @dataclass
 class PromptRequest:
     text: str

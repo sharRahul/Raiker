@@ -17,6 +17,7 @@ function makeProfile(partial: Partial<ModelProfile>): ModelProfile {
     runtime_gate: null,
     off_machine: false,
     selected: false,
+    prompt_cache_ttl: null,
     ...partial,
   };
 }
@@ -29,6 +30,7 @@ function makeModels(partial: Partial<ModelsView>): ModelsView {
     private_network_model_gate_state: "enabled_runtime",
     model_egress_allowlist_configured: false,
     remote_profile_count: 0,
+    fallback_sequence: [],
     no_silent_hosted_fallback: true,
     ...partial,
   };

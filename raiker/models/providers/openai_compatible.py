@@ -142,6 +142,25 @@ class AsyncOpenAICompatibleProvider:
         if request.tools and self.capabilities.supports_tool_calls:
             payload["tools"] = [t.to_openai_tool() for t in request.tools]
             payload["tool_choice"] = "auto"
+        # Prompt-cache hints. OpenAI-compatible caching is server-side; the only
+        # client levers are provider-specific, so we send them only to providers
+        # that document them (a strict server would 400 on an unknown field):
+        #   - OpenAI: `prompt_cache_key` routes same-prefix requests together. We
+        #     key by profile_id, so every Raiker turn on this profile shares the
+        #     stable system-prompt prefix and hits the same cache.
+        #   - llama.cpp server: `cache_prompt` reuses the prompt KV cache.
+        # Any other backend (vLLM/Ollama/LM Studio/Gemini/OpenRouter) caches
+        # automatically or exposes no client lever — no field is sent.
+        if request.cache_ttl:
+            if self.provider == "openai":
+                payload["prompt_cache_key"] = self.profile_id
+            elif self.provider == "llama.cpp":
+                payload["cache_prompt"] = True
+            if stream and self.provider == "openai":
+                # Ask OpenAI to include a usage block in the final stream chunk so
+                # cache-hit metrics survive the streamed path. Gated to OpenAI to
+                # avoid tripping local servers that don't accept stream_options.
+                payload["stream_options"] = {"include_usage": True}
         reasoning = request.reasoning
         if reasoning and reasoning.enabled and self.capabilities.supports_reasoning:
             if reasoning.effort and self.capabilities.supports_reasoning_effort:
@@ -190,7 +209,14 @@ class AsyncOpenAICompatibleProvider:
                         decoded = json.loads(data)
                     except json.JSONDecodeError as exc:
                         raise ProviderStreamError("malformed_sse_json") from exc
+                    # The final usage-only chunk (from stream_options.include_usage)
+                    # carries an empty choices list — surface its usage so cache-hit
+                    # metrics survive streaming.
+                    usage = decoded.get("usage") if isinstance(decoded, dict) else None
                     choices = decoded.get("choices") if isinstance(decoded, dict) else None
+                    if isinstance(usage, dict) and (not isinstance(choices, list) or not choices):
+                        yield ModelStreamEvent(event_type="usage", metadata={"usage": usage})
+                        continue
                     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
                         continue
                     choice = choices[0]

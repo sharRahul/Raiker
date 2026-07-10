@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from raiker.approval_previews import redact_secret_like_text
+from raiker.control.dtos import ControlResult
 from raiker.control.service import RuntimeControlService
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
 from raiker.models.policy_state import HOSTED_MODEL_GATE, PRIVATE_NETWORK_MODEL_GATE
@@ -134,6 +135,9 @@ class ModelProfileView:
     runtime_gate: str | None
     off_machine: bool
     selected: bool
+    # Prompt-cache TTL breakpoint the provider uses for this profile ("5m"/"1h"),
+    # or None when the provider/profile does not cache. Read-only status.
+    prompt_cache_ttl: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -147,6 +151,10 @@ class ModelsView:
     private_network_model_gate_state: str
     model_egress_allowlist_configured: bool
     remote_profile_count: int
+    # User-owned ordered model fallback sequence (profile ids). When the selected
+    # provider is unavailable, the runtime walks this list in order; each candidate
+    # is still gated by provider policy, so hosted access is never granted silently.
+    fallback_sequence: tuple[str, ...] = ()
     # The runtime never silently falls back to hosted providers; hosted runtime is not enabled.
     no_silent_hosted_fallback: bool = True
 
@@ -158,6 +166,7 @@ class ModelsView:
             "private_network_model_gate_state": self.private_network_model_gate_state,
             "model_egress_allowlist_configured": self.model_egress_allowlist_configured,
             "remote_profile_count": self.remote_profile_count,
+            "fallback_sequence": list(self.fallback_sequence),
             "no_silent_hosted_fallback": self.no_silent_hosted_fallback,
         }
 
@@ -358,6 +367,7 @@ class DashboardService:
                 runtime_gate=self._runtime_gate_for_profile(str(p.raw.get("endpoint_kind", "unknown"))),
                 off_machine=str(p.raw.get("endpoint_kind", "unknown")) in {"remote_hosted", "private_network"},
                 selected=(p.profile_id == current),
+                prompt_cache_ttl=(str(p.raw.get("prompt_cache_ttl")) if p.raw.get("prompt_cache_ttl") else None),
             )
             for p in registry.list_profiles()
             # Test-harness profiles (mock/deterministic) are not selectable outside
@@ -374,7 +384,40 @@ class DashboardService:
                 os.environ.get(MODEL_EGRESS_ALLOWLIST_ENV, "").strip()
             ),
             remote_profile_count=sum(1 for p in profiles if p.off_machine),
+            fallback_sequence=tuple(
+                self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
+            ),
         )
+
+    def set_model_fallback_sequence(
+        self, profile_ids: list[str], acting_principal_id: str | None
+    ) -> ControlResult:
+        """Persist the user-owned ordered fallback sequence (human gate-manager only).
+
+        Only known, non-test model profile ids are accepted; unknown ids fail
+        closed with ``unknown_profile:<id>``. Authorization mirrors the capability
+        control plane: the acting principal must be a human ``runtime_gate_manager``.
+        Persisting the ordered list does not itself enable any provider — each
+        candidate is still gated by provider policy when a turn actually falls back.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if not self.control._is_gate_manager(principal):  # noqa: SLF001
+            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        registry = ModelProfileRegistry.load()
+        known: dict[str, Any] = {p.profile_id: p for p in registry.list_profiles()}
+        cleaned: list[str] = []
+        for profile_id in profile_ids:
+            profile = known.get(profile_id)
+            if profile is None:
+                return ControlResult(ok=False, reason_code=f"unknown_profile:{profile_id}")
+            if bool(profile.raw.get("test_only", False)):
+                return ControlResult(ok=False, reason_code=f"test_profile_not_allowed:{profile_id}")
+            if profile_id not in cleaned:
+                cleaned.append(profile_id)
+        self.store.save_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID, cleaned)
+        return ControlResult(ok=True, data={"fallback_sequence": cleaned})
 
     @staticmethod
     def _runtime_gate_for_profile(endpoint_kind: str) -> str | None:

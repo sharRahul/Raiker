@@ -62,6 +62,23 @@ def _map_finish(stop_reason: str) -> str:
 
 ANTHROPIC_VERSION = "2023-06-01"
 
+# Beta header required to opt into the 1-hour extended prompt-cache TTL. The
+# default 5-minute ephemeral cache needs no beta header.
+EXTENDED_CACHE_TTL_BETA = "extended-cache-ttl-2025-04-11"
+
+
+def _cache_control(cache_ttl: str | None) -> dict[str, Any] | None:
+    """Anthropic ``cache_control`` block for a requested TTL, or None if caching is off.
+
+    ``"5m"`` → the default ephemeral cache (no ``ttl`` field); ``"1h"`` → the
+    1-hour extended cache. Any other value disables caching.
+    """
+    if cache_ttl == "5m":
+        return {"type": "ephemeral"}
+    if cache_ttl == "1h":
+        return {"type": "ephemeral", "ttl": "1h"}
+    return None
+
 
 def _map_status(status: int, *, model: str) -> Exception:
     if status in {401, 403}:
@@ -144,8 +161,9 @@ class AsyncAnthropicMessagesProvider:
         return self.endpoint.rstrip("/") + path
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        headers = {**self._headers, **kwargs.pop("headers", {})}
         try:
-            response = await self._client.request(method, self._url(path), headers=self._headers, **kwargs)
+            response = await self._client.request(method, self._url(path), headers=headers, **kwargs)
         except httpx.TimeoutException as exc:
             raise ProviderTimeoutError("provider_timeout") from exc
         except httpx.HTTPError as exc:
@@ -180,13 +198,27 @@ class AsyncAnthropicMessagesProvider:
 
     def _payload(self, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
         system, messages = _to_anthropic_messages(list(request.messages))
+        cache_control = _cache_control(request.cache_ttl)
         payload: dict[str, Any] = {
             "model": request.model or self.model,
             "max_tokens": request.max_tokens or self.max_tokens,
             "messages": messages,
         }
         if system:
-            payload["system"] = system
+            if cache_control is not None:
+                # Break the cache at the end of the (stable) system prompt. Per the
+                # Anthropic cache ordering (tools → system → messages) this reuses
+                # tools + system across turns within the TTL. System becomes a list
+                # of content blocks so the breakpoint can ride the last block.
+                payload["system"] = [{"type": "text", "text": system, "cache_control": cache_control}]
+            else:
+                payload["system"] = system
+        elif cache_control is not None and messages:
+            # No system prompt: fall back to a breakpoint on the last content block
+            # of the last message so at least the message prefix is cached.
+            last_block = messages[-1]["content"][-1] if messages[-1]["content"] else None
+            if isinstance(last_block, dict):
+                last_block["cache_control"] = cache_control
         if stream:
             payload["stream"] = True
         if request.tools and self.capabilities.supports_tool_calls:
@@ -206,8 +238,19 @@ class AsyncAnthropicMessagesProvider:
             payload["thinking"] = thinking
         return payload
 
+    @staticmethod
+    def _cache_headers(request: ModelRequest) -> dict[str, str]:
+        """Per-request beta header needed only for the 1-hour extended cache TTL."""
+        if request.cache_ttl == "1h":
+            return {"anthropic-beta": EXTENDED_CACHE_TTL_BETA}
+        return {}
+
     async def chat(self, request: ModelRequest) -> ModelResponse:
-        response = await self._request("POST", self.chat_path, json=self._payload(request, stream=False))
+        response = await self._request(
+            "POST", self.chat_path,
+            json=self._payload(request, stream=False),
+            headers=self._cache_headers(request),
+        )
         return self._parse_chat(_json(response))
 
     def _parse_chat(self, data: dict[str, Any]) -> ModelResponse:
@@ -242,9 +285,11 @@ class AsyncAnthropicMessagesProvider:
         return ModelResponse(text="".join(text_parts), tool_calls=tool_calls, finish_reason=finish, usage=usage)
 
     async def stream_chat(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
+        usage_acc: dict[str, Any] = {}
         try:
             async with self._client.stream(
-                "POST", self._url(self.chat_path), headers=self._headers,
+                "POST", self._url(self.chat_path),
+                headers={**self._headers, **self._cache_headers(request)},
                 json=self._payload(request, stream=True),
             ) as response:
                 if response.status_code >= 400:
@@ -260,7 +305,15 @@ class AsyncAnthropicMessagesProvider:
                     if not isinstance(decoded, dict):
                         continue
                     event_type = decoded.get("type")
-                    if event_type == "content_block_delta":
+                    if event_type == "message_start":
+                        # Input + cache usage arrives up front; output tokens come
+                        # in message_delta. Merge and surface once so cache-hit
+                        # metrics survive the streamed path.
+                        message = decoded.get("message")
+                        start_usage = message.get("usage") if isinstance(message, dict) else None
+                        if isinstance(start_usage, dict):
+                            usage_acc.update(start_usage)
+                    elif event_type == "content_block_delta":
                         delta = decoded.get("delta")
                         if isinstance(delta, dict) and delta.get("type") == "text_delta":
                             text = delta.get("text")
@@ -268,8 +321,13 @@ class AsyncAnthropicMessagesProvider:
                                 yield ModelStreamEvent(event_type="text_delta", text_delta=text)
                     elif event_type == "message_delta":
                         delta = decoded.get("delta")
+                        delta_usage = decoded.get("usage")
+                        if isinstance(delta_usage, dict):
+                            usage_acc.update(delta_usage)
                         stop = delta.get("stop_reason") if isinstance(delta, dict) else None
                         if isinstance(stop, str) and stop:
+                            if usage_acc:
+                                yield ModelStreamEvent(event_type="usage", metadata={"usage": dict(usage_acc)})
                             yield ModelStreamEvent(event_type="finish", finish_reason=_map_finish(stop))
                     elif event_type == "message_stop":
                         return

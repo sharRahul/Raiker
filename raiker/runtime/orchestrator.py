@@ -10,7 +10,13 @@ from raiker.contracts.models import AgentResponse, PromptEnvelope, ToolAction, T
 from raiker.contracts.streaming import FINAL, LIFECYCLE, TEXT_DELTA, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
-from raiker.models.contracts import FINISH_REASONS, ModelMessage, ModelResponse, ToolCallProposal
+from raiker.models.contracts import (
+    FINISH_REASONS,
+    ModelMessage,
+    ModelResponse,
+    ToolCallProposal,
+    summarize_model_usage,
+)
 from raiker.models.exceptions import ModelProviderError
 from raiker.models.router import ModelRouter
 from raiker.models.tool_call_validation import (
@@ -43,6 +49,7 @@ class RuntimeOrchestrator:
         model_router: ModelRouter,
         default_provider: tuple[str, str] = ("mock", "mock-deterministic"),
         profile_resolver: Callable[[str], tuple[str, str] | None] | None = None,
+        fallback_resolver: Callable[[], list[tuple[str, str]]] | None = None,
     ) -> None:
         self.workspace_root = Path(workspace_root).resolve()
         self.writer = writer
@@ -50,6 +57,11 @@ class RuntimeOrchestrator:
         self.model_router = model_router
         self.default_provider = default_provider
         self.profile_resolver = profile_resolver
+        # Ordered, user-owned fallback chain, resolved fresh per turn. When the
+        # bound provider fails (no network, timeout, non-responsive host, policy
+        # denial) the turn walks these candidates in order. Each is still gated by
+        # the model router, so fallback never bypasses provider policy.
+        self.fallback_resolver = fallback_resolver
         self.classifier = SimpleClassifier()
         self.planner = SimplePlanner()
         self.context_gatherer = ContextGatherer()
@@ -136,35 +148,64 @@ class RuntimeOrchestrator:
             )
         return self.default_provider
 
+    def _provider_chain(self, envelope: PromptEnvelope) -> list[tuple[str, str]]:
+        """Ordered providers to try this turn: the bound provider, then the fallback chain.
+
+        The fallback chain is the user-owned sequence resolved fresh each turn.
+        Duplicates and the already-bound provider are skipped so a provider is
+        never tried twice in one turn.
+        """
+        chain: list[tuple[str, str]] = [self._turn_provider(envelope)]
+        if self.fallback_resolver is not None:
+            try:
+                candidates = self.fallback_resolver()
+            except Exception:  # noqa: BLE001 — a broken resolver must not break the turn
+                candidates = []
+            for candidate in candidates:
+                if candidate not in chain:
+                    chain.append(candidate)
+        return chain
+
     async def _acall_model(
         self, envelope: PromptEnvelope, messages: list[ModelMessage]
     ) -> ModelResponse:
-        provider, model = self._turn_provider(envelope)
-        self._event(
-            envelope,
-            "model_request_started",
-            {"provider": provider, "model": model, "message_count": len(messages)},
-        )
-        try:
-            response = await self.model_router.achat(provider, model, messages, self.tool_specs)
-        except ModelProviderError as exc:
+        chain = self._provider_chain(envelope)
+        for rank, (provider, model) in enumerate(chain):
+            if rank > 0:
+                self._event(
+                    envelope,
+                    "model_fallback_engaged",
+                    {"provider": provider, "model": model, "fallback_rank": rank, "reason": "primary_provider_unavailable"},
+                )
             self._event(
                 envelope,
-                "model_request_failed",
-                {"provider": provider, "finish_reason": "error", "error_class": type(exc).__name__, "safe_error_code": "provider_connection_failed"},
+                "model_request_started",
+                {"provider": provider, "model": model, "message_count": len(messages)},
             )
-            return ModelResponse(text="model_unavailable: provider_connection_failed", finish_reason="error")
-        self._event(
-            envelope,
-            "model_request_completed",
-            {
-                "provider": provider,
-                "finish_reason": response.finish_reason,
-                "tool_call_count": len(response.tool_calls),
-                "text_length": len(response.text),
-            },
-        )
-        return response
+            try:
+                response = await self.model_router.achat(provider, model, messages, self.tool_specs)
+            except ModelProviderError as exc:
+                self._event(
+                    envelope,
+                    "model_request_failed",
+                    {"provider": provider, "finish_reason": "error", "error_class": type(exc).__name__, "safe_error_code": "provider_connection_failed"},
+                )
+                continue
+            self._event(
+                envelope,
+                "model_request_completed",
+                {
+                    "provider": provider,
+                    "finish_reason": response.finish_reason,
+                    "tool_call_count": len(response.tool_calls),
+                    "text_length": len(response.text),
+                    # Metadata-only token counts (incl. cache hits), normalised
+                    # across providers; empty when the provider reports no usage.
+                    "usage": summarize_model_usage(response.usage),
+                },
+            )
+            return response
+        return ModelResponse(text="model_unavailable: provider_connection_failed", finish_reason="error")
 
     @staticmethod
     def _format_from_result(action: ToolAction, tool_result: ToolResult) -> str:
@@ -217,58 +258,75 @@ class RuntimeOrchestrator:
         On provider error it fails safe, exactly like the non-streaming path.
         """
 
-        provider, model = self._turn_provider(envelope)
-        self._event(
-            envelope,
-            "model_request_started",
-            {"provider": provider, "model": model, "message_count": len(messages)},
-        )
-        deltas: list[StreamEvent] = []
-        text_parts: list[str] = []
-        tool_deltas: list[dict[str, object]] = []
-        finish: str | None = None
-        try:
-            async for sev in self.model_router.astream(provider, model, messages, self.tool_specs):
-                if sev.text_delta:
-                    text_parts.append(sev.text_delta)
-                    deltas.append(StreamEvent(kind=TEXT_DELTA, text=sev.text_delta))
-                if sev.tool_call_delta:
-                    tool_deltas.append(sev.tool_call_delta)
-                if sev.event_type == "finish":
-                    finish = sev.finish_reason
-        except Exception as exc:
+        chain = self._provider_chain(envelope)
+        for rank, (provider, model) in enumerate(chain):
+            if rank > 0:
+                self._event(
+                    envelope,
+                    "model_fallback_engaged",
+                    {"provider": provider, "model": model, "fallback_rank": rank, "reason": "primary_provider_unavailable"},
+                )
             self._event(
                 envelope,
-                "model_request_failed",
+                "model_request_started",
+                {"provider": provider, "model": model, "message_count": len(messages)},
+            )
+            # Fresh per-attempt buffers: a failed attempt's partial deltas are
+            # discarded before the next candidate streams (nothing is yielded live
+            # until this method returns), so fallback never duplicates output.
+            deltas: list[StreamEvent] = []
+            text_parts: list[str] = []
+            tool_deltas: list[dict[str, object]] = []
+            finish: str | None = None
+            usage: dict[str, object] | None = None
+            try:
+                async for sev in self.model_router.astream(provider, model, messages, self.tool_specs):
+                    if sev.text_delta:
+                        text_parts.append(sev.text_delta)
+                        deltas.append(StreamEvent(kind=TEXT_DELTA, text=sev.text_delta))
+                    if sev.tool_call_delta:
+                        tool_deltas.append(sev.tool_call_delta)
+                    stream_usage = sev.metadata.get("usage")
+                    if isinstance(stream_usage, dict):
+                        usage = stream_usage
+                    if sev.event_type == "finish":
+                        finish = sev.finish_reason
+            except Exception as exc:  # noqa: BLE001 — provider streams fail safe, then fall back
+                self._event(
+                    envelope,
+                    "model_request_failed",
+                    {
+                        "provider": provider,
+                        "finish_reason": "error",
+                        "error_class": type(exc).__name__,
+                        "safe_error_code": "provider_connection_failed",
+                    },
+                )
+                continue
+            response = ModelResponse(
+                text="".join(text_parts),
+                # Defensive: providers map protocol stop reasons to the contract, but a
+                # turn must fail safe (not raise) if one ever streams an unknown value.
+                finish_reason=finish if finish in FINISH_REASONS else "stop",
+                tool_calls=self._reconstruct_tool_calls(tool_deltas),
+                usage=usage,
+            )
+            self._event(
+                envelope,
+                "model_request_completed",
                 {
                     "provider": provider,
-                    "finish_reason": "error",
-                    "error_class": type(exc).__name__,
-                    "safe_error_code": "provider_connection_failed",
+                    "finish_reason": response.finish_reason,
+                    "tool_call_count": len(response.tool_calls),
+                    "text_length": len(response.text),
+                    "usage": summarize_model_usage(response.usage),
                 },
             )
-            return (
-                ModelResponse(text="model_unavailable: provider_connection_failed", finish_reason="error"),
-                deltas,
-            )
-        response = ModelResponse(
-            text="".join(text_parts),
-            # Defensive: providers map protocol stop reasons to the contract, but a
-            # turn must fail safe (not raise) if one ever streams an unknown value.
-            finish_reason=finish if finish in FINISH_REASONS else "stop",
-            tool_calls=self._reconstruct_tool_calls(tool_deltas),
+            return response, deltas
+        return (
+            ModelResponse(text="model_unavailable: provider_connection_failed", finish_reason="error"),
+            [],
         )
-        self._event(
-            envelope,
-            "model_request_completed",
-            {
-                "provider": provider,
-                "finish_reason": response.finish_reason,
-                "tool_call_count": len(response.tool_calls),
-                "text_length": len(response.text),
-            },
-        )
-        return response, deltas
 
     async def astream_handle(self, envelope: PromptEnvelope):  # type: ignore[no-untyped-def]
         """Run a turn, yielding :class:`StreamEvent`s incrementally (text + lifecycle + final)."""

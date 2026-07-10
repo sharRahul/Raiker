@@ -68,7 +68,8 @@
       "embeddings_path": "/v1/embeddings",
       "timeout_seconds": 120.0,
       "temperature": 0.2,
-      "max_tokens": 1024
+      "max_tokens": 1024,
+      "prompt_cache_ttl": "5m"
     },
     {
       "profile_id": "ollama-local-openai-compatible",
@@ -198,7 +199,9 @@
       "supports_json_schema": false,
       "supports_reasoning": true,
       "supports_reasoning_summary": true,
-      "reasoning_modes": ["adaptive"],
+      "reasoning_modes": [
+        "adaptive"
+      ],
       "reasoning_trace_visible": false,
       "tool_call_mode": "native",
       "models_path": "/v1/models",
@@ -208,7 +211,8 @@
       "redact_from_logs": [
         "api_key_env",
         "extra_headers.x-api-key"
-      ]
+      ],
+      "prompt_cache_ttl": "5m"
     },
     {
       "profile_id": "openai-hosted",
@@ -230,13 +234,18 @@
       "supports_json_schema": true,
       "supports_reasoning": true,
       "supports_reasoning_effort": true,
-      "reasoning_effort_values": ["low", "medium", "high"],
+      "reasoning_effort_values": [
+        "low",
+        "medium",
+        "high"
+      ],
       "reasoning_trace_visible": false,
       "tool_call_mode": "native_or_text_json",
       "redact_from_logs": [
         "api_key_env",
         "extra_headers.Authorization"
-      ]
+      ],
+      "prompt_cache_ttl": "5m"
     },
     {
       "profile_id": "gemini-hosted-openai-compatible",

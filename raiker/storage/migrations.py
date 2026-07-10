@@ -1054,3 +1054,19 @@ CREATE TABLE IF NOT EXISTS scheduled_routines (
   status TEXT NOT NULL DEFAULT 'scheduled'
 );
 """
+
+# Ordered, user-owned model fallback sequence. When the actively selected model
+# provider is unavailable (no network, timeout, non-responsive host, policy
+# denial), the runtime walks this ordered list of profile ids and tries the next
+# one — typically a local backend (llama.cpp / Ollama / LM Studio / vLLM). Each
+# candidate is still resolved and gated through the model router, so fallback can
+# never bypass provider policy. Stored one ordered list per client session id.
+MODEL_FALLBACK_SEQUENCE_MIGRATION_ID = "RAIKER-1004-model-fallback-sequence"
+
+MODEL_FALLBACK_SEQUENCE_SQL = """
+CREATE TABLE IF NOT EXISTS model_fallback_sequence (
+  session_id TEXT PRIMARY KEY,
+  profile_ids_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""

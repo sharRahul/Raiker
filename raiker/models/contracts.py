@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import uuid4
@@ -15,6 +15,46 @@ class ModelContractError(ValueError):
 
 def new_call_id() -> str:
     return f"call_{uuid4().hex}"
+
+
+def summarize_model_usage(usage: Mapping[str, Any] | None) -> dict[str, int]:
+    """Normalize a provider's ``usage`` dict into comparable token counts.
+
+    Providers report usage differently — Anthropic exposes
+    ``cache_read_input_tokens`` / ``cache_creation_input_tokens`` at the top
+    level; OpenAI-compatible endpoints nest cache hits under
+    ``prompt_tokens_details.cached_tokens``. This flattens both into a common
+    metadata-only shape (token counts only, never prompt/response text) so the
+    runtime can emit and the UI can render cache activity irrespective of which
+    model served the turn. Missing fields are simply omitted; a non-dict input
+    yields ``{}``.
+    """
+    if not isinstance(usage, Mapping):
+        return {}
+    out: dict[str, int] = {}
+
+    def _put(key: str, value: Any) -> None:
+        if isinstance(value, bool):  # guard: bools are ints in Python
+            return
+        if isinstance(value, int) and value >= 0:
+            out[key] = value
+
+    # Input tokens: Anthropic uses input_tokens; OpenAI uses prompt_tokens.
+    _put("input_tokens", usage.get("input_tokens", usage.get("prompt_tokens")))
+    # Output tokens: Anthropic uses output_tokens; OpenAI uses completion_tokens.
+    _put("output_tokens", usage.get("output_tokens", usage.get("completion_tokens")))
+    # Cache read (the cost/latency win): Anthropic top-level; OpenAI nested.
+    cached = usage.get("cache_read_input_tokens")
+    if cached is None:
+        details = usage.get("prompt_tokens_details")
+        if isinstance(details, Mapping):
+            cached = details.get("cached_tokens")
+    _put("cache_read_tokens", cached)
+    # Cache write (Anthropic only; OpenAI has no separate write metric).
+    _put("cache_write_tokens", usage.get("cache_creation_input_tokens"))
+    if "cache_read_tokens" in out:
+        out["cache_hit"] = int(out["cache_read_tokens"] > 0)
+    return out
 
 
 @dataclass(frozen=True)
@@ -135,6 +175,11 @@ class ModelRequest:
     reasoning: ReasoningOptions | None = None
     session_id: str | None = None
     turn_id: str | None = None
+    # Prompt-cache TTL breakpoint for providers that support it (Anthropic today):
+    # None/"" = no caching; "5m" = default 5-minute ephemeral cache; "1h" = 1-hour
+    # extended cache. Cuts cost and latency by reusing the stable prompt prefix
+    # (system prompt + workspace context) across turns within the TTL window.
+    cache_ttl: str | None = None
 
 
 @dataclass(frozen=True)

@@ -77,6 +77,7 @@ export interface ModelProfile {
   runtime_gate: string | null;
   off_machine: boolean;
   selected: boolean;
+  prompt_cache_ttl: string | null;
 }
 
 export interface ModelsView {
@@ -86,6 +87,7 @@ export interface ModelsView {
   private_network_model_gate_state: string;
   model_egress_allowlist_configured: boolean;
   remote_profile_count: number;
+  fallback_sequence: string[];
   no_silent_hosted_fallback: boolean;
 }
 

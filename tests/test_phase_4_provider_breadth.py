@@ -129,6 +129,64 @@ def test_chat_refusal_maps_to_error_finish() -> None:
     assert resp.finish_reason == "error" and resp.text == ""
 
 
+# ── Prompt caching (cost/latency: reuse the stable prompt prefix) ──────────────
+
+
+def _cache_handler(seen: dict[str, Any]):  # type: ignore[no-untyped-def]
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["beta"] = request.headers.get("anthropic-beta")
+        seen.update(json.loads(request.content.decode()))
+        return httpx.Response(200, json={
+            "content": [{"type": "text", "text": "ok"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 10, "output_tokens": 5, "cache_read_input_tokens": 8},
+        })
+
+    return handler
+
+
+def test_no_cache_control_by_default() -> None:
+    seen: dict[str, Any] = {}
+    asyncio.run(_provider(_cache_handler(seen)).chat(_request()))
+    # Default: system is a plain string, no cache_control, no beta header.
+    assert seen["system"] == "be safe"
+    assert seen["beta"] is None
+
+
+def test_cache_control_5m_breaks_system_without_beta_header() -> None:
+    seen: dict[str, Any] = {}
+    asyncio.run(_provider(_cache_handler(seen)).chat(_request(cache_ttl="5m")))
+    assert seen["system"] == [
+        {"type": "text", "text": "be safe", "cache_control": {"type": "ephemeral"}}
+    ]
+    # 5-minute ephemeral cache needs no beta header.
+    assert seen["beta"] is None
+
+
+def test_cache_control_1h_sets_ttl_and_beta_header() -> None:
+    seen: dict[str, Any] = {}
+    asyncio.run(_provider(_cache_handler(seen)).chat(_request(cache_ttl="1h")))
+    assert seen["system"] == [
+        {"type": "text", "text": "be safe", "cache_control": {"type": "ephemeral", "ttl": "1h"}}
+    ]
+    assert seen["beta"] == "extended-cache-ttl-2025-04-11"
+
+
+def test_invalid_cache_ttl_is_ignored() -> None:
+    seen: dict[str, Any] = {}
+    asyncio.run(_provider(_cache_handler(seen)).chat(_request(cache_ttl="30s")))
+    assert seen["system"] == "be safe"
+    assert seen["beta"] is None
+
+
+def test_router_reads_prompt_cache_ttl_from_profile() -> None:
+    from raiker.models.router import _cache_ttl
+
+    profile = ModelProfileRegistry.load().resolve_profile_id("anthropic-hosted")
+    # The shipped hosted-Anthropic profile opts into the default 5-minute cache.
+    assert _cache_ttl(profile) == "5m"
+
+
 def test_stream_chat_yields_text_deltas() -> None:
     body = "\n".join([
         'data: {"type": "message_start"}',

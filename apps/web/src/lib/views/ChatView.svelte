@@ -54,6 +54,22 @@
     return rows.length > 0 ? rows[rows.length - 1].phase : null;
   }
 
+  // Provider-agnostic cache metrics from the last model_request_completed event.
+  // The runtime normalises every provider's usage into the same shape, so this
+  // reads cache-hit tokens irrespective of which model served the turn.
+  function cacheInfo(turn: ChatTurn): { read: number; hit: boolean } | null {
+    for (let i = turn.events.length - 1; i >= 0; i--) {
+      const ev = turn.events[i];
+      if (ev.kind !== "lifecycle" || ev.event_type !== "model_request_completed") continue;
+      const usage = ev.payload?.usage as Record<string, number> | undefined;
+      if (usage && typeof usage.cache_read_tokens === "number") {
+        return { read: usage.cache_read_tokens, hit: usage.cache_read_tokens > 0 };
+      }
+      return null;
+    }
+    return null;
+  }
+
   function answerText(turn: ChatTurn): string {
     const streamed = collectText(turn.events);
     if (streamed.trim() !== "") return streamed;
@@ -173,6 +189,16 @@
           {#if turn.response !== null}
             <div class="response-meta">
               <Badge variant={responseBadge(turn.response.status)} label={turn.response.status} />
+              {#if cacheInfo(turn)}
+                {@const cache = cacheInfo(turn)}
+                <span
+                  class="cache-chip"
+                  class:hit={cache?.hit}
+                  title="Prompt cache — cached input tokens reused this turn (cuts cost and latency)"
+                >
+                  {cache?.hit ? `Cache hit · ${cache.read} tok` : "Cache miss"}
+                </span>
+              {/if}
             </div>
 
             {#if turn.response.status === "needs_approval" && turn.response.approval}
@@ -395,6 +421,24 @@
   }
   .response-meta {
     margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .cache-chip {
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--neutral-border);
+    background: var(--neutral-soft);
+    color: var(--text-3);
+    padding: 0.08rem 0.55rem;
+  }
+  .cache-chip.hit {
+    border-color: var(--ok-border);
+    background: var(--ok-soft);
+    color: var(--ok);
   }
   .approval-card {
     margin-top: 0.65rem;

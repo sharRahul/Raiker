@@ -8,7 +8,7 @@
   import { groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { responseBadge } from "../statusMaps";
   import { collectText } from "../turnPhases";
-  import { humanize } from "../format";
+  import { humanize, providerName } from "../format";
 
   interface ChatTurn {
     id: number;
@@ -63,15 +63,20 @@
   async function submit() {
     const text = promptText.trim();
     if (text === "" || streaming) return;
-    const turn: ChatTurn = {
-      id: nextId++,
-      prompt: text,
-      events: [],
-      response: null,
-      streaming: true,
-      error: null,
-    };
-    turns = [...turns, turn];
+    turns = [
+      ...turns,
+      {
+        id: nextId++,
+        prompt: text,
+        events: [],
+        response: null,
+        streaming: true,
+        error: null,
+      },
+    ];
+    // Mutate the $state-proxied instance, not the raw literal: raw-object writes
+    // bypass Svelte 5's signals and the transcript would never re-render.
+    const turn = turns[turns.length - 1];
     promptText = "";
     streaming = true;
     void scrollToEnd();
@@ -91,7 +96,6 @@
           } else {
             turn.events = [...turn.events, event];
           }
-          turns = [...turns];
           void scrollToEnd();
         },
       );
@@ -101,14 +105,16 @@
     } finally {
       turn.streaming = false;
       streaming = false;
-      turns = [...turns];
       void scrollToEnd();
     }
   }
 
   async function scrollToEnd() {
     await tick();
-    scrollEl?.scrollTo({ top: scrollEl.scrollHeight });
+    // Guarded: jsdom (vitest) has no scrollTo implementation.
+    if (typeof scrollEl?.scrollTo === "function") {
+      scrollEl.scrollTo({ top: scrollEl.scrollHeight });
+    }
   }
 
   function onKeydown(e: KeyboardEvent) {
@@ -230,9 +236,17 @@
         <div class="option">
           <label class="field-label" for="opt-model">Model profile</label>
           <select id="opt-model" class="select" bind:value={modelProfile} disabled={streaming}>
-            <option value="">Runtime default</option>
+            <option value="">Selected model (see Models)</option>
             {#each profiles as p (p.profile_id)}
-              <option value={p.profile_id}>{p.profile_id} ({p.provider})</option>
+              <option
+                value={p.profile_id}
+                disabled={p.model === "<model>" && !p.selected}
+                title={p.model === "<model>" && !p.selected
+                  ? "Pick a concrete model for this profile first (/model use)"
+                  : undefined}
+              >
+                {providerName(p.provider)} · {p.profile_id}
+              </option>
             {/each}
           </select>
         </div>

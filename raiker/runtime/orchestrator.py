@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 from raiker.context.gatherer import ContextGatherer
@@ -9,7 +10,7 @@ from raiker.contracts.models import AgentResponse, PromptEnvelope, ToolAction, T
 from raiker.contracts.streaming import FINAL, LIFECYCLE, TEXT_DELTA, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
-from raiker.models.contracts import ModelMessage, ModelResponse, ToolCallProposal
+from raiker.models.contracts import FINISH_REASONS, ModelMessage, ModelResponse, ToolCallProposal
 from raiker.models.exceptions import ModelProviderError
 from raiker.models.router import ModelRouter
 from raiker.models.tool_call_validation import (
@@ -41,12 +42,14 @@ class RuntimeOrchestrator:
         tool_broker: ToolBroker,
         model_router: ModelRouter,
         default_provider: tuple[str, str] = ("mock", "mock-deterministic"),
+        profile_resolver: Callable[[str], tuple[str, str] | None] | None = None,
     ) -> None:
         self.workspace_root = Path(workspace_root).resolve()
         self.writer = writer
         self.tool_broker = tool_broker
         self.model_router = model_router
         self.default_provider = default_provider
+        self.profile_resolver = profile_resolver
         self.classifier = SimpleClassifier()
         self.planner = SimplePlanner()
         self.context_gatherer = ContextGatherer()
@@ -113,10 +116,30 @@ class RuntimeOrchestrator:
         self._event(envelope, "verification_completed", result.event_payload())
         return result
 
+    def _turn_provider(self, envelope: PromptEnvelope) -> tuple[str, str]:
+        """Bind the model for this turn.
+
+        An explicit, resolvable profile choice on the envelope wins; otherwise the
+        operator's persisted selection (``default_provider``). Unresolvable or
+        non-runnable requests fall back to the selection with an honest event —
+        never to a test provider.
+        """
+        requested = envelope.options.model_profile
+        if requested and self.profile_resolver is not None:
+            resolved = self.profile_resolver(requested)
+            if resolved is not None:
+                return resolved
+            self._event(
+                envelope,
+                "model_provider_rejected_by_policy",
+                {"profile_id": requested, "reason": "profile_not_resolved_for_turn"},
+            )
+        return self.default_provider
+
     async def _acall_model(
         self, envelope: PromptEnvelope, messages: list[ModelMessage]
     ) -> ModelResponse:
-        provider, model = self.default_provider
+        provider, model = self._turn_provider(envelope)
         self._event(
             envelope,
             "model_request_started",
@@ -194,7 +217,7 @@ class RuntimeOrchestrator:
         On provider error it fails safe, exactly like the non-streaming path.
         """
 
-        provider, model = self.default_provider
+        provider, model = self._turn_provider(envelope)
         self._event(
             envelope,
             "model_request_started",
@@ -230,7 +253,9 @@ class RuntimeOrchestrator:
             )
         response = ModelResponse(
             text="".join(text_parts),
-            finish_reason=finish or "stop",
+            # Defensive: providers map protocol stop reasons to the contract, but a
+            # turn must fail safe (not raise) if one ever streams an unknown value.
+            finish_reason=finish if finish in FINISH_REASONS else "stop",
             tool_calls=self._reconstruct_tool_calls(tool_deltas),
         )
         self._event(

@@ -1,15 +1,60 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   Raiker design system — pastel, professional, dual-theme.
+   Raiker design system — "Control Deck": calm precision, dual-theme.
+   Dark ("deck") is the flagship; light ("paper") is a first-class peer.
    Tokens are defined per theme on :root[data-theme=…]; the default (no
    attribute) follows the OS via prefers-color-scheme. Components use tokens
    only — never raw colours — so both themes stay in lockstep.
+
+   Fonts are bundled locally (see src/assets/fonts/LICENSE.md — SIL OFL 1.1):
+   the built app makes no external requests of any kind and runs fully offline.
    ──────────────────────────────────────────────────────────────────────────── */
+
+/* ── Bundled fonts (variable weight, latin + latin-ext) ── */
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("./assets/fonts/manrope-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("./assets/fonts/manrope-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("./assets/fonts/jetbrains-mono-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("./assets/fonts/jetbrains-mono-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
 
 :root {
   --font-sans:
-    "Inter", "SF Pro Text", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    sans-serif;
-  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
 
   --r-sm: 8px;
   --r-md: 12px;
@@ -26,107 +71,107 @@
   --sidebar-w: 232px;
   --topbar-h: 56px;
 
-  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* ── Light theme tokens ── */
+/* ── Light theme tokens ("paper") ── */
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #f6f5fb;
+  --bg: #f4f7f9;
   --surface: #ffffff;
-  --sunken: #efedf7;
+  --sunken: #eaf0f3;
   --raised: #ffffff;
-  --border: #e5e2f0;
-  --border-strong: #cfcae4;
+  --border: #dde5ea;
+  --border-strong: #c2cfd7;
 
-  --text-1: #262430;
-  --text-2: #5c5970;
-  --text-3: #8c89a0;
+  --text-1: #16232c;
+  --text-2: #51626f;
+  --text-3: #6f7e89;
   --text-inverse: #ffffff;
 
-  /* Iris — primary pastel accent */
-  --accent: #5b57c7;
-  --accent-strong: #4b47b4;
-  --accent-soft: #e9e8fa;
-  --accent-border: #c8c6f0;
+  /* Teal — the one accent; brand, primary action, active state */
+  --accent: #0f766e;
+  --accent-strong: #0d5f59;
+  --accent-soft: #d9f2ee;
+  --accent-border: #9fdcd2;
 
-  /* Mint — success / enabled / allow */
-  --ok: #1f7a5c;
-  --ok-soft: #dcf3e9;
-  --ok-border: #b2e2cf;
+  /* Green — success / enabled / allow */
+  --ok: #177a4c;
+  --ok-soft: #ddf3e6;
+  --ok-border: #b0e0c6;
 
-  /* Peach — warning / ask / pending */
-  --warn: #96591d;
-  --warn-soft: #fceadb;
-  --warn-border: #f2d1b0;
+  /* Amber — warning / ask / pending */
+  --warn: #8f5d0a;
+  --warn-soft: #fdf0da;
+  --warn-border: #f0d7a5;
 
-  /* Rose — danger / deny / disabled-dangerous */
-  --danger: #b03a54;
-  --danger-strong: #973046;
-  --danger-soft: #fae2e8;
-  --danger-border: #f0bfcc;
+  /* Red — danger / deny / critical risk */
+  --danger: #c22f36;
+  --danger-strong: #a52830;
+  --danger-soft: #fbe3e4;
+  --danger-border: #f2bfc2;
 
-  /* Sky — info / read-only */
-  --info: #2d6e9e;
-  --info-soft: #e0eef9;
-  --info-border: #b9d9f0;
+  /* Blue — info / read-only / authenticated trust */
+  --info: #22648f;
+  --info-soft: #e1eff8;
+  --info-border: #b7d8ec;
 
-  --neutral-soft: #ececf2;
-  --neutral-border: #d8d6e4;
+  --neutral-soft: #eceff2;
+  --neutral-border: #d5dce2;
 
-  --shadow-1: 0 1px 2px rgba(38, 36, 48, 0.05), 0 2px 8px rgba(38, 36, 48, 0.05);
-  --shadow-2: 0 4px 12px rgba(38, 36, 48, 0.08), 0 12px 32px rgba(38, 36, 48, 0.1);
-  --overlay: rgba(38, 36, 48, 0.42);
-  --focus-ring: #5b57c7;
+  --shadow-1: 0 1px 2px rgba(22, 35, 44, 0.05), 0 2px 8px rgba(22, 35, 44, 0.05);
+  --shadow-2: 0 4px 12px rgba(22, 35, 44, 0.08), 0 12px 32px rgba(22, 35, 44, 0.1);
+  --overlay: rgba(22, 35, 44, 0.42);
+  --focus-ring: #0f766e;
 }
 
-/* ── Dark theme tokens ── */
+/* ── Dark theme tokens ("deck") ── */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #131318;
-  --surface: #1a1a22;
-  --sunken: #15151c;
-  --raised: #21212b;
-  --border: #2b2b38;
-  --border-strong: #3b3b4c;
+  --bg: #0b0f14;
+  --surface: #11161d;
+  --sunken: #0d1218;
+  --raised: #182029;
+  --border: #26303b;
+  --border-strong: #354350;
 
-  --text-1: #eceaf4;
-  --text-2: #a8a6bc;
-  --text-3: #7a7790;
-  --text-inverse: #1a1a22;
+  --text-1: #e8edf2;
+  --text-2: #9aa7b4;
+  --text-3: #75848f;
+  --text-inverse: #06231f;
 
-  --accent: #a3a0f0;
-  --accent-strong: #bab8f6;
-  --accent-soft: rgba(163, 160, 240, 0.14);
-  --accent-border: rgba(163, 160, 240, 0.38);
+  --accent: #2dd4bf;
+  --accent-strong: #5eead4;
+  --accent-soft: rgba(45, 212, 191, 0.13);
+  --accent-border: rgba(45, 212, 191, 0.38);
 
-  --ok: #85dcba;
-  --ok-soft: rgba(133, 220, 186, 0.12);
-  --ok-border: rgba(133, 220, 186, 0.36);
+  --ok: #7ed8a8;
+  --ok-soft: rgba(126, 216, 168, 0.12);
+  --ok-border: rgba(126, 216, 168, 0.35);
 
-  --warn: #f0be93;
-  --warn-soft: rgba(240, 190, 147, 0.12);
-  --warn-border: rgba(240, 190, 147, 0.36);
+  --warn: #f5b942;
+  --warn-soft: rgba(245, 185, 66, 0.12);
+  --warn-border: rgba(245, 185, 66, 0.35);
 
-  --danger: #f0a2b2;
-  --danger-strong: #f5b9c6;
-  --danger-soft: rgba(240, 162, 178, 0.13);
-  --danger-border: rgba(240, 162, 178, 0.38);
+  --danger: #f47174;
+  --danger-strong: #f88d8f;
+  --danger-soft: rgba(229, 72, 77, 0.14);
+  --danger-border: rgba(229, 72, 77, 0.4);
 
-  --info: #93c9ee;
-  --info-soft: rgba(147, 201, 238, 0.12);
-  --info-border: rgba(147, 201, 238, 0.36);
+  --info: #6aa9f0;
+  --info-soft: rgba(106, 169, 240, 0.12);
+  --info-border: rgba(106, 169, 240, 0.35);
 
-  --neutral-soft: rgba(168, 166, 188, 0.12);
-  --neutral-border: rgba(168, 166, 188, 0.3);
+  --neutral-soft: rgba(154, 167, 180, 0.1);
+  --neutral-border: rgba(154, 167, 180, 0.28);
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-2: 0 4px 14px rgba(0, 0, 0, 0.45), 0 16px 40px rgba(0, 0, 0, 0.4);
-  --overlay: rgba(8, 8, 12, 0.6);
-  --focus-ring: #a3a0f0;
+  --overlay: rgba(3, 6, 9, 0.62);
+  --focus-ring: #5eead4;
 }
 
 /* System preference drives the default when the user hasn't chosen. */
@@ -134,47 +179,47 @@
   :root:not([data-theme]) {
     color-scheme: dark;
 
-    --bg: #131318;
-    --surface: #1a1a22;
-    --sunken: #15151c;
-    --raised: #21212b;
-    --border: #2b2b38;
-    --border-strong: #3b3b4c;
+    --bg: #0b0f14;
+    --surface: #11161d;
+    --sunken: #0d1218;
+    --raised: #182029;
+    --border: #26303b;
+    --border-strong: #354350;
 
-    --text-1: #eceaf4;
-    --text-2: #a8a6bc;
-    --text-3: #7a7790;
-    --text-inverse: #1a1a22;
+    --text-1: #e8edf2;
+    --text-2: #9aa7b4;
+    --text-3: #75848f;
+    --text-inverse: #06231f;
 
-    --accent: #a3a0f0;
-    --accent-strong: #bab8f6;
-    --accent-soft: rgba(163, 160, 240, 0.14);
-    --accent-border: rgba(163, 160, 240, 0.38);
+    --accent: #2dd4bf;
+    --accent-strong: #5eead4;
+    --accent-soft: rgba(45, 212, 191, 0.13);
+    --accent-border: rgba(45, 212, 191, 0.38);
 
-    --ok: #85dcba;
-    --ok-soft: rgba(133, 220, 186, 0.12);
-    --ok-border: rgba(133, 220, 186, 0.36);
+    --ok: #7ed8a8;
+    --ok-soft: rgba(126, 216, 168, 0.12);
+    --ok-border: rgba(126, 216, 168, 0.35);
 
-    --warn: #f0be93;
-    --warn-soft: rgba(240, 190, 147, 0.12);
-    --warn-border: rgba(240, 190, 147, 0.36);
+    --warn: #f5b942;
+    --warn-soft: rgba(245, 185, 66, 0.12);
+    --warn-border: rgba(245, 185, 66, 0.35);
 
-    --danger: #f0a2b2;
-    --danger-strong: #f5b9c6;
-    --danger-soft: rgba(240, 162, 178, 0.13);
-    --danger-border: rgba(240, 162, 178, 0.38);
+    --danger: #f47174;
+    --danger-strong: #f88d8f;
+    --danger-soft: rgba(229, 72, 77, 0.14);
+    --danger-border: rgba(229, 72, 77, 0.4);
 
-    --info: #93c9ee;
-    --info-soft: rgba(147, 201, 238, 0.12);
-    --info-border: rgba(147, 201, 238, 0.36);
+    --info: #6aa9f0;
+    --info-soft: rgba(106, 169, 240, 0.12);
+    --info-border: rgba(106, 169, 240, 0.35);
 
-    --neutral-soft: rgba(168, 166, 188, 0.12);
-    --neutral-border: rgba(168, 166, 188, 0.3);
+    --neutral-soft: rgba(154, 167, 180, 0.1);
+    --neutral-border: rgba(154, 167, 180, 0.28);
 
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.3);
     --shadow-2: 0 4px 14px rgba(0, 0, 0, 0.45), 0 16px 40px rgba(0, 0, 0, 0.4);
-    --overlay: rgba(8, 8, 12, 0.6);
-    --focus-ring: #a3a0f0;
+    --overlay: rgba(3, 6, 9, 0.62);
+    --focus-ring: #5eead4;
   }
 }
 
@@ -211,7 +256,7 @@ h2,
 h3,
 h4 {
   color: var(--text-1);
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -0.01em;
   margin: 0 0 var(--space-3);
 }
@@ -238,6 +283,7 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Mono means "machine output, verbatim" — ids, codes, payloads, diffs. */
 code,
 .mono {
   font-family: var(--font-mono);
@@ -393,9 +439,9 @@ code,
 .table th {
   text-align: left;
   font-size: 0.72rem;
-  font-weight: 650;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   color: var(--text-3);
   padding: 0.45rem 0.6rem;
   border-bottom: 1px solid var(--border);
@@ -411,9 +457,9 @@ code,
 
 .kicker {
   font-size: 0.72rem;
-  font-weight: 650;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   color: var(--text-3);
   margin: 0 0 var(--space-1);
 }

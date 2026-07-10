@@ -302,7 +302,9 @@ class PromptPayload:
 class PromptOptions:
     planning_mode: str = "auto"
     approval_mode: str = "interactive"
-    model_profile: str = "mock-test"
+    # Empty means "the operator's selected model" (persisted via /model use);
+    # an explicit profile id binds this turn only. Never defaults to a test provider.
+    model_profile: str = ""
     max_tool_calls: int = 10
 
     def __post_init__(self) -> None:

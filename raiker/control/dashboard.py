@@ -360,6 +360,10 @@ class DashboardService:
                 selected=(p.profile_id == current),
             )
             for p in registry.list_profiles()
+            # Test-harness profiles (mock/deterministic) are not selectable outside
+            # test mode (the provider factory fails closed), so the web surface
+            # lists working backends only.
+            if not bool(p.raw.get("test_only", False))
         )
         return ModelsView(
             profiles=profiles,

@@ -149,7 +149,41 @@ def test_stream_chat_yields_text_deltas() -> None:
 
     events = asyncio.run(main())
     assert "".join(e.text_delta for e in events if e.event_type == "text_delta") == "hello"
-    assert events[-1].event_type == "finish" and events[-1].finish_reason == "end_turn"
+    # The streamed finish must arrive in contract vocabulary ("stop", not the raw
+    # Anthropic "end_turn") — a ModelResponse is built from it downstream.
+    assert events[-1].event_type == "finish" and events[-1].finish_reason == "stop"
+
+
+def test_stream_chat_maps_stop_reasons_to_contract_vocabulary() -> None:
+    from raiker.models.contracts import FINISH_REASONS
+
+    def run(stop_reason: str) -> str:
+        body = "\n".join([
+            'data: {"type": "message_start"}',
+            f'data: {{"type": "message_delta", "delta": {{"stop_reason": "{stop_reason}"}}}}',
+            'data: {"type": "message_stop"}',
+        ])
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200, content=body.encode(), headers={"content-type": "text/event-stream"}
+            )
+
+        async def main() -> str:
+            async for event in _provider(handler).stream_chat(_request(stream=True)):
+                if event.event_type == "finish":
+                    assert event.finish_reason is not None
+                    return event.finish_reason
+            raise AssertionError("no finish event")
+
+        return asyncio.run(main())
+
+    assert run("end_turn") == "stop"
+    assert run("max_tokens") == "length"
+    assert run("tool_use") == "tool_calls"
+    assert run("refusal") == "error"
+    # Unknown future stop reasons stay inside the contract instead of crashing turns.
+    assert run("some_future_reason") in FINISH_REASONS
 
 
 def test_embeddings_unsupported() -> None:

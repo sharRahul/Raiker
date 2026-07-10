@@ -31,6 +31,22 @@ from raiker.models.exceptions import (
 )
 from raiker.models.health import ProviderHealth
 
+# Anthropic stop_reason → Raiker contract finish_reason (contracts.FINISH_REASONS).
+# Both the buffered and the streaming path must map through this table — the raw
+# Anthropic vocabulary ("end_turn", "tool_use", …) is not valid in ModelResponse.
+_STOP_REASON_TO_FINISH = {
+    "end_turn": "stop",
+    "stop_sequence": "stop",
+    "max_tokens": "length",
+    "tool_use": "tool_calls",
+    "refusal": "error",
+    "pause_turn": "stop",
+}
+
+
+def _map_finish(stop_reason: str) -> str:
+    return _STOP_REASON_TO_FINISH.get(stop_reason, "stop")
+
 # Native Anthropic Messages API adapter over raw httpx — Raiker deliberately
 # owns its transport (no SDK wrappers; httpx.AsyncClient is the only runtime
 # HTTP dependency). Model outputs and tool calls remain untrusted proposals
@@ -219,10 +235,7 @@ class AsyncAnthropicMessagesProvider:
             # thinking blocks are intentionally dropped: private chain-of-thought
             # is never surfaced through Raiker contracts.
         stop_reason = str(data.get("stop_reason") or "end_turn")
-        finish = {
-            "end_turn": "stop", "stop_sequence": "stop", "max_tokens": "length",
-            "tool_use": "tool_calls", "refusal": "error", "pause_turn": "stop",
-        }.get(stop_reason, "stop")
+        finish = _map_finish(stop_reason)
         if tool_calls:
             finish = "tool_calls"
         usage = data.get("usage") if isinstance(data.get("usage"), dict) else None
@@ -257,7 +270,7 @@ class AsyncAnthropicMessagesProvider:
                         delta = decoded.get("delta")
                         stop = delta.get("stop_reason") if isinstance(delta, dict) else None
                         if isinstance(stop, str) and stop:
-                            yield ModelStreamEvent(event_type="finish", finish_reason=stop)
+                            yield ModelStreamEvent(event_type="finish", finish_reason=_map_finish(stop))
                     elif event_type == "message_stop":
                         return
         except asyncio.CancelledError:

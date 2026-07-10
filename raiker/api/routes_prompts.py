@@ -53,7 +53,7 @@ def _build_envelope(body: PromptRequest) -> PromptEnvelope:
     options = PromptOptions(
         planning_mode=body.planning_mode or "auto",
         approval_mode=body.approval_mode or "interactive",
-        model_profile=body.model_profile or "mock-test",
+        model_profile=body.model_profile or "",
         max_tool_calls=body.max_tool_calls if body.max_tool_calls is not None else 10,
     )
     client = _PROMPT_CLIENTS.get(body.client_type or "web_ui", WEB_UI_CLIENT)

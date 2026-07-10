@@ -38,3 +38,23 @@ export function humanize(name: string | null | undefined): string {
   const spaced = name.replaceAll("_", " ").trim();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
+
+// Brand names for the model providers Raiker ships profiles for. Unknown
+// providers render verbatim rather than guessing.
+const PROVIDER_NAMES: Record<string, string> = {
+  "llama.cpp": "llama.cpp",
+  ollama: "Ollama",
+  "lm-studio": "LM Studio",
+  vllm: "vLLM",
+  "openai-compatible": "OpenAI-compatible",
+  openrouter: "OpenRouter",
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  gemini: "Gemini",
+};
+
+/** "lm-studio" → "LM Studio"; unknown providers pass through unchanged. */
+export function providerName(provider: string | null | undefined): string {
+  if (!provider) return "—";
+  return PROVIDER_NAMES[provider] ?? provider;
+}

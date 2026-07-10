@@ -13,6 +13,33 @@ to the user, and every capability governed, default-ask human/humam governed, an
 
 Be mind full of token usage if needed do it in batches. Keep committing after every phase and then push to origin main before the token limit is ended for the session. Plan and implement it in such a way that anyone can pick it up after your session token are over even though the goal is not complete. In next session review where you are and then start from next phase.
 
+## State as of 2026-07-10 (session end) — Control Deck design plan + W0 retheme
+
+> **Adopted web design plan:** `docs/WEB_UI_CONTROL_DECK_PLAN.md` — the "Control
+> Deck" direction, corrected against the codebase (19 runtime states, turn-only
+> checkpoints today, honesty labels are docs vocabulary not API data, decision
+> modes stay the primary capability-row control per the owner's PR #104 call,
+> no SSE replay-from-cursor yet, `docs/UI-implementation/*` is gone — the test
+> suites are the acceptance anchors). Section 9 of the plan lists the read-only
+> API additions the later workstreams (W3–W7) need.
+>
+> **W0 shipped (frontend-only, no backend change):**
+> - **Bundled fonts, fully offline:** Manrope (display/UI) + JetBrains Mono
+>   (machine-verbatim output) as local variable woff2 under
+>   `apps/web/src/assets/fonts/` (SIL OFL 1.1, license file alongside). The
+>   built app still makes zero external requests.
+> - **Control Deck token retheme** in `apps/web/src/app.css`: dark "deck"
+>   flagship (near-black blue-grey surfaces, luminous teal accent) + light
+>   "paper" peer; same token names, so no component changes were needed.
+> - **Model chip** in the top bar (`ModelChip.svelte` + tests): one-glance
+>   `Local · <provider>` / `Hosted · <provider> · egress open|closed` /
+>   "No model selected", pure render of `GET /api/models`, links to Models.
+> - Wordmark + favicon aligned to the new identity.
+> - Gate: lint, svelte-check, 62 vitest tests, build all green; verified live
+>   against `raiker-web` in both themes (Chromium screenshots).
+> - **Next (W1):** Deck turn cards — State Tape ribbon, permission cards,
+>   retrieval chip, tool-block collapse (see plan §11).
+
 ## State as of 2026-07-07 (session end) — web app rebuild
 
 > **Web UI rebuilt from scratch (open in PR #104, branch

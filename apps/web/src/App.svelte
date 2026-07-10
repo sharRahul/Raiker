@@ -4,6 +4,7 @@
   import Topbar from "./lib/components/Topbar.svelte";
   import { DEFAULT_ROUTE, navItem, routeFromHash } from "./lib/nav";
   import { api, connect } from "./lib/api";
+  import type { ModelsView as ModelsSnapshot } from "./lib/apiTypes";
   import ChatView from "./lib/views/ChatView.svelte";
   import ApprovalsView from "./lib/views/ApprovalsView.svelte";
   import TasksView from "./lib/views/TasksView.svelte";
@@ -24,6 +25,7 @@
   let principal = $state("—");
   let runtimeMode = $state("—");
   let ready = $state(false);
+  let models = $state<ModelsSnapshot | null>(null);
 
   onMount(() => {
     const handler = () => {
@@ -38,9 +40,14 @@
     try {
       const session = await connect();
       principal = session.principal_id;
-      const [mode, diag] = await Promise.all([api.runtimeMode(), api.diagnostics()]);
+      const [mode, diag, modelsView] = await Promise.all([
+        api.runtimeMode(),
+        api.diagnostics(),
+        api.models(),
+      ]);
       runtimeMode = mode.mode_name;
       ready = diag.production_ready_local_single_user_runtime;
+      models = modelsView;
       authState = "ready";
     } catch {
       authState = "error";
@@ -59,6 +66,7 @@
       {principal}
       {runtimeMode}
       {ready}
+      {models}
       connecting={authState === "connecting"}
     />
     <main id="main" class="content" tabindex="-1">

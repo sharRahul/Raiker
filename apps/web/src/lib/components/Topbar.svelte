@@ -1,5 +1,7 @@
 <script lang="ts">
+  import type { ModelsView } from "../apiTypes";
   import Icon from "./Icon.svelte";
+  import ModelChip from "./ModelChip.svelte";
   import StopSwitch from "./StopSwitch.svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
   import { humanize } from "../format";
@@ -11,6 +13,7 @@
     runtimeMode,
     ready,
     connecting = false,
+    models = null,
   }: {
     title: string;
     hint: string;
@@ -18,6 +21,7 @@
     runtimeMode: string;
     ready: boolean;
     connecting?: boolean;
+    models?: ModelsView | null;
   } = $props();
 </script>
 
@@ -31,6 +35,7 @@
     {#if connecting}
       <span class="pill pill-muted">Connecting…</span>
     {:else}
+      <ModelChip {models} />
       <span class="pill" class:pill-ok={ready} class:pill-warn={!ready} title="Local runtime readiness">
         <span class="dot" aria-hidden="true"></span>
         {ready ? "Runtime ready" : "Runtime not ready"}

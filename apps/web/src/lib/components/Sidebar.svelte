@@ -71,9 +71,10 @@
     line-height: 1.15;
   }
   .brand-name {
-    font-weight: 700;
-    font-size: 1.02rem;
-    letter-spacing: -0.01em;
+    font-weight: 800;
+    font-size: 0.98rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     color: var(--text-1);
   }
   .brand-sub {

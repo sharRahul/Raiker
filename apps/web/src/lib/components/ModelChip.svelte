@@ -3,6 +3,7 @@
   // whether it stays on this machine. Pure render of GET /api/models — no
   // client-side policy, links to the Models view for detail and changes.
   import type { ModelsView } from "../apiTypes";
+  import { providerName } from "../format";
 
   let { models }: { models: ModelsView | null } = $props();
 
@@ -33,7 +34,7 @@
       title={`${current.profile_id} · ${current.model} · ${current.endpoint_kind}`}
     >
       <span class="glyph" aria-hidden="true">▲</span>
-      Hosted · {current.provider}
+      Hosted · {providerName(current.provider)}
       <span class="egress">{egressOpen ? "egress open" : "egress closed"}</span>
     </a>
   {:else}
@@ -43,7 +44,7 @@
       title={`${current.profile_id} · ${current.model} · ${current.endpoint_kind}`}
     >
       <span class="glyph" aria-hidden="true">●</span>
-      Local · {current.provider}
+      Local · {providerName(current.provider)}
     </a>
   {/if}
 {/if}

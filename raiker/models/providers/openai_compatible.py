@@ -201,7 +201,13 @@ class AsyncOpenAICompatibleProvider:
                     if text:
                         yield ModelStreamEvent(event_type="text_delta", text_delta=text)
                     if finish:
-                        yield ModelStreamEvent(event_type="finish", finish_reason=finish)
+                        # Map protocol vocabulary ("content_filter", "function_call", …)
+                        # into the contract's finish reasons — raw passthrough would
+                        # fail ModelResponse validation downstream.
+                        yield ModelStreamEvent(
+                            event_type="finish",
+                            finish_reason=finish if finish in {"stop", "length", "tool_calls"} else "stop",
+                        )
         except asyncio.CancelledError:
             raise
         except ProviderStreamError:

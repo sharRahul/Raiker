@@ -400,9 +400,28 @@ class ContextGatherer:
         profiles = registry.list_profiles()
         if not profiles:
             return None
-        selected = next(
-            (p for p in profiles if p.raw.get("is_native_default")), profiles[0]
-        )
+        # Prefer the operator's persisted selection (/model use); the native default
+        # is only the fallback. Anything else tells the model a false story about
+        # which backend is actually running the turn.
+        selected = None
+        try:
+            import sqlite3
+
+            from raiker.models.registry import profile_with_model
+            from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
+            from raiker.storage.sqlite import SQLiteStore
+
+            state = SQLiteStore(root).load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+            if state is not None:
+                selected = next((p for p in profiles if p.profile_id == state.profile_id), None)
+                if selected is not None and state.model:
+                    selected = profile_with_model(selected, state.model)
+        except (sqlite3.Error, OSError, ValueError):
+            selected = None
+        if selected is None:
+            selected = next(
+                (p for p in profiles if p.raw.get("is_native_default")), profiles[0]
+            )
         local_state = "local" if selected.local_only else "hosted_or_policy_gated"
         lines = [
             f"profile_id: {selected.profile_id}",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTimestamp, humanize, relativeTime, shortId } from "./format";
+import { formatTimestamp, humanize, providerName, relativeTime, shortId } from "./format";
 
 describe("format helpers", () => {
   it("renders compact relative times", () => {
@@ -31,5 +31,14 @@ describe("format helpers", () => {
   it("humanizes snake_case names", () => {
     expect(humanize("shell_execution")).toBe("Shell execution");
     expect(humanize("")).toBe("—");
+  });
+
+  it("maps providers to brand names and passes unknown ones through", () => {
+    expect(providerName("lm-studio")).toBe("LM Studio");
+    expect(providerName("vllm")).toBe("vLLM");
+    expect(providerName("anthropic")).toBe("Anthropic");
+    expect(providerName("llama.cpp")).toBe("llama.cpp");
+    expect(providerName("something-else")).toBe("something-else");
+    expect(providerName(null)).toBe("—");
   });
 });

@@ -39,6 +39,37 @@ Be mind full of token usage if needed do it in batches. Keep committing after ev
 >   against `raiker-web` in both themes (Chromium screenshots).
 > - **Next (W1):** Deck turn cards — State Tape ribbon, permission cards,
 >   retrieval chip, tool-block collapse (see plan §11).
+>
+> **Same session, part 2 — working models only (owner request):**
+> - **Web surface lists working backends only:** test-harness profiles
+>   (`test_only: true`) are filtered out of `GET /api/models`, so the Models
+>   board and the Chat profile picker never show mock/deterministic scaffolding.
+>   Models cards, the top-bar chip, and Chat options show provider brand names
+>   (llama.cpp, Ollama, LM Studio, vLLM, OpenRouter, Anthropic, OpenAI, Gemini).
+> - **Per-turn model choice is now real:** `PromptOptions.model_profile` defaults
+>   to `""` (= the operator's persisted `/model use` selection, never a test
+>   provider); an explicit profile id binds that turn via a gateway resolver.
+>   Test-only/placeholder requests fall back honestly with a
+>   `model_provider_rejected_by_policy` event (`tests/test_turn_model_binding.py`).
+> - **Live-fire fixes found by running the real hosted path:**
+>   1. Anthropic streaming yielded raw `stop_reason` ("end_turn") which crashed
+>      `ModelResponse` validation — both providers now map protocol stop reasons
+>      to contract vocabulary, and the orchestrator sanitizes defensively.
+>   2. ChatView mutated the raw (non-proxied) turn object, so Svelte 5 signals
+>      never fired and the transcript stayed on "Working…" forever after the
+>      stream completed — fixed + regression test (`ChatView.test.ts`).
+>   3. The context bundle's "Selected model profile" item always described the
+>      native default; it now reports the persisted selection, so the model is
+>      told its true backend.
+> - **Hosted Anthropic journey verified live end-to-end:** owner bootstrap →
+>   runtime mode activate → threat ack → confirmation token → gate
+>   `enabled_runtime` → egress allowlist + key env → `/model use
+>   anthropic-hosted` → real streamed turn rendered in the web UI (~4 s),
+>   top-bar chip showing `Hosted · Anthropic · egress open`. Keys/env values
+>   were never persisted or committed.
+> - **Gap for W2:** there is no user-facing threat-ack command or endpoint —
+>   tests (and this verification) insert `threat_model_acks` rows directly. The
+>   GuardedSwitch checklist needs a governed ack path.
 
 ## State as of 2026-07-07 (session end) — web app rebuild
 

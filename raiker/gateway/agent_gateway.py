@@ -65,6 +65,7 @@ class AgentGateway:
             tool_broker=self.tool_broker,
             model_router=self.model_router,
             default_provider=self.default_provider,
+            profile_resolver=self._resolve_profile_for_turn,
         )
 
     def _resolve_default_provider(self) -> tuple[str, str]:
@@ -88,6 +89,28 @@ class AgentGateway:
             return native_default
         if effective_model != profile.model:
             self.model_registry.register(profile_with_model(profile, effective_model))
+        return (profile.provider, effective_model)
+
+    def _resolve_profile_for_turn(self, profile_id: str) -> tuple[str, str] | None:
+        """Resolve an explicit per-turn profile choice to ``(provider, model)``.
+
+        Test-harness profiles and unresolved ``<model>`` placeholders return None so
+        the turn falls back to the operator's persisted selection — the web/REST
+        surface only ever runs working backends. Provider policy (gates, egress
+        allowlist, API keys) is still enforced downstream by the model router.
+        """
+        try:
+            profile = self.model_registry.resolve_profile_id(profile_id)
+        except RegistryError:
+            return None
+        if bool(profile.raw.get("test_only", False)):
+            return None
+        effective_model = profile.model
+        state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        if state is not None and state.profile_id == profile.profile_id and state.model:
+            effective_model = state.model
+        if not effective_model or "<" in effective_model:
+            return None
         return (profile.provider, effective_model)
 
     def _dispatch_lifecycle_hook(self, event_name: str, envelope: PromptEnvelope) -> None:

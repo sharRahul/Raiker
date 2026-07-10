@@ -109,7 +109,7 @@ Required fields:
   "options": {
     "planning_mode": "auto",
     "approval_mode": "interactive",
-    "model_profile": "mock-test",
+    "model_profile": "",
     "max_tool_calls": 10
   }
 }
@@ -118,6 +118,12 @@ Required fields:
 Allowed `planning_mode` values: `auto`, `always`, `never_safe_only`.
 
 Allowed `approval_mode` values: `interactive`, `deny_risky`, `allow_safe_only`.
+
+`model_profile`: empty string means "the operator's selected model" (persisted via
+`/model use`). An explicit profile id binds that turn only; test-harness profiles and
+unresolved `<model>` placeholders are ignored with a `model_provider_rejected_by_policy`
+event, and the turn runs on the persisted selection instead. There is never a default
+to a test provider.
 
 ---
 

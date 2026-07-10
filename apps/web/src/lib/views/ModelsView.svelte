@@ -6,7 +6,7 @@
   import { api, ApiError } from "../api";
   import type { ModelsView as ModelsData } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
-  import { humanize } from "../format";
+  import { humanize, providerName } from "../format";
 
   let models = $state<ModelsData | null>(null);
   let loadError = $state<string | null>(null);
@@ -64,13 +64,18 @@
       {#each models.profiles as p (p.profile_id)}
         <article class="card profile" class:selected={p.selected}>
           <div class="profile-head">
-            <h2 class="profile-id mono">{p.profile_id}</h2>
+            <h2 class="profile-name">{providerName(p.provider)}</h2>
             {#if p.selected}
               <Badge variant="active" label="selected" />
             {/if}
           </div>
           <p class="profile-model">
-            {p.provider} · <code>{p.model}</code>
+            {#if p.model === "<model>"}
+              <span class="model-unpinned">model chosen at selection</span>
+            {:else}
+              <code>{p.model}</code>
+            {/if}
+            · <code class="profile-ref" title="Profile id">{p.profile_id}</code>
           </p>
           <div class="chips">
             <span class="chip">{endpointLabel(p.endpoint_kind)}</span>
@@ -149,8 +154,8 @@
     justify-content: space-between;
     gap: 0.5rem;
   }
-  .profile-id {
-    font-size: 0.92rem;
+  .profile-name {
+    font-size: 1rem;
     margin: 0;
     overflow-wrap: anywhere;
   }
@@ -158,6 +163,14 @@
     color: var(--text-2);
     font-size: 0.84rem;
     margin: 0.3rem 0 0.6rem;
+    overflow-wrap: anywhere;
+  }
+  .model-unpinned {
+    color: var(--text-3);
+    font-style: italic;
+  }
+  .profile-ref {
+    color: var(--text-3);
   }
   .chips {
     display: flex;

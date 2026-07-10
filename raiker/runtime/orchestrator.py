@@ -48,7 +48,7 @@ class RuntimeOrchestrator:
         tool_broker: ToolBroker,
         model_router: ModelRouter,
         default_provider: tuple[str, str] = ("mock", "mock-deterministic"),
-        profile_resolver: Callable[[str], tuple[str, str] | None] | None = None,
+        profile_resolver: Callable[[str, str | None], tuple[str, str] | None] | None = None,
         fallback_resolver: Callable[[], list[tuple[str, str]]] | None = None,
     ) -> None:
         self.workspace_root = Path(workspace_root).resolve()
@@ -137,8 +137,9 @@ class RuntimeOrchestrator:
         never to a test provider.
         """
         requested = envelope.options.model_profile
+        requested_model = envelope.options.model or None
         if requested and self.profile_resolver is not None:
-            resolved = self.profile_resolver(requested)
+            resolved = self.profile_resolver(requested, requested_model)
             if resolved is not None:
                 return resolved
             self._event(

@@ -19,6 +19,9 @@ class TestPromptOptionsDefault:
     def test_model_profile_defaults_to_operator_selection_not_mock(self) -> None:
         assert PromptOptions().model_profile == ""
 
+    def test_per_turn_model_defaults_to_profile_model(self) -> None:
+        assert PromptOptions().model == ""
+
 
 class TestResolveProfileForTurn:
     def test_resolves_concrete_hosted_profile(self, tmp_path: Path) -> None:
@@ -50,6 +53,45 @@ class TestResolveProfileForTurn:
         )
         resolved = gateway._resolve_profile_for_turn("ollama-local-openai-compatible")
         assert resolved == ("ollama", "qwen2.5")
+
+    def test_explicit_per_turn_model_wins(self, tmp_path: Path) -> None:
+        gateway = _gateway(tmp_path)
+        resolved = gateway._resolve_profile_for_turn(
+            "ollama-local-openai-compatible", "qwen2.5"
+        )
+        assert resolved == ("ollama", "qwen2.5")
+        # The concrete choice is registered so the router can resolve it.
+        assert gateway.model_registry.find("ollama", "qwen2.5")
+
+    def test_explicit_per_turn_model_overrides_persisted_selection(
+        self, tmp_path: Path
+    ) -> None:
+        gateway = _gateway(tmp_path)
+        gateway.store.save_model_session_state(
+            ModelSessionState(
+                session_id=TERMINAL_MODEL_SESSION_ID,
+                profile_id="anthropic-hosted",
+                model=None,
+            )
+        )
+        resolved = gateway._resolve_profile_for_turn(
+            "anthropic-hosted", "claude-haiku-4-5-20251001"
+        )
+        assert resolved == ("anthropic", "claude-haiku-4-5-20251001")
+        assert gateway.model_registry.find("anthropic", "claude-haiku-4-5-20251001")
+
+    def test_per_turn_model_registration_is_idempotent(self, tmp_path: Path) -> None:
+        gateway = _gateway(tmp_path)
+        gateway._resolve_profile_for_turn("ollama-local-openai-compatible", "qwen2.5")
+        gateway._resolve_profile_for_turn("ollama-local-openai-compatible", "qwen2.5")
+        assert len(gateway.model_registry.find("ollama", "qwen2.5")) == 1
+
+    def test_placeholder_per_turn_model_rejected(self, tmp_path: Path) -> None:
+        gateway = _gateway(tmp_path)
+        assert (
+            gateway._resolve_profile_for_turn("ollama-local-openai-compatible", "<model>")
+            is None
+        )
 
 
 class TestContextModelProfileItem:

@@ -83,12 +83,23 @@ export interface ModelProfile {
 export interface ModelsView {
   profiles: ModelProfile[];
   current_profile_id: string | null;
+  current_model: string | null;
   hosted_model_gate_state: string;
   private_network_model_gate_state: string;
   model_egress_allowlist_configured: boolean;
   remote_profile_count: number;
   fallback_sequence: string[];
   no_silent_hosted_fallback: boolean;
+}
+
+/** On-demand listing of the models one provider serves. Failures come back as an
+ * honest status with an empty list — the backend never fabricates model names. */
+export interface ProviderModelList {
+  profile_id: string;
+  provider: string;
+  status: "available" | "policy_denied" | "unsupported" | "unavailable";
+  reason_code: string | null;
+  models: string[];
 }
 
 export interface EventEntry {
@@ -251,6 +262,7 @@ export interface PromptRequestBody {
   planning_mode?: string;
   approval_mode?: string;
   model_profile?: string;
+  model?: string;
   max_tool_calls?: number;
 }
 

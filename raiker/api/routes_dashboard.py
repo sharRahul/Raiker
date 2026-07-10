@@ -6,7 +6,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
-from raiker.api.schemas import AuthSessionRequest, SetModelFallbackRequest, serialize_dto
+from raiker.api.schemas import (
+    AuthSessionRequest,
+    SetModelFallbackRequest,
+    SetModelSelectionRequest,
+    serialize_dto,
+)
 from raiker.api.sessions import ApiSession
 from raiker.control.dashboard import AuthSessionView, DashboardService
 from raiker.runtime.authority.models import Principal
@@ -127,6 +132,49 @@ async def get_models(
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     return serialize_dto(_service(request).get_models())
+
+
+@router.get("/api/models/{profile_id}/provider-models")
+async def list_provider_models(
+    profile_id: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """On-demand listing of the models a provider serves for one profile.
+
+    User-initiated read; provider policy (gates, egress allowlist, API key) is
+    enforced before any network contact, and failures return an honest empty
+    list — model names are never fabricated.
+    """
+    view = await _service(request).list_provider_models(profile_id)
+    if view is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown model profile: {profile_id}"
+        )
+    return serialize_dto(view)
+
+
+@router.put("/api/model-selection")
+async def set_model_selection(
+    body: SetModelSelectionRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Persist the operator's model selection (human gate-manager only).
+
+    Placeholder profiles require a concrete model; provider policy is validated
+    fail-closed before the selection is saved.
+    """
+    session, _principal = _auth_data
+    result = await _service(request).set_model_selection(
+        body.profile_id, body.model, session.principal_id
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
 
 
 @router.put("/api/model-fallback")

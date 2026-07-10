@@ -4,7 +4,7 @@
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import { api, ApiError, streamPrompt } from "../api";
-  import type { AgentResponse, ModelProfile, StreamEvent } from "../apiTypes";
+  import type { AgentResponse, ModelProfile, ProviderModelList, StreamEvent } from "../apiTypes";
   import { groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { responseBadge } from "../statusMaps";
   import { collectText } from "../turnPhases";
@@ -33,6 +33,40 @@
   let planningMode = $state("");
   let maxToolCalls = $state("");
   let profiles = $state<ModelProfile[]>([]);
+
+  // Per-turn model for the chosen profile. Populated on demand from the
+  // provider's own catalogue; when the catalogue is unavailable the user can
+  // still type a model id. Empty means the profile/persisted default.
+  let modelChoice = $state("");
+  let providerModels = $state<ProviderModelList | null>(null);
+  let loadingModels = $state(false);
+
+  const chosenProfile = $derived(profiles.find((p) => p.profile_id === modelProfile) ?? null);
+
+  async function onProfileChange() {
+    modelChoice = "";
+    providerModels = null;
+    if (modelProfile === "") return;
+    loadingModels = true;
+    try {
+      providerModels = await api.providerModels(modelProfile);
+    } catch {
+      providerModels = null; // manual entry still works below
+    } finally {
+      loadingModels = false;
+    }
+  }
+
+  function providerModelsNote(list: ProviderModelList): string {
+    switch (list.status) {
+      case "policy_denied":
+        return "Model list denied by provider policy — enable the provider's gate first.";
+      case "unsupported":
+        return "This provider does not support model listing.";
+      default:
+        return "Provider unreachable — type a model id if you know it.";
+    }
+  }
 
   let scrollEl: HTMLDivElement | undefined = $state();
 
@@ -102,6 +136,7 @@
           text,
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
+          model: modelChoice.trim() || undefined,
           planning_mode: planningMode || undefined,
           max_tool_calls: maxToolCalls !== "" ? Number(maxToolCalls) : undefined,
         },
@@ -260,22 +295,66 @@
     {#if showOptions}
       <div class="options">
         <div class="option">
-          <label class="field-label" for="opt-model">Model profile</label>
-          <select id="opt-model" class="select" bind:value={modelProfile} disabled={streaming}>
+          <label class="field-label" for="opt-model">Provider</label>
+          <select
+            id="opt-model"
+            class="select"
+            bind:value={modelProfile}
+            onchange={() => void onProfileChange()}
+            disabled={streaming}
+          >
             <option value="">Selected model (see Models)</option>
             {#each profiles as p (p.profile_id)}
-              <option
-                value={p.profile_id}
-                disabled={p.model === "<model>" && !p.selected}
-                title={p.model === "<model>" && !p.selected
-                  ? "Pick a concrete model for this profile first (/model use)"
-                  : undefined}
-              >
+              <option value={p.profile_id}>
                 {providerName(p.provider)} · {p.profile_id}
               </option>
             {/each}
           </select>
         </div>
+        {#if modelProfile !== ""}
+          <div class="option">
+            <label class="field-label" for="opt-model-name">Model</label>
+            {#if loadingModels}
+              <p class="model-note" role="status">Loading models…</p>
+            {:else if providerModels !== null && providerModels.status === "available" && providerModels.models.length > 0}
+              <select
+                id="opt-model-name"
+                class="select"
+                bind:value={modelChoice}
+                disabled={streaming}
+              >
+                <option value="">
+                  {chosenProfile !== null && chosenProfile.model !== "<model>"
+                    ? `Default (${chosenProfile.model})`
+                    : "Pick a model…"}
+                </option>
+                {#each providerModels.models as m (m)}
+                  <option value={m}>{m}</option>
+                {/each}
+              </select>
+            {:else}
+              <input
+                id="opt-model-name"
+                class="input"
+                type="text"
+                placeholder={chosenProfile !== null && chosenProfile.model !== "<model>"
+                  ? chosenProfile.model
+                  : "model id"}
+                bind:value={modelChoice}
+                disabled={streaming}
+              />
+            {/if}
+            {#if !loadingModels && providerModels !== null && providerModels.status !== "available"}
+              <p class="model-note">{providerModelsNote(providerModels)}</p>
+            {/if}
+            {#if !loadingModels && chosenProfile !== null && chosenProfile.model === "<model>" && modelChoice.trim() === ""}
+              <p class="model-note">
+                This provider needs a concrete model — without one the turn uses your persisted
+                selection.
+              </p>
+            {/if}
+          </div>
+        {/if}
         <div class="option">
           <label class="field-label" for="opt-planning">Planning</label>
           <select id="opt-planning" class="select" bind:value={planningMode} disabled={streaming}>
@@ -524,6 +603,12 @@
   .option .input,
   .option .select {
     min-width: 11rem;
+  }
+  .model-note {
+    font-size: 0.74rem;
+    color: var(--text-3);
+    margin: 0.25rem 0 0;
+    max-width: 16rem;
   }
   .composer-row {
     display: flex;

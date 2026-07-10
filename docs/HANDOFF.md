@@ -24,7 +24,45 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 - **Web reads are read-only + rate-limit-aware** (120 req/min/IP). Prefer folding new read data into an existing endpoint over adding a fan-out.
 - **Secrets never surface.** API keys/allowlist values come from owner env, are never displayed, logged, or committed.
 
-## State as of 2026-07-10 (this session) — web-app feature tasks 1 & 6
+## State as of 2026-07-10 (later session) — Task 7: provider model selection
+
+Implemented on branch `claude/provider-model-selection-5ufga4` as a full
+vertical slice (backend + API + web + tests + live verification).
+
+**Task 7 — select the provider's available models in Chat and Models (DONE).**
+- **Provider catalogue, on demand:** `GET /api/models/{profile_id}/provider-models`
+  calls the provider's own model-listing endpoint (reuses
+  `ModelRouter.alist_models_for_profile`, so gates/egress/key are enforced by the
+  provider factory *before* any network contact). Honest statuses: `available` |
+  `policy_denied` | `unsupported` | `unavailable` — failures return an empty
+  list, never fabricated names. This is the only web read that touches the
+  network, and only on explicit user demand (unknown/test profiles 404).
+- **Selection:** `PUT /api/model-selection` (`{profile_id, model?}`) persists the
+  same `ModelSessionState` the CLI `/model use` writes — human gate-manager only,
+  unknown/test profiles fail closed, placeholder profiles require a concrete
+  model, and the provider factory validates policy fail-closed before saving
+  (emits `model_profile_selected`). `GET /api/models` now returns `current_model`
+  and shows the concrete model on the selected profile card.
+- **Per-turn model:** `PromptOptions.model` (+ `PromptRequest.model`) lets a chat
+  turn pin a concrete model for the chosen profile; the gateway resolver
+  registers the concrete choice so the router resolves it (idempotent), and
+  provider policy is still enforced downstream.
+- **Web:** Models cards get Select / "Choose model…" (picker fetches the live
+  catalogue; manual model-id entry when the catalogue is unavailable). Chat →
+  Options gets a Provider select + a Model select populated from the catalogue.
+  The "Development preview" runtime-mode pill was removed from the top bar
+  (only an explicitly activated mode shows a badge).
+- Tests: `tests/test_api_model_selection.py` (14), +5 in
+  `tests/test_turn_model_binding.py`, +4 web vitest (ModelsView picker/select,
+  ChatView per-turn model). Suite: **1298 passed**; ruff/mypy clean; web
+  lint/check/**75 vitest**/build green; all five validators pass.
+- **Live-verified (hosted Anthropic, real key in server env only):** catalogue
+  listed 10 real models; selection via the new endpoint bound a streamed turn to
+  `claude-haiku-4-5-20251001`; a per-turn override ran `claude-sonnet-4-6`;
+  Chromium pass on both views with 0 console errors. Details in
+  `docs/WEB_APP_LIVE_TEST.md`.
+
+## State as of 2026-07-10 — web-app feature tasks 1 & 6
 
 Two of a six-task batch were implemented as full vertical slices (backend + API +
 web + tests) on branch `claude/raiker-web-app-features-8g8k5q`. Tasks 2–5 are

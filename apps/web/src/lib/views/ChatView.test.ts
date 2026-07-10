@@ -24,6 +24,7 @@ const MODELS_ROUTE = {
   "GET /api/models": {
     profiles: [],
     current_profile_id: null,
+    current_model: null,
     hosted_model_gate_state: "enabled_runtime",
     private_network_model_gate_state: "enabled_runtime",
     model_egress_allowlist_configured: false,
@@ -121,6 +122,72 @@ describe("ChatView streaming transcript", () => {
     await waitFor(() => {
       expect(screen.getByText(/cache hit · 128 tok/i)).toBeInTheDocument();
     });
+  });
+
+  it("lets the user pick a provider and one of its models for the turn", async () => {
+    stubFetch({
+      ...MODELS_ROUTE,
+      "GET /api/models": {
+        ...(MODELS_ROUTE["GET /api/models"] as Record<string, unknown>),
+        profiles: [
+          {
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "<model>",
+            default_state: "disabled",
+            local_only: true,
+            requires_network: false,
+            endpoint_kind: "local",
+            requires_egress_policy: false,
+            requires_budget_policy: false,
+            runtime_gate: null,
+            off_machine: false,
+            selected: false,
+            prompt_cache_ttl: null,
+          },
+        ],
+      },
+      "GET /api/models/ollama-local-openai-compatible/provider-models": {
+        profile_id: "ollama-local-openai-compatible",
+        provider: "ollama",
+        status: "available",
+        reason_code: null,
+        models: ["qwen2.5", "llama3.2"],
+      },
+    });
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: finalResponse("OK"),
+        } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    await fireEvent.click(screen.getByText("Options"));
+    const providerSelect = screen.getByLabelText("Provider") as HTMLSelectElement;
+    await fireEvent.change(providerSelect, {
+      target: { value: "ollama-local-openai-compatible" },
+    });
+
+    // The provider's catalogue loads on demand and populates the model select.
+    await waitFor(() => expect(screen.getByLabelText("Model")).toBeTruthy());
+    const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
+    expect(modelSelect.textContent).toContain("qwen2.5");
+    await fireEvent.change(modelSelect, { target: { value: "qwen2.5" } });
+
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "hi" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledOnce());
+    const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(body.model_profile).toBe("ollama-local-openai-compatible");
+    expect(body.model).toBe("qwen2.5");
   });
 
   it("shows an honest error when the stream cannot be reached", async () => {

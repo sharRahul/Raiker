@@ -46,6 +46,16 @@ class AuthSessionRequest:
     as_principal: str | None = None
 
 
+class SetModelSelectionRequest(BaseModel):
+    # Persist the operator's model selection: a profile id plus, for providers
+    # that serve several models (or ship a placeholder), the concrete model.
+    # extra="forbid" rejects unknown fields.
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    profile_id: str
+    model: str | None = None
+
+
 class SetModelFallbackRequest(BaseModel):
     # Ordered list of model profile ids to try (in order) when the selected
     # provider is unavailable. extra="forbid" rejects unknown fields.
@@ -61,6 +71,9 @@ class PromptRequest:
     planning_mode: str | None = None
     approval_mode: str | None = None
     model_profile: str | None = None
+    # Optional concrete model for the chosen profile (per-turn only; provider
+    # policy is still enforced downstream).
+    model: str | None = None
     max_tool_calls: int | None = None
     # Origin of the prompt: the bundled SPA sends "web_ui"; external single-user
     # REST clients (other machines/UIs) send "rest". Both land in the same

@@ -40,10 +40,15 @@
         <span class="dot" aria-hidden="true"></span>
         {ready ? "Runtime ready" : "Runtime not ready"}
       </span>
-      <span class="pill pill-muted" title="Active runtime mode">
-        <Icon name="shield" size={13} />
-        {humanize(runtimeMode)}
-      </span>
+      {#if runtimeMode !== "development_preview"}
+        <!-- The default development_preview mode is not shown — the readiness pill
+             already says the runtime isn't ready; only an explicitly activated
+             mode is worth a badge. -->
+        <span class="pill pill-muted" title="Active runtime mode">
+          <Icon name="shield" size={13} />
+          {humanize(runtimeMode)}
+        </span>
+      {/if}
       <span class="pill pill-muted mono" title="Acting principal">{principal}</span>
     {/if}
   </div>

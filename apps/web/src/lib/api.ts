@@ -12,6 +12,7 @@ import type {
   InterruptResult,
   ModelsView,
   PromptRequestBody,
+  ProviderModelList,
   ResolveApprovalResult,
   RuntimeMode,
   RuntimeReadiness,
@@ -97,6 +98,20 @@ export const api = {
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   models: () => request<ModelsView>("/api/models"),
+  // On-demand listing of the models a provider serves (user-initiated; provider
+  // policy is enforced server-side before any network contact).
+  providerModels: (profileId: string) =>
+    request<ProviderModelList>(
+      `/api/models/${encodeURIComponent(profileId)}/provider-models`,
+    ),
+  // Persist the operator's model selection (human gate-manager only, enforced
+  // server-side; placeholder profiles require a concrete model).
+  selectModel: (profile_id: string, model?: string) =>
+    request<{ ok: boolean; profile_id: string; model: string }>("/api/model-selection", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile_id, model: model || null }),
+    }),
   // Persist the user-owned ordered model fallback sequence (human gate-manager only,
   // enforced server-side). Returns the cleaned/de-duplicated sequence.
   setModelFallback: (profile_ids: string[]) =>

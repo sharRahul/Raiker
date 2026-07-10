@@ -92,12 +92,16 @@ class AgentGateway:
             self.model_registry.register(profile_with_model(profile, effective_model))
         return (profile.provider, effective_model)
 
-    def _resolve_profile_for_turn(self, profile_id: str) -> tuple[str, str] | None:
+    def _resolve_profile_for_turn(
+        self, profile_id: str, model: str | None = None
+    ) -> tuple[str, str] | None:
         """Resolve an explicit per-turn profile choice to ``(provider, model)``.
 
-        Test-harness profiles and unresolved ``<model>`` placeholders return None so
-        the turn falls back to the operator's persisted selection — the web/REST
-        surface only ever runs working backends. Provider policy (gates, egress
+        An explicit per-turn ``model`` wins, then the operator's persisted
+        selection for that profile, then the profile's own model. Test-harness
+        profiles and unresolved ``<model>`` placeholders return None so the turn
+        falls back to the operator's persisted selection — the web/REST surface
+        only ever runs working backends. Provider policy (gates, egress
         allowlist, API keys) is still enforced downstream by the model router.
         """
         try:
@@ -110,8 +114,17 @@ class AgentGateway:
         state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
         if state is not None and state.profile_id == profile.profile_id and state.model:
             effective_model = state.model
+        if model:
+            effective_model = model
         if not effective_model or "<" in effective_model:
             return None
+        # Register the concrete choice so the router can resolve (provider, model)
+        # even when the profile ships a different or placeholder model. Policy is
+        # unchanged — the registered copy inherits the profile's gates/egress/key.
+        if effective_model != profile.model and not self.model_registry.find(
+            profile.provider, effective_model
+        ):
+            self.model_registry.register(profile_with_model(profile, effective_model))
         return (profile.provider, effective_model)
 
     def _resolve_fallback_chain(self) -> list[tuple[str, str]]:

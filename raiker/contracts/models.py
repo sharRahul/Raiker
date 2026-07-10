@@ -306,6 +306,11 @@ class PromptOptions:
     # Empty means "the operator's selected model" (persisted via /model use);
     # an explicit profile id binds this turn only. Never defaults to a test provider.
     model_profile: str = ""
+    # Optional concrete model for the chosen profile, for providers whose profile
+    # ships a placeholder model or serves several models. Only meaningful together
+    # with model_profile; provider policy (gates, egress, keys) is still enforced
+    # downstream, so naming a model never grants access to its provider.
+    model: str = ""
     max_tool_calls: int = 10
 
     def __post_init__(self) -> None:

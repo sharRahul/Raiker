@@ -37,6 +37,22 @@ cache accounting fields, and the streamed usage was captured and normalised into
 the event. To observe a non-zero `cache_read_tokens`, use a model/prefix over the
 minimum (Opus/Sonnet: ~1024; Haiku: ~2048) and send two turns in the same session.
 
+## Result — 2026-07-10 (Task 7: provider model selection, hosted Anthropic)
+
+| Check | Result |
+|---|---|
+| `GET /api/models/anthropic-hosted/provider-models` returns the provider's live catalogue | ✅ 10 models (claude-sonnet-5, claude-fable-5, claude-opus-4-8, …, claude-haiku-4-5-20251001) |
+| Same endpoint with the hosted gate disabled | ✅ `status: policy_denied`, empty list, no network contact |
+| Same endpoint for an unreachable local provider (llama.cpp) | ✅ `status: unavailable`, empty list — never fabricated |
+| `PUT /api/model-selection` (`anthropic-hosted` + `claude-haiku-4-5-20251001`) | ✅ persisted; `GET /api/models` shows `current_model` + concrete model on the selected card |
+| Streamed turn binds the selected model | ✅ `model_request_started → model: claude-haiku-4-5-20251001` |
+| Per-turn override (`model_profile` + `model: claude-sonnet-4-6` on the prompt) | ✅ turn ran on `claude-sonnet-4-6`, exact answer returned |
+| Browser: Models card picker lists the 10 live models; "Use model" re-selects through the UI | ✅ |
+| Browser: Chat → Options → Provider populates a Model select from the live catalogue | ✅ 10 models |
+| Browser: unreachable provider shows honest manual-entry fallback | ✅ "Provider unreachable — type a model id if you know it." |
+| "Development preview" pill removed from the top bar | ✅ |
+| Browser console errors | ✅ 0 |
+
 ## Repeatable procedure
 
 1. **Bootstrap + enable the backend's gate** (human owner). For a hosted

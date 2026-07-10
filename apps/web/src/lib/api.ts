@@ -97,6 +97,14 @@ export const api = {
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   models: () => request<ModelsView>("/api/models"),
+  // Persist the user-owned ordered model fallback sequence (human gate-manager only,
+  // enforced server-side). Returns the cleaned/de-duplicated sequence.
+  setModelFallback: (profile_ids: string[]) =>
+    request<{ ok: boolean; fallback_sequence: string[] }>("/api/model-fallback", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile_ids }),
+    }),
   events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
     request<EventEntry[]>(withQuery("/api/events", params)),
   checkpoints: (sessionId?: string) =>

@@ -66,6 +66,7 @@ class AgentGateway:
             model_router=self.model_router,
             default_provider=self.default_provider,
             profile_resolver=self._resolve_profile_for_turn,
+            fallback_resolver=self._resolve_fallback_chain,
         )
 
     def _resolve_default_provider(self) -> tuple[str, str]:
@@ -112,6 +113,23 @@ class AgentGateway:
         if not effective_model or "<" in effective_model:
             return None
         return (profile.provider, effective_model)
+
+    def _resolve_fallback_chain(self) -> list[tuple[str, str]]:
+        """Resolve the user-owned ordered fallback sequence to ``(provider, model)`` pairs.
+
+        Read fresh each turn from the persisted sequence. Each profile id is
+        resolved through the same rules as an explicit per-turn choice
+        (``_resolve_profile_for_turn``), so test-harness profiles and unresolved
+        ``<model>`` placeholders are dropped and duplicates collapse. Provider
+        policy (gates, egress allowlist, API keys) is still enforced downstream by
+        the model router when each candidate is actually tried.
+        """
+        chain: list[tuple[str, str]] = []
+        for profile_id in self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID):
+            resolved = self._resolve_profile_for_turn(profile_id)
+            if resolved is not None and resolved not in chain:
+                chain.append(resolved)
+        return chain
 
     def _dispatch_lifecycle_hook(self, event_name: str, envelope: PromptEnvelope) -> None:
         self.hook_dispatcher.dispatch(

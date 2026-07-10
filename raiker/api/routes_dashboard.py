@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
-from raiker.api.schemas import AuthSessionRequest, serialize_dto
+from raiker.api.schemas import AuthSessionRequest, SetModelFallbackRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.control.dashboard import AuthSessionView, DashboardService
 from raiker.runtime.authority.models import Principal
@@ -127,6 +127,23 @@ async def get_models(
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     return serialize_dto(_service(request).get_models())
+
+
+@router.put("/api/model-fallback")
+async def set_model_fallback(
+    body: SetModelFallbackRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Set the user-owned ordered model fallback sequence (human gate-manager only)."""
+    session, _principal = _auth_data
+    result = _service(request).set_model_fallback_sequence(body.profile_ids, session.principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
 
 
 @router.get("/api/diagnostics")

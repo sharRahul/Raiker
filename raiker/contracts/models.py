@@ -77,6 +77,7 @@ EVENT_TYPES = {
     "model_health_check_started",
     "model_health_check_completed",
     "model_provider_rejected_by_policy",
+    "model_fallback_engaged",
     "model_profile_selected",
     "model_capabilities_inspected",
     "reasoning_setting_changed",

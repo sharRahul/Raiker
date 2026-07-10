@@ -52,6 +52,8 @@ from raiker.storage.migrations import (
     CAPABILITY_DECISION_MODE_SQL,
     EMAIL_DRAFTS_MIGRATION_ID,
     EMAIL_DRAFTS_SQL,
+    MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
+    MODEL_FALLBACK_SEQUENCE_SQL,
     MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
     MODEL_SESSION_RESOLVED_MODEL_SQL,
     PHASE_1_MIGRATION_ID,
@@ -433,6 +435,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(THREAT_MODEL_ACKS_MIGRATION_ID, THREAT_MODEL_ACKS_SQL, connection)
             self._apply_migration(
                 PHASE_4_SCHEDULED_ROUTINES_MIGRATION_ID, PHASE_4_SCHEDULED_ROUTINES_SQL, connection
+            )
+            self._apply_migration(
+                MODEL_FALLBACK_SEQUENCE_MIGRATION_ID, MODEL_FALLBACK_SEQUENCE_SQL, connection
             )
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
@@ -1769,6 +1774,37 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             reasoning_mode=row["reasoning_mode"],
             reasoning_budget_tokens=row["reasoning_budget_tokens"],
         )
+
+    def save_model_fallback_sequence(self, session_id: str, profile_ids: list[str]) -> None:
+        """Persist the ordered, user-owned model fallback sequence for ``session_id``.
+
+        The list is stored verbatim (deduplication/validation is the caller's job).
+        An empty list clears the sequence.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO model_fallback_sequence
+                (session_id, profile_ids_json, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                (session_id, json.dumps(list(profile_ids)), utc_now()),
+            )
+
+    def load_model_fallback_sequence(self, session_id: str) -> list[str]:
+        """Return the ordered fallback profile ids for ``session_id`` ([] if unset)."""
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT profile_ids_json FROM model_fallback_sequence WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+        if row is None:
+            return []
+        try:
+            value = json.loads(row["profile_ids_json"])
+        except (ValueError, TypeError):
+            return []
+        return [str(item) for item in value] if isinstance(value, list) else []
 
     # ── Phase 10: Runtime Authority (Principals + Risk Acceptance) ──
 

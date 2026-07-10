@@ -56,18 +56,42 @@ never opened; when all fail the turn fails closed as before.
   (same rule as per-turn selection). A per-profile "fallback model" field is the
   natural follow-up.
 
-**Task 6 — Anthropic prompt caching (DONE).** `ModelRequest.cache_ttl`
-(None | `"5m"` | `"1h"`), threaded from the profile by the router
-(`_cache_ttl`). The Anthropic provider emits the system prompt as a
-content-block list with a `cache_control` breakpoint at its end (reuses tools +
-system within the TTL); `"1h"` adds `ttl:"1h"` + the
-`extended-cache-ttl-2025-04-11` beta header. The `anthropic-hosted` profile opts
-into `"5m"`. Cache metrics already flow through `ModelResponse.usage`. Web shows
-a read-only "Cache 5m/1h" chip. Tests in `tests/test_phase_4_provider_breadth.py`
-(+5) and a web chip test.
-- **Follow-up:** OpenAI-compatible caching is automatic server-side (no client
-  breakpoints), so no change was needed there; if explicit control is wanted
-  later, thread the same `cache_ttl` into the OpenAI-compatible provider.
+**Task 6 — prompt caching, unified control across providers (DONE, incl. Option A).**
+`ModelRequest.cache_ttl` (None | `"5m"` | `"1h"`), threaded from each profile by
+the router (`_cache_ttl`). The KV cache is model-specific and lives inside each
+provider, so Raiker cannot share one cache across models; instead it drives each
+backend's own lever and normalises the metrics:
+- **Anthropic:** system prompt emitted as a content-block list with a
+  `cache_control` breakpoint (reuses tools + system within the TTL); `"1h"` adds
+  `ttl:"1h"` + the `extended-cache-ttl-2025-04-11` beta header.
+- **OpenAI-compatible (Option A):** hints sent only where the backend documents
+  one — OpenAI gets `prompt_cache_key` (keyed by profile_id, so same-prefix turns
+  share a cache) + `stream_options.include_usage`; llama.cpp gets
+  `cache_prompt: true`. vLLM/Ollama/LM Studio/Gemini/OpenRouter cache
+  automatically server-side, so no field is sent (a strict server would 400 on an
+  unknown field).
+- **Provider-agnostic cache-hit metrics:** `summarize_model_usage()`
+  (`raiker/models/contracts.py`) flattens Anthropic (`cache_read_input_tokens`)
+  and OpenAI (`prompt_tokens_details.cached_tokens`) usage into one shape; the
+  orchestrator emits it on `model_request_completed` (both buffered and streamed
+  paths — streaming usage is captured from Anthropic `message_start`/
+  `message_delta` and the OpenAI final usage chunk via `ModelStreamEvent.metadata`).
+- Profiles opting in: `anthropic-hosted`, `openai-hosted`, `raiker-local-llama-cpp`
+  (`prompt_cache_ttl: "5m"`). Web: a "Cache 5m/1h" chip per profile on Models,
+  and a per-turn "Cache hit · N tok / Cache miss" chip in Chat.
+- Tests: `tests/test_phase_4_provider_breadth.py` (+5 Anthropic),
+  `tests/test_prompt_cache_metrics.py` (14: summarizer, OpenAI-compatible hints,
+  streamed usage both providers, orchestrator emission), +1 web chip test.
+- **Option B (deferred, opt-in for later): a Raiker-level *response* cache.**
+  Store `(exact prompt + model) → response` and short-circuit identical repeated
+  prompts without calling the model. Provider-agnostic and fully Raiker-owned,
+  but note: (1) must be keyed by model (serving one model's answer for another is
+  wrong), so it's still not "cache irrespective of model"; (2) only helps on
+  *identical* prompts, and Raiker gathers fresh context each turn, so hits are
+  rare; (3) it changes a core invariant — a cache hit means the model did not run
+  this turn — so it needs deliberate governance (staleness, is a cached answer
+  still policy-valid, audit). Build only if short-circuiting repeats is
+  explicitly wanted; design the governance first.
 
 **Session gate (both tasks):** full backend suite **1265 passed**; `ruff check .`
 clean; `mypy` clean on changed sources (remaining output is the documented

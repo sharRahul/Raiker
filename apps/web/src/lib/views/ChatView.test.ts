@@ -92,6 +92,37 @@ describe("ChatView streaming transcript", () => {
     expect(streamPromptMock).toHaveBeenCalledOnce();
   });
 
+  it("shows a cache-hit chip from the model_request_completed usage", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "lifecycle",
+          text: "",
+          event_type: "model_request_completed",
+          payload: { provider: "anthropic", usage: { cache_read_tokens: 128, cache_hit: 1 } },
+          response: null,
+        } as StreamEvent);
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: finalResponse("DONE"),
+        } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "hi" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(screen.getByText(/cache hit · 128 tok/i)).toBeInTheDocument();
+    });
+  });
+
   it("shows an honest error when the stream cannot be reached", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockRejectedValue(new Error("connection refused"));

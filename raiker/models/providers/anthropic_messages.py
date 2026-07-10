@@ -285,6 +285,7 @@ class AsyncAnthropicMessagesProvider:
         return ModelResponse(text="".join(text_parts), tool_calls=tool_calls, finish_reason=finish, usage=usage)
 
     async def stream_chat(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
+        usage_acc: dict[str, Any] = {}
         try:
             async with self._client.stream(
                 "POST", self._url(self.chat_path),
@@ -304,7 +305,15 @@ class AsyncAnthropicMessagesProvider:
                     if not isinstance(decoded, dict):
                         continue
                     event_type = decoded.get("type")
-                    if event_type == "content_block_delta":
+                    if event_type == "message_start":
+                        # Input + cache usage arrives up front; output tokens come
+                        # in message_delta. Merge and surface once so cache-hit
+                        # metrics survive the streamed path.
+                        message = decoded.get("message")
+                        start_usage = message.get("usage") if isinstance(message, dict) else None
+                        if isinstance(start_usage, dict):
+                            usage_acc.update(start_usage)
+                    elif event_type == "content_block_delta":
                         delta = decoded.get("delta")
                         if isinstance(delta, dict) and delta.get("type") == "text_delta":
                             text = delta.get("text")
@@ -312,8 +321,13 @@ class AsyncAnthropicMessagesProvider:
                                 yield ModelStreamEvent(event_type="text_delta", text_delta=text)
                     elif event_type == "message_delta":
                         delta = decoded.get("delta")
+                        delta_usage = decoded.get("usage")
+                        if isinstance(delta_usage, dict):
+                            usage_acc.update(delta_usage)
                         stop = delta.get("stop_reason") if isinstance(delta, dict) else None
                         if isinstance(stop, str) and stop:
+                            if usage_acc:
+                                yield ModelStreamEvent(event_type="usage", metadata={"usage": dict(usage_acc)})
                             yield ModelStreamEvent(event_type="finish", finish_reason=_map_finish(stop))
                     elif event_type == "message_stop":
                         return

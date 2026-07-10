@@ -10,7 +10,13 @@ from raiker.contracts.models import AgentResponse, PromptEnvelope, ToolAction, T
 from raiker.contracts.streaming import FINAL, LIFECYCLE, TEXT_DELTA, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
-from raiker.models.contracts import FINISH_REASONS, ModelMessage, ModelResponse, ToolCallProposal
+from raiker.models.contracts import (
+    FINISH_REASONS,
+    ModelMessage,
+    ModelResponse,
+    ToolCallProposal,
+    summarize_model_usage,
+)
 from raiker.models.exceptions import ModelProviderError
 from raiker.models.router import ModelRouter
 from raiker.models.tool_call_validation import (
@@ -193,6 +199,9 @@ class RuntimeOrchestrator:
                     "finish_reason": response.finish_reason,
                     "tool_call_count": len(response.tool_calls),
                     "text_length": len(response.text),
+                    # Metadata-only token counts (incl. cache hits), normalised
+                    # across providers; empty when the provider reports no usage.
+                    "usage": summarize_model_usage(response.usage),
                 },
             )
             return response
@@ -269,6 +278,7 @@ class RuntimeOrchestrator:
             text_parts: list[str] = []
             tool_deltas: list[dict[str, object]] = []
             finish: str | None = None
+            usage: dict[str, object] | None = None
             try:
                 async for sev in self.model_router.astream(provider, model, messages, self.tool_specs):
                     if sev.text_delta:
@@ -276,6 +286,9 @@ class RuntimeOrchestrator:
                         deltas.append(StreamEvent(kind=TEXT_DELTA, text=sev.text_delta))
                     if sev.tool_call_delta:
                         tool_deltas.append(sev.tool_call_delta)
+                    stream_usage = sev.metadata.get("usage")
+                    if isinstance(stream_usage, dict):
+                        usage = stream_usage
                     if sev.event_type == "finish":
                         finish = sev.finish_reason
             except Exception as exc:  # noqa: BLE001 — provider streams fail safe, then fall back
@@ -296,6 +309,7 @@ class RuntimeOrchestrator:
                 # turn must fail safe (not raise) if one ever streams an unknown value.
                 finish_reason=finish if finish in FINISH_REASONS else "stop",
                 tool_calls=self._reconstruct_tool_calls(tool_deltas),
+                usage=usage,
             )
             self._event(
                 envelope,
@@ -305,6 +319,7 @@ class RuntimeOrchestrator:
                     "finish_reason": response.finish_reason,
                     "tool_call_count": len(response.tool_calls),
                     "text_length": len(response.text),
+                    "usage": summarize_model_usage(response.usage),
                 },
             )
             return response, deltas

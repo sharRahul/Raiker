@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 from raiker.runtime.executors.channels import ChannelApprovalRelayExecutor, ExternalChannelExecutor
 from raiker.runtime.executors.containers import ContainerExecutionExecutor
 from raiker.runtime.executors.models_runtime import (
+    AdvisorModelRuntimeExecutor,
     HostedModelRuntimeExecutor,
     ModelProviderExecutor,
     PrivateNetworkModelRuntimeExecutor,
@@ -66,7 +67,8 @@ __all__ = [
     "PluginRuntimeExecutor", "PluginSandboxedRuntimeExecutor",
     "ExternalChannelExecutor", "ChannelApprovalRelayExecutor",
     "RemoteExecutionExecutor", "ContainerExecutionExecutor", "CloudExecutionExecutor",
-    "HostedModelRuntimeExecutor", "PrivateNetworkModelRuntimeExecutor", "ScheduledRoutinesExecutor",
+    "HostedModelRuntimeExecutor", "PrivateNetworkModelRuntimeExecutor",
+    "AdvisorModelRuntimeExecutor", "ScheduledRoutinesExecutor",
     "EmailRuntimeExecutor", "CalendarRuntimeExecutor", "ReminderRuntimeExecutor",
     "FinanceRuntimeExecutor", "InvestmentRuntimeExecutor", "MedicalRuntimeExecutor",
     "PregnancyBabyRuntimeExecutor", "CctvRuntimeExecutor", "HomeSecurityRuntimeExecutor",
@@ -124,6 +126,10 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # same allowlist in the provider factory)
     "hosted_model_runtime",
     "private_network_model_runtime",
+    # Web-app task 2 — advisor model for local-model turns (default-ask consult
+    # of the owner-picked advisor profile; provider policy — hosted/private gate,
+    # owner egress allowlist, env-only key — re-checked per call).
+    "advisor_model_runtime",
     # Tier 4 — local manifest validation + brokered read-only plugin tool
     # invocation + revocation off-switch + bounded subprocess code runtime for an
     # owner-allowlisted installed plugin (slice 14) + network-isolated container
@@ -178,6 +184,7 @@ def build_default_executor_registry(
     registry.register("scheduled_routines", ScheduledRoutinesExecutor(ws, store))
     registry.register("hosted_model_runtime", HostedModelRuntimeExecutor(ws))
     registry.register("private_network_model_runtime", PrivateNetworkModelRuntimeExecutor(ws))
+    registry.register("advisor_model_runtime", AdvisorModelRuntimeExecutor(ws, store))
     registry.register("plugin_install", PluginInstallExecutor(ws, store))
     registry.register("plugin_execution_cap", PluginExecutionCapExecutor(ws, store))
     registry.register("plugin_revocation_cap", PluginRevocationExecutor(ws, store))

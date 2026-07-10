@@ -263,3 +263,76 @@ def _dump_vector(vector: list[float]) -> str:
     import json
 
     return json.dumps([float(v) for v in vector])
+
+
+# ── Advisor model (advisor_model_runtime) ─────────────────────────────────────
+
+
+class AdvisorModelRuntimeExecutor:
+    """Real executor for ``advisor_model_runtime`` — one governed advisor consult.
+
+    Reached only through ``route_action``, which already applied the capability
+    gate, the per-capability decision mode (default ``ask``), and the approval
+    flow — so this executor skips the mode layer and enforces everything else
+    fail-closed via :class:`raiker.runtime.advisor.AdvisorService`: a configured
+    non-test advisor profile with a concrete model, a bounded question, and
+    provider policy (hosted/private gate + owner egress allowlist + env-only
+    API key) re-checked per call by the provider factory.
+
+    Artifacts are **metadata only** — profile id, provider, model, and
+    question/answer lengths. The question and answer text never enter runtime
+    events; the chat path (the brokered ``consult_advisor`` tool) is where the
+    answer actually flows back to the calling model.
+    """
+
+    capability = "advisor_model_runtime"
+
+    def __init__(
+        self,
+        workspace_root: str | Path,
+        store: SQLiteStore,
+        consult_fn: Callable[[str, str, str], str] | None = None,
+    ) -> None:
+        self._workspace_root = Path(workspace_root).resolve()
+        self._store = store
+        self._consult_fn = consult_fn
+
+    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        from raiker.runtime.advisor import AdvisorService
+
+        operation = str(action.arguments.get("operation", "consult")).strip()
+        if operation != "consult":
+            return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
+        question = action.arguments.get("question")
+        if not isinstance(question, str) or not question.strip():
+            return self._fail(action.action_id, "missing_argument:question")
+
+        service = AdvisorService(self._workspace_root, self._store, consult_fn=self._consult_fn)
+        outcome = service.consult(question, enforce_modes=False)
+        if outcome.get("status") != "success":
+            error = outcome.get("error", {})
+            return self._fail(action.action_id, str(error.get("type", "advisor_failed")))
+        return ExecutionResult(
+            ok=True,
+            capability=self.capability,
+            action_id=action.action_id,
+            summary="Advisor consulted; answer withheld from artifacts (metadata only).",
+            artifacts={
+                "advisor_profile_id": outcome.get("advisor_profile_id"),
+                "provider": outcome.get("provider"),
+                "model": outcome.get("model"),
+                "question_length": len(question),
+                "answer_length": outcome.get("answer_length"),
+                "content_redacted": True,
+            },
+        )
+
+    def _fail(self, action_id: str, reason_code: str) -> ExecutionResult:
+        return ExecutionResult(
+            ok=False,
+            capability=self.capability,
+            action_id=action_id,
+            reason_code=reason_code,
+            summary="Advisor model runtime failed closed.",
+            artifacts={},
+        )

@@ -37,6 +37,8 @@ function models(partial: Partial<ModelsData>): ModelsData {
     ],
     current_profile_id: null,
     current_model: null,
+    advisor_profile_id: null,
+    advisor_model_gate_state: "enabled_runtime",
     hosted_model_gate_state: "enabled_runtime",
     private_network_model_gate_state: "enabled_runtime",
     model_egress_allowlist_configured: false,
@@ -204,6 +206,71 @@ describe("ModelsView fallback sequence", () => {
       expect(screen.getByText(/denied by provider policy/i)).toBeTruthy(),
     );
     expect(screen.getByLabelText("Model id")).toBeTruthy();
+  });
+
+  it("saves the advisor model via PUT /api/model-advisor", async () => {
+    const mock = stubFetch({
+      "GET /api/models": models({}),
+      "PUT /api/model-advisor": { ok: true, advisor_profile_id: "anthropic-hosted" },
+    });
+    render(ModelsView);
+    await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
+
+    const select = screen.getByLabelText("Advisor model profile") as HTMLSelectElement;
+    // Only concrete-model profiles are offered as advisors.
+    expect(select.textContent).toContain("Anthropic");
+    await fireEvent.change(select, { target: { value: "anthropic-hosted" } });
+    await fireEvent.click(screen.getByText("Save advisor"));
+
+    await waitFor(() => {
+      const put = mock.mock.calls.find(
+        (c) =>
+          (c[1]?.method ?? "GET").toUpperCase() === "PUT" &&
+          String(c[0]).includes("/api/model-advisor"),
+      );
+      expect(put).toBeTruthy();
+      expect(JSON.parse(put![1]!.body as string)).toEqual({ profile_id: "anthropic-hosted" });
+    });
+  });
+
+  it("clears the advisor by saving 'No advisor'", async () => {
+    const mock = stubFetch({
+      "GET /api/models": models({ advisor_profile_id: "anthropic-hosted" }),
+      "PUT /api/model-advisor": { ok: true, advisor_profile_id: null },
+    });
+    render(ModelsView);
+    await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
+
+    const select = screen.getByLabelText("Advisor model profile") as HTMLSelectElement;
+    expect(select.value).toBe("anthropic-hosted");
+    await fireEvent.change(select, { target: { value: "" } });
+    await fireEvent.click(screen.getByText("Save advisor"));
+
+    await waitFor(() => {
+      const put = mock.mock.calls.find(
+        (c) =>
+          (c[1]?.method ?? "GET").toUpperCase() === "PUT" &&
+          String(c[0]).includes("/api/model-advisor"),
+      );
+      expect(put).toBeTruthy();
+      expect(JSON.parse(put![1]!.body as string)).toEqual({ profile_id: null });
+    });
+  });
+
+  it("does not offer placeholder-model profiles as advisors", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({ profile_id: "anthropic-hosted", provider: "anthropic" }),
+          profile({ profile_id: "ollama-local-openai-compatible", provider: "ollama", model: "<model>" }),
+        ],
+      }),
+    });
+    render(ModelsView);
+    await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
+    const select = screen.getByLabelText("Advisor model profile") as HTMLSelectElement;
+    expect(select.textContent).toContain("Anthropic");
+    expect(select.textContent).not.toContain("Ollama");
   });
 
   it("surfaces a server rejection reason", async () => {

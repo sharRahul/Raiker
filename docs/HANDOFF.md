@@ -24,6 +24,54 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 - **Web reads are read-only + rate-limit-aware** (120 req/min/IP). Prefer folding new read data into an existing endpoint over adding a fan-out.
 - **Secrets never surface.** API keys/allowlist values come from owner env, are never displayed, logged, or committed.
 
+## State as of 2026-07-10 (later session, continued) — Task 2: advisor model
+
+Implemented on the same branch (`claude/provider-model-selection-5ufga4`, PR
+#107) as a governed vertical slice, following the slice discipline.
+
+**Task 2 — advisor model for local-model turns (DONE).** A user running a local
+model can attach one advisor profile (typically hosted) that the local model
+consults through the brokered tool `consult_advisor(question)`.
+- **Capability `advisor_model_runtime`** (threat model
+  `docs/threat-models/advisor-model.md`): real executor
+  (`AdvisorModelRuntimeExecutor`, operation `consult`, metadata-only
+  artifacts), activation requires human gate-manager + threat-model ack +
+  confirmation token + `local_single_user_runtime`. In
+  `REAL_EXECUTOR_CAPABILITIES` / phase-gates tier 5 / `CAPABILITY_GATE_MAP` /
+  activation registry / policy `approval_required_actions`.
+- **Governance layering** (`raiker/runtime/advisor.py::AdvisorService`,
+  mirrors `RetrievalAugmentor`): gate disabled → fail closed; decision mode
+  default **`ask` withholds** (`auto` withholds too — off-machine prompt
+  content is never low-risk; `deny` blocks; only `allow` runs); no/unknown/
+  test-only/placeholder advisor → fail closed; then the consult goes through
+  `ModelRouter.achat` so the provider factory re-checks the hosted/private
+  gate + owner egress allowlist + env-only key per call.
+- **Tool**: `consult_advisor` in the ToolBroker + PolicyEngine read allowlist +
+  `_MODEL_EXPOSED_TOOLS` (advertised to the model; question required). Answer
+  returns as an untrusted-data block, capped 16k; question capped 8k. Broker
+  events/stored actions are scrubbed to metadata (`_METADATA_ONLY_TOOLS`) —
+  the question/answer never enter event payloads (lengths only).
+- **Persistence**: `model_advisor` table (migration `RAIKER-1005`) +
+  `save/load_model_advisor`.
+- **API**: `advisor_profile_id` + `advisor_model_gate_state` on
+  `GET /api/models`; `PUT /api/model-advisor` (gate-manager only; null clears;
+  unknown/test/placeholder profiles fail closed). Web: "Advisor model"
+  selector on Models (concrete-model profiles only) + governance copy.
+- Tests: `tests/test_advisor_model.py` (29: service governance matrix,
+  executor fail-closed + activation, broker metadata-only audit, API), +3 web
+  vitest. Suite: **1327 passed**; ruff/mypy clean; web lint/check/**78
+  vitest**/build green; all five validators pass.
+- **Live-verified (hosted Anthropic, operator key in process env only):** with
+  the advisor gate enabled (ack + token), decision mode `allow`, and
+  `anthropic-hosted` set as advisor, `AdvisorService.consult` returned a real
+  answer from `claude-opus-4-8`, and the **brokered `consult_advisor` path**
+  ran the same consult through PolicyEngine + ToolBroker — the durable event
+  log contained `question_length` but neither the question nor the answer
+  text (metadata-only audit verified live). This run also caught and fixed a
+  circular import (`broker → advisor_tools → runtime.authority → … → broker`)
+  that test-import ordering had masked: `advisor_tools` now imports the
+  service lazily at call time.
+
 ## State as of 2026-07-10 (later session) — Task 7: provider model selection
 
 Implemented on branch `claude/provider-model-selection-5ufga4` as a full

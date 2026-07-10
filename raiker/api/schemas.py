@@ -56,6 +56,14 @@ class SetModelSelectionRequest(BaseModel):
     model: str | None = None
 
 
+class SetModelAdvisorRequest(BaseModel):
+    # Persist (or clear, with null/empty) the user-owned advisor model profile.
+    # extra="forbid" rejects unknown fields.
+    model_config = ConfigDict(extra="forbid")
+
+    profile_id: str | None = None
+
+
 class SetModelFallbackRequest(BaseModel):
     # Ordered list of model profile ids to try (in order) when the selected
     # provider is unavailable. extra="forbid" rejects unknown fields.

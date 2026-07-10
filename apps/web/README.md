@@ -28,7 +28,7 @@ RuntimeAuthority, and append-only audit log as the terminal client.
 | Tasks | Active tasks with progress + safe-boundary stop, task history |
 | Sessions | Session browser → turns → per-turn governed events |
 | Capabilities | All capability gates (per phase), friendly labels, gate enable/disable with step-up (reason, Tier-2 confirmation token, threat ack), per-capability decision modes (`ask`/`allow`/`auto`/`deny`) |
-| Models | Model profiles with provider + model selection (each provider's model catalogue fetched on demand, gate-manager only writes), hosted/private gate + egress allowlist posture (no keys, no allowlist values) |
+| Models | Model profiles with provider + model selection (each provider's model catalogue fetched on demand, gate-manager only writes), advisor-model picker for local-model turns, hosted/private gate + egress allowlist posture (no keys, no allowlist values) |
 | Checkpoints | Rewind metadata per session (restore flags are metadata only) |
 | Audit log | The append-only event record with session/type filters |
 | Diagnostics | Readiness checks, configuration gaps, counts, config-derived provider status |

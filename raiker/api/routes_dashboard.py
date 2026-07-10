@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
     AuthSessionRequest,
+    SetModelAdvisorRequest,
     SetModelFallbackRequest,
     SetModelSelectionRequest,
     serialize_dto,
@@ -169,6 +170,28 @@ async def set_model_selection(
     result = await _service(request).set_model_selection(
         body.profile_id, body.model, session.principal_id
     )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/model-advisor")
+async def set_model_advisor(
+    body: SetModelAdvisorRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Persist (or clear) the user-owned advisor model profile (gate-manager only).
+
+    Selecting an advisor grants nothing: the consult path is gated by the
+    advisor_model_runtime capability, its decision mode (default ask), and
+    provider policy (hosted/private gate + egress allowlist + key) per call.
+    """
+    session, _principal = _auth_data
+    result = _service(request).set_model_advisor(body.profile_id, session.principal_id)
     if not result.ok:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

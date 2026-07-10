@@ -1070,3 +1070,18 @@ CREATE TABLE IF NOT EXISTS model_fallback_sequence (
   updated_at TEXT NOT NULL
 );
 """
+
+# Web-app task 2: the user-owned advisor model. A single profile id per client
+# session — the (typically hosted) model a local model may consult through the
+# governed `consult_advisor` tool. Persisting the choice grants nothing: the
+# consult is gated by advisor_model_runtime + its decision mode, and the
+# provider call re-checks the hosted/private gate, egress allowlist, and key.
+MODEL_ADVISOR_MIGRATION_ID = "RAIKER-1005-model-advisor"
+
+MODEL_ADVISOR_SQL = """
+CREATE TABLE IF NOT EXISTS model_advisor (
+  session_id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""

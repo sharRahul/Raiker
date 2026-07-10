@@ -127,6 +127,11 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     for cap in ("hosted_model_runtime", "private_network_model_runtime"):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Owner egress allowlist, env-only credentials, metadata-only events.")
+    # Advisor model for local-model turns: the consult re-checks the hosted/
+    # private egress path per call. See docs/threat-models/advisor-model.md.
+    r["advisor_model_runtime"] = _req(
+        "advisor_model_runtime", "5", threat_ack=True, human_confirm=True,
+        notes="Default-ask consult of the owner-picked advisor profile; provider policy re-checked per call.")
     for cap in ("scheduled_routines",):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Scheduler storage, owner consent, budget.")

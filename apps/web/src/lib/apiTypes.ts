@@ -84,6 +84,8 @@ export interface ModelsView {
   profiles: ModelProfile[];
   current_profile_id: string | null;
   current_model: string | null;
+  advisor_profile_id: string | null;
+  advisor_model_gate_state: string;
   hosted_model_gate_state: string;
   private_network_model_gate_state: string;
   model_egress_allowlist_configured: boolean;

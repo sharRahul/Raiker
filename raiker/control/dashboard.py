@@ -193,12 +193,20 @@ class ModelsView:
     # model override when present, else the selected profile's own model).
     # None when nothing is selected or the selection is an unresolved placeholder.
     current_model: str | None = None
+    # User-owned advisor model (web-app task 2): the profile a local model may
+    # consult through the governed `consult_advisor` tool. Persisting it grants
+    # nothing — the consult is gated by advisor_model_runtime + decision mode +
+    # provider policy at call time.
+    advisor_profile_id: str | None = None
+    advisor_model_gate_state: str = "unknown"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "profiles": [p.to_dict() for p in self.profiles],
             "current_profile_id": self.current_profile_id,
             "current_model": self.current_model,
+            "advisor_profile_id": self.advisor_profile_id,
+            "advisor_model_gate_state": self.advisor_model_gate_state,
             "hosted_model_gate_state": self.hosted_model_gate_state,
             "private_network_model_gate_state": self.private_network_model_gate_state,
             "model_egress_allowlist_configured": self.model_egress_allowlist_configured,
@@ -394,6 +402,7 @@ class DashboardService:
         override = state.model if state is not None and state.model else None
         hosted_gate = self.control.get_capability_gate(HOSTED_MODEL_GATE)
         private_gate = self.control.get_capability_gate(PRIVATE_NETWORK_MODEL_GATE)
+        advisor_gate = self.control.get_capability_gate("advisor_model_runtime")
         profiles = tuple(
             ModelProfileView(
                 profile_id=p.profile_id,
@@ -429,6 +438,8 @@ class DashboardService:
                 self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
             ),
             current_model=self._current_model(registry, state),
+            advisor_profile_id=self.store.load_model_advisor(TERMINAL_MODEL_SESSION_ID),
+            advisor_model_gate_state=advisor_gate.state if advisor_gate is not None else "unknown",
         )
 
     @staticmethod
@@ -474,6 +485,38 @@ class DashboardService:
                 cleaned.append(profile_id)
         self.store.save_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID, cleaned)
         return ControlResult(ok=True, data={"fallback_sequence": cleaned})
+
+    def set_model_advisor(
+        self, profile_id: str | None, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Persist the user-owned advisor model profile (human gate-manager only).
+
+        ``None``/empty clears the advisor. Only known, non-test profiles with a
+        concrete model are accepted — placeholder-``<model>`` profiles fail
+        closed (pick a concrete model for the profile first). Persisting the
+        advisor never enables anything: the consult path is gated by
+        ``advisor_model_runtime``, its decision mode, and provider policy.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if not self.control._is_gate_manager(principal):  # noqa: SLF001
+            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        cleaned = (profile_id or "").strip()
+        if not cleaned:
+            self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, None)
+            return ControlResult(ok=True, data={"advisor_profile_id": None})
+        registry = ModelProfileRegistry.load()
+        try:
+            profile = registry.resolve_profile_id(cleaned)
+        except Exception:  # noqa: BLE001 — unknown profile fails closed
+            return ControlResult(ok=False, reason_code=f"unknown_profile:{cleaned}")
+        if bool(profile.raw.get("test_only", False)):
+            return ControlResult(ok=False, reason_code=f"test_profile_not_allowed:{cleaned}")
+        if not profile.model or "<" in profile.model:
+            return ControlResult(ok=False, reason_code=f"model_required_for_profile:{cleaned}")
+        self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, profile.profile_id)
+        return ControlResult(ok=True, data={"advisor_profile_id": profile.profile_id})
 
     async def list_provider_models(self, profile_id: str) -> ProviderModelListView | None:
         """List the models a provider serves, on explicit user demand.

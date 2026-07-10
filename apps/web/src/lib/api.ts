@@ -104,6 +104,15 @@ export const api = {
     request<ProviderModelList>(
       `/api/models/${encodeURIComponent(profileId)}/provider-models`,
     ),
+  // Persist (or clear, with null) the user-owned advisor model profile — the
+  // model a local model may consult through the governed consult_advisor tool.
+  // Gate-manager only, enforced server-side; selecting an advisor grants nothing.
+  setModelAdvisor: (profile_id: string | null) =>
+    request<{ ok: boolean; advisor_profile_id: string | null }>("/api/model-advisor", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profile_id }),
+    }),
   // Persist the operator's model selection (human gate-manager only, enforced
   // server-side; placeholder profiles require a concrete model).
   selectModel: (profile_id: string, model?: string) =>

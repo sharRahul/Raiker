@@ -37,6 +37,18 @@ cache accounting fields, and the streamed usage was captured and normalised into
 the event. To observe a non-zero `cache_read_tokens`, use a model/prefix over the
 minimum (Opus/Sonnet: ~1024; Haiku: ~2048) and send two turns in the same session.
 
+## Result — 2026-07-10 (Task 2: advisor model, hosted Anthropic)
+
+| Check | Result |
+|---|---|
+| `advisor_model_runtime` gate enabled via control plane (threat ack + token) | ✅ |
+| `PUT /api/model-advisor` persists `anthropic-hosted`; `GET /api/models` reflects it | ✅ |
+| Decision mode default `ask` withholds the consult (no provider contact) | ✅ `advisor_withheld_ask` |
+| With mode `allow`: `AdvisorService.consult` returns a real advisor answer | ✅ `claude-opus-4-8` answered; untrusted-data framing |
+| Brokered `consult_advisor` tool through PolicyEngine + ToolBroker | ✅ policy `allow`, tool `success`, real answer returned to the caller |
+| Durable event log is metadata-only (no question/answer text; lengths present) | ✅ verified against the session JSONL |
+| Provider policy re-checked per call (hosted gate off ⇒ denied before network) | ✅ `advisor_provider_denied:provider_requires_explicit_policy_approval` |
+
 ## Result — 2026-07-10 (Task 7: provider model selection, hosted Anthropic)
 
 | Check | Result |

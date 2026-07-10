@@ -23,6 +23,7 @@
     try {
       models = await api.models();
       sequence = [...models.fallback_sequence];
+      advisorChoice = models.advisor_profile_id ?? "";
     } catch (e) {
       models = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
@@ -79,6 +80,44 @@
           : "Could not select";
     } finally {
       selecting = false;
+    }
+  }
+
+  // ── Advisor model (web-app task 2) ───────────────────────────────────
+  // The profile a local model may consult through the governed consult_advisor
+  // tool. Choosing one grants nothing: the consult is gated by the
+  // advisor_model_runtime capability, its decision mode, and provider policy.
+  let advisorChoice = $state("");
+  let advisorSaving = $state(false);
+  let advisorError = $state<string | null>(null);
+  let advisorSaved = $state(false);
+
+  // Only profiles with a concrete model can advise (fail-closed server-side too).
+  const advisorCandidates = $derived(
+    (models?.profiles ?? []).filter((p) => p.model !== "<model>"),
+  );
+  const advisorDirty = $derived(
+    models !== null && advisorChoice !== (models.advisor_profile_id ?? ""),
+  );
+
+  async function saveAdvisor() {
+    advisorSaving = true;
+    advisorError = null;
+    advisorSaved = false;
+    try {
+      const result = await api.setModelAdvisor(advisorChoice || null);
+      if (models !== null) {
+        models = { ...models, advisor_profile_id: result.advisor_profile_id };
+      }
+      advisorChoice = result.advisor_profile_id ?? "";
+      advisorSaved = true;
+    } catch (e) {
+      advisorError =
+        e instanceof ApiError
+          ? `Could not save (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+          : "Could not save";
+    } finally {
+      advisorSaving = false;
     }
   }
 
@@ -357,6 +396,39 @@
     </div>
   </section>
 
+  <section class="card advisor" aria-labelledby="advisor-h">
+    <h2 id="advisor-h">Advisor model</h2>
+    <p class="sub">
+      When you run a local model, it can consult one advisor — typically a hosted model — through
+      the governed <code>consult_advisor</code> tool. Picking an advisor grants nothing on its own:
+      the consult is gated by the <code>advisor_model_runtime</code> capability, its decision mode
+      (default <strong>ask</strong>, which withholds the consult), and the provider's own policy
+      (hosted gate, egress allowlist, API key) at call time. The advisor's answer is always treated
+      as untrusted data, and the question/answer never enter the audit log — only lengths do.
+    </p>
+    <div class="advisor-row">
+      <select bind:value={advisorChoice} aria-label="Advisor model profile">
+        <option value="">No advisor</option>
+        {#each advisorCandidates as p (p.profile_id)}
+          <option value={p.profile_id}>{providerName(p.provider)} — {p.model}</option>
+        {/each}
+      </select>
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        onclick={saveAdvisor}
+        disabled={!advisorDirty || advisorSaving}
+      >
+        {advisorSaving ? "Saving…" : "Save advisor"}
+      </button>
+      {#if advisorError}
+        <span class="error" role="alert">{advisorError}</span>
+      {:else if advisorSaved && !advisorDirty}
+        <span class="ok-note">Saved.</span>
+      {/if}
+    </div>
+  </section>
+
   <section class="card gate-status" aria-labelledby="model-gates-h">
     <h2 id="model-gates-h">Off-machine provider posture</h2>
     <dl class="gates">
@@ -549,6 +621,26 @@
   .ok-note {
     color: var(--ok);
     font-size: 0.82rem;
+  }
+  .advisor {
+    margin-top: var(--space-4);
+  }
+  .advisor .sub {
+    margin-bottom: var(--space-3);
+  }
+  .advisor-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .advisor-row select {
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--r-md);
+    border: 1px solid var(--neutral-border);
+    background: var(--surface-1);
+    color: var(--text-1);
+    max-width: 22rem;
   }
   .gate-status {
     margin-top: var(--space-4);

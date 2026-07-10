@@ -38,6 +38,17 @@ class ModelLaunchResult:
     message: str
 
 
+# Accepted prompt-cache TTL breakpoints. Anything else (including the common
+# unset/empty case) means "no caching" and is normalised to None.
+_VALID_CACHE_TTLS = {"5m", "1h"}
+
+
+def _cache_ttl(profile: ModelProfile) -> str | None:
+    """Read the profile's ``prompt_cache_ttl`` config, validated to {"5m","1h"} or None."""
+    value = str(profile.raw.get("prompt_cache_ttl", "") or "").strip()
+    return value if value in _VALID_CACHE_TTLS else None
+
+
 class ModelRouter:
     def __init__(self, registry: ModelProfileRegistry, writer: EventLogWriter | None = None, *, allow_test_provider: bool = False, runtime_policy: ProviderRuntimePolicy | None = None) -> None:
         self.registry = registry
@@ -56,7 +67,7 @@ class ModelRouter:
     async def achat(self, provider: str, model: str, messages: Sequence[ModelMessage], tools: Sequence[ToolSpec] | None = None) -> ModelResponse:
         profile = self._profile(provider, model)
         p = self._factory().create(profile)
-        request = ModelRequest(profile.profile_id, p.provider, p.model, messages, tools, temperature=float(profile.raw.get("temperature", 0.2)), max_tokens=int(profile.raw.get("max_tokens", 1024)), tool_call_mode=str(profile.raw.get("tool_call_mode", "text_json")), reasoning=self.reasoning)
+        request = ModelRequest(profile.profile_id, p.provider, p.model, messages, tools, temperature=float(profile.raw.get("temperature", 0.2)), max_tokens=int(profile.raw.get("max_tokens", 1024)), tool_call_mode=str(profile.raw.get("tool_call_mode", "text_json")), reasoning=self.reasoning, cache_ttl=_cache_ttl(profile))
         try:
             return await p.chat(request)
         finally:
@@ -65,7 +76,7 @@ class ModelRouter:
     async def astream(self, provider: str, model: str, messages: Sequence[ModelMessage], tools: Sequence[ToolSpec] | None = None) -> AsyncIterator[ModelStreamEvent]:
         profile = self._profile(provider, model)
         p = self._factory().create(profile)
-        request = ModelRequest(profile.profile_id, p.provider, p.model, messages, tools, stream=True, reasoning=self.reasoning)
+        request = ModelRequest(profile.profile_id, p.provider, p.model, messages, tools, stream=True, reasoning=self.reasoning, cache_ttl=_cache_ttl(profile))
         try:
             async for event in p.stream_chat(request):
                 yield event

@@ -135,6 +135,9 @@ class ModelProfileView:
     runtime_gate: str | None
     off_machine: bool
     selected: bool
+    # Prompt-cache TTL breakpoint the provider uses for this profile ("5m"/"1h"),
+    # or None when the provider/profile does not cache. Read-only status.
+    prompt_cache_ttl: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -364,6 +367,7 @@ class DashboardService:
                 runtime_gate=self._runtime_gate_for_profile(str(p.raw.get("endpoint_kind", "unknown"))),
                 off_machine=str(p.raw.get("endpoint_kind", "unknown")) in {"remote_hosted", "private_network"},
                 selected=(p.profile_id == current),
+                prompt_cache_ttl=(str(p.raw.get("prompt_cache_ttl")) if p.raw.get("prompt_cache_ttl") else None),
             )
             for p in registry.list_profiles()
             # Test-harness profiles (mock/deterministic) are not selectable outside

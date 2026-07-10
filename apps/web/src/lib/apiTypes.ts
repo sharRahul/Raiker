@@ -77,6 +77,7 @@ export interface ModelProfile {
   runtime_gate: string | null;
   off_machine: boolean;
   selected: boolean;
+  prompt_cache_ttl: string | null;
 }
 
 export interface ModelsView {

@@ -158,6 +158,11 @@
                 {capabilityLabel(p.runtime_gate)}
               </span>
             {/if}
+            {#if p.prompt_cache_ttl}
+              <span class="chip chip-ok" title="Prompt caching cuts cost and latency by reusing the stable prompt prefix">
+                Cache {p.prompt_cache_ttl}
+              </span>
+            {/if}
           </div>
         </article>
       {/each}

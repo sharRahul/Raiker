@@ -17,6 +17,7 @@ function makeProfile(partial: Partial<ModelProfile>): ModelProfile {
     runtime_gate: null,
     off_machine: false,
     selected: false,
+    prompt_cache_ttl: null,
     ...partial,
   };
 }

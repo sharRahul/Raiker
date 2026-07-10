@@ -24,6 +24,7 @@ function profile(partial: Partial<ModelProfile>): ModelProfile {
     runtime_gate: null,
     off_machine: false,
     selected: false,
+    prompt_cache_ttl: null,
     ...partial,
   };
 }
@@ -59,6 +60,18 @@ describe("ModelsView fallback sequence", () => {
     const list = screen.getByRole("list");
     expect(list.textContent).toContain("anthropic-hosted");
     expect(list.textContent).toContain("raiker-local-llama-cpp");
+  });
+
+  it("shows a cache chip for a profile with prompt caching enabled", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({ profile_id: "anthropic-hosted", provider: "anthropic", prompt_cache_ttl: "5m" }),
+        ],
+      }),
+    });
+    render(ModelsView);
+    await waitFor(() => expect(screen.getByText("Cache 5m")).toBeTruthy());
   });
 
   it("shows the empty state when no fallback is configured", async () => {

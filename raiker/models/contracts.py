@@ -135,6 +135,11 @@ class ModelRequest:
     reasoning: ReasoningOptions | None = None
     session_id: str | None = None
     turn_id: str | None = None
+    # Prompt-cache TTL breakpoint for providers that support it (Anthropic today):
+    # None/"" = no caching; "5m" = default 5-minute ephemeral cache; "1h" = 1-hour
+    # extended cache. Cuts cost and latency by reusing the stable prompt prefix
+    # (system prompt + workspace context) across turns within the TTL window.
+    cache_ttl: str | None = None
 
 
 @dataclass(frozen=True)

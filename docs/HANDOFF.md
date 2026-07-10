@@ -93,6 +93,24 @@ backend's own lever and normalises the metrics:
   still policy-valid, audit). Build only if short-circuiting repeats is
   explicitly wanted; design the governance first.
 
+**Live web-app test (2026-07-10, hosted Anthropic Haiku 4.5) — PASSED.** Ran one
+round against a real operator key: `raiker-web` booted, owner session minted,
+`GET /api/models` showed `anthropic-hosted` selected + hosted gate
+`enabled_runtime` + the fallback sequence + cache `5m`, and a **streamed turn**
+returned a real Haiku answer bound to `claude-haiku-4-5-20251001`
+(`model_request_started` confirms the model; `model_request_completed` carried
+normalised usage `{input:2013, output:19, cache_read:0, cache_write:0}`). A
+Chromium pass rendered the Models cards (Anthropic "selected" + "Cache 5m" chips,
+fallback editor) and drove a live chat turn through the UI with **zero console
+errors**; the top-bar chip showed `Hosted · Anthropic · egress open`. Full
+procedure + a per-model test matrix (OpenAI/Gemini/OpenRouter/llama.cpp/Ollama/
+LM Studio/vLLM, all `Ready`) is in **`docs/WEB_APP_LIVE_TEST.md`**. Honest note:
+the cached prefix was 2013 tokens — just under Haiku's ~2048 minimum — so no cache
+*write* happened this round; the caching path (breakpoint sent, usage captured +
+normalised) is verified, and a >2048-token prefix on two same-session turns will
+show a non-zero `cache_read`. Keys were used in the server env only, never
+persisted or committed.
+
 **Session gate (both tasks):** full backend suite **1265 passed**; `ruff check .`
 clean; `mypy` clean on changed sources (remaining output is the documented
 environmental missing-stub noise for pytest/fastapi/httpx); web `lint` +

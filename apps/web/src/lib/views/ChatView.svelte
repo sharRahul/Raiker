@@ -63,11 +63,21 @@
   const MAX_ATTACHMENTS = 8;
   const IMAGE_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
   const MAX_IMAGE_BYTES = 5_000_000;
-  // Text documents: extracted text is folded into context as bounded, untrusted
-  // data (validated fail-closed server-side: allowlist, 2 MB cap, UTF-8 sniff).
-  const DOCUMENT_MEDIA_TYPES = ["text/plain", "text/markdown", "text/csv"];
-  const DOCUMENT_EXTENSIONS = [".txt", ".md", ".markdown", ".csv"];
-  const MAX_DOCUMENT_BYTES = 2_000_000;
+  // Documents: extracted text is folded into context as bounded, untrusted data
+  // (validated fail-closed server-side: allowlist, 32 MB cap, per-type sniff —
+  // UTF-8 for text, %PDF- for PDF, OOXML zip for .docx; PDF/.docx are extracted
+  // locally, no bytes leave the box).
+  const DOCX_MEDIA_TYPE =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  const DOCUMENT_MEDIA_TYPES = [
+    "text/plain",
+    "text/markdown",
+    "text/csv",
+    "application/pdf",
+    DOCX_MEDIA_TYPE,
+  ];
+  const DOCUMENT_EXTENSIONS = [".txt", ".md", ".markdown", ".csv", ".pdf", ".docx"];
+  const MAX_DOCUMENT_BYTES = 32_000_000;
   let attachments = $state<ComposerAttachment[]>([]);
   let attachInput = $state("");
   // The "+" button reveals the attach controls (path input + image upload).
@@ -150,6 +160,8 @@
     if (lower.endsWith(".csv")) return "text/csv";
     if (lower.endsWith(".md") || lower.endsWith(".markdown")) return "text/markdown";
     if (lower.endsWith(".txt")) return "text/plain";
+    if (lower.endsWith(".pdf")) return "application/pdf";
+    if (lower.endsWith(".docx")) return DOCX_MEDIA_TYPE;
     return null;
   }
 
@@ -161,11 +173,11 @@
     attachError = null;
     const mediaType = documentMediaType(file);
     if (mediaType === null) {
-      attachError = "Only plain-text, Markdown, or CSV documents can be attached.";
+      attachError = "Only plain-text, Markdown, CSV, PDF, or Word (.docx) documents can be attached.";
       return;
     }
     if (file.size > MAX_DOCUMENT_BYTES) {
-      attachError = "Document is too large (2 MB max).";
+      attachError = "Document is too large (32 MB max).";
       return;
     }
     uploading = true;
@@ -563,7 +575,7 @@
           <label
             class="btn btn-sm"
             for="document-upload-input"
-            title="Upload a text document (plain text/Markdown/CSV, 2 MB max). Its extracted text is added to context as untrusted data."
+            title="Upload a document (plain text/Markdown/CSV/PDF/Word .docx, 32 MB max). Its extracted text is added to context as untrusted data."
           >
             {uploading ? "Uploading…" : "Document…"}
           </label>

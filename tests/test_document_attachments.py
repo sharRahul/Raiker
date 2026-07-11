@@ -1,17 +1,20 @@
-"""Web-app task 3 (uploaded-documents slice) — governed text-document attachments.
+"""Web-app task 3 (uploaded-documents slice) — governed document attachments.
 
-Uploaded bytes are untrusted data behind fail-closed validation: media-type
-allowlist (text/plain, text/markdown, text/csv), a hard size cap, and a
-UTF-8/NUL sniff that the bytes really are clean text (a binary file mislabelled
-as text fails closed). A stored document's extracted text reaches a model as a
-bounded, ``untrusted_external`` context item — document content is data, never
-instructions. PDF/office binaries are intentionally out of scope for this slice.
+Uploaded bytes are untrusted data behind fail-closed, per-type validation:
+media-type allowlist, a hard size cap (32 MB, matching Claude's document limit),
+and a type-specific sniff — clean UTF-8 (no NUL) for text, a ``%PDF-`` header
+pypdf can parse for PDF, a well-formed OOXML zip for .docx. Extraction is
+local-only (decode / pypdf / stdlib zip+XML), and the bounded extracted text
+reaches a model as an ``untrusted_external`` context item — document content is
+data, never instructions.
 """
 
 from __future__ import annotations
 
 import base64
+import io
 import json
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -24,8 +27,10 @@ from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.context.gatherer import ContextGatherer
 from raiker.runtime.attachments import (
+    DOCX_MEDIA_TYPE,
     MAX_DOCUMENT_BYTES,
     MAX_DOCUMENT_TEXT_CHARS,
+    PDF_MEDIA_TYPE,
     AttachmentValidationError,
     extract_document_text,
     load_document,
@@ -37,6 +42,49 @@ from raiker.storage.sqlite import SQLiteStore
 TXT_BYTES = b"hello raiker\nthis is a plain text document.\n"
 CSV_BYTES = b"name,role\nrahul,owner\nclaude,builder\n"
 MD_BYTES = b"# Title\n\nSome **markdown** body text.\n"
+
+
+def make_pdf(text: str) -> bytes:
+    """A minimal, valid single-page PDF whose content stream draws ``text``."""
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+    ]
+    stream = b"BT /F1 24 Tf 72 720 Td (" + text.encode("latin-1") + b") Tj ET"
+    objects.append(b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream")
+    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets: list[int] = []
+    for i, obj in enumerate(objects, start=1):
+        offsets.append(len(pdf))
+        pdf += str(i).encode() + b" 0 obj\n" + obj + b"\nendobj\n"
+    xref_pos = len(pdf)
+    pdf += b"xref\n0 " + str(len(objects) + 1).encode() + b"\n0000000000 65535 f \n"
+    for off in offsets:
+        pdf += f"{off:010d} 00000 n \n".encode()
+    pdf += b"trailer\n<< /Size " + str(len(objects) + 1).encode() + b" /Root 1 0 R >>\n"
+    pdf += b"startxref\n" + str(xref_pos).encode() + b"\n%%EOF"
+    return bytes(pdf)
+
+
+def make_docx(text: str) -> bytes:
+    """A minimal .docx (OOXML zip) whose body contains ``text``."""
+    doc_xml = (
+        '<?xml version="1.0"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:body><w:p><w:r><w:t>" + text + "</w:t></w:r></w:p></w:body>"
+        "</w:document>"
+    ).encode()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        archive.writestr("word/document.xml", doc_xml)
+    return buf.getvalue()
+
+
+PDF_BYTES = make_pdf("Hello Raiker PDF")
+DOCX_BYTES = make_docx("Hello Raiker DOCX")
 
 
 # ── validation ──────────────────────────────────────────────────────────────
@@ -52,9 +100,15 @@ class TestDocumentValidation:
     def test_valid_markdown_passes(self) -> None:
         validate_document("text/markdown", MD_BYTES)
 
+    def test_valid_pdf_passes(self) -> None:
+        validate_document(PDF_MEDIA_TYPE, PDF_BYTES)
+
+    def test_valid_docx_passes(self) -> None:
+        validate_document(DOCX_MEDIA_TYPE, DOCX_BYTES)
+
     def test_unsupported_media_type_fails_closed(self) -> None:
         with pytest.raises(AttachmentValidationError, match="unsupported_media_type"):
-            validate_document("application/pdf", TXT_BYTES)
+            validate_document("application/x-msdownload", TXT_BYTES)
 
     def test_image_media_type_not_accepted_as_document(self) -> None:
         with pytest.raises(AttachmentValidationError, match="unsupported_media_type"):
@@ -78,6 +132,27 @@ class TestDocumentValidation:
         with pytest.raises(AttachmentValidationError, match="content_does_not_match_media_type"):
             validate_document("text/plain", b"\xff\xfe not utf-8")
 
+    def test_non_pdf_labelled_pdf_fails_closed(self) -> None:
+        with pytest.raises(AttachmentValidationError, match="content_does_not_match_media_type"):
+            validate_document(PDF_MEDIA_TYPE, b"not a pdf at all")
+
+    def test_corrupt_pdf_fails_closed(self) -> None:
+        # Right magic header, but the body is garbage — must fail closed, not
+        # silently extract nothing.
+        with pytest.raises(AttachmentValidationError):
+            validate_document(PDF_MEDIA_TYPE, b"%PDF-1.4\ngarbage not a real pdf body")
+
+    def test_non_zip_labelled_docx_fails_closed(self) -> None:
+        with pytest.raises(AttachmentValidationError, match="content_does_not_match_media_type"):
+            validate_document(DOCX_MEDIA_TYPE, b"not a zip package")
+
+    def test_zip_without_document_xml_fails_closed(self) -> None:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as archive:
+            archive.writestr("some/other.xml", b"<x/>")
+        with pytest.raises(AttachmentValidationError, match="content_does_not_match_media_type"):
+            validate_document(DOCX_MEDIA_TYPE, buf.getvalue())
+
 
 # ── extraction bounds ───────────────────────────────────────────────────────
 
@@ -90,6 +165,12 @@ class TestDocumentExtraction:
         big = ("x" * (MAX_DOCUMENT_TEXT_CHARS + 5000)).encode()
         extracted = extract_document_text("text/plain", big)
         assert len(extracted) == MAX_DOCUMENT_TEXT_CHARS
+
+    def test_extract_pdf_text(self) -> None:
+        assert "Hello Raiker PDF" in extract_document_text(PDF_MEDIA_TYPE, PDF_BYTES)
+
+    def test_extract_docx_text(self) -> None:
+        assert "Hello Raiker DOCX" in extract_document_text(DOCX_MEDIA_TYPE, DOCX_BYTES)
 
 
 # ── store / load round-trip ─────────────────────────────────────────────────
@@ -140,6 +221,25 @@ class TestDocumentStore:
         with pytest.raises(AttachmentValidationError):
             store_document(store, filename="x.txt", media_type="text/plain", data=b"a\x00b")
 
+    def test_store_and_load_pdf(self, tmp_path: Path) -> None:
+        store = SQLiteStore(tmp_path)
+        stored = store_document(
+            store, filename="doc.pdf", media_type=PDF_MEDIA_TYPE, data=PDF_BYTES
+        )
+        assert stored.kind == "document"
+        record = load_document(store, stored.attachment_id)
+        assert record is not None
+        assert "Hello Raiker PDF" in record["extracted_text"]
+
+    def test_store_and_load_docx(self, tmp_path: Path) -> None:
+        store = SQLiteStore(tmp_path)
+        stored = store_document(
+            store, filename="doc.docx", media_type=DOCX_MEDIA_TYPE, data=DOCX_BYTES
+        )
+        record = load_document(store, stored.attachment_id)
+        assert record is not None
+        assert "Hello Raiker DOCX" in record["extracted_text"]
+
 
 # ── context gathering (bounded, untrusted text) ─────────────────────────────
 
@@ -179,6 +279,21 @@ class TestDocumentAttachmentGathering:
         )
         item = [i for i in bundle.items if i.source.source_type == "attachment"][0]
         assert item.metadata["attachment_status"] == "missing_attachment_id"
+
+    def test_uploaded_pdf_extracted_text_enters_context(self, tmp_path: Path) -> None:
+        store = SQLiteStore(tmp_path)
+        stored = store_document(
+            store, filename="doc.pdf", media_type=PDF_MEDIA_TYPE, data=PDF_BYTES
+        )
+        bundle = ContextGatherer().gather(
+            workspace_root=tmp_path, session_id="s", turn_id="t", prompt_text="hi",
+            attachments=[{"type": "document", "attachment_id": stored.attachment_id}],
+        )
+        item = [i for i in bundle.items if i.source.source_type == "attachment"][0]
+        assert item.source.trust_level == "untrusted_external"
+        assert item.metadata["attachment_status"] == "document_uploaded"
+        assert "Hello Raiker PDF" in item.content
+        assert "untrusted document content" in item.content
 
 
 # ── upload API ──────────────────────────────────────────────────────────────
@@ -225,12 +340,35 @@ class TestUploadApi:
         assert "data" not in body and "data_base64" not in body
         assert load_document(SQLiteStore(workspace), body["attachment_id"]) is not None
 
+    def test_upload_pdf_returns_metadata_only(
+        self, client: TestClient, owner_token: str, workspace: Path
+    ) -> None:
+        resp = self._upload(
+            client, owner_token, filename="doc.pdf", media_type=PDF_MEDIA_TYPE,
+            data_base64=base64.b64encode(PDF_BYTES).decode(),
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True and body["kind"] == "document"
+        record = load_document(SQLiteStore(workspace), body["attachment_id"])
+        assert record is not None and "Hello Raiker PDF" in record["extracted_text"]
+
     def test_upload_rejects_unsupported_media_type(
         self, client: TestClient, owner_token: str
     ) -> None:
-        resp = self._upload(client, owner_token, media_type="application/pdf")
+        resp = self._upload(client, owner_token, media_type="application/x-msdownload")
         assert resp.status_code == 400
         assert "unsupported_media_type" in json.dumps(resp.json())
+
+    def test_upload_rejects_corrupt_pdf(
+        self, client: TestClient, owner_token: str
+    ) -> None:
+        resp = self._upload(
+            client, owner_token, filename="bad.pdf", media_type=PDF_MEDIA_TYPE,
+            data_base64=base64.b64encode(b"not a pdf").decode(),
+        )
+        assert resp.status_code == 400
+        assert "content_does_not_match_media_type" in json.dumps(resp.json())
 
     def test_upload_rejects_binary_mislabelled_as_text(
         self, client: TestClient, owner_token: str

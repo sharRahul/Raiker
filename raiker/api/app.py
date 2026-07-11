@@ -20,7 +20,7 @@ from raiker.api.security import (
     RateLimitMiddleware,
     SecurityHeadersMiddleware,
 )
-from raiker.runtime.attachments import MAX_IMAGE_BYTES
+from raiker.runtime.attachments import MAX_ATTACHMENT_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
 
 # Paths whose responses must not be buffered/redacted by RedactionMiddleware:
@@ -116,12 +116,12 @@ def create_app(
     # RedactionMiddleware so these wrap it (outermost = SecurityHeaders), and so
     # a rate-limit/oversize rejection still carries the security headers.
     # The attachment-upload route alone accepts a larger (still hard-capped)
-    # body: a base64-encoded image up to the store's 5 MB limit. Every other
-    # route keeps the tight default.
+    # body: a base64-encoded attachment up to the store's largest cap (images
+    # 5 MB, documents 32 MB). Every other route keeps the tight default.
     app.add_middleware(
         MaxBodySizeMiddleware,
         max_bytes=max_body_bytes,
-        path_overrides={"/api/attachments": (MAX_IMAGE_BYTES * 4) // 3 + 4096},
+        path_overrides={"/api/attachments": (MAX_ATTACHMENT_BYTES * 4) // 3 + 4096},
     )
     app.add_middleware(RateLimitMiddleware, max_requests=rate_limit_per_minute, window_seconds=60.0)
     app.add_middleware(SecurityHeadersMiddleware, hsts=hsts)

@@ -339,7 +339,7 @@ describe("ChatView streaming transcript", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/only plain-text, markdown, or csv/i),
+        screen.getByText(/only plain-text, markdown, csv, pdf, or word/i),
       ).toBeInTheDocument(),
     );
     expect(screen.queryByText("archive.zip")).not.toBeInTheDocument();

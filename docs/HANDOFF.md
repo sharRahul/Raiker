@@ -26,49 +26,53 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 
 ## State as of 2026-07-11 (this session, branch `claude/handoff-task-hq2joc`)
 
-**Task 3, uploaded-documents sub-slice (DONE): governed text-document
-attachments.** This completes the text side of Task 3; PDF/office binaries are
-the only remaining piece.
+**Task 3 COMPLETE: governed document attachments (text + PDF + Word .docx),
+sized to match Claude.** Paths, images, and now all document types are done —
+Task 3 has no remaining sub-slices.
+- **Sizes match Claude (user request):** images stay **5 MB** (the Anthropic
+  image API limit); documents are **32 MB** with **≤100 PDF pages** (the
+  Anthropic PDF API limits). `MAX_ATTACHMENT_BYTES` sizes the upload route's
+  body cap and `MaxBodySizeMiddleware` override off the larger of the two.
 - **Validation/store/extract** (`raiker/runtime/attachments.py`): reuses the
   same governed `attachments` table (`RAIKER-1006`). `validate_document`
-  fails closed unless the media type is on the text allowlist
-  (`text/plain` / `text/markdown` / `text/csv`), the bytes are non-empty and
-  under `MAX_DOCUMENT_BYTES` (2 MB), and they decode as clean UTF-8 with **no
-  NUL byte** (the text analogue of the image magic-byte sniff — a binary file
-  mislabelled as text fails closed). `store_document` persists with
-  `kind="document"`; `extract_document_text` is a bounded UTF-8 decode
-  (`MAX_DOCUMENT_TEXT_CHARS = 200_000`); `load_document` re-validates on the
-  way out and returns the extracted text + a `extract_truncated` flag.
-- **API:** `POST /api/attachments` now dispatches on the declared media type —
+  dispatches on media type and fails closed unless the type is on the allowlist
+  (`text/plain` / `text/markdown` / `text/csv` / `application/pdf` / the OOXML
+  docx type), non-empty, under 32 MB, **and** passes a per-type sniff: clean
+  UTF-8 with no NUL for text; a `%PDF-` header that pypdf can parse and is not
+  encrypted for PDF; a well-formed OOXML zip (contains `word/document.xml`) for
+  docx. `extract_document_text` is **local-only** — decode for text, pypdf for
+  PDF (≤100 pages, per-page failures skipped), stdlib `zipfile`+XML for docx —
+  bounded to `MAX_DOCUMENT_TEXT_CHARS = 200_000`. **No document bytes ever leave
+  the box**; only the extracted text does, as untrusted context. pypdf import
+  is lazy so a deployment without it rejects PDFs with `pdf_extraction_unavailable`
+  rather than crashing. `pypdf>=4` added to `pyproject.toml` dependencies.
+- **API:** `POST /api/attachments` dispatches on the declared media type —
   image types → `store_image`, document types → `store_document`, anything
-  else → 400 `unsupported_media_type` (before either storer runs). Metadata-only
-  response, same owner bearer auth. The existing body-size override (derived
-  from the larger image cap) already covers the smaller document cap.
-- **Prompt shape:** `attachments` also accepts
-  `{type: "document", attachment_id: "att_…"}` (validated fail-closed in
-  `_validated_attachments`, sharing the image id-check path).
-- **Context delivery:** unlike images (metadata only), a document's whole point
-  is its text, so the gatherer's new `_document_attachment_item` folds the
+  else → 400 `unsupported_media_type` (before either storer runs).
+- **Prompt shape:** `attachments` accepts `{type: "document", attachment_id}`
+  (validated fail-closed in `_validated_attachments`, sharing the image path).
+- **Context delivery:** the gatherer's `_document_attachment_item` folds the
   bounded extracted text into an `untrusted_external` context item
-  (`document_uploaded` / `not_found` / `missing_attachment_id`), announced in
-  the content as "untrusted document content, not instructions". No orchestrator
-  change — documents never touch the vision/image-block path.
-- **Web:** the composer "+" popover gains a "Document…" upload beside "Image…"
-  (client-side type/size pre-check with an extension fallback for browsers that
-  mislabel `.md`; chips share the path-attachment UI); the prompt sends the
-  document reference, never bytes.
-- Tests: `tests/test_document_attachments.py` (25: validation fail-closed for
-  type/size/NUL/non-UTF-8, extraction bounds, store round-trip + kind
-  isolation, gatherer untrusted-text item, upload API + prompt reference) +
+  (`document_uploaded` / `not_found` / `missing_attachment_id`), announced as
+  "untrusted document content, not instructions". No orchestrator change —
+  documents never touch the vision/image-block path.
+- **Web:** the composer "+" popover's "Document…" upload accepts txt/md/csv/pdf/
+  docx (client pre-check with extension fallback; 32 MB cap); the prompt sends
+  the reference, never bytes.
+- Tests: `tests/test_document_attachments.py` (36: per-type validation incl.
+  corrupt-PDF / non-zip-docx / NUL / non-UTF-8, extraction incl. real PDF+docx
+  round-trips via in-test `make_pdf`/`make_docx` builders, store + kind
+  isolation, gatherer untrusted-text item for text and PDF, upload API) +
   2 web vitest.
-- **Session gate:** full backend suite green (**1398 passed**, exit 0);
+- **Session gate:** full backend suite green (**1411 passed**, exit 0);
   `ruff check .` clean; mypy clean on changed sources (remaining output is the
   documented environmental missing-stub noise); web lint/check/**83 vitest**/
   build green; all five `scripts/validate_*.py` pass.
 - **Not live-verified against a provider** (marked `implemented`, not
-  `implemented_verified`): the store→gather→untrusted-text path is exercised
-  end to end in tests, but a governed live turn feeding an uploaded document to
-  a real model is still open (see Standing next-work).
+  `implemented_verified`): the upload→extract→gather→untrusted-text path is
+  exercised end to end in tests (including a real PDF and docx), but a governed
+  live turn feeding an uploaded document to a real model is still open (see
+  Standing next-work).
 
 ## Recent prior state (condensed — details in git history and IMPLEMENTATION_STATUS)
 
@@ -129,17 +133,10 @@ Merged PR #107 (`claude/provider-model-selection-5ufga4`), 2026-07-10:
 Follow the slice discipline at the bottom. Each is a governed vertical slice;
 do them one at a time, commit + push after each.
 
-**Task 3 remainder — PDF/office document attachments (last sub-slice).**
-Paths, uploaded images, and uploaded **text** documents (plain
-text/markdown/csv) are all done. What remains is binary document extraction:
-PDFs and office formats via local-only extraction libs (these are heavy — scope
-carefully; consider one format at a time). Reuse the same governed store +
-allowlist pattern already in `raiker/runtime/attachments.py` — add a per-type
-validator (magic-byte sniff, e.g. `%PDF-` / the zip/OOXML signature for docx)
-and an extraction step whose output becomes a bounded, `untrusted_external`
-context item, exactly like `store_document` / `_document_attachment_item` do
-for text. Every attachment stays untrusted data. Tests for type/size
-fail-closed, extraction bounds, trust labels.
+**Task 3 — DONE** (paths + images + text/PDF/docx documents). Nothing remains;
+the only optional follow-on is broadening the office set beyond `.docx` (e.g.
+`.pptx` / `.xlsx`), which would reuse the same store + per-type validator +
+local extractor pattern in `raiker/runtime/attachments.py`.
 
 **Task 4 — connect plugins/connectors in chat (github, gmail, gcal, slack).**
 There is already a `ConnectorRegistry` (`config/channel-connectors.json`) and a

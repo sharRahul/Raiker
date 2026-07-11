@@ -8,7 +8,16 @@ version = "0.0.0"
 description = "Local-first agent runtime core"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["httpx>=0.27", "fastapi>=0.110", "uvicorn>=0.30", "cryptography>=41"]
+dependencies = [
+    "httpx>=0.27",
+    "fastapi>=0.110",
+    "uvicorn>=0.30",
+    "cryptography>=41",
+    # Pure-Python, local-only PDF text extraction for uploaded document
+    # attachments (web-app task 3). No system deps; extraction fails closed if
+    # the import is unavailable.
+    "pypdf>=4",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10"]

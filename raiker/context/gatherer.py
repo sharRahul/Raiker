@@ -393,7 +393,8 @@ class ContextGatherer:
 
         Unlike images, a document's whole purpose is its text, so the extracted
         content rides into context here (re-validated fail-closed on the way
-        out, decoded as UTF-8, truncated in the runtime layer and again to this
+        out, extracted locally per type — decode for text, pypdf for PDF, stdlib
+        zip+XML for .docx — truncated in the runtime layer and again to this
         gatherer's per-item cap). The item is ``untrusted_external``: document
         text is data, never instructions. Missing or unknown ids fail closed
         with an honest, content-free denial rather than a silent drop.

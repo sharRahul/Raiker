@@ -26,7 +26,7 @@ from raiker.api.sessions import ApiSession
 from raiker.runtime.attachments import (
     DOCUMENT_MEDIA_TYPES,
     IMAGE_MEDIA_TYPES,
-    MAX_IMAGE_BYTES,
+    MAX_ATTACHMENT_BYTES,
     AttachmentValidationError,
     StoredAttachment,
     store_document,
@@ -37,9 +37,10 @@ from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
 
-# Base64 inflates by 4/3; anything longer than this cannot decode to an in-cap
-# image, so reject before decoding (cheap fail-closed pre-check).
-_MAX_BASE64_CHARS = (MAX_IMAGE_BYTES * 4) // 3 + 8
+# Base64 inflates by 4/3; anything longer than this cannot decode to the largest
+# in-cap attachment, so reject before decoding (cheap fail-closed pre-check).
+# Per-type size limits are still enforced by the validators after decode.
+_MAX_BASE64_CHARS = (MAX_ATTACHMENT_BYTES * 4) // 3 + 8
 
 
 def _ws(request: Request) -> str | Path:

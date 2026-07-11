@@ -37,6 +37,12 @@ export const NAV_GROUPS: NavGroup[] = [
       },
       { id: "models", label: "Models", icon: "models", hint: "Model profiles and provider gates" },
       {
+        id: "connections",
+        label: "Connections",
+        icon: "connections",
+        hint: "Governed service connectors and their status",
+      },
+      {
         id: "checkpoints",
         label: "Checkpoints",
         icon: "checkpoints",

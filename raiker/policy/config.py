@@ -28,6 +28,9 @@ class StaticPolicyConfig:
                 # The consult itself is gated inside the tool (advisor gate +
                 # decision mode + provider policy); the proposal is read-shaped.
                 "consult_advisor",
+                # Governed inside the tool (connector gate + decision mode +
+                # owner credential + egress allowlist); the proposal is read-shaped.
+                "github_read",
                 "user_create",
                 "user_deactivate",
                 "role_create",
@@ -48,6 +51,7 @@ class StaticPolicyConfig:
             "external_channel_runtime", "channel_approval_relay",
             "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
             "hosted_model_runtime", "private_network_model_runtime", "advisor_model_runtime",
+            "connector_github_runtime",
             "scheduled_routines",
             "subagents", "multi_agent_teams",
             "email_runtime", "calendar_runtime", "reminder_runtime",

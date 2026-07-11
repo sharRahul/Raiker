@@ -8,6 +8,7 @@ export type IconName =
   | "tasks"
   | "sessions"
   | "capabilities"
+  | "connections"
   | "models"
   | "checkpoints"
   | "activity"
@@ -44,6 +45,11 @@ export const ICON_PATHS: Record<IconName, string[]> = {
     "M3 12h3.5",
     "M17.5 12H21",
     "M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z",
+  ],
+  connections: [
+    "M9 15l-2.5 2.5a3.5 3.5 0 0 1-5-5L4 10",
+    "M15 9l2.5-2.5a3.5 3.5 0 0 1 5 5L20 14",
+    "M9.5 14.5 14.5 9.5",
   ],
   models: ["M12 3 4 7.5v9L12 21l8-4.5v-9L12 3Z", "M4 7.5 12 12l8-4.5", "M12 12v9"],
   checkpoints: ["M12 8v4l2.5 2.5", "M12 3a9 9 0 1 1-9 9", "M3 5v4h4"],

@@ -19,6 +19,7 @@ describe("nav model", () => {
       "sessions",
       "capabilities",
       "models",
+      "connections",
       "checkpoints",
       "activity",
       "diagnostics",

@@ -135,6 +135,23 @@ async def get_models(
     return serialize_dto(_service(request).get_models())
 
 
+@router.get("/api/connections")
+async def get_connections(
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Read-only status of governed service connectors (web-app task 4).
+
+    Reports each connector's capability gate state, decision mode, whether the
+    owner credential env is set, and whether its host is on the connector egress
+    allowlist. Never reaches the network and never exposes a credential value.
+    Enabling a connector is done through the capability-gate + decision-mode
+    control plane (gate-manager only), not here.
+    """
+    session, _principal = _auth_data
+    return serialize_dto(_service(request).get_connections(session.principal_id))
+
+
 @router.get("/api/models/{profile_id}/provider-models")
 async def list_provider_models(
     profile_id: str,

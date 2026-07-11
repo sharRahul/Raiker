@@ -132,6 +132,12 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     r["advisor_model_runtime"] = _req(
         "advisor_model_runtime", "5", threat_ack=True, human_confirm=True,
         notes="Default-ask consult of the owner-picked advisor profile; provider policy re-checked per call.")
+    # GitHub read-only service connector (Task 4 reference slice): the read
+    # reaches api.github.com with the owner's env-only token per call. See
+    # docs/threat-models/connectors-github.md.
+    r["connector_github_runtime"] = _req(
+        "connector_github_runtime", "5", threat_ack=True, human_confirm=True,
+        notes="Default-ask GitHub issue/PR read; env-only owner token, owner egress allowlist.")
     for cap in ("scheduled_routines",):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Scheduler storage, owner consent, budget.")

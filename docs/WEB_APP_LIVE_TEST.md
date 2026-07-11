@@ -72,6 +72,32 @@ field (`test_tool_round_trip_carries_assistant_tool_call_message`,
 `test_assistant_tool_calls_serialize_for_both_protocols`). Re-run: the loop
 completed end-to-end (table above).
 
+## Result — 2026-07-11 (Task 4: GitHub read-only connector, hosted Anthropic Haiku 4.5)
+
+Reference slice for governed service connectors. Real owner GitHub token
+(`RAIKER_GITHUB_TOKEN`, server env), `api.github.com` on
+`RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, `connector_github_runtime` enabled via the
+control plane (threat ack + confirm), decision mode raised to `allow`.
+
+| Check | Result |
+|---|---|
+| Default `ask` withholds the read (no network contact) | ✅ `connector_withheld_ask` |
+| With mode `allow`: `GithubConnectorService.read` fetches a **real** PR | ✅ `sharrahul/raiker#109` → title "Task 3 complete: governed document attachments (text + PDF + docx)", state `closed`, 5325-char body, untrusted-data framing |
+| Owner token never appears in the tool output | ✅ verified (`token in output: False`) |
+| **End-to-end model turn**: hosted Haiku 4.5 given the `github_read` tool | ✅ model called `github_read(pull_request, sharrahul/raiker, 109)`; tool action recorded `success` |
+| Model answered from the fetched untrusted content | ✅ replied with the exact PR title + an accurate one-sentence summary |
+| Fail-closed without a credential | ✅ `connector_not_configured` (token env unset) |
+| Fail-closed without egress | ✅ `connector_egress_denied` (`api.github.com` not allowlisted) |
+| Argument validation (bad repo/resource/number) fails closed, URL built server-side | ✅ `invalid_repo` / `unsupported_resource` / `invalid_number` |
+| Browser: **Connections** view renders connector status | ✅ "Ready" card — capability gate / decision mode / owner credential (`***REDACTED***`) / egress allowlist all ✓; actions `read_issue, read_pull_request` |
+| Browser: fresh workspace shows honest **fail-closed** with remediation | ✅ "Fail-closed" card — decision mode / credential / egress ✗ with per-check guidance; egress-allowlist warning banner |
+| Browser console errors | ✅ 0 (both states) |
+
+The read-only Connections surface never reaches the network and never shows a
+credential value (the response redaction layer scrubs even the env-var name to
+`***REDACTED***`). Enabling a connector stays on the capability-gate +
+decision-mode control plane, gate-manager only.
+
 ## Result — 2026-07-10 (hosted Anthropic, Haiku 4.5)
 
 | Check | Result |

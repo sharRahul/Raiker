@@ -94,6 +94,29 @@ export interface ModelsView {
   no_silent_hosted_fallback: boolean;
 }
 
+/** Read-only status of one governed service connector (web-app task 4). Every
+ * field derives from stored/config state — the view never reaches the network
+ * and never exposes a credential value (only whether one is set). */
+export interface ConnectorView {
+  connector_id: string;
+  display_name: string;
+  capability: string;
+  gate_state: string;
+  capability_enabled: boolean;
+  decision_mode: string;
+  credential_env: string;
+  credential_configured: boolean;
+  egress_host: string;
+  egress_allowed: boolean;
+  actions: string[];
+  kind: string;
+}
+
+export interface ConnectionsView {
+  connectors: ConnectorView[];
+  connector_egress_allowlist_configured: boolean;
+}
+
 /** On-demand listing of the models one provider serves. Failures come back as an
  * honest status with an empty list — the backend never fabricates model names. */
 export interface ProviderModelList {

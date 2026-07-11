@@ -119,6 +119,69 @@ def channel_egress_allowlist() -> frozenset[str]:
     return frozenset(part.strip() for part in raw.split(",") if part.strip())
 
 
+def connector_egress_allowlist() -> frozenset[str]:
+    """Owner-controlled outbound host allowlist for service connectors.
+
+    Read from ``RAIKER_CONNECTOR_EGRESS_ALLOWLIST`` (comma-separated host globs,
+    e.g. ``api.github.com``). Defaults to **empty** so a connector cannot reach
+    the network until the owner explicitly allowlists a host — fail-closed by
+    default even when the connector's capability gate is on. Connector hosts are
+    built from validated components (never a model-supplied raw URL), so this is
+    a second, independent egress boundary.
+    """
+    import os
+    raw = os.environ.get("RAIKER_CONNECTOR_EGRESS_ALLOWLIST", "")
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
+def get_url(
+    url: str,
+    *,
+    egress_allowlist: frozenset[str] | None = None,
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 200_000,
+    timeout: float = 15.0,
+) -> dict:
+    """GET ``url`` only if its host matches ``egress_allowlist``.
+
+    An empty/absent allowlist denies all egress (fail closed). Unlike
+    :func:`fetch_url`, this returns the (bounded) decoded response body so a
+    read connector can hand the external content back as untrusted data. Request
+    headers (e.g. an ``Authorization`` bearer from owner env) are sent verbatim
+    but are never returned or logged by this function.
+    """
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise SandboxError(f"invalid_url:{url}")
+    if not egress_allowlist:
+        raise SandboxError("egress_denied:no_allowlist")
+    if not any(fnmatch.fnmatch(parsed.netloc, pattern) for pattern in egress_allowlist):
+        raise SandboxError(f"egress_denied:{parsed.netloc}")
+    import urllib.error
+    import urllib.request
+    request = urllib.request.Request(  # noqa: S310 - scheme checked above
+        url, method="GET", headers=headers or {},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+            data = resp.read(max_bytes + 1)
+            status_code = resp.status if hasattr(resp, "status") else 200
+    except urllib.error.HTTPError as exc:
+        # Surface the HTTP status (404/403/...) without leaking the body.
+        raise SandboxError(f"http_error:{exc.code}") from None
+    except Exception as exc:
+        raise SandboxError(f"fetch_failed:{type(exc).__name__}") from None
+    truncated = len(data) > max_bytes
+    body = data[:max_bytes]
+    return {
+        "status": status_code,
+        "body_bytes": len(body),
+        "body_text": body.decode("utf-8", errors="replace"),
+        "truncated": truncated,
+    }
+
+
 def post_url(
     url: str,
     payload: bytes,

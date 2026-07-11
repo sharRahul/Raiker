@@ -14,6 +14,37 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-07-11 (Task 4: Gmail read-only connector, hosted Anthropic Haiku 4.5)
+
+Second read connector, replicating the GitHub reference slice. Verified against
+the **real** `gmail.googleapis.com` egress boundary. We hold no real Gmail OAuth
+token in this environment, so the fully-governed path fails closed at the auth
+boundary (`http_error:401`) — which still proves the whole gate → mode →
+credential → egress chain, that the request reaches the fixed host with the
+token in the header (never the URL/output), and that the tool is wired into the
+real hosted-model turn. A real `RAIKER_GMAIL_TOKEN` would return the message
+snippet + headers as untrusted data.
+
+| Check | Result |
+|---|---|
+| Gate disabled (fresh workspace) fails closed | ✅ `connector_gate_disabled` |
+| Default `ask` withholds the read (no network contact) | ✅ `connector_withheld_ask` |
+| Decision mode `deny` blocks | ✅ `connector_denied_by_decision_mode` |
+| Fail-closed without a credential | ✅ `connector_not_configured` (`RAIKER_GMAIL_TOKEN` unset) |
+| Fail-closed without egress | ✅ `connector_egress_denied` (`gmail.googleapis.com` not allowlisted) |
+| Argument validation, URL built server-side (`format=metadata`) | ✅ `unsupported_resource` / `invalid_message_id` |
+| Fully governed (gate on + `allow` + token + egress): **real** GET to `gmail.googleapis.com` | ✅ reached Gmail → `connector_fetch_failed:http_error:401` (fake token); token **not** in output (`token in output: False`) |
+| **End-to-end model turn**: hosted Haiku 4.5 given the `gmail_read` tool | ✅ `model_request_started → provider: anthropic, model: claude-haiku-4-5-20251001`; model called `gmail_read(message, msg_abc123)` (`tool_started`/`tool_failed gmail_read`); model reported the exact governed error type back to the user |
+| Durable event log is metadata-only | ✅ owner token absent (0 hits) and fetched content absent; the non-secret `message_id` identifier retained (1 hit) |
+| Browser: **Connections** view renders Gmail **Ready** | ✅ dark-theme card — capability gate / decision mode / owner credential (`***REDACTED***`) / egress (`gmail.googleapis.com`) all ✓; actions `read_message, read_thread`; shown next to a GitHub "Fail-closed" card |
+| Browser: Gmail honest **Fail-closed** with remediation | ✅ light-theme card — credential + egress ✗ with per-check guidance; egress-allowlist warning banner; credential value never shown |
+| Browser console errors | ✅ 0 (both states) |
+
+The read-only Connections surface never reaches the network and never shows a
+credential value (the response redaction layer scrubs even the env-var name to
+`***REDACTED***`). Enabling a connector stays on the capability-gate +
+decision-mode control plane, gate-manager only.
+
 ## Result — 2026-07-11 (uploaded-document attachments: PDF + docx + image, hosted Anthropic Haiku 4.5)
 
 Run with a 1-hour operator key held in the server process env only, against

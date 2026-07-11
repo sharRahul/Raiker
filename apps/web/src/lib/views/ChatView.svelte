@@ -10,10 +10,22 @@
   import { collectText } from "../turnPhases";
   import { humanize, providerName } from "../format";
 
+  // One composer attachment chip: a workspace path, or an image already
+  // uploaded into the governed attachment store (referenced by id — the bytes
+  // stay server-side and are only ever delivered as an image block when the
+  // turn's model profile supports vision).
+  interface ComposerAttachment {
+    kind: "path" | "image";
+    label: string;
+    detail: string;
+    path?: string;
+    attachmentId?: string;
+  }
+
   interface ChatTurn {
     id: number;
     prompt: string;
-    attachments: string[];
+    attachments: ComposerAttachment[];
     events: StreamEvent[];
     response: AgentResponse | null;
     streaming: boolean;
@@ -43,24 +55,84 @@
 
   const chosenProfile = $derived(profiles.find((p) => p.profile_id === modelProfile) ?? null);
 
-  // Workspace path attachments for the next prompt (this slice supports paths
-  // only). Paths are resolved server-side inside the workspace — anything
-  // outside fails closed — and included as bounded, untrusted-labelled context.
+  // Attachments for the next prompt: workspace paths (resolved server-side
+  // inside the workspace — anything outside fails closed — and included as
+  // bounded, untrusted-labelled context) and uploaded images (validated
+  // fail-closed server-side: media-type allowlist, 5 MB cap, magic-byte sniff).
   const MAX_ATTACHMENTS = 8;
-  let attachments = $state<string[]>([]);
+  const IMAGE_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+  const MAX_IMAGE_BYTES = 5_000_000;
+  let attachments = $state<ComposerAttachment[]>([]);
   let attachInput = $state("");
-  // The "+" button reveals the path input.
+  // The "+" button reveals the attach controls (path input + image upload).
   let showAttach = $state(false);
+  let uploading = $state(false);
+  let attachError = $state<string | null>(null);
 
   function addAttachment() {
     const path = attachInput.trim();
-    if (path === "" || attachments.includes(path) || attachments.length >= MAX_ATTACHMENTS) return;
-    attachments = [...attachments, path];
+    if (
+      path === "" ||
+      attachments.some((a) => a.path === path) ||
+      attachments.length >= MAX_ATTACHMENTS
+    )
+      return;
+    attachments = [
+      ...attachments,
+      { kind: "path", label: fileName(path), detail: path, path },
+    ];
     attachInput = "";
   }
 
   function removeAttachment(index: number) {
     attachments = attachments.filter((_, i) => i !== index);
+  }
+
+  async function onImagePicked(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file || attachments.length >= MAX_ATTACHMENTS) return;
+    attachError = null;
+    if (!IMAGE_MEDIA_TYPES.includes(file.type)) {
+      attachError = "Only PNG, JPEG, WebP, or GIF images can be attached.";
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      attachError = "Image is too large (5 MB max).";
+      return;
+    }
+    uploading = true;
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      const stored = await api.uploadAttachment({
+        filename: file.name,
+        media_type: file.type,
+        data_base64: base64,
+      });
+      attachments = [
+        ...attachments,
+        {
+          kind: "image",
+          label: file.name,
+          detail: `${file.name} (${stored.media_type}, ${stored.byte_size} bytes)`,
+          attachmentId: stored.attachment_id,
+        },
+      ];
+    } catch (e) {
+      attachError =
+        e instanceof ApiError
+          ? `Upload rejected (${e.reasonCode ?? e.status}).`
+          : "Upload failed — could not reach the local runtime.";
+    } finally {
+      uploading = false;
+    }
   }
 
   // Chips show only the file/folder name; the full workspace path stays in the
@@ -169,7 +241,11 @@
           model: modelChoice.trim() || undefined,
           attachments:
             sentAttachments.length > 0
-              ? sentAttachments.map((path) => ({ type: "path" as const, path }))
+              ? sentAttachments.map((a) =>
+                  a.kind === "image"
+                    ? { type: "image" as const, attachment_id: a.attachmentId ?? "" }
+                    : { type: "path" as const, path: a.path ?? "" },
+                )
               : undefined,
           planning_mode: planningMode || undefined,
         },
@@ -232,10 +308,10 @@
           <p class="bubble-text">{turn.prompt}</p>
           {#if turn.attachments.length > 0}
             <p class="turn-attachments">
-              {#each turn.attachments as path (path)}
-                <span class="attach-chip" title={path}>
+              {#each turn.attachments as a, i (a.attachmentId ?? a.path ?? i)}
+                <span class="attach-chip" title={a.detail}>
                   <Icon name="file" size={13} />
-                  {fileName(path)}
+                  {a.label}
                 </span>
               {/each}
             </p>
@@ -338,15 +414,15 @@
     <div class="composer-card">
       {#if attachments.length > 0}
         <div class="attach-chips">
-          {#each attachments as path, i (path)}
-            <span class="attach-chip" title={path}>
+          {#each attachments as a, i (a.attachmentId ?? a.path ?? i)}
+            <span class="attach-chip" title={a.detail}>
               <Icon name="file" size={13} />
-              {fileName(path)}
+              {a.label}
               <button
                 type="button"
                 class="attach-remove"
                 onclick={() => removeAttachment(i)}
-                aria-label={`Remove attachment ${path}`}
+                aria-label={`Remove attachment ${a.detail}`}
               >
                 ×
               </button>
@@ -391,7 +467,26 @@
           >
             Attach
           </button>
+          <input
+            class="sr-only"
+            id="image-upload-input"
+            type="file"
+            accept={IMAGE_MEDIA_TYPES.join(",")}
+            onchange={onImagePicked}
+            disabled={streaming || uploading || attachments.length >= MAX_ATTACHMENTS}
+            aria-label="Upload image"
+          />
+          <label
+            class="btn btn-sm"
+            for="image-upload-input"
+            title="Upload an image (PNG/JPEG/WebP/GIF, 5 MB max). Sent to the model only if the selected model supports vision."
+          >
+            {uploading ? "Uploading…" : "Image…"}
+          </label>
         </div>
+        {#if attachError !== null}
+          <p class="error-line" role="alert">{attachError}</p>
+        {/if}
       {/if}
 
       <div class="composer-bar">

@@ -13,6 +13,7 @@ from raiker.models.contracts import (
     EmbeddingRequest,
     EmbeddingResponse,
     ModelCapabilities,
+    ModelMessage,
     ModelRequest,
     ModelResponse,
     ModelStreamEvent,
@@ -131,10 +132,32 @@ class AsyncOpenAICompatibleProvider:
                 models.append(ProviderModelInfo(id=item["id"], owned_by=owned_by, metadata={}))
         return models
 
+    def _message_dict(self, message: ModelMessage) -> dict[str, Any]:
+        """Serialize one message, expanding image attachments to content parts.
+
+        Image parts (data URLs) are sent only when the profile declares vision
+        support — every other case falls back to the plain text shape so a
+        non-vision backend never receives an unsupported content structure.
+        """
+        if not (message.images and message.role == "user" and self.capabilities.supports_vision):
+            return message.to_dict()
+        parts: list[dict[str, Any]] = [
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{image.media_type};base64,{image.base64_data}"},
+            }
+            for image in message.images
+        ]
+        if message.content:
+            parts.append({"type": "text", "text": message.content})
+        serialized = message.to_dict()
+        serialized["content"] = parts
+        return serialized
+
     def _payload(self, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": request.model or self.model,
-            "messages": [m.to_dict() for m in request.messages],
+            "messages": [self._message_dict(m) for m in request.messages],
             "temperature": request.temperature,
             "max_tokens": request.max_tokens,
             "stream": stream,

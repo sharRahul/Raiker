@@ -26,6 +26,7 @@ def capabilities_from_profile(profile: ModelProfile) -> ModelCapabilities:
         supports_streaming=bool(raw.get("supports_streaming", False)),
         supports_embeddings=bool(raw.get("supports_embeddings", False)),
         supports_tool_calls=bool(raw.get("supports_tool_calls", False)),
+        supports_vision=bool(raw.get("supports_vision", False)),
         supports_json_schema=bool(raw.get("supports_json_schema", False)),
         supports_reasoning=bool(raw.get("supports_reasoning", False)),
         supports_reasoning_effort=bool(raw.get("supports_reasoning_effort", False)),

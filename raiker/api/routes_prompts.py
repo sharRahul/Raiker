@@ -56,8 +56,10 @@ _MAX_ATTACHMENTS = 8
 def _validated_attachments(raw: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     """Validate prompt attachments fail-closed before a turn starts.
 
-    Only ``{"type": "path", "path": <non-empty str>}`` entries are accepted in
-    this slice; anything else rejects the whole prompt honestly rather than
+    Accepted shapes: ``{"type": "path", "path": <non-empty str>}`` (workspace
+    path) and ``{"type": "image", "attachment_id": <non-empty str>}`` (an image
+    already uploaded through POST /api/attachments). Anything else rejects the
+    whole prompt honestly rather than
     silently dropping data. Path *safety* (workspace containment) is enforced
     later by the workspace-scoped filesystem layer during context gathering.
     """
@@ -70,12 +72,21 @@ def _validated_attachments(raw: list[dict[str, Any]] | None) -> list[dict[str, A
         if not isinstance(entry, dict):
             raise ContractValidationError("invalid_attachment:not_object")
         kind = entry.get("type")
-        if kind != "path":
-            raise ContractValidationError(f"invalid_attachment_type:{kind}")
-        path = entry.get("path")
-        if not isinstance(path, str) or not path.strip():
-            raise ContractValidationError("invalid_attachment:missing_path")
-        cleaned.append({"type": "path", "path": path.strip()})
+        if kind == "path":
+            path = entry.get("path")
+            if not isinstance(path, str) or not path.strip():
+                raise ContractValidationError("invalid_attachment:missing_path")
+            cleaned.append({"type": "path", "path": path.strip()})
+            continue
+        if kind == "image":
+            # Uploaded-image reference: the bytes were already validated and
+            # stored via POST /api/attachments; the prompt carries only the id.
+            attachment_id = entry.get("attachment_id")
+            if not isinstance(attachment_id, str) or not attachment_id.strip():
+                raise ContractValidationError("invalid_attachment:missing_attachment_id")
+            cleaned.append({"type": "image", "attachment_id": attachment_id.strip()})
+            continue
+        raise ContractValidationError(f"invalid_attachment_type:{kind}")
     return cleaned
 
 

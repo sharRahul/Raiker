@@ -214,6 +214,8 @@ EVENT_TYPES = {
     "principal_resolution_failed",
     "action_executed",
     "action_failed",
+    "attachment_image_included",
+    "attachment_image_withheld",
 }
 INTENTS = {
     "chat",

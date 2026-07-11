@@ -1085,3 +1085,24 @@ CREATE TABLE IF NOT EXISTS model_advisor (
   updated_at TEXT NOT NULL
 );
 """
+
+# Web-app task 3 (uploaded attachments): the governed local attachment store.
+# Uploaded bytes land here only after fail-closed validation (media-type
+# allowlist, size cap, magic-byte sniff) and are always treated as untrusted
+# data. Content is delivered to a model solely as an image block on a
+# vision-capable profile — attachment bytes never enter event payloads or
+# text context (metadata only: filename, media type, size, sha256).
+ATTACHMENT_STORE_MIGRATION_ID = "RAIKER-1006-attachment-store"
+
+ATTACHMENT_STORE_SQL = """
+CREATE TABLE IF NOT EXISTS attachments (
+  attachment_id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  filename TEXT NOT NULL,
+  media_type TEXT NOT NULL,
+  byte_size INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  data BLOB NOT NULL,
+  created_at TEXT NOT NULL
+);
+"""

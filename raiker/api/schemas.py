@@ -64,6 +64,17 @@ class SetModelAdvisorRequest(BaseModel):
     profile_id: str | None = None
 
 
+class UploadAttachmentRequest(BaseModel):
+    # One base64-encoded image upload for the governed attachment store.
+    # Validation is fail-closed server-side (media-type allowlist, size cap,
+    # magic-byte sniff); extra="forbid" rejects unknown fields.
+    model_config = ConfigDict(extra="forbid")
+
+    filename: str
+    media_type: str
+    data_base64: str
+
+
 class SetModelFallbackRequest(BaseModel):
     # Ordered list of model profile ids to try (in order) when the selected
     # provider is unavailable. extra="forbid" rejects unknown fields.
@@ -83,11 +94,14 @@ class PromptRequest:
     # policy is still enforced downstream).
     model: str | None = None
     max_tool_calls: int | None = None
-    # Optional attachments for this prompt. This slice supports workspace path
-    # attachments only: {"type": "path", "path": "<workspace-relative path>"}.
-    # Paths are resolved through the workspace-scoped filesystem layer (outside
-    # the workspace fails closed) and included as bounded, untrusted-labelled
-    # context items. Unknown shapes are rejected before a turn starts.
+    # Optional attachments for this prompt:
+    #   {"type": "path", "path": "<workspace-relative path>"} — resolved through
+    #     the workspace-scoped filesystem layer (outside the workspace fails
+    #     closed), included as bounded, untrusted-labelled context items;
+    #   {"type": "image", "attachment_id": "att_…"} — an image previously
+    #     uploaded via POST /api/attachments, delivered as an image block only
+    #     when the turn's model profile supports vision (withheld otherwise).
+    # Unknown shapes are rejected before a turn starts.
     attachments: list[dict[str, Any]] | None = None
     # Origin of the prompt: the bundled SPA sends "web_ui"; external single-user
     # REST clients (other machines/UIs) send "rest". Both land in the same

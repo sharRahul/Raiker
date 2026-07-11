@@ -46,6 +46,8 @@ from raiker.models.session_state import ModelSessionState
 from raiker.storage.migrations import (
     API_SESSIONS_MIGRATION_ID,
     API_SESSIONS_SQL,
+    ATTACHMENT_STORE_MIGRATION_ID,
+    ATTACHMENT_STORE_SQL,
     CALENDAR_EVENTS_MIGRATION_ID,
     CALENDAR_EVENTS_SQL,
     CAPABILITY_DECISION_MODE_MIGRATION_ID,
@@ -442,6 +444,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 MODEL_FALLBACK_SEQUENCE_MIGRATION_ID, MODEL_FALLBACK_SEQUENCE_SQL, connection
             )
             self._apply_migration(MODEL_ADVISOR_MIGRATION_ID, MODEL_ADVISOR_SQL, connection)
+            self._apply_migration(ATTACHMENT_STORE_MIGRATION_ID, ATTACHMENT_STORE_SQL, connection)
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
         row = connection.execute(
@@ -1838,6 +1841,54 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (session_id,),
             ).fetchone()
         return str(row["profile_id"]) if row is not None else None
+
+    # ── Uploaded attachments (web-app task 3): governed local attachment store ──
+
+    def save_attachment(
+        self,
+        *,
+        attachment_id: str,
+        kind: str,
+        filename: str,
+        media_type: str,
+        sha256: str,
+        data: bytes,
+    ) -> None:
+        """Persist validated attachment bytes. Validation is the caller's job
+        (``raiker.runtime.attachments``) — this layer only stores what it is given."""
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO attachments
+                (attachment_id, kind, filename, media_type, byte_size, sha256, data, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (attachment_id, kind, filename, media_type, len(data), sha256, data, utc_now()),
+            )
+
+    def load_attachment(self, attachment_id: str) -> dict[str, Any] | None:
+        """Return the stored attachment (metadata + raw bytes), or None if unknown."""
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM attachments WHERE attachment_id = ?", (attachment_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        record = dict(row)
+        record["data"] = bytes(record["data"])
+        return record
+
+    def load_attachment_metadata(self, attachment_id: str) -> dict[str, Any] | None:
+        """Return attachment metadata only — the bytes never ride this path."""
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT attachment_id, kind, filename, media_type, byte_size, sha256, created_at
+                FROM attachments WHERE attachment_id = ?
+                """,
+                (attachment_id,),
+            ).fetchone()
+        return dict(row) if row is not None else None
 
     # ── Phase 10: Runtime Authority (Principals + Risk Acceptance) ──
 

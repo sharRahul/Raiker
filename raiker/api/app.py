@@ -10,6 +10,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from raiker.api.redaction import redact_response_body
 from raiker.api.routes_approvals import router as approvals_router
+from raiker.api.routes_attachments import router as attachments_router
 from raiker.api.routes_channels import router as channels_router
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
@@ -19,6 +20,7 @@ from raiker.api.security import (
     RateLimitMiddleware,
     SecurityHeadersMiddleware,
 )
+from raiker.runtime.attachments import MAX_IMAGE_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
 
 # Paths whose responses must not be buffered/redacted by RedactionMiddleware:
@@ -113,12 +115,20 @@ def create_app(
     # Transport hardening for single-user internet exposure. Added after
     # RedactionMiddleware so these wrap it (outermost = SecurityHeaders), and so
     # a rate-limit/oversize rejection still carries the security headers.
-    app.add_middleware(MaxBodySizeMiddleware, max_bytes=max_body_bytes)
+    # The attachment-upload route alone accepts a larger (still hard-capped)
+    # body: a base64-encoded image up to the store's 5 MB limit. Every other
+    # route keeps the tight default.
+    app.add_middleware(
+        MaxBodySizeMiddleware,
+        max_bytes=max_body_bytes,
+        path_overrides={"/api/attachments": (MAX_IMAGE_BYTES * 4) // 3 + 4096},
+    )
     app.add_middleware(RateLimitMiddleware, max_requests=rate_limit_per_minute, window_seconds=60.0)
     app.add_middleware(SecurityHeadersMiddleware, hsts=hsts)
     app.include_router(control_router)
     app.include_router(dashboard_router)
     app.include_router(prompts_router)
+    app.include_router(attachments_router)
     app.include_router(approvals_router)
     app.include_router(channels_router)
     # Serve the built local web dashboard (apps/web/dist) from the same loopback origin, so the

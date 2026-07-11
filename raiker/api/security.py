@@ -70,23 +70,36 @@ class SecurityHeadersMiddleware:
 
 
 class MaxBodySizeMiddleware:
-    """Rejects requests whose declared Content-Length exceeds ``max_bytes`` (413)."""
+    """Rejects requests whose declared Content-Length exceeds ``max_bytes`` (413).
 
-    def __init__(self, app: ASGIApp, *, max_bytes: int = 1_000_000) -> None:
+    ``path_overrides`` grants a different (still hard) cap to specific exact
+    paths — used so the attachment-upload endpoint can accept a base64 image
+    without loosening the tight default for every other route.
+    """
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        max_bytes: int = 1_000_000,
+        path_overrides: dict[str, int] | None = None,
+    ) -> None:
         self.app = app
         self._max_bytes = max_bytes
+        self._path_overrides = dict(path_overrides or {})
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+        limit = self._path_overrides.get(str(scope.get("path", "")), self._max_bytes)
         for key, value in scope.get("headers", []):
             if key.lower() == b"content-length":
                 try:
                     declared = int(value)
                 except ValueError:
                     declared = 0
-                if declared > self._max_bytes:
+                if declared > limit:
                     await _send_json(
                         send, 413,
                         {"ok": False, "reason_code": "request_body_too_large"},

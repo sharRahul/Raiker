@@ -58,6 +58,20 @@ def summarize_model_usage(usage: Mapping[str, Any] | None) -> dict[str, int]:
 
 
 @dataclass(frozen=True)
+class ModelImage:
+    """One validated image riding a user message as untrusted visual data.
+
+    ``base64_data`` is the raw image content, base64-encoded. It is provider
+    payload only: adapters serialize it as an image block when the profile
+    supports vision, and it must never be written to event logs or text
+    context (metadata only — media type, byte size, sha256 live elsewhere).
+    """
+
+    media_type: str
+    base64_data: str
+
+
+@dataclass(frozen=True)
 class ModelMessage:
     """A single chat message exchanged with a model provider.
 
@@ -69,6 +83,10 @@ class ModelMessage:
     content: str
     name: str | None = None
     tool_call_id: str | None = None
+    # Untrusted image attachments for user-role messages. Delivered as image
+    # blocks only by providers whose capabilities include supports_vision;
+    # every other adapter drops them fail-closed rather than erroring.
+    images: tuple[ModelImage, ...] = ()
 
     def __post_init__(self) -> None:
         if self.role not in MODEL_ROLES:
@@ -142,6 +160,9 @@ class ModelCapabilities:
     supports_streaming: bool = False
     supports_embeddings: bool = False
     supports_tool_calls: bool = False
+    # Image (vision) input. Off by default: image blocks are sent only to
+    # profiles that explicitly declare vision support in their config.
+    supports_vision: bool = False
     supports_json_schema: bool = False
     supports_reasoning: bool = False
     supports_reasoning_effort: bool = False

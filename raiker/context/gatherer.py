@@ -262,10 +262,13 @@ class ContextGatherer:
                     metadata={"attachment_status": reason, "path": p},
                 )
 
+            if kind == "image":
+                items.append(self._image_attachment_item(root, entry))
+                continue
             if kind != "path":
                 items.append(denied(
                     f"unsupported_type:{kind or 'missing'}",
-                    "(attachment not included: only workspace path attachments are supported in this slice)",
+                    "(attachment not included: only path and uploaded-image attachments are supported)",
                 ))
                 continue
             if not raw_path:
@@ -329,6 +332,55 @@ class ContextGatherer:
                 metadata={"attachment_status": "dropped_over_limit", "dropped": dropped},
             ))
         return items
+
+    def _image_attachment_item(self, root: Path, entry: dict[str, object]) -> ContextItem:
+        """Metadata-only context item for an uploaded image attachment.
+
+        Image bytes never enter text context — they are delivered separately as
+        an image block, and only when the turn's bound model profile declares
+        vision support (the orchestrator enforces that and events the outcome).
+        This item gives the model and the audit trail an honest, bounded record
+        of what was attached: filename, media type, size, digest.
+        """
+        attachment_id = str(entry.get("attachment_id", "")).strip()
+        title = f"Attachment: uploaded image {attachment_id or '(missing id)'}"
+
+        def make(status: str, content: str, extra: dict[str, object] | None = None) -> ContextItem:
+            return self._make_item(
+                source_type="attachment",
+                trust_level="untrusted_external",
+                sensitivity="unknown",
+                provenance={"origin": "user_attachment", "attachment_id": attachment_id},
+                title=title,
+                content=content,
+                metadata={"attachment_status": status, "attachment_id": attachment_id, **(extra or {})},
+            )
+
+        if not attachment_id:
+            return make("missing_attachment_id", "(image attachment not included: no attachment id given)")
+        try:
+            metadata = SQLiteStore(root).load_attachment_metadata(attachment_id)
+        except Exception:  # noqa: BLE001 — a bad attachment must never break gathering
+            metadata = None
+        if metadata is None or metadata.get("kind") != "image":
+            return make("not_found", "(image attachment not included: no such uploaded attachment)")
+        lines = [
+            f"filename: {metadata.get('filename')}",
+            f"media_type: {metadata.get('media_type')}",
+            f"byte_size: {metadata.get('byte_size')}",
+            f"sha256: {metadata.get('sha256')}",
+            "delivery: sent to the model as an image block only if the selected model "
+            "profile supports vision; otherwise withheld (fail closed)",
+        ]
+        return make(
+            "image_uploaded",
+            "\n".join(lines),
+            {
+                "kind": "image",
+                "media_type": str(metadata.get("media_type")),
+                "byte_size": int(metadata.get("byte_size") or 0),
+            },
+        )
 
     def _current_prompt(self, root: Path, prompt_text: str) -> ContextItem:
         return self._make_item(

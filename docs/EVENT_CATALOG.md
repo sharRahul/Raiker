@@ -171,6 +171,7 @@ These event names are reserved and must not be used with different meanings.
 | Side questions | `side_question_received`, `side_question_answered` | Phase 2 |
 | Interrupts/steering | `interrupt_received`, `safe_boundary_reached`, `task_steered` | Phase 2 |
 | Models | `model_profile_loaded`, `model_launch_requested`, `model_launch_completed`, `model_launch_failed`, `model_request_started`, `model_output_chunk`, `model_request_completed`, `model_request_failed`, `model_provider_rejected_by_policy`, `model_fallback_engaged` | Phase 1-2 |
+| Uploaded attachments | `attachment_image_included` (attachment id, media type, byte size, sha256 — never image bytes), `attachment_image_withheld` (attachment id + reason: `attachment_not_found` / `model_profile_lacks_vision_support`) | Phase 4 |
 | Hooks | `hook_registered`, `hook_started`, `hook_completed`, `hook_failed`, `hook_decision_proposed` | Phase 2 |
 | Plugins | `plugin_discovered`, `plugin_manifest_loaded`, `plugin_manifest_invalid`, `plugin_permission_diff_created`, `plugin_enabled`, `plugin_disabled` | Phase 3 |
 | Channels | `channel_profile_loaded`, `channel_link_requested`, `channel_linked`, `channel_message_received`, `channel_message_rejected`, `channel_unlinked` | Phase 3-4 |

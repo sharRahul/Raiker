@@ -258,6 +258,12 @@ export interface InterruptResult {
   safe_boundary: boolean;
 }
 
+// One prompt attachment: a workspace path, or an image previously uploaded
+// through POST /api/attachments (referenced by id; the bytes stay server-side).
+export type PromptAttachment =
+  | { type: "path"; path: string }
+  | { type: "image"; attachment_id: string };
+
 export interface PromptRequestBody {
   text: string;
   session_id?: string;
@@ -266,8 +272,19 @@ export interface PromptRequestBody {
   model_profile?: string;
   model?: string;
   max_tool_calls?: number;
-  // Workspace path attachments for this prompt (this slice supports paths only).
-  attachments?: { type: "path"; path: string }[];
+  attachments?: PromptAttachment[];
+}
+
+// POST /api/attachments response (raiker/api/routes_attachments.py) —
+// metadata only; the stored bytes are never echoed back.
+export interface UploadedAttachment {
+  ok: boolean;
+  attachment_id: string;
+  kind: string;
+  filename: string;
+  media_type: string;
+  byte_size: number;
+  sha256: string;
 }
 
 export interface InterruptRequestBody {

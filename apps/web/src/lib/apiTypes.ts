@@ -258,11 +258,13 @@ export interface InterruptResult {
   safe_boundary: boolean;
 }
 
-// One prompt attachment: a workspace path, or an image previously uploaded
-// through POST /api/attachments (referenced by id; the bytes stay server-side).
+// One prompt attachment: a workspace path, or an image/document previously
+// uploaded through POST /api/attachments (referenced by id; the bytes stay
+// server-side).
 export type PromptAttachment =
   | { type: "path"; path: string }
-  | { type: "image"; attachment_id: string };
+  | { type: "image"; attachment_id: string }
+  | { type: "document"; attachment_id: string };
 
 export interface PromptRequestBody {
   text: string;

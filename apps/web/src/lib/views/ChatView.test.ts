@@ -287,6 +287,64 @@ describe("ChatView streaming transcript", () => {
     expect(screen.queryByText("evil.sh")).not.toBeInTheDocument();
   });
 
+  it("uploads a document and sends it as a document attachment reference", async () => {
+    stubFetch({
+      ...MODELS_ROUTE,
+      "POST /api/attachments": {
+        ok: true,
+        attachment_id: "att_doc",
+        kind: "document",
+        filename: "notes.txt",
+        media_type: "text/plain",
+        byte_size: 42,
+        sha256: "abc",
+      },
+    });
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: finalResponse("OK"),
+        } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    await fireEvent.click(screen.getByLabelText("Add attachment"));
+    const fileInput = screen.getByLabelText("Upload document") as HTMLInputElement;
+    const file = new File(["hello raiker"], "notes.txt", { type: "text/plain" });
+    await fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByText("notes.txt")).toBeInTheDocument());
+
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "summarize this document" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledOnce());
+    const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(body.attachments).toEqual([{ type: "document", attachment_id: "att_doc" }]);
+  });
+
+  it("rejects an unsupported document type client-side with an honest error", async () => {
+    stubFetch(MODELS_ROUTE);
+    render(ChatView);
+    await fireEvent.click(screen.getByLabelText("Add attachment"));
+    const fileInput = screen.getByLabelText("Upload document") as HTMLInputElement;
+    const file = new File(["binary"], "archive.zip", { type: "application/zip" });
+    await fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/only plain-text, markdown, csv, pdf, or word/i),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("archive.zip")).not.toBeInTheDocument();
+  });
+
   it("shows an honest error when the stream cannot be reached", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockRejectedValue(new Error("connection refused"));

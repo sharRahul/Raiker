@@ -14,6 +14,34 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-07-11 (uploaded-document attachments: PDF + docx + image, hosted Anthropic Haiku 4.5)
+
+Run with a 1-hour operator key held in the server process env only, against
+three **real** user-supplied files. This round live-verifies Task 3's document
+attachments (PDF + Word .docx text extraction) and re-confirms image vision,
+end to end through the served stack, bound to `anthropic-hosted` /
+`claude-haiku-4-5-20251001`.
+
+| Check | Result |
+|---|---|
+| `POST /api/attachments` stores a real 2-page PDF (156 KB) | ✅ `att_…`, `kind: document` |
+| `POST /api/attachments` stores a real .docx (202 KB) | ✅ `att_…`, `kind: document` |
+| `POST /api/attachments` stores a real 1.76 MB JPEG | ✅ `att_…`, `kind: image`, metadata-only |
+| Governed turn, PDF document → extracted text in context → real Haiku answer | ✅ "Full Name: **Rahul Sharma** … Most Recent Job Title: **Information Security Consultant**" (both facts live only inside the PDF) |
+| Governed turn, .docx document → extracted text → real Haiku answer | ✅ "Full Name: **Gaurav Choudhary** … Over 13 years … Knowledge Management Lead at Mott MacDonald" |
+| Governed turn, JPG image (vision) → image block → real Haiku answer | ✅ correctly identified an **HAL Tejas** aircraft cutaway diagram (illustrator, publisher, maiden-flight date — all read from the image) |
+| `model_request_started` bound model | ✅ `provider: anthropic, model: claude-haiku-4-5-20251001` |
+| `model_request_completed` normalised usage | ✅ `{input_tokens: 2694, output_tokens: 37, cache_*: 0}` |
+| `attachment_image_included` event | ✅ id + `image/jpeg` + `1761205` bytes + sha256; **no image base64 anywhere in the event log** (checked) |
+| Browser (Chromium): composer "Document…" upload + image chip render; turn completes on Hosted · Anthropic | ✅ top bar "Hosted · Anthropic · egress open"; turn `completed`; **0 console errors** |
+
+**Honest note:** in the browser round the model, given both a PDF and an image
+and asked to read the CV, opened with "I'll read the CV document…" and finished
+`completed` (the document text was already in context; the model's agentic
+phrasing is model behaviour, not an attachment-path defect). The per-attachment
+API turns above are the definitive content proof — each answer states facts that
+exist only inside the uploaded file.
+
 ## Result — 2026-07-11 (uploaded-image vision turn + agentic tool loop, hosted Anthropic Haiku 4.5)
 
 Run with a 1-hour operator key held in the server process env only. This round

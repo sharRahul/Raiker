@@ -1,10 +1,15 @@
 """Uploaded-attachment API (web-app task 3): the governed local attachment store.
 
-POST /api/attachments accepts one base64-encoded image and stores it only after
-fail-closed validation (media-type allowlist, size cap, magic-byte sniff that
-the bytes really are the declared type). The response is metadata only — the
-stored bytes are never echoed back, never logged, and reach a model solely as
-an image block on a vision-capable profile during a later prompt turn.
+POST /api/attachments accepts one base64-encoded upload and stores it only after
+fail-closed validation. The declared media type selects the validator:
+
+* **Images** (png/jpeg/webp/gif) — allowlist, 5 MB cap, magic-byte sniff. They
+  reach a model solely as an image block on a vision-capable profile.
+* **Documents** (plain text / markdown / csv) — allowlist, 2 MB cap, UTF-8/NUL
+  sniff. Their extracted text reaches a model as bounded, untrusted context.
+
+The response is metadata only — the stored bytes are never echoed back and are
+never logged.
 """
 
 from __future__ import annotations
@@ -19,8 +24,12 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import UploadAttachmentRequest
 from raiker.api.sessions import ApiSession
 from raiker.runtime.attachments import (
-    MAX_IMAGE_BYTES,
+    DOCUMENT_MEDIA_TYPES,
+    IMAGE_MEDIA_TYPES,
+    MAX_ATTACHMENT_BYTES,
     AttachmentValidationError,
+    StoredAttachment,
+    store_document,
     store_image,
 )
 from raiker.runtime.authority.models import Principal
@@ -28,9 +37,10 @@ from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
 
-# Base64 inflates by 4/3; anything longer than this cannot decode to an in-cap
-# image, so reject before decoding (cheap fail-closed pre-check).
-_MAX_BASE64_CHARS = (MAX_IMAGE_BYTES * 4) // 3 + 8
+# Base64 inflates by 4/3; anything longer than this cannot decode to the largest
+# in-cap attachment, so reject before decoding (cheap fail-closed pre-check).
+# Per-type size limits are still enforced by the validators after decode.
+_MAX_BASE64_CHARS = (MAX_ATTACHMENT_BYTES * 4) // 3 + 8
 
 
 def _ws(request: Request) -> str | Path:
@@ -60,8 +70,22 @@ def upload_attachment(
             detail={"ok": False, "reason_code": "invalid_base64"},
         ) from exc
     store = SQLiteStore(_ws(request))
+    # The declared media type selects the validator. Anything on neither
+    # allowlist is rejected before either store function runs (fail closed).
+    if body.media_type in IMAGE_MEDIA_TYPES:
+        storer = store_image
+    elif body.media_type in DOCUMENT_MEDIA_TYPES:
+        storer = store_document
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "ok": False,
+                "reason_code": f"unsupported_media_type:{body.media_type or 'missing'}",
+            },
+        )
     try:
-        stored = store_image(
+        stored: StoredAttachment = storer(
             store, filename=body.filename, media_type=body.media_type, data=data
         )
     except AttachmentValidationError as exc:

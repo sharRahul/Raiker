@@ -10,12 +10,13 @@
   import { collectText } from "../turnPhases";
   import { humanize, providerName } from "../format";
 
-  // One composer attachment chip: a workspace path, or an image already
-  // uploaded into the governed attachment store (referenced by id — the bytes
-  // stay server-side and are only ever delivered as an image block when the
-  // turn's model profile supports vision).
+  // One composer attachment chip: a workspace path, an image, or a text
+  // document already uploaded into the governed attachment store (referenced by
+  // id — the bytes stay server-side). An image is only ever delivered as an
+  // image block when the turn's model profile supports vision; a document's
+  // extracted text is folded into context as bounded, untrusted data.
   interface ComposerAttachment {
-    kind: "path" | "image";
+    kind: "path" | "image" | "document";
     label: string;
     detail: string;
     path?: string;
@@ -62,6 +63,21 @@
   const MAX_ATTACHMENTS = 8;
   const IMAGE_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
   const MAX_IMAGE_BYTES = 5_000_000;
+  // Documents: extracted text is folded into context as bounded, untrusted data
+  // (validated fail-closed server-side: allowlist, 32 MB cap, per-type sniff —
+  // UTF-8 for text, %PDF- for PDF, OOXML zip for .docx; PDF/.docx are extracted
+  // locally, no bytes leave the box).
+  const DOCX_MEDIA_TYPE =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  const DOCUMENT_MEDIA_TYPES = [
+    "text/plain",
+    "text/markdown",
+    "text/csv",
+    "application/pdf",
+    DOCX_MEDIA_TYPE,
+  ];
+  const DOCUMENT_EXTENSIONS = [".txt", ".md", ".markdown", ".csv", ".pdf", ".docx"];
+  const MAX_DOCUMENT_BYTES = 32_000_000;
   let attachments = $state<ComposerAttachment[]>([]);
   let attachInput = $state("");
   // The "+" button reveals the attach controls (path input + image upload).
@@ -120,6 +136,68 @@
         ...attachments,
         {
           kind: "image",
+          label: file.name,
+          detail: `${file.name} (${stored.media_type}, ${stored.byte_size} bytes)`,
+          attachmentId: stored.attachment_id,
+        },
+      ];
+    } catch (e) {
+      attachError =
+        e instanceof ApiError
+          ? `Upload rejected (${e.reasonCode ?? e.status}).`
+          : "Upload failed — could not reach the local runtime.";
+    } finally {
+      uploading = false;
+    }
+  }
+
+  // Browsers report text media types inconsistently (a .md file often arrives
+  // with an empty or non-standard type), so fall back to the extension. The
+  // server re-validates fail-closed regardless of what we send.
+  function documentMediaType(file: File): string | null {
+    if (DOCUMENT_MEDIA_TYPES.includes(file.type)) return file.type;
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith(".csv")) return "text/csv";
+    if (lower.endsWith(".md") || lower.endsWith(".markdown")) return "text/markdown";
+    if (lower.endsWith(".txt")) return "text/plain";
+    if (lower.endsWith(".pdf")) return "application/pdf";
+    if (lower.endsWith(".docx")) return DOCX_MEDIA_TYPE;
+    return null;
+  }
+
+  async function onDocumentPicked(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file || attachments.length >= MAX_ATTACHMENTS) return;
+    attachError = null;
+    const mediaType = documentMediaType(file);
+    if (mediaType === null) {
+      attachError = "Only plain-text, Markdown, CSV, PDF, or Word (.docx) documents can be attached.";
+      return;
+    }
+    if (file.size > MAX_DOCUMENT_BYTES) {
+      attachError = "Document is too large (32 MB max).";
+      return;
+    }
+    uploading = true;
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      const stored = await api.uploadAttachment({
+        filename: file.name,
+        media_type: mediaType,
+        data_base64: base64,
+      });
+      attachments = [
+        ...attachments,
+        {
+          kind: "document",
           label: file.name,
           detail: `${file.name} (${stored.media_type}, ${stored.byte_size} bytes)`,
           attachmentId: stored.attachment_id,
@@ -244,7 +322,9 @@
               ? sentAttachments.map((a) =>
                   a.kind === "image"
                     ? { type: "image" as const, attachment_id: a.attachmentId ?? "" }
-                    : { type: "path" as const, path: a.path ?? "" },
+                    : a.kind === "document"
+                      ? { type: "document" as const, attachment_id: a.attachmentId ?? "" }
+                      : { type: "path" as const, path: a.path ?? "" },
                 )
               : undefined,
           planning_mode: planningMode || undefined,
@@ -482,6 +562,22 @@
             title="Upload an image (PNG/JPEG/WebP/GIF, 5 MB max). Sent to the model only if the selected model supports vision."
           >
             {uploading ? "Uploading…" : "Image…"}
+          </label>
+          <input
+            class="sr-only"
+            id="document-upload-input"
+            type="file"
+            accept={[...DOCUMENT_MEDIA_TYPES, ...DOCUMENT_EXTENSIONS].join(",")}
+            onchange={onDocumentPicked}
+            disabled={streaming || uploading || attachments.length >= MAX_ATTACHMENTS}
+            aria-label="Upload document"
+          />
+          <label
+            class="btn btn-sm"
+            for="document-upload-input"
+            title="Upload a document (plain text/Markdown/CSV/PDF/Word .docx, 32 MB max). Its extracted text is added to context as untrusted data."
+          >
+            {uploading ? "Uploading…" : "Document…"}
           </label>
         </div>
         {#if attachError !== null}

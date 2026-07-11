@@ -57,9 +57,10 @@ def _validated_attachments(raw: list[dict[str, Any]] | None) -> list[dict[str, A
     """Validate prompt attachments fail-closed before a turn starts.
 
     Accepted shapes: ``{"type": "path", "path": <non-empty str>}`` (workspace
-    path) and ``{"type": "image", "attachment_id": <non-empty str>}`` (an image
-    already uploaded through POST /api/attachments). Anything else rejects the
-    whole prompt honestly rather than
+    path), ``{"type": "image", "attachment_id": <non-empty str>}`` (an image
+    already uploaded through POST /api/attachments), and
+    ``{"type": "document", "attachment_id": <non-empty str>}`` (an uploaded text
+    document). Anything else rejects the whole prompt honestly rather than
     silently dropping data. Path *safety* (workspace containment) is enforced
     later by the workspace-scoped filesystem layer during context gathering.
     """
@@ -78,13 +79,13 @@ def _validated_attachments(raw: list[dict[str, Any]] | None) -> list[dict[str, A
                 raise ContractValidationError("invalid_attachment:missing_path")
             cleaned.append({"type": "path", "path": path.strip()})
             continue
-        if kind == "image":
-            # Uploaded-image reference: the bytes were already validated and
+        if kind in ("image", "document"):
+            # Uploaded-attachment reference: the bytes were already validated and
             # stored via POST /api/attachments; the prompt carries only the id.
             attachment_id = entry.get("attachment_id")
             if not isinstance(attachment_id, str) or not attachment_id.strip():
                 raise ContractValidationError("invalid_attachment:missing_attachment_id")
-            cleaned.append({"type": "image", "attachment_id": attachment_id.strip()})
+            cleaned.append({"type": kind, "attachment_id": attachment_id.strip()})
             continue
         raise ContractValidationError(f"invalid_attachment_type:{kind}")
     return cleaned

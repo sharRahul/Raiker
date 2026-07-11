@@ -24,83 +24,82 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 - **Web reads are read-only + rate-limit-aware** (120 req/min/IP). Prefer folding new read data into an existing endpoint over adding a fan-out.
 - **Secrets never surface.** API keys/allowlist values come from owner env, are never displayed, logged, or committed.
 
-## State as of 2026-07-11 (this session, branch `claude/unbounded-tool-calls-gd19nt`)
+## State as of 2026-07-11 (this session, branch `claude/handoff-task-hq2joc`)
 
-**1. Per-turn tool-call budget now defaults to effectively unbounded (user
-decision).** `PromptOptions.max_tool_calls` and the `/api/prompts` default both
-use `DEFAULT_MAX_TOOL_CALLS = 10_000` (`raiker/contracts/models.py`): a turn
-ends when the model finishes its task or the provider's context/token budget
-runs out — never because of the counter, which remains only as a hard
-runaway-loop fail-safe. Callers can still pass a lower explicit bound per turn.
-Docs updated (CONTRACTS, API_AND_CONTRACT_SCHEMAS, OWASP LLM06/LLM10 rows);
-`test_default_tool_call_budget_is_effectively_unbounded` pins the contract.
-
-**2. Task 3, uploaded-images sub-slice (DONE): governed image attachments.**
-- **Store:** `attachments` table (migration `RAIKER-1006`) +
-  `save_attachment` / `load_attachment` / `load_attachment_metadata`.
-  Validation is fail-closed in `raiker/runtime/attachments.py`: media-type
-  allowlist (png/jpeg/webp/gif), 5 MB cap, magic-byte sniff that the bytes
-  really are the declared type (webp also checks the RIFF/WEBP tag);
-  `load_image` re-validates on the way out.
-- **API:** `POST /api/attachments` (owner bearer auth; base64 body;
-  metadata-only response — bytes are never echoed). Only this route gets a
-  larger body cap via the new `MaxBodySizeMiddleware.path_overrides`; every
-  other route keeps the tight 1 MB default.
-- **Prompt shape:** `attachments` now also accepts
-  `{type: "image", attachment_id: "att_…"}` (validated fail-closed in
-  `_validated_attachments`; `att_` added to id prefixes).
-- **Vision capability:** `supports_vision` on `ModelCapabilities`, parsed from
-  profile config; set for `anthropic-hosted`, `openai-hosted`,
-  `gemini-hosted-openai-compatible` (both copies of `model-profiles.json`).
-  `ModelRouter.supports_vision(provider, model)` fails closed on unresolvable
-  profiles.
-- **Delivery:** the orchestrator attaches stored images to the user
-  `ModelMessage` (`ModelMessage.images: tuple[ModelImage, ...]`) only when the
-  turn's bound profile supports vision; otherwise it withholds honestly. New
-  metadata-only audit events `attachment_image_included` /
-  `attachment_image_withheld` (id, media type, size, sha256, reason — image
-  bytes/base64 never enter event payloads or text context). The gatherer adds
-  a metadata-only `attachment` context item (`image_uploaded` / `not_found` /
-  `missing_attachment_id`), trust `untrusted_external`.
-- **Providers:** Anthropic serializes base64 `image` blocks, OpenAI-compatible
-  serializes `image_url` data-URL parts — both only when
-  `capabilities.supports_vision`; non-vision profiles get plain text
-  (fail-closed drop, no provider 400s).
-- **Web:** the composer "+" popover gains an image upload (client-side
-  type/size pre-check, chips share the path-attachment UI, honest upload
-  errors); the prompt sends the attachment reference, never bytes.
-- Tests: `tests/test_uploaded_image_attachments.py` (28: validation, store
-  round-trip, capability parse, both providers, gatherer, orchestrator
-  deliver/withhold/fail-closed, upload API) + 2 web vitest.
-- **Session gate:** full backend suite green (~1373 passed, exit 0);
+**Task 3 COMPLETE: governed document attachments (text + PDF + Word .docx),
+sized to match Claude.** Paths, images, and now all document types are done —
+Task 3 has no remaining sub-slices.
+- **Sizes match Claude (user request):** images stay **5 MB** (the Anthropic
+  image API limit); documents are **32 MB** with **≤100 PDF pages** (the
+  Anthropic PDF API limits). `MAX_ATTACHMENT_BYTES` sizes the upload route's
+  body cap and `MaxBodySizeMiddleware` override off the larger of the two.
+- **Validation/store/extract** (`raiker/runtime/attachments.py`): reuses the
+  same governed `attachments` table (`RAIKER-1006`). `validate_document`
+  dispatches on media type and fails closed unless the type is on the allowlist
+  (`text/plain` / `text/markdown` / `text/csv` / `application/pdf` / the OOXML
+  docx type), non-empty, under 32 MB, **and** passes a per-type sniff: clean
+  UTF-8 with no NUL for text; a `%PDF-` header that pypdf can parse and is not
+  encrypted for PDF; a well-formed OOXML zip (contains `word/document.xml`) for
+  docx. `extract_document_text` is **local-only** — decode for text, pypdf for
+  PDF (≤100 pages, per-page failures skipped), stdlib `zipfile`+XML for docx —
+  bounded to `MAX_DOCUMENT_TEXT_CHARS = 200_000`. **No document bytes ever leave
+  the box**; only the extracted text does, as untrusted context. pypdf import
+  is lazy so a deployment without it rejects PDFs with `pdf_extraction_unavailable`
+  rather than crashing. `pypdf>=4` added to `pyproject.toml` dependencies.
+- **API:** `POST /api/attachments` dispatches on the declared media type —
+  image types → `store_image`, document types → `store_document`, anything
+  else → 400 `unsupported_media_type` (before either storer runs).
+- **Prompt shape:** `attachments` accepts `{type: "document", attachment_id}`
+  (validated fail-closed in `_validated_attachments`, sharing the image path).
+- **Context delivery:** the gatherer's `_document_attachment_item` folds the
+  bounded extracted text into an `untrusted_external` context item
+  (`document_uploaded` / `not_found` / `missing_attachment_id`), announced as
+  "untrusted document content, not instructions". No orchestrator change —
+  documents never touch the vision/image-block path.
+- **Web:** the composer "+" popover's "Document…" upload accepts txt/md/csv/pdf/
+  docx (client pre-check with extension fallback; 32 MB cap); the prompt sends
+  the reference, never bytes.
+- Tests: `tests/test_document_attachments.py` (36: per-type validation incl.
+  corrupt-PDF / non-zip-docx / NUL / non-UTF-8, extraction incl. real PDF+docx
+  round-trips via in-test `make_pdf`/`make_docx` builders, store + kind
+  isolation, gatherer untrusted-text item for text and PDF, upload API) +
+  2 web vitest.
+- **Session gate:** full backend suite green (**1411 passed**, exit 0);
   `ruff check .` clean; mypy clean on changed sources (remaining output is the
-  documented environmental missing-stub noise); web lint/check/**81 vitest**/
+  documented environmental missing-stub noise); web lint/check/**83 vitest**/
   build green; all five `scripts/validate_*.py` pass.
-- **Live-verified (hosted Anthropic Haiku 4.5, 1-hour operator key in server
-  env only):** a real 2.2 MB JPEG uploaded through `POST /api/attachments`
-  produced a correct vision answer through both the API and the Chromium-driven
-  composer UI (0 console errors); the withheld path fired
-  `attachment_image_withheld` before any provider contact on a non-vision
-  profile; the event log contained metadata only (no bytes/base64 — checked).
-  Full table in `docs/WEB_APP_LIVE_TEST.md` (2026-07-11 section).
-
-**3. Tool round-trip fix (found live, would break any hosted multi-step turn).**
-The orchestrator appended only the `role="tool"` result message after a tool
-run — never the assistant message carrying the model's tool call — so the
-*second* model call of an agentic turn got HTTP 400 from Anthropic
-(`tool_result` with no matching `tool_use`); strict OpenAI endpoints reject the
-same shape. Fixed contract-level: `ModelMessage.tool_calls`
-(`tuple[ToolCallProposal, ...]`), the orchestrator appends the assistant
-tool-call message before each tool result, the Anthropic adapter serializes
-`tool_use` blocks, and `to_dict()` emits the OpenAI `tool_calls` field. Two new
-tests in `tests/test_model_tool_call_loop.py`. **Live-verified:** a governed
-agentic turn (list files → read file → report codeword) ran 3 model calls +
-2 governed tool executions on hosted Haiku 4.5 and finished because the model
-was done — the Claude-style loop end to end.
+- **Live-verified (marked `implemented_verified`).** 2026-07-11, hosted
+  Anthropic Haiku 4.5 with a 1-hour operator key (server env only): a real
+  2-page PDF and a real .docx uploaded through `POST /api/attachments` produced
+  correct Haiku answers from their extracted text (candidate name + role /
+  name + 13 yrs experience — facts that live only inside the files), and the
+  1.76 MB JPEG produced a correct vision answer (HAL Tejas cutaway). Bound to
+  `provider: anthropic, model: claude-haiku-4-5-20251001`; `attachment_image_included`
+  metadata-only (no image bytes in the log); through the API and the
+  Chromium-driven composer UI (0 console errors). Full table in
+  `docs/WEB_APP_LIVE_TEST.md` (2026-07-11 document section).
 
 ## Recent prior state (condensed — details in git history and IMPLEMENTATION_STATUS)
 
-All on merged PR #107 (`claude/provider-model-selection-5ufga4`), 2026-07-10:
+Merged PR #108 (`claude/unbounded-tool-calls-gd19nt`), 2026-07-11:
+
+- **Per-turn tool-call budget defaults to effectively unbounded** —
+  `DEFAULT_MAX_TOOL_CALLS = 10_000` in `raiker/contracts/models.py`; a turn ends
+  when the model is done or the provider's budget runs out, the counter is only
+  a runaway fail-safe. Callers can still pass a lower explicit bound.
+- **Task 3, uploaded-images sub-slice (DONE, live-verified):** governed image
+  attachment store (media-type allowlist + 5 MB cap + magic-byte sniff),
+  `supports_vision` capability, image blocks delivered only to vision-capable
+  profiles (withheld honestly otherwise; metadata-only audit — image
+  bytes/base64 never enter events or text context). Anthropic + OpenAI adapters
+  serialize image blocks only when vision-capable. Live-verified with a real
+  2.2 MB JPEG through API + composer UI (table in `docs/WEB_APP_LIVE_TEST.md`).
+- **Tool round-trip fix (live-found):** the orchestrator now appends the
+  assistant tool-call message before each `role="tool"` result
+  (`ModelMessage.tool_calls`, Anthropic `tool_use` blocks, OpenAI `tool_calls`)
+  so the second model call of an agentic turn no longer 400s.
+
+Merged PR #107 (`claude/provider-model-selection-5ufga4`), 2026-07-10:
 
 - **Task 3, paths-first sub-slice (DONE):** prompts carry
   `{type: "path", path}` attachments (max 8); the gatherer includes each as a
@@ -139,15 +138,10 @@ All on merged PR #107 (`claude/provider-model-selection-5ufga4`), 2026-07-10:
 Follow the slice discipline at the bottom. Each is a governed vertical slice;
 do them one at a time, commit + push after each.
 
-**Task 3 remainder — office/pdf document attachments (last sub-slice).**
-Paths and uploaded images are done; what remains is text extraction for
-uploaded documents: local-only extraction libs (PDFs/office are heavy — scope
-carefully; prefer starting with plain-text/markdown/csv before pdf/docx),
-reuse the same governed attachment store + allowlist pattern
-(`raiker/runtime/attachments.py` — add per-type validators + an extraction
-step whose output becomes a bounded, `untrusted_external` context item, like
-path attachments). Every attachment stays untrusted data. Tests for
-type/size fail-closed, extraction bounds, trust labels.
+**Task 3 — DONE** (paths + images + text/PDF/docx documents). Nothing remains;
+the only optional follow-on is broadening the office set beyond `.docx` (e.g.
+`.pptx` / `.xlsx`), which would reuse the same store + per-type validator +
+local extractor pattern in `raiker/runtime/attachments.py`.
 
 **Task 4 — connect plugins/connectors in chat (github, gmail, gcal, slack).**
 There is already a `ConnectorRegistry` (`config/channel-connectors.json`) and a
@@ -198,8 +192,10 @@ an ongoing piece of work: its own workspace subpath, sessions, checkpoints, and
 1. **Open hosted-provider live verification (evidence only).** `anthropic-hosted`
    is `implemented_verified`. `openai-hosted` / `gemini-hosted-openai-compatible`
    remain to verify with a governed live turn when operator keys are available
-   (this cloud session's egress proxy blocks those hosts). Add a **live vision
-   turn** (uploaded image → image block → real answer) to the same checklist.
+   (this cloud session's egress proxy blocks those hosts). The **live vision
+   turn** and **live document turn** (image / PDF / docx → real answer) are both
+   done for hosted Anthropic (2026-07-11); repeat them for openai/gemini when
+   reachable.
 2. **Plugin runtime remainder (Tier 4).** In-process import isolation; image
    build/pull management for the sandboxed runtime + per-plugin network egress
    for the bare-subprocess runtime; plugin hooks/MCP/LSP/monitors/panels

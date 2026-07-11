@@ -212,7 +212,8 @@
         "api_key_env",
         "extra_headers.x-api-key"
       ],
-      "prompt_cache_ttl": "5m"
+      "prompt_cache_ttl": "5m",
+      "supports_vision": true
     },
     {
       "profile_id": "openai-hosted",
@@ -245,7 +246,8 @@
         "api_key_env",
         "extra_headers.Authorization"
       ],
-      "prompt_cache_ttl": "5m"
+      "prompt_cache_ttl": "5m",
+      "supports_vision": true
     },
     {
       "profile_id": "gemini-hosted-openai-compatible",
@@ -271,7 +273,8 @@
       "redact_from_logs": [
         "api_key_env",
         "extra_headers.Authorization"
-      ]
+      ],
+      "supports_vision": true
     }
   ]
 }

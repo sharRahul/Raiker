@@ -228,6 +228,65 @@ describe("ChatView streaming transcript", () => {
     expect((screen.getByLabelText("Attachment path") as HTMLInputElement).value).toBe("");
   });
 
+  it("uploads an image and sends it as an image attachment reference", async () => {
+    stubFetch({
+      ...MODELS_ROUTE,
+      "POST /api/attachments": {
+        ok: true,
+        attachment_id: "att_1",
+        kind: "image",
+        filename: "shot.png",
+        media_type: "image/png",
+        byte_size: 68,
+        sha256: "abc",
+      },
+    });
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: finalResponse("OK"),
+        } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    await fireEvent.click(screen.getByLabelText("Add attachment"));
+    const fileInput = screen.getByLabelText("Upload image") as HTMLInputElement;
+    const file = new File([new Uint8Array([137, 80, 78, 71])], "shot.png", {
+      type: "image/png",
+    });
+    await fireEvent.change(fileInput, { target: { files: [file] } });
+
+    // The upload resolves and the chip shows the file name.
+    await waitFor(() => expect(screen.getByText("shot.png")).toBeInTheDocument());
+
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "what is in this image?" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledOnce());
+    const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(body.attachments).toEqual([{ type: "image", attachment_id: "att_1" }]);
+  });
+
+  it("rejects a non-image file client-side with an honest error", async () => {
+    stubFetch(MODELS_ROUTE);
+    render(ChatView);
+    await fireEvent.click(screen.getByLabelText("Add attachment"));
+    const fileInput = screen.getByLabelText("Upload image") as HTMLInputElement;
+    const file = new File(["#!/bin/sh"], "evil.sh", { type: "text/x-shellscript" });
+    await fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() =>
+      expect(screen.getByText(/only png, jpeg, webp, or gif/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("evil.sh")).not.toBeInTheDocument();
+  });
+
   it("shows an honest error when the stream cannot be reached", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockRejectedValue(new Error("connection refused"));

@@ -59,11 +59,11 @@ mitigation is not a real one. Status: ✅ implemented · 🟡 partial · 🔒 di
 | LLM03 | Supply chain | yes | 🔒 | Manifest validation real; add signing/checksums + trusted-publisher allowlist + dependency policy. |
 | LLM04 | Data & model poisoning | yes | 🔒 | Memory writes disabled; enforce provenance + contradiction checks when enabled. |
 | LLM05 | Improper output handling | yes | ✅ | Model tool calls are schema-validated at the boundary (`raiker/models/tool_call_validation.py`); unknown tools / missing args are rejected (`model_tool_call_rejected`) before execution. |
-| LLM06 | Excessive agency | yes | ✅ | Broker + approvals + per-turn max-tool-calls budget (`PromptOptions.max_tool_calls`, enforced in the orchestrator loop). Add time/token budgets next. |
+| LLM06 | Excessive agency | yes | ✅ | Broker + approvals + per-turn max-tool-calls fail-safe (`PromptOptions.max_tool_calls`, enforced in the orchestrator loop; the default is effectively unbounded — `DEFAULT_MAX_TOOL_CALLS = 10000` — so a turn ends when the model finishes or the provider's context/token budget runs out; the counter only stops runaway loops, and callers may pass a lower explicit bound). Add time/token budgets next. |
 | LLM07 | System prompt leakage | yes | 📘 | Separate system/security prompt from user-visible context; implement with first real provider. |
 | LLM08 | Vector & embedding weaknesses | yes | 🔒 | Vector writes disabled; apply sensitivity/provenance filters on retrieval when enabled. |
 | LLM09 | Misinformation | yes | 🟡 | Verifier is a stub (`raiker/runtime/verifier.py`); implement verification + citation/provenance gating. |
-| LLM10 | Unbounded consumption | yes | 🟡 | Per-turn tool-call budget enforced; add token/time budgets and rate limits next. |
+| LLM10 | Unbounded consumption | yes | 🟡 | Per-turn tool-call fail-safe enforced (default is deliberately effectively unbounded; the provider's context/token budget is the practical per-turn bound). Add token/time budgets and rate limits next. |
 
 **Implemented strengths today:** workspace path-safety (symlink/traversal rejection), policy-gated
 tool execution with approvals, append-only event log, and disabled-by-default for high-risk

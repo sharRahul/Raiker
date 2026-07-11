@@ -24,230 +24,130 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 - **Web reads are read-only + rate-limit-aware** (120 req/min/IP). Prefer folding new read data into an existing endpoint over adding a fan-out.
 - **Secrets never surface.** API keys/allowlist values come from owner env, are never displayed, logged, or committed.
 
-## State as of 2026-07-10 (later session, continued) — Task 3: path attachments
+## State as of 2026-07-11 (this session, branch `claude/unbounded-tool-calls-gd19nt`)
 
-**Task 3, paths-first sub-slice (DONE): chat attachments for file/folder paths.**
-A prompt can carry `attachments: [{type: "path", path: "<workspace path>"}]`
-(max 8). The context gatherer includes each as a bounded, trust-labelled
-context item — files become capped text, directories become listings — with
-`trust_level: untrusted_external` (data, never instructions) and priority just
-below the current prompt.
-- Fail-closed: paths resolve through the same workspace-scoped filesystem
-  layer as the read tools — outside the workspace yields an honest denial item
-  with **no content**; missing paths and unsupported attachment types are
-  reported honestly; invalid attachment shapes reject the prompt before a turn
-  starts (`_validated_attachments` in `routes_prompts.py`).
-- Web: the Chat composer was redesigned as a single clean card (user request,
-  modelled on claude.ai): a "+" button reveals the attach-path input; chips
-  show the **file name only** (full path in the tooltip; max 8, cleared on
-  send; sent turns keep their chips). The per-turn Planning / Provider / Model
-  controls sit as compact selects on the **right** of the card's bottom bar,
-  next to a **disabled mic placeholder** (future voice input — plan:
-  local transcription via whisper.cpp, governed like every other capability;
-  nothing is wired up yet). The tool-budget input was removed from the UI at
-  the user's request — the runtime still enforces its bounded per-turn
-  default (10) as the runaway-loop fail-safe; raising it is a deliberate
-  backend decision, not a hidden UI default.
-- Tests: `tests/test_chat_attachments.py` (15) + 1 web vitest.
-- **Remaining Task 3 sub-slices (not started):** uploaded images (needs a
-  governed attachment store + `supports_vision` capability) and office/pdf
-  text extraction — see the original scoping under "Remaining web-app tasks".
+**1. Per-turn tool-call budget now defaults to effectively unbounded (user
+decision).** `PromptOptions.max_tool_calls` and the `/api/prompts` default both
+use `DEFAULT_MAX_TOOL_CALLS = 10_000` (`raiker/contracts/models.py`): a turn
+ends when the model finishes its task or the provider's context/token budget
+runs out — never because of the counter, which remains only as a hard
+runaway-loop fail-safe. Callers can still pass a lower explicit bound per turn.
+Docs updated (CONTRACTS, API_AND_CONTRACT_SCHEMAS, OWASP LLM06/LLM10 rows);
+`test_default_tool_call_budget_is_effectively_unbounded` pins the contract.
 
-## State as of 2026-07-10 (later session, continued) — Task 2: advisor model
+**2. Task 3, uploaded-images sub-slice (DONE): governed image attachments.**
+- **Store:** `attachments` table (migration `RAIKER-1006`) +
+  `save_attachment` / `load_attachment` / `load_attachment_metadata`.
+  Validation is fail-closed in `raiker/runtime/attachments.py`: media-type
+  allowlist (png/jpeg/webp/gif), 5 MB cap, magic-byte sniff that the bytes
+  really are the declared type (webp also checks the RIFF/WEBP tag);
+  `load_image` re-validates on the way out.
+- **API:** `POST /api/attachments` (owner bearer auth; base64 body;
+  metadata-only response — bytes are never echoed). Only this route gets a
+  larger body cap via the new `MaxBodySizeMiddleware.path_overrides`; every
+  other route keeps the tight 1 MB default.
+- **Prompt shape:** `attachments` now also accepts
+  `{type: "image", attachment_id: "att_…"}` (validated fail-closed in
+  `_validated_attachments`; `att_` added to id prefixes).
+- **Vision capability:** `supports_vision` on `ModelCapabilities`, parsed from
+  profile config; set for `anthropic-hosted`, `openai-hosted`,
+  `gemini-hosted-openai-compatible` (both copies of `model-profiles.json`).
+  `ModelRouter.supports_vision(provider, model)` fails closed on unresolvable
+  profiles.
+- **Delivery:** the orchestrator attaches stored images to the user
+  `ModelMessage` (`ModelMessage.images: tuple[ModelImage, ...]`) only when the
+  turn's bound profile supports vision; otherwise it withholds honestly. New
+  metadata-only audit events `attachment_image_included` /
+  `attachment_image_withheld` (id, media type, size, sha256, reason — image
+  bytes/base64 never enter event payloads or text context). The gatherer adds
+  a metadata-only `attachment` context item (`image_uploaded` / `not_found` /
+  `missing_attachment_id`), trust `untrusted_external`.
+- **Providers:** Anthropic serializes base64 `image` blocks, OpenAI-compatible
+  serializes `image_url` data-URL parts — both only when
+  `capabilities.supports_vision`; non-vision profiles get plain text
+  (fail-closed drop, no provider 400s).
+- **Web:** the composer "+" popover gains an image upload (client-side
+  type/size pre-check, chips share the path-attachment UI, honest upload
+  errors); the prompt sends the attachment reference, never bytes.
+- Tests: `tests/test_uploaded_image_attachments.py` (28: validation, store
+  round-trip, capability parse, both providers, gatherer, orchestrator
+  deliver/withhold/fail-closed, upload API) + 2 web vitest.
+- **Session gate:** full backend suite green (~1373 passed, exit 0);
+  `ruff check .` clean; mypy clean on changed sources (remaining output is the
+  documented environmental missing-stub noise); web lint/check/**81 vitest**/
+  build green; all five `scripts/validate_*.py` pass.
+- **Live-verified (hosted Anthropic Haiku 4.5, 1-hour operator key in server
+  env only):** a real 2.2 MB JPEG uploaded through `POST /api/attachments`
+  produced a correct vision answer through both the API and the Chromium-driven
+  composer UI (0 console errors); the withheld path fired
+  `attachment_image_withheld` before any provider contact on a non-vision
+  profile; the event log contained metadata only (no bytes/base64 — checked).
+  Full table in `docs/WEB_APP_LIVE_TEST.md` (2026-07-11 section).
 
-Implemented on the same branch (`claude/provider-model-selection-5ufga4`, PR
-#107) as a governed vertical slice, following the slice discipline.
+**3. Tool round-trip fix (found live, would break any hosted multi-step turn).**
+The orchestrator appended only the `role="tool"` result message after a tool
+run — never the assistant message carrying the model's tool call — so the
+*second* model call of an agentic turn got HTTP 400 from Anthropic
+(`tool_result` with no matching `tool_use`); strict OpenAI endpoints reject the
+same shape. Fixed contract-level: `ModelMessage.tool_calls`
+(`tuple[ToolCallProposal, ...]`), the orchestrator appends the assistant
+tool-call message before each tool result, the Anthropic adapter serializes
+`tool_use` blocks, and `to_dict()` emits the OpenAI `tool_calls` field. Two new
+tests in `tests/test_model_tool_call_loop.py`. **Live-verified:** a governed
+agentic turn (list files → read file → report codeword) ran 3 model calls +
+2 governed tool executions on hosted Haiku 4.5 and finished because the model
+was done — the Claude-style loop end to end.
 
-**Task 2 — advisor model for local-model turns (DONE).** A user running a local
-model can attach one advisor profile (typically hosted) that the local model
-consults through the brokered tool `consult_advisor(question)`.
-- **Capability `advisor_model_runtime`** (threat model
-  `docs/threat-models/advisor-model.md`): real executor
-  (`AdvisorModelRuntimeExecutor`, operation `consult`, metadata-only
-  artifacts), activation requires human gate-manager + threat-model ack +
-  confirmation token + `local_single_user_runtime`. In
-  `REAL_EXECUTOR_CAPABILITIES` / phase-gates tier 5 / `CAPABILITY_GATE_MAP` /
-  activation registry / policy `approval_required_actions`.
-- **Governance layering** (`raiker/runtime/advisor.py::AdvisorService`,
-  mirrors `RetrievalAugmentor`): gate disabled → fail closed; decision mode
-  default **`ask` withholds** (`auto` withholds too — off-machine prompt
-  content is never low-risk; `deny` blocks; only `allow` runs); no/unknown/
-  test-only/placeholder advisor → fail closed; then the consult goes through
-  `ModelRouter.achat` so the provider factory re-checks the hosted/private
-  gate + owner egress allowlist + env-only key per call.
-- **Tool**: `consult_advisor` in the ToolBroker + PolicyEngine read allowlist +
-  `_MODEL_EXPOSED_TOOLS` (advertised to the model; question required). Answer
-  returns as an untrusted-data block, capped 16k; question capped 8k. Broker
-  events/stored actions are scrubbed to metadata (`_METADATA_ONLY_TOOLS`) —
-  the question/answer never enter event payloads (lengths only).
-- **Persistence**: `model_advisor` table (migration `RAIKER-1005`) +
-  `save/load_model_advisor`.
-- **API**: `advisor_profile_id` + `advisor_model_gate_state` on
-  `GET /api/models`; `PUT /api/model-advisor` (gate-manager only; null clears;
-  unknown/test/placeholder profiles fail closed). Web: "Advisor model"
-  selector on Models (concrete-model profiles only) + governance copy.
-- Tests: `tests/test_advisor_model.py` (29: service governance matrix,
-  executor fail-closed + activation, broker metadata-only audit, API), +3 web
-  vitest. Suite: **1327 passed**; ruff/mypy clean; web lint/check/**78
-  vitest**/build green; all five validators pass.
-- **Live-verified (hosted Anthropic, operator key in process env only):** with
-  the advisor gate enabled (ack + token), decision mode `allow`, and
-  `anthropic-hosted` set as advisor, `AdvisorService.consult` returned a real
-  answer from `claude-opus-4-8`, and the **brokered `consult_advisor` path**
-  ran the same consult through PolicyEngine + ToolBroker — the durable event
-  log contained `question_length` but neither the question nor the answer
-  text (metadata-only audit verified live). This run also caught and fixed a
-  circular import (`broker → advisor_tools → runtime.authority → … → broker`)
-  that test-import ordering had masked: `advisor_tools` now imports the
-  service lazily at call time.
+## Recent prior state (condensed — details in git history and IMPLEMENTATION_STATUS)
 
-## State as of 2026-07-10 (later session) — Task 7: provider model selection
+All on merged PR #107 (`claude/provider-model-selection-5ufga4`), 2026-07-10:
 
-Implemented on branch `claude/provider-model-selection-5ufga4` as a full
-vertical slice (backend + API + web + tests + live verification).
+- **Task 3, paths-first sub-slice (DONE):** prompts carry
+  `{type: "path", path}` attachments (max 8); the gatherer includes each as a
+  bounded, `untrusted_external` context item via the workspace-scoped
+  filesystem layer (outside-workspace fails closed with no content). Composer
+  redesigned as a single card ("+" attach, name-only chips, right-side
+  planning/provider/model selects, disabled mic placeholder; tool-budget input
+  removed from the UI). `tests/test_chat_attachments.py`.
+- **Task 2 (DONE): advisor model** for local-model turns via the brokered
+  `consult_advisor` tool — capability `advisor_model_runtime`, default-`ask`
+  withholds, provider policy re-checked per call, metadata-only audit
+  (`raiker/runtime/advisor.py`; threat model
+  `docs/threat-models/advisor-model.md`). Live-verified against hosted
+  Anthropic. `tests/test_advisor_model.py` (29).
+- **Task 7 (DONE): provider model selection** —
+  `GET /api/models/{id}/provider-models` (honest statuses, gates enforced
+  before network), `PUT /api/model-selection`, per-turn
+  `PromptOptions.model`, web pickers. Live-verified (10 real models listed;
+  streamed turns bound to chosen models).
+- **Task 1 (DONE): user-owned model fallback sequence** — ordered profile-id
+  chain walked on provider failure, each candidate still router-gated;
+  `PUT /api/model-fallback`; web editor. Honest limit: candidates need a
+  concrete model (placeholder profiles resolve only with a persisted
+  selection).
+- **Task 6 (DONE): prompt caching** — `ModelRequest.cache_ttl` (5m/1h) drives
+  Anthropic `cache_control` (+1h beta header), OpenAI `prompt_cache_key`,
+  llama.cpp `cache_prompt`; provider-agnostic usage normalisation
+  (`summarize_model_usage`) emitted on `model_request_completed` (buffered +
+  streamed); web cache chips. Option B (Raiker-level response cache) remains
+  deliberately deferred — see git history for the governance notes.
+- **Live web-app test (hosted Anthropic) PASSED** — procedure + per-model
+  matrix in `docs/WEB_APP_LIVE_TEST.md`.
 
-**Task 7 — select the provider's available models in Chat and Models (DONE).**
-- **Provider catalogue, on demand:** `GET /api/models/{profile_id}/provider-models`
-  calls the provider's own model-listing endpoint (reuses
-  `ModelRouter.alist_models_for_profile`, so gates/egress/key are enforced by the
-  provider factory *before* any network contact). Honest statuses: `available` |
-  `policy_denied` | `unsupported` | `unavailable` — failures return an empty
-  list, never fabricated names. This is the only web read that touches the
-  network, and only on explicit user demand (unknown/test profiles 404).
-- **Selection:** `PUT /api/model-selection` (`{profile_id, model?}`) persists the
-  same `ModelSessionState` the CLI `/model use` writes — human gate-manager only,
-  unknown/test profiles fail closed, placeholder profiles require a concrete
-  model, and the provider factory validates policy fail-closed before saving
-  (emits `model_profile_selected`). `GET /api/models` now returns `current_model`
-  and shows the concrete model on the selected profile card.
-- **Per-turn model:** `PromptOptions.model` (+ `PromptRequest.model`) lets a chat
-  turn pin a concrete model for the chosen profile; the gateway resolver
-  registers the concrete choice so the router resolves it (idempotent), and
-  provider policy is still enforced downstream.
-- **Web:** Models cards get Select / "Choose model…" (picker fetches the live
-  catalogue; manual model-id entry when the catalogue is unavailable). Chat →
-  Options gets a Provider select + a Model select populated from the catalogue.
-  The "Development preview" runtime-mode pill was removed from the top bar
-  (only an explicitly activated mode shows a badge).
-- Tests: `tests/test_api_model_selection.py` (14), +5 in
-  `tests/test_turn_model_binding.py`, +4 web vitest (ModelsView picker/select,
-  ChatView per-turn model). Suite: **1298 passed**; ruff/mypy clean; web
-  lint/check/**75 vitest**/build green; all five validators pass.
-- **Live-verified (hosted Anthropic, real key in server env only):** catalogue
-  listed 10 real models; selection via the new endpoint bound a streamed turn to
-  `claude-haiku-4-5-20251001`; a per-turn override ran `claude-sonnet-4-6`;
-  Chromium pass on both views with 0 console errors. Details in
-  `docs/WEB_APP_LIVE_TEST.md`.
-
-## State as of 2026-07-10 — web-app feature tasks 1 & 6
-
-Two of a six-task batch were implemented as full vertical slices (backend + API +
-web + tests) on branch `claude/raiker-web-app-features-8g8k5q`. Tasks 2–5 are
-scoped below with a concrete build plan but **not yet started**.
-
-**Task 1 — user-owned model fallback sequence (DONE).** When the selected
-provider is unavailable (no network, timeout, non-responsive host, or a policy
-denial), the turn walks a user-owned ordered list of profile ids and tries the
-next backend — typically a local runtime. Each candidate is still resolved and
-gated by the model router, so a hosted candidate that policy denies is *skipped*,
-never opened; when all fail the turn fails closed as before.
-- Storage `model_fallback_sequence` table (migration `RAIKER-1004`) +
-  `save/load_model_fallback_sequence`.
-- `RuntimeOrchestrator._provider_chain` / `_acall_model` / `_astream_model_call`
-  iterate the chain and emit `model_fallback_engaged`. Streaming uses fresh
-  per-attempt buffers (nothing is yielded live until the call returns), so a
-  failed attempt's partial deltas are discarded — no duplicated output.
-- Gateway `_resolve_fallback_chain` (reuses `_resolve_profile_for_turn`, so
-  test/placeholder profiles drop out).
-- API `PUT /api/model-fallback` (human gate-manager only, unknown/test profiles
-  fail closed, de-duplicated) + `fallback_sequence` on `GET /api/models`.
-- Web: Models view fallback-sequence editor (add / remove / reorder / save).
-- Tests: `tests/test_turn_model_fallback.py` (12), `tests/test_api_model_fallback.py`
-  (8), `apps/web/.../ModelsView.test.ts` (4).
-- **Honest limit:** a fallback candidate needs a *concrete* model. The llama.cpp
-  profile (`local-gguf`) and hosted profiles ship concrete models and work
-  out-of-box; placeholder-`<model>` profiles (Ollama/LM Studio/vLLM) resolve only
-  if the owner has a persisted concrete-model selection for that profile
-  (same rule as per-turn selection). A per-profile "fallback model" field is the
-  natural follow-up.
-
-**Task 6 — prompt caching, unified control across providers (DONE, incl. Option A).**
-`ModelRequest.cache_ttl` (None | `"5m"` | `"1h"`), threaded from each profile by
-the router (`_cache_ttl`). The KV cache is model-specific and lives inside each
-provider, so Raiker cannot share one cache across models; instead it drives each
-backend's own lever and normalises the metrics:
-- **Anthropic:** system prompt emitted as a content-block list with a
-  `cache_control` breakpoint (reuses tools + system within the TTL); `"1h"` adds
-  `ttl:"1h"` + the `extended-cache-ttl-2025-04-11` beta header.
-- **OpenAI-compatible (Option A):** hints sent only where the backend documents
-  one — OpenAI gets `prompt_cache_key` (keyed by profile_id, so same-prefix turns
-  share a cache) + `stream_options.include_usage`; llama.cpp gets
-  `cache_prompt: true`. vLLM/Ollama/LM Studio/Gemini/OpenRouter cache
-  automatically server-side, so no field is sent (a strict server would 400 on an
-  unknown field).
-- **Provider-agnostic cache-hit metrics:** `summarize_model_usage()`
-  (`raiker/models/contracts.py`) flattens Anthropic (`cache_read_input_tokens`)
-  and OpenAI (`prompt_tokens_details.cached_tokens`) usage into one shape; the
-  orchestrator emits it on `model_request_completed` (both buffered and streamed
-  paths — streaming usage is captured from Anthropic `message_start`/
-  `message_delta` and the OpenAI final usage chunk via `ModelStreamEvent.metadata`).
-- Profiles opting in: `anthropic-hosted`, `openai-hosted`, `raiker-local-llama-cpp`
-  (`prompt_cache_ttl: "5m"`). Web: a "Cache 5m/1h" chip per profile on Models,
-  and a per-turn "Cache hit · N tok / Cache miss" chip in Chat.
-- Tests: `tests/test_phase_4_provider_breadth.py` (+5 Anthropic),
-  `tests/test_prompt_cache_metrics.py` (14: summarizer, OpenAI-compatible hints,
-  streamed usage both providers, orchestrator emission), +1 web chip test.
-- **Option B (deferred, opt-in for later): a Raiker-level *response* cache.**
-  Store `(exact prompt + model) → response` and short-circuit identical repeated
-  prompts without calling the model. Provider-agnostic and fully Raiker-owned,
-  but note: (1) must be keyed by model (serving one model's answer for another is
-  wrong), so it's still not "cache irrespective of model"; (2) only helps on
-  *identical* prompts, and Raiker gathers fresh context each turn, so hits are
-  rare; (3) it changes a core invariant — a cache hit means the model did not run
-  this turn — so it needs deliberate governance (staleness, is a cached answer
-  still policy-valid, audit). Build only if short-circuiting repeats is
-  explicitly wanted; design the governance first.
-
-**Live web-app test (2026-07-10, hosted Anthropic Haiku 4.5) — PASSED.** Ran one
-round against a real operator key: `raiker-web` booted, owner session minted,
-`GET /api/models` showed `anthropic-hosted` selected + hosted gate
-`enabled_runtime` + the fallback sequence + cache `5m`, and a **streamed turn**
-returned a real Haiku answer bound to `claude-haiku-4-5-20251001`
-(`model_request_started` confirms the model; `model_request_completed` carried
-normalised usage `{input:2013, output:19, cache_read:0, cache_write:0}`). A
-Chromium pass rendered the Models cards (Anthropic "selected" + "Cache 5m" chips,
-fallback editor) and drove a live chat turn through the UI with **zero console
-errors**; the top-bar chip showed `Hosted · Anthropic · egress open`. Full
-procedure + a per-model test matrix (OpenAI/Gemini/OpenRouter/llama.cpp/Ollama/
-LM Studio/vLLM, all `Ready`) is in **`docs/WEB_APP_LIVE_TEST.md`**. Honest note:
-the cached prefix was 2013 tokens — just under Haiku's ~2048 minimum — so no cache
-*write* happened this round; the caching path (breakpoint sent, usage captured +
-normalised) is verified, and a >2048-token prefix on two same-session turns will
-show a non-zero `cache_read`. Keys were used in the server env only, never
-persisted or committed.
-
-**Session gate (both tasks):** full backend suite **1265 passed**; `ruff check .`
-clean; `mypy` clean on changed sources (remaining output is the documented
-environmental missing-stub noise for pytest/fastapi/httpx); web `lint` +
-`svelte-check` + **70 vitest** + `build` green; all five `scripts/validate_*.py`
-pass.
-
-## Remaining web-app tasks (3-remainder, 4, 5) — build plan for the next session
+## Remaining web-app tasks — build plan for the next session
 
 Follow the slice discipline at the bottom. Each is a governed vertical slice;
-do them one at a time, commit + push after each. (Tasks 1, 2, 6, 7 and the
-paths-first sub-slice of Task 3 are DONE — see the state sections above.)
+do them one at a time, commit + push after each.
 
-**Task 3 remainder — uploaded attachments (images, docs).** Path attachments
-are done; what remains:
-- **Uploaded files (images/docs):** need a governed local attachment store
-  (new table + size/type allowlist + redaction), text extraction for docs
-  (local-only libs; PDFs/office are heavier — scope carefully), and image blocks
-  only for vision-capable profiles (`supports_vision` capability — add it).
-  Treat every attachment as untrusted data. This is the biggest sub-slice; do
-  paths first, images next, office/pdf extraction last.
-- Web: attachment picker in the Chat composer; API multipart or base64 on
-  `/api/prompts`. Tests for path inclusion, type/size fail-closed, trust labels.
+**Task 3 remainder — office/pdf document attachments (last sub-slice).**
+Paths and uploaded images are done; what remains is text extraction for
+uploaded documents: local-only extraction libs (PDFs/office are heavy — scope
+carefully; prefer starting with plain-text/markdown/csv before pdf/docx),
+reuse the same governed attachment store + allowlist pattern
+(`raiker/runtime/attachments.py` — add per-type validators + an extraction
+step whose output becomes a bounded, `untrusted_external` context item, like
+path attachments). Every attachment stays untrusted data. Tests for
+type/size fail-closed, extraction bounds, trust labels.
 
 **Task 4 — connect plugins/connectors in chat (github, gmail, gcal, slack).**
 There is already a `ConnectorRegistry` (`config/channel-connectors.json`) and a
@@ -298,7 +198,8 @@ an ongoing piece of work: its own workspace subpath, sessions, checkpoints, and
 1. **Open hosted-provider live verification (evidence only).** `anthropic-hosted`
    is `implemented_verified`. `openai-hosted` / `gemini-hosted-openai-compatible`
    remain to verify with a governed live turn when operator keys are available
-   (this cloud session's egress proxy blocks those hosts).
+   (this cloud session's egress proxy blocks those hosts). Add a **live vision
+   turn** (uploaded image → image block → real answer) to the same checklist.
 2. **Plugin runtime remainder (Tier 4).** In-process import isolation; image
    build/pull management for the sandboxed runtime + per-plugin network egress
    for the bare-subprocess runtime; plugin hooks/MCP/LSP/monitors/panels

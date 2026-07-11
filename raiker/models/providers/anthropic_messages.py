@@ -104,11 +104,16 @@ def _json(response: httpx.Response) -> dict[str, Any]:
     return data
 
 
-def _to_anthropic_messages(messages: list[ModelMessage]) -> tuple[str, list[dict[str, Any]]]:
+def _to_anthropic_messages(
+    messages: list[ModelMessage], *, include_images: bool = False
+) -> tuple[str, list[dict[str, Any]]]:
     """Split Raiker messages into (system_text, anthropic messages).
 
     Tool-role messages become user-role ``tool_result`` blocks; consecutive
     same-role turns are merged because the Messages API requires alternation.
+    Image attachments become base64 image blocks only when ``include_images``
+    (i.e. the profile declares vision support); otherwise they are dropped
+    fail-closed so a non-vision model is never sent an unsupported block.
     """
     system_parts: list[str] = []
     converted: list[dict[str, Any]] = []
@@ -124,7 +129,34 @@ def _to_anthropic_messages(messages: list[ModelMessage]) -> tuple[str, list[dict
             }]
             role = "user"
         else:
-            blocks = [{"type": "text", "text": message.content}] if message.content else []
+            blocks = []
+            if include_images and message.role == "user":
+                blocks.extend(
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": image.media_type,
+                            "data": image.base64_data,
+                        },
+                    }
+                    for image in message.images
+                )
+            if message.content:
+                blocks.append({"type": "text", "text": message.content})
+            if message.role == "assistant":
+                # The tool_use blocks this assistant turn made. Required: a
+                # later tool_result must reference a tool_use id from a prior
+                # assistant message or the API rejects the whole request.
+                blocks.extend(
+                    {
+                        "type": "tool_use",
+                        "id": call.call_id,
+                        "name": call.tool_name,
+                        "input": call.arguments,
+                    }
+                    for call in message.tool_calls
+                )
             role = message.role
         if converted and converted[-1]["role"] == role:
             converted[-1]["content"].extend(blocks)
@@ -197,7 +229,9 @@ class AsyncAnthropicMessagesProvider:
         return models
 
     def _payload(self, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
-        system, messages = _to_anthropic_messages(list(request.messages))
+        system, messages = _to_anthropic_messages(
+            list(request.messages), include_images=self.capabilities.supports_vision
+        )
         cache_control = _cache_control(request.cache_ttl)
         payload: dict[str, Any] = {
             "model": request.model or self.model,

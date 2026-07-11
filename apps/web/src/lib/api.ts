@@ -21,6 +21,7 @@ import type {
   StreamEvent,
   TaskView,
   TurnDetail,
+  UploadedAttachment,
 } from "./apiTypes";
 
 // Bearer token held in memory only — never localStorage/sessionStorage (security requirement).
@@ -129,6 +130,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ profile_ids }),
     }),
+  // Upload one image (base64) into the governed attachment store. Validation
+  // is fail-closed server-side (media-type allowlist, 5 MB cap, magic-byte
+  // sniff); the response is metadata only.
+  uploadAttachment: (body: { filename: string; media_type: string; data_base64: string }) =>
+    postJson<UploadedAttachment>("/api/attachments", body),
   events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
     request<EventEntry[]>(withQuery("/api/events", params)),
   checkpoints: (sessionId?: string) =>

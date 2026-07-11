@@ -119,6 +119,17 @@ class ModelRouter:
         finally:
             await p.aclose()
 
+    def supports_vision(self, provider: str, model: str) -> bool:
+        """Whether the resolved profile declares image (vision) input support.
+
+        Fails closed: an unresolvable profile means no vision — the caller must
+        withhold image content rather than guess.
+        """
+        try:
+            return capabilities_from_profile(self._profile(provider, model)).supports_vision
+        except (RegistryError, ValueError):
+            return False
+
     def chat(self, provider: str, model: str, messages: Sequence[ModelMessage], tools: Sequence[ToolSpec] | None = None) -> ModelResponse:
         try:
             asyncio.get_running_loop()

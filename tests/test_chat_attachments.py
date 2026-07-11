@@ -87,7 +87,7 @@ class TestPathAttachmentGathering:
         assert item.metadata["attachment_status"] == "not_found"
 
     def test_unsupported_type_is_reported_honestly(self, workspace: Path) -> None:
-        bundle = _gather(workspace, [{"type": "image", "path": "notes.md"}])
+        bundle = _gather(workspace, [{"type": "upload", "path": "notes.md"}])
         item = _attachment_items(bundle)[0]
         assert str(item.metadata["attachment_status"]).startswith("unsupported_type")
         assert "attachment payload ALPHA" not in item.content
@@ -122,6 +122,10 @@ class TestAttachmentValidation:
         assert _validated_attachments(None) == []
 
     def test_unknown_type_rejected(self) -> None:
+        with pytest.raises(ContractValidationError):
+            _validated_attachments([{"type": "upload", "path": "x.png"}])
+
+    def test_image_without_attachment_id_rejected(self) -> None:
         with pytest.raises(ContractValidationError):
             _validated_attachments([{"type": "image", "path": "x.png"}])
 

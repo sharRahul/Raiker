@@ -12,6 +12,7 @@ from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.models.contracts import (
     FINISH_REASONS,
+    ModelImage,
     ModelMessage,
     ModelResponse,
     ToolCallProposal,
@@ -166,6 +167,74 @@ class RuntimeOrchestrator:
                 if candidate not in chain:
                     chain.append(candidate)
         return chain
+
+    def _image_attachments(self, envelope: PromptEnvelope) -> tuple[ModelImage, ...]:
+        """Resolve uploaded image attachments into image blocks for this turn.
+
+        Fail-closed at every step: an image is delivered only when it exists in
+        the governed attachment store, still passes validation, AND the turn's
+        bound model profile declares vision support. Everything else emits an
+        honest metadata-only ``attachment_image_withheld`` event (attachment id,
+        reason — never image bytes) and sends nothing.
+        """
+        import base64
+
+        from raiker.runtime.attachments import load_image
+        from raiker.storage.sqlite import SQLiteStore
+
+        entries = [
+            entry
+            for entry in envelope.prompt.attachments
+            if isinstance(entry, dict) and entry.get("type") == "image"
+        ]
+        if not entries:
+            return ()
+        provider, model = self._turn_provider(envelope)
+        vision_check = getattr(self.model_router, "supports_vision", None)
+        try:
+            vision = bool(vision_check(provider, model)) if callable(vision_check) else False
+        except Exception:  # noqa: BLE001 — an unresolvable profile means no vision
+            vision = False
+        store = getattr(self.tool_broker, "store", None) or SQLiteStore(self.workspace_root)
+        images: list[ModelImage] = []
+        for entry in entries:
+            attachment_id = str(entry.get("attachment_id", ""))
+            record = load_image(store, attachment_id) if attachment_id else None
+            if record is None:
+                self._event(
+                    envelope,
+                    "attachment_image_withheld",
+                    {"attachment_id": attachment_id, "reason": "attachment_not_found"},
+                )
+                continue
+            if not vision:
+                self._event(
+                    envelope,
+                    "attachment_image_withheld",
+                    {
+                        "attachment_id": attachment_id,
+                        "reason": "model_profile_lacks_vision_support",
+                        "provider": provider,
+                    },
+                )
+                continue
+            images.append(
+                ModelImage(
+                    media_type=str(record["media_type"]),
+                    base64_data=base64.b64encode(record["data"]).decode("ascii"),
+                )
+            )
+            self._event(
+                envelope,
+                "attachment_image_included",
+                {
+                    "attachment_id": attachment_id,
+                    "media_type": str(record["media_type"]),
+                    "byte_size": int(record["byte_size"]),
+                    "sha256": str(record["sha256"]),
+                },
+            )
+        return tuple(images)
 
     async def _acall_model(
         self, envelope: PromptEnvelope, messages: list[ModelMessage]
@@ -423,7 +492,13 @@ class RuntimeOrchestrator:
         ]
         if retrieval_context is not None:
             messages.append(ModelMessage(role="system", content=retrieval_context))
-        messages.append(ModelMessage(role="user", content=envelope.prompt.text))
+        messages.append(
+            ModelMessage(
+                role="user",
+                content=envelope.prompt.text,
+                images=self._image_attachments(envelope),
+            )
+        )
         max_tool_calls = envelope.options.max_tool_calls
         tool_calls_made = 0
         started_action_ids: set[str] = set()
@@ -526,6 +601,17 @@ class RuntimeOrchestrator:
                 started_action_ids=started_action_ids,
             )
             tool_calls_made += 1
+            # A valid tool round-trip on both wire protocols: first the
+            # assistant message that made the call (Anthropic tool_use block /
+            # OpenAI tool_calls field), then the matching tool result. Without
+            # the assistant message, hosted providers reject the request.
+            messages.append(
+                ModelMessage(
+                    role="assistant",
+                    content=response.text,
+                    tool_calls=(proposal,),
+                )
+            )
             messages.append(
                 ModelMessage(
                     role="tool",

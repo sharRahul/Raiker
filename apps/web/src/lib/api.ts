@@ -6,6 +6,7 @@ import type {
   CapabilityDecisionMode,
   CapabilityGate,
   Checkpoint,
+  ConnectionsView,
   Diagnostics,
   EventEntry,
   InterruptRequestBody,
@@ -99,6 +100,10 @@ export const api = {
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   models: () => request<ModelsView>("/api/models"),
+  // Read-only status of governed service connectors (never reaches the network;
+  // never exposes a credential value). Enabling one is done via the capability
+  // gate + decision-mode control plane, not here.
+  connections: () => request<ConnectionsView>("/api/connections"),
   // On-demand listing of the models a provider serves (user-initiated; provider
   // policy is enforced server-side before any network contact).
   providerModels: (profileId: string) =>

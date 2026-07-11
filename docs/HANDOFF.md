@@ -24,7 +24,69 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 - **Web reads are read-only + rate-limit-aware** (120 req/min/IP). Prefer folding new read data into an existing endpoint over adding a fan-out.
 - **Secrets never surface.** API keys/allowlist values come from owner env, are never displayed, logged, or committed.
 
-## State as of 2026-07-11 (this session, branch `claude/handoff-task-hq2joc`)
+## State as of 2026-07-11 (this session, branch `claude/handoff-task-implementation-5k3kw7`)
+
+**Task 4 reference slice COMPLETE: governed GitHub read-only connector,
+live-verified end-to-end on hosted Anthropic.** This is the reference pattern
+for all Task 4 connectors (Gmail / Calendar / Slack replicate it).
+- **Capability `connector_github_runtime`** (in `RUNTIME_DOMAIN_CAPABILITIES` +
+  `REAL_EXECUTOR_CAPABILITIES`; router map + activation requirement + policy
+  config all wired). Mirrors the advisor pattern exactly.
+- **Brokered tool `github_read(resource, repo, number)`**
+  (`raiker/runtime/connectors.py::GithubConnectorService`, wrapped by
+  `raiker/tools/connector_tools.py`, registered in the broker + exposed to the
+  model in `tool_call_validation.py`). Governance, in order: gate (disabled ⇒
+  fail closed) → decision mode (**default `ask`/`auto` withhold**; `deny`
+  blocks; only `allow` runs — a network read carrying the owner token's scope is
+  never low-risk) → owner credential `RAIKER_GITHUB_TOKEN` (env only) → owner
+  egress allowlist `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` must contain
+  `api.github.com` → validated components (`resource` ∈ issue/pull_request,
+  `repo` = owner/name, positive `number`; the request URL is **built
+  server-side**, never taken from the model → no SSRF). Fetched body returned as
+  **untrusted data, not instructions**, bounded (200 KB fetch / 20 000-char
+  body). Reads only — send/modify not implemented (fail closed).
+- **route_action executor** `GithubConnectorExecutor` (operation `read`,
+  `enforce_modes=False`, metadata-only artifacts) is the activation anchor.
+- **Audit is metadata-only:** the fetched `content` is dropped from broker
+  events/results; the token never appears in args/URLs/events. Governance
+  identifiers (`repo`/`resource`/`number`) are kept. New network primitive
+  `get_url` in `sandbox.py` (GET + headers + egress allowlist; returns body;
+  never logs headers) and `connector_egress_allowlist()`.
+- **Web "Connections" surface** (read-only): `GET /api/connections` +
+  `DashboardService.get_connections()` + `ConnectionsView.svelte` (new nav item
+  under Governance). Reports each connector's gate state, decision mode,
+  credential-set (bool, value never shown), and egress-allowed honestly; a
+  "Ready" vs "Fail-closed" status with per-check remediation. Enabling stays on
+  the capability-gate + decision-mode control plane (gate-manager only).
+- **Threat model:** `docs/threat-models/connectors-github.md`.
+- Tests: `tests/test_github_connector.py` (18: gate/mode withhold+deny, missing
+  credential/egress fail-closed, arg validation, real-content success via
+  injected fetch, executor metadata-only, broker metadata-only event scrub,
+  model exposure/validation) + 2 web vitest (`ConnectionsView.test.ts`).
+- **Session gate:** full backend suite green (exit 0); `ruff check .` clean;
+  mypy clean on changed sources (remaining output is the documented
+  environmental missing-stub noise); web lint/check/**85 vitest**/build green;
+  all five `scripts/validate_*.py` pass.
+- **Live-verified.** 2026-07-11, hosted Anthropic Haiku 4.5 with a 1-hour
+  operator key + the session's `GITHUB_TOKEN` (server env only): default-`ask`
+  withheld (`connector_withheld_ask`); with `allow`, a real read of
+  `sharrahul/raiker#109` returned the true title/state/body (token absent from
+  output); and an **end-to-end model turn** where Haiku called `github_read` and
+  answered with the PR's exact title + accurate summary from the fetched
+  untrusted content. Fail-closed paths (`connector_not_configured` /
+  `connector_egress_denied`) confirmed. Connections web view screenshotted in
+  both "Ready" and honest "Fail-closed" states (0 console errors). Full table in
+  `docs/WEB_APP_LIVE_TEST.md` (2026-07-11 Task 4 section).
+
+**Next for Task 4:** replicate the pattern for a second read connector (Gmail /
+Calendar / Slack) — each = new capability + `*ConnectorService` (gate + mode +
+env credential + `api.<host>` on the connector egress allowlist + server-built
+request) + brokered tool + `GithubConnectorExecutor`-style route executor + a
+`ConnectorView` row in `get_connections()`. Then the first **write** action
+(must require approval, not just `ask`). Do NOT ship a connector whose executor
+isn't real.
+
+### Prior state — Task 3 (done, merged PR #109)
 
 **Task 3 COMPLETE: governed document attachments (text + PDF + Word .docx),
 sized to match Claude.** Paths, images, and now all document types are done —
@@ -144,19 +206,27 @@ the only optional follow-on is broadening the office set beyond `.docx` (e.g.
 local extractor pattern in `raiker/runtime/attachments.py`.
 
 **Task 4 — connect plugins/connectors in chat (github, gmail, gcal, slack).**
-There is already a `ConnectorRegistry` (`config/channel-connectors.json`) and a
-`routes_channels.py` surface — build on them, don't reinvent.
+**Reference slice (GitHub read) DONE + live-verified** (see the state section
+above). The governed pattern is established in `raiker/runtime/connectors.py`,
+`raiker/tools/connector_tools.py`, `raiker/runtime/executors/connectors.py`, the
+`connector_github_runtime` capability, and the `GET /api/connections` +
+`ConnectionsView` web surface. Remaining:
 - Each connector = a governed capability + egress allowlist + owner credential
   from env (never args/UI). Model connector actions as governed tools routed
   through the broker/policy/approval path with default decision mode `ask`
-  (send/modify actions must require approval; reads are `ask`).
-- Start with **one read-only connector end-to-end** (e.g. GitHub issue/PR read)
-  as the reference slice, then replicate. Do NOT ship a connector whose executor
-  isn't real — fail closed until it is.
-- Web: a "Connections" surface showing connector status (configured / gated /
-  egress) read-only, and a per-connector enable flow through the existing gate
-  control plane. Tests: tool executes when configured+allowed, fails closed
-  otherwise, approval required for write actions.
+  (send/modify actions must require **approval**, not just `ask`; reads are
+  `ask` and withhold until raised to `allow`).
+- Replicate the GitHub slice for a second **read-only** connector (Gmail /
+  Calendar / Slack), reusing `GithubConnectorService` as the template and adding
+  a `ConnectorView` row to `get_connections()`. Do NOT ship a connector whose
+  executor isn't real — fail closed until it is.
+- Then add the first **write** action end-to-end (requires approval through the
+  broker/policy/approval path — the write executor must be real). Tests: tool
+  executes when configured+allowed, fails closed otherwise, approval required
+  for write actions.
+- Note: `config/channel-connectors.json` / `routes_channels.py` are the inbound
+  *channel* surface (interfaces into Raiker), a different concept from these
+  outbound service connectors — the connector pattern above is the one to grow.
 
 **Task 5 — project folders (like Claude Cowork).** A named "project" that scopes
 an ongoing piece of work: its own workspace subpath, sessions, checkpoints, and

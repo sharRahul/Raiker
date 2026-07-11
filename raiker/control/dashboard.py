@@ -217,6 +217,50 @@ class ModelsView:
 
 
 @dataclass(frozen=True)
+class ConnectorView:
+    """Read-only status of one governed service connector (web-app task 4).
+
+    Every field is derived from stored/config state — this view never reaches
+    the network and never exposes a credential value (only whether one is set).
+    A connector is usable in chat only when its capability gate is enabled AND
+    its decision mode is raised to ``allow`` AND the owner credential is set AND
+    its host is on the connector egress allowlist; each condition is reported
+    honestly so the owner can see exactly what is still fail-closed.
+    """
+
+    connector_id: str
+    display_name: str
+    capability: str
+    gate_state: str
+    capability_enabled: bool
+    decision_mode: str
+    # Owner credential presence only — the value (an API token) is never read out.
+    credential_env: str
+    credential_configured: bool
+    egress_host: str
+    egress_allowed: bool
+    # Read-only summary of what actions this connector exposes and their kind.
+    actions: tuple[str, ...]
+    kind: str = "read_only"
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ConnectionsView:
+    connectors: tuple[ConnectorView, ...]
+    # True when the owner has set RAIKER_CONNECTOR_EGRESS_ALLOWLIST at all.
+    connector_egress_allowlist_configured: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "connectors": [c.to_dict() for c in self.connectors],
+            "connector_egress_allowlist_configured": self.connector_egress_allowlist_configured,
+        }
+
+
+@dataclass(frozen=True)
 class ProviderHealthView:
     profile_id: str
     provider: str
@@ -440,6 +484,48 @@ class DashboardService:
             current_model=self._current_model(registry, state),
             advisor_profile_id=self.store.load_model_advisor(TERMINAL_MODEL_SESSION_ID),
             advisor_model_gate_state=advisor_gate.state if advisor_gate is not None else "unknown",
+        )
+
+    # ── Connections (governed service connectors — web-app task 4) ───────
+    def get_connections(self, acting_principal_id: str | None = None) -> ConnectionsView:
+        """Read-only status of every governed service connector.
+
+        Never reaches the network and never exposes a credential value. Each
+        connector reports its capability gate state, decision mode, whether the
+        owner credential env is set, and whether its host is on the connector
+        egress allowlist — so the owner can see exactly what is still
+        fail-closed. Enabling a connector is done through the existing capability
+        gate + decision-mode control plane (gate-manager only), not here.
+        """
+        from raiker.runtime.connectors import GITHUB_HOST, GITHUB_TOKEN_ENV
+        from raiker.runtime.executors.sandbox import connector_egress_allowlist
+
+        connectors: list[ConnectorView] = []
+        gh_gate = self.control.get_capability_gate(
+            "connector_github_runtime", acting_principal_id
+        )
+        gh_allowlist = connector_egress_allowlist()
+        connectors.append(
+            ConnectorView(
+                connector_id="github",
+                display_name="GitHub (read-only)",
+                capability="connector_github_runtime",
+                gate_state=gh_gate.state if gh_gate is not None else "unknown",
+                capability_enabled=bool(gh_gate.runtime_enabled) if gh_gate is not None else False,
+                decision_mode=gh_gate.decision_mode if gh_gate is not None else "ask",
+                credential_env=GITHUB_TOKEN_ENV,
+                credential_configured=bool(os.environ.get(GITHUB_TOKEN_ENV, "").strip()),
+                egress_host=GITHUB_HOST,
+                egress_allowed=GITHUB_HOST in gh_allowlist,
+                actions=("read_issue", "read_pull_request"),
+                kind="read_only",
+            )
+        )
+        return ConnectionsView(
+            connectors=tuple(connectors),
+            connector_egress_allowlist_configured=bool(
+                os.environ.get("RAIKER_CONNECTOR_EGRESS_ALLOWLIST", "").strip()
+            ),
         )
 
     @staticmethod

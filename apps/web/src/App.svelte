@@ -11,6 +11,7 @@
   import SessionsView from "./lib/views/SessionsView.svelte";
   import CapabilitiesView from "./lib/views/CapabilitiesView.svelte";
   import ModelsView from "./lib/views/ModelsView.svelte";
+  import ConnectionsView from "./lib/views/ConnectionsView.svelte";
   import CheckpointsView from "./lib/views/CheckpointsView.svelte";
   import ActivityView from "./lib/views/ActivityView.svelte";
   import DiagnosticsView from "./lib/views/DiagnosticsView.svelte";
@@ -96,6 +97,8 @@
         <CapabilitiesView {principal} />
       {:else if current === "models"}
         <ModelsView />
+      {:else if current === "connections"}
+        <ConnectionsView />
       {:else if current === "checkpoints"}
         <CheckpointsView />
       {:else if current === "activity"}

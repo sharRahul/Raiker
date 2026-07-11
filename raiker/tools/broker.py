@@ -15,6 +15,7 @@ from raiker.memory.governance import GovernedMemoryService
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.advisor_tools import consult_advisor
+from raiker.tools.connector_tools import github_read
 from raiker.tools.filesystem import (
     FilesystemSafetyError,
     diff_files,
@@ -36,7 +37,16 @@ from raiker.tools.vector_tools import vector_get
 # payloads or the stored tool-action record. The advisor question/answer flow
 # only between the models (that is the tool's purpose); the audit trail records
 # lengths and profile metadata, never the text.
+# Tools whose *arguments* are scrubbed to lengths before entering events (the
+# argument text is itself sensitive prompt content — the advisor question).
 _METADATA_ONLY_TOOLS = frozenset({"consult_advisor"})
+# Tools whose *result content* is dropped from events. The advisor answer and the
+# fetched GitHub body are untrusted content that flows only to the calling model;
+# the audit trail keeps metadata (lengths, ids), never the content itself.
+# github_read's arguments (repo / resource / number) are governance-relevant
+# non-secret identifiers and are kept verbatim (redacted) for the audit trail.
+_CONTENT_RESULT_TOOLS = frozenset({"consult_advisor", "github_read"})
+_CONTENT_RESULT_FIELDS = ("answer", "content")
 
 
 class ToolBroker:
@@ -124,6 +134,13 @@ class ToolBroker:
                 str(args.get("question", "")),
                 store=self.store,
             ),
+            "github_read": lambda args: github_read(
+                self.workspace_root,
+                str(args.get("resource", "")),
+                str(args.get("repo", "")),
+                args.get("number", ""),
+                store=self.store,
+            ),
         }
 
     @staticmethod
@@ -157,9 +174,10 @@ class ToolBroker:
     def _event_safe_result_payload(cls, result: ToolResult) -> dict[str, Any]:
         """Result payload for events: metadata-only tools drop content fields."""
         payload = result.to_dict()
-        if result.tool_name in _METADATA_ONLY_TOOLS and isinstance(payload.get("output"), dict):
+        if result.tool_name in _CONTENT_RESULT_TOOLS and isinstance(payload.get("output"), dict):
             output = dict(payload["output"])
-            output.pop("answer", None)
+            for field in _CONTENT_RESULT_FIELDS:
+                output.pop(field, None)
             output["content_redacted"] = True
             payload["output"] = output
         return payload

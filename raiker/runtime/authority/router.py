@@ -72,6 +72,7 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "cloud_execution_cap": "cloud_execution_cap",
     "hosted_model_runtime": "hosted_model_runtime",
     "private_network_model_runtime": "private_network_model_runtime",
+    "advisor_model_runtime": "advisor_model_runtime",
     "scheduled_routines": "scheduled_routines",
     "subagents": "subagents",
     "multi_agent_teams": "multi_agent_teams",

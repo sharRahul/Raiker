@@ -52,6 +52,8 @@ from raiker.storage.migrations import (
     CAPABILITY_DECISION_MODE_SQL,
     EMAIL_DRAFTS_MIGRATION_ID,
     EMAIL_DRAFTS_SQL,
+    MODEL_ADVISOR_MIGRATION_ID,
+    MODEL_ADVISOR_SQL,
     MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
     MODEL_FALLBACK_SEQUENCE_SQL,
     MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
@@ -439,6 +441,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MODEL_FALLBACK_SEQUENCE_MIGRATION_ID, MODEL_FALLBACK_SEQUENCE_SQL, connection
             )
+            self._apply_migration(MODEL_ADVISOR_MIGRATION_ID, MODEL_ADVISOR_SQL, connection)
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
         row = connection.execute(
@@ -1805,6 +1808,36 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         except (ValueError, TypeError):
             return []
         return [str(item) for item in value] if isinstance(value, list) else []
+
+    def save_model_advisor(self, session_id: str, profile_id: str | None) -> None:
+        """Persist the user-owned advisor model profile id (None/empty clears it).
+
+        Storing the id grants nothing — the consult path is gated by the
+        ``advisor_model_runtime`` capability, its decision mode, and provider
+        policy at call time. Validation is the caller's job.
+        """
+        with self.connect() as connection:
+            if not profile_id:
+                connection.execute(
+                    "DELETE FROM model_advisor WHERE session_id = ?", (session_id,)
+                )
+                return
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO model_advisor (session_id, profile_id, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                (session_id, profile_id, utc_now()),
+            )
+
+    def load_model_advisor(self, session_id: str) -> str | None:
+        """Return the persisted advisor profile id for ``session_id`` (None if unset)."""
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT profile_id FROM model_advisor WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+        return str(row["profile_id"]) if row is not None else None
 
     # ── Phase 10: Runtime Authority (Principals + Risk Acceptance) ──
 

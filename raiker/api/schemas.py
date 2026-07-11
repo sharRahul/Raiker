@@ -46,6 +46,24 @@ class AuthSessionRequest:
     as_principal: str | None = None
 
 
+class SetModelSelectionRequest(BaseModel):
+    # Persist the operator's model selection: a profile id plus, for providers
+    # that serve several models (or ship a placeholder), the concrete model.
+    # extra="forbid" rejects unknown fields.
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    profile_id: str
+    model: str | None = None
+
+
+class SetModelAdvisorRequest(BaseModel):
+    # Persist (or clear, with null/empty) the user-owned advisor model profile.
+    # extra="forbid" rejects unknown fields.
+    model_config = ConfigDict(extra="forbid")
+
+    profile_id: str | None = None
+
+
 class SetModelFallbackRequest(BaseModel):
     # Ordered list of model profile ids to try (in order) when the selected
     # provider is unavailable. extra="forbid" rejects unknown fields.
@@ -61,7 +79,16 @@ class PromptRequest:
     planning_mode: str | None = None
     approval_mode: str | None = None
     model_profile: str | None = None
+    # Optional concrete model for the chosen profile (per-turn only; provider
+    # policy is still enforced downstream).
+    model: str | None = None
     max_tool_calls: int | None = None
+    # Optional attachments for this prompt. This slice supports workspace path
+    # attachments only: {"type": "path", "path": "<workspace-relative path>"}.
+    # Paths are resolved through the workspace-scoped filesystem layer (outside
+    # the workspace fails closed) and included as bounded, untrusted-labelled
+    # context items. Unknown shapes are rejected before a turn starts.
+    attachments: list[dict[str, Any]] | None = None
     # Origin of the prompt: the bundled SPA sends "web_ui"; external single-user
     # REST clients (other machines/UIs) send "rest". Both land in the same
     # session when they share session_id (Phase 8 same-session gate).

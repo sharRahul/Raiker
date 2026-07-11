@@ -4,7 +4,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
-  import type { ModelsView as ModelsData } from "../apiTypes";
+  import type { ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
   import { humanize, providerName } from "../format";
 
@@ -23,9 +23,112 @@
     try {
       models = await api.models();
       sequence = [...models.fallback_sequence];
+      advisorChoice = models.advisor_profile_id ?? "";
     } catch (e) {
       models = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+    }
+  }
+
+  // ── Model selection (per provider card) ──────────────────────────────
+  // One picker open at a time. The model list comes from the provider itself,
+  // on demand; when the catalogue is unavailable the user can type a model id.
+  let pickerFor = $state<string | null>(null);
+  let pickerList = $state<ProviderModelList | null>(null);
+  let pickerLoading = $state(false);
+  let pickerChoice = $state("");
+  let selecting = $state(false);
+  let selectError = $state<string | null>(null);
+
+  async function openPicker(profileId: string) {
+    if (pickerFor === profileId) {
+      closePicker();
+      return;
+    }
+    pickerFor = profileId;
+    pickerList = null;
+    pickerChoice = "";
+    selectError = null;
+    pickerLoading = true;
+    try {
+      pickerList = await api.providerModels(profileId);
+    } catch {
+      pickerList = null; // manual entry still works
+    } finally {
+      pickerLoading = false;
+    }
+  }
+
+  function closePicker() {
+    pickerFor = null;
+    pickerList = null;
+    pickerChoice = "";
+    selectError = null;
+  }
+
+  async function select(profileId: string, model = "") {
+    selecting = true;
+    selectError = null;
+    try {
+      await api.selectModel(profileId, model.trim() || undefined);
+      closePicker();
+      await load();
+    } catch (e) {
+      selectError =
+        e instanceof ApiError
+          ? `Could not select (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+          : "Could not select";
+    } finally {
+      selecting = false;
+    }
+  }
+
+  // ── Advisor model (web-app task 2) ───────────────────────────────────
+  // The profile a local model may consult through the governed consult_advisor
+  // tool. Choosing one grants nothing: the consult is gated by the
+  // advisor_model_runtime capability, its decision mode, and provider policy.
+  let advisorChoice = $state("");
+  let advisorSaving = $state(false);
+  let advisorError = $state<string | null>(null);
+  let advisorSaved = $state(false);
+
+  // Only profiles with a concrete model can advise (fail-closed server-side too).
+  const advisorCandidates = $derived(
+    (models?.profiles ?? []).filter((p) => p.model !== "<model>"),
+  );
+  const advisorDirty = $derived(
+    models !== null && advisorChoice !== (models.advisor_profile_id ?? ""),
+  );
+
+  async function saveAdvisor() {
+    advisorSaving = true;
+    advisorError = null;
+    advisorSaved = false;
+    try {
+      const result = await api.setModelAdvisor(advisorChoice || null);
+      if (models !== null) {
+        models = { ...models, advisor_profile_id: result.advisor_profile_id };
+      }
+      advisorChoice = result.advisor_profile_id ?? "";
+      advisorSaved = true;
+    } catch (e) {
+      advisorError =
+        e instanceof ApiError
+          ? `Could not save (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+          : "Could not save";
+    } finally {
+      advisorSaving = false;
+    }
+  }
+
+  function pickerNote(list: ProviderModelList): string {
+    switch (list.status) {
+      case "policy_denied":
+        return "Model list denied by provider policy — enable the provider's gate first. You can still type a model id.";
+      case "unsupported":
+        return "This provider does not support model listing — type a model id.";
+      default:
+        return "Provider unreachable — type a model id if you know it.";
     }
   }
 
@@ -103,8 +206,9 @@
 <div class="head-row">
   <p class="page-lead">
     The model profiles Raiker can talk to. The choice of backend belongs to you — local, home-lab,
-    or hosted — and there is never a silent fallback between them. Selection happens in the terminal
-    client (<code>/model use …</code>) or per prompt in Chat → Options.
+    or hosted — and there is never a silent fallback between them. Select a provider here (and,
+    where the provider serves several, the exact model), per prompt in Chat → Options, or in the
+    terminal client (<code>/model use …</code>).
   </p>
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh models">
     <Icon name="refresh" size={15} />
@@ -164,9 +268,79 @@
               </span>
             {/if}
           </div>
+
+          <div class="select-row">
+            {#if !p.selected && p.model !== "<model>"}
+              <button
+                type="button"
+                class="btn btn-sm"
+                onclick={() => void select(p.profile_id)}
+                disabled={selecting}
+              >
+                Select
+              </button>
+            {/if}
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onclick={() => void openPicker(p.profile_id)}
+              aria-expanded={pickerFor === p.profile_id}
+            >
+              {p.model === "<model>" ? "Choose model…" : "Change model…"}
+            </button>
+          </div>
+
+          {#if pickerFor === p.profile_id}
+            <div class="picker">
+              {#if pickerLoading}
+                <p class="picker-note" role="status">Loading models from {providerName(p.provider)}…</p>
+              {:else}
+                {#if pickerList !== null && pickerList.status === "available" && pickerList.models.length > 0}
+                  <select class="picker-select" bind:value={pickerChoice} aria-label="Available models">
+                    <option value="">Pick a model…</option>
+                    {#each pickerList.models as m (m)}
+                      <option value={m}>{m}</option>
+                    {/each}
+                  </select>
+                {:else}
+                  {#if pickerList !== null}
+                    <p class="picker-note">{pickerNote(pickerList)}</p>
+                  {:else}
+                    <p class="picker-note">Model list unavailable — type a model id.</p>
+                  {/if}
+                  <input
+                    class="picker-input"
+                    type="text"
+                    placeholder="model id"
+                    bind:value={pickerChoice}
+                    aria-label="Model id"
+                  />
+                {/if}
+                <div class="picker-actions">
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    onclick={() => void select(p.profile_id, pickerChoice)}
+                    disabled={selecting || pickerChoice.trim() === ""}
+                  >
+                    {selecting ? "Selecting…" : "Use model"}
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick={closePicker}>
+                    Cancel
+                  </button>
+                </div>
+                {#if selectError}
+                  <p class="error picker-error" role="alert">{selectError}</p>
+                {/if}
+              {/if}
+            </div>
+          {/if}
         </article>
       {/each}
     </div>
+    {#if selectError && pickerFor === null}
+      <p class="error" role="alert">{selectError}</p>
+    {/if}
   {/if}
 
   <section class="card fallback" aria-labelledby="fallback-h">
@@ -217,6 +391,39 @@
       {#if saveError}
         <span class="error" role="alert">{saveError}</span>
       {:else if saved && !dirty}
+        <span class="ok-note">Saved.</span>
+      {/if}
+    </div>
+  </section>
+
+  <section class="card advisor" aria-labelledby="advisor-h">
+    <h2 id="advisor-h">Advisor model</h2>
+    <p class="sub">
+      When you run a local model, it can consult one advisor — typically a hosted model — through
+      the governed <code>consult_advisor</code> tool. Picking an advisor grants nothing on its own:
+      the consult is gated by the <code>advisor_model_runtime</code> capability, its decision mode
+      (default <strong>ask</strong>, which withholds the consult), and the provider's own policy
+      (hosted gate, egress allowlist, API key) at call time. The advisor's answer is always treated
+      as untrusted data, and the question/answer never enter the audit log — only lengths do.
+    </p>
+    <div class="advisor-row">
+      <select bind:value={advisorChoice} aria-label="Advisor model profile">
+        <option value="">No advisor</option>
+        {#each advisorCandidates as p (p.profile_id)}
+          <option value={p.profile_id}>{providerName(p.provider)} — {p.model}</option>
+        {/each}
+      </select>
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        onclick={saveAdvisor}
+        disabled={!advisorDirty || advisorSaving}
+      >
+        {advisorSaving ? "Saving…" : "Save advisor"}
+      </button>
+      {#if advisorError}
+        <span class="error" role="alert">{advisorError}</span>
+      {:else if advisorSaved && !advisorDirty}
         <span class="ok-note">Saved.</span>
       {/if}
     </div>
@@ -316,6 +523,41 @@
     background: var(--warn-soft);
     color: var(--warn);
   }
+  .select-row {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+  }
+  .picker {
+    margin-top: 0.55rem;
+    border-top: 1px dashed var(--border);
+    padding-top: 0.55rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+  .picker-select,
+  .picker-input {
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--r-md);
+    border: 1px solid var(--neutral-border);
+    background: var(--surface-1);
+    color: var(--text-1);
+    max-width: 100%;
+  }
+  .picker-note {
+    font-size: 0.76rem;
+    color: var(--text-3);
+    margin: 0;
+  }
+  .picker-actions {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .picker-error {
+    font-size: 0.78rem;
+    margin: 0;
+  }
   .fallback {
     margin-top: var(--space-4);
   }
@@ -379,6 +621,26 @@
   .ok-note {
     color: var(--ok);
     font-size: 0.82rem;
+  }
+  .advisor {
+    margin-top: var(--space-4);
+  }
+  .advisor .sub {
+    margin-bottom: var(--space-3);
+  }
+  .advisor-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .advisor-row select {
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--r-md);
+    border: 1px solid var(--neutral-border);
+    background: var(--surface-1);
+    color: var(--text-1);
+    max-width: 22rem;
   }
   .gate-status {
     margin-top: var(--space-4);

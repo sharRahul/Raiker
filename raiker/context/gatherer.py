@@ -63,6 +63,7 @@ class ContextGatherer:
         session_id: str,
         turn_id: str,
         prompt_text: str,
+        attachments: list[dict[str, object]] | None = None,
         max_items: int = 20,
         max_chars: int = 12000,
     ) -> ContextBundle:
@@ -84,6 +85,9 @@ class ContextGatherer:
 
         candidates: list[ContextItem] = []
         for source_type in PRIORITY_ORDER:
+            if source_type == "attachment":
+                candidates.extend(self._attachment_items(root, attachments))
+                continue
             builder = builders.get(source_type)
             if builder is None:
                 continue
@@ -215,6 +219,116 @@ class ContextGatherer:
             metadata=metadata or {},
             token_estimate=_token_estimate(redacted),
         )
+
+    # Maximum path attachments honoured per turn (the rest are dropped with an
+    # honest note). Attachment content is still capped per item and budgeted
+    # like every other context item.
+    MAX_ATTACHMENTS = 8
+
+    def _attachment_items(
+        self, root: Path, attachments: list[dict[str, object]] | None
+    ) -> list[ContextItem]:
+        """User-attached workspace paths as bounded, trust-labelled context items.
+
+        Web-app task 3 (path attachments): each ``{"type": "path", "path": …}``
+        entry is resolved through the same workspace-scoped filesystem layer the
+        read tools use — a path outside the workspace fails closed with an
+        honest denial item and **no content**. Files become bounded text items,
+        directories become listings; missing paths and unsupported attachment
+        types are reported honestly rather than silently dropped. Every item is
+        labelled ``untrusted_external``: attachment content is data, never
+        instructions.
+        """
+        from raiker.tools.filesystem import (
+            FilesystemSafetyError,
+            list_directory,
+            read_file,
+        )
+
+        items: list[ContextItem] = []
+        for entry in (attachments or [])[: self.MAX_ATTACHMENTS]:
+            kind = str(entry.get("type", ""))
+            raw_path = str(entry.get("path", "")).strip()
+            title = f"Attachment: {raw_path or '(missing path)'}"
+
+            def denied(reason: str, note: str, *, t: str = title, p: str = raw_path) -> ContextItem:
+                return self._make_item(
+                    source_type="attachment",
+                    trust_level="untrusted_external",
+                    sensitivity="unknown",
+                    provenance={"origin": "user_attachment", "path": p},
+                    title=t,
+                    content=note,
+                    metadata={"attachment_status": reason, "path": p},
+                )
+
+            if kind != "path":
+                items.append(denied(
+                    f"unsupported_type:{kind or 'missing'}",
+                    "(attachment not included: only workspace path attachments are supported in this slice)",
+                ))
+                continue
+            if not raw_path:
+                items.append(denied("missing_path", "(attachment not included: no path given)"))
+                continue
+            try:
+                result = read_file(root, raw_path)
+                if result.get("status") != "success" and result.get("error", {}).get("type") == "not_file":
+                    result = list_directory(root, raw_path)
+            except FilesystemSafetyError:
+                # Fail closed: never read or echo anything from outside the workspace.
+                items.append(denied(
+                    "denied_outside_workspace",
+                    "(attachment denied: path is outside the workspace — fail closed)",
+                ))
+                continue
+            except Exception:  # noqa: BLE001 — a bad attachment must never break gathering
+                items.append(denied("read_failed", "(attachment not included: read failed)"))
+                continue
+
+            if result.get("status") != "success":
+                reason = str(result.get("error", {}).get("type", "read_failed"))
+                items.append(denied(reason, f"(attachment not included: {reason})"))
+                continue
+            if "entries" in result:
+                entries = [str(e) for e in result.get("entries", [])]
+                content = "Directory listing:\n" + "\n".join(entries[:200])
+                metadata: dict[str, object] = {
+                    "attachment_status": "included",
+                    "path": raw_path,
+                    "kind": "directory",
+                    "entry_count": len(entries),
+                }
+            else:
+                content = str(result.get("text", ""))
+                metadata = {
+                    "attachment_status": "included",
+                    "path": raw_path,
+                    "kind": "file",
+                    "char_length": len(content),
+                    "truncated_to_item_cap": len(content) > self.config.max_item_chars,
+                }
+            items.append(self._make_item(
+                source_type="attachment",
+                trust_level="untrusted_external",
+                sensitivity="unknown",
+                provenance={"origin": "user_attachment", "path": raw_path},
+                title=title,
+                content=content,
+                metadata=metadata,
+            ))
+        dropped = len(attachments or []) - min(len(attachments or []), self.MAX_ATTACHMENTS)
+        if dropped > 0:
+            items.append(self._make_item(
+                source_type="attachment",
+                trust_level="untrusted_external",
+                sensitivity="unknown",
+                provenance={"origin": "user_attachment", "path": ""},
+                title="Attachments dropped",
+                content=f"({dropped} attachment(s) dropped: at most {self.MAX_ATTACHMENTS} per turn)",
+                metadata={"attachment_status": "dropped_over_limit", "dropped": dropped},
+            ))
+        return items
 
     def _current_prompt(self, root: Path, prompt_text: str) -> ContextItem:
         return self._make_item(

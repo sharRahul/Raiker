@@ -23,12 +23,12 @@ RuntimeAuthority, and append-only audit log as the terminal client.
 
 | Page | What it covers |
 | --- | --- |
-| Chat | Streaming governed turns (SSE), per-prompt options (model profile, planning, tool budget), inline needs-approval hand-off |
+| Chat | Streaming governed turns (SSE), per-prompt options (provider + model picked from the provider's live catalogue, planning, tool budget), workspace path attachments (bounded, untrusted-labelled, workspace-scoped fail-closed), inline needs-approval hand-off |
 | Approvals | Pending/approved/denied inbox, redacted diff/argument previews, metadata-only resolution |
 | Tasks | Active tasks with progress + safe-boundary stop, task history |
 | Sessions | Session browser → turns → per-turn governed events |
 | Capabilities | All capability gates (per phase), friendly labels, gate enable/disable with step-up (reason, Tier-2 confirmation token, threat ack), per-capability decision modes (`ask`/`allow`/`auto`/`deny`) |
-| Models | Model profiles and selection status, hosted/private gate + egress allowlist posture (read-only; no keys, no allowlist values) |
+| Models | Model profiles with provider + model selection (each provider's model catalogue fetched on demand, gate-manager only writes), advisor-model picker for local-model turns, hosted/private gate + egress allowlist posture (no keys, no allowlist values) |
 | Checkpoints | Rewind metadata per session (restore flags are metadata only) |
 | Audit log | The append-only event record with session/type filters |
 | Diagnostics | Readiness checks, configuration gaps, counts, config-derived provider status |

@@ -25,6 +25,9 @@ class StaticPolicyConfig:
                 "memory_list",
                 "memory_get",
                 "vector_get",
+                # The consult itself is gated inside the tool (advisor gate +
+                # decision mode + provider policy); the proposal is read-shaped.
+                "consult_advisor",
                 "user_create",
                 "user_deactivate",
                 "role_create",
@@ -44,7 +47,8 @@ class StaticPolicyConfig:
             "plugin_runtime_cap", "plugin_sandboxed_runtime_cap",
             "external_channel_runtime", "channel_approval_relay",
             "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
-            "hosted_model_runtime", "private_network_model_runtime", "scheduled_routines",
+            "hosted_model_runtime", "private_network_model_runtime", "advisor_model_runtime",
+            "scheduled_routines",
             "subagents", "multi_agent_teams",
             "email_runtime", "calendar_runtime", "reminder_runtime",
             "finance_runtime", "investment_runtime", "medical_runtime",

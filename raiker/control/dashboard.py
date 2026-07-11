@@ -12,9 +12,16 @@ from raiker.approval_previews import redact_secret_like_text
 from raiker.control.dtos import ControlResult
 from raiker.control.service import RuntimeControlService
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
-from raiker.models.policy_state import HOSTED_MODEL_GATE, PRIVATE_NETWORK_MODEL_GATE
-from raiker.models.registry import ModelProfileRegistry
-from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
+from raiker.models.exceptions import ModelProviderError, ProviderPolicyError, safe_error
+from raiker.models.factory import ModelProviderFactory
+from raiker.models.policy_state import (
+    HOSTED_MODEL_GATE,
+    PRIVATE_NETWORK_MODEL_GATE,
+    provider_runtime_policy_from_gates,
+)
+from raiker.models.registry import ModelProfileRegistry, profile_with_model
+from raiker.models.router import ModelRouter
+from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 from raiker.runtime.authority.models import PrincipalType
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
 from raiker.storage.sqlite import SQLiteStore
@@ -144,6 +151,31 @@ class ModelProfileView:
 
 
 @dataclass(frozen=True)
+class ProviderModelListView:
+    """On-demand, user-initiated listing of the models a provider serves.
+
+    ``status`` is honest: "available" only when the provider actually answered;
+    policy denials and unreachable/unsupported backends return an empty list —
+    the view never fabricates model names.
+    """
+
+    profile_id: str
+    provider: str
+    status: str  # "available" | "policy_denied" | "unsupported" | "unavailable"
+    reason_code: str | None
+    models: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "profile_id": self.profile_id,
+            "provider": self.provider,
+            "status": self.status,
+            "reason_code": self.reason_code,
+            "models": list(self.models),
+        }
+
+
+@dataclass(frozen=True)
 class ModelsView:
     profiles: tuple[ModelProfileView, ...]
     current_profile_id: str | None
@@ -157,11 +189,24 @@ class ModelsView:
     fallback_sequence: tuple[str, ...] = ()
     # The runtime never silently falls back to hosted providers; hosted runtime is not enabled.
     no_silent_hosted_fallback: bool = True
+    # Concrete model bound by the current selection (the persisted per-profile
+    # model override when present, else the selected profile's own model).
+    # None when nothing is selected or the selection is an unresolved placeholder.
+    current_model: str | None = None
+    # User-owned advisor model (web-app task 2): the profile a local model may
+    # consult through the governed `consult_advisor` tool. Persisting it grants
+    # nothing — the consult is gated by advisor_model_runtime + decision mode +
+    # provider policy at call time.
+    advisor_profile_id: str | None = None
+    advisor_model_gate_state: str = "unknown"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "profiles": [p.to_dict() for p in self.profiles],
             "current_profile_id": self.current_profile_id,
+            "current_model": self.current_model,
+            "advisor_profile_id": self.advisor_profile_id,
+            "advisor_model_gate_state": self.advisor_model_gate_state,
             "hosted_model_gate_state": self.hosted_model_gate_state,
             "private_network_model_gate_state": self.private_network_model_gate_state,
             "model_egress_allowlist_configured": self.model_egress_allowlist_configured,
@@ -351,13 +396,18 @@ class DashboardService:
         registry = ModelProfileRegistry.load()
         state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
         current = state.profile_id if state is not None else None
+        # The persisted per-profile model override (e.g. an Ollama/OpenAI model
+        # picked at selection time) is what the runtime actually binds, so the
+        # selected profile card shows it instead of the profile's placeholder.
+        override = state.model if state is not None and state.model else None
         hosted_gate = self.control.get_capability_gate(HOSTED_MODEL_GATE)
         private_gate = self.control.get_capability_gate(PRIVATE_NETWORK_MODEL_GATE)
+        advisor_gate = self.control.get_capability_gate("advisor_model_runtime")
         profiles = tuple(
             ModelProfileView(
                 profile_id=p.profile_id,
                 provider=p.provider,
-                model=p.model,
+                model=(override if override and p.profile_id == current else p.model),
                 default_state=p.default_state,
                 local_only=p.local_only,
                 requires_network=p.requires_network,
@@ -387,7 +437,24 @@ class DashboardService:
             fallback_sequence=tuple(
                 self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
             ),
+            current_model=self._current_model(registry, state),
+            advisor_profile_id=self.store.load_model_advisor(TERMINAL_MODEL_SESSION_ID),
+            advisor_model_gate_state=advisor_gate.state if advisor_gate is not None else "unknown",
         )
+
+    @staticmethod
+    def _current_model(registry: ModelProfileRegistry, state: ModelSessionState | None) -> str | None:
+        """The concrete model the current selection binds, or None."""
+        if state is None:
+            return None
+        try:
+            profile = registry.resolve_profile_id(state.profile_id)
+        except Exception:  # noqa: BLE001 — a stale selection must not break the read
+            return None
+        effective = state.model or profile.model
+        if not effective or "<" in effective:
+            return None
+        return effective
 
     def set_model_fallback_sequence(
         self, profile_ids: list[str], acting_principal_id: str | None
@@ -418,6 +485,179 @@ class DashboardService:
                 cleaned.append(profile_id)
         self.store.save_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID, cleaned)
         return ControlResult(ok=True, data={"fallback_sequence": cleaned})
+
+    def set_model_advisor(
+        self, profile_id: str | None, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Persist the user-owned advisor model profile (human gate-manager only).
+
+        ``None``/empty clears the advisor. Only known, non-test profiles with a
+        concrete model are accepted — placeholder-``<model>`` profiles fail
+        closed (pick a concrete model for the profile first). Persisting the
+        advisor never enables anything: the consult path is gated by
+        ``advisor_model_runtime``, its decision mode, and provider policy.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if not self.control._is_gate_manager(principal):  # noqa: SLF001
+            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        cleaned = (profile_id or "").strip()
+        if not cleaned:
+            self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, None)
+            return ControlResult(ok=True, data={"advisor_profile_id": None})
+        registry = ModelProfileRegistry.load()
+        try:
+            profile = registry.resolve_profile_id(cleaned)
+        except Exception:  # noqa: BLE001 — unknown profile fails closed
+            return ControlResult(ok=False, reason_code=f"unknown_profile:{cleaned}")
+        if bool(profile.raw.get("test_only", False)):
+            return ControlResult(ok=False, reason_code=f"test_profile_not_allowed:{cleaned}")
+        if not profile.model or "<" in profile.model:
+            return ControlResult(ok=False, reason_code=f"model_required_for_profile:{cleaned}")
+        self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, profile.profile_id)
+        return ControlResult(ok=True, data={"advisor_profile_id": profile.profile_id})
+
+    async def list_provider_models(self, profile_id: str) -> ProviderModelListView | None:
+        """List the models a provider serves, on explicit user demand.
+
+        Returns None for unknown/test-only profiles (the route 404s). This is the
+        only web read that touches the network, and only because the user asked
+        for this provider's catalogue; provider policy (gates, egress allowlist,
+        API key) is enforced by the provider factory exactly as for a chat call,
+        so a policy-denied provider is never contacted. On any failure the list
+        is empty with an honest status — model names are never fabricated.
+        """
+        registry = ModelProfileRegistry.load()
+        try:
+            profile = registry.resolve_profile_id(profile_id)
+        except Exception:  # noqa: BLE001 — unknown profile fails closed
+            return None
+        if bool(profile.raw.get("test_only", False)):
+            return None
+        router = ModelRouter(
+            registry, runtime_policy=provider_runtime_policy_from_gates(self.store)
+        )
+        try:
+            models = await router.alist_models_for_profile(profile)
+        except ProviderPolicyError as exc:
+            return ProviderModelListView(
+                profile_id=profile.profile_id,
+                provider=profile.provider,
+                status="policy_denied",
+                reason_code=safe_error(str(exc)),
+                models=(),
+            )
+        except ModelProviderError as exc:
+            unsupported = "unsupported" in str(exc)
+            return ProviderModelListView(
+                profile_id=profile.profile_id,
+                provider=profile.provider,
+                status="unsupported" if unsupported else "unavailable",
+                reason_code="model_listing_unsupported" if unsupported else "provider_unreachable",
+                models=(),
+            )
+        except Exception as exc:  # noqa: BLE001 — network/parse failures fail closed
+            return ProviderModelListView(
+                profile_id=profile.profile_id,
+                provider=profile.provider,
+                status="unavailable",
+                reason_code=safe_error(type(exc).__name__),
+                models=(),
+            )
+        return ProviderModelListView(
+            profile_id=profile.profile_id,
+            provider=profile.provider,
+            status="available",
+            reason_code=None,
+            models=tuple(m.id for m in models),
+        )
+
+    async def set_model_selection(
+        self, profile_id: str, model: str | None, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Persist the operator's model selection (human gate-manager only).
+
+        Mirrors the CLI ``/model use``: the effective profile (concrete model +
+        endpoint + provider policy) is validated by the provider factory without
+        connecting, so a hosted provider whose gate/egress/key is missing fails
+        closed here instead of at turn time. Placeholder profiles require an
+        explicit concrete model.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if not self.control._is_gate_manager(principal):  # noqa: SLF001
+            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        registry = ModelProfileRegistry.load()
+        try:
+            profile = registry.resolve_profile_id(profile_id)
+        except Exception:  # noqa: BLE001 — unknown profile fails closed
+            return ControlResult(ok=False, reason_code=f"unknown_profile:{profile_id}")
+        if bool(profile.raw.get("test_only", False)):
+            return ControlResult(ok=False, reason_code=f"test_profile_not_allowed:{profile_id}")
+        resolved_model = (model or "").strip() or profile.model
+        if not resolved_model or "<" in resolved_model:
+            return ControlResult(ok=False, reason_code=f"model_required_for_profile:{profile_id}")
+        effective = (
+            profile
+            if resolved_model == profile.model
+            else profile_with_model(profile, resolved_model)
+        )
+        try:
+            validator = ModelProviderFactory(
+                policy=provider_runtime_policy_from_gates(self.store)
+            ).create(effective)
+        except Exception as exc:  # noqa: BLE001 — provider policy failures fail closed
+            self._append_model_event(
+                "model_provider_rejected_by_policy",
+                {
+                    "profile_id": profile.profile_id,
+                    "provider": profile.provider,
+                    "model": resolved_model,
+                    "reason": safe_error(str(exc)),
+                },
+            )
+            return ControlResult(ok=False, reason_code=safe_error(str(exc)))
+        aclose = getattr(validator, "aclose", None)
+        if aclose is not None:
+            await aclose()
+        self.store.save_model_session_state(
+            ModelSessionState(
+                session_id=TERMINAL_MODEL_SESSION_ID,
+                profile_id=profile.profile_id,
+                model=(None if resolved_model == profile.model else resolved_model),
+            )
+        )
+        self._append_model_event(
+            "model_profile_selected",
+            {
+                "profile_id": profile.profile_id,
+                "provider": profile.provider,
+                "model": profile.model,
+                "endpoint_kind": profile.raw.get("endpoint_kind", "unknown"),
+                "resolved_model": resolved_model,
+            },
+        )
+        return ControlResult(
+            ok=True, data={"profile_id": profile.profile_id, "model": resolved_model}
+        )
+
+    def _append_model_event(self, event_type: str, payload: dict[str, Any]) -> None:
+        from raiker.contracts.models import ClientMetadata
+        from raiker.events.types import make_event
+        from raiker.events.writer import EventLogWriter
+
+        EventLogWriter(self.store).append(
+            make_event(
+                session_id=TERMINAL_MODEL_SESSION_ID,
+                turn_id=None,
+                event_type=event_type,
+                actor="web_ui",
+                payload=payload,
+                client=ClientMetadata(type="web_ui", name="raiker-web", version="0.0.0"),
+            )
+        )
 
     @staticmethod
     def _runtime_gate_for_profile(endpoint_kind: str) -> str | None:

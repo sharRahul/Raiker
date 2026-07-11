@@ -14,6 +14,7 @@ from raiker.hooks.dispatcher import HookDispatcher
 from raiker.memory.governance import GovernedMemoryService
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tools.advisor_tools import consult_advisor
 from raiker.tools.filesystem import (
     FilesystemSafetyError,
     diff_files,
@@ -30,6 +31,12 @@ from raiker.tools.memory_tools import (
 )
 from raiker.tools.search import glob, grep
 from raiker.tools.vector_tools import vector_get
+
+# Tools whose arguments/results are scrubbed to metadata before entering event
+# payloads or the stored tool-action record. The advisor question/answer flow
+# only between the models (that is the tool's purpose); the audit trail records
+# lengths and profile metadata, never the text.
+_METADATA_ONLY_TOOLS = frozenset({"consult_advisor"})
 
 
 class ToolBroker:
@@ -112,6 +119,11 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("vector_id", "")),
             ),
+            "consult_advisor": lambda args: consult_advisor(
+                self.workspace_root,
+                str(args.get("question", "")),
+                store=self.store,
+            ),
         }
 
     @staticmethod
@@ -128,9 +140,34 @@ class ToolBroker:
         return value
 
     @classmethod
+    def _event_safe_arguments(cls, action: ToolAction) -> dict[str, Any]:
+        """Arguments as they may appear in events / stored records.
+
+        Metadata-only tools replace their content-bearing arguments with
+        lengths; everything else is secret-redacted verbatim.
+        """
+        if action.tool_name in _METADATA_ONLY_TOOLS:
+            return {
+                f"{key}_length": len(str(value))
+                for key, value in action.arguments.items()
+            }
+        return cls._redact_value(action.arguments)
+
+    @classmethod
+    def _event_safe_result_payload(cls, result: ToolResult) -> dict[str, Any]:
+        """Result payload for events: metadata-only tools drop content fields."""
+        payload = result.to_dict()
+        if result.tool_name in _METADATA_ONLY_TOOLS and isinstance(payload.get("output"), dict):
+            output = dict(payload["output"])
+            output.pop("answer", None)
+            output["content_redacted"] = True
+            payload["output"] = output
+        return payload
+
+    @classmethod
     def _sanitized_action_payload(cls, action: ToolAction) -> dict[str, Any]:
         payload = action.to_dict()
-        payload["arguments"] = cls._redact_value(action.arguments)
+        payload["arguments"] = cls._event_safe_arguments(action)
         return payload
 
     def _event(
@@ -252,7 +289,7 @@ class ToolBroker:
         sanitized_action = ToolAction(
             action_id=action.action_id,
             tool_name=action.tool_name,
-            arguments=self._redact_value(action.arguments),
+            arguments=self._event_safe_arguments(action),
             risk_level=action.risk_level,
             requires_approval=action.requires_approval,
             proposed_by=action.proposed_by,
@@ -338,7 +375,7 @@ class ToolBroker:
                     "approval_id": approval_id,
                     "action_id": action.action_id,
                     "tool_name": action.tool_name,
-                    "arguments_preview": self._redact_value(action.arguments),
+                    "arguments_preview": self._event_safe_arguments(action),
                     "proposal_preview": proposal_preview,
                     "risk_level": "high",
                     "policy_reasons": decision.reasons,
@@ -380,7 +417,7 @@ class ToolBroker:
                         "approval_id": approval_id,
                         "action_id": action.action_id,
                         "tool_name": action.tool_name,
-                        "exact_arguments": self._redact_value(action.arguments),
+                        "exact_arguments": self._event_safe_arguments(action),
                         "risk_level": "high",
                         "reasons": decision.reasons,
                         "proposal_preview": proposal_preview,
@@ -459,7 +496,7 @@ class ToolBroker:
             turn_id=turn_id,
             event_type="tool_completed" if result.status == "success" else "tool_failed",
             actor="tool_broker",
-            payload=result.to_dict(),
+            payload=self._event_safe_result_payload(result),
             client=client,
         )
         self._notify_hook(

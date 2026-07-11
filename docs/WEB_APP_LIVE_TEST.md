@@ -37,6 +37,52 @@ cache accounting fields, and the streamed usage was captured and normalised into
 the event. To observe a non-zero `cache_read_tokens`, use a model/prefix over the
 minimum (Opus/Sonnet: ~1024; Haiku: ~2048) and send two turns in the same session.
 
+## Result — 2026-07-10 (Task 3: path attachments, local stub backend)
+
+The operator keys had expired by this round, so the model end of the turn ran
+against a **local OpenAI-compatible stub** on the llama.cpp profile's endpoint
+(`127.0.0.1:8080`) that answers based on what actually arrived in the request —
+an honest end-to-end probe of the served path (raiker-web → gateway → context
+gatherer → orchestrator → provider request) with no fabrication.
+
+| Check | Result |
+|---|---|
+| `POST /api/prompts` with `attachments: [{type:"path", path:"mission-brief.txt"}]` | ✅ turn completed; the model's request contained the file's content (stub echoed the codeword back) |
+| `context_gathered` event lists the `attachment` source | ✅ |
+| Outside-workspace attachment (`/etc/passwd`) | ✅ denial note reached the model, **no file content did** (checked for distinctive passwd markers) |
+| Invalid attachment shape (`type: "upload"`) | ✅ prompt rejected before a turn starts (`invalid_attachment_type`) |
+| Browser: attach row adds a chip; sent bubble shows the attachment chip; input clears | ✅ |
+| Browser: Models "Advisor model" section renders with the persisted advisor | ✅ `anthropic-hosted` |
+| Browser console errors | ✅ 0 |
+
+## Result — 2026-07-10 (Task 2: advisor model, hosted Anthropic)
+
+| Check | Result |
+|---|---|
+| `advisor_model_runtime` gate enabled via control plane (threat ack + token) | ✅ |
+| `PUT /api/model-advisor` persists `anthropic-hosted`; `GET /api/models` reflects it | ✅ |
+| Decision mode default `ask` withholds the consult (no provider contact) | ✅ `advisor_withheld_ask` |
+| With mode `allow`: `AdvisorService.consult` returns a real advisor answer | ✅ `claude-opus-4-8` answered; untrusted-data framing |
+| Brokered `consult_advisor` tool through PolicyEngine + ToolBroker | ✅ policy `allow`, tool `success`, real answer returned to the caller |
+| Durable event log is metadata-only (no question/answer text; lengths present) | ✅ verified against the session JSONL |
+| Provider policy re-checked per call (hosted gate off ⇒ denied before network) | ✅ `advisor_provider_denied:provider_requires_explicit_policy_approval` |
+
+## Result — 2026-07-10 (Task 7: provider model selection, hosted Anthropic)
+
+| Check | Result |
+|---|---|
+| `GET /api/models/anthropic-hosted/provider-models` returns the provider's live catalogue | ✅ 10 models (claude-sonnet-5, claude-fable-5, claude-opus-4-8, …, claude-haiku-4-5-20251001) |
+| Same endpoint with the hosted gate disabled | ✅ `status: policy_denied`, empty list, no network contact |
+| Same endpoint for an unreachable local provider (llama.cpp) | ✅ `status: unavailable`, empty list — never fabricated |
+| `PUT /api/model-selection` (`anthropic-hosted` + `claude-haiku-4-5-20251001`) | ✅ persisted; `GET /api/models` shows `current_model` + concrete model on the selected card |
+| Streamed turn binds the selected model | ✅ `model_request_started → model: claude-haiku-4-5-20251001` |
+| Per-turn override (`model_profile` + `model: claude-sonnet-4-6` on the prompt) | ✅ turn ran on `claude-sonnet-4-6`, exact answer returned |
+| Browser: Models card picker lists the 10 live models; "Use model" re-selects through the UI | ✅ |
+| Browser: Chat → Options → Provider populates a Model select from the live catalogue | ✅ 10 models |
+| Browser: unreachable provider shows honest manual-entry fallback | ✅ "Provider unreachable — type a model id if you know it." |
+| "Development preview" pill removed from the top bar | ✅ |
+| Browser console errors | ✅ 0 |
+
 ## Repeatable procedure
 
 1. **Bootstrap + enable the backend's gate** (human owner). For a hosted

@@ -24,7 +24,122 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 - **Web reads are read-only + rate-limit-aware** (120 req/min/IP). Prefer folding new read data into an existing endpoint over adding a fan-out.
 - **Secrets never surface.** API keys/allowlist values come from owner env, are never displayed, logged, or committed.
 
-## State as of 2026-07-10 (this session) — web-app feature tasks 1 & 6
+## State as of 2026-07-10 (later session, continued) — Task 3: path attachments
+
+**Task 3, paths-first sub-slice (DONE): chat attachments for file/folder paths.**
+A prompt can carry `attachments: [{type: "path", path: "<workspace path>"}]`
+(max 8). The context gatherer includes each as a bounded, trust-labelled
+context item — files become capped text, directories become listings — with
+`trust_level: untrusted_external` (data, never instructions) and priority just
+below the current prompt.
+- Fail-closed: paths resolve through the same workspace-scoped filesystem
+  layer as the read tools — outside the workspace yields an honest denial item
+  with **no content**; missing paths and unsupported attachment types are
+  reported honestly; invalid attachment shapes reject the prompt before a turn
+  starts (`_validated_attachments` in `routes_prompts.py`).
+- Web: the Chat composer was redesigned as a single clean card (user request,
+  modelled on claude.ai): a "+" button reveals the attach-path input; chips
+  show the **file name only** (full path in the tooltip; max 8, cleared on
+  send; sent turns keep their chips). The per-turn Planning / Provider / Model
+  controls sit as compact selects on the **right** of the card's bottom bar,
+  next to a **disabled mic placeholder** (future voice input — plan:
+  local transcription via whisper.cpp, governed like every other capability;
+  nothing is wired up yet). The tool-budget input was removed from the UI at
+  the user's request — the runtime still enforces its bounded per-turn
+  default (10) as the runaway-loop fail-safe; raising it is a deliberate
+  backend decision, not a hidden UI default.
+- Tests: `tests/test_chat_attachments.py` (15) + 1 web vitest.
+- **Remaining Task 3 sub-slices (not started):** uploaded images (needs a
+  governed attachment store + `supports_vision` capability) and office/pdf
+  text extraction — see the original scoping under "Remaining web-app tasks".
+
+## State as of 2026-07-10 (later session, continued) — Task 2: advisor model
+
+Implemented on the same branch (`claude/provider-model-selection-5ufga4`, PR
+#107) as a governed vertical slice, following the slice discipline.
+
+**Task 2 — advisor model for local-model turns (DONE).** A user running a local
+model can attach one advisor profile (typically hosted) that the local model
+consults through the brokered tool `consult_advisor(question)`.
+- **Capability `advisor_model_runtime`** (threat model
+  `docs/threat-models/advisor-model.md`): real executor
+  (`AdvisorModelRuntimeExecutor`, operation `consult`, metadata-only
+  artifacts), activation requires human gate-manager + threat-model ack +
+  confirmation token + `local_single_user_runtime`. In
+  `REAL_EXECUTOR_CAPABILITIES` / phase-gates tier 5 / `CAPABILITY_GATE_MAP` /
+  activation registry / policy `approval_required_actions`.
+- **Governance layering** (`raiker/runtime/advisor.py::AdvisorService`,
+  mirrors `RetrievalAugmentor`): gate disabled → fail closed; decision mode
+  default **`ask` withholds** (`auto` withholds too — off-machine prompt
+  content is never low-risk; `deny` blocks; only `allow` runs); no/unknown/
+  test-only/placeholder advisor → fail closed; then the consult goes through
+  `ModelRouter.achat` so the provider factory re-checks the hosted/private
+  gate + owner egress allowlist + env-only key per call.
+- **Tool**: `consult_advisor` in the ToolBroker + PolicyEngine read allowlist +
+  `_MODEL_EXPOSED_TOOLS` (advertised to the model; question required). Answer
+  returns as an untrusted-data block, capped 16k; question capped 8k. Broker
+  events/stored actions are scrubbed to metadata (`_METADATA_ONLY_TOOLS`) —
+  the question/answer never enter event payloads (lengths only).
+- **Persistence**: `model_advisor` table (migration `RAIKER-1005`) +
+  `save/load_model_advisor`.
+- **API**: `advisor_profile_id` + `advisor_model_gate_state` on
+  `GET /api/models`; `PUT /api/model-advisor` (gate-manager only; null clears;
+  unknown/test/placeholder profiles fail closed). Web: "Advisor model"
+  selector on Models (concrete-model profiles only) + governance copy.
+- Tests: `tests/test_advisor_model.py` (29: service governance matrix,
+  executor fail-closed + activation, broker metadata-only audit, API), +3 web
+  vitest. Suite: **1327 passed**; ruff/mypy clean; web lint/check/**78
+  vitest**/build green; all five validators pass.
+- **Live-verified (hosted Anthropic, operator key in process env only):** with
+  the advisor gate enabled (ack + token), decision mode `allow`, and
+  `anthropic-hosted` set as advisor, `AdvisorService.consult` returned a real
+  answer from `claude-opus-4-8`, and the **brokered `consult_advisor` path**
+  ran the same consult through PolicyEngine + ToolBroker — the durable event
+  log contained `question_length` but neither the question nor the answer
+  text (metadata-only audit verified live). This run also caught and fixed a
+  circular import (`broker → advisor_tools → runtime.authority → … → broker`)
+  that test-import ordering had masked: `advisor_tools` now imports the
+  service lazily at call time.
+
+## State as of 2026-07-10 (later session) — Task 7: provider model selection
+
+Implemented on branch `claude/provider-model-selection-5ufga4` as a full
+vertical slice (backend + API + web + tests + live verification).
+
+**Task 7 — select the provider's available models in Chat and Models (DONE).**
+- **Provider catalogue, on demand:** `GET /api/models/{profile_id}/provider-models`
+  calls the provider's own model-listing endpoint (reuses
+  `ModelRouter.alist_models_for_profile`, so gates/egress/key are enforced by the
+  provider factory *before* any network contact). Honest statuses: `available` |
+  `policy_denied` | `unsupported` | `unavailable` — failures return an empty
+  list, never fabricated names. This is the only web read that touches the
+  network, and only on explicit user demand (unknown/test profiles 404).
+- **Selection:** `PUT /api/model-selection` (`{profile_id, model?}`) persists the
+  same `ModelSessionState` the CLI `/model use` writes — human gate-manager only,
+  unknown/test profiles fail closed, placeholder profiles require a concrete
+  model, and the provider factory validates policy fail-closed before saving
+  (emits `model_profile_selected`). `GET /api/models` now returns `current_model`
+  and shows the concrete model on the selected profile card.
+- **Per-turn model:** `PromptOptions.model` (+ `PromptRequest.model`) lets a chat
+  turn pin a concrete model for the chosen profile; the gateway resolver
+  registers the concrete choice so the router resolves it (idempotent), and
+  provider policy is still enforced downstream.
+- **Web:** Models cards get Select / "Choose model…" (picker fetches the live
+  catalogue; manual model-id entry when the catalogue is unavailable). Chat →
+  Options gets a Provider select + a Model select populated from the catalogue.
+  The "Development preview" runtime-mode pill was removed from the top bar
+  (only an explicitly activated mode shows a badge).
+- Tests: `tests/test_api_model_selection.py` (14), +5 in
+  `tests/test_turn_model_binding.py`, +4 web vitest (ModelsView picker/select,
+  ChatView per-turn model). Suite: **1298 passed**; ruff/mypy clean; web
+  lint/check/**75 vitest**/build green; all five validators pass.
+- **Live-verified (hosted Anthropic, real key in server env only):** catalogue
+  listed 10 real models; selection via the new endpoint bound a streamed turn to
+  `claude-haiku-4-5-20251001`; a per-turn override ran `claude-sonnet-4-6`;
+  Chromium pass on both views with 0 console errors. Details in
+  `docs/WEB_APP_LIVE_TEST.md`.
+
+## State as of 2026-07-10 — web-app feature tasks 1 & 6
 
 Two of a six-task batch were implemented as full vertical slices (backend + API +
 web + tests) on branch `claude/raiker-web-app-features-8g8k5q`. Tasks 2–5 are
@@ -117,38 +232,14 @@ environmental missing-stub noise for pytest/fastapi/httpx); web `lint` +
 `svelte-check` + **70 vitest** + `build` green; all five `scripts/validate_*.py`
 pass.
 
-## Remaining web-app tasks (2–5) — build plan for the next session
+## Remaining web-app tasks (3-remainder, 4, 5) — build plan for the next session
 
 Follow the slice discipline at the bottom. Each is a governed vertical slice;
-do them one at a time, commit + push after each.
+do them one at a time, commit + push after each. (Tasks 1, 2, 6, 7 and the
+paths-first sub-slice of Task 3 are DONE — see the state sections above.)
 
-**Task 2 — advisor model for local-model turns.** Let a user running a *local*
-model attach a hosted "advisor" that the local model can consult (ref:
-Anthropic advisor tool, https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool).
-- Model it as a governed capability `advisor_model_runtime` (new gate, defaults
-  disabled; enabling needs the hosted/private egress path since the advisor is
-  typically a hosted provider). Persist the advisor profile id like the fallback
-  sequence (single-row settings table or reuse `model_session_state` shape).
-- Expose the advisor to the local model as a **tool** (`consult_advisor`)
-  registered in `ToolBroker` + PolicyEngine read allowlist, default decision
-  mode `ask`. The tool calls the advisor profile through `ModelRouter.achat`
-  (which re-checks egress/gate/key), returns the advisor's answer as an
-  untrusted-data block. Metadata-only events; advisor prompt/answer never leak
-  into event payloads.
-- Threat model `docs/threat-models/advisor-model.md`; API read on `GET /api/models`
-  (`advisor_profile_id`) + a `PUT /api/model-advisor` setter (gate-manager only);
-  web selector on the Models view. Tests: tool executes when allowed, fails
-  closed when the gate/egress/key is missing, decision-mode `ask` withholds.
-
-**Task 3 — chat attachments (images, docs, file/folder paths).** Let a prompt
-carry attachments: images, documents (docx/xlsx/csv/markdown/txt/pptx/pdf), and
-a file or folder *path*.
-- **Path attachments are the governed-cheap win:** they reuse the existing
-  read tools (`read_file`, `list_directory`, `glob`) through the broker/policy —
-  no new upload storage, workspace-scoped, already fail-closed on escape. Start
-  here: add an attachment list to `PromptPayload`/`PromptOptions`, and have the
-  context gatherer include the referenced path(s) as bounded, trust-labelled
-  context items (never as instructions).
+**Task 3 remainder — uploaded attachments (images, docs).** Path attachments
+are done; what remains:
 - **Uploaded files (images/docs):** need a governed local attachment store
   (new table + size/type allowlist + redaction), text extraction for docs
   (local-only libs; PDFs/office are heavier — scope carefully), and image blocks

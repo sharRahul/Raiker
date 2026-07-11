@@ -1,0 +1,17 @@
+{
+  "name": "Raiker",
+  "short_name": "Raiker",
+  "description": "A governed AI assistant, agent, and extensible agent platform.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eef2f7",
+  "theme_color": "#eef2f7",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -38,10 +38,16 @@ below the current prompt.
   reported honestly; invalid attachment shapes reject the prompt before a turn
   starts (`_validated_attachments` in `routes_prompts.py`).
 - Web: the Chat composer was redesigned as a single clean card (user request,
-  modelled on claude.ai): a "+" button reveals the attach-path input (chips
-  shown in-card, max 8, cleared on send; sent turns keep their chips), and the
-  per-turn Provider / Model / Planning / tool-budget controls sit as compact
-  selects at the bottom of the card — the separate "Options" panel is gone.
+  modelled on claude.ai): a "+" button reveals the attach-path input; chips
+  show the **file name only** (full path in the tooltip; max 8, cleared on
+  send; sent turns keep their chips). The per-turn Planning / Provider / Model
+  controls sit as compact selects on the **right** of the card's bottom bar,
+  next to a **disabled mic placeholder** (future voice input — plan:
+  local transcription via whisper.cpp, governed like every other capability;
+  nothing is wired up yet). The tool-budget input was removed from the UI at
+  the user's request — the runtime still enforces its bounded per-turn
+  default (10) as the runaway-loop fail-safe; raising it is a deliberate
+  backend decision, not a hidden UI default.
 - Tests: `tests/test_chat_attachments.py` (15) + 1 web vitest.
 - **Remaining Task 3 sub-slices (not started):** uploaded images (needs a
   governed attachment store + `supports_vision` capability) and office/pdf

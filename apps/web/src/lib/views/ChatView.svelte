@@ -32,7 +32,6 @@
   // live as compact controls at the bottom of the composer card.
   let modelProfile = $state("");
   let planningMode = $state("");
-  let maxToolCalls = $state("");
   let profiles = $state<ModelProfile[]>([]);
 
   // Per-turn model for the chosen profile. Populated on demand from the
@@ -62,6 +61,13 @@
 
   function removeAttachment(index: number) {
     attachments = attachments.filter((_, i) => i !== index);
+  }
+
+  // Chips show only the file/folder name; the full workspace path stays in the
+  // tooltip and is what actually rides the prompt.
+  function fileName(path: string): string {
+    const parts = path.split("/").filter(Boolean);
+    return parts.length > 0 ? parts[parts.length - 1] : path;
   }
 
   async function onProfileChange() {
@@ -166,7 +172,6 @@
               ? sentAttachments.map((path) => ({ type: "path" as const, path }))
               : undefined,
           planning_mode: planningMode || undefined,
-          max_tool_calls: maxToolCalls !== "" ? Number(maxToolCalls) : undefined,
         },
         (event) => {
           if (event.kind === "final" && event.response !== null) {
@@ -228,7 +233,10 @@
           {#if turn.attachments.length > 0}
             <p class="turn-attachments">
               {#each turn.attachments as path (path)}
-                <span class="attach-chip" title="Attached workspace path"><code>{path}</code></span>
+                <span class="attach-chip" title={path}>
+                  <Icon name="file" size={13} />
+                  {fileName(path)}
+                </span>
               {/each}
             </p>
           {/if}
@@ -331,8 +339,9 @@
       {#if attachments.length > 0}
         <div class="attach-chips">
           {#each attachments as path, i (path)}
-            <span class="attach-chip">
-              <code>{path}</code>
+            <span class="attach-chip" title={path}>
+              <Icon name="file" size={13} />
+              {fileName(path)}
               <button
                 type="button"
                 class="attach-remove"
@@ -388,17 +397,37 @@
       <div class="composer-bar">
         <button
           type="button"
-          class="plus-btn"
+          class="round-btn"
           onclick={() => (showAttach = !showAttach)}
           aria-label="Add attachment"
           aria-expanded={showAttach}
-          title="Attach a workspace file or folder path"
+          title="Attach a workspace file or folder"
           disabled={streaming}
         >
           +
         </button>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          onclick={newConversation}
+          disabled={streaming || turns.length === 0}
+        >
+          New chat
+        </button>
 
-        <div class="bar-controls">
+        <div class="bar-right">
+          <select
+            class="bar-select"
+            bind:value={planningMode}
+            disabled={streaming}
+            aria-label="Planning"
+            title="Planning mode for this turn"
+          >
+            <option value="">Planning: auto</option>
+            <option value="always">Always plan</option>
+            <option value="never">Never plan</option>
+          </select>
+
           <select
             class="bar-select"
             bind:value={modelProfile}
@@ -448,40 +477,16 @@
             {/if}
           {/if}
 
-          <select
-            class="bar-select"
-            bind:value={planningMode}
-            disabled={streaming}
-            aria-label="Planning"
-            title="Planning mode for this turn"
-          >
-            <option value="">Planning: auto</option>
-            <option value="always">Always plan</option>
-            <option value="never">Never plan</option>
-          </select>
-
-          <input
-            class="bar-input bar-tools"
-            type="number"
-            min="0"
-            max="50"
-            placeholder="10"
-            bind:value={maxToolCalls}
-            disabled={streaming}
-            aria-label="Max tool calls"
-            title="Tool-call budget for this turn"
-          />
-        </div>
-
-        <div class="bar-actions">
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
-            onclick={newConversation}
-            disabled={streaming || turns.length === 0}
+            class="round-btn"
+            disabled
+            aria-label="Voice input (coming soon)"
+            title="Voice input — planned: local transcription via whisper.cpp; not wired up yet"
           >
-            New chat
+            <Icon name="mic" size={15} />
           </button>
+
           <button
             type="submit"
             class="btn btn-primary send"
@@ -716,7 +721,7 @@
     padding-top: 0.5rem;
     flex-wrap: wrap;
   }
-  .plus-btn {
+  .round-btn {
     width: 1.9rem;
     height: 1.9rem;
     border-radius: 50%;
@@ -727,17 +732,27 @@
     line-height: 1;
     cursor: pointer;
     flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
-  .plus-btn:hover:not(:disabled) {
+  .round-btn:hover:not(:disabled) {
     border-color: var(--accent-border);
     color: var(--accent);
   }
-  .bar-controls {
+  .round-btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  /* Model/planning controls sit on the right of the bar, like the reference. */
+  .bar-right {
+    margin-left: auto;
     display: flex;
     align-items: center;
     gap: 0.35rem;
     flex-wrap: wrap;
     min-width: 0;
+    justify-content: flex-end;
   }
   .bar-select,
   .bar-input {
@@ -756,24 +771,15 @@
   }
   .bar-select:focus-visible,
   .bar-input:focus-visible,
-  .plus-btn:focus-visible {
+  .round-btn:focus-visible {
     outline: 2px solid var(--focus-ring);
   }
   .bar-input {
     border: 1px dashed var(--neutral-border);
   }
-  .bar-tools {
-    width: 3.4rem;
-  }
   .bar-note {
     font-size: 0.76rem;
     color: var(--text-3);
-  }
-  .bar-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
   }
   .model-note {
     font-size: 0.74rem;

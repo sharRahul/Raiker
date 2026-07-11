@@ -213,7 +213,9 @@ describe("ChatView streaming transcript", () => {
     const attach = screen.getByLabelText("Attachment path") as HTMLInputElement;
     await fireEvent.input(attach, { target: { value: "docs/HANDOFF.md" } });
     await fireEvent.click(screen.getByText("Attach"));
-    expect(screen.getByText("docs/HANDOFF.md")).toBeInTheDocument();
+    // The chip shows only the file name; the full path stays in the tooltip.
+    expect(screen.getByText("HANDOFF.md")).toBeInTheDocument();
+    expect(screen.queryByText("docs/HANDOFF.md")).not.toBeInTheDocument();
 
     const box = screen.getByRole("textbox", { name: /prompt/i });
     await fireEvent.input(box, { target: { value: "summarize the attachment" } });

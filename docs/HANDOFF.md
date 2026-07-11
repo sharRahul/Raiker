@@ -68,11 +68,16 @@ Task 3 has no remaining sub-slices.
   `ruff check .` clean; mypy clean on changed sources (remaining output is the
   documented environmental missing-stub noise); web lint/check/**83 vitest**/
   build green; all five `scripts/validate_*.py` pass.
-- **Not live-verified against a provider** (marked `implemented`, not
-  `implemented_verified`): the upload→extract→gather→untrusted-text path is
-  exercised end to end in tests (including a real PDF and docx), but a governed
-  live turn feeding an uploaded document to a real model is still open (see
-  Standing next-work).
+- **Live-verified (marked `implemented_verified`).** 2026-07-11, hosted
+  Anthropic Haiku 4.5 with a 1-hour operator key (server env only): a real
+  2-page PDF and a real .docx uploaded through `POST /api/attachments` produced
+  correct Haiku answers from their extracted text (candidate name + role /
+  name + 13 yrs experience — facts that live only inside the files), and the
+  1.76 MB JPEG produced a correct vision answer (HAL Tejas cutaway). Bound to
+  `provider: anthropic, model: claude-haiku-4-5-20251001`; `attachment_image_included`
+  metadata-only (no image bytes in the log); through the API and the
+  Chromium-driven composer UI (0 console errors). Full table in
+  `docs/WEB_APP_LIVE_TEST.md` (2026-07-11 document section).
 
 ## Recent prior state (condensed — details in git history and IMPLEMENTATION_STATUS)
 
@@ -187,10 +192,10 @@ an ongoing piece of work: its own workspace subpath, sessions, checkpoints, and
 1. **Open hosted-provider live verification (evidence only).** `anthropic-hosted`
    is `implemented_verified`. `openai-hosted` / `gemini-hosted-openai-compatible`
    remain to verify with a governed live turn when operator keys are available
-   (this cloud session's egress proxy blocks those hosts). Add a **live vision
-   turn** (uploaded image → image block → real answer) and a **live document
-   turn** (uploaded text document → extracted untrusted context → real answer)
-   to the same checklist.
+   (this cloud session's egress proxy blocks those hosts). The **live vision
+   turn** and **live document turn** (image / PDF / docx → real answer) are both
+   done for hosted Anthropic (2026-07-11); repeat them for openai/gemini when
+   reachable.
 2. **Plugin runtime remainder (Tier 4).** In-process import isolation; image
    build/pull management for the sandboxed runtime + per-plugin network egress
    for the bare-subprocess runtime; plugin hooks/MCP/LSP/monitors/panels

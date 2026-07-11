@@ -23,7 +23,7 @@ RuntimeAuthority, and append-only audit log as the terminal client.
 
 | Page | What it covers |
 | --- | --- |
-| Chat | Streaming governed turns (SSE), per-prompt options (provider + model picked from the provider's live catalogue, planning, tool budget), inline needs-approval hand-off |
+| Chat | Streaming governed turns (SSE), per-prompt options (provider + model picked from the provider's live catalogue, planning, tool budget), workspace path attachments (bounded, untrusted-labelled, workspace-scoped fail-closed), inline needs-approval hand-off |
 | Approvals | Pending/approved/denied inbox, redacted diff/argument previews, metadata-only resolution |
 | Tasks | Active tasks with progress + safe-boundary stop, task history |
 | Sessions | Session browser → turns → per-turn governed events |

@@ -24,6 +24,26 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 - **Web reads are read-only + rate-limit-aware** (120 req/min/IP). Prefer folding new read data into an existing endpoint over adding a fan-out.
 - **Secrets never surface.** API keys/allowlist values come from owner env, are never displayed, logged, or committed.
 
+## State as of 2026-07-10 (later session, continued) — Task 3: path attachments
+
+**Task 3, paths-first sub-slice (DONE): chat attachments for file/folder paths.**
+A prompt can carry `attachments: [{type: "path", path: "<workspace path>"}]`
+(max 8). The context gatherer includes each as a bounded, trust-labelled
+context item — files become capped text, directories become listings — with
+`trust_level: untrusted_external` (data, never instructions) and priority just
+below the current prompt.
+- Fail-closed: paths resolve through the same workspace-scoped filesystem
+  layer as the read tools — outside the workspace yields an honest denial item
+  with **no content**; missing paths and unsupported attachment types are
+  reported honestly; invalid attachment shapes reject the prompt before a turn
+  starts (`_validated_attachments` in `routes_prompts.py`).
+- Web: attach-path row in the Chat composer (chips, max 8, cleared on send;
+  sent turns show their attachment chips).
+- Tests: `tests/test_chat_attachments.py` (15) + 1 web vitest.
+- **Remaining Task 3 sub-slices (not started):** uploaded images (needs a
+  governed attachment store + `supports_vision` capability) and office/pdf
+  text extraction — see the original scoping under "Remaining web-app tasks".
+
 ## State as of 2026-07-10 (later session, continued) — Task 2: advisor model
 
 Implemented on the same branch (`claude/provider-model-selection-5ufga4`, PR
@@ -203,38 +223,14 @@ environmental missing-stub noise for pytest/fastapi/httpx); web `lint` +
 `svelte-check` + **70 vitest** + `build` green; all five `scripts/validate_*.py`
 pass.
 
-## Remaining web-app tasks (2–5) — build plan for the next session
+## Remaining web-app tasks (3-remainder, 4, 5) — build plan for the next session
 
 Follow the slice discipline at the bottom. Each is a governed vertical slice;
-do them one at a time, commit + push after each.
+do them one at a time, commit + push after each. (Tasks 1, 2, 6, 7 and the
+paths-first sub-slice of Task 3 are DONE — see the state sections above.)
 
-**Task 2 — advisor model for local-model turns.** Let a user running a *local*
-model attach a hosted "advisor" that the local model can consult (ref:
-Anthropic advisor tool, https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool).
-- Model it as a governed capability `advisor_model_runtime` (new gate, defaults
-  disabled; enabling needs the hosted/private egress path since the advisor is
-  typically a hosted provider). Persist the advisor profile id like the fallback
-  sequence (single-row settings table or reuse `model_session_state` shape).
-- Expose the advisor to the local model as a **tool** (`consult_advisor`)
-  registered in `ToolBroker` + PolicyEngine read allowlist, default decision
-  mode `ask`. The tool calls the advisor profile through `ModelRouter.achat`
-  (which re-checks egress/gate/key), returns the advisor's answer as an
-  untrusted-data block. Metadata-only events; advisor prompt/answer never leak
-  into event payloads.
-- Threat model `docs/threat-models/advisor-model.md`; API read on `GET /api/models`
-  (`advisor_profile_id`) + a `PUT /api/model-advisor` setter (gate-manager only);
-  web selector on the Models view. Tests: tool executes when allowed, fails
-  closed when the gate/egress/key is missing, decision-mode `ask` withholds.
-
-**Task 3 — chat attachments (images, docs, file/folder paths).** Let a prompt
-carry attachments: images, documents (docx/xlsx/csv/markdown/txt/pptx/pdf), and
-a file or folder *path*.
-- **Path attachments are the governed-cheap win:** they reuse the existing
-  read tools (`read_file`, `list_directory`, `glob`) through the broker/policy —
-  no new upload storage, workspace-scoped, already fail-closed on escape. Start
-  here: add an attachment list to `PromptPayload`/`PromptOptions`, and have the
-  context gatherer include the referenced path(s) as bounded, trust-labelled
-  context items (never as instructions).
+**Task 3 remainder — uploaded attachments (images, docs).** Path attachments
+are done; what remains:
 - **Uploaded files (images/docs):** need a governed local attachment store
   (new table + size/type allowlist + redaction), text extraction for docs
   (local-only libs; PDFs/office are heavier — scope carefully), and image blocks

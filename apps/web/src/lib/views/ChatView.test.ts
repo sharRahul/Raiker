@@ -192,6 +192,37 @@ describe("ChatView streaming transcript", () => {
     expect(body.model).toBe("qwen2.5");
   });
 
+  it("attaches workspace paths and sends them with the prompt", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: finalResponse("OK"),
+        } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    const attach = screen.getByLabelText("Attachment path") as HTMLInputElement;
+    await fireEvent.input(attach, { target: { value: "docs/HANDOFF.md" } });
+    await fireEvent.click(screen.getByText("Attach"));
+    expect(screen.getByText("docs/HANDOFF.md")).toBeInTheDocument();
+
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "summarize the attachment" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledOnce());
+    const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(body.attachments).toEqual([{ type: "path", path: "docs/HANDOFF.md" }]);
+    // The sent turn shows the attachment chip; the composer input is cleared.
+    expect((screen.getByLabelText("Attachment path") as HTMLInputElement).value).toBe("");
+  });
+
   it("shows an honest error when the stream cannot be reached", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockRejectedValue(new Error("connection refused"));

@@ -383,6 +383,7 @@ class RuntimeOrchestrator:
             session_id=envelope.session_id,
             turn_id=envelope.turn_id,
             prompt_text=envelope.prompt.text,
+            attachments=envelope.prompt.attachments,
         )
         self._event(envelope, "context_gathered", bundle.event_payload())
 

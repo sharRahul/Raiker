@@ -266,6 +266,8 @@ export interface PromptRequestBody {
   model_profile?: string;
   model?: string;
   max_tool_calls?: number;
+  // Workspace path attachments for this prompt (this slice supports paths only).
+  attachments?: { type: "path"; path: string }[];
 }
 
 export interface InterruptRequestBody {

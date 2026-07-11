@@ -37,6 +37,24 @@ cache accounting fields, and the streamed usage was captured and normalised into
 the event. To observe a non-zero `cache_read_tokens`, use a model/prefix over the
 minimum (Opus/Sonnet: ~1024; Haiku: ~2048) and send two turns in the same session.
 
+## Result — 2026-07-10 (Task 3: path attachments, local stub backend)
+
+The operator keys had expired by this round, so the model end of the turn ran
+against a **local OpenAI-compatible stub** on the llama.cpp profile's endpoint
+(`127.0.0.1:8080`) that answers based on what actually arrived in the request —
+an honest end-to-end probe of the served path (raiker-web → gateway → context
+gatherer → orchestrator → provider request) with no fabrication.
+
+| Check | Result |
+|---|---|
+| `POST /api/prompts` with `attachments: [{type:"path", path:"mission-brief.txt"}]` | ✅ turn completed; the model's request contained the file's content (stub echoed the codeword back) |
+| `context_gathered` event lists the `attachment` source | ✅ |
+| Outside-workspace attachment (`/etc/passwd`) | ✅ denial note reached the model, **no file content did** (checked for distinctive passwd markers) |
+| Invalid attachment shape (`type: "upload"`) | ✅ prompt rejected before a turn starts (`invalid_attachment_type`) |
+| Browser: attach row adds a chip; sent bubble shows the attachment chip; input clears | ✅ |
+| Browser: Models "Advisor model" section renders with the persisted advisor | ✅ `anthropic-hosted` |
+| Browser console errors | ✅ 0 |
+
 ## Result — 2026-07-10 (Task 2: advisor model, hosted Anthropic)
 
 | Check | Result |

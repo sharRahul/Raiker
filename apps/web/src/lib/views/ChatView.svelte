@@ -13,6 +13,7 @@
   interface ChatTurn {
     id: number;
     prompt: string;
+    attachments: string[];
     events: StreamEvent[];
     response: AgentResponse | null;
     streaming: boolean;
@@ -42,6 +43,24 @@
   let loadingModels = $state(false);
 
   const chosenProfile = $derived(profiles.find((p) => p.profile_id === modelProfile) ?? null);
+
+  // Workspace path attachments for the next prompt (this slice supports paths
+  // only). Paths are resolved server-side inside the workspace — anything
+  // outside fails closed — and included as bounded, untrusted-labelled context.
+  const MAX_ATTACHMENTS = 8;
+  let attachments = $state<string[]>([]);
+  let attachInput = $state("");
+
+  function addAttachment() {
+    const path = attachInput.trim();
+    if (path === "" || attachments.includes(path) || attachments.length >= MAX_ATTACHMENTS) return;
+    attachments = [...attachments, path];
+    attachInput = "";
+  }
+
+  function removeAttachment(index: number) {
+    attachments = attachments.filter((_, i) => i !== index);
+  }
 
   async function onProfileChange() {
     modelChoice = "";
@@ -113,11 +132,13 @@
   async function submit() {
     const text = promptText.trim();
     if (text === "" || streaming) return;
+    const sentAttachments = [...attachments];
     turns = [
       ...turns,
       {
         id: nextId++,
         prompt: text,
+        attachments: sentAttachments,
         events: [],
         response: null,
         streaming: true,
@@ -128,6 +149,7 @@
     // bypass Svelte 5's signals and the transcript would never re-render.
     const turn = turns[turns.length - 1];
     promptText = "";
+    attachments = [];
     streaming = true;
     void scrollToEnd();
     try {
@@ -137,6 +159,10 @@
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
           model: modelChoice.trim() || undefined,
+          attachments:
+            sentAttachments.length > 0
+              ? sentAttachments.map((path) => ({ type: "path" as const, path }))
+              : undefined,
           planning_mode: planningMode || undefined,
           max_tool_calls: maxToolCalls !== "" ? Number(maxToolCalls) : undefined,
         },
@@ -197,6 +223,13 @@
       <div class="turn">
         <div class="bubble user">
           <p class="bubble-text">{turn.prompt}</p>
+          {#if turn.attachments.length > 0}
+            <p class="turn-attachments">
+              {#each turn.attachments as path (path)}
+                <span class="attach-chip" title="Attached workspace path"><code>{path}</code></span>
+              {/each}
+            </p>
+          {/if}
         </div>
 
         <div class="bubble agent">
@@ -378,6 +411,44 @@
         </div>
       </div>
     {/if}
+
+    <div class="attach-row">
+      {#each attachments as path, i (path)}
+        <span class="attach-chip">
+          <code>{path}</code>
+          <button
+            type="button"
+            class="attach-remove"
+            onclick={() => removeAttachment(i)}
+            aria-label={`Remove attachment ${path}`}
+          >
+            ×
+          </button>
+        </span>
+      {/each}
+      <input
+        class="input attach-input"
+        type="text"
+        placeholder="Attach a workspace file or folder path…"
+        bind:value={attachInput}
+        onkeydown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            addAttachment();
+          }
+        }}
+        disabled={streaming || attachments.length >= MAX_ATTACHMENTS}
+        aria-label="Attachment path"
+      />
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm"
+        onclick={addAttachment}
+        disabled={streaming || attachInput.trim() === "" || attachments.length >= MAX_ATTACHMENTS}
+      >
+        Attach
+      </button>
+    </div>
 
     <div class="composer-row">
       <label for="prompt-input" class="sr-only">Prompt</label>
@@ -609,6 +680,47 @@
     color: var(--text-3);
     margin: 0.25rem 0 0;
     max-width: 16rem;
+  }
+  .attach-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    padding-bottom: 0.45rem;
+  }
+  .attach-input {
+    flex: 1;
+    min-width: 14rem;
+    font-size: 0.8rem;
+  }
+  .attach-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.74rem;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--neutral-border);
+    background: var(--neutral-soft);
+    color: var(--text-2);
+    padding: 0.1rem 0.5rem;
+  }
+  .attach-remove {
+    border: none;
+    background: none;
+    color: var(--text-3);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0 0.1rem;
+    line-height: 1;
+  }
+  .attach-remove:hover {
+    color: var(--danger);
+  }
+  .turn-attachments {
+    margin: 0.4rem 0 0;
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
   }
   .composer-row {
     display: flex;

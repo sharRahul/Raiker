@@ -49,6 +49,35 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
     return AuthMiddleware(_ws(request)).authenticate(request)
 
 
+_MAX_ATTACHMENTS = 8
+
+
+def _validated_attachments(raw: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Validate prompt attachments fail-closed before a turn starts.
+
+    Only ``{"type": "path", "path": <non-empty str>}`` entries are accepted in
+    this slice; anything else rejects the whole prompt honestly rather than
+    silently dropping data. Path *safety* (workspace containment) is enforced
+    later by the workspace-scoped filesystem layer during context gathering.
+    """
+    if not raw:
+        return []
+    if len(raw) > _MAX_ATTACHMENTS:
+        raise ContractValidationError(f"too_many_attachments:{len(raw)}>{_MAX_ATTACHMENTS}")
+    cleaned: list[dict[str, Any]] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            raise ContractValidationError("invalid_attachment:not_object")
+        kind = entry.get("type")
+        if kind != "path":
+            raise ContractValidationError(f"invalid_attachment_type:{kind}")
+        path = entry.get("path")
+        if not isinstance(path, str) or not path.strip():
+            raise ContractValidationError("invalid_attachment:missing_path")
+        cleaned.append({"type": "path", "path": path.strip()})
+    return cleaned
+
+
 def _build_envelope(body: PromptRequest) -> PromptEnvelope:
     options = PromptOptions(
         planning_mode=body.planning_mode or "auto",
@@ -64,7 +93,11 @@ def _build_envelope(body: PromptRequest) -> PromptEnvelope:
         turn_id=new_id("turn_"),
         client=client,
         user=UserMetadata(),
-        prompt=PromptPayload(text=body.text, metadata={"entry_command": client.type}),
+        prompt=PromptPayload(
+            text=body.text,
+            attachments=_validated_attachments(body.attachments),
+            metadata={"entry_command": client.type},
+        ),
         options=options,
     )
 

@@ -83,6 +83,12 @@ class PromptRequest:
     # policy is still enforced downstream).
     model: str | None = None
     max_tool_calls: int | None = None
+    # Optional attachments for this prompt. This slice supports workspace path
+    # attachments only: {"type": "path", "path": "<workspace-relative path>"}.
+    # Paths are resolved through the workspace-scoped filesystem layer (outside
+    # the workspace fails closed) and included as bounded, untrusted-labelled
+    # context items. Unknown shapes are rejected before a turn starts.
+    attachments: list[dict[str, Any]] | None = None
     # Origin of the prompt: the bundled SPA sends "web_ui"; external single-user
     # REST clients (other machines/UIs) send "rest". Both land in the same
     # session when they share session_id (Phase 8 same-session gate).

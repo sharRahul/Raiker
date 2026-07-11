@@ -21,6 +21,9 @@ SOURCE_TYPES = (
 # list = kept first when the bundle is over budget.
 PRIORITY_ORDER = (
     "current_prompt",
+    # User-attached workspace paths (web-app task 3): explicitly attached by the
+    # user this turn, so they outrank ambient metadata when the budget is tight.
+    "attachment",
     "workspace_summary",
     "capability_status",
     "approvals",

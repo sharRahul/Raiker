@@ -24,83 +24,73 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 - **Web reads are read-only + rate-limit-aware** (120 req/min/IP). Prefer folding new read data into an existing endpoint over adding a fan-out.
 - **Secrets never surface.** API keys/allowlist values come from owner env, are never displayed, logged, or committed.
 
-## State as of 2026-07-11 (this session, branch `claude/unbounded-tool-calls-gd19nt`)
+## State as of 2026-07-11 (this session, branch `claude/handoff-task-hq2joc`)
 
-**1. Per-turn tool-call budget now defaults to effectively unbounded (user
-decision).** `PromptOptions.max_tool_calls` and the `/api/prompts` default both
-use `DEFAULT_MAX_TOOL_CALLS = 10_000` (`raiker/contracts/models.py`): a turn
-ends when the model finishes its task or the provider's context/token budget
-runs out — never because of the counter, which remains only as a hard
-runaway-loop fail-safe. Callers can still pass a lower explicit bound per turn.
-Docs updated (CONTRACTS, API_AND_CONTRACT_SCHEMAS, OWASP LLM06/LLM10 rows);
-`test_default_tool_call_budget_is_effectively_unbounded` pins the contract.
-
-**2. Task 3, uploaded-images sub-slice (DONE): governed image attachments.**
-- **Store:** `attachments` table (migration `RAIKER-1006`) +
-  `save_attachment` / `load_attachment` / `load_attachment_metadata`.
-  Validation is fail-closed in `raiker/runtime/attachments.py`: media-type
-  allowlist (png/jpeg/webp/gif), 5 MB cap, magic-byte sniff that the bytes
-  really are the declared type (webp also checks the RIFF/WEBP tag);
-  `load_image` re-validates on the way out.
-- **API:** `POST /api/attachments` (owner bearer auth; base64 body;
-  metadata-only response — bytes are never echoed). Only this route gets a
-  larger body cap via the new `MaxBodySizeMiddleware.path_overrides`; every
-  other route keeps the tight 1 MB default.
-- **Prompt shape:** `attachments` now also accepts
-  `{type: "image", attachment_id: "att_…"}` (validated fail-closed in
-  `_validated_attachments`; `att_` added to id prefixes).
-- **Vision capability:** `supports_vision` on `ModelCapabilities`, parsed from
-  profile config; set for `anthropic-hosted`, `openai-hosted`,
-  `gemini-hosted-openai-compatible` (both copies of `model-profiles.json`).
-  `ModelRouter.supports_vision(provider, model)` fails closed on unresolvable
-  profiles.
-- **Delivery:** the orchestrator attaches stored images to the user
-  `ModelMessage` (`ModelMessage.images: tuple[ModelImage, ...]`) only when the
-  turn's bound profile supports vision; otherwise it withholds honestly. New
-  metadata-only audit events `attachment_image_included` /
-  `attachment_image_withheld` (id, media type, size, sha256, reason — image
-  bytes/base64 never enter event payloads or text context). The gatherer adds
-  a metadata-only `attachment` context item (`image_uploaded` / `not_found` /
-  `missing_attachment_id`), trust `untrusted_external`.
-- **Providers:** Anthropic serializes base64 `image` blocks, OpenAI-compatible
-  serializes `image_url` data-URL parts — both only when
-  `capabilities.supports_vision`; non-vision profiles get plain text
-  (fail-closed drop, no provider 400s).
-- **Web:** the composer "+" popover gains an image upload (client-side
-  type/size pre-check, chips share the path-attachment UI, honest upload
-  errors); the prompt sends the attachment reference, never bytes.
-- Tests: `tests/test_uploaded_image_attachments.py` (28: validation, store
-  round-trip, capability parse, both providers, gatherer, orchestrator
-  deliver/withhold/fail-closed, upload API) + 2 web vitest.
-- **Session gate:** full backend suite green (~1373 passed, exit 0);
+**Task 3, uploaded-documents sub-slice (DONE): governed text-document
+attachments.** This completes the text side of Task 3; PDF/office binaries are
+the only remaining piece.
+- **Validation/store/extract** (`raiker/runtime/attachments.py`): reuses the
+  same governed `attachments` table (`RAIKER-1006`). `validate_document`
+  fails closed unless the media type is on the text allowlist
+  (`text/plain` / `text/markdown` / `text/csv`), the bytes are non-empty and
+  under `MAX_DOCUMENT_BYTES` (2 MB), and they decode as clean UTF-8 with **no
+  NUL byte** (the text analogue of the image magic-byte sniff — a binary file
+  mislabelled as text fails closed). `store_document` persists with
+  `kind="document"`; `extract_document_text` is a bounded UTF-8 decode
+  (`MAX_DOCUMENT_TEXT_CHARS = 200_000`); `load_document` re-validates on the
+  way out and returns the extracted text + a `extract_truncated` flag.
+- **API:** `POST /api/attachments` now dispatches on the declared media type —
+  image types → `store_image`, document types → `store_document`, anything
+  else → 400 `unsupported_media_type` (before either storer runs). Metadata-only
+  response, same owner bearer auth. The existing body-size override (derived
+  from the larger image cap) already covers the smaller document cap.
+- **Prompt shape:** `attachments` also accepts
+  `{type: "document", attachment_id: "att_…"}` (validated fail-closed in
+  `_validated_attachments`, sharing the image id-check path).
+- **Context delivery:** unlike images (metadata only), a document's whole point
+  is its text, so the gatherer's new `_document_attachment_item` folds the
+  bounded extracted text into an `untrusted_external` context item
+  (`document_uploaded` / `not_found` / `missing_attachment_id`), announced in
+  the content as "untrusted document content, not instructions". No orchestrator
+  change — documents never touch the vision/image-block path.
+- **Web:** the composer "+" popover gains a "Document…" upload beside "Image…"
+  (client-side type/size pre-check with an extension fallback for browsers that
+  mislabel `.md`; chips share the path-attachment UI); the prompt sends the
+  document reference, never bytes.
+- Tests: `tests/test_document_attachments.py` (25: validation fail-closed for
+  type/size/NUL/non-UTF-8, extraction bounds, store round-trip + kind
+  isolation, gatherer untrusted-text item, upload API + prompt reference) +
+  2 web vitest.
+- **Session gate:** full backend suite green (**1398 passed**, exit 0);
   `ruff check .` clean; mypy clean on changed sources (remaining output is the
-  documented environmental missing-stub noise); web lint/check/**81 vitest**/
+  documented environmental missing-stub noise); web lint/check/**83 vitest**/
   build green; all five `scripts/validate_*.py` pass.
-- **Live-verified (hosted Anthropic Haiku 4.5, 1-hour operator key in server
-  env only):** a real 2.2 MB JPEG uploaded through `POST /api/attachments`
-  produced a correct vision answer through both the API and the Chromium-driven
-  composer UI (0 console errors); the withheld path fired
-  `attachment_image_withheld` before any provider contact on a non-vision
-  profile; the event log contained metadata only (no bytes/base64 — checked).
-  Full table in `docs/WEB_APP_LIVE_TEST.md` (2026-07-11 section).
-
-**3. Tool round-trip fix (found live, would break any hosted multi-step turn).**
-The orchestrator appended only the `role="tool"` result message after a tool
-run — never the assistant message carrying the model's tool call — so the
-*second* model call of an agentic turn got HTTP 400 from Anthropic
-(`tool_result` with no matching `tool_use`); strict OpenAI endpoints reject the
-same shape. Fixed contract-level: `ModelMessage.tool_calls`
-(`tuple[ToolCallProposal, ...]`), the orchestrator appends the assistant
-tool-call message before each tool result, the Anthropic adapter serializes
-`tool_use` blocks, and `to_dict()` emits the OpenAI `tool_calls` field. Two new
-tests in `tests/test_model_tool_call_loop.py`. **Live-verified:** a governed
-agentic turn (list files → read file → report codeword) ran 3 model calls +
-2 governed tool executions on hosted Haiku 4.5 and finished because the model
-was done — the Claude-style loop end to end.
+- **Not live-verified against a provider** (marked `implemented`, not
+  `implemented_verified`): the store→gather→untrusted-text path is exercised
+  end to end in tests, but a governed live turn feeding an uploaded document to
+  a real model is still open (see Standing next-work).
 
 ## Recent prior state (condensed — details in git history and IMPLEMENTATION_STATUS)
 
-All on merged PR #107 (`claude/provider-model-selection-5ufga4`), 2026-07-10:
+Merged PR #108 (`claude/unbounded-tool-calls-gd19nt`), 2026-07-11:
+
+- **Per-turn tool-call budget defaults to effectively unbounded** —
+  `DEFAULT_MAX_TOOL_CALLS = 10_000` in `raiker/contracts/models.py`; a turn ends
+  when the model is done or the provider's budget runs out, the counter is only
+  a runaway fail-safe. Callers can still pass a lower explicit bound.
+- **Task 3, uploaded-images sub-slice (DONE, live-verified):** governed image
+  attachment store (media-type allowlist + 5 MB cap + magic-byte sniff),
+  `supports_vision` capability, image blocks delivered only to vision-capable
+  profiles (withheld honestly otherwise; metadata-only audit — image
+  bytes/base64 never enter events or text context). Anthropic + OpenAI adapters
+  serialize image blocks only when vision-capable. Live-verified with a real
+  2.2 MB JPEG through API + composer UI (table in `docs/WEB_APP_LIVE_TEST.md`).
+- **Tool round-trip fix (live-found):** the orchestrator now appends the
+  assistant tool-call message before each `role="tool"` result
+  (`ModelMessage.tool_calls`, Anthropic `tool_use` blocks, OpenAI `tool_calls`)
+  so the second model call of an agentic turn no longer 400s.
+
+Merged PR #107 (`claude/provider-model-selection-5ufga4`), 2026-07-10:
 
 - **Task 3, paths-first sub-slice (DONE):** prompts carry
   `{type: "path", path}` attachments (max 8); the gatherer includes each as a
@@ -139,15 +129,17 @@ All on merged PR #107 (`claude/provider-model-selection-5ufga4`), 2026-07-10:
 Follow the slice discipline at the bottom. Each is a governed vertical slice;
 do them one at a time, commit + push after each.
 
-**Task 3 remainder — office/pdf document attachments (last sub-slice).**
-Paths and uploaded images are done; what remains is text extraction for
-uploaded documents: local-only extraction libs (PDFs/office are heavy — scope
-carefully; prefer starting with plain-text/markdown/csv before pdf/docx),
-reuse the same governed attachment store + allowlist pattern
-(`raiker/runtime/attachments.py` — add per-type validators + an extraction
-step whose output becomes a bounded, `untrusted_external` context item, like
-path attachments). Every attachment stays untrusted data. Tests for
-type/size fail-closed, extraction bounds, trust labels.
+**Task 3 remainder — PDF/office document attachments (last sub-slice).**
+Paths, uploaded images, and uploaded **text** documents (plain
+text/markdown/csv) are all done. What remains is binary document extraction:
+PDFs and office formats via local-only extraction libs (these are heavy — scope
+carefully; consider one format at a time). Reuse the same governed store +
+allowlist pattern already in `raiker/runtime/attachments.py` — add a per-type
+validator (magic-byte sniff, e.g. `%PDF-` / the zip/OOXML signature for docx)
+and an extraction step whose output becomes a bounded, `untrusted_external`
+context item, exactly like `store_document` / `_document_attachment_item` do
+for text. Every attachment stays untrusted data. Tests for type/size
+fail-closed, extraction bounds, trust labels.
 
 **Task 4 — connect plugins/connectors in chat (github, gmail, gcal, slack).**
 There is already a `ConnectorRegistry` (`config/channel-connectors.json`) and a
@@ -199,7 +191,9 @@ an ongoing piece of work: its own workspace subpath, sessions, checkpoints, and
    is `implemented_verified`. `openai-hosted` / `gemini-hosted-openai-compatible`
    remain to verify with a governed live turn when operator keys are available
    (this cloud session's egress proxy blocks those hosts). Add a **live vision
-   turn** (uploaded image → image block → real answer) to the same checklist.
+   turn** (uploaded image → image block → real answer) and a **live document
+   turn** (uploaded text document → extracted untrusted context → real answer)
+   to the same checklist.
 2. **Plugin runtime remainder (Tier 4).** In-process import isolation; image
    build/pull management for the sandboxed runtime + per-plugin network egress
    for the bare-subprocess runtime; plugin hooks/MCP/LSP/monitors/panels

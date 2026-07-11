@@ -100,7 +100,10 @@ class PromptRequest:
     #     closed), included as bounded, untrusted-labelled context items;
     #   {"type": "image", "attachment_id": "att_…"} — an image previously
     #     uploaded via POST /api/attachments, delivered as an image block only
-    #     when the turn's model profile supports vision (withheld otherwise).
+    #     when the turn's model profile supports vision (withheld otherwise);
+    #   {"type": "document", "attachment_id": "att_…"} — a text document
+    #     previously uploaded via POST /api/attachments; its extracted text is
+    #     folded into context as a bounded, untrusted-labelled item.
     # Unknown shapes are rejected before a turn starts.
     attachments: list[dict[str, Any]] | None = None
     # Origin of the prompt: the bundled SPA sends "web_ui"; external single-user

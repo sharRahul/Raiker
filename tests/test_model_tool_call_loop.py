@@ -28,6 +28,7 @@ class FakeRouter:
     def __init__(self, responses: list[ModelResponse]) -> None:
         self.responses = responses
         self.calls = 0
+        self.seen_messages: list[list[ModelMessage]] = []
 
     def chat(
         self,
@@ -38,6 +39,7 @@ class FakeRouter:
     ) -> ModelResponse:
         index = min(self.calls, len(self.responses) - 1)
         self.calls += 1
+        self.seen_messages.append(list(messages))
         return self.responses[index]
 
     async def achat(
@@ -151,6 +153,56 @@ def test_tool_call_budget_is_enforced(tmp_path: Path) -> None:
     orchestrator.handle(envelope)
     events = _events(orchestrator, envelope.session_id)
     assert events.count("tool_completed") == 2
+
+
+def test_tool_round_trip_carries_assistant_tool_call_message(tmp_path: Path) -> None:
+    """A valid tool round-trip on both wire protocols: the follow-up model call
+    must contain the assistant message that made the tool call (Anthropic
+    tool_use / OpenAI tool_calls) followed by the matching tool result —
+    hosted providers reject a tool result with no preceding tool call."""
+    (tmp_path / "README.md").write_text("hi", encoding="utf-8")
+    router = FakeRouter(
+        [
+            ModelResponse(text="Listing…", tool_calls=[_list_dir_call()], finish_reason="tool_calls"),
+            ModelResponse(text="Done.", finish_reason="stop"),
+        ]
+    )
+    orchestrator = _orchestrator(tmp_path, router)
+    orchestrator.handle(_envelope("list files"))
+    assert len(router.seen_messages) == 2
+    follow_up = router.seen_messages[1]
+    assistant = [m for m in follow_up if m.role == "assistant" and m.tool_calls]
+    assert len(assistant) == 1
+    assert assistant[0].tool_calls[0].call_id == "call_ls"
+    tool_msgs = [m for m in follow_up if m.role == "tool"]
+    assert len(tool_msgs) == 1
+    assert tool_msgs[0].tool_call_id == "call_ls"
+    # The assistant message must come before its tool result.
+    assert follow_up.index(assistant[0]) < follow_up.index(tool_msgs[0])
+
+
+def test_assistant_tool_calls_serialize_for_both_protocols() -> None:
+    from raiker.models.providers.anthropic_messages import _to_anthropic_messages
+
+    assistant = ModelMessage(role="assistant", content="Listing…", tool_calls=(_list_dir_call(),))
+    tool = ModelMessage(role="tool", content="{}", tool_call_id="call_ls", name="list_directory")
+
+    # OpenAI shape: tool_calls field with JSON-encoded arguments.
+    serialized = assistant.to_dict()
+    assert serialized["tool_calls"][0]["id"] == "call_ls"
+    assert serialized["tool_calls"][0]["function"]["name"] == "list_directory"
+
+    # Anthropic shape: assistant tool_use block whose id matches the tool_result.
+    _, converted = _to_anthropic_messages([assistant, tool])
+    assert converted[0]["role"] == "assistant"
+    tool_use = [b for b in converted[0]["content"] if b["type"] == "tool_use"]
+    assert tool_use and tool_use[0]["id"] == "call_ls"
+    assert converted[1]["role"] == "user"
+    assert converted[1]["content"][0] == {
+        "type": "tool_result",
+        "tool_use_id": "call_ls",
+        "content": "{}",
+    }
 
 
 def test_model_proposed_shell_requires_approval(tmp_path: Path) -> None:

@@ -601,6 +601,17 @@ class RuntimeOrchestrator:
                 started_action_ids=started_action_ids,
             )
             tool_calls_made += 1
+            # A valid tool round-trip on both wire protocols: first the
+            # assistant message that made the call (Anthropic tool_use block /
+            # OpenAI tool_calls field), then the matching tool result. Without
+            # the assistant message, hosted providers reject the request.
+            messages.append(
+                ModelMessage(
+                    role="assistant",
+                    content=response.text,
+                    tool_calls=(proposal,),
+                )
+            )
             messages.append(
                 ModelMessage(
                     role="tool",

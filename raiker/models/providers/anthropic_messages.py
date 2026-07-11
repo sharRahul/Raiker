@@ -144,6 +144,19 @@ def _to_anthropic_messages(
                 )
             if message.content:
                 blocks.append({"type": "text", "text": message.content})
+            if message.role == "assistant":
+                # The tool_use blocks this assistant turn made. Required: a
+                # later tool_result must reference a tool_use id from a prior
+                # assistant message or the API rejects the whole request.
+                blocks.extend(
+                    {
+                        "type": "tool_use",
+                        "id": call.call_id,
+                        "name": call.tool_name,
+                        "input": call.arguments,
+                    }
+                    for call in message.tool_calls
+                )
             role = message.role
         if converted and converted[-1]["role"] == role:
             converted[-1]["content"].extend(blocks)

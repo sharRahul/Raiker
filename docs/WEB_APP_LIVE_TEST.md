@@ -14,6 +14,36 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-07-11 (uploaded-image vision turn + agentic tool loop, hosted Anthropic Haiku 4.5)
+
+Run with a 1-hour operator key held in the server process env only. This round
+verified the two changes on PR #108 live: **uploaded image attachments (vision)**
+and the **effectively-unbounded tool loop**, and caught + fixed a real bug the
+unit suite could not see (below).
+
+| Check | Result |
+|---|---|
+| `POST /api/attachments` stores a real 2.2 MB JPEG (owner auth; metadata-only response) | ✅ `att_…`, `image/jpeg`, `2217857` bytes, sha256 returned |
+| Vision turn: prompt + `{type:"image", attachment_id}` on the selected `anthropic-hosted` profile | ✅ real Haiku answer correctly describing the photographed dessert; `RAIKER_VISION_OK` |
+| `attachment_image_included` event (id, media type, size, sha256) | ✅ present; **no image bytes/base64 anywhere in the event log** (checked) |
+| Withheld path: same image bound to non-vision `raiker-local-llama-cpp` | ✅ `attachment_image_withheld` (`model_profile_lacks_vision_support`) before any provider contact; turn then failed honestly (`provider_connection_failed`, no local server running) |
+| Agentic tool loop ("list files, read mission-brief.txt, tell me the codeword") | ✅ 3 model calls + 2 governed tool executions (`list_directory`, `read_file`); correct codeword extracted; `RAIKER_AGENT_OK`; the turn ended because the **model finished**, not a budget |
+| Browser (Chromium): upload the image through the composer "+" → Image…, chip renders, streamed vision turn through the UI | ✅ `RAIKER_UI_VISION_OK`; **0 console errors** |
+
+**Bug found live and fixed (tool round-trip):** the first agentic run failed on
+the second model call with HTTP 400 → `provider_connection_failed`. Cause: the
+orchestrator appended only the `role="tool"` result message — never the
+assistant message carrying the model's `tool_use` — and the Anthropic Messages
+API rejects a `tool_result` with no matching `tool_use` in a prior assistant
+turn (strict OpenAI endpoints do the same for `tool_calls`). Earlier live
+rounds were single-shot Q&A, so this had never been exercised against a hosted
+provider. Fix: `ModelMessage.tool_calls` + the orchestrator now appends the
+assistant tool-call message before each tool result; the Anthropic adapter
+serializes `tool_use` blocks and `to_dict()` emits the OpenAI `tool_calls`
+field (`test_tool_round_trip_carries_assistant_tool_call_message`,
+`test_assistant_tool_calls_serialize_for_both_protocols`). Re-run: the loop
+completed end-to-end (table above).
+
 ## Result — 2026-07-10 (hosted Anthropic, Haiku 4.5)
 
 | Check | Result |

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -87,6 +88,12 @@ class ModelMessage:
     # blocks only by providers whose capabilities include supports_vision;
     # every other adapter drops them fail-closed rather than erroring.
     images: tuple[ModelImage, ...] = ()
+    # Tool calls this assistant message made. Required by both wire protocols
+    # for a valid tool round-trip: a tool-result message must be preceded by an
+    # assistant message that carries the matching tool call (Anthropic
+    # ``tool_use`` block / OpenAI ``tool_calls`` field) — otherwise the
+    # provider rejects the request outright.
+    tool_calls: tuple[ToolCallProposal, ...] = ()
 
     def __post_init__(self) -> None:
         if self.role not in MODEL_ROLES:
@@ -98,6 +105,18 @@ class ModelMessage:
             message["name"] = self.name
         if self.tool_call_id is not None:
             message["tool_call_id"] = self.tool_call_id
+        if self.tool_calls:
+            message["tool_calls"] = [
+                {
+                    "id": call.call_id,
+                    "type": "function",
+                    "function": {
+                        "name": call.tool_name,
+                        "arguments": json.dumps(call.arguments),
+                    },
+                }
+                for call in self.tool_calls
+            ]
         return message
 
 

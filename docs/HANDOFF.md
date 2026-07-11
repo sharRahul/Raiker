@@ -76,10 +76,27 @@ Docs updated (CONTRACTS, API_AND_CONTRACT_SCHEMAS, OWASP LLM06/LLM10 rows);
   `ruff check .` clean; mypy clean on changed sources (remaining output is the
   documented environmental missing-stub noise); web lint/check/**81 vitest**/
   build green; all five `scripts/validate_*.py` pass.
-- **Not live-verified with a hosted vision model** (this cloud runner has no
-  operator key); the provider payload shapes are unit-tested. A governed live
-  vision turn (attach a PNG, ask "what is in this image?" on
-  `anthropic-hosted`) is cheap evidence for a later session with a key.
+- **Live-verified (hosted Anthropic Haiku 4.5, 1-hour operator key in server
+  env only):** a real 2.2 MB JPEG uploaded through `POST /api/attachments`
+  produced a correct vision answer through both the API and the Chromium-driven
+  composer UI (0 console errors); the withheld path fired
+  `attachment_image_withheld` before any provider contact on a non-vision
+  profile; the event log contained metadata only (no bytes/base64 — checked).
+  Full table in `docs/WEB_APP_LIVE_TEST.md` (2026-07-11 section).
+
+**3. Tool round-trip fix (found live, would break any hosted multi-step turn).**
+The orchestrator appended only the `role="tool"` result message after a tool
+run — never the assistant message carrying the model's tool call — so the
+*second* model call of an agentic turn got HTTP 400 from Anthropic
+(`tool_result` with no matching `tool_use`); strict OpenAI endpoints reject the
+same shape. Fixed contract-level: `ModelMessage.tool_calls`
+(`tuple[ToolCallProposal, ...]`), the orchestrator appends the assistant
+tool-call message before each tool result, the Anthropic adapter serializes
+`tool_use` blocks, and `to_dict()` emits the OpenAI `tool_calls` field. Two new
+tests in `tests/test_model_tool_call_loop.py`. **Live-verified:** a governed
+agentic turn (list files → read file → report codeword) ran 3 model calls +
+2 governed tool executions on hosted Haiku 4.5 and finished because the model
+was done — the Claude-style loop end to end.
 
 ## Recent prior state (condensed — details in git history and IMPLEMENTATION_STATUS)
 

@@ -33,6 +33,7 @@ from raiker.models.contracts import ToolCallProposal
 from raiker.models.tool_call_validation import default_tool_specs, validate_tool_call
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.authority.router import GovernedAction
 from raiker.runtime.connectors import (
     GITHUB_TOKEN_ENV,
     GithubConnectorService,
@@ -202,9 +203,7 @@ class TestGithubConnectorGovernance:
 
 
 class TestGithubConnectorExecutor:
-    def _action(self, arguments: dict[str, object]) -> ToolAction:
-        from raiker.runtime.authority.router import GovernedAction
-
+    def _action(self, arguments: dict[str, object]) -> GovernedAction:
         return GovernedAction(
             action_id=new_id("act_"),
             principal_id="principal_rahul",

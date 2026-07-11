@@ -29,6 +29,10 @@ CLIENT_TYPES = {
 }
 PLANNING_MODES = {"auto", "always", "never_safe_only"}
 APPROVAL_MODES = {"interactive", "deny_risky", "allow_safe_only"}
+# Effectively unbounded: a turn ends when the model finishes or the provider's
+# context/token budget runs out, not because of this counter. It exists only as
+# a hard runaway-loop fail-safe; callers may still pass a lower explicit bound.
+DEFAULT_MAX_TOOL_CALLS = 10_000
 EVENT_TYPES = {
     "global_command_invoked",
     "terminal_client_started",
@@ -311,7 +315,7 @@ class PromptOptions:
     # with model_profile; provider policy (gates, egress, keys) is still enforced
     # downstream, so naming a model never grants access to its provider.
     model: str = ""
-    max_tool_calls: int = 10
+    max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS
 
     def __post_init__(self) -> None:
         _one_of(self.planning_mode, PLANNING_MODES, "planning_mode")

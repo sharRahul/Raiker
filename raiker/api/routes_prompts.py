@@ -14,6 +14,7 @@ from raiker.api.schemas import InterruptRequest, PromptRequest
 from raiker.api.sessions import ApiSession
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import (
+    DEFAULT_MAX_TOOL_CALLS,
     AgentResponse,
     ClientMetadata,
     ContractValidationError,
@@ -84,7 +85,9 @@ def _build_envelope(body: PromptRequest) -> PromptEnvelope:
         approval_mode=body.approval_mode or "interactive",
         model_profile=body.model_profile or "",
         model=body.model or "",
-        max_tool_calls=body.max_tool_calls if body.max_tool_calls is not None else 10,
+        max_tool_calls=(
+            body.max_tool_calls if body.max_tool_calls is not None else DEFAULT_MAX_TOOL_CALLS
+        ),
     )
     client = _PROMPT_CLIENTS.get(body.client_type or "web_ui", WEB_UI_CLIENT)
     return PromptEnvelope(

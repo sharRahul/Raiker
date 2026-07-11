@@ -110,7 +110,7 @@ Required fields:
     "planning_mode": "auto",
     "approval_mode": "interactive",
     "model_profile": "",
-    "max_tool_calls": 10
+    "max_tool_calls": 10000
   }
 }
 ```

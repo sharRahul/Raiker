@@ -6,6 +6,7 @@ from pathlib import Path
 
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import (
+    DEFAULT_MAX_TOOL_CALLS,
     ClientMetadata,
     PromptEnvelope,
     PromptOptions,
@@ -131,6 +132,14 @@ def test_unknown_tool_call_is_rejected(tmp_path: Path) -> None:
     assert "model_tool_call_rejected" in events
     assert "tool_started" not in events
     assert response.status == "completed"
+
+
+def test_default_tool_call_budget_is_effectively_unbounded() -> None:
+    # The default is a runaway-loop fail-safe, not a working limit: a turn
+    # should end because the model finishes (or the provider's context/token
+    # budget runs out), never because of the default counter.
+    assert PromptOptions().max_tool_calls == DEFAULT_MAX_TOOL_CALLS
+    assert DEFAULT_MAX_TOOL_CALLS >= 10_000
 
 
 def test_tool_call_budget_is_enforced(tmp_path: Path) -> None:

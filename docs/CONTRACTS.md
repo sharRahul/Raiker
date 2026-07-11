@@ -60,7 +60,7 @@ Used by every client to submit work. In Phase 1, the first implemented user-faci
     "planning_mode": "auto",
     "approval_mode": "interactive",
     "model_profile": "mock-test",
-    "max_tool_calls": 10
+    "max_tool_calls": 10000
   }
 }
 ```

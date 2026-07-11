@@ -170,8 +170,9 @@ describe("ChatView streaming transcript", () => {
     );
 
     render(ChatView);
-    await fireEvent.click(screen.getByText("Options"));
     const providerSelect = screen.getByLabelText("Provider") as HTMLSelectElement;
+    // Wait for the profiles fetch to populate the provider options.
+    await waitFor(() => expect(providerSelect.options.length).toBeGreaterThan(1));
     await fireEvent.change(providerSelect, {
       target: { value: "ollama-local-openai-compatible" },
     });
@@ -207,6 +208,8 @@ describe("ChatView streaming transcript", () => {
     );
 
     render(ChatView);
+    // The "+" button reveals the attachment path input.
+    await fireEvent.click(screen.getByLabelText("Add attachment"));
     const attach = screen.getByLabelText("Attachment path") as HTMLInputElement;
     await fireEvent.input(attach, { target: { value: "docs/HANDOFF.md" } });
     await fireEvent.click(screen.getByText("Attach"));

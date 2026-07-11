@@ -28,8 +28,8 @@
   let nextId = 1;
 
   // Optional per-prompt options. Left unset they change nothing — the backend
-  // applies its own defaults, exactly as if the option was never sent.
-  let showOptions = $state(false);
+  // applies its own defaults, exactly as if the option was never sent. They
+  // live as compact controls at the bottom of the composer card.
   let modelProfile = $state("");
   let planningMode = $state("");
   let maxToolCalls = $state("");
@@ -50,6 +50,8 @@
   const MAX_ATTACHMENTS = 8;
   let attachments = $state<string[]>([]);
   let attachInput = $state("");
+  // The "+" button reveals the path input.
+  let showAttach = $state(false);
 
   function addAttachment() {
     const path = attachInput.trim();
@@ -325,36 +327,102 @@
       void submit();
     }}
   >
-    {#if showOptions}
-      <div class="options">
-        <div class="option">
-          <label class="field-label" for="opt-model">Provider</label>
+    <div class="composer-card">
+      {#if attachments.length > 0}
+        <div class="attach-chips">
+          {#each attachments as path, i (path)}
+            <span class="attach-chip">
+              <code>{path}</code>
+              <button
+                type="button"
+                class="attach-remove"
+                onclick={() => removeAttachment(i)}
+                aria-label={`Remove attachment ${path}`}
+              >
+                ×
+              </button>
+            </span>
+          {/each}
+        </div>
+      {/if}
+
+      <label for="prompt-input" class="sr-only">Prompt</label>
+      <textarea
+        id="prompt-input"
+        class="prompt-input"
+        bind:value={promptText}
+        onkeydown={onKeydown}
+        rows="2"
+        placeholder="How can I help you today?"
+        title="Enter to send, Shift+Enter for a new line"
+        disabled={streaming}
+      ></textarea>
+
+      {#if showAttach}
+        <div class="attach-popover">
+          <input
+            class="attach-input"
+            type="text"
+            placeholder="Workspace file or folder path…"
+            bind:value={attachInput}
+            onkeydown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addAttachment();
+              }
+            }}
+            disabled={streaming || attachments.length >= MAX_ATTACHMENTS}
+            aria-label="Attachment path"
+          />
+          <button
+            type="button"
+            class="btn btn-sm"
+            onclick={addAttachment}
+            disabled={streaming || attachInput.trim() === "" || attachments.length >= MAX_ATTACHMENTS}
+          >
+            Attach
+          </button>
+        </div>
+      {/if}
+
+      <div class="composer-bar">
+        <button
+          type="button"
+          class="plus-btn"
+          onclick={() => (showAttach = !showAttach)}
+          aria-label="Add attachment"
+          aria-expanded={showAttach}
+          title="Attach a workspace file or folder path"
+          disabled={streaming}
+        >
+          +
+        </button>
+
+        <div class="bar-controls">
           <select
-            id="opt-model"
-            class="select"
+            class="bar-select"
             bind:value={modelProfile}
             onchange={() => void onProfileChange()}
             disabled={streaming}
+            aria-label="Provider"
+            title="Provider for this turn (default: your selected model)"
           >
-            <option value="">Selected model (see Models)</option>
+            <option value="">Selected model</option>
             {#each profiles as p (p.profile_id)}
-              <option value={p.profile_id}>
-                {providerName(p.provider)} · {p.profile_id}
-              </option>
+              <option value={p.profile_id}>{providerName(p.provider)}</option>
             {/each}
           </select>
-        </div>
-        {#if modelProfile !== ""}
-          <div class="option">
-            <label class="field-label" for="opt-model-name">Model</label>
+
+          {#if modelProfile !== ""}
             {#if loadingModels}
-              <p class="model-note" role="status">Loading models…</p>
+              <span class="bar-note" role="status">Loading models…</span>
             {:else if providerModels !== null && providerModels.status === "available" && providerModels.models.length > 0}
               <select
-                id="opt-model-name"
-                class="select"
+                class="bar-select"
                 bind:value={modelChoice}
                 disabled={streaming}
+                aria-label="Model"
+                title="Model for this turn, from the provider's catalogue"
               >
                 <option value="">
                   {chosenProfile !== null && chosenProfile.model !== "<model>"
@@ -367,127 +435,75 @@
               </select>
             {:else}
               <input
-                id="opt-model-name"
-                class="input"
+                class="bar-input"
                 type="text"
-                placeholder={chosenProfile !== null && chosenProfile.model !== "<model>"
-                  ? chosenProfile.model
-                  : "model id"}
+                placeholder="model id"
                 bind:value={modelChoice}
                 disabled={streaming}
+                aria-label="Model"
+                title={providerModels !== null && providerModels.status !== "available"
+                  ? providerModelsNote(providerModels)
+                  : "Model for this turn"}
               />
             {/if}
-            {#if !loadingModels && providerModels !== null && providerModels.status !== "available"}
-              <p class="model-note">{providerModelsNote(providerModels)}</p>
-            {/if}
-            {#if !loadingModels && chosenProfile !== null && chosenProfile.model === "<model>" && modelChoice.trim() === ""}
-              <p class="model-note">
-                This provider needs a concrete model — without one the turn uses your persisted
-                selection.
-              </p>
-            {/if}
-          </div>
-        {/if}
-        <div class="option">
-          <label class="field-label" for="opt-planning">Planning</label>
-          <select id="opt-planning" class="select" bind:value={planningMode} disabled={streaming}>
-            <option value="">Auto</option>
+          {/if}
+
+          <select
+            class="bar-select"
+            bind:value={planningMode}
+            disabled={streaming}
+            aria-label="Planning"
+            title="Planning mode for this turn"
+          >
+            <option value="">Planning: auto</option>
             <option value="always">Always plan</option>
             <option value="never">Never plan</option>
           </select>
-        </div>
-        <div class="option">
-          <label class="field-label" for="opt-tools">Max tool calls</label>
+
           <input
-            id="opt-tools"
-            class="input"
+            class="bar-input bar-tools"
             type="number"
             min="0"
             max="50"
             placeholder="10"
             bind:value={maxToolCalls}
             disabled={streaming}
+            aria-label="Max tool calls"
+            title="Tool-call budget for this turn"
           />
         </div>
-      </div>
-    {/if}
 
-    <div class="attach-row">
-      {#each attachments as path, i (path)}
-        <span class="attach-chip">
-          <code>{path}</code>
+        <div class="bar-actions">
           <button
             type="button"
-            class="attach-remove"
-            onclick={() => removeAttachment(i)}
-            aria-label={`Remove attachment ${path}`}
+            class="btn btn-ghost btn-sm"
+            onclick={newConversation}
+            disabled={streaming || turns.length === 0}
           >
-            ×
+            New chat
           </button>
-        </span>
-      {/each}
-      <input
-        class="input attach-input"
-        type="text"
-        placeholder="Attach a workspace file or folder path…"
-        bind:value={attachInput}
-        onkeydown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            addAttachment();
-          }
-        }}
-        disabled={streaming || attachments.length >= MAX_ATTACHMENTS}
-        aria-label="Attachment path"
-      />
-      <button
-        type="button"
-        class="btn btn-ghost btn-sm"
-        onclick={addAttachment}
-        disabled={streaming || attachInput.trim() === "" || attachments.length >= MAX_ATTACHMENTS}
-      >
-        Attach
-      </button>
-    </div>
-
-    <div class="composer-row">
-      <label for="prompt-input" class="sr-only">Prompt</label>
-      <textarea
-        id="prompt-input"
-        class="textarea prompt-input"
-        bind:value={promptText}
-        onkeydown={onKeydown}
-        rows="2"
-        placeholder="Ask Raiker… (Enter to send, Shift+Enter for a new line)"
-        disabled={streaming}
-      ></textarea>
-      <div class="composer-actions">
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          onclick={() => (showOptions = !showOptions)}
-          aria-expanded={showOptions}
-        >
-          Options
-        </button>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          onclick={newConversation}
-          disabled={streaming || turns.length === 0}
-        >
-          New chat
-        </button>
-        <button
-          type="submit"
-          class="btn btn-primary send"
-          disabled={streaming || promptText.trim() === ""}
-        >
-          <Icon name="send" size={15} />
-          {streaming ? "Running…" : "Send"}
-        </button>
+          <button
+            type="submit"
+            class="btn btn-primary send"
+            disabled={streaming || promptText.trim() === ""}
+            aria-label={streaming ? "Running" : "Send"}
+          >
+            <Icon name="send" size={15} />
+            {streaming ? "Running…" : "Send"}
+          </button>
+        </div>
       </div>
     </div>
+
+    {#if modelProfile !== "" && !loadingModels}
+      {#if providerModels !== null && providerModels.status !== "available"}
+        <p class="model-note">{providerModelsNote(providerModels)}</p>
+      {:else if chosenProfile !== null && chosenProfile.model === "<model>" && modelChoice.trim() === ""}
+        <p class="model-note">
+          This provider needs a concrete model — without one the turn uses your persisted selection.
+        </p>
+      {/if}
+    {/if}
   </form>
 </div>
 
@@ -661,37 +677,128 @@
     margin: 0.3rem 0 0;
   }
   .composer {
-    border-top: 1px solid var(--border);
     padding-top: var(--space-3);
     background: var(--bg);
   }
-  .options {
+  /* One clean card: prompt on top, "+" and the per-turn controls at the bottom. */
+  .composer-card {
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+    padding: 0.75rem 0.85rem 0.6rem;
     display: flex;
-    gap: var(--space-4);
-    flex-wrap: wrap;
-    padding: 0.35rem 0 0.7rem;
+    flex-direction: column;
+    gap: 0.5rem;
   }
-  .option .input,
-  .option .select {
-    min-width: 11rem;
+  .composer-card:focus-within {
+    border-color: var(--accent-border);
+  }
+  .prompt-input {
+    width: 100%;
+    border: none;
+    outline: none;
+    resize: vertical;
+    background: transparent;
+    color: var(--text-1);
+    font: inherit;
+    font-size: 0.95rem;
+    min-height: 2.6rem;
+  }
+  .prompt-input::placeholder {
+    color: var(--text-3);
+  }
+  .composer-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .plus-btn {
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 50%;
+    border: 1px solid var(--neutral-border);
+    background: var(--neutral-soft);
+    color: var(--text-2);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .plus-btn:hover:not(:disabled) {
+    border-color: var(--accent-border);
+    color: var(--accent);
+  }
+  .bar-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .bar-select,
+  .bar-input {
+    border: none;
+    background: transparent;
+    color: var(--text-2);
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.25rem 0.35rem;
+    border-radius: var(--r-md);
+    max-width: 15rem;
+  }
+  .bar-select:hover:not(:disabled),
+  .bar-input:hover:not(:disabled) {
+    background: var(--neutral-soft);
+  }
+  .bar-select:focus-visible,
+  .bar-input:focus-visible,
+  .plus-btn:focus-visible {
+    outline: 2px solid var(--focus-ring);
+  }
+  .bar-input {
+    border: 1px dashed var(--neutral-border);
+  }
+  .bar-tools {
+    width: 3.4rem;
+  }
+  .bar-note {
+    font-size: 0.76rem;
+    color: var(--text-3);
+  }
+  .bar-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
   }
   .model-note {
     font-size: 0.74rem;
     color: var(--text-3);
-    margin: 0.25rem 0 0;
-    max-width: 16rem;
+    margin: 0.35rem 0.2rem 0;
   }
-  .attach-row {
+  .attach-popover {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    flex-wrap: wrap;
-    padding-bottom: 0.45rem;
   }
   .attach-input {
     flex: 1;
-    min-width: 14rem;
+    min-width: 12rem;
     font-size: 0.8rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--r-md);
+    border: 1px solid var(--neutral-border);
+    background: var(--surface-1);
+    color: var(--text-1);
+  }
+  .attach-chips {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
   }
   .attach-chip {
     display: inline-flex;
@@ -721,20 +828,6 @@
     display: flex;
     gap: 0.3rem;
     flex-wrap: wrap;
-  }
-  .composer-row {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  .prompt-input {
-    width: 100%;
-  }
-  .composer-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    justify-content: flex-end;
   }
   .send {
     min-width: 6.5rem;

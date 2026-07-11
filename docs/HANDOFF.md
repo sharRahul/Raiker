@@ -37,8 +37,11 @@ below the current prompt.
   with **no content**; missing paths and unsupported attachment types are
   reported honestly; invalid attachment shapes reject the prompt before a turn
   starts (`_validated_attachments` in `routes_prompts.py`).
-- Web: attach-path row in the Chat composer (chips, max 8, cleared on send;
-  sent turns show their attachment chips).
+- Web: the Chat composer was redesigned as a single clean card (user request,
+  modelled on claude.ai): a "+" button reveals the attach-path input (chips
+  shown in-card, max 8, cleared on send; sent turns keep their chips), and the
+  per-turn Provider / Model / Planning / tool-budget controls sit as compact
+  selects at the bottom of the card — the separate "Options" panel is gone.
 - Tests: `tests/test_chat_attachments.py` (15) + 1 web vitest.
 - **Remaining Task 3 sub-slices (not started):** uploaded images (needs a
   governed attachment store + `supports_vision` capability) and office/pdf

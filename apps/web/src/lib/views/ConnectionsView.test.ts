@@ -47,6 +47,33 @@ describe("ConnectionsView", () => {
     expect(screen.queryByText(/ghp_/)).not.toBeInTheDocument();
   });
 
+  it("renders every governed connector, including Gmail, with its own env name", async () => {
+    stubFetch({
+      "GET /api/connections": {
+        connectors: [
+          connector(),
+          connector({
+            connector_id: "gmail",
+            display_name: "Gmail (read-only)",
+            capability: "connector_gmail_runtime",
+            credential_env: "RAIKER_GMAIL_TOKEN",
+            egress_host: "gmail.googleapis.com",
+            actions: ["read_message", "read_thread"],
+          }),
+        ],
+        connector_egress_allowlist_configured: false,
+      },
+    });
+    render(ConnectionsView);
+    await waitFor(() => {
+      expect(screen.getByText("Gmail (read-only)")).toBeInTheDocument();
+    });
+    // Both connectors are listed and each surfaces its own credential env name.
+    expect(screen.getByText("GitHub (read-only)")).toBeInTheDocument();
+    expect(screen.getByText(/RAIKER_GMAIL_TOKEN/)).toBeInTheDocument();
+    expect(screen.getByText(/gmail.googleapis.com/)).toBeInTheDocument();
+  });
+
   it("reports a connector as ready only when every precondition is met", async () => {
     stubFetch({
       "GET /api/connections": {

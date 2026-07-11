@@ -15,7 +15,7 @@ from raiker.memory.governance import GovernedMemoryService
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.advisor_tools import consult_advisor
-from raiker.tools.connector_tools import github_read
+from raiker.tools.connector_tools import github_read, gmail_read
 from raiker.tools.filesystem import (
     FilesystemSafetyError,
     diff_files,
@@ -43,9 +43,10 @@ _METADATA_ONLY_TOOLS = frozenset({"consult_advisor"})
 # Tools whose *result content* is dropped from events. The advisor answer and the
 # fetched GitHub body are untrusted content that flows only to the calling model;
 # the audit trail keeps metadata (lengths, ids), never the content itself.
-# github_read's arguments (repo / resource / number) are governance-relevant
-# non-secret identifiers and are kept verbatim (redacted) for the audit trail.
-_CONTENT_RESULT_TOOLS = frozenset({"consult_advisor", "github_read"})
+# github_read's / gmail_read's arguments (repo / resource / number / message_id)
+# are governance-relevant non-secret identifiers and are kept verbatim (redacted)
+# for the audit trail.
+_CONTENT_RESULT_TOOLS = frozenset({"consult_advisor", "github_read", "gmail_read"})
 _CONTENT_RESULT_FIELDS = ("answer", "content")
 
 
@@ -139,6 +140,12 @@ class ToolBroker:
                 str(args.get("resource", "")),
                 str(args.get("repo", "")),
                 args.get("number", ""),
+                store=self.store,
+            ),
+            "gmail_read": lambda args: gmail_read(
+                self.workspace_root,
+                str(args.get("resource", "")),
+                str(args.get("message_id", "")),
                 store=self.store,
             ),
         }

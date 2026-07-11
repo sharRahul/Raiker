@@ -138,6 +138,12 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     r["connector_github_runtime"] = _req(
         "connector_github_runtime", "5", threat_ack=True, human_confirm=True,
         notes="Default-ask GitHub issue/PR read; env-only owner token, owner egress allowlist.")
+    # Gmail read-only service connector (Task 4, second read connector): the read
+    # reaches gmail.googleapis.com with the owner's env-only OAuth token per call.
+    # See docs/threat-models/connectors-gmail.md.
+    r["connector_gmail_runtime"] = _req(
+        "connector_gmail_runtime", "5", threat_ack=True, human_confirm=True,
+        notes="Default-ask Gmail message/thread read; env-only owner token, owner egress allowlist.")
     for cap in ("scheduled_routines",):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Scheduler storage, owner consent, budget.")

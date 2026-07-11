@@ -33,3 +33,27 @@ def github_read(
 
     service = GithubConnectorService(workspace_root, store or SQLiteStore(workspace_root))
     return service.read(resource, repo, number)
+
+
+def gmail_read(
+    workspace_root: str | Path,
+    resource: str,
+    message_id: str,
+    *,
+    store: SQLiteStore | None = None,
+) -> dict[str, Any]:
+    """Governed Gmail message/thread read, brokered as the ``gmail_read`` tool.
+
+    Lets a model read one Gmail message or thread. Everything is enforced inside
+    :class:`GmailConnectorService`: the ``connector_gmail_runtime`` gate (fail
+    closed), the decision mode (default ``ask`` withholds), the owner credential
+    (``RAIKER_GMAIL_TOKEN``, env only), and the owner egress allowlist
+    (``gmail.googleapis.com``). The fetched content comes back as an
+    untrusted-data block; broker events drop the content (see
+    ``ToolBroker._CONTENT_RESULT_TOOLS``).
+    """
+    from raiker.runtime.connectors import GmailConnectorService
+    from raiker.storage.sqlite import SQLiteStore
+
+    service = GmailConnectorService(workspace_root, store or SQLiteStore(workspace_root))
+    return service.read(resource, message_id)

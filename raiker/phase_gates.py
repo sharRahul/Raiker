@@ -63,6 +63,7 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "private_network_model_runtime",
     "advisor_model_runtime",
     "connector_github_runtime",
+    "connector_gmail_runtime",
     "email_runtime",
     "calendar_runtime",
     "reminder_runtime",
@@ -175,7 +176,8 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
                              "remote_execution_cap", "container_execution_cap",
                              "cloud_execution_cap", "hosted_model_runtime",
                              "private_network_model_runtime", "advisor_model_runtime",
-                             "connector_github_runtime", "scheduled_routines")
+                             "connector_github_runtime", "connector_gmail_runtime",
+                             "scheduled_routines")
     _TIER6_EXECUTED_CAPS = ("email_runtime", "calendar_runtime", "reminder_runtime",
                              "finance_runtime", "investment_runtime", "medical_runtime",
                              "pregnancy_baby_runtime", "cctv_runtime", "home_security_runtime",

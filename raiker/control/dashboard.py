@@ -497,14 +497,19 @@ class DashboardService:
         fail-closed. Enabling a connector is done through the existing capability
         gate + decision-mode control plane (gate-manager only), not here.
         """
-        from raiker.runtime.connectors import GITHUB_HOST, GITHUB_TOKEN_ENV
+        from raiker.runtime.connectors import (
+            GITHUB_HOST,
+            GITHUB_TOKEN_ENV,
+            GMAIL_HOST,
+            GMAIL_TOKEN_ENV,
+        )
         from raiker.runtime.executors.sandbox import connector_egress_allowlist
 
+        allowlist = connector_egress_allowlist()
         connectors: list[ConnectorView] = []
         gh_gate = self.control.get_capability_gate(
             "connector_github_runtime", acting_principal_id
         )
-        gh_allowlist = connector_egress_allowlist()
         connectors.append(
             ConnectorView(
                 connector_id="github",
@@ -516,8 +521,29 @@ class DashboardService:
                 credential_env=GITHUB_TOKEN_ENV,
                 credential_configured=bool(os.environ.get(GITHUB_TOKEN_ENV, "").strip()),
                 egress_host=GITHUB_HOST,
-                egress_allowed=GITHUB_HOST in gh_allowlist,
+                egress_allowed=GITHUB_HOST in allowlist,
                 actions=("read_issue", "read_pull_request"),
+                kind="read_only",
+            )
+        )
+        gmail_gate = self.control.get_capability_gate(
+            "connector_gmail_runtime", acting_principal_id
+        )
+        connectors.append(
+            ConnectorView(
+                connector_id="gmail",
+                display_name="Gmail (read-only)",
+                capability="connector_gmail_runtime",
+                gate_state=gmail_gate.state if gmail_gate is not None else "unknown",
+                capability_enabled=(
+                    bool(gmail_gate.runtime_enabled) if gmail_gate is not None else False
+                ),
+                decision_mode=gmail_gate.decision_mode if gmail_gate is not None else "ask",
+                credential_env=GMAIL_TOKEN_ENV,
+                credential_configured=bool(os.environ.get(GMAIL_TOKEN_ENV, "").strip()),
+                egress_host=GMAIL_HOST,
+                egress_allowed=GMAIL_HOST in allowlist,
+                actions=("read_message", "read_thread"),
                 kind="read_only",
             )
         )

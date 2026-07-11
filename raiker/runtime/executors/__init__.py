@@ -10,7 +10,7 @@ from raiker.runtime.executors.sandbox import SandboxError
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 from raiker.runtime.executors.channels import ChannelApprovalRelayExecutor, ExternalChannelExecutor
-from raiker.runtime.executors.connectors import GithubConnectorExecutor
+from raiker.runtime.executors.connectors import GithubConnectorExecutor, GmailConnectorExecutor
 from raiker.runtime.executors.containers import ContainerExecutionExecutor
 from raiker.runtime.executors.models_runtime import (
     AdvisorModelRuntimeExecutor,
@@ -69,7 +69,8 @@ __all__ = [
     "ExternalChannelExecutor", "ChannelApprovalRelayExecutor",
     "RemoteExecutionExecutor", "ContainerExecutionExecutor", "CloudExecutionExecutor",
     "HostedModelRuntimeExecutor", "PrivateNetworkModelRuntimeExecutor",
-    "AdvisorModelRuntimeExecutor", "GithubConnectorExecutor", "ScheduledRoutinesExecutor",
+    "AdvisorModelRuntimeExecutor", "GithubConnectorExecutor", "GmailConnectorExecutor",
+    "ScheduledRoutinesExecutor",
     "EmailRuntimeExecutor", "CalendarRuntimeExecutor", "ReminderRuntimeExecutor",
     "FinanceRuntimeExecutor", "InvestmentRuntimeExecutor", "MedicalRuntimeExecutor",
     "PregnancyBabyRuntimeExecutor", "CctvRuntimeExecutor", "HomeSecurityRuntimeExecutor",
@@ -137,6 +138,12 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # (`RAIKER_GITHUB_TOKEN`), and `api.github.com` must be on the owner connector
     # egress allowlist. Reads only — send/modify actions are not implemented.
     "connector_github_runtime",
+    # Web-app task 4 — Gmail read-only connector (second read connector). A model
+    # may read a Gmail message/thread through the brokered `gmail_read` tool;
+    # default-ask decision mode withholds, the owner credential is env-only
+    # (`RAIKER_GMAIL_TOKEN`), and `gmail.googleapis.com` must be on the owner
+    # connector egress allowlist. Reads only — send/modify are not implemented.
+    "connector_gmail_runtime",
     # Tier 4 — local manifest validation + brokered read-only plugin tool
     # invocation + revocation off-switch + bounded subprocess code runtime for an
     # owner-allowlisted installed plugin (slice 14) + network-isolated container
@@ -193,6 +200,7 @@ def build_default_executor_registry(
     registry.register("private_network_model_runtime", PrivateNetworkModelRuntimeExecutor(ws))
     registry.register("advisor_model_runtime", AdvisorModelRuntimeExecutor(ws, store))
     registry.register("connector_github_runtime", GithubConnectorExecutor(ws, store))
+    registry.register("connector_gmail_runtime", GmailConnectorExecutor(ws, store))
     registry.register("plugin_install", PluginInstallExecutor(ws, store))
     registry.register("plugin_execution_cap", PluginExecutionCapExecutor(ws, store))
     registry.register("plugin_revocation_cap", PluginRevocationExecutor(ws, store))

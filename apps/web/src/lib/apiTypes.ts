@@ -117,6 +117,28 @@ export interface ConnectionsView {
   connector_egress_allowlist_configured: boolean;
 }
 
+export interface StoreConnector {
+  connector_id: string;
+  display_name: string;
+  category: string;
+  description: string;
+  auth_type: "oauth2" | "api_key";
+  host: string;
+  installed: boolean;
+  enabled: boolean;
+  auth_status: "connected" | "reauth_required" | "not_connected";
+  vault_configured: boolean;
+  activity_status: "idle" | "processing" | "completed" | "failed";
+  active_operation: string | null;
+  last_invoked_at: string | null;
+}
+
+export interface ConnectorStoreView {
+  connectors: StoreConnector[];
+  count: number;
+  vault_configured: boolean;
+}
+
 /** On-demand listing of the models one provider serves. Failures come back as an
  * honest status with an empty list — the backend never fabricates model names. */
 export interface ProviderModelList {
@@ -225,7 +247,7 @@ export interface ApprovalView {
   created_at: string;
   age_seconds: number | null;
   requires_approval: boolean;
-  executes_action: boolean; // always false — resolution is metadata-only
+  executes_action: boolean; // true only for an approved, single-use connector write intent
 }
 
 // raiker/control/dashboard.py ApprovalDetailView.to_dict()
@@ -245,6 +267,7 @@ export interface ResolveApprovalResult {
   status: string;
   executes_action: boolean;
   reason: string;
+  connector_result?: Record<string, unknown>;
 }
 
 // Approval proposal carried on an AgentResponse when status === "needs_approval".

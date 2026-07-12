@@ -91,7 +91,7 @@ def _validated_attachments(raw: list[dict[str, Any]] | None) -> list[dict[str, A
     return cleaned
 
 
-def _build_envelope(body: PromptRequest) -> PromptEnvelope:
+def _build_envelope(body: PromptRequest, principal_id: str = "local_user") -> PromptEnvelope:
     options = PromptOptions(
         planning_mode=body.planning_mode or "auto",
         approval_mode=body.approval_mode or "interactive",
@@ -107,7 +107,7 @@ def _build_envelope(body: PromptRequest) -> PromptEnvelope:
         session_id=body.session_id or new_id("sess_"),
         turn_id=new_id("turn_"),
         client=client,
-        user=UserMetadata(),
+        user=UserMetadata(id=principal_id),
         prompt=PromptPayload(
             text=body.text,
             attachments=_validated_attachments(body.attachments),
@@ -133,11 +133,12 @@ async def submit_prompt(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
+    session, _principal = _auth_data
     try:
-        envelope = _build_envelope(body)
+        envelope = _build_envelope(body, session.principal_id)
     except ContractValidationError as exc:
         return _invalid_response(exc).to_dict()
-    gateway = AgentGateway(_ws(request))
+    gateway = AgentGateway(_ws(request), principal_id=session.principal_id)
     response = await gateway.submit_prompt_async(envelope)
     return response.to_dict()
 
@@ -161,8 +162,9 @@ async def stream_prompt(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> StreamingResponse:
+    session, _principal = _auth_data
     try:
-        envelope = _build_envelope(body)
+        envelope = _build_envelope(body, session.principal_id)
     except ContractValidationError as exc:
         final = _invalid_response(exc)
 
@@ -171,7 +173,7 @@ async def stream_prompt(
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
-    gateway = AgentGateway(_ws(request))
+    gateway = AgentGateway(_ws(request), principal_id=session.principal_id)
 
     async def gen() -> AsyncIterator[str]:
         async for event in gateway.astream_prompt(envelope):

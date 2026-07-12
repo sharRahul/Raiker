@@ -26,6 +26,44 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 
 ## State as of 2026-07-12 (this session, local, pushed to `main`)
 
+**Manifest-driven bi-directional Connector Store COMPLETE (generic governed runtime).**
+- Added migrations `RAIKER-1008`/`1009`: principal-scoped installations,
+  encrypted credentials, stored manifests, action-bound write intents, and
+  metadata-only invocation lifecycle records.
+- Catalog contains every service named in the request (**26 actual names**, not
+  the request's conflicting count of 23): the prior GitHub/Gmail/Calendar/Slack
+  plus Hugging Face, NVIDIA, Vercel, Wolfram, Drive, YouTube, Signal, ten travel
+  services, and five on-demand/local services.
+- Store API supports browse/install/uninstall, encrypted API-key/OAuth token
+  setup, enable/disable, manifest registration, and operation invocation. Vault
+  requires owner `RAIKER_CONNECTOR_VAULT_KEY`; no fallback key; values never echo.
+- OpenAPI 2/3 manifests compile to a bounded operation index; `ai-plugin.json`
+  API metadata is recognized. URLs are manifest-built, HTTPS-only, catalog-host
+  pinned, path-encoded, redirect-disabled, and owner-egress-allowlisted.
+- Model surface: authenticated prompt principal is server-bound; generic
+  `connector_read` (GET only) and `connector_write` (mutations only) tools are
+  exposed. Enabled connector/invocation state is included as bounded local model
+  context (`idle`/`processing`/`completed`/`failed`), never credentials/content.
+- Writes default to approval. The broker persists the exact immutable intent;
+  approval atomically claims and executes it once. Denied/failed/executed intents
+  cannot replay. Existing non-connector approvals remain metadata-only.
+- OAuth refresh: expired credentials refresh silently using the manifest-declared
+  HTTPS token URL plus encrypted refresh/client credentials; the token host must
+  be owner-egress-allowlisted and rotated tokens are re-encrypted.
+- UI is a responsive categorized marketplace with search, installed filter,
+  Install/Manage, encrypted API-key/OAuth-token setup, enable/disable, uninstall,
+  Connected/Re-authentication/Disabled/Invoking states, and server-side manifest
+  registration.
+- Honest provider boundary: catalog presence does not invent access. Partner-only
+  services execute only after the owner supplies an authorized manifest and
+  credentials. Provider-specific OAuth consent popups require issued client IDs
+  and redirect configuration; the generic UI currently accepts encrypted OAuth
+  token material instead of fabricating unsupported authorization URLs.
+- Threat model: `docs/threat-models/connector-ecosystem.md`.
+- Verification: full backend **1519 passed, 2 skipped**; ruff clean; full web
+  **95 passed**, Svelte check/lint/build green. Manifest compilation performance
+  acceptance test is under 200 ms.
+
 **Connectors window UX refresh COMPLETE (ChatGPT Plugins-style discovery and management).**
 - Replaced the read-only diagnostic list with a searchable connector directory:
   category tabs (All/Developer/Productivity/Communication), enabled-only filter,

@@ -12,6 +12,7 @@ from raiker.api.redaction import redact_response_body
 from raiker.api.routes_approvals import router as approvals_router
 from raiker.api.routes_attachments import router as attachments_router
 from raiker.api.routes_channels import router as channels_router
+from raiker.api.routes_connectors import router as connectors_router
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
 from raiker.api.routes_prompts import router as prompts_router
@@ -131,6 +132,7 @@ def create_app(
     app.include_router(attachments_router)
     app.include_router(approvals_router)
     app.include_router(channels_router)
+    app.include_router(connectors_router)
     # Serve the built local web dashboard (apps/web/dist) from the same loopback origin, so the
     # dashboard launches with one command and the SPA's relative /api paths resolve directly.
     # Mounted LAST so the /api routes above keep precedence; skipped when no build is present

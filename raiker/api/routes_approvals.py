@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -9,9 +10,11 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import ResolveApprovalRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.approvals import ApprovalInbox
+from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import Principal
+from raiker.runtime.connector_ecosystem import ConnectorInvoker
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -69,6 +72,15 @@ async def resolve_approval(
     session, _principal = _auth_data
     store = SQLiteStore(_ws(request))
     inbox = ApprovalInbox(store, EventLogWriter(store))
+    with store.connect() as connection:
+        pending_intent_row = connection.execute(
+            "SELECT * FROM connector_write_intents WHERE approval_id=?", (approval_id,)
+        ).fetchone()
+    if pending_intent_row is not None and pending_intent_row["principal_id"] != session.principal_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": "connector_intent_principal_mismatch"},
+        )
     try:
         resolution = inbox.resolve(
             approval_id,
@@ -82,8 +94,58 @@ async def resolve_approval(
             status_code=_RESOLVE_ERRORS.get(code, status.HTTP_400_BAD_REQUEST),
             detail={"ok": False, "reason_code": code},
         ) from exc
-    # The response states the metadata-only limitation explicitly: a decision was recorded,
-    # the action was NOT executed.
+    # Connector write intents are the deliberately narrow exception to Raiker's
+    # metadata-only approval resolution. The intent is immutable, principal-
+    # bound, single-use, and executes only after this exact approval is accepted.
+    if pending_intent_row is not None:
+        intent = dict(pending_intent_row)
+        if not body.approve:
+            with store.connect() as connection:
+                connection.execute(
+                    "UPDATE connector_write_intents SET status='denied' WHERE intent_id=? AND status='pending_approval'",
+                    (intent["intent_id"],),
+                )
+        else:
+            with store.connect() as connection:
+                claimed = connection.execute(
+                    "UPDATE connector_write_intents SET status='executing' WHERE intent_id=? AND status='pending_approval'",
+                    (intent["intent_id"],),
+                )
+            if claimed.rowcount != 1:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"ok": False, "reason_code": "connector_intent_already_consumed"},
+                )
+            try:
+                output = await ConnectorInvoker(store).invoke(
+                    session.principal_id,
+                    str(intent["connector_id"]),
+                    str(intent["operation_id"]),
+                    json.loads(intent["arguments_json"]),
+                )
+            except (ValueError, json.JSONDecodeError) as exc:
+                with store.connect() as connection:
+                    connection.execute(
+                        "UPDATE connector_write_intents SET status='failed', executed_at=? WHERE intent_id=?",
+                        (utc_now(), intent["intent_id"]),
+                    )
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"ok": False, "reason_code": str(exc)},
+                ) from exc
+            with store.connect() as connection:
+                connection.execute(
+                    "UPDATE connector_write_intents SET status='executed', executed_at=? WHERE intent_id=?",
+                    (utc_now(), intent["intent_id"]),
+                )
+            return {
+                "approval_id": resolution.approval_id,
+                "action_id": resolution.action_id,
+                "status": "executed",
+                "executes_action": True,
+                "reason": body.reason,
+                "connector_result": output,
+            }
     return {
         "approval_id": resolution.approval_id,
         "action_id": resolution.action_id,

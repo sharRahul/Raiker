@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "connectors": [
+    {"id":"github","name":"GitHub","category":"Development","description":"Issues, pull requests, and repositories.","auth":"oauth2","host":"api.github.com"},
+    {"id":"gmail","name":"Gmail","category":"Productivity","description":"Messages and email workflows.","auth":"oauth2","host":"gmail.googleapis.com"},
+    {"id":"gcal","name":"Google Calendar","category":"Productivity","description":"Calendars and event scheduling.","auth":"oauth2","host":"www.googleapis.com"},
+    {"id":"slack","name":"Slack","category":"Communication","description":"Channels, messages, and collaboration.","auth":"oauth2","host":"slack.com"},
+    {"id":"huggingface","name":"Hugging Face","category":"Development","description":"Models, datasets, and inference.","auth":"api_key","host":"huggingface.co"},
+    {"id":"nvidia","name":"NVIDIA","category":"Development","description":"NIM models and accelerated AI services.","auth":"api_key","host":"integrate.api.nvidia.com"},
+    {"id":"vercel","name":"Vercel","category":"Development","description":"Projects, deployments, and domains.","auth":"oauth2","host":"api.vercel.com"},
+    {"id":"wolfram","name":"Wolfram","category":"Development","description":"Computational knowledge and answers.","auth":"api_key","host":"api.wolframalpha.com"},
+    {"id":"google-drive","name":"Google Drive","category":"Productivity","description":"Files, folders, and documents.","auth":"oauth2","host":"www.googleapis.com"},
+    {"id":"youtube","name":"YouTube","category":"Media","description":"Videos, channels, and playlists.","auth":"oauth2","host":"www.googleapis.com"},
+    {"id":"signal","name":"Signal","category":"Communication","description":"Private messaging through an owner-managed bridge.","auth":"api_key","host":"localhost"},
+    {"id":"booking","name":"Booking.com","category":"Travel","description":"Accommodation search and booking workflows.","auth":"oauth2","host":"distribution-xml.booking.com"},
+    {"id":"trip","name":"Trip.com","category":"Travel","description":"Flights, hotels, and itinerary workflows.","auth":"api_key","host":"openservice.ctrip.com"},
+    {"id":"skyscanner","name":"Skyscanner","category":"Travel","description":"Flight and travel search.","auth":"api_key","host":"partners.api.skyscanner.net"},
+    {"id":"expedia","name":"Expedia","category":"Travel","description":"Lodging and travel booking workflows.","auth":"api_key","host":"api.ean.com"},
+    {"id":"makemytrip","name":"MakeMyTrip","category":"Travel","description":"Flights, hotels, and rail planning.","auth":"oauth2","host":"api.makemytrip.com"},
+    {"id":"ixigo","name":"ixigo","category":"Travel","description":"Indian rail and flight planning.","auth":"api_key","host":"api.ixigo.com"},
+    {"id":"ryanair","name":"Ryanair","category":"Travel","description":"Flight discovery and booking preparation.","auth":"oauth2","host":"www.ryanair.com"},
+    {"id":"trainline","name":"Trainline","category":"Travel","description":"Rail search and booking workflows.","auth":"api_key","host":"api.thetrainline.com"},
+    {"id":"easemytrip","name":"EaseMyTrip","category":"Travel","description":"Flights and hotel planning.","auth":"api_key","host":"api.easemytrip.com"},
+    {"id":"ticketmaster","name":"Ticketmaster","category":"Travel","description":"Event discovery and ticket workflows.","auth":"api_key","host":"app.ticketmaster.com"},
+    {"id":"uber","name":"Uber","category":"On-demand","description":"Ride estimates and trip requests.","auth":"oauth2","host":"api.uber.com"},
+    {"id":"ubereats","name":"Uber Eats","category":"On-demand","description":"Restaurant discovery and order workflows.","auth":"oauth2","host":"api.uber.com"},
+    {"id":"getir","name":"Getir","category":"On-demand","description":"Local grocery delivery workflows.","auth":"oauth2","host":"api.getir.com"},
+    {"id":"zoopla","name":"Zoopla","category":"On-demand","description":"UK property discovery.","auth":"api_key","host":"api.zoopla.co.uk"},
+    {"id":"olx-india","name":"OLX India","category":"On-demand","description":"Local marketplace search and listing workflows.","auth":"oauth2","host":"www.olx.in"}
+  ]
+}

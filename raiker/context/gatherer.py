@@ -74,6 +74,7 @@ class ContextGatherer:
             "current_prompt": lambda: self._current_prompt(root, prompt_text),
             "workspace_summary": lambda: self._workspace_summary(root, store),
             "capability_status": lambda: self._capability_status(root),
+            "connector_status": lambda: self._connector_status(root, store),
             "approvals": lambda: self._approvals(root, store),
             "recent_events": lambda: self._recent_events(root, store),
             "tasks": lambda: self._tasks(root, store),
@@ -613,6 +614,34 @@ class ContextGatherer:
             title=f"Memory candidates ({len(candidates)})",
             content="\n".join(lines),
             metadata={"candidate_count": len(candidates)},
+        )
+
+    def _connector_status(self, root: Path, store: SQLiteStore) -> ContextItem | None:
+        del root
+        with store.connect() as connection:
+            rows = connection.execute(
+                """SELECT i.connector_id,
+                          COALESCE((SELECT v.status FROM connector_invocations v
+                                    WHERE v.principal_id=i.principal_id
+                                      AND v.connector_id=i.connector_id
+                                    ORDER BY v.started_at DESC LIMIT 1), 'idle') AS activity_status
+                   FROM connector_installations i WHERE i.enabled=1
+                   ORDER BY i.connector_id LIMIT 50"""
+            ).fetchall()
+        if not rows:
+            return None
+        lines = [
+            f"{row['connector_id']}: enabled, invocation={row['activity_status']}"
+            for row in rows
+        ]
+        return self._make_item(
+            source_type="connector_status",
+            trust_level="local_metadata",
+            sensitivity="low",
+            provenance={"origin": "connector_installations"},
+            title=f"Active connectors ({len(rows)})",
+            content="\n".join(lines),
+            metadata={"connector_count": len(rows)},
         )
 
     def _model_profile(self, root: Path) -> ContextItem | None:

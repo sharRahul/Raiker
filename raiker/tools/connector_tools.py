@@ -102,3 +102,22 @@ def slack_read(
 
     service = SlackConnectorService(workspace_root, store or SQLiteStore(workspace_root))
     return service.read(resource, channel)
+
+
+def connector_read(
+    workspace_root: str | Path,
+    principal_id: str,
+    connector_id: str,
+    operation_id: str,
+    arguments: dict[str, Any] | None = None,
+    *,
+    store: SQLiteStore | None = None,
+) -> dict[str, Any]:
+    """Invoke one manifest-declared GET operation for the authenticated principal."""
+    from raiker.runtime.connector_ecosystem import ConnectorInvoker
+    from raiker.storage.sqlite import SQLiteStore
+
+    service = ConnectorInvoker(store or SQLiteStore(workspace_root))
+    return service.invoke_read_sync(
+        principal_id, connector_id, operation_id, arguments or {}
+    )

@@ -15,6 +15,7 @@ SOURCE_TYPES = (
     "memory_candidates",
     "model_profile",
     "capability_status",
+    "connector_status",
 )
 
 # Deterministic priority order used by the gatherer when applying the budget. Higher in the
@@ -26,6 +27,7 @@ PRIORITY_ORDER = (
     "attachment",
     "workspace_summary",
     "capability_status",
+    "connector_status",
     "approvals",
     "recent_events",
     "tasks",

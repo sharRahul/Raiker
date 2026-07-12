@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -15,7 +16,13 @@ from raiker.memory.governance import GovernedMemoryService
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.advisor_tools import consult_advisor
-from raiker.tools.connector_tools import gcal_read, github_read, gmail_read, slack_read
+from raiker.tools.connector_tools import (
+    connector_read,
+    gcal_read,
+    github_read,
+    gmail_read,
+    slack_read,
+)
 from raiker.tools.filesystem import (
     FilesystemSafetyError,
     diff_files,
@@ -48,7 +55,7 @@ _METADATA_ONLY_TOOLS = frozenset({"consult_advisor"})
 # identifiers and are kept verbatim (redacted) for the audit trail; only the
 # fetched *content* is dropped from events.
 _CONTENT_RESULT_TOOLS = frozenset(
-    {"consult_advisor", "github_read", "gmail_read", "gcal_read", "slack_read"}
+    {"consult_advisor", "github_read", "gmail_read", "gcal_read", "slack_read", "connector_read"}
 )
 _CONTENT_RESULT_FIELDS = ("answer", "content")
 
@@ -62,12 +69,14 @@ class ToolBroker:
         store: SQLiteStore | None = None,
         writer: EventLogWriter | None = None,
         hook_dispatcher: HookDispatcher | None = None,
+        principal_id: str = "local_user",
     ) -> None:
         self.workspace_root = Path(workspace_root).resolve()
         self.policy_engine = policy_engine
         self.store = store
         self.writer = writer
         self.hook_dispatcher = hook_dispatcher
+        self.principal_id = principal_id
         self.memory_service = GovernedMemoryService(
             self.workspace_root,
             store=store or SQLiteStore(self.workspace_root),
@@ -162,6 +171,14 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("resource", "")),
                 str(args.get("channel", "")),
+                store=self.store,
+            ),
+            "connector_read": lambda args: connector_read(
+                self.workspace_root,
+                self.principal_id,
+                str(args.get("connector_id", "")),
+                str(args.get("operation_id", "")),
+                args.get("arguments") if isinstance(args.get("arguments"), dict) else {},
                 store=self.store,
             ),
         }
@@ -407,6 +424,12 @@ class ToolBroker:
         if decision.decision == "needs_approval":
             approval_id = new_id("appr_")
             proposal_preview = self._approval_preview(action)
+            connector_write = action.tool_name == "connector_write"
+            expected_effect = (
+                "Approving executes this exact connector mutation once."
+                if connector_write
+                else "Records an action-bound approval request only. Approval resolution is metadata-only and does not execute the action."
+            )
             self._event(
                 session_id=session_id,
                 turn_id=turn_id,
@@ -420,11 +443,11 @@ class ToolBroker:
                     "proposal_preview": proposal_preview,
                     "risk_level": "high",
                     "policy_reasons": decision.reasons,
-                    "expected_effect": "Records an action-bound approval request only. Approval resolution is metadata-only and does not execute the action.",
+                    "expected_effect": expected_effect,
                     "state_changes": {
                         "files": action.tool_name in {"write_file", "edit_file", "apply_patch"},
                         "memory": action.tool_name in {"memory_write", "memory_forget"},
-                        "network": action.tool_name == "shell",
+                        "network": action.tool_name in {"shell", "connector_write"},
                         "shell": action.tool_name == "shell",
                         "provider": False,
                         "export": False,
@@ -441,6 +464,40 @@ class ToolBroker:
                 self.store.insert_tool_action(
                     sanitized_action, session_id, turn_id, "approval_required"
                 )
+                if action.tool_name == "connector_write":
+                    connector_id = action.arguments.get("connector_id")
+                    operation_id = action.arguments.get("operation_id")
+                    arguments = action.arguments.get("arguments", {})
+                    if (
+                        isinstance(connector_id, str)
+                        and isinstance(operation_id, str)
+                        and isinstance(arguments, dict)
+                    ):
+                        from raiker.runtime.connector_ecosystem import ConnectorInvoker
+
+                        try:
+                            operation, _base = ConnectorInvoker(self.store)._operation(
+                                connector_id, operation_id
+                            )
+                        except ValueError:
+                            operation = {}
+                        if operation.get("method") in {"POST", "PUT", "PATCH", "DELETE"}:
+                            with self.store.connect() as connection:
+                                connection.execute(
+                                """INSERT INTO connector_write_intents
+                                   (intent_id, approval_id, principal_id, connector_id,
+                                    operation_id, arguments_json, status, created_at)
+                                   VALUES (?, ?, ?, ?, ?, ?, 'pending_approval', ?)""",
+                                    (
+                                    new_id("cwi_"),
+                                    approval_id,
+                                    self.principal_id,
+                                    connector_id,
+                                    operation_id,
+                                    json.dumps(arguments, sort_keys=True),
+                                        utc_now(),
+                                    ),
+                                )
             self._notify_hook(
                 "PermissionRequest",
                 action,
@@ -462,7 +519,7 @@ class ToolBroker:
                         "risk_level": "high",
                         "reasons": decision.reasons,
                         "proposal_preview": proposal_preview,
-                        "expected_effect": "Stores approval metadata only. Resolving approval does not execute the action in the current backend.",
+                        "expected_effect": expected_effect,
                     },
                     error=None,
                     started_at=now,

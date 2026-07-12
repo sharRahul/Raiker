@@ -1152,6 +1152,11 @@ class DashboardService:
             diff=diff,
             diff_path=diff_path,
             preview_kind=kind,
+            metadata_only_notice=(
+                "Approving this connector write executes this exact action once."
+                if view.tool_name == "connector_write"
+                else "Approval resolution is metadata-only. Recording a decision does NOT execute the action."
+            ),
         )
 
     @classmethod

@@ -7,6 +7,7 @@ import type {
   CapabilityGate,
   Checkpoint,
   ConnectionsView,
+  ConnectorStoreView,
   Diagnostics,
   EventEntry,
   InterruptRequestBody,
@@ -106,6 +107,40 @@ export const api = {
   // never exposes a credential value). Enabling one is done via the capability
   // gate + decision-mode control plane, not here.
   connections: () => request<ConnectionsView>("/api/connections"),
+  connectorStore: () => request<ConnectorStoreView>("/api/connector-store"),
+  installConnector: (connectorId: string) =>
+    postJson<{ ok: boolean; installed: boolean }>(
+      `/api/connector-store/${encodeURIComponent(connectorId)}/install`,
+      {},
+    ),
+  uninstallConnector: (connectorId: string) =>
+    request<{ ok: boolean; installed: boolean }>(
+      `/api/connector-store/${encodeURIComponent(connectorId)}`,
+      { method: "DELETE" },
+    ),
+  setConnectorCredentials: (
+    connectorId: string,
+    values: Record<string, string>,
+    expiresAt?: string,
+  ) =>
+    request<{ ok: boolean; auth_status: string }>(
+      `/api/connector-store/${encodeURIComponent(connectorId)}/credentials`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ values, expires_at: expiresAt || null }),
+      },
+    ),
+  setConnectorEnabled: (connectorId: string, enabled: boolean) =>
+    request<{ ok: boolean; enabled: boolean }>(
+      `/api/connector-store/${encodeURIComponent(connectorId)}/enabled?enabled=${enabled}`,
+      { method: "PUT" },
+    ),
+  registerConnectorManifest: (connectorId: string, manifest: Record<string, unknown>) =>
+    postJson<{ ok: boolean; operations: unknown[] }>(
+      `/api/connector-store/${encodeURIComponent(connectorId)}/manifest`,
+      { manifest },
+    ),
   // On-demand listing of the models a provider serves (user-initiated; provider
   // policy is enforced server-side before any network contact).
   providerModels: (profileId: string) =>

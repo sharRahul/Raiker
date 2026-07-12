@@ -62,6 +62,8 @@ _PREFIXES = {
     "rtn_",
     "att_",
     "proj_",
+    "cwi_",
+    "cinv_",
 }
 
 

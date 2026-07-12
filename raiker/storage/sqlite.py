@@ -52,6 +52,10 @@ from raiker.storage.migrations import (
     CALENDAR_EVENTS_SQL,
     CAPABILITY_DECISION_MODE_MIGRATION_ID,
     CAPABILITY_DECISION_MODE_SQL,
+    CONNECTOR_ECOSYSTEM_MIGRATION_ID,
+    CONNECTOR_ECOSYSTEM_SQL,
+    CONNECTOR_INVOCATIONS_MIGRATION_ID,
+    CONNECTOR_INVOCATIONS_SQL,
     EMAIL_DRAFTS_MIGRATION_ID,
     EMAIL_DRAFTS_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
@@ -448,6 +452,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(MODEL_ADVISOR_MIGRATION_ID, MODEL_ADVISOR_SQL, connection)
             self._apply_migration(ATTACHMENT_STORE_MIGRATION_ID, ATTACHMENT_STORE_SQL, connection)
             self._apply_migration(PROJECTS_MIGRATION_ID, PROJECTS_SQL, connection)
+            self._apply_migration(
+                CONNECTOR_ECOSYSTEM_MIGRATION_ID, CONNECTOR_ECOSYSTEM_SQL, connection
+            )
+            self._apply_migration(
+                CONNECTOR_INVOCATIONS_MIGRATION_ID, CONNECTOR_INVOCATIONS_SQL, connection
+            )
             with contextlib.suppress(sqlite3.OperationalError):
                 connection.execute(
                     "ALTER TABLE sessions ADD COLUMN project_id TEXT REFERENCES projects(project_id)"

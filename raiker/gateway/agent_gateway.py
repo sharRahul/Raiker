@@ -24,7 +24,7 @@ from raiker.tools.broker import ToolBroker
 
 
 class AgentGateway:
-    def __init__(self, workspace_root: str | Path) -> None:
+    def __init__(self, workspace_root: str | Path, principal_id: str = "local_user") -> None:
         self.workspace_root = Path(workspace_root).resolve()
         self.store = SQLiteStore(self.workspace_root)
         self.writer = EventLogWriter(self.store)
@@ -42,6 +42,7 @@ class AgentGateway:
             store=self.store,
             writer=self.writer,
             hook_dispatcher=self.hook_dispatcher,
+            principal_id=principal_id,
         )
         self.model_registry = ModelProfileRegistry.load()
         self.connector_registry = ConnectorRegistry.load()

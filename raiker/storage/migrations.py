@@ -1130,3 +1130,71 @@ CREATE TABLE IF NOT EXISTS attachments (
   created_at TEXT NOT NULL
 );
 """
+
+# Manifest-driven outbound connector ecosystem. Catalog metadata remains in a
+# versioned config file; these tables hold only per-principal lifecycle state,
+# encrypted credentials, validated manifests, and action-bound write intents.
+CONNECTOR_ECOSYSTEM_MIGRATION_ID = "RAIKER-1008-connector-ecosystem"
+
+CONNECTOR_ECOSYSTEM_SQL = """
+CREATE TABLE IF NOT EXISTS connector_installations (
+  principal_id TEXT NOT NULL,
+  connector_id TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  auth_status TEXT NOT NULL DEFAULT 'not_connected',
+  installed_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, connector_id)
+);
+
+CREATE TABLE IF NOT EXISTS connector_credentials (
+  principal_id TEXT NOT NULL,
+  connector_id TEXT NOT NULL,
+  encrypted_payload BLOB NOT NULL,
+  expires_at TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, connector_id)
+);
+
+CREATE TABLE IF NOT EXISTS connector_manifests (
+  connector_id TEXT PRIMARY KEY,
+  manifest_json TEXT NOT NULL,
+  manifest_sha256 TEXT NOT NULL,
+  installed_by TEXT NOT NULL,
+  installed_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS connector_write_intents (
+  intent_id TEXT PRIMARY KEY,
+  approval_id TEXT UNIQUE,
+  principal_id TEXT NOT NULL,
+  connector_id TEXT NOT NULL,
+  operation_id TEXT NOT NULL,
+  arguments_json TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  executed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_connector_installations_principal
+  ON connector_installations(principal_id);
+CREATE INDEX IF NOT EXISTS idx_connector_intents_approval
+  ON connector_write_intents(approval_id);
+"""
+
+CONNECTOR_INVOCATIONS_MIGRATION_ID = "RAIKER-1009-connector-invocations"
+CONNECTOR_INVOCATIONS_SQL = """
+CREATE TABLE IF NOT EXISTS connector_invocations (
+  invocation_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  connector_id TEXT NOT NULL,
+  operation_id TEXT NOT NULL,
+  method TEXT NOT NULL,
+  status TEXT NOT NULL,
+  session_id TEXT,
+  started_at TEXT NOT NULL,
+  completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_connector_invocations_lifecycle
+  ON connector_invocations(principal_id, connector_id, started_at DESC);
+"""

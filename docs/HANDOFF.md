@@ -26,6 +26,31 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 
 ## State as of 2026-07-11 (this session, branch `claude/handoff-task-implementation-9fapmw`)
 
+**Task 4 read connectors COMPLETE: GitHub + Gmail + Google Calendar + Slack, all
+governed read-only.** Four connectors now share the identical fail-closed pattern
+(gate + default-`ask` decision mode + owner env-only credential + owner egress
+allowlist + server-built request URL + untrusted-data framing + metadata-only
+audit; reads only). GitHub and Gmail are **live-verified end-to-end on hosted
+Anthropic**; Calendar and Slack are code-complete + fully unit-tested (live
+verification deferred — no operator tokens for those services this run).
+- **`connector_gcal_runtime`** — `gcal_read(resource, calendar_id, event_id)`;
+  resource ∈ event/calendar; env `RAIKER_GCAL_TOKEN`; host `www.googleapis.com`;
+  URL built server-side and **path-encoded** from validated components. Threat
+  model `docs/threat-models/connectors-gcal.md`; `tests/test_gcal_connector.py`
+  (19).
+- **`connector_slack_runtime`** — `slack_read(resource, channel)`; resource ∈
+  channel_info/channel_history; env `RAIKER_SLACK_TOKEN`; host `slack.com`; URL
+  built server-side against a fixed Web API method (`conversations.info`/
+  `conversations.history`) from a validated channel id; a Slack `ok:false` body
+  is treated as `connector_bad_response`, never surfaced as content. Threat model
+  `docs/threat-models/connectors-slack.md`; `tests/test_slack_connector.py` (19).
+- Both wired exactly like GitHub/Gmail (phase_gates RUNTIME_DOMAIN + tier-5,
+  executor registry + `REAL_EXECUTOR_CAPABILITIES`, activation, router, policy
+  config, tool_call_validation, broker content-scrub set) with `ConnectorView`
+  rows in `get_connections()` (the generic `ConnectionsView` renders all four).
+
+### Prior state — Task 4 second read connector (Gmail, done + live-verified this branch)
+
 **Task 4 second read connector COMPLETE: governed Gmail read-only connector,
 live-verified end-to-end on hosted Anthropic.** Replicates the GitHub reference
 slice exactly — different host + credential + resource, identical governance.
@@ -124,14 +149,14 @@ for all Task 4 connectors (Gmail done above; Calendar / Slack replicate it).
   both "Ready" and honest "Fail-closed" states (0 console errors). Full table in
   `docs/WEB_APP_LIVE_TEST.md` (2026-07-11 Task 4 section).
 
-**Next for Task 4:** two read connectors are done (GitHub, Gmail). Either add a
-**third** read connector (Calendar / Slack — each = new capability +
-`*ConnectorService` (gate + mode + env credential + `<host>` on the connector
-egress allowlist + server-built request) + brokered tool +
-`GithubConnectorExecutor`-style route executor + a `ConnectorView` row in
-`get_connections()`), or move to the first **write** action end-to-end (must
-require **approval**, not just `ask`; the write executor must be real). Do NOT
-ship a connector whose executor isn't real.
+**Next for Task 4:** all four read connectors are done (GitHub, Gmail, Calendar,
+Slack). The remaining Task-4 work is the first **write** action end-to-end (must
+require **approval**, not just `ask`; the write executor must be real). Two
+follow-ons for the read connectors: (a) **live-verify Calendar + Slack** when
+operator tokens for those services are available (repeat the Gmail live
+procedure — governance fail-closed paths + real egress boundary + an end-to-end
+model turn); (b) optional broadening (more resources per connector). Do NOT ship
+a connector whose executor isn't real.
 
 ### Prior state — Task 3 (done, merged PR #109)
 
@@ -263,10 +288,12 @@ above). The governed pattern is established in `raiker/runtime/connectors.py`,
   through the broker/policy/approval path with default decision mode `ask`
   (send/modify actions must require **approval**, not just `ask`; reads are
   `ask` and withhold until raised to `allow`).
-- **DONE** — second read-only connector: **Gmail** (`connector_gmail_runtime`,
-  `gmail_read`), reusing `GithubConnectorService` as the template with a
-  `ConnectorView` row in `get_connections()`. A third read connector (Calendar /
-  Slack) would follow the same pattern. Do NOT ship a connector whose executor
+- **DONE** — all four read-only connectors: **GitHub**, **Gmail**, **Google
+  Calendar** (`connector_gcal_runtime`, `gcal_read`), and **Slack**
+  (`connector_slack_runtime`, `slack_read`), each reusing the reference template
+  with a `ConnectorView` row in `get_connections()`. GitHub + Gmail are
+  live-verified; Calendar + Slack are code-complete + unit-tested (live
+  verification pending operator tokens). Do NOT ship a connector whose executor
   isn't real — fail closed until it is.
 - Then add the first **write** action end-to-end (requires approval through the
   broker/policy/approval path — the write executor must be real). Tests: tool

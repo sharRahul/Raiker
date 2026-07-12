@@ -32,6 +32,8 @@ class StaticPolicyConfig:
                 # owner credential + egress allowlist); the proposal is read-shaped.
                 "github_read",
                 "gmail_read",
+                "gcal_read",
+                "slack_read",
                 "user_create",
                 "user_deactivate",
                 "role_create",
@@ -53,6 +55,7 @@ class StaticPolicyConfig:
             "remote_execution_cap", "container_execution_cap", "cloud_execution_cap",
             "hosted_model_runtime", "private_network_model_runtime", "advisor_model_runtime",
             "connector_github_runtime", "connector_gmail_runtime",
+            "connector_gcal_runtime", "connector_slack_runtime",
             "scheduled_routines",
             "subagents", "multi_agent_teams",
             "email_runtime", "calendar_runtime", "reminder_runtime",

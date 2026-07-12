@@ -75,6 +75,8 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "advisor_model_runtime": "advisor_model_runtime",
     "connector_github_runtime": "connector_github_runtime",
     "connector_gmail_runtime": "connector_gmail_runtime",
+    "connector_gcal_runtime": "connector_gcal_runtime",
+    "connector_slack_runtime": "connector_slack_runtime",
     "scheduled_routines": "scheduled_routines",
     "subagents": "subagents",
     "multi_agent_teams": "multi_agent_teams",

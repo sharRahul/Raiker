@@ -47,7 +47,7 @@ describe("ConnectionsView", () => {
     expect(screen.queryByText(/ghp_/)).not.toBeInTheDocument();
   });
 
-  it("renders every governed connector, including Gmail, with its own env name", async () => {
+  it("renders every governed connector (GitHub, Gmail, Calendar, Slack) with its own env name", async () => {
     stubFetch({
       "GET /api/connections": {
         connectors: [
@@ -60,18 +60,37 @@ describe("ConnectionsView", () => {
             egress_host: "gmail.googleapis.com",
             actions: ["read_message", "read_thread"],
           }),
+          connector({
+            connector_id: "gcal",
+            display_name: "Google Calendar (read-only)",
+            capability: "connector_gcal_runtime",
+            credential_env: "RAIKER_GCAL_TOKEN",
+            egress_host: "www.googleapis.com",
+            actions: ["read_event", "read_calendar"],
+          }),
+          connector({
+            connector_id: "slack",
+            display_name: "Slack (read-only)",
+            capability: "connector_slack_runtime",
+            credential_env: "RAIKER_SLACK_TOKEN",
+            egress_host: "slack.com",
+            actions: ["read_channel_info", "read_channel_history"],
+          }),
         ],
         connector_egress_allowlist_configured: false,
       },
     });
     render(ConnectionsView);
     await waitFor(() => {
-      expect(screen.getByText("Gmail (read-only)")).toBeInTheDocument();
+      expect(screen.getByText("Slack (read-only)")).toBeInTheDocument();
     });
-    // Both connectors are listed and each surfaces its own credential env name.
+    // Every connector is listed and each surfaces its own credential env name.
     expect(screen.getByText("GitHub (read-only)")).toBeInTheDocument();
+    expect(screen.getByText("Gmail (read-only)")).toBeInTheDocument();
+    expect(screen.getByText("Google Calendar (read-only)")).toBeInTheDocument();
     expect(screen.getByText(/RAIKER_GMAIL_TOKEN/)).toBeInTheDocument();
-    expect(screen.getByText(/gmail.googleapis.com/)).toBeInTheDocument();
+    expect(screen.getByText(/RAIKER_GCAL_TOKEN/)).toBeInTheDocument();
+    expect(screen.getByText(/RAIKER_SLACK_TOKEN/)).toBeInTheDocument();
   });
 
   it("reports a connector as ready only when every precondition is met", async () => {

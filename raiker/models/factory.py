@@ -58,44 +58,88 @@ class ModelProviderFactory:
     test_mode: bool = False
     client: httpx.AsyncClient | None = None
 
-    def __init__(self, allow_test_provider: bool = False, client: httpx.AsyncClient | None = None, policy: ProviderRuntimePolicy | None = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        allow_test_provider: bool = False,
+        client: httpx.AsyncClient | None = None,
+        policy: ProviderRuntimePolicy | None = None,
+        **kwargs: Any,
+    ) -> None:
         object.__setattr__(self, "client", client)
         if policy is None:
             policy = ProviderRuntimePolicy(allow_test_provider=allow_test_provider, **kwargs)
         object.__setattr__(self, "allow_test_provider", policy.allow_test_provider)
         object.__setattr__(self, "allow_policy_gated_provider", policy.allow_policy_gated_provider)
         object.__setattr__(self, "allow_hosted_provider", policy.allow_hosted_provider)
-        object.__setattr__(self, "allow_private_network_provider", policy.allow_private_network_provider)
+        object.__setattr__(
+            self, "allow_private_network_provider", policy.allow_private_network_provider
+        )
         object.__setattr__(self, "require_api_key_for_hosted", policy.require_api_key_for_hosted)
         object.__setattr__(self, "test_mode", policy.test_mode)
+
+    @staticmethod
+    def _configured_endpoint(raw: dict[str, Any]) -> str:
+        endpoint_env = raw.get("endpoint_env")
+        if isinstance(endpoint_env, str) and endpoint_env:
+            configured = os.environ.get(endpoint_env, "").strip()
+            if configured:
+                return configured
+        return str(raw.get("endpoint") or raw.get("base_url") or "").strip()
 
     def create(self, profile: ModelProfile, *, require_model: bool = True) -> Any:
         provider = profile.provider.replace("_", "-").lower()
         raw = profile.raw
-        is_test = provider in {"mock", "test", "deterministic-test"} or bool(raw.get("test_only"))
+        is_test = provider in {"mock", "test", "deterministic-test"} or bool(
+            raw.get("test_only")
+        )
         if is_test:
-            if not (self.allow_test_provider or self.test_mode or os.environ.get("RAIKER_TEST_MODE") == "1"):
+            if not (
+                self.allow_test_provider
+                or self.test_mode
+                or os.environ.get("RAIKER_TEST_MODE") == "1"
+            ):
                 raise ProviderPolicyError("deterministic_test_provider_requires_test_mode")
-            return DeterministicTestProvider(provider="test", model=profile.model, profile_id=profile.profile_id)
+            return DeterministicTestProvider(
+                provider="test", model=profile.model, profile_id=profile.profile_id
+            )
         aliases = {
-            "llama-cpp", "llama.cpp", "llama-cpp-server", "ollama", "lm-studio", "vllm",
-            "openai-compatible", "openrouter",
-            # Hosted providers: OpenAI + Gemini speak the OpenAI-compatible
-            # protocol; Anthropic uses the native Messages API adapter.
-            "openai", "gemini", "anthropic",
+            "llama-cpp",
+            "llama.cpp",
+            "llama-cpp-server",
+            "ollama",
+            "ollama-cloud",
+            "lm-studio",
+            "lm-studio-remote",
+            "vllm",
+            "openai-compatible",
+            "openrouter",
+            "huggingface",
+            # Hosted providers: OpenAI, Gemini, Ollama Cloud and Hugging Face
+            # speak the OpenAI-compatible protocol; Anthropic uses its native
+            # Messages API adapter.
+            "openai",
+            "gemini",
+            "anthropic",
         }
         if provider not in aliases:
             raise ProviderConfigurationError(f"unknown_provider:{profile.provider}")
         state = str(raw.get("default_state", ""))
-        if state == "enabled_for_tests_only" and not (self.allow_test_provider or self.test_mode or os.environ.get("RAIKER_TEST_MODE") == "1"):
+        if state == "enabled_for_tests_only" and not (
+            self.allow_test_provider
+            or self.test_mode
+            or os.environ.get("RAIKER_TEST_MODE") == "1"
+        ):
             raise ProviderPolicyError("test_only_profile_requires_test_mode")
         if state == "disabled_until_policy_approved" and not self.allow_policy_gated_provider:
             raise ProviderPolicyError("provider_requires_explicit_policy_approval")
         model_name = str(profile.model or "")
         if require_model and (not model_name or "<" in model_name or ">" in model_name):
             raise ProviderConfigurationError("model_name_not_configured")
-        endpoint = str(raw.get("endpoint") or raw.get("base_url") or "")
+        endpoint = self._configured_endpoint(raw)
         if not endpoint or "<" in endpoint:
+            endpoint_env = raw.get("endpoint_env")
+            if isinstance(endpoint_env, str) and endpoint_env:
+                raise ProviderConfigurationError(f"missing_endpoint_env:{endpoint_env}")
             raise ProviderConfigurationError("missing_endpoint")
         policy = EndpointPolicy(
             local_only=profile.local_only,
@@ -118,19 +162,26 @@ class ModelProviderFactory:
         headers: dict[str, str] = {}
         api_key_env = raw.get("api_key_env")
         if provider == "openrouter":
-            if not (raw.get("requires_network") and raw.get("requires_egress_policy") and raw.get("requires_budget_policy")):
+            if not (
+                raw.get("requires_network")
+                and raw.get("requires_egress_policy")
+                and raw.get("requires_budget_policy")
+            ):
                 raise ProviderPolicyError("openrouter_requires_hosted_egress_budget_policy")
             if urlparse(endpoint).scheme != "https":
                 raise ProviderPolicyError("openrouter_requires_https")
             if not isinstance(api_key_env, str) or not os.environ.get(api_key_env):
                 raise ProviderConfigurationError("openrouter_api_key_missing")
+        api_key = os.environ.get(api_key_env, "") if isinstance(api_key_env, str) else ""
+        if bool(raw.get("requires_api_key", False)) and not api_key:
+            key_name = api_key_env if isinstance(api_key_env, str) else "api_key_env"
+            raise ProviderConfigurationError(f"provider_api_key_missing:{key_name}")
         if (
             endpoint_kind == "remote_hosted"
             and self.require_api_key_for_hosted
-            and (not isinstance(api_key_env, str) or not os.environ.get(api_key_env))
+            and not api_key
         ):
             raise ProviderConfigurationError("hosted_api_key_missing")
-        api_key = os.environ.get(api_key_env, "") if isinstance(api_key_env, str) else ""
         if provider == "anthropic":
             if api_key:
                 headers["x-api-key"] = api_key

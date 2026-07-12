@@ -2025,6 +2025,108 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ),
             )
 
+    # ── Local-account credentials & settings (lock screen) ──────────────────
+    def upsert_account(
+        self,
+        principal_id: str,
+        username: str,
+        password_hash: str,
+        hash_algo: str,
+        created_at: str,
+        updated_at: str,
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO account_credentials
+                   (principal_id, username, password_hash, hash_algo, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(principal_id) DO UPDATE SET
+                     username=excluded.username,
+                     password_hash=excluded.password_hash,
+                     hash_algo=excluded.hash_algo,
+                     updated_at=excluded.updated_at""",
+                (principal_id, username, password_hash, hash_algo, created_at, updated_at),
+            )
+
+    def get_account_by_username(self, username: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM account_credentials WHERE username = ?", (username,)
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def get_account(self, principal_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM account_credentials WHERE principal_id = ?", (principal_id,)
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def set_account_failed(
+        self, principal_id: str, failed_attempts: int, locked_until: str | None
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE account_credentials SET failed_attempts = ?, locked_until = ? "
+                "WHERE principal_id = ?",
+                (failed_attempts, locked_until, principal_id),
+            )
+
+    def set_account_mfa(
+        self,
+        principal_id: str,
+        enrolled: bool,
+        secret_encrypted: bytes | None,
+        backup_codes_hashed: str | None,
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE account_credentials SET mfa_enrolled = ?, mfa_secret_encrypted = ?, "
+                "backup_codes_hashed = ? WHERE principal_id = ?",
+                (int(enrolled), secret_encrypted, backup_codes_hashed, principal_id),
+            )
+
+    def set_account_password(
+        self, principal_id: str, password_hash: str, hash_algo: str, updated_at: str
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE account_credentials SET password_hash = ?, hash_algo = ?, updated_at = ? "
+                "WHERE principal_id = ?",
+                (password_hash, hash_algo, updated_at, principal_id),
+            )
+
+    def delete_account(self, principal_id: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM account_credentials WHERE principal_id = ?", (principal_id,)
+            )
+
+    def list_accounts(self) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT principal_id, username, mfa_enrolled, created_at FROM account_credentials "
+                "ORDER BY created_at ASC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_user_settings(self, principal_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM user_settings WHERE principal_id = ?", (principal_id,)
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def put_user_settings(self, principal_id: str, settings_json: str, updated_at: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO user_settings (principal_id, settings_json, updated_at)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(principal_id) DO UPDATE SET
+                     settings_json=excluded.settings_json, updated_at=excluded.updated_at""",
+                (principal_id, settings_json, updated_at),
+            )
+
     def get_principal(self, principal_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
             row = connection.execute(

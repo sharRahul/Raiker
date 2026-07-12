@@ -48,7 +48,7 @@ class RuntimeOrchestrator:
         writer: EventLogWriter,
         tool_broker: ToolBroker,
         model_router: ModelRouter,
-        default_provider: tuple[str, str] = ("mock", "mock-deterministic"),
+        default_provider: tuple[str, str] = ("llama.cpp", "local-gguf"),
         profile_resolver: Callable[[str, str | None], tuple[str, str] | None] | None = None,
         fallback_resolver: Callable[[], list[tuple[str, str]]] | None = None,
     ) -> None:

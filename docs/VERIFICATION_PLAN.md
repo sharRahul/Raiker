@@ -53,7 +53,7 @@ Expected validation actions inside the terminal client:
 ```text
 normal prompt: Hello Raiker
 normal prompt: List files in this project
-/launch --provider mock --model mock-deterministic
+/launch --provider mock --model anything
 /channels
 /models
 ```
@@ -118,7 +118,7 @@ tests/test_runtime_state_machine.py
 
 ### 6. Terminal And Global Command Smoke Tests
 
-Verify global `raiker` launches the configured local terminal client, terminal prompt input builds a `PromptEnvelope`, terminal client calls gateway, terminal client renders response/status, event log and checkpoint paths are created, local command prompt does not execute automatically, and `/launch --provider mock --model mock-deterministic` resolves a model profile.
+Verify global `raiker` launches the configured local terminal client, terminal prompt input builds a `PromptEnvelope`, terminal client calls gateway, terminal client renders response/status, event log and checkpoint paths are created, local command prompt does not execute automatically, and `/launch` for an unregistered provider fails closed with `unknown_model_profile` instead of resolving a fabricated profile.
 
 Files:
 

@@ -143,14 +143,6 @@ class TestAdvisorServiceGovernance:
         outcome = AdvisorService(workspace, store).consult("q")
         assert outcome["error"]["type"].startswith("advisor_profile_unknown")
 
-    def test_test_only_persisted_advisor_fails_closed(
-        self, workspace: Path, store: SQLiteStore
-    ) -> None:
-        _allow(_enable_gate(workspace, store))
-        store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, "mock-test")
-        outcome = AdvisorService(workspace, store).consult("q")
-        assert outcome["error"]["type"].startswith("advisor_profile_not_allowed")
-
     def test_placeholder_persisted_advisor_fails_closed(
         self, workspace: Path, store: SQLiteStore
     ) -> None:
@@ -377,12 +369,6 @@ class TestModelAdvisorApi:
         )
         assert resp.status_code == 403
         assert resp.json()["detail"]["reason_code"] == "unknown_profile:nope"
-
-    def test_test_profile_fails_closed(self, client: TestClient, owner_token: str) -> None:
-        resp = client.put(
-            "/api/model-advisor", json={"profile_id": "mock-test"}, headers=self._auth(owner_token)
-        )
-        assert resp.status_code == 403
 
     def test_placeholder_profile_fails_closed(self, client: TestClient, owner_token: str) -> None:
         resp = client.put(

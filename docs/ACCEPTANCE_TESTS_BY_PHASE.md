@@ -201,7 +201,7 @@ Manual terminal actions:
 ```text
 Hello Raiker
 List files in this project
-/launch --provider mock --model mock-deterministic  # test-only; normal CLI should report deterministic_test_provider_requires_test_mode
+/launch --provider mock --model anything  # unregistered provider; CLI reports unknown_model_profile:mock:anything
 /channels
 /models
 ```

@@ -101,15 +101,6 @@ class TestFailClosed:
         assert resp.status_code == 403
         assert resp.json()["detail"]["reason_code"] == "unknown_profile:no-such-profile"
 
-    def test_test_profile_rejected(self, client: TestClient, owner_token: str) -> None:
-        resp = client.put(
-            "/api/model-fallback",
-            json={"profile_ids": ["mock-test"]},
-            headers=_auth(owner_token),
-        )
-        assert resp.status_code == 403
-        assert resp.json()["detail"]["reason_code"] == "test_profile_not_allowed:mock-test"
-
     def test_write_requires_auth(self, client: TestClient) -> None:
         resp = client.put(
             "/api/model-fallback", json={"profile_ids": ["raiker-local-llama-cpp"]}

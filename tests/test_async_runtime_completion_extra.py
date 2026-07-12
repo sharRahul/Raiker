@@ -18,7 +18,7 @@ from raiker.contracts.models import AgentResponse
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.models.contracts import ModelMessage, ModelResponse
-from raiker.models.exceptions import ProviderConnectionError, ProviderPolicyError
+from raiker.models.exceptions import ProviderConnectionError
 from raiker.models.factory import ModelProviderFactory, ProviderRuntimePolicy
 from raiker.models.registry import ModelProfileRegistry
 from raiker.models.router import ModelRouter
@@ -210,13 +210,7 @@ def test_cli_model_and_reasoning_events_are_safe(tmp_path: Path) -> None:
 
 
 def test_provider_policy_matrix(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("RAIKER_TEST_MODE", raising=False)
     r = ModelProfileRegistry.load()
-    with pytest.raises(ProviderPolicyError):
-        ModelProviderFactory().create(r.resolve_profile_id("mock-test"))
-    monkeypatch.setenv("RAIKER_TEST_MODE", "1")
-    assert ModelProviderFactory().create(r.resolve_profile_id("mock-test")).provider == "test"
-    monkeypatch.delenv("RAIKER_TEST_MODE", raising=False)
     assert ModelRouter(r).default_provider() == ("llama.cpp", "local-gguf")
     for profile_id in [
         "ollama-local-openai-compatible",

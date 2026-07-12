@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 _TEXT_SUFFIXES = {".json", ".md", ".py", ".toml", ".ts", ".svelte", ".yaml", ".yml"}
 _FORBIDDEN = (
     "".join(("mock", "-test")),

@@ -93,7 +93,7 @@ def test_same_session_accepts_cli_and_rest_prompt(workspace: Path) -> None:
         client=ClientMetadata(type="cli", name="raiker", version="0.0.0"),
         user=UserMetadata(),
         prompt=PromptPayload(text="hello from cli", metadata={"entry_command": "cli"}),
-        options=PromptOptions(model_profile="mock-test"),
+        options=PromptOptions(model_profile="missing-profile"),
     )
     asyncio.run(AgentGateway(workspace).submit_prompt_async(cli_env))
 

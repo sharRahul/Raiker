@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from raiker.contracts.models import ClientMetadata, ModelProfile
 from raiker.events.types import make_event
@@ -54,21 +54,15 @@ class ModelRouter:
         registry: ModelProfileRegistry,
         writer: EventLogWriter | None = None,
         *,
-        allow_test_provider: bool = False,
         runtime_policy: ProviderRuntimePolicy | None = None,
     ) -> None:
         self.registry = registry
         self.writer = writer
-        self.allow_test_provider = allow_test_provider
         if runtime_policy is None and writer is not None:
             from raiker.models.policy_state import provider_runtime_policy_from_gates
 
-            runtime_policy = provider_runtime_policy_from_gates(
-                writer.store, allow_test_provider=allow_test_provider
-            )
-        self.runtime_policy = runtime_policy or ProviderRuntimePolicy(
-            allow_test_provider=allow_test_provider
-        )
+            runtime_policy = provider_runtime_policy_from_gates(writer.store)
+        self.runtime_policy = runtime_policy or ProviderRuntimePolicy()
         self.active_profile_id: str | None = None
         self.reasoning: ReasoningOptions | None = None
 
@@ -286,15 +280,7 @@ class ModelRouter:
             )
         try:
             profile = self.registry.resolve(provider, model)
-            policy = replace(
-                self.runtime_policy,
-                allow_test_provider=(
-                    self.runtime_policy.allow_test_provider
-                    or self.allow_test_provider
-                    or client.type == "test_harness"
-                ),
-            )
-            ModelProviderFactory(policy=policy).create(profile)
+            ModelProviderFactory(policy=self.runtime_policy).create(profile)
         except (RegistryError, ModelProviderError) as exc:
             if self.writer is not None:
                 self.writer.append(

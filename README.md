@@ -52,7 +52,6 @@ This installs the package in editable mode with the dev toolchain (`pytest`, `ru
 Raiker is local and needs **no credentials** to run. Behavior is controlled by a few environment variables and the bundled JSON config files — never by hard-coded secrets:
 
 - `RAIKER_TUI=plain` — keep the plain line-oriented shell path (the launchable terminal client; the local web dashboard is the other launchable surface).
-- `RAIKER_TEST_MODE=1` — enable the deterministic test provider (test/offline only; production CLI policy blocks it with `deterministic_test_provider_requires_test_mode`).
 - `RAIKER_WEB_UI_DIR=<path>` — override the built web dashboard directory `raiker-web` serves (default `apps/web/dist`).
 - `--workspace <path>` — choose the workspace root that holds local runtime state (defaults to the current directory).
 - Model endpoints are declared in [`config/model-profiles.json`](config/model-profiles.json); channel connector profiles live in [`config/channel-connectors.json`](config/channel-connectors.json).

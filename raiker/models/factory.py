@@ -17,7 +17,6 @@ from raiker.models.endpoint_policy import (
 from raiker.models.exceptions import ProviderConfigurationError, ProviderPolicyError
 from raiker.models.providers.anthropic_messages import AsyncAnthropicMessagesProvider
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
-from raiker.models.providers.test_provider import DeterministicTestProvider
 
 
 def capabilities_from_profile(profile: ModelProfile) -> ModelCapabilities:
@@ -40,42 +39,35 @@ def capabilities_from_profile(profile: ModelProfile) -> ModelCapabilities:
 
 @dataclass(frozen=True)
 class ProviderRuntimePolicy:
-    allow_test_provider: bool = False
     allow_policy_gated_provider: bool = False
     allow_hosted_provider: bool = False
     allow_private_network_provider: bool = False
     require_api_key_for_hosted: bool = True
-    test_mode: bool = False
 
 
 @dataclass(frozen=True)
 class ModelProviderFactory:
-    allow_test_provider: bool = False
     allow_policy_gated_provider: bool = False
     allow_hosted_provider: bool = False
     allow_private_network_provider: bool = False
     require_api_key_for_hosted: bool = True
-    test_mode: bool = False
     client: httpx.AsyncClient | None = None
 
     def __init__(
         self,
-        allow_test_provider: bool = False,
         client: httpx.AsyncClient | None = None,
         policy: ProviderRuntimePolicy | None = None,
         **kwargs: Any,
     ) -> None:
         object.__setattr__(self, "client", client)
         if policy is None:
-            policy = ProviderRuntimePolicy(allow_test_provider=allow_test_provider, **kwargs)
-        object.__setattr__(self, "allow_test_provider", policy.allow_test_provider)
+            policy = ProviderRuntimePolicy(**kwargs)
         object.__setattr__(self, "allow_policy_gated_provider", policy.allow_policy_gated_provider)
         object.__setattr__(self, "allow_hosted_provider", policy.allow_hosted_provider)
         object.__setattr__(
             self, "allow_private_network_provider", policy.allow_private_network_provider
         )
         object.__setattr__(self, "require_api_key_for_hosted", policy.require_api_key_for_hosted)
-        object.__setattr__(self, "test_mode", policy.test_mode)
 
     @staticmethod
     def _configured_endpoint(raw: dict[str, Any]) -> str:
@@ -89,19 +81,10 @@ class ModelProviderFactory:
     def create(self, profile: ModelProfile, *, require_model: bool = True) -> Any:
         provider = profile.provider.replace("_", "-").lower()
         raw = profile.raw
-        is_test = provider in {"mock", "test", "deterministic-test"} or bool(
-            raw.get("test_only")
-        )
-        if is_test:
-            if not (
-                self.allow_test_provider
-                or self.test_mode
-                or os.environ.get("RAIKER_TEST_MODE") == "1"
-            ):
-                raise ProviderPolicyError("deterministic_test_provider_requires_test_mode")
-            return DeterministicTestProvider(
-                provider="test", model=profile.model, profile_id=profile.profile_id
-            )
+        # Raiker ships no built-in test/mock model provider. Any profile that
+        # still claims to be one is rejected fail-closed rather than served.
+        if provider in {"mock", "test"} or bool(raw.get("test_only")):
+            raise ProviderPolicyError("test_provider_not_available")
         aliases = {
             "llama-cpp",
             "llama.cpp",
@@ -124,12 +107,8 @@ class ModelProviderFactory:
         if provider not in aliases:
             raise ProviderConfigurationError(f"unknown_provider:{profile.provider}")
         state = str(raw.get("default_state", ""))
-        if state == "enabled_for_tests_only" and not (
-            self.allow_test_provider
-            or self.test_mode
-            or os.environ.get("RAIKER_TEST_MODE") == "1"
-        ):
-            raise ProviderPolicyError("test_only_profile_requires_test_mode")
+        if state == "enabled_for_tests_only":
+            raise ProviderPolicyError("test_only_profile_not_runnable")
         if state == "disabled_until_policy_approved" and not self.allow_policy_gated_provider:
             raise ProviderPolicyError("provider_requires_explicit_policy_approval")
         model_name = str(profile.model or "")

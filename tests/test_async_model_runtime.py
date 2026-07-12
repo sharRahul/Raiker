@@ -69,12 +69,8 @@ def test_endpoint_classification_and_policy() -> None:
         validate_endpoint_policy("https://openrouter.ai/api/v1", EndpointPolicy(False, True, True, False, provider="openrouter"))
 
 
-def test_factory_test_provider_gate_and_openai_profiles() -> None:
+def test_factory_openai_profiles() -> None:
     r = ModelProfileRegistry.load()
-    test_profile = r.resolve_profile_id("deterministic-test")
-    with pytest.raises(ProviderPolicyError):
-        ModelProviderFactory().create(test_profile)
-    assert ModelProviderFactory(allow_test_provider=True).create(test_profile).profile_id == "deterministic-test"
     provider = ModelProviderFactory().create(r.resolve_profile_id("raiker-local-llama-cpp"))
     assert isinstance(provider, AsyncOpenAICompatibleProvider)
     run(provider.aclose())

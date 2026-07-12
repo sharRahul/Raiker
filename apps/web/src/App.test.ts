@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
 import { BOOTSTRAP_ROUTES, stubFetch } from "./lib/test-helpers";
@@ -36,6 +36,99 @@ describe("App shell", () => {
     // mode identifier is shown as a plain-English name, not the raw code.
     expect(screen.getByText("prin_owner")).toBeInTheDocument();
     expect(screen.getByText("Local single user runtime")).toBeInTheDocument();
+  });
+
+  it("refreshes the topbar model chip after a selection on the Models view", async () => {
+    const profileBase = {
+      default_state: "disabled",
+      local_only: true,
+      requires_network: false,
+      endpoint_kind: "local",
+      requires_egress_policy: false,
+      requires_budget_policy: false,
+      runtime_gate: null,
+      off_machine: false,
+      prompt_cache_ttl: null,
+    };
+    const modelsBase = {
+      current_profile_id: null,
+      current_model: null,
+      advisor_profile_id: null,
+      advisor_model_gate_state: "enabled_runtime",
+      hosted_model_gate_state: "enabled_runtime",
+      private_network_model_gate_state: "enabled_runtime",
+      model_egress_allowlist_configured: false,
+      remote_profile_count: 0,
+      fallback_sequence: [],
+      no_silent_hosted_fallback: true,
+    };
+    // The selection flips server-side after the PUT; GET /api/models must be
+    // re-read by the shell for the chip to change.
+    let selected = "raiker-local-llama-cpp";
+    const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const path = url.split("?")[0];
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "PUT" && path.includes("/api/model-selection")) {
+        selected = "ollama-local-openai-compatible";
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, profile_id: selected, model: "gemma4:31b-cloud" }),
+        } as Response;
+      }
+      if (method === "GET" && path.endsWith("/api/models")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ...modelsBase,
+            profiles: [
+              {
+                ...profileBase,
+                profile_id: "raiker-local-llama-cpp",
+                provider: "llama.cpp",
+                model: "local-gguf",
+                selected: selected === "raiker-local-llama-cpp",
+              },
+              {
+                ...profileBase,
+                profile_id: "ollama-local-openai-compatible",
+                provider: "ollama",
+                model: "gemma4:31b-cloud",
+                selected: selected === "ollama-local-openai-compatible",
+              },
+            ],
+            current_profile_id: selected,
+          }),
+        } as Response;
+      }
+      const key = `${method} ${path}`;
+      for (const routeKey of Object.keys(BOOTSTRAP_ROUTES)) {
+        if (key.endsWith(routeKey.split(" ")[1]) && key.startsWith(routeKey.split(" ")[0])) {
+          return { ok: true, status: 200, json: async () => BOOTSTRAP_ROUTES[routeKey] } as Response;
+        }
+      }
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: { reason_code: `unrouted:${key}` } }),
+      } as Response;
+    });
+    vi.stubGlobal("fetch", mock);
+
+    window.location.hash = "#/models";
+    render(App);
+    await waitFor(() => {
+      expect(screen.getByText(/Local · llama.cpp/)).toBeInTheDocument();
+    });
+
+    // Select the Ollama profile on the Models view; the topbar chip must follow.
+    await waitFor(() => expect(screen.getAllByText("Select").length).toBeGreaterThan(0));
+    await fireEvent.click(screen.getAllByText("Select")[0]);
+    await waitFor(() => {
+      expect(screen.getByText(/Local · Ollama/)).toBeInTheDocument();
+    });
   });
 
   it("shows an honest connection error when the local API is unreachable", async () => {

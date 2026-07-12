@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
@@ -7,6 +6,9 @@
   import type { SessionDetail, SessionSummary, TurnDetail } from "../apiTypes";
   import { responseBadge } from "../statusMaps";
   import { humanize, relativeTime, shortId } from "../format";
+
+  // When a project is active (topbar switcher) the list is scoped to it.
+  let { projectId = null }: { projectId?: string | null } = $props();
 
   let sessions = $state<SessionSummary[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -20,7 +22,7 @@
   async function load() {
     loadError = null;
     try {
-      sessions = await api.sessions();
+      sessions = await api.sessions(projectId ?? undefined);
     } catch (e) {
       sessions = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
@@ -49,7 +51,11 @@
     }
   }
 
-  onMount(load);
+  // Load on mount and again whenever the active project changes.
+  $effect(() => {
+    void projectId;
+    void load();
+  });
 </script>
 
 <div class="head-row">

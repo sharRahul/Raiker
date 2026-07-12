@@ -127,6 +127,28 @@ export interface ProviderModelList {
   models: string[];
 }
 
+/** A project is an organizing scope (workspace-contained subpath + its
+ * sessions/checkpoints), never an authority — selecting one grants nothing. */
+export interface ProjectView {
+  project_id: string;
+  name: string;
+  root_subpath: string;
+  created_at: string;
+  session_count: number;
+  selected: boolean;
+}
+
+export interface ProjectsList {
+  projects: ProjectView[];
+  active_project_id: string | null;
+}
+
+export interface ProjectDetail {
+  project: ProjectView;
+  sessions: SessionSummary[];
+  checkpoints: Checkpoint[];
+}
+
 export interface EventEntry {
   event_id: string;
   session_id: string;

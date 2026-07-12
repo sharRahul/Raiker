@@ -144,6 +144,8 @@ from raiker.storage.migrations import (
     PHASE_10_RUNTIME_AUTHORITY_SQL,
     PHASE_10_RUNTIME_MODE_STATE_MIGRATION_ID,
     PHASE_10_RUNTIME_MODE_STATE_SQL,
+    PROJECTS_MIGRATION_ID,
+    PROJECTS_SQL,
     REMINDERS_MIGRATION_ID,
     REMINDERS_SQL,
     THREAT_MODEL_ACKS_MIGRATION_ID,
@@ -445,6 +447,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(MODEL_ADVISOR_MIGRATION_ID, MODEL_ADVISOR_SQL, connection)
             self._apply_migration(ATTACHMENT_STORE_MIGRATION_ID, ATTACHMENT_STORE_SQL, connection)
+            self._apply_migration(PROJECTS_MIGRATION_ID, PROJECTS_SQL, connection)
+            with contextlib.suppress(sqlite3.OperationalError):
+                connection.execute(
+                    "ALTER TABLE sessions ADD COLUMN project_id TEXT REFERENCES projects(project_id)"
+                )
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
         row = connection.execute(
@@ -468,14 +475,74 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def create_session(self, session_id: str, project_root: str, title: str | None = None, user_id: str | None = None) -> None:
         now = utc_now()
+        # New sessions are stamped with the active project (if any) so project
+        # scoping needs no caller changes — an organizing label, not authority.
+        project_id = self.get_active_project()
         with self.connect() as connection:
             connection.execute(
                 """
                 INSERT OR IGNORE INTO sessions
-                (session_id, project_root, created_at, updated_at, status, title, user_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (session_id, project_root, created_at, updated_at, status, title, user_id, project_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (session_id, project_root, now, now, "open", title, user_id),
+                (session_id, project_root, now, now, "open", title, user_id, project_id),
+            )
+
+    # ── Projects (web-app task 5: named organizing scopes, governance-neutral) ──
+
+    ACTIVE_PROJECT_SCOPE = "local_single_user"
+
+    def create_project(self, project_id: str, name: str, root_subpath: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT INTO projects (project_id, name, root_subpath, created_at) VALUES (?, ?, ?, ?)",
+                (project_id, name, root_subpath, utc_now()),
+            )
+
+    def load_project(self, project_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM projects WHERE project_id = ?", (project_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def load_project_by_name(self, name: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM projects WHERE name = ?", (name,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_projects(self) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT projects.*, COUNT(sessions.session_id) AS session_count
+                FROM projects
+                LEFT JOIN sessions ON sessions.project_id = projects.project_id
+                GROUP BY projects.project_id
+                ORDER BY projects.created_at DESC
+                """
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_active_project(self) -> str | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT project_id FROM active_project WHERE scope_id = ?",
+                (self.ACTIVE_PROJECT_SCOPE,),
+            ).fetchone()
+        return str(row["project_id"]) if row is not None and row["project_id"] else None
+
+    def save_active_project(self, project_id: str | None) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO active_project (scope_id, project_id, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(scope_id) DO UPDATE SET project_id = excluded.project_id, updated_at = excluded.updated_at
+                """,
+                (self.ACTIVE_PROJECT_SCOPE, project_id, utc_now()),
             )
 
     def load_session(self, session_id: str) -> dict[str, Any] | None:
@@ -485,11 +552,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
-    def list_sessions(self, limit: int = 10) -> list[dict[str, Any]]:
+    def list_sessions(self, limit: int = 10, project_id: str | None = None) -> list[dict[str, Any]]:
+        query = "SELECT * FROM sessions"
+        params: list[Any] = []
+        if project_id is not None:
+            query += " WHERE project_id = ?"
+            params.append(project_id)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
         with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM sessions ORDER BY created_at DESC LIMIT ?", (limit,)
-            ).fetchall()
+            rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
     def list_turns(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
@@ -864,12 +936,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
-    def list_checkpoints(self, session_id: str | None = None, limit: int = 50) -> list[dict]:
+    def list_checkpoints(
+        self, session_id: str | None = None, limit: int = 50, project_id: str | None = None
+    ) -> list[dict]:
         query = "SELECT * FROM checkpoints"
         params: list[Any] = []
+        clauses: list[str] = []
         if session_id is not None:
-            query += " WHERE session_id = ?"
+            clauses.append("session_id = ?")
             params.append(session_id)
+        if project_id is not None:
+            # Checkpoints belong to a project through their session.
+            clauses.append("session_id IN (SELECT session_id FROM sessions WHERE project_id = ?)")
+            params.append(project_id)
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(str(limit))
         with self.connect() as connection:

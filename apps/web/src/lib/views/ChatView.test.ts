@@ -193,6 +193,40 @@ describe("ChatView streaming transcript", () => {
     expect(body.model).toBe("qwen2.5");
   });
 
+  it("names the persisted selection in the provider dropdown default option", async () => {
+    stubFetch({
+      ...MODELS_ROUTE,
+      "GET /api/models": {
+        ...(MODELS_ROUTE["GET /api/models"] as Record<string, unknown>),
+        profiles: [
+          {
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "gemma4:31b-cloud",
+            default_state: "disabled",
+            local_only: true,
+            requires_network: false,
+            endpoint_kind: "local",
+            requires_egress_policy: false,
+            requires_budget_policy: false,
+            runtime_gate: null,
+            off_machine: false,
+            selected: true,
+            prompt_cache_ttl: null,
+          },
+        ],
+      },
+    });
+
+    render(ChatView);
+    const providerSelect = screen.getByLabelText("Provider") as HTMLSelectElement;
+    await waitFor(() => expect(providerSelect.options.length).toBeGreaterThan(1));
+    // The default option must name the actual persisted selection, not just
+    // say "Selected model" — the user has to see what will serve the turn.
+    expect(providerSelect.options[0].textContent).toContain("Ollama");
+    expect(providerSelect.options[0].textContent).toContain("gemma4:31b-cloud");
+  });
+
   it("attaches workspace paths and sends them with the prompt", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockImplementation(

@@ -3,12 +3,14 @@ from __future__ import annotations
 import difflib
 import json
 import os
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from raiker.approval_previews import redact_secret_like_text
+from raiker.contracts.ids import new_id
 from raiker.control.dtos import ControlResult
 from raiker.control.service import RuntimeControlService
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
@@ -108,6 +110,48 @@ class CheckpointView:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class ProjectView:
+    # A project is an organizing scope, not an authority: it names a
+    # workspace-contained subpath and groups sessions/checkpoints. Selecting or
+    # creating one grants nothing.
+    project_id: str
+    name: str
+    root_subpath: str
+    created_at: str
+    session_count: int
+    selected: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ProjectsListView:
+    projects: tuple[ProjectView, ...]
+    active_project_id: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "projects": [p.to_dict() for p in self.projects],
+            "active_project_id": self.active_project_id,
+        }
+
+
+@dataclass(frozen=True)
+class ProjectDetailView:
+    project: ProjectView
+    sessions: tuple[SessionView, ...]
+    checkpoints: tuple[CheckpointView, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "project": self.project.to_dict(),
+            "sessions": [s.to_dict() for s in self.sessions],
+            "checkpoints": [c.to_dict() for c in self.checkpoints],
+        }
 
 
 @dataclass(frozen=True)
@@ -381,8 +425,11 @@ class DashboardService:
         self.control = RuntimeControlService(self.workspace_root)
 
     # ── Sessions / turns ────────────────────────────────────────────────
-    def list_sessions(self, limit: int = 50) -> list[SessionView]:
-        return [self._session_view(row) for row in self.store.list_sessions(limit=limit)]
+    def list_sessions(self, limit: int = 50, project_id: str | None = None) -> list[SessionView]:
+        return [
+            self._session_view(row)
+            for row in self.store.list_sessions(limit=limit, project_id=project_id)
+        ]
 
     def get_session(self, session_id: str) -> SessionDetailView | None:
         row = self.store.load_session(session_id)
@@ -413,14 +460,113 @@ class DashboardService:
         )
         return [self._event_view(r) for r in rows]
 
-    def list_checkpoints(self, session_id: str | None = None, limit: int = 50) -> list[CheckpointView]:
+    def list_checkpoints(
+        self, session_id: str | None = None, limit: int = 50, project_id: str | None = None
+    ) -> list[CheckpointView]:
         return [
-            self._checkpoint_view(r) for r in self.store.list_checkpoints(session_id, limit=limit)
+            self._checkpoint_view(r)
+            for r in self.store.list_checkpoints(session_id, limit=limit, project_id=project_id)
         ]
 
     def get_checkpoint(self, checkpoint_id: str) -> CheckpointView | None:
         row = self.store.load_checkpoint_by_id(checkpoint_id)
         return self._checkpoint_view(row) if row is not None else None
+
+    # ── Projects (web-app task 5) ────────────────────────────────────────
+    # A project is a named organizing scope: a workspace-contained subpath plus
+    # the sessions (and their checkpoints) created while it is active. It is
+    # deliberately governance-neutral — creating or selecting a project grants
+    # no capability, and every path stays inside the workspace, fail-closed.
+
+    _PROJECT_NAME_MAX = 100
+
+    def list_projects(self) -> ProjectsListView:
+        active = self.store.get_active_project()
+        return ProjectsListView(
+            projects=tuple(self._project_view(row, active) for row in self.store.list_projects()),
+            active_project_id=active,
+        )
+
+    def get_project(self, project_id: str) -> ProjectDetailView | None:
+        row = self.store.load_project(project_id)
+        if row is None:
+            return None
+        active = self.store.get_active_project()
+        sessions = tuple(
+            self._session_view(s) for s in self.store.list_sessions(limit=200, project_id=project_id)
+        )
+        checkpoints = tuple(
+            self._checkpoint_view(c) for c in self.store.list_checkpoints(project_id=project_id)
+        )
+        row["session_count"] = len(sessions)
+        return ProjectDetailView(
+            project=self._project_view(row, active), sessions=sessions, checkpoints=checkpoints
+        )
+
+    def create_project(self, name: str, acting_principal_id: str | None) -> ControlResult:
+        """Create a named project folder (human gate-manager only).
+
+        The root subpath is derived server-side from the name (slug under
+        ``projects/``) and verified to stay inside the workspace — a name can
+        never place a project root outside it (fail closed).
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if not self.control._is_gate_manager(principal):  # noqa: SLF001
+            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        cleaned = (name or "").strip()
+        if not cleaned or len(cleaned) > self._PROJECT_NAME_MAX:
+            return ControlResult(ok=False, reason_code="invalid_project_name")
+        slug = re.sub(r"[^a-z0-9]+", "-", cleaned.lower()).strip("-")
+        if not slug:
+            return ControlResult(ok=False, reason_code="invalid_project_name")
+        if self.store.load_project_by_name(cleaned) is not None:
+            return ControlResult(ok=False, reason_code="duplicate_project_name")
+        root_subpath = f"projects/{slug}"
+        workspace = self.workspace_root.resolve()
+        resolved = (workspace / root_subpath).resolve()
+        if workspace != resolved and workspace not in resolved.parents:
+            return ControlResult(ok=False, reason_code="project_root_escapes_workspace")
+        if any(p.get("root_subpath") == root_subpath for p in self.store.list_projects()):
+            return ControlResult(ok=False, reason_code="duplicate_project_root")
+        project_id = new_id("proj_")
+        resolved.mkdir(parents=True, exist_ok=True)
+        self.store.create_project(project_id, cleaned, root_subpath)
+        return ControlResult(
+            ok=True,
+            data={"project_id": project_id, "name": cleaned, "root_subpath": root_subpath},
+        )
+
+    def select_project(self, project_id: str | None, acting_principal_id: str | None) -> ControlResult:
+        """Set (or clear, with null/empty) the active project (human gate-manager only).
+
+        New sessions are stamped with the active project. Selecting grants
+        nothing — it is an organizing scope only.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if not self.control._is_gate_manager(principal):  # noqa: SLF001
+            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        cleaned = (project_id or "").strip()
+        if not cleaned:
+            self.store.save_active_project(None)
+            return ControlResult(ok=True, data={"active_project_id": None})
+        if self.store.load_project(cleaned) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_project:{cleaned}")
+        self.store.save_active_project(cleaned)
+        return ControlResult(ok=True, data={"active_project_id": cleaned})
+
+    def _project_view(self, row: dict[str, Any], active_project_id: str | None) -> ProjectView:
+        return ProjectView(
+            project_id=str(row["project_id"]),
+            name=str(row["name"]),
+            root_subpath=str(row["root_subpath"]),
+            created_at=str(row.get("created_at", "")),
+            session_count=int(row.get("session_count", 0) or 0),
+            selected=(str(row["project_id"]) == active_project_id),
+        )
 
     def list_tasks(self, session_id: str | None = None, status: str | None = None) -> list[TaskView]:
         return [self._task_view(t) for t in self.store.list_tasks(session_id=session_id, status=status)]

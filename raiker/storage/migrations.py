@@ -1092,6 +1092,30 @@ CREATE TABLE IF NOT EXISTS model_advisor (
 # data. Content is delivered to a model solely as an image block on a
 # vision-capable profile — attachment bytes never enter event payloads or
 # text context (metadata only: filename, media type, size, sha256).
+# Web-app task 5: project folders. A project is a named organizing scope — its
+# own workspace subpath plus the sessions (and, via sessions, checkpoints) that
+# belong to it. Governance-neutral by design: a project grants no authority and
+# its root_subpath is always contained inside the workspace (enforced by the
+# service; the subpath is derived server-side, never taken from the client).
+# active_project persists which project new sessions are stamped with, one row
+# per scope (the local single-user runtime uses a single fixed scope id).
+PROJECTS_MIGRATION_ID = "RAIKER-1007-projects"
+
+PROJECTS_SQL = """
+CREATE TABLE IF NOT EXISTS projects (
+  project_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  root_subpath TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS active_project (
+  scope_id TEXT PRIMARY KEY,
+  project_id TEXT REFERENCES projects(project_id),
+  updated_at TEXT NOT NULL
+);
+"""
+
 ATTACHMENT_STORE_MIGRATION_ID = "RAIKER-1006-attachment-store"
 
 ATTACHMENT_STORE_SQL = """

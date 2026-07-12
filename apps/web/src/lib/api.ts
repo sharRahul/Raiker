@@ -12,6 +12,8 @@ import type {
   InterruptRequestBody,
   InterruptResult,
   ModelsView,
+  ProjectDetail,
+  ProjectsList,
   PromptRequestBody,
   ProviderModelList,
   ResolveApprovalResult,
@@ -142,10 +144,31 @@ export const api = {
     postJson<UploadedAttachment>("/api/attachments", body),
   events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
     request<EventEntry[]>(withQuery("/api/events", params)),
-  checkpoints: (sessionId?: string) =>
-    request<Checkpoint[]>(withQuery("/api/checkpoints", { session_id: sessionId })),
+  checkpoints: (sessionId?: string, projectId?: string) =>
+    request<Checkpoint[]>(
+      withQuery("/api/checkpoints", { session_id: sessionId, project_id: projectId }),
+    ),
   checkpoint: (id: string) => request<Checkpoint>(`/api/checkpoints/${encodeURIComponent(id)}`),
-  sessions: () => request<SessionSummary[]>("/api/sessions"),
+  sessions: (projectId?: string) =>
+    request<SessionSummary[]>(withQuery("/api/sessions", { project_id: projectId })),
+
+  // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
+  projects: () => request<ProjectsList>("/api/projects"),
+  project: (id: string) => request<ProjectDetail>(`/api/projects/${encodeURIComponent(id)}`),
+  // Create a named project (human gate-manager only, enforced server-side).
+  // The root subpath is derived and contained server-side — no path is sent.
+  createProject: (name: string) =>
+    postJson<{ ok: boolean; project_id: string; name: string; root_subpath: string }>(
+      "/api/projects",
+      { name },
+    ),
+  // Set (or clear, with null) the active project; new sessions are stamped with it.
+  selectProject: (project_id: string | null) =>
+    request<{ ok: boolean; active_project_id: string | null }>("/api/projects/selection", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id }),
+    }),
   session: (id: string) => request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
   turn: (id: string) => request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
   tasks: (params: { session_id?: string; status?: string } = {}) =>

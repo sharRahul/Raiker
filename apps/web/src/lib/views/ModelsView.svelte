@@ -8,6 +8,10 @@
   import { capabilityLabel } from "../capabilityModel";
   import { humanize, providerName } from "../format";
 
+  // The shell owns a models snapshot for the topbar chip; it passes onchanged
+  // so a selection here is reflected there without a full page reload.
+  let { onchanged }: { onchanged?: () => void } = $props();
+
   let models = $state<ModelsData | null>(null);
   let loadError = $state<string | null>(null);
 
@@ -73,6 +77,7 @@
       await api.selectModel(profileId, model.trim() || undefined);
       closePicker();
       await load();
+      onchanged?.();
     } catch (e) {
       selectError =
         e instanceof ApiError

@@ -24,7 +24,40 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 - **Web reads are read-only + rate-limit-aware** (120 req/min/IP). Prefer folding new read data into an existing endpoint over adding a fan-out.
 - **Secrets never surface.** API keys/allowlist values come from owner env, are never displayed, logged, or committed.
 
-## State as of 2026-07-11 (this session, branch `claude/handoff-task-implementation-9fapmw`)
+## State as of 2026-07-12 (this session, local, pushed to `main`)
+
+**Task 5 COMPLETE: project folders (governance-neutral organizing scope).**
+- **Storage:** `projects` table (project_id `proj_…`, unique name, `root_subpath`,
+  created_at) + `active_project` (single-scope row) + `project_id` column on
+  `sessions` (migration `RAIKER-1007-projects`). `SQLiteStore.create_session`
+  stamps new sessions with the active project — no caller changes needed.
+  `list_sessions` / `list_checkpoints` take an optional `project_id` filter
+  (checkpoints scope through their session).
+- **Service (`DashboardService`):** `create_project` (human gate-manager only;
+  root subpath derived server-side as a slug under `projects/`, verified inside
+  the workspace — fail closed on escape/empty/duplicate), `select_project`
+  (set/clear active), `list_projects`, `get_project` (detail bundles scoped
+  sessions + checkpoints). A project grants nothing — no gate/mode/policy change.
+- **API:** `GET/POST /api/projects`, `PUT /api/projects/selection`,
+  `GET /api/projects/{id}`; `project_id` query filter on `GET /api/sessions` +
+  `GET /api/checkpoints`. Same Bearer auth as every governed read; mutations 403
+  with honest reason codes.
+- **Web:** Projects view (create/list/set-active/detail; nav "Work" group) +
+  topbar active-project switcher (App owns one `ProjectsList` snapshot);
+  Sessions/Checkpoints views filter by the active project and reload when it
+  changes.
+- Tests: `tests/test_projects.py` (14: create/list/select, traversal-shaped
+  names contained, empty/dup fail closed, session stamping, checkpoint scoping,
+  API auth + roundtrip + filters) + `ProjectsView.test.ts` (5).
+- **Also this session (model-selection UI truth fix):** the Chat provider
+  dropdown's default option now names the persisted selection (e.g. "Selected
+  model — Ollama · gemma4:31b-cloud") and the topbar model chip refreshes after
+  a selection on the Models view (`onchanged` → App re-reads `/api/models`).
+  3 regression tests (ChatView label, ModelsView callback, App chip refresh).
+- Deferred (spec'd "later" in the task): per-project memory/attachments; Chat
+  does not yet show the active project inline (sessions are stamped server-side).
+
+### Prior state — 2026-07-11 (branch `claude/handoff-task-implementation-9fapmw`)
 
 **Task 4 read connectors COMPLETE: GitHub + Gmail + Google Calendar + Slack, all
 governed read-only.** Four connectors now share the identical fail-closed pattern
@@ -303,17 +336,9 @@ above). The governed pattern is established in `raiker/runtime/connectors.py`,
   *channel* surface (interfaces into Raiker), a different concept from these
   outbound service connectors — the connector pattern above is the one to grow.
 
-**Task 5 — project folders (like Claude Cowork).** A named "project" that scopes
-an ongoing piece of work: its own workspace subpath, sessions, checkpoints, and
-(later) memory/attachments.
-- Storage: `projects` table (id, name, root_subpath, created_at) +
-  `project_id` FK on sessions. Service to create/list/select a project;
-  workspace-scoped root so a project can never escape the workspace.
-- API: `GET/POST /api/projects`, `GET /api/projects/{id}` (sessions/checkpoints
-  filtered by project). Web: a Projects surface + a project switcher in the top
-  bar; Chat/Sessions/Checkpoints filter by the active project.
-- Keep it governance-neutral (a project is an organizing scope, not a new
-  authority). Tests: create/list/select, session association, path containment.
+**Task 5 — DONE** (project folders; see the state section at the top). Optional
+follow-ons: per-project memory/attachments, and surfacing the active project
+inline in Chat.
 
 ## Reference: how a user turns on a hosted provider
 

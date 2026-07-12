@@ -75,6 +75,23 @@ class UploadAttachmentRequest(BaseModel):
     data_base64: str
 
 
+class CreateProjectRequest(BaseModel):
+    # Create a named project (web-app task 5). The root subpath is derived
+    # server-side from the name and contained inside the workspace — the client
+    # never supplies a path. extra="forbid" rejects unknown fields.
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+
+
+class SelectProjectRequest(BaseModel):
+    # Set (or clear, with null/empty) the active project. Selecting a project
+    # grants nothing — it is an organizing scope only.
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: str | None = None
+
+
 class SetModelFallbackRequest(BaseModel):
     # Ordered list of model profile ids to try (in order) when the selected
     # provider is unavailable. extra="forbid" rejects unknown fields.

@@ -4,8 +4,9 @@
   import Topbar from "./lib/components/Topbar.svelte";
   import { DEFAULT_ROUTE, navItem, routeFromHash } from "./lib/nav";
   import { api, connect } from "./lib/api";
-  import type { ModelsView as ModelsSnapshot } from "./lib/apiTypes";
+  import type { ModelsView as ModelsSnapshot, ProjectsList } from "./lib/apiTypes";
   import ChatView from "./lib/views/ChatView.svelte";
+  import ProjectsView from "./lib/views/ProjectsView.svelte";
   import ApprovalsView from "./lib/views/ApprovalsView.svelte";
   import TasksView from "./lib/views/TasksView.svelte";
   import SessionsView from "./lib/views/SessionsView.svelte";
@@ -27,6 +28,8 @@
   let runtimeMode = $state("—");
   let ready = $state(false);
   let models = $state<ModelsSnapshot | null>(null);
+  let projects = $state<ProjectsList | null>(null);
+  const activeProjectId = $derived(projects?.active_project_id ?? null);
 
   onMount(() => {
     const handler = () => {
@@ -41,18 +44,49 @@
     try {
       const session = await connect();
       principal = session.principal_id;
-      const [mode, diag, modelsView] = await Promise.all([
+      const [mode, diag, modelsView, projectsList] = await Promise.all([
         api.runtimeMode(),
         api.diagnostics(),
         api.models(),
+        api.projects(),
       ]);
       runtimeMode = mode.mode_name;
       ready = diag.production_ready_local_single_user_runtime;
       models = modelsView;
+      projects = projectsList;
       authState = "ready";
     } catch {
       authState = "error";
     }
+  }
+
+  // Re-read the models snapshot when the Models view changes the selection so
+  // the topbar chip keeps telling the truth without a full reload.
+  async function refreshModels() {
+    try {
+      models = await api.models();
+    } catch {
+      // Keep the last known snapshot; the chip never fabricates data.
+    }
+  }
+
+  // Same for projects: the Projects view and the topbar switcher share one
+  // snapshot so the active project reads identically everywhere.
+  async function refreshProjects() {
+    try {
+      projects = await api.projects();
+    } catch {
+      // Keep the last known snapshot.
+    }
+  }
+
+  async function selectProject(projectId: string | null) {
+    try {
+      await api.selectProject(projectId);
+    } catch {
+      // Server refused (e.g. not gate-manager); the refresh below re-reads truth.
+    }
+    await refreshProjects();
   }
 </script>
 
@@ -68,6 +102,8 @@
       {runtimeMode}
       {ready}
       {models}
+      {projects}
+      onProjectSelect={selectProject}
       connecting={authState === "connecting"}
     />
     <main id="main" class="content" tabindex="-1">
@@ -92,15 +128,17 @@
       {:else if current === "tasks"}
         <TasksView />
       {:else if current === "sessions"}
-        <SessionsView />
+        <SessionsView projectId={activeProjectId} />
+      {:else if current === "projects"}
+        <ProjectsView onchanged={refreshProjects} />
       {:else if current === "capabilities"}
         <CapabilitiesView {principal} />
       {:else if current === "models"}
-        <ModelsView />
+        <ModelsView onchanged={refreshModels} />
       {:else if current === "connections"}
         <ConnectionsView />
       {:else if current === "checkpoints"}
-        <CheckpointsView />
+        <CheckpointsView projectId={activeProjectId} />
       {:else if current === "activity"}
         <ActivityView />
       {:else if current === "diagnostics"}

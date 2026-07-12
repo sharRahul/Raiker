@@ -56,6 +56,10 @@
 
   const chosenProfile = $derived(profiles.find((p) => p.profile_id === modelProfile) ?? null);
 
+  // The persisted selection (Models view / /model use). The default provider
+  // option names it so the user can see what will actually serve the turn.
+  const selectedProfile = $derived(profiles.find((p) => p.selected) ?? null);
+
   // Attachments for the next prompt: workspace paths (resolved server-side
   // inside the workspace — anything outside fails closed — and included as
   // bounded, untrusted-labelled context) and uploaded images (validated
@@ -627,7 +631,11 @@
             aria-label="Provider"
             title="Provider for this turn (default: your selected model)"
           >
-            <option value="">Selected model</option>
+            <option value="">
+              {selectedProfile !== null
+                ? `${providerName(selectedProfile.provider)} · ${selectedProfile.model}`
+                : "Selected model"}
+            </option>
             {#each profiles as p (p.profile_id)}
               <option value={p.profile_id}>{providerName(p.provider)}</option>
             {/each}

@@ -137,6 +137,24 @@ describe("ModelsView fallback sequence", () => {
     });
   });
 
+  it("notifies onchanged after a successful selection so the shell can refresh", async () => {
+    stubFetch({
+      "GET /api/models": models({}),
+      "PUT /api/model-selection": {
+        ok: true,
+        profile_id: "raiker-local-llama-cpp",
+        model: "local-gguf",
+      },
+    });
+    const onchanged = vi.fn();
+    render(ModelsView, { props: { onchanged } });
+    await waitFor(() => expect(screen.getAllByText("Select").length).toBeGreaterThan(0));
+
+    await fireEvent.click(screen.getAllByText("Select")[0]);
+
+    await waitFor(() => expect(onchanged).toHaveBeenCalled());
+  });
+
   it("lists the provider's models on demand and selects one", async () => {
     const mock = stubFetch({
       "GET /api/models": models({

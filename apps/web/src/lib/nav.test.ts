@@ -17,6 +17,7 @@ describe("nav model", () => {
       "approvals",
       "tasks",
       "sessions",
+      "projects",
       "capabilities",
       "models",
       "connections",

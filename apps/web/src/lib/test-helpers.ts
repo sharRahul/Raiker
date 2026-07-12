@@ -76,6 +76,7 @@ export const BOOTSTRAP_ROUTES: Record<string, unknown> = {
   "POST /api/auth/session": AUTH_SESSION,
   "GET /api/runtime-mode": RUNTIME_MODE,
   "GET /api/diagnostics": DIAGNOSTICS,
+  "GET /api/projects": { projects: [], active_project_id: null },
   "GET /api/models": {
     profiles: [],
     current_profile_id: null,

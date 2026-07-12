@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
     AuthSessionRequest,
+    CreateProjectRequest,
+    SelectProjectRequest,
     SetModelAdvisorRequest,
     SetModelFallbackRequest,
     SetModelSelectionRequest,
@@ -48,9 +50,10 @@ async def mint_session(body: AuthSessionRequest, request: Request) -> dict[str, 
 async def list_sessions(
     request: Request,
     limit: int = 50,
+    project_id: str | None = None,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
-    return serialize_dto(_service(request).list_sessions(limit=limit))
+    return serialize_dto(_service(request).list_sessions(limit=limit, project_id=project_id))
 
 
 @router.get("/api/sessions/{session_id}")
@@ -98,9 +101,78 @@ async def list_checkpoints(
     request: Request,
     session_id: str | None = None,
     limit: int = 50,
+    project_id: str | None = None,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
-    return serialize_dto(_service(request).list_checkpoints(session_id=session_id, limit=limit))
+    return serialize_dto(
+        _service(request).list_checkpoints(
+            session_id=session_id, limit=limit, project_id=project_id
+        )
+    )
+
+
+# ── Projects (web-app task 5: organizing scopes, governance-neutral) ──────────
+@router.get("/api/projects")
+async def list_projects(
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return serialize_dto(_service(request).list_projects())
+
+
+@router.post("/api/projects")
+async def create_project(
+    body: CreateProjectRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Create a named project (human gate-manager only).
+
+    The project root is derived server-side and always contained inside the
+    workspace; a project grants no authority.
+    """
+    session, _principal = _auth_data
+    result = _service(request).create_project(body.name, session.principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/projects/selection")
+async def select_project(
+    body: SelectProjectRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Set (or clear) the active project (human gate-manager only).
+
+    New sessions are stamped with the active project; selecting grants nothing.
+    """
+    session, _principal = _auth_data
+    result = _service(request).select_project(body.project_id, session.principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.get("/api/projects/{project_id}")
+async def get_project(
+    project_id: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    view = _service(request).get_project(project_id)
+    if view is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown project: {project_id}"
+        )
+    return serialize_dto(view)
 
 
 @router.get("/api/checkpoints/{checkpoint_id}")

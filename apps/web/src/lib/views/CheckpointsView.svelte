@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
   import type { Checkpoint } from "../apiTypes";
   import { humanize, relativeTime, shortId } from "../format";
+
+  // When a project is active (topbar switcher) the list is scoped to it.
+  let { projectId = null }: { projectId?: string | null } = $props();
 
   let checkpoints = $state<Checkpoint[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -14,14 +16,18 @@
   async function load() {
     loadError = null;
     try {
-      checkpoints = await api.checkpoints(sessionFilter.trim() || undefined);
+      checkpoints = await api.checkpoints(sessionFilter.trim() || undefined, projectId ?? undefined);
     } catch (e) {
       checkpoints = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
     }
   }
 
-  onMount(load);
+  // Load on mount and again whenever the active project changes.
+  $effect(() => {
+    void projectId;
+    void load();
+  });
 </script>
 
 <div class="head-row">

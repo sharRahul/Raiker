@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ModelsView } from "../apiTypes";
+  import type { ModelsView, ProjectsList } from "../apiTypes";
   import Icon from "./Icon.svelte";
   import ModelChip from "./ModelChip.svelte";
   import StopSwitch from "./StopSwitch.svelte";
@@ -14,6 +14,8 @@
     ready,
     connecting = false,
     models = null,
+    projects = null,
+    onProjectSelect = undefined,
   }: {
     title: string;
     hint: string;
@@ -22,6 +24,8 @@
     ready: boolean;
     connecting?: boolean;
     models?: ModelsView | null;
+    projects?: ProjectsList | null;
+    onProjectSelect?: (projectId: string | null) => void;
   } = $props();
 </script>
 
@@ -35,6 +39,22 @@
     {#if connecting}
       <span class="pill pill-muted">Connecting…</span>
     {:else}
+      {#if projects !== null && projects.projects.length > 0}
+        <!-- Active project: an organizing scope only. New sessions are stamped
+             with it; selecting one grants nothing. -->
+        <select
+          class="project-select"
+          aria-label="Active project"
+          title="Active project — new sessions are scoped to it"
+          value={projects.active_project_id ?? ""}
+          onchange={(e) => onProjectSelect?.((e.currentTarget as HTMLSelectElement).value || null)}
+        >
+          <option value="">No project</option>
+          {#each projects.projects as p (p.project_id)}
+            <option value={p.project_id}>{p.name}</option>
+          {/each}
+        </select>
+      {/if}
       <ModelChip {models} />
       <span class="pill" class:pill-ok={ready} class:pill-warn={!ready} title="Local runtime readiness">
         <span class="dot" aria-hidden="true"></span>
@@ -85,6 +105,16 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .project-select {
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 0.18rem 0.5rem;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--neutral-border);
+    background: var(--neutral-soft);
+    color: var(--text-2);
+    max-width: 12rem;
   }
   .status {
     display: flex;

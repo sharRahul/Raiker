@@ -24,6 +24,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
       { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
       { id: "sessions", label: "Sessions", icon: "sessions", hint: "Past conversations and turns" },
+      { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },
     ],
   },
   {

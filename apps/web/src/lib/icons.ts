@@ -31,7 +31,8 @@ export type IconName =
   | "info"
   | "spark"
   | "mic"
-  | "file";
+  | "file"
+  | "projects";
 
 // Each icon is one or more SVG path `d` strings (stroke, round caps).
 export const ICON_PATHS: Record<IconName, string[]> = {
@@ -84,6 +85,7 @@ export const ICON_PATHS: Record<IconName, string[]> = {
     "M9 21h6",
   ],
   file: ["M7 3h7l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 0-1Z", "M14 3v4h4"],
+  projects: ["M3 7a1 1 0 0 1 1-1h5l2 2.5h9a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z"],
   "chevron-down": ["M6 9.5 12 15.5 18 9.5"],
   "chevron-right": ["M9.5 6 15.5 12 9.5 18"],
   search: ["M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Z", "M15.5 15.5 21 21"],

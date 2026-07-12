@@ -11,6 +11,8 @@
 - **Policy-gated automation with approvals, review, and checkpoints** — Safe read/search/git tools run directly; file mutations become approval-gated proposals. A deterministic local code-review workflow (`/review`), a proposal lifecycle, metadata-only approval previews, and checkpoint/rewind metadata give you reviewable, reversible automation.
 - **Strict authority model** — RuntimeAuthority governs every mutation through capability gates, the policy engine, risk classification, and approval/risk acceptance, with four AI-executable roles, human-only roles, domain scopes, and an auditable owner-bootstrap → acting-principal → `runtime_gate_manager` chain.
 
+- **Device-local lock screen (multi-account)** — The web dashboard is gated by local accounts (username + Argon2id/scrypt password, optional TOTP MFA) so several people can share one machine while each account's connector credentials stay isolated. A server-authoritative login state machine blocks governed APIs until MFA is verified; sessions are CSPRNG tokens with absolute expiry and are revoked on password/MFA change. Connector secrets are encrypted with a user-managed **Vault Key** (fail-closed if missing); MFA seeds use a separate internal key so MFA and the vault are independent. See [`docs/guide/auth.md`](docs/guide/auth.md) and [`docs/threat-models/local-lock-screen.md`](docs/threat-models/local-lock-screen.md). Full per-account isolation of chat/task history is a documented follow-up.
+
 ---
 
 ## Architecture & Tech Stack

@@ -452,3 +452,33 @@ update `docs/IMPLEMENTATION_STATUS.md` + `docs/RUNTIME_EXECUTORS_SPEC.md` →
 run `pytest`, `ruff check .`, `mypy raiker apps tests`, the web gate
 (lint/check/test/build), and all five `scripts/validate_*.py` → commit →
 push to the working branch → open/refresh the PR.
+
+## Local-owner lock screen (2026-07-13)
+
+Added a device-local, multi-account lock screen protecting per-account connector
+credentials. Design: `docs/superpowers/specs/2026-07-12-local-lock-screen-system-overhaul-design.md`.
+Plan: `docs/superpowers/plans/2026-07-12-local-lock-screen-system-overhaul.md`.
+Threat model: `docs/threat-models/local-lock-screen.md`. User guide: `docs/guide/auth.md`.
+
+Shipped + tested:
+- Schema: `account_credentials`, `user_settings`, `trusted_contacts`; `api_sessions`
+  gains scope/absolute_expires_at/last_seen_at/device_label; `tasks` gains
+  priority/scheduled_at/recurrence/reminder_at.
+- `raiker/auth/`: passwords (argon2id + scrypt), app_key (MFA-seed key),
+  vault_key_file, mfa (TOTP), accounts (login state machine, lockout, elevation).
+- API: `routes_auth`, `routes_vault`, `routes_settings`; unauthenticated owner mint
+  fails closed once an account exists; app-key + vault-key boot loaders wired.
+- Web: login/register/MFA gate; nav rename+reorder (The Hustle / Steering / System);
+  New Chat + Search Chat; Settings → Security & Login (vault key + MFA + require-MFA).
+- Tests: `test_owasp_acceptance.py` (A01/A03/A04/A05/A07 + MFA⟂Vault independence),
+  plus per-module unit/route tests; web nav/App/a11y/SecurityLogin.
+
+Remaining (not yet done):
+- Full 9-section settings reorg (General/Notification/Personalisation/Voice/Data
+  Controls/Storage/Trusted Contact/Account) — only Security & Login is built; other
+  sections still use the existing Settings layout.
+- Connector gallery UI rewrite (backend endpoints exist: `/api/connector-store`).
+- Task create/schedule form + its backend, and full principal-scoping of
+  sessions/tasks (chat/task cross-account isolation is the key gap).
+- Pre-existing: 5 `apps/web` theme.test.ts failures (node-25 localStorage env quirk),
+  unrelated to this work.

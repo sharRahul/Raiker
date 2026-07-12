@@ -1,0 +1,37 @@
+name: Model provider diagnostics
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  pytest-log:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e ".[dev]"
+      - name: Run tests and capture output
+        id: pytest
+        continue-on-error: true
+        run: |
+          python -m pytest > pytest.log 2>&1
+      - name: Upload pytest log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-provider-pytest-log
+          path: pytest.log
+          retention-days: 1
+      - name: Propagate test result
+        if: steps.pytest.outcome == 'failure'
+        run: exit 1

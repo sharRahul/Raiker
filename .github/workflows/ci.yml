@@ -7,20 +7,20 @@ on:
       - main
 
 jobs:
-  inventory-test-model-provider:
+  export-pr-source:
     runs-on: ubuntu-latest
     steps:
-      - name: Inventory remaining built-in test model provider references
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Archive source
         run: |
-          git init -q .
-          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch -q --depth=1 origin "${GITHUB_SHA}"
-          git checkout -q FETCH_HEAD
-          pattern="mock""-test|mock""-deterministic|deterministic""-test|Deterministic""TestProvider|Mock""ModelProvider|RAIKER""_TEST_MODE|allow""_test_provider"
-          git grep -n -E "$pattern" -- . ':(exclude).github/workflows/ci.yml' | sed -n '46,180p' || true
-          exit 1
+          tar --exclude=.git -czf /tmp/raiker-pr-source.tar.gz .
+      - name: Upload source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: raiker-pr-source
+          path: /tmp/raiker-pr-source.tar.gz
+          retention-days: 1
 
   python:
     name: Python ${{ matrix.python-version }}

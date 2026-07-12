@@ -33,7 +33,7 @@ A provider must never execute tools. It may only return text or structured tool-
   "session_id": "sess_01H...",
   "turn_id": "turn_01H...",
   "role": "chat",
-  "profile_id": "mock-deterministic",
+  "profile_id": "raiker-local-llama-cpp",
   "messages": [
     {"role": "user", "content": "Hello Raiker"}
   ],
@@ -61,9 +61,9 @@ A provider must never execute tools. It may only return text or structured tool-
 {
   "schema_version": "1.0",
   "model_request_id": "modelreq_01H...",
-  "profile_id": "mock-deterministic",
+  "profile_id": "raiker-local-llama-cpp",
   "status": "completed",
-  "text": "Hello. I am Raiker mock provider.",
+  "text": "Hello. I am the configured local model.",
   "tool_call_proposals": [],
   "usage": {
     "input_tokens_estimated": 5,

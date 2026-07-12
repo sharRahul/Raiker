@@ -44,13 +44,16 @@ export function humanize(name: string | null | undefined): string {
 const PROVIDER_NAMES: Record<string, string> = {
   "llama.cpp": "llama.cpp",
   ollama: "Ollama",
+  "ollama-cloud": "Ollama Cloud",
   "lm-studio": "LM Studio",
+  "lm-studio-remote": "LM Studio (remote)",
   vllm: "vLLM",
   "openai-compatible": "OpenAI-compatible",
   openrouter: "OpenRouter",
   anthropic: "Anthropic",
   openai: "OpenAI",
   gemini: "Gemini",
+  huggingface: "Hugging Face",
 };
 
 /** "lm-studio" → "LM Studio"; unknown providers pass through unchanged. */

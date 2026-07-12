@@ -91,7 +91,7 @@ REQUIRED_COMMANDS = {
     "/proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>] [--approval-preview]",
     "/doctor",
     "/channels",
-    "/launch --provider mock --model mock-deterministic",
+    "/launch --provider <provider> --model <model>",
     "/quit",
     "/runtime-mode",
     "/runtime-mode status",

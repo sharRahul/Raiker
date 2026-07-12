@@ -38,7 +38,7 @@ def test_terminal_approval_and_registry_commands(tmp_path, monkeypatch) -> None:
     assert "model_unavailable: provider_connection_failed" in approval
     assert "model_unavailable: provider_connection_failed" in approval
     assert "Apple Mobile App" in handle_slash_command("/channels", workspace_root=tmp_path)
-    assert "mock-test" in handle_slash_command("/models", workspace_root=tmp_path)
-    assert "deterministic_test_provider_requires_test_mode" in handle_slash_command(
-        "/launch --provider mock --model mock-deterministic", workspace_root=tmp_path
+    assert "raiker-local-llama-cpp" in handle_slash_command("/models", workspace_root=tmp_path)
+    assert "unknown_model_profile:mock:anything" in handle_slash_command(
+        "/launch --provider mock --model anything", workspace_root=tmp_path
     )

@@ -80,9 +80,9 @@ class TestResolveFallbackChain:
         gw = _gateway(tmp_path)
         gw.store.save_model_fallback_sequence(
             TERMINAL_MODEL_SESSION_ID,
-            ["mock-test", "ollama-local-openai-compatible", "raiker-local-llama-cpp"],
+            ["missing-profile", "ollama-local-openai-compatible", "raiker-local-llama-cpp"],
         )
-        # mock-test (test_only) and the placeholder-<model> ollama profile (no
+        # The unknown profile and the placeholder-<model> ollama profile (no
         # persisted concrete model) drop out; only the concrete local backend remains.
         assert gw._resolve_fallback_chain() == [("llama.cpp", "local-gguf")]
 

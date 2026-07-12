@@ -7,6 +7,21 @@ on:
       - main
 
 jobs:
+  export-pr-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Archive source
+        run: |
+          tar --exclude=.git -czf /tmp/raiker-pr-source.tar.gz .
+      - name: Upload source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: raiker-pr-source
+          path: /tmp/raiker-pr-source.tar.gz
+          retention-days: 1
+
   python:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest

@@ -21,11 +21,7 @@ def _gate_enabled(store: Any, capability: str) -> bool:
     return str(record.get("state", "")) in _ENABLED_GATE_STATES
 
 
-def provider_runtime_policy_from_gates(
-    store: Any,
-    *,
-    allow_test_provider: bool = False,
-) -> ProviderRuntimePolicy:
+def provider_runtime_policy_from_gates(store: Any) -> ProviderRuntimePolicy:
     """Derive the model-provider runtime policy from persisted capability gates.
 
     Hosted and private-network model access stay OFF unless the owner has
@@ -38,7 +34,6 @@ def provider_runtime_policy_from_gates(
     hosted = _gate_enabled(store, HOSTED_MODEL_GATE)
     private = _gate_enabled(store, PRIVATE_NETWORK_MODEL_GATE)
     return ProviderRuntimePolicy(
-        allow_test_provider=allow_test_provider,
         allow_policy_gated_provider=hosted or private,
         allow_hosted_provider=hosted,
         allow_private_network_provider=private,

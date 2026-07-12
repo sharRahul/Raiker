@@ -35,6 +35,9 @@ describe("format helpers", () => {
 
   it("maps providers to brand names and passes unknown ones through", () => {
     expect(providerName("lm-studio")).toBe("LM Studio");
+    expect(providerName("lm-studio-remote")).toBe("LM Studio (remote)");
+    expect(providerName("ollama-cloud")).toBe("Ollama Cloud");
+    expect(providerName("huggingface")).toBe("Hugging Face");
     expect(providerName("vllm")).toBe("vLLM");
     expect(providerName("anthropic")).toBe("Anthropic");
     expect(providerName("llama.cpp")).toBe("llama.cpp");

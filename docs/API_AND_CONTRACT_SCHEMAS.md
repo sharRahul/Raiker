@@ -147,8 +147,8 @@ Used for slash commands and interface actions such as `/models`, `/channels`, `/
     "action_type": "model_launch",
     "name": "/launch",
     "arguments": {
-      "provider": "mock",
-      "model": "mock-deterministic"
+      "provider": "llama.cpp",
+      "model": "local-gguf"
     }
   }
 }

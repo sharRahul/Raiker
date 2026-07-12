@@ -58,10 +58,6 @@ class TestProviderModelListing:
         )
         assert resp.status_code == 404
 
-    def test_test_profile_is_404(self, client: TestClient, owner_token: str) -> None:
-        resp = client.get("/api/models/mock-test/provider-models", headers=_auth(owner_token))
-        assert resp.status_code == 404
-
     def test_unreachable_local_provider_returns_empty_honestly(
         self, client: TestClient, owner_token: str
     ) -> None:
@@ -105,15 +101,6 @@ class TestSetModelSelection:
         )
         assert resp.status_code == 403
         assert resp.json()["detail"]["reason_code"] == "unknown_profile:no-such-profile"
-
-    def test_test_profile_fails_closed(self, client: TestClient, owner_token: str) -> None:
-        resp = client.put(
-            "/api/model-selection",
-            json={"profile_id": "mock-test"},
-            headers=_auth(owner_token),
-        )
-        assert resp.status_code == 403
-        assert resp.json()["detail"]["reason_code"] == "test_profile_not_allowed:mock-test"
 
     def test_placeholder_profile_requires_concrete_model(
         self, client: TestClient, owner_token: str

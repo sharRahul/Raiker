@@ -217,7 +217,6 @@ def test_gate_enabled_yields_hosted_provider_policy(tmp_path: Path) -> None:
     assert policy.allow_hosted_provider is True
     assert policy.allow_private_network_provider is False
     assert policy.allow_policy_gated_provider is True
-    assert policy.allow_test_provider is False
 
 
 def test_hosted_provider_requires_egress_allowlist(

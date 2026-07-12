@@ -69,12 +69,8 @@ def test_endpoint_classification_and_policy() -> None:
         validate_endpoint_policy("https://openrouter.ai/api/v1", EndpointPolicy(False, True, True, False, provider="openrouter"))
 
 
-def test_factory_test_provider_gate_and_openai_profiles() -> None:
+def test_factory_openai_profiles() -> None:
     r = ModelProfileRegistry.load()
-    test_profile = r.resolve_profile_id("deterministic-test")
-    with pytest.raises(ProviderPolicyError):
-        ModelProviderFactory().create(test_profile)
-    assert ModelProviderFactory(allow_test_provider=True).create(test_profile).profile_id == "deterministic-test"
     provider = ModelProviderFactory().create(r.resolve_profile_id("raiker-local-llama-cpp"))
     assert isinstance(provider, AsyncOpenAICompatibleProvider)
     run(provider.aclose())
@@ -97,7 +93,7 @@ def test_factory_test_provider_gate_and_openai_profiles() -> None:
 
 def _provider(handler: Callable[[httpx.Request], httpx.Response], caps: ModelCapabilities | None = None) -> AsyncOpenAICompatibleProvider:
     if caps is None:
-        caps = ModelCapabilities(supports_tool_calls=True, supports_embeddings=True, supports_reasoning=True, supports_reasoning_effort=True, reasoning_effort_values=("low", "high"))
+        caps = ModelCapabilities(supports_streaming=True, supports_tool_calls=True, supports_embeddings=True, supports_reasoning=True, supports_reasoning_effort=True, reasoning_effort_values=("low", "high"))
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     return AsyncOpenAICompatibleProvider("p", "llama.cpp", "m", "http://127.0.0.1:1/v1", caps, client=client)
 

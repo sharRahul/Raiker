@@ -112,6 +112,6 @@ def test_non_interactive_run_exits_safely(capsys) -> None:  # type: ignore[no-un
 
 def test_launch_command_remains_policy_gated(tmp_path) -> None:  # type: ignore[no-untyped-def]
     out = _route_input(
-        "/launch --provider mock --model mock-deterministic", tmp_path, _PLAIN
+        "/launch --provider mock --model anything", tmp_path, _PLAIN
     )
-    assert "deterministic_test_provider_requires_test_mode" in out
+    assert "unknown_model_profile:mock:anything" in out

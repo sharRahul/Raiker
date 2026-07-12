@@ -31,9 +31,6 @@ from raiker.models.exceptions import (
 )
 from raiker.models.health import ProviderHealth
 
-# Anthropic stop_reason → Raiker contract finish_reason (contracts.FINISH_REASONS).
-# Both the buffered and the streaming path must map through this table — the raw
-# Anthropic vocabulary ("end_turn", "tool_use", …) is not valid in ModelResponse.
 _STOP_REASON_TO_FINISH = {
     "end_turn": "stop",
     "stop_sequence": "stop",
@@ -47,32 +44,12 @@ _STOP_REASON_TO_FINISH = {
 def _map_finish(stop_reason: str) -> str:
     return _STOP_REASON_TO_FINISH.get(stop_reason, "stop")
 
-# Native Anthropic Messages API adapter over raw httpx — Raiker deliberately
-# owns its transport (no SDK wrappers; httpx.AsyncClient is the only runtime
-# HTTP dependency). Model outputs and tool calls remain untrusted proposals
-# that must pass Raiker validation, policy, and approval downstream.
-#
-# API shape (Messages API, anthropic-version 2023-06-01):
-# - POST /v1/messages: system is a top-level field; messages alternate
-#   user/assistant with content blocks; tools use {name, description,
-#   input_schema}; tool results are user-role tool_result blocks.
-# - Current-generation models (Opus 4.6+) use adaptive thinking
-#   ({"type": "adaptive"}) and reject sampling params (temperature/top_p),
-#   so this adapter never sends temperature.
 
 ANTHROPIC_VERSION = "2023-06-01"
-
-# Beta header required to opt into the 1-hour extended prompt-cache TTL. The
-# default 5-minute ephemeral cache needs no beta header.
 EXTENDED_CACHE_TTL_BETA = "extended-cache-ttl-2025-04-11"
 
 
 def _cache_control(cache_ttl: str | None) -> dict[str, Any] | None:
-    """Anthropic ``cache_control`` block for a requested TTL, or None if caching is off.
-
-    ``"5m"`` → the default ephemeral cache (no ``ttl`` field); ``"1h"`` → the
-    1-hour extended cache. Any other value disables caching.
-    """
     if cache_ttl == "5m":
         return {"type": "ephemeral"}
     if cache_ttl == "1h":
@@ -107,14 +84,7 @@ def _json(response: httpx.Response) -> dict[str, Any]:
 def _to_anthropic_messages(
     messages: list[ModelMessage], *, include_images: bool = False
 ) -> tuple[str, list[dict[str, Any]]]:
-    """Split Raiker messages into (system_text, anthropic messages).
-
-    Tool-role messages become user-role ``tool_result`` blocks; consecutive
-    same-role turns are merged because the Messages API requires alternation.
-    Image attachments become base64 image blocks only when ``include_images``
-    (i.e. the profile declares vision support); otherwise they are dropped
-    fail-closed so a non-vision model is never sent an unsupported block.
-    """
+    """Split Raiker messages into top-level system text and Anthropic messages."""
     system_parts: list[str] = []
     converted: list[dict[str, Any]] = []
     for message in messages:
@@ -122,11 +92,13 @@ def _to_anthropic_messages(
             system_parts.append(message.content)
             continue
         if message.role == "tool":
-            blocks: list[dict[str, Any]] = [{
-                "type": "tool_result",
-                "tool_use_id": message.tool_call_id or "",
-                "content": message.content,
-            }]
+            blocks: list[dict[str, Any]] = [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": message.tool_call_id,
+                    "content": message.content,
+                }
+            ]
             role = "user"
         else:
             blocks = []
@@ -145,9 +117,6 @@ def _to_anthropic_messages(
             if message.content:
                 blocks.append({"type": "text", "text": message.content})
             if message.role == "assistant":
-                # The tool_use blocks this assistant turn made. Required: a
-                # later tool_result must reference a tool_use id from a prior
-                # assistant message or the API rejects the whole request.
                 blocks.extend(
                     {
                         "type": "tool_use",
@@ -163,6 +132,28 @@ def _to_anthropic_messages(
         elif blocks:
             converted.append({"role": role, "content": blocks})
     return "\n\n".join(part for part in system_parts if part), converted
+
+
+def _stream_tool_event(raw: dict[str, str]) -> ModelStreamEvent:
+    call_id = raw.get("id", "")
+    name = raw.get("name", "")
+    if not call_id or not name:
+        raise ProviderStreamError("stream_tool_call_identity_missing")
+    raw_json = raw.get("partial_json", "") or "{}"
+    try:
+        arguments = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        raise ProviderStreamError("malformed_stream_tool_arguments") from exc
+    if not isinstance(arguments, dict):
+        raise ProviderStreamError("stream_tool_arguments_not_object")
+    return ModelStreamEvent(
+        event_type="tool_call_delta",
+        tool_call_delta={
+            "call_id": call_id,
+            "tool_name": name,
+            "arguments": arguments,
+        },
+    )
 
 
 @dataclass
@@ -190,12 +181,14 @@ class AsyncAnthropicMessagesProvider:
             await self._client.aclose()
 
     def _url(self, path: str) -> str:
-        return self.endpoint.rstrip("/") + path
+        return self.endpoint.rstrip("/") + "/" + path.lstrip("/")
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         headers = {**self._headers, **kwargs.pop("headers", {})}
         try:
-            response = await self._client.request(method, self._url(path), headers=headers, **kwargs)
+            response = await self._client.request(
+                method, self._url(path), headers=headers, **kwargs
+            )
         except httpx.TimeoutException as exc:
             raise ProviderTimeoutError("provider_timeout") from exc
         except httpx.HTTPError as exc:
@@ -208,10 +201,21 @@ class AsyncAnthropicMessagesProvider:
         try:
             response = await self._request("GET", self.models_path, timeout=timeout)
             models = self._parse_models(_json(response))
-            available = any(m.id == self.model for m in models)
-            return ProviderHealth(self.provider, available, True, "model_available" if available else "model_missing")
-        except (ProviderConnectionError, ProviderTimeoutError, ProviderAuthenticationError,
-                ProviderModelNotFoundError, ProviderResponseValidationError) as exc:
+            available = any(item.id == self.model for item in models)
+            return ProviderHealth(
+                self.provider,
+                available,
+                True,
+                "model_available" if available else "model_missing",
+            )
+        except (
+            ProviderConnectionError,
+            ProviderTimeoutError,
+            ProviderAuthenticationError,
+            ProviderRateLimitError,
+            ProviderModelNotFoundError,
+            ProviderResponseValidationError,
+        ) as exc:
             return ProviderHealth(self.provider, False, False, type(exc).__name__)
 
     async def list_models(self) -> list[ProviderModelInfo]:
@@ -225,10 +229,14 @@ class AsyncAnthropicMessagesProvider:
         models: list[ProviderModelInfo] = []
         for item in raw:
             if isinstance(item, dict) and isinstance(item.get("id"), str):
-                models.append(ProviderModelInfo(id=item["id"], owned_by="anthropic", metadata={}))
+                models.append(
+                    ProviderModelInfo(id=item["id"], owned_by="anthropic", metadata={})
+                )
         return models
 
     def _payload(self, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
+        if request.response_schema is not None:
+            raise ProviderUnsupportedCapabilityError("json_schema_unsupported")
         system, messages = _to_anthropic_messages(
             list(request.messages), include_images=self.capabilities.supports_vision
         )
@@ -240,29 +248,28 @@ class AsyncAnthropicMessagesProvider:
         }
         if system:
             if cache_control is not None:
-                # Break the cache at the end of the (stable) system prompt. Per the
-                # Anthropic cache ordering (tools → system → messages) this reuses
-                # tools + system across turns within the TTL. System becomes a list
-                # of content blocks so the breakpoint can ride the last block.
-                payload["system"] = [{"type": "text", "text": system, "cache_control": cache_control}]
+                payload["system"] = [
+                    {"type": "text", "text": system, "cache_control": cache_control}
+                ]
             else:
                 payload["system"] = system
         elif cache_control is not None and messages:
-            # No system prompt: fall back to a breakpoint on the last content block
-            # of the last message so at least the message prefix is cached.
             last_block = messages[-1]["content"][-1] if messages[-1]["content"] else None
             if isinstance(last_block, dict):
                 last_block["cache_control"] = cache_control
         if stream:
             payload["stream"] = True
-        if request.tools and self.capabilities.supports_tool_calls:
+        if request.tools:
+            if not self.capabilities.supports_tool_calls:
+                raise ProviderUnsupportedCapabilityError("tool_calls_unsupported")
             payload["tools"] = [
                 {
-                    "name": t.name,
-                    "description": t.description,
-                    "input_schema": t.parameters or {"type": "object", "properties": {}},
+                    "name": tool.name,
+                    "description": tool.description,
+                    "input_schema": tool.parameters
+                    or {"type": "object", "properties": {}},
                 }
-                for t in request.tools
+                for tool in request.tools
             ]
         reasoning = request.reasoning
         if reasoning and reasoning.enabled and self.capabilities.supports_reasoning:
@@ -274,20 +281,22 @@ class AsyncAnthropicMessagesProvider:
 
     @staticmethod
     def _cache_headers(request: ModelRequest) -> dict[str, str]:
-        """Per-request beta header needed only for the 1-hour extended cache TTL."""
         if request.cache_ttl == "1h":
             return {"anthropic-beta": EXTENDED_CACHE_TTL_BETA}
         return {}
 
     async def chat(self, request: ModelRequest) -> ModelResponse:
         response = await self._request(
-            "POST", self.chat_path,
+            "POST",
+            self.chat_path,
             json=self._payload(request, stream=False),
             headers=self._cache_headers(request),
         )
         return self._parse_chat(_json(response))
 
     def _parse_chat(self, data: dict[str, Any]) -> ModelResponse:
+        if data.get("type") == "error" or isinstance(data.get("error"), dict):
+            raise ProviderConnectionError("provider_response_error")
         content = data.get("content")
         if not isinstance(content, list):
             raise ProviderResponseValidationError("missing_content")
@@ -309,22 +318,31 @@ class AsyncAnthropicMessagesProvider:
                         arguments=arguments,
                     )
                 )
-            # thinking blocks are intentionally dropped: private chain-of-thought
-            # is never surfaced through Raiker contracts.
         stop_reason = str(data.get("stop_reason") or "end_turn")
         finish = _map_finish(stop_reason)
         if tool_calls:
             finish = "tool_calls"
         usage = data.get("usage") if isinstance(data.get("usage"), dict) else None
-        return ModelResponse(text="".join(text_parts), tool_calls=tool_calls, finish_reason=finish, usage=usage)
+        return ModelResponse(
+            text="".join(text_parts),
+            tool_calls=tool_calls,
+            finish_reason=finish,
+            usage=usage,
+        )
 
     async def stream_chat(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
+        if not self.capabilities.supports_streaming:
+            raise ProviderUnsupportedCapabilityError("streaming_unsupported")
         usage_acc: dict[str, Any] = {}
+        tool_blocks: dict[int, dict[str, str]] = {}
+        finish_emitted = False
         try:
             async with self._client.stream(
-                "POST", self._url(self.chat_path),
+                "POST",
+                self._url(self.chat_path),
                 headers={**self._headers, **self._cache_headers(request)},
                 json=self._payload(request, stream=True),
+                timeout=self.timeout,
             ) as response:
                 if response.status_code >= 400:
                     raise _map_status(response.status_code, model=self.model)
@@ -339,20 +357,48 @@ class AsyncAnthropicMessagesProvider:
                     if not isinstance(decoded, dict):
                         continue
                     event_type = decoded.get("type")
+                    if event_type == "error":
+                        raise ProviderStreamError("provider_stream_error")
                     if event_type == "message_start":
-                        # Input + cache usage arrives up front; output tokens come
-                        # in message_delta. Merge and surface once so cache-hit
-                        # metrics survive the streamed path.
                         message = decoded.get("message")
                         start_usage = message.get("usage") if isinstance(message, dict) else None
                         if isinstance(start_usage, dict):
                             usage_acc.update(start_usage)
+                    elif event_type == "content_block_start":
+                        index = decoded.get("index")
+                        block = decoded.get("content_block")
+                        if isinstance(index, int) and isinstance(block, dict) and block.get("type") == "tool_use":
+                            call_id = block.get("id")
+                            name = block.get("name")
+                            if not isinstance(call_id, str) or not isinstance(name, str):
+                                raise ProviderStreamError("stream_tool_call_identity_missing")
+                            initial = block.get("input")
+                            partial_json = json.dumps(initial) if isinstance(initial, dict) and initial else ""
+                            tool_blocks[index] = {
+                                "id": call_id,
+                                "name": name,
+                                "partial_json": partial_json,
+                            }
                     elif event_type == "content_block_delta":
+                        index = decoded.get("index")
                         delta = decoded.get("delta")
-                        if isinstance(delta, dict) and delta.get("type") == "text_delta":
+                        if not isinstance(delta, dict):
+                            continue
+                        if delta.get("type") == "text_delta":
                             text = delta.get("text")
                             if isinstance(text, str) and text:
                                 yield ModelStreamEvent(event_type="text_delta", text_delta=text)
+                        elif delta.get("type") == "input_json_delta" and isinstance(index, int):
+                            partial = delta.get("partial_json")
+                            if isinstance(partial, str):
+                                block = tool_blocks.get(index)
+                                if block is None:
+                                    raise ProviderStreamError("stream_tool_delta_without_start")
+                                block["partial_json"] += partial
+                    elif event_type == "content_block_stop":
+                        index = decoded.get("index")
+                        if isinstance(index, int) and index in tool_blocks:
+                            yield _stream_tool_event(tool_blocks.pop(index))
                     elif event_type == "message_delta":
                         delta = decoded.get("delta")
                         delta_usage = decoded.get("usage")
@@ -360,19 +406,45 @@ class AsyncAnthropicMessagesProvider:
                             usage_acc.update(delta_usage)
                         stop = delta.get("stop_reason") if isinstance(delta, dict) else None
                         if isinstance(stop, str) and stop:
+                            if tool_blocks:
+                                for index in sorted(tool_blocks):
+                                    yield _stream_tool_event(tool_blocks[index])
+                                tool_blocks.clear()
                             if usage_acc:
-                                yield ModelStreamEvent(event_type="usage", metadata={"usage": dict(usage_acc)})
-                            yield ModelStreamEvent(event_type="finish", finish_reason=_map_finish(stop))
+                                yield ModelStreamEvent(
+                                    event_type="usage", metadata={"usage": dict(usage_acc)}
+                                )
+                            yield ModelStreamEvent(
+                                event_type="finish", finish_reason=_map_finish(stop)
+                            )
+                            finish_emitted = True
                     elif event_type == "message_stop":
+                        if not finish_emitted:
+                            if tool_blocks:
+                                for index in sorted(tool_blocks):
+                                    yield _stream_tool_event(tool_blocks[index])
+                            if usage_acc:
+                                yield ModelStreamEvent(
+                                    event_type="usage", metadata={"usage": dict(usage_acc)}
+                                )
+                            yield ModelStreamEvent(event_type="finish", finish_reason="stop")
                         return
         except asyncio.CancelledError:
             raise
         except ProviderStreamError:
             raise
         except Exception as exc:
-            if isinstance(exc, (ProviderConnectionError, ProviderTimeoutError,
-                                ProviderAuthenticationError, ProviderRateLimitError,
-                                ProviderModelNotFoundError)):
+            if isinstance(
+                exc,
+                (
+                    ProviderConnectionError,
+                    ProviderTimeoutError,
+                    ProviderAuthenticationError,
+                    ProviderRateLimitError,
+                    ProviderModelNotFoundError,
+                    ProviderUnsupportedCapabilityError,
+                ),
+            ):
                 raise ProviderStreamError(type(exc).__name__) from exc
             raise
 

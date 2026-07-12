@@ -59,7 +59,7 @@ Used by every client to submit work. In Phase 1, the first implemented user-faci
   "options": {
     "planning_mode": "auto",
     "approval_mode": "interactive",
-    "model_profile": "mock-test",
+    "model_profile": "raiker-local-llama-cpp",
     "max_tool_calls": 10000
   }
 }

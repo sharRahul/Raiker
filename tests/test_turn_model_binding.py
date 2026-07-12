@@ -29,11 +29,6 @@ class TestResolveProfileForTurn:
         resolved = gateway._resolve_profile_for_turn("anthropic-hosted")
         assert resolved == ("anthropic", "claude-opus-4-8")
 
-    def test_rejects_test_harness_profiles(self, tmp_path: Path) -> None:
-        gateway = _gateway(tmp_path)
-        assert gateway._resolve_profile_for_turn("mock-test") is None
-        assert gateway._resolve_profile_for_turn("deterministic-test") is None
-
     def test_rejects_unknown_profile(self, tmp_path: Path) -> None:
         gateway = _gateway(tmp_path)
         assert gateway._resolve_profile_for_turn("no-such-profile") is None
@@ -153,8 +148,8 @@ class TestOrchestratorTurnProvider:
             "anthropic",
             "claude-opus-4-8",
         )
-        # Test-harness profile: honest fallback to the persisted selection,
-        # never a mock turn.
-        assert runtime._turn_provider(envelope("mock-test")) == runtime.default_provider
+        # Unresolvable profile choice: honest fallback to the persisted
+        # selection, never a fabricated turn.
+        assert runtime._turn_provider(envelope("missing-profile")) == runtime.default_provider
         # No explicit choice: the operator's selection binds the turn.
         assert runtime._turn_provider(envelope("")) == runtime.default_provider

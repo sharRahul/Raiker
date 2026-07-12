@@ -159,14 +159,13 @@ currently exposes. It is the source of truth checked by `scripts/validate_repo_t
 /proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>] [--approval-preview]
 /doctor
 /channels
-/launch --provider mock --model mock-deterministic
+/launch --provider <provider> --model <model>
 /quit
 ```
 
-The deterministic mock launch command is test-only: normal production CLI policy blocks
-`/launch --provider mock --model mock-deterministic` and reports
-`deterministic_test_provider_requires_test_mode` unless explicit test mode/test harness policy is
-active.
+`/launch` resolves only registered production model profiles: Raiker ships no built-in
+test or mock model provider, and launching an unregistered provider fails closed with
+`unknown_model_profile:<provider>:<model>`.
 
 ---
 
@@ -455,7 +454,7 @@ These permission labels are used in the inventory below so coding agents know wh
 | `/doctor` | Show diagnostics and disabled gates. | `config:read`, `model:read`, `channel:read` | Yes |
 | `/channels` | List channel connector profiles. | `channel:read` | Yes — activation disabled |
 | `/models` | List model profiles. | `model:read` | Yes |
-| `/launch --provider mock --model mock-deterministic` | Test-only deterministic profile launch; normal production CLI policy blocks it with `deterministic_test_provider_requires_test_mode`. | `model:launch` | Test-only/deferred; not a production CLI runtime |
+| `/launch --provider <provider> --model <model>` | Resolve and validate a registered model profile; unregistered providers fail closed with `unknown_model_profile`. | `model:launch` | Yes |
 | `/users` | List user/identity records. | `config:read` | Yes — Phase 5 |
 | `/user create <user_id> [--display <name>] [--email <email>]` | Create user/identity record. | `config:write` | Yes — Phase 5 |
 | `/user deactivate <user_id>` | Deactivate user; no new sessions permitted. | `config:write` | Yes — Phase 5 |
@@ -637,7 +636,7 @@ Slice P adds deterministic metadata-only readiness contracts, registry, optional
 | `/storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>]` | Inspection/control command exposed by terminal CLI. | local_terminal | `planning_only_implemented_verified` | planning/simulation only | No direct tool execution; unsafe runtime disabled. |
 | `/doctor` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/channels` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
-| `/launch --provider mock --model mock-deterministic` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | test-only policy-block smoke | Deterministic mock provider is test-only; normal CLI must not imply production launch support. |
+| `/launch --provider <provider> --model <model>` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | fail-closed launch smoke | No built-in test model provider; unregistered providers fail closed. |
 | `/users` | Inspection/control command exposed by terminal CLI. | local_terminal | `implemented_verified` | read-only output | No direct tool execution; unsafe runtime disabled. |
 | `/user create <user_id> [--display <name>] [--email <email>]` | Governed user creation command. | local_terminal | `implemented_verified` | policy-gated write | Requires policy; creates user/identity record. |
 | `/user deactivate <user_id>` | Governed user deactivation command. | local_terminal | `implemented_verified` | policy-gated write | Deactivates user; no new sessions permitted. |

@@ -35,8 +35,8 @@ from raiker.models.providers.llama_cpp_server import _parse_text_json_tool_calls
 
 def _join(base: str, path: str) -> str:
     parts = urlsplit(base)
-    base_parts = [p for p in parts.path.split("/") if p]
-    path_parts = [p for p in path.split("/") if p]
+    base_parts = [part for part in parts.path.split("/") if part]
+    path_parts = [part for part in path.split("/") if part]
     if base_parts and path_parts and base_parts[-1] == "v1" and path_parts[0] == "v1":
         path_parts = path_parts[1:]
     joined = "/" + "/".join([*base_parts, *path_parts])
@@ -67,6 +67,68 @@ def _json(response: httpx.Response) -> dict[str, Any]:
     return data
 
 
+def _raise_in_band_error(value: Any) -> None:
+    if isinstance(value, dict):
+        code = value.get("code")
+        suffix = f":{code}" if isinstance(code, int | str) else ""
+        raise ProviderConnectionError(f"provider_response_error{suffix}")
+
+
+def _content_text(content: Any) -> tuple[str, bool]:
+    """Normalize OpenAI-compatible string/part-array content without leaking shape."""
+    if isinstance(content, str):
+        return content, False
+    if not isinstance(content, list):
+        return "", False
+    parts: list[str] = []
+    refused = False
+    for part in content:
+        if not isinstance(part, dict):
+            continue
+        part_type = part.get("type")
+        if part_type in {"text", "output_text"} and isinstance(part.get("text"), str):
+            parts.append(part["text"])
+        elif part_type == "refusal" and isinstance(part.get("refusal"), str):
+            parts.append(part["refusal"])
+            refused = True
+    return "".join(parts), refused
+
+
+def _finish_reason(raw: Any, *, has_tools: bool = False, refused: bool = False) -> str:
+    if has_tools:
+        return "tool_calls"
+    if refused or raw in {"content_filter", "error"}:
+        return "error"
+    return raw if raw in {"stop", "length", "tool_calls"} else "stop"
+
+
+def _tool_call_events(raw_calls: dict[int, dict[str, str]]) -> list[ModelStreamEvent]:
+    events: list[ModelStreamEvent] = []
+    for index in sorted(raw_calls):
+        raw = raw_calls[index]
+        name = raw.get("name", "")
+        if not name:
+            raise ProviderStreamError("stream_tool_call_missing_name")
+        raw_arguments = raw.get("arguments", "") or "{}"
+        try:
+            arguments = json.loads(raw_arguments)
+        except json.JSONDecodeError as exc:
+            raise ProviderStreamError("malformed_stream_tool_arguments") from exc
+        if not isinstance(arguments, dict):
+            raise ProviderStreamError("stream_tool_arguments_not_object")
+        events.append(
+            ModelStreamEvent(
+                event_type="tool_call_delta",
+                tool_call_delta={
+                    "call_id": raw.get("id") or f"call_{index}",
+                    "tool_name": name,
+                    "arguments": arguments,
+                },
+            )
+        )
+    return events
+
+
 @dataclass
 class AsyncOpenAICompatibleProvider:
     profile_id: str
@@ -86,7 +148,10 @@ class AsyncOpenAICompatibleProvider:
     client: httpx.AsyncClient | None = None
 
     def __post_init__(self) -> None:
-        self._client = self.client or httpx.AsyncClient(timeout=self.timeout, headers=dict(self.extra_headers))
+        self._headers = dict(self.extra_headers)
+        self._client = self.client or httpx.AsyncClient(
+            timeout=self.timeout, headers=self._headers
+        )
         self._owns_client = self.client is None
 
     async def aclose(self) -> None:
@@ -94,8 +159,11 @@ class AsyncOpenAICompatibleProvider:
             await self._client.aclose()
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        headers = {**self._headers, **kwargs.pop("headers", {})}
         try:
-            response = await self._client.request(method, _join(self.endpoint, path), **kwargs)
+            response = await self._client.request(
+                method, _join(self.endpoint, path), headers=headers, **kwargs
+            )
         except httpx.TimeoutException as exc:
             raise ProviderTimeoutError("provider_timeout") from exc
         except httpx.HTTPError as exc:
@@ -111,10 +179,17 @@ class AsyncOpenAICompatibleProvider:
             detail = "reachable"
             if path == self.models_path:
                 models = self._parse_models(_json(response))
-                detail = "model_available" if any(m.id == self.model for m in models) else "model_missing"
+                detail = "model_available" if any(item.id == self.model for item in models) else "model_missing"
                 return ProviderHealth(self.provider, detail == "model_available", True, detail)
             return ProviderHealth(self.provider, True, True, detail)
-        except (ProviderConnectionError, ProviderTimeoutError, ProviderAuthenticationError, ProviderModelNotFoundError, ProviderResponseValidationError) as exc:
+        except (
+            ProviderConnectionError,
+            ProviderTimeoutError,
+            ProviderAuthenticationError,
+            ProviderRateLimitError,
+            ProviderModelNotFoundError,
+            ProviderResponseValidationError,
+        ) as exc:
             return ProviderHealth(self.provider, False, False, type(exc).__name__)
 
     async def list_models(self) -> list[ProviderModelInfo]:
@@ -122,6 +197,7 @@ class AsyncOpenAICompatibleProvider:
         return self._parse_models(_json(response))
 
     def _parse_models(self, data: dict[str, Any]) -> list[ProviderModelInfo]:
+        _raise_in_band_error(data.get("error"))
         raw = data.get("data")
         if not isinstance(raw, list):
             raise ProviderResponseValidationError("models_response_missing_data")
@@ -133,12 +209,6 @@ class AsyncOpenAICompatibleProvider:
         return models
 
     def _message_dict(self, message: ModelMessage) -> dict[str, Any]:
-        """Serialize one message, expanding image attachments to content parts.
-
-        Image parts (data URLs) are sent only when the profile declares vision
-        support — every other case falls back to the plain text shape so a
-        non-vision backend never receives an unsupported content structure.
-        """
         if not (message.images and message.role == "user" and self.capabilities.supports_vision):
             return message.to_dict()
         parts: list[dict[str, Any]] = [
@@ -154,36 +224,59 @@ class AsyncOpenAICompatibleProvider:
         serialized["content"] = parts
         return serialized
 
+    @staticmethod
+    def _apply_openai_cache_breakpoint(messages: list[dict[str, Any]]) -> None:
+        for message in reversed(messages):
+            if message.get("role") not in {"system", "developer"}:
+                continue
+            content = message.get("content")
+            if isinstance(content, str) and content:
+                message["content"] = [
+                    {
+                        "type": "text",
+                        "text": content,
+                        "prompt_cache_breakpoint": {"mode": "explicit"},
+                    }
+                ]
+            elif isinstance(content, list) and content:
+                last = content[-1]
+                if isinstance(last, dict):
+                    last["prompt_cache_breakpoint"] = {"mode": "explicit"}
+            return
+
     def _payload(self, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
+        messages = [self._message_dict(message) for message in request.messages]
         payload: dict[str, Any] = {
             "model": request.model or self.model,
-            "messages": [self._message_dict(m) for m in request.messages],
+            "messages": messages,
             "temperature": request.temperature,
             "max_tokens": request.max_tokens,
             "stream": stream,
         }
-        if request.tools and self.capabilities.supports_tool_calls:
-            payload["tools"] = [t.to_openai_tool() for t in request.tools]
+        if request.tools:
+            if not self.capabilities.supports_tool_calls:
+                raise ProviderUnsupportedCapabilityError("tool_calls_unsupported")
+            payload["tools"] = [tool.to_openai_tool() for tool in request.tools]
             payload["tool_choice"] = "auto"
-        # Prompt-cache hints. OpenAI-compatible caching is server-side; the only
-        # client levers are provider-specific, so we send them only to providers
-        # that document them (a strict server would 400 on an unknown field):
-        #   - OpenAI: `prompt_cache_key` routes same-prefix requests together. We
-        #     key by profile_id, so every Raiker turn on this profile shares the
-        #     stable system-prompt prefix and hits the same cache.
-        #   - llama.cpp server: `cache_prompt` reuses the prompt KV cache.
-        # Any other backend (vLLM/Ollama/LM Studio/Gemini/OpenRouter) caches
-        # automatically or exposes no client lever — no field is sent.
+        if request.response_schema is not None:
+            if not self.capabilities.supports_json_schema:
+                raise ProviderUnsupportedCapabilityError("json_schema_unsupported")
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": request.response_schema_name,
+                    "strict": True,
+                    "schema": request.response_schema,
+                },
+            }
         if request.cache_ttl:
             if self.provider == "openai":
-                payload["prompt_cache_key"] = self.profile_id
+                self._apply_openai_cache_breakpoint(messages)
+                payload["prompt_cache_options"] = {"ttl": request.cache_ttl}
             elif self.provider == "llama.cpp":
                 payload["cache_prompt"] = True
-            if stream and self.provider == "openai":
-                # Ask OpenAI to include a usage block in the final stream chunk so
-                # cache-hit metrics survive the streamed path. Gated to OpenAI to
-                # avoid tripping local servers that don't accept stream_options.
-                payload["stream_options"] = {"include_usage": True}
+        if stream and self.provider == "openai":
+            payload["stream_options"] = {"include_usage": True}
         reasoning = request.reasoning
         if reasoning and reasoning.enabled and self.capabilities.supports_reasoning:
             if reasoning.effort and self.capabilities.supports_reasoning_effort:
@@ -195,30 +288,53 @@ class AsyncOpenAICompatibleProvider:
         return payload
 
     async def chat(self, request: ModelRequest) -> ModelResponse:
-        response = await self._request("POST", self.chat_path, json=self._payload(request, stream=False))
+        response = await self._request(
+            "POST", self.chat_path, json=self._payload(request, stream=False)
+        )
         return self._parse_chat(_json(response))
 
     def _parse_chat(self, data: dict[str, Any]) -> ModelResponse:
+        _raise_in_band_error(data.get("error"))
         choices = data.get("choices")
         if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
             raise ProviderResponseValidationError("missing_choices")
         choice = choices[0]
+        _raise_in_band_error(choice.get("error"))
         raw_message = choice.get("message")
         message: dict[str, Any] = raw_message if isinstance(raw_message, dict) else {}
-        text = str(message.get("content") or "")
+        text, content_refusal = _content_text(message.get("content"))
+        direct_refusal = message.get("refusal")
+        refused = content_refusal or isinstance(direct_refusal, str)
+        if isinstance(direct_refusal, str) and direct_refusal and direct_refusal not in text:
+            text = f"{text}{direct_refusal}"
         tool_calls = _parse_tool_calls(message.get("tool_calls"))
-        if not tool_calls and self.tool_call_mode in {"text_json", "native_or_text_json", "native_or_json_schema"}:
+        if not tool_calls and self.tool_call_mode in {
+            "text_json",
+            "native_or_text_json",
+            "native_or_json_schema",
+        }:
             tool_calls = _parse_text_json_tool_calls(text)
             if tool_calls:
                 text = ""
-        raw_finish = str(choice.get("finish_reason") or "stop")
-        finish = "tool_calls" if tool_calls else (raw_finish if raw_finish in {"stop", "length"} else "stop")
+        finish = _finish_reason(
+            choice.get("finish_reason"), has_tools=bool(tool_calls), refused=refused
+        )
         usage = data.get("usage") if isinstance(data.get("usage"), dict) else None
         return ModelResponse(text=text, tool_calls=tool_calls, finish_reason=finish, usage=usage)
 
     async def stream_chat(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
+        if not self.capabilities.supports_streaming:
+            raise ProviderUnsupportedCapabilityError("streaming_unsupported")
+        tool_calls: dict[int, dict[str, str]] = {}
+        finish_emitted = False
         try:
-            async with self._client.stream("POST", _join(self.endpoint, self.chat_path), json=self._payload(request, stream=True)) as response:
+            async with self._client.stream(
+                "POST",
+                _join(self.endpoint, self.chat_path),
+                headers=self._headers,
+                json=self._payload(request, stream=True),
+                timeout=self.timeout,
+            ) as response:
                 if response.status_code >= 400:
                     raise _map_status(response.status_code, model=self.model)
                 async for line in response.aiter_lines():
@@ -226,56 +342,104 @@ class AsyncOpenAICompatibleProvider:
                         continue
                     data = line.removeprefix("data:").strip()
                     if data == "[DONE]":
-                        yield ModelStreamEvent(event_type="finish", finish_reason="stop")
+                        if not finish_emitted:
+                            for event in _tool_call_events(tool_calls):
+                                yield event
+                            yield ModelStreamEvent(event_type="finish", finish_reason="stop")
                         return
                     try:
                         decoded = json.loads(data)
                     except json.JSONDecodeError as exc:
                         raise ProviderStreamError("malformed_sse_json") from exc
-                    # The final usage-only chunk (from stream_options.include_usage)
-                    # carries an empty choices list — surface its usage so cache-hit
-                    # metrics survive streaming.
-                    usage = decoded.get("usage") if isinstance(decoded, dict) else None
-                    choices = decoded.get("choices") if isinstance(decoded, dict) else None
+                    if not isinstance(decoded, dict):
+                        continue
+                    _raise_in_band_error(decoded.get("error"))
+                    usage = decoded.get("usage")
+                    choices = decoded.get("choices")
                     if isinstance(usage, dict) and (not isinstance(choices, list) or not choices):
                         yield ModelStreamEvent(event_type="usage", metadata={"usage": usage})
                         continue
                     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
                         continue
                     choice = choices[0]
+                    _raise_in_band_error(choice.get("error"))
                     raw_delta = choice.get("delta")
                     delta: dict[str, Any] = raw_delta if isinstance(raw_delta, dict) else {}
-                    text = delta.get("content") if isinstance(delta.get("content"), str) else ""
-                    finish = choice.get("finish_reason") if isinstance(choice.get("finish_reason"), str) else None
+                    text, content_refusal = _content_text(delta.get("content"))
+                    direct_refusal = delta.get("refusal")
+                    refused = content_refusal or isinstance(direct_refusal, str)
+                    if isinstance(direct_refusal, str) and direct_refusal and direct_refusal not in text:
+                        text = f"{text}{direct_refusal}"
                     if text:
                         yield ModelStreamEvent(event_type="text_delta", text_delta=text)
-                    if finish:
-                        # Map protocol vocabulary ("content_filter", "function_call", …)
-                        # into the contract's finish reasons — raw passthrough would
-                        # fail ModelResponse validation downstream.
-                        yield ModelStreamEvent(
-                            event_type="finish",
-                            finish_reason=finish if finish in {"stop", "length", "tool_calls"} else "stop",
+                    raw_tool_calls = delta.get("tool_calls")
+                    if isinstance(raw_tool_calls, list):
+                        for position, raw_call in enumerate(raw_tool_calls):
+                            if not isinstance(raw_call, dict):
+                                continue
+                            raw_index = raw_call.get("index")
+                            index = raw_index if isinstance(raw_index, int) else position
+                            current = tool_calls.setdefault(
+                                index, {"id": "", "name": "", "arguments": ""}
+                            )
+                            call_id = raw_call.get("id")
+                            if isinstance(call_id, str):
+                                current["id"] = call_id
+                            function = raw_call.get("function")
+                            if isinstance(function, dict):
+                                name = function.get("name")
+                                arguments = function.get("arguments")
+                                if isinstance(name, str):
+                                    current["name"] += name
+                                if isinstance(arguments, str):
+                                    current["arguments"] += arguments
+                    raw_finish = choice.get("finish_reason")
+                    if isinstance(raw_finish, str):
+                        for event in _tool_call_events(tool_calls):
+                            yield event
+                        finish = _finish_reason(
+                            raw_finish, has_tools=bool(tool_calls), refused=refused
                         )
+                        yield ModelStreamEvent(event_type="finish", finish_reason=finish)
+                        finish_emitted = True
         except asyncio.CancelledError:
             raise
         except ProviderStreamError:
             raise
         except Exception as exc:
-            if isinstance(exc, (ProviderConnectionError, ProviderTimeoutError, ProviderAuthenticationError, ProviderRateLimitError, ProviderModelNotFoundError)):
+            if isinstance(
+                exc,
+                (
+                    ProviderConnectionError,
+                    ProviderTimeoutError,
+                    ProviderAuthenticationError,
+                    ProviderRateLimitError,
+                    ProviderModelNotFoundError,
+                    ProviderUnsupportedCapabilityError,
+                ),
+            ):
                 raise ProviderStreamError(type(exc).__name__) from exc
             raise
 
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
         if not self.capabilities.supports_embeddings:
             raise ProviderUnsupportedCapabilityError("embeddings_unsupported")
-        response = await self._request("POST", self.embeddings_path, json={"model": request.model or self.model, "input": request.text})
+        response = await self._request(
+            "POST",
+            self.embeddings_path,
+            json={"model": request.model, "input": request.text},
+        )
         data = _json(response)
+        _raise_in_band_error(data.get("error"))
         rows = data.get("data")
         if not isinstance(rows, list) or not rows or not isinstance(rows[0], dict):
             raise ProviderResponseValidationError("embedding_response_missing_data")
         vector = rows[0].get("embedding")
-        if not isinstance(vector, list) or not all(isinstance(v, int | float) for v in vector):
+        if not isinstance(vector, list) or not all(
+            isinstance(value, int | float) and not isinstance(value, bool) for value in vector
+        ):
             raise ProviderResponseValidationError("embedding_vector_invalid")
         usage = data.get("usage") if isinstance(data.get("usage"), dict) else None
-        return EmbeddingResponse(vector=[float(v) for v in vector], model=self.model, usage=usage)
+        return EmbeddingResponse(
+            vector=[float(value) for value in vector], model=request.model, usage=usage
+        )

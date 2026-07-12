@@ -19,7 +19,7 @@
 - **Runtime:** `asyncio` for the agent loop; `httpx.AsyncClient` as the only runtime HTTP transport (no provider SDKs). Rich/Textual are not runtime dependencies.
 - **API + web:** FastAPI (`raiker/api/`) exposes the governed control/read/prompt/approval routes on loopback; the dashboard (`apps/web`) is a Vite + Svelte + TypeScript SPA that talks only to that local API.
 - **Storage/State:** SQLite (`raiker/storage/sqlite.py`) for runtime state, tasks, sessions, approvals, checkpoints, memory candidates, and metadata records; append-only JSONL for the event log.
-- **Inference:** Local LLM runtimes via an async OpenAI-compatible adapter — **llama.cpp** server is the native local default (`http://127.0.0.1:8080`); Ollama, LM Studio, and vLLM are local/home-lab profiles; OpenRouter is hosted and policy/budget-gated; a deterministic provider powers offline tests.
+- **Inference:** Local runtimes use Raiker's async OpenAI-compatible adapter — **llama.cpp** is the native local default (`http://127.0.0.1:8080`), with Ollama, LM Studio, and vLLM profiles. OpenRouter, OpenAI, Gemini, and native Anthropic Messages profiles are implemented as governed hosted options. Off-machine providers remain fail-closed behind capability gates, owner egress allowlists, budget-policy metadata, and environment-only credentials. A deterministic provider powers offline tests only.
 
 Component-by-component responsibilities live in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the design foundations are under [`docs/foundation/`](docs/foundation/); the web app's design system, surfaces, and security UX are described in [`apps/web/README.md`](apps/web/README.md).
 
@@ -52,7 +52,6 @@ This installs the package in editable mode with the dev toolchain (`pytest`, `ru
 Raiker is local and needs **no credentials** to run. Behavior is controlled by a few environment variables and the bundled JSON config files — never by hard-coded secrets:
 
 - `RAIKER_TUI=plain` — keep the plain line-oriented shell path (the launchable terminal client; the local web dashboard is the other launchable surface).
-- `RAIKER_TEST_MODE=1` — enable the deterministic test provider (test/offline only; production CLI policy blocks it with `deterministic_test_provider_requires_test_mode`).
 - `RAIKER_WEB_UI_DIR=<path>` — override the built web dashboard directory `raiker-web` serves (default `apps/web/dist`).
 - `--workspace <path>` — choose the workspace root that holds local runtime state (defaults to the current directory).
 - Model endpoints are declared in [`config/model-profiles.json`](config/model-profiles.json); channel connector profiles live in [`config/channel-connectors.json`](config/channel-connectors.json).
@@ -61,7 +60,7 @@ There is no silent fallback from local to hosted, or from production to the test
 
 ### Choosing and adding a model (required to use Raiker as an agent)
 
-Raiker does **not** ship with a model — it talks to an OpenAI-compatible inference server you run locally. Until you point it at a reachable model, prompts return `model_unavailable: provider_connection_failed` (by design — it never fabricates output). Model profiles live in [`config/model-profiles.json`](config/model-profiles.json) and are inspected/selected from the CLI.
+Raiker does **not** ship with a model — it talks to a model server or API selected by the owner. Until you point it at a reachable model, prompts return `model_unavailable: provider_connection_failed` (by design — it never fabricates output). Model profiles live in [`config/model-profiles.json`](config/model-profiles.json) and are inspected/selected from the CLI or web dashboard.
 
 **1. Run a local model server**, e.g. one of:
 
@@ -87,11 +86,11 @@ Raiker does **not** ship with a model — it talks to an OpenAI-compatible infer
 /model use --provider ollama --model llama3.1
 ```
 
-The selected model is remembered and is what subsequent prompts run on. If the server isn't reachable, the command says so and leaves the native llama.cpp default active (it never fabricates a model).
+The selected model is remembered and is what subsequent prompts run on. If the server is not reachable, the command reports the failure and leaves the existing selection unchanged; it never fabricates a model.
 
-**3. (Optional) Add or edit a model profile** by editing `config/model-profiles.json`: copy an entry and set the `endpoint` and capability flags. Supported `provider` values are `llama.cpp`, `ollama`, `lm-studio`, `vllm`, and `openai-compatible` (the `mock`/`test` providers are test-only and policy-blocked in the normal CLI). Re-launch `raiker` to pick up file changes.
+**3. (Optional) Add or edit a model profile** by editing `config/model-profiles.json`: copy an entry and set the endpoint, model identifiers, and capability flags. Supported providers include `llama.cpp`, `ollama`, `lm-studio`, `vllm`, `openai-compatible`, `openrouter`, `anthropic`, `openai`, and `gemini` (the `mock`/`test` providers are test-only and policy-blocked in normal operation). Re-launch Raiker to pick up file changes.
 
-**Hosted / cloud models are not enabled in the current build.** The OpenRouter (hosted) and vLLM (home-lab / private-network) profiles exist as configuration/contract only: the runtime policy that would permit hosted, policy-gated, or private-network providers is not turned on anywhere, so selecting them fails closed (e.g. `hosted_provider_requires_explicit_policy`, `provider_requires_explicit_policy_approval`). A governed enablement path and secret storage for API keys are deferred work — until then, run Raiker against a **local** model. (Hosted profiles declare `requires_network` + `requires_egress_policy` + `requires_budget_policy` and read their key from an environment variable such as `OPENROUTER_API_KEY`; the key is never stored by Raiker and is redacted from logs.)
+**Hosted and private-network model inference is implemented but fail-closed.** Before Raiker contacts an off-machine model, the owner must enable the corresponding `hosted_model_runtime` or `private_network_model_runtime` capability through the governed control plane, add the endpoint hostname to `RAIKER_MODEL_EGRESS_ALLOWLIST`, and provide the profile's API key environment variable where required (`OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`). Keys are never stored in model profiles or event logs. Raiker currently has no built-in secret store, and enabling model inference does not turn Raiker itself into a hosted or multi-user service.
 
 ### Running the terminal client
 
@@ -173,7 +172,7 @@ The implementation control ledger is [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPL
 - Tier 2 executors (shell/process/network/web-fetch) require a threat-model ack and a human confirmation token to enable.
 - Finance/investment/medical/pregnancy/CCTV/home-security/hardware runtime remains disabled/deferred; email/calendar/reminder are local-only stores/drafts.
 - The web dashboard is single-user and loopback-only; there is no secret/credential store (secret storage is deferred).
-- Hosted/multi-user/cloud runtime is future implementation work, and current production readiness applies only to the local single-user runtime.
+- Hosted/private **model inference** is available only through its bounded governed gates and owner configuration. Hosted/multi-user deployment of the Raiker application itself remains future work; current production readiness applies only to the local single-user runtime.
 
 ### Detailed status
 

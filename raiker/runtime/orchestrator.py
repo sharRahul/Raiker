@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 
 from raiker.context.gatherer import ContextGatherer
@@ -48,7 +48,7 @@ class RuntimeOrchestrator:
         writer: EventLogWriter,
         tool_broker: ToolBroker,
         model_router: ModelRouter,
-        default_provider: tuple[str, str] = ("mock", "mock-deterministic"),
+        default_provider: tuple[str, str] = ("llama.cpp", "local-gguf"),
         profile_resolver: Callable[[str, str | None], tuple[str, str] | None] | None = None,
         fallback_resolver: Callable[[], list[tuple[str, str]]] | None = None,
     ) -> None:
@@ -58,25 +58,14 @@ class RuntimeOrchestrator:
         self.model_router = model_router
         self.default_provider = default_provider
         self.profile_resolver = profile_resolver
-        # Ordered, user-owned fallback chain, resolved fresh per turn. When the
-        # bound provider fails (no network, timeout, non-responsive host, policy
-        # denial) the turn walks these candidates in order. Each is still gated by
-        # the model router, so fallback never bypasses provider policy.
         self.fallback_resolver = fallback_resolver
         self.classifier = SimpleClassifier()
         self.planner = SimplePlanner()
         self.context_gatherer = ContextGatherer()
-        # Governed, default-ask retrieval augmentation (reuses the
-        # vector_embedding_runtime gate + decision mode). Disabled/withheld unless
-        # the owner enables the gate and raises the mode to allow/auto, so the
-        # default turn behaviour is unchanged.
         store = getattr(tool_broker, "store", None)
         self.retrieval = RetrievalAugmentor(workspace_root, store) if store is not None else None
         self.verifier = Verifier()
         self.tool_specs = default_tool_specs()
-        # When streaming, lifecycle events are mirrored here so the turn generator can
-        # surface them to a client in near-real-time. ``None`` disables mirroring (the
-        # synchronous ``ahandle`` path), which keeps its behaviour byte-for-byte unchanged.
         self._sink: list[StreamEvent] | None = None
 
     def _state(
@@ -95,7 +84,9 @@ class RuntimeOrchestrator:
             )
         )
 
-    def _event(self, envelope: PromptEnvelope, event_type: str, payload: dict[str, object]) -> None:
+    def _event(
+        self, envelope: PromptEnvelope, event_type: str, payload: dict[str, object]
+    ) -> None:
         self.writer.append(
             make_event(
                 session_id=envelope.session_id,
@@ -107,12 +98,18 @@ class RuntimeOrchestrator:
             )
         )
         if self._sink is not None:
-            self._sink.append(StreamEvent(kind=LIFECYCLE, event_type=event_type, payload=dict(payload)))
+            self._sink.append(
+                StreamEvent(kind=LIFECYCLE, event_type=event_type, payload=dict(payload))
+            )
+
+    def _drain_sink(self) -> list[StreamEvent]:
+        drained: list[StreamEvent] = []
+        while self._sink:
+            drained.append(self._sink.pop(0))
+        return drained
 
     @staticmethod
     def _context_prompt(bundle: ContextBundle) -> str:
-        """Bounded, metadata-only context summary passed into the model prompt path."""
-
         lines = [bundle.summary]
         for item in bundle.included_items:
             if item.source.source_type == "current_prompt":
@@ -130,13 +127,6 @@ class RuntimeOrchestrator:
         return result
 
     def _turn_provider(self, envelope: PromptEnvelope) -> tuple[str, str]:
-        """Bind the model for this turn.
-
-        An explicit, resolvable profile choice on the envelope wins; otherwise the
-        operator's persisted selection (``default_provider``). Unresolvable or
-        non-runnable requests fall back to the selection with an honest event —
-        never to a test provider.
-        """
         requested = envelope.options.model_profile
         requested_model = envelope.options.model or None
         if requested and self.profile_resolver is not None:
@@ -151,17 +141,11 @@ class RuntimeOrchestrator:
         return self.default_provider
 
     def _provider_chain(self, envelope: PromptEnvelope) -> list[tuple[str, str]]:
-        """Ordered providers to try this turn: the bound provider, then the fallback chain.
-
-        The fallback chain is the user-owned sequence resolved fresh each turn.
-        Duplicates and the already-bound provider are skipped so a provider is
-        never tried twice in one turn.
-        """
         chain: list[tuple[str, str]] = [self._turn_provider(envelope)]
         if self.fallback_resolver is not None:
             try:
                 candidates = self.fallback_resolver()
-            except Exception:  # noqa: BLE001 — a broken resolver must not break the turn
+            except Exception:  # noqa: BLE001
                 candidates = []
             for candidate in candidates:
                 if candidate not in chain:
@@ -169,14 +153,6 @@ class RuntimeOrchestrator:
         return chain
 
     def _image_attachments(self, envelope: PromptEnvelope) -> tuple[ModelImage, ...]:
-        """Resolve uploaded image attachments into image blocks for this turn.
-
-        Fail-closed at every step: an image is delivered only when it exists in
-        the governed attachment store, still passes validation, AND the turn's
-        bound model profile declares vision support. Everything else emits an
-        honest metadata-only ``attachment_image_withheld`` event (attachment id,
-        reason — never image bytes) and sends nothing.
-        """
         import base64
 
         from raiker.runtime.attachments import load_image
@@ -193,7 +169,7 @@ class RuntimeOrchestrator:
         vision_check = getattr(self.model_router, "supports_vision", None)
         try:
             vision = bool(vision_check(provider, model)) if callable(vision_check) else False
-        except Exception:  # noqa: BLE001 — an unresolvable profile means no vision
+        except Exception:  # noqa: BLE001
             vision = False
         store = getattr(self.tool_broker, "store", None) or SQLiteStore(self.workspace_root)
         images: list[ModelImage] = []
@@ -239,13 +215,17 @@ class RuntimeOrchestrator:
     async def _acall_model(
         self, envelope: PromptEnvelope, messages: list[ModelMessage]
     ) -> ModelResponse:
-        chain = self._provider_chain(envelope)
-        for rank, (provider, model) in enumerate(chain):
+        for rank, (provider, model) in enumerate(self._provider_chain(envelope)):
             if rank > 0:
                 self._event(
                     envelope,
                     "model_fallback_engaged",
-                    {"provider": provider, "model": model, "fallback_rank": rank, "reason": "primary_provider_unavailable"},
+                    {
+                        "provider": provider,
+                        "model": model,
+                        "fallback_rank": rank,
+                        "reason": "primary_provider_unavailable",
+                    },
                 )
             self._event(
                 envelope,
@@ -253,12 +233,19 @@ class RuntimeOrchestrator:
                 {"provider": provider, "model": model, "message_count": len(messages)},
             )
             try:
-                response = await self.model_router.achat(provider, model, messages, self.tool_specs)
+                response = await self.model_router.achat(
+                    provider, model, messages, self.tool_specs
+                )
             except ModelProviderError as exc:
                 self._event(
                     envelope,
                     "model_request_failed",
-                    {"provider": provider, "finish_reason": "error", "error_class": type(exc).__name__, "safe_error_code": "provider_connection_failed"},
+                    {
+                        "provider": provider,
+                        "finish_reason": "error",
+                        "error_class": type(exc).__name__,
+                        "safe_error_code": "provider_connection_failed",
+                    },
                 )
                 continue
             self._event(
@@ -269,13 +256,13 @@ class RuntimeOrchestrator:
                     "finish_reason": response.finish_reason,
                     "tool_call_count": len(response.tool_calls),
                     "text_length": len(response.text),
-                    # Metadata-only token counts (incl. cache hits), normalised
-                    # across providers; empty when the provider reports no usage.
                     "usage": summarize_model_usage(response.usage),
                 },
             )
             return response
-        return ModelResponse(text="model_unavailable: provider_connection_failed", finish_reason="error")
+        return ModelResponse(
+            text="model_unavailable: provider_connection_failed", finish_reason="error"
+        )
 
     @staticmethod
     def _format_from_result(action: ToolAction, tool_result: ToolResult) -> str:
@@ -293,75 +280,81 @@ class RuntimeOrchestrator:
         return "Tool completed."
 
     @staticmethod
-    def _reconstruct_tool_calls(deltas: list[dict[str, object]]) -> list[ToolCallProposal]:
-        """Best-effort reconstruction of tool calls from streamed deltas.
-
-        Current providers stream text only, so this is normally empty; it future-proofs the
-        streaming path for providers that emit ``tool_call_delta`` chunks. Malformed deltas
-        are skipped — model output is untrusted and validated downstream regardless.
-        """
-
+    def _reconstruct_tool_calls(
+        deltas: list[dict[str, object]],
+    ) -> list[ToolCallProposal]:
         calls: list[ToolCallProposal] = []
         for delta in deltas:
             name = delta.get("tool_name") or delta.get("name")
-            args = delta.get("arguments")
-            if not isinstance(name, str) or not name:
-                continue
-            if not isinstance(args, dict):
-                args = {}
+            arguments = delta.get("arguments")
             call_id = delta.get("call_id")
+            if not isinstance(name, str) or not name or not isinstance(arguments, dict):
+                continue
             calls.append(
                 ToolCallProposal(
-                    call_id=str(call_id) if isinstance(call_id, str) else f"call_{len(calls)}",
+                    call_id=(
+                        call_id
+                        if isinstance(call_id, str) and call_id
+                        else f"call_{len(calls)}"
+                    ),
                     tool_name=name,
-                    arguments=args,
+                    arguments=arguments,
                 )
             )
         return calls
 
     async def _astream_model_call(
         self, envelope: PromptEnvelope, messages: list[ModelMessage]
-    ) -> tuple[ModelResponse, list[StreamEvent]]:
-        """Stream one model call, returning (response, text_delta StreamEvents).
+    ) -> AsyncIterator[StreamEvent | ModelResponse]:
+        """Yield provider output live and finish with one ``ModelResponse``.
 
-        Emits the same JSONL events as :meth:`_acall_model` so observers are unchanged.
-        On provider error it fails safe, exactly like the non-streaming path.
+        A fallback may be attempted only before any text/tool output from the
+        current provider has been exposed. Once output is committed to the
+        client, a later stream failure ends the turn honestly instead of mixing
+        another provider's response into the same transcript.
         """
-
-        chain = self._provider_chain(envelope)
-        for rank, (provider, model) in enumerate(chain):
+        for rank, (provider, model) in enumerate(self._provider_chain(envelope)):
             if rank > 0:
                 self._event(
                     envelope,
                     "model_fallback_engaged",
-                    {"provider": provider, "model": model, "fallback_rank": rank, "reason": "primary_provider_unavailable"},
+                    {
+                        "provider": provider,
+                        "model": model,
+                        "fallback_rank": rank,
+                        "reason": "primary_provider_unavailable",
+                    },
                 )
             self._event(
                 envelope,
                 "model_request_started",
                 {"provider": provider, "model": model, "message_count": len(messages)},
             )
-            # Fresh per-attempt buffers: a failed attempt's partial deltas are
-            # discarded before the next candidate streams (nothing is yielded live
-            # until this method returns), so fallback never duplicates output.
-            deltas: list[StreamEvent] = []
+            for lifecycle in self._drain_sink():
+                yield lifecycle
+
             text_parts: list[str] = []
             tool_deltas: list[dict[str, object]] = []
             finish: str | None = None
             usage: dict[str, object] | None = None
+            output_committed = False
             try:
-                async for sev in self.model_router.astream(provider, model, messages, self.tool_specs):
-                    if sev.text_delta:
-                        text_parts.append(sev.text_delta)
-                        deltas.append(StreamEvent(kind=TEXT_DELTA, text=sev.text_delta))
-                    if sev.tool_call_delta:
-                        tool_deltas.append(sev.tool_call_delta)
-                    stream_usage = sev.metadata.get("usage")
+                async for provider_event in self.model_router.astream(
+                    provider, model, messages, self.tool_specs
+                ):
+                    if provider_event.text_delta:
+                        output_committed = True
+                        text_parts.append(provider_event.text_delta)
+                        yield StreamEvent(kind=TEXT_DELTA, text=provider_event.text_delta)
+                    if provider_event.tool_call_delta:
+                        output_committed = True
+                        tool_deltas.append(provider_event.tool_call_delta)
+                    stream_usage = provider_event.metadata.get("usage")
                     if isinstance(stream_usage, dict):
                         usage = stream_usage
-                    if sev.event_type == "finish":
-                        finish = sev.finish_reason
-            except Exception as exc:  # noqa: BLE001 — provider streams fail safe, then fall back
+                    if provider_event.event_type == "finish":
+                        finish = provider_event.finish_reason
+            except Exception as exc:  # noqa: BLE001
                 self._event(
                     envelope,
                     "model_request_failed",
@@ -370,13 +363,21 @@ class RuntimeOrchestrator:
                         "finish_reason": "error",
                         "error_class": type(exc).__name__,
                         "safe_error_code": "provider_connection_failed",
+                        "partial_output_exposed": output_committed,
                     },
                 )
+                for lifecycle in self._drain_sink():
+                    yield lifecycle
+                if output_committed:
+                    yield ModelResponse(
+                        text="model_unavailable: provider_stream_failed_after_partial_output",
+                        finish_reason="error",
+                    )
+                    return
                 continue
+
             response = ModelResponse(
                 text="".join(text_parts),
-                # Defensive: providers map protocol stop reasons to the contract, but a
-                # turn must fail safe (not raise) if one ever streams an unknown value.
                 finish_reason=finish if finish in FINISH_REASONS else "stop",
                 tool_calls=self._reconstruct_tool_calls(tool_deltas),
                 usage=usage,
@@ -392,15 +393,18 @@ class RuntimeOrchestrator:
                     "usage": summarize_model_usage(response.usage),
                 },
             )
-            return response, deltas
-        return (
-            ModelResponse(text="model_unavailable: provider_connection_failed", finish_reason="error"),
-            [],
+            for lifecycle in self._drain_sink():
+                yield lifecycle
+            yield response
+            return
+
+        yield ModelResponse(
+            text="model_unavailable: provider_connection_failed", finish_reason="error"
         )
 
-    async def astream_handle(self, envelope: PromptEnvelope):  # type: ignore[no-untyped-def]
-        """Run a turn, yielding :class:`StreamEvent`s incrementally (text + lifecycle + final)."""
-
+    async def astream_handle(
+        self, envelope: PromptEnvelope
+    ) -> AsyncIterator[StreamEvent]:
         async for event in self._aturn_events(envelope, stream=True):
             yield event
 
@@ -409,10 +413,12 @@ class RuntimeOrchestrator:
         async for event in self._aturn_events(envelope, stream=False):
             if event.kind == FINAL and event.response is not None:
                 final = event.response
-        assert final is not None  # the generator always yields a FINAL event
+        assert final is not None
         return final
 
-    async def _aturn_events(self, envelope: PromptEnvelope, *, stream: bool):  # type: ignore[no-untyped-def]
+    async def _aturn_events(
+        self, envelope: PromptEnvelope, *, stream: bool
+    ) -> AsyncIterator[StreamEvent]:
         self._sink = [] if stream else None
         try:
             async for event in self._aturn_events_inner(envelope, stream=stream):
@@ -420,10 +426,14 @@ class RuntimeOrchestrator:
         finally:
             self._sink = None
 
-    async def _aturn_events_inner(self, envelope: PromptEnvelope, *, stream: bool):  # type: ignore[no-untyped-def]
+    async def _aturn_events_inner(
+        self, envelope: PromptEnvelope, *, stream: bool
+    ) -> AsyncIterator[StreamEvent]:
         machine = RuntimeStateMachine()
         self._state(machine, envelope, "NORMALISED")
-        self._event(envelope, "prompt_normalised", {"text_length": len(envelope.prompt.text)})
+        self._event(
+            envelope, "prompt_normalised", {"text_length": len(envelope.prompt.text)}
+        )
         self._state(machine, envelope, "CLASSIFIED")
         classification = self.classifier.classify(envelope.prompt.text)
         self._event(
@@ -456,10 +466,6 @@ class RuntimeOrchestrator:
         )
         self._event(envelope, "context_gathered", bundle.event_payload())
 
-        # Governed, default-ask retrieval augmentation. The vector_embedding_runtime
-        # gate is integrated and defaults enabled, but decision mode defaults to ask;
-        # retrieved context is injected only when the owner changes the standing
-        # decision mode to allow/auto.
         retrieval_context: str | None = None
         if self.retrieval is not None:
             retrieval_plan = self.retrieval.plan(envelope.prompt.text)
@@ -477,7 +483,9 @@ class RuntimeOrchestrator:
                     retrieval_context = retrieval_plan.context_text
 
         plan_result = self.planner.create_or_skip(classification)
-        self._state(machine, envelope, "PLAN_READY" if plan_result.required else "PLAN_SKIPPED")
+        self._state(
+            machine, envelope, "PLAN_READY" if plan_result.required else "PLAN_SKIPPED"
+        )
         self._event(envelope, plan_result.event_type, plan_result.payload)
 
         messages: list[ModelMessage] = [
@@ -499,6 +507,7 @@ class RuntimeOrchestrator:
                 images=self._image_attachments(envelope),
             )
         )
+
         max_tool_calls = envelope.options.max_tool_calls
         tool_calls_made = 0
         started_action_ids: set[str] = set()
@@ -509,19 +518,23 @@ class RuntimeOrchestrator:
         last_action: ToolAction | None = None
         last_result: ToolResult | None = None
 
-        # Surface everything accumulated before the first model call.
-        while self._sink:
-            yield self._sink.pop(0)
+        for pending in self._drain_sink():
+            yield pending
 
         while True:
             if stream and hasattr(self.model_router, "astream"):
-                response, deltas = await self._astream_model_call(envelope, messages)
-                for delta in deltas:
-                    yield delta
+                response: ModelResponse | None = None
+                async for item in self._astream_model_call(envelope, messages):
+                    if isinstance(item, ModelResponse):
+                        response = item
+                    else:
+                        yield item
+                assert response is not None
             else:
                 response = await self._acall_model(envelope, messages)
-            while self._sink:
-                yield self._sink.pop(0)
+
+            for pending in self._drain_sink():
+                yield pending
             if response.finish_reason == "error":
                 status = "failed"
                 message = response.text or "model_unavailable: provider_connection_failed"
@@ -529,6 +542,7 @@ class RuntimeOrchestrator:
             if not response.tool_calls:
                 final_text = response.text
                 break
+
             proposal = response.tool_calls[0]
             try:
                 action = validate_tool_call(proposal)
@@ -542,11 +556,14 @@ class RuntimeOrchestrator:
                     envelope,
                     rejected_tool_call={"tool_name": exc.tool_name, "reason": exc.reason},
                 )
-                final_text = "I could not run that step because the requested tool call was invalid."
+                final_text = (
+                    "I could not run that step because the requested tool call was invalid."
+                )
                 break
             if tool_calls_made >= max_tool_calls:
                 final_text = "Stopped: reached the maximum number of tool calls for this turn."
                 break
+
             self._state(machine, envelope, "POLICY_REVIEWED")
             tool_result, decision = self.tool_broker.execute(
                 action,
@@ -589,6 +606,7 @@ class RuntimeOrchestrator:
                 status = "denied"
                 message = f"Action denied by policy: {', '.join(decision.reasons)}"
                 break
+
             self._state(machine, envelope, "EXECUTING")
             self._state(machine, envelope, "OBSERVING")
             self._state(machine, envelope, "VERIFYING")
@@ -601,10 +619,6 @@ class RuntimeOrchestrator:
                 started_action_ids=started_action_ids,
             )
             tool_calls_made += 1
-            # A valid tool round-trip on both wire protocols: first the
-            # assistant message that made the call (Anthropic tool_use block /
-            # OpenAI tool_calls field), then the matching tool result. Without
-            # the assistant message, hosted providers reject the request.
             messages.append(
                 ModelMessage(
                     role="assistant",
@@ -620,8 +634,8 @@ class RuntimeOrchestrator:
                     name=action.tool_name,
                 )
             )
-            while self._sink:
-                yield self._sink.pop(0)
+            for pending in self._drain_sink():
+                yield pending
 
         if status is None:
             self._state(machine, envelope, "RESPONDING")
@@ -637,8 +651,8 @@ class RuntimeOrchestrator:
             "response_created",
             {"status": status, "summary": message[:200], "runtime_state": machine.state},
         )
-        while self._sink:
-            yield self._sink.pop(0)
+        for pending in self._drain_sink():
+            yield pending
         yield StreamEvent(
             kind=FINAL,
             response=AgentResponse(
@@ -652,7 +666,6 @@ class RuntimeOrchestrator:
                 last_event_id=self.writer.last_event_id,
             ),
         )
-
 
     def handle(self, envelope: PromptEnvelope) -> AgentResponse:
         import asyncio

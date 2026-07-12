@@ -51,19 +51,14 @@ def test_join(base: str, path: str, expected: str) -> None:
     assert _join(base, path) == expected
 
 
-def test_production_router_rejects_test_provider(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("RAIKER_TEST_MODE", raising=False)
-    router = ModelRouter(ModelProfileRegistry.load())
+def test_registry_ships_no_test_provider_profiles() -> None:
+    registry = ModelProfileRegistry.load()
+    router = ModelRouter(registry)
     assert router.default_provider()[0] == "llama.cpp"
-    with pytest.raises(ProviderPolicyError):
-        router.select_profile("mock-test")
-
-
-def test_test_mode_allows_test_provider(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("RAIKER_TEST_MODE", "1")
-    router = ModelRouter(ModelProfileRegistry.load())
-    profile = router.select_profile("mock-test")
-    assert profile.profile_id == "mock-test"
+    for profile in registry.list_profiles():
+        assert profile.provider not in {"mock", "test"}
+        assert not profile.raw.get("test_only")
+        assert profile.default_state != "enabled_for_tests_only"
 
 
 def test_factory_policy_openrouter(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -175,7 +170,7 @@ def test_stream_cancellation_preserves_cancelled_error() -> None:
     async def main() -> None:
         async def handler(request: httpx.Request) -> httpx.Response:
             raise asyncio.CancelledError()
-        p = AsyncOpenAICompatibleProvider("p", "llama.cpp", "m", "http://127.0.0.1:8080", ModelCapabilities(), client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+        p = AsyncOpenAICompatibleProvider("p", "llama.cpp", "m", "http://127.0.0.1:8080", ModelCapabilities(supports_streaming=True), client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
         with pytest.raises(asyncio.CancelledError):
             async for _ in p.stream_chat(ModelRequest("p", "llama.cpp", "m", [ModelMessage("user", "x")])):
                 pass

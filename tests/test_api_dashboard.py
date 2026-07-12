@@ -126,8 +126,7 @@ class TestReads:
         ids = [p["profile_id"] for p in body["profiles"]]
         assert "raiker-local-llama-cpp" in ids
         # Test-harness profiles never reach the web surface — working backends only.
-        assert "mock-test" not in ids
-        assert "deterministic-test" not in ids
+        assert all(p["provider"] not in {"mock", "test"} for p in body["profiles"])
         assert body["remote_profile_count"] >= 1
         assert all("selected" in p and "provider" in p for p in body["profiles"])
         hosted = next(p for p in body["profiles"] if p["profile_id"] == "openai-hosted")

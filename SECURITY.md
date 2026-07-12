@@ -307,7 +307,7 @@ The **local web dashboard** has completed this bar for its scope (read-only gove
 | Event logging | Implemented append-style records | `raiker/events/`, `raiker/storage/sqlite.py`, event docs | Tamper-evidence missing/deferred. |
 | SQLite state records | Implemented | `raiker/storage/sqlite.py` | Encryption/backup/hardening not claimed. |
 | Checkpoints | Implemented metadata/service paths | `raiker/checkpoints/` | Restore/fork execution remains approval-gated/deferred where applicable. |
-| Deterministic test provider gating | Implemented | `config/model-profiles.json`, catalog `/launch --provider mock --model mock-deterministic` | Keep test-only; no production fallback. |
+| No built-in test model provider | Implemented | `raiker/models/factory.py`, `tests/test_no_builtin_test_model_provider.py` | Test/mock profiles are rejected fail-closed (`test_provider_not_available`); production never falls back to a fabricated model. |
 | Provider policy gating | Implemented for profiles/policy markers | `config/model-profiles.json`, `raiker/models/` | Secret manager and hosted DLP controls missing. |
 | Disabled runtime flags | Implemented validation/readiness markers | `scripts/validate_repo_truthfulness.py`, `docs/IMPLEMENTATION_STATUS.md` | Maintain for every deferred runtime. |
 | Tool broker validation | Implemented | `raiker/tools/`, `raiker/models/tool_call_validation.py` | Add adversarial model-call corpus. |

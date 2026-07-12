@@ -497,14 +497,23 @@ class DashboardService:
         fail-closed. Enabling a connector is done through the existing capability
         gate + decision-mode control plane (gate-manager only), not here.
         """
-        from raiker.runtime.connectors import GITHUB_HOST, GITHUB_TOKEN_ENV
+        from raiker.runtime.connectors import (
+            GCAL_HOST,
+            GCAL_TOKEN_ENV,
+            GITHUB_HOST,
+            GITHUB_TOKEN_ENV,
+            GMAIL_HOST,
+            GMAIL_TOKEN_ENV,
+            SLACK_HOST,
+            SLACK_TOKEN_ENV,
+        )
         from raiker.runtime.executors.sandbox import connector_egress_allowlist
 
+        allowlist = connector_egress_allowlist()
         connectors: list[ConnectorView] = []
         gh_gate = self.control.get_capability_gate(
             "connector_github_runtime", acting_principal_id
         )
-        gh_allowlist = connector_egress_allowlist()
         connectors.append(
             ConnectorView(
                 connector_id="github",
@@ -516,8 +525,71 @@ class DashboardService:
                 credential_env=GITHUB_TOKEN_ENV,
                 credential_configured=bool(os.environ.get(GITHUB_TOKEN_ENV, "").strip()),
                 egress_host=GITHUB_HOST,
-                egress_allowed=GITHUB_HOST in gh_allowlist,
+                egress_allowed=GITHUB_HOST in allowlist,
                 actions=("read_issue", "read_pull_request"),
+                kind="read_only",
+            )
+        )
+        gmail_gate = self.control.get_capability_gate(
+            "connector_gmail_runtime", acting_principal_id
+        )
+        connectors.append(
+            ConnectorView(
+                connector_id="gmail",
+                display_name="Gmail (read-only)",
+                capability="connector_gmail_runtime",
+                gate_state=gmail_gate.state if gmail_gate is not None else "unknown",
+                capability_enabled=(
+                    bool(gmail_gate.runtime_enabled) if gmail_gate is not None else False
+                ),
+                decision_mode=gmail_gate.decision_mode if gmail_gate is not None else "ask",
+                credential_env=GMAIL_TOKEN_ENV,
+                credential_configured=bool(os.environ.get(GMAIL_TOKEN_ENV, "").strip()),
+                egress_host=GMAIL_HOST,
+                egress_allowed=GMAIL_HOST in allowlist,
+                actions=("read_message", "read_thread"),
+                kind="read_only",
+            )
+        )
+        gcal_gate = self.control.get_capability_gate(
+            "connector_gcal_runtime", acting_principal_id
+        )
+        connectors.append(
+            ConnectorView(
+                connector_id="gcal",
+                display_name="Google Calendar (read-only)",
+                capability="connector_gcal_runtime",
+                gate_state=gcal_gate.state if gcal_gate is not None else "unknown",
+                capability_enabled=(
+                    bool(gcal_gate.runtime_enabled) if gcal_gate is not None else False
+                ),
+                decision_mode=gcal_gate.decision_mode if gcal_gate is not None else "ask",
+                credential_env=GCAL_TOKEN_ENV,
+                credential_configured=bool(os.environ.get(GCAL_TOKEN_ENV, "").strip()),
+                egress_host=GCAL_HOST,
+                egress_allowed=GCAL_HOST in allowlist,
+                actions=("read_event", "read_calendar"),
+                kind="read_only",
+            )
+        )
+        slack_gate = self.control.get_capability_gate(
+            "connector_slack_runtime", acting_principal_id
+        )
+        connectors.append(
+            ConnectorView(
+                connector_id="slack",
+                display_name="Slack (read-only)",
+                capability="connector_slack_runtime",
+                gate_state=slack_gate.state if slack_gate is not None else "unknown",
+                capability_enabled=(
+                    bool(slack_gate.runtime_enabled) if slack_gate is not None else False
+                ),
+                decision_mode=slack_gate.decision_mode if slack_gate is not None else "ask",
+                credential_env=SLACK_TOKEN_ENV,
+                credential_configured=bool(os.environ.get(SLACK_TOKEN_ENV, "").strip()),
+                egress_host=SLACK_HOST,
+                egress_allowed=SLACK_HOST in allowlist,
+                actions=("read_channel_info", "read_channel_history"),
                 kind="read_only",
             )
         )

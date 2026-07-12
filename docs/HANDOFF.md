@@ -24,11 +24,82 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 - **Web reads are read-only + rate-limit-aware** (120 req/min/IP). Prefer folding new read data into an existing endpoint over adding a fan-out.
 - **Secrets never surface.** API keys/allowlist values come from owner env, are never displayed, logged, or committed.
 
-## State as of 2026-07-11 (this session, branch `claude/handoff-task-implementation-5k3kw7`)
+## State as of 2026-07-11 (this session, branch `claude/handoff-task-implementation-9fapmw`)
+
+**Task 4 read connectors COMPLETE: GitHub + Gmail + Google Calendar + Slack, all
+governed read-only.** Four connectors now share the identical fail-closed pattern
+(gate + default-`ask` decision mode + owner env-only credential + owner egress
+allowlist + server-built request URL + untrusted-data framing + metadata-only
+audit; reads only). GitHub and Gmail are **live-verified end-to-end on hosted
+Anthropic**; Calendar and Slack are code-complete + fully unit-tested (live
+verification deferred — no operator tokens for those services this run).
+- **`connector_gcal_runtime`** — `gcal_read(resource, calendar_id, event_id)`;
+  resource ∈ event/calendar; env `RAIKER_GCAL_TOKEN`; host `www.googleapis.com`;
+  URL built server-side and **path-encoded** from validated components. Threat
+  model `docs/threat-models/connectors-gcal.md`; `tests/test_gcal_connector.py`
+  (19).
+- **`connector_slack_runtime`** — `slack_read(resource, channel)`; resource ∈
+  channel_info/channel_history; env `RAIKER_SLACK_TOKEN`; host `slack.com`; URL
+  built server-side against a fixed Web API method (`conversations.info`/
+  `conversations.history`) from a validated channel id; a Slack `ok:false` body
+  is treated as `connector_bad_response`, never surfaced as content. Threat model
+  `docs/threat-models/connectors-slack.md`; `tests/test_slack_connector.py` (19).
+- Both wired exactly like GitHub/Gmail (phase_gates RUNTIME_DOMAIN + tier-5,
+  executor registry + `REAL_EXECUTOR_CAPABILITIES`, activation, router, policy
+  config, tool_call_validation, broker content-scrub set) with `ConnectorView`
+  rows in `get_connections()` (the generic `ConnectionsView` renders all four).
+
+### Prior state — Task 4 second read connector (Gmail, done + live-verified this branch)
+
+**Task 4 second read connector COMPLETE: governed Gmail read-only connector,
+live-verified end-to-end on hosted Anthropic.** Replicates the GitHub reference
+slice exactly — different host + credential + resource, identical governance.
+- **Capability `connector_gmail_runtime`** (in `RUNTIME_DOMAIN_CAPABILITIES` +
+  tier-5 executed caps + `REAL_EXECUTOR_CAPABILITIES`; router map + activation
+  requirement + policy config all wired). Mirrors the GitHub connector exactly.
+- **Brokered tool `gmail_read(resource, message_id)`**
+  (`raiker/runtime/connectors.py::GmailConnectorService`, wrapped by
+  `raiker/tools/connector_tools.py::gmail_read`, registered in the broker + model-
+  exposed in `tool_call_validation.py`). Governance, in order: gate → decision
+  mode (**default `ask`/`auto` withhold**; `deny` blocks; only `allow` runs) →
+  owner credential `RAIKER_GMAIL_TOKEN` (env only) → owner egress allowlist must
+  contain `gmail.googleapis.com` → validated components (`resource` ∈
+  message/thread, URL-safe id; the request URL is **built server-side** with
+  `format=metadata` — Gmail's own snippet + Subject/From/To/Date headers, never
+  raw MIME body, no SSRF). Fetched summary returned as **untrusted data, not
+  instructions**. Reads only.
+- **route_action executor** `GmailConnectorExecutor` (operation `read`,
+  `enforce_modes=False`, metadata-only artifacts: resource/message_id/subject/
+  length) is the activation anchor.
+- **Audit is metadata-only:** the fetched `content` is dropped from broker
+  events/results (`gmail_read` added to `_CONTENT_RESULT_TOOLS`); the token never
+  appears in args/URLs/events.
+- **Web "Connections" surface:** a second `ConnectorView` row for Gmail in
+  `DashboardService.get_connections()`; the generic `ConnectionsView` renders it.
+- **Threat model:** `docs/threat-models/connectors-gmail.md`.
+- Tests: `tests/test_gmail_connector.py` (18, mirrors the GitHub suite: gate/mode
+  withhold+deny, missing credential/egress fail-closed, arg validation, message +
+  thread success via injected fetch, executor metadata-only, broker metadata-only
+  event scrub, model exposure/validation) + a second-connector web vitest in
+  `ConnectionsView.test.ts`.
+- **Session gate:** full backend suite green (**1447 passed**, exit 0);
+  `ruff check .` clean; mypy clean on changed sources; web lint/check/**86
+  vitest**/build green; all five `scripts/validate_*.py` pass.
+- **Live-verified.** 2026-07-11, hosted Anthropic Haiku 4.5 with a 1-hour
+  operator key: all fail-closed paths confirmed; the fully-governed path made a
+  **real** GET to `gmail.googleapis.com` (401 with a fake token — no real Gmail
+  OAuth token in this env; token absent from output); and an **end-to-end model
+  turn** where Haiku called `gmail_read(message, msg_abc123)` and reported the
+  exact governed error (event log metadata-only: no token, `message_id` kept).
+  Connections web view screenshotted in Gmail "Ready" and honest "Fail-closed"
+  states (0 console errors). Full table in `docs/WEB_APP_LIVE_TEST.md`
+  (2026-07-11 Gmail section).
+
+### Prior state — Task 4 reference slice (done, this branch's base)
 
 **Task 4 reference slice COMPLETE: governed GitHub read-only connector,
 live-verified end-to-end on hosted Anthropic.** This is the reference pattern
-for all Task 4 connectors (Gmail / Calendar / Slack replicate it).
+for all Task 4 connectors (Gmail done above; Calendar / Slack replicate it).
 - **Capability `connector_github_runtime`** (in `RUNTIME_DOMAIN_CAPABILITIES` +
   `REAL_EXECUTOR_CAPABILITIES`; router map + activation requirement + policy
   config all wired). Mirrors the advisor pattern exactly.
@@ -78,13 +149,14 @@ for all Task 4 connectors (Gmail / Calendar / Slack replicate it).
   both "Ready" and honest "Fail-closed" states (0 console errors). Full table in
   `docs/WEB_APP_LIVE_TEST.md` (2026-07-11 Task 4 section).
 
-**Next for Task 4:** replicate the pattern for a second read connector (Gmail /
-Calendar / Slack) — each = new capability + `*ConnectorService` (gate + mode +
-env credential + `api.<host>` on the connector egress allowlist + server-built
-request) + brokered tool + `GithubConnectorExecutor`-style route executor + a
-`ConnectorView` row in `get_connections()`. Then the first **write** action
-(must require approval, not just `ask`). Do NOT ship a connector whose executor
-isn't real.
+**Next for Task 4:** all four read connectors are done (GitHub, Gmail, Calendar,
+Slack). The remaining Task-4 work is the first **write** action end-to-end (must
+require **approval**, not just `ask`; the write executor must be real). Two
+follow-ons for the read connectors: (a) **live-verify Calendar + Slack** when
+operator tokens for those services are available (repeat the Gmail live
+procedure — governance fail-closed paths + real egress boundary + an end-to-end
+model turn); (b) optional broadening (more resources per connector). Do NOT ship
+a connector whose executor isn't real.
 
 ### Prior state — Task 3 (done, merged PR #109)
 
@@ -216,10 +288,13 @@ above). The governed pattern is established in `raiker/runtime/connectors.py`,
   through the broker/policy/approval path with default decision mode `ask`
   (send/modify actions must require **approval**, not just `ask`; reads are
   `ask` and withhold until raised to `allow`).
-- Replicate the GitHub slice for a second **read-only** connector (Gmail /
-  Calendar / Slack), reusing `GithubConnectorService` as the template and adding
-  a `ConnectorView` row to `get_connections()`. Do NOT ship a connector whose
-  executor isn't real — fail closed until it is.
+- **DONE** — all four read-only connectors: **GitHub**, **Gmail**, **Google
+  Calendar** (`connector_gcal_runtime`, `gcal_read`), and **Slack**
+  (`connector_slack_runtime`, `slack_read`), each reusing the reference template
+  with a `ConnectorView` row in `get_connections()`. GitHub + Gmail are
+  live-verified; Calendar + Slack are code-complete + unit-tested (live
+  verification pending operator tokens). Do NOT ship a connector whose executor
+  isn't real — fail closed until it is.
 - Then add the first **write** action end-to-end (requires approval through the
   broker/policy/approval path — the write executor must be real). Tests: tool
   executes when configured+allowed, fails closed otherwise, approval required

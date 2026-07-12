@@ -17,6 +17,7 @@ from raiker.api.routes_connectors import router as connectors_router
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
 from raiker.api.routes_prompts import router as prompts_router
+from raiker.api.routes_settings import router as settings_router
 from raiker.api.routes_vault import router as vault_router
 from raiker.api.security import (
     MaxBodySizeMiddleware,
@@ -148,6 +149,7 @@ def create_app(
     app.add_middleware(SecurityHeadersMiddleware, hsts=hsts)
     app.include_router(auth_router)
     app.include_router(vault_router)
+    app.include_router(settings_router)
     app.include_router(control_router)
     app.include_router(dashboard_router)
     app.include_router(prompts_router)

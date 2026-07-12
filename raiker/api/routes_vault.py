@@ -50,12 +50,12 @@ def _settings(ws: str | Path, principal_id: str) -> dict[str, Any]:
 def _enforce_vault_mfa_policy(ws: str | Path, principal_id: str, mfa_code: str | None) -> None:
     settings = _settings(ws, principal_id)
     service = AccountService(ws)
-    if settings.get(REQUIRE_MFA_KEY) and service.mfa_enrolled(principal_id):
-        if not mfa_code or not service.verify_mfa_code(principal_id, mfa_code):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={"ok": False, "reason_code": "mfa_required_for_vault"},
-            )
+    policy_on = settings.get(REQUIRE_MFA_KEY) and service.mfa_enrolled(principal_id)
+    if policy_on and (not mfa_code or not service.verify_mfa_code(principal_id, mfa_code)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": "mfa_required_for_vault"},
+        )
 
 
 @router.get("/api/vault/status")

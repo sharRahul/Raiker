@@ -58,6 +58,8 @@ from raiker.storage.migrations import (
     CONNECTOR_INVOCATIONS_SQL,
     EMAIL_DRAFTS_MIGRATION_ID,
     EMAIL_DRAFTS_SQL,
+    LOCK_SCREEN_MIGRATION_ID,
+    LOCK_SCREEN_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
     MODEL_ADVISOR_SQL,
     MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
@@ -462,6 +464,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection.execute(
                     "ALTER TABLE sessions ADD COLUMN project_id TEXT REFERENCES projects(project_id)"
                 )
+            self._apply_migration(LOCK_SCREEN_MIGRATION_ID, LOCK_SCREEN_SQL, connection)
+            for _alter_sql in (
+                "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
+                "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
+                "ALTER TABLE api_sessions ADD COLUMN last_seen_at TEXT",
+                "ALTER TABLE api_sessions ADD COLUMN device_label TEXT",
+                "ALTER TABLE tasks ADD COLUMN priority TEXT",
+                "ALTER TABLE tasks ADD COLUMN scheduled_at TEXT",
+                "ALTER TABLE tasks ADD COLUMN recurrence TEXT",
+                "ALTER TABLE tasks ADD COLUMN reminder_at TEXT",
+            ):
+                with contextlib.suppress(sqlite3.OperationalError):
+                    connection.execute(_alter_sql)
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
         row = connection.execute(

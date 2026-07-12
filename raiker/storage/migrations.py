@@ -1198,3 +1198,39 @@ CREATE TABLE IF NOT EXISTS connector_invocations (
 CREATE INDEX IF NOT EXISTS idx_connector_invocations_lifecycle
   ON connector_invocations(principal_id, connector_id, started_at DESC);
 """
+
+
+LOCK_SCREEN_MIGRATION_ID = "RAIKER-6001-local-lock-screen"
+LOCK_SCREEN_SQL = """
+CREATE TABLE IF NOT EXISTS account_credentials (
+  principal_id TEXT PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  hash_algo TEXT NOT NULL,
+  failed_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until TEXT,
+  mfa_enrolled INTEGER NOT NULL DEFAULT 0,
+  mfa_secret_encrypted BLOB,
+  backup_codes_hashed TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+  principal_id TEXT PRIMARY KEY,
+  settings_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS trusted_contacts (
+  contact_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  method TEXT NOT NULL,
+  value TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_username ON account_credentials(username);
+CREATE INDEX IF NOT EXISTS idx_trusted_contacts_principal ON trusted_contacts(principal_id);
+"""

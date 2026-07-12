@@ -16,7 +16,17 @@ class AuthMiddleware:
         self._session_store = ApiSessionStore(self._workspace_root)
         self._sqlite = SQLiteStore(self._workspace_root)
 
-    def authenticate(self, request: Request) -> tuple[ApiSession, Principal]:
+    @staticmethod
+    def _scope_satisfies(session_scope: str, required_scope: str) -> bool:
+        if required_scope == "control":
+            return session_scope in {"control", "elevated"}
+        if required_scope == "elevated":
+            return session_scope == "elevated"
+        return session_scope == required_scope
+
+    def authenticate(
+        self, request: Request, required_scope: str = "control"
+    ) -> tuple[ApiSession, Principal]:
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
             raise HTTPException(
@@ -44,6 +54,11 @@ class AuthMiddleware:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token expired",
+            )
+        if not self._scope_satisfies(session.scope, required_scope):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"ok": False, "reason_code": "scope_insufficient"},
             )
         principal = self._resolve_principal(session.principal_id)
         if principal is None:

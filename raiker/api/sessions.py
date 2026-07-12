@@ -19,11 +19,15 @@ class ApiSession:
     created_at: str = ""
     expires_at: str | None = None
     revoked: bool = False
+    scope: str = "control"
+    absolute_expires_at: str | None = None
 
     def is_expired(self, now: str | None = None) -> bool:
+        check = now or utc_now()
+        if self.absolute_expires_at is not None and check > self.absolute_expires_at:
+            return True
         if self.expires_at is None:
             return False
-        check = now or utc_now()
         return check > self.expires_at
 
 
@@ -45,23 +49,44 @@ class ApiSessionStore:
         principal_id: str,
         scopes: tuple[str, ...] = ("control",),
         expires_in_seconds: int = 86400 * 30,
+        scope: str = "control",
+        absolute_expires_in_seconds: int | None = None,
+        device_label: str | None = None,
     ) -> tuple[str, ApiSession]:
+        from datetime import datetime, timedelta
+
         raw_token, token_hash = _generate_token()
         session_id = f"api_ses_{secrets.token_hex(12)}"
         now = utc_now()
         expires_at = None
         if expires_in_seconds > 0:
-            from datetime import datetime, timedelta
-            dt = datetime.now(UTC) + timedelta(seconds=expires_in_seconds)
-            expires_at = dt.isoformat(timespec="seconds")
+            expires_at = (
+                datetime.now(UTC) + timedelta(seconds=expires_in_seconds)
+            ).isoformat(timespec="seconds")
+        absolute_expires_at = None
+        if absolute_expires_in_seconds is not None:
+            absolute_expires_at = (
+                datetime.now(UTC) + timedelta(seconds=absolute_expires_in_seconds)
+            ).isoformat(timespec="seconds")
         import json
         scopes_json = json.dumps(list(scopes))
         with self._store.connect() as connection:
             connection.execute(
                 """INSERT OR IGNORE INTO api_sessions
-                   (session_id, principal_id, token_hash, scopes, created_at, expires_at, revoked)
-                   VALUES (?, ?, ?, ?, ?, ?, 0)""",
-                (session_id, principal_id, token_hash, scopes_json, now, expires_at),
+                   (session_id, principal_id, token_hash, scopes, created_at, expires_at,
+                    revoked, scope, absolute_expires_at, device_label)
+                   VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)""",
+                (
+                    session_id,
+                    principal_id,
+                    token_hash,
+                    scopes_json,
+                    now,
+                    expires_at,
+                    scope,
+                    absolute_expires_at,
+                    device_label,
+                ),
             )
         session = ApiSession(
             session_id=session_id,
@@ -69,8 +94,26 @@ class ApiSessionStore:
             scopes=scopes,
             created_at=now,
             expires_at=expires_at,
+            scope=scope,
+            absolute_expires_at=absolute_expires_at,
         )
         return raw_token, session
+
+    def revoke_others_for_principal(self, principal_id: str, keep_session_id: str) -> int:
+        with self._store.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE api_sessions SET revoked = 1 "
+                "WHERE principal_id = ? AND session_id != ? AND revoked = 0",
+                (principal_id, keep_session_id),
+            )
+            return cursor.rowcount
+
+    def touch(self, session_id: str, when: str) -> None:
+        with self._store.connect() as connection:
+            connection.execute(
+                "UPDATE api_sessions SET last_seen_at = ? WHERE session_id = ?",
+                (when, session_id),
+            )
 
     def get_by_token(self, raw_token: str) -> ApiSession | None:
         token_hash = _hash_token(raw_token)
@@ -114,4 +157,8 @@ class ApiSessionStore:
             created_at=str(row.get("created_at", "")),
             expires_at=str(row["expires_at"]) if row.get("expires_at") else None,
             revoked=bool(row.get("revoked", 0)),
+            scope=str(row.get("scope") or "control"),
+            absolute_expires_at=(
+                str(row["absolute_expires_at"]) if row.get("absolute_expires_at") else None
+            ),
         )

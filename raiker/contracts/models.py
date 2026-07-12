@@ -623,6 +623,10 @@ class TaskRecord:
     progress_percent: int | None = None
     completed_at: str | None = None
     summary: str | None = None
+    priority: str | None = None
+    scheduled_at: str | None = None
+    recurrence: str | None = None
+    reminder_at: str | None = None
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:

@@ -17,6 +17,10 @@ dependencies = [
     # attachments (web-app task 3). No system deps; extraction fails closed if
     # the import is unavailable.
     "pypdf>=4",
+    # Local-owner lock screen. Argon2id password hashing (scrypt fallback lives
+    # in the stdlib) and TOTP multi-factor auth. Both are local-only, no egress.
+    "argon2-cffi>=23.1",
+    "pyotp>=2.9",
 ]
 
 [project.optional-dependencies]

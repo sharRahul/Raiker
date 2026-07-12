@@ -5,6 +5,7 @@
   import type { StepUpValues } from "../components/StepUpDialog.svelte";
   import { api, ApiError } from "../api";
   import type { RuntimeMode } from "../apiTypes";
+  import SecurityLogin from "./settings/SecurityLogin.svelte";
   import { humanize } from "../format";
   import { explainReasonCode } from "../reasonCodes";
   import {
@@ -160,13 +161,16 @@
   {/if}
 </section>
 
+<SecurityLogin />
+
 <section class="card" aria-labelledby="secrets-h">
   <h2 id="secrets-h">Secrets &amp; redaction</h2>
   <p class="notice notice-warn" role="note">
     <Icon name="lock" size={15} />
     <span>
-      <strong>Secret storage is not implemented (deferred).</strong> There is no secret/credential
-      store in this local single-user runtime, so there is nothing to enter here.
+      <strong>Provider API keys are read from the environment only.</strong> Connector credentials
+      are managed under Security &amp; Login and encrypted with the Vault Key; other provider keys are
+      never displayed or stored here.
     </span>
   </p>
   <p class="sub">

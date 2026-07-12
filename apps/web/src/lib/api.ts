@@ -39,6 +39,10 @@ export function hasToken(): boolean {
   return token !== null;
 }
 
+export function getToken(): string | null {
+  return token;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -139,7 +143,29 @@ export const auth = {
     }),
 };
 
+export interface SettingsView {
+  settings: Record<string, unknown>;
+  status: { vault: string; mfa_enrolled: boolean; username: string };
+}
+
 export const api = {
+  // ── Local-account settings, vault key, MFA status ──
+  settings: () => request<SettingsView>("/api/settings"),
+  putSettings: (settings: Record<string, unknown>) =>
+    request<{ settings: Record<string, unknown> }>("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings }),
+    }),
+  vaultStatus: () => request<{ state: string }>("/api/vault/status"),
+  setVaultKey: (key: string, mfaCode?: string) =>
+    request<{ state: string }>("/api/vault/key", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, mfa_code: mfaCode }),
+    }),
+  clearVaultKey: () => request<{ state: string }>("/api/vault/key", { method: "DELETE" }),
+
   // ── Read-only governed views ──
   capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),
   capabilityGate: (capability: string) =>

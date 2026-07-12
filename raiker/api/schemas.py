@@ -46,6 +46,63 @@ class AuthSessionRequest:
     as_principal: str | None = None
 
 
+class RegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    username: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    username: str
+    password: str
+    device_label: str | None = None
+
+
+class MfaVerifyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ticket: str
+    code: str
+
+
+class MfaCodeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    code: str
+
+
+class ElevateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    password: str | None = None
+    mfa_code: str | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    old_password: str
+    new_password: str
+
+
+class VaultKeyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    key: str
+    mfa_code: str | None = None
+
+
+class SettingsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    settings: dict[str, Any]
+
+
+class TaskCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str
+    description: str = ""
+    priority: str | None = None
+    scheduled_at: str | None = None
+    recurrence: str | None = None
+    reminder_at: str | None = None
+
+
 class SetModelSelectionRequest(BaseModel):
     # Persist the operator's model selection: a profile id plus, for providers
     # that serve several models (or ship a placeholder), the concrete model.

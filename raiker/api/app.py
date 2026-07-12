@@ -11,11 +11,13 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from raiker.api.redaction import redact_response_body
 from raiker.api.routes_approvals import router as approvals_router
 from raiker.api.routes_attachments import router as attachments_router
+from raiker.api.routes_auth import router as auth_router
 from raiker.api.routes_channels import router as channels_router
 from raiker.api.routes_connectors import router as connectors_router
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
 from raiker.api.routes_prompts import router as prompts_router
+from raiker.api.routes_vault import router as vault_router
 from raiker.api.security import (
     MaxBodySizeMiddleware,
     RateLimitMiddleware,
@@ -27,7 +29,17 @@ from raiker.runtime.executors.registry import ExecutorRegistry
 # Paths whose responses must not be buffered/redacted by RedactionMiddleware:
 # - /api/auth/session returns the owner's bearer token (must reach the client intact);
 # - /api/prompts/stream is an SSE stream (buffering would break streaming; it is redacted per-chunk).
-_REDACTION_EXEMPT_PATHS = frozenset({"/api/auth/session", "/api/prompts/stream"})
+_REDACTION_EXEMPT_PATHS = frozenset(
+    {
+        "/api/auth/session",
+        "/api/auth/register",
+        "/api/auth/login",
+        "/api/auth/mfa/verify",
+        "/api/auth/mfa/enroll",
+        "/api/auth/elevate",
+        "/api/prompts/stream",
+    }
+)
 
 
 class RedactionMiddleware:
@@ -110,6 +122,14 @@ def create_app(
         openapi_url="/api/openapi.json",
     )
     app.state.workspace_root = Path(workspace_root).resolve()
+    # Boot key material: ensure the internal app key exists (encrypts MFA seeds)
+    # and load the connector vault key-file into the environment when the env var
+    # is unset. The vault key remains fail-closed if neither is present.
+    from raiker.auth.app_key import ensure_app_key
+    from raiker.auth.vault_key_file import load_vault_key_into_env
+
+    ensure_app_key(app.state.workspace_root)
+    load_vault_key_into_env(app.state.workspace_root)
     if executor_registry is not None:
         app.state.executor_registry = executor_registry
     app.add_middleware(RedactionMiddleware)
@@ -126,6 +146,8 @@ def create_app(
     )
     app.add_middleware(RateLimitMiddleware, max_requests=rate_limit_per_minute, window_seconds=60.0)
     app.add_middleware(SecurityHeadersMiddleware, hsts=hsts)
+    app.include_router(auth_router)
+    app.include_router(vault_router)
     app.include_router(control_router)
     app.include_router(dashboard_router)
     app.include_router(prompts_router)

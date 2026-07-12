@@ -216,6 +216,16 @@ class AccountService:
             principal_id, True, account["mfa_secret_encrypted"], account["backup_codes_hashed"]
         )
 
+    def mfa_enrolled(self, principal_id: str) -> bool:
+        account = self._store.get_account(principal_id)
+        return bool(account and account["mfa_enrolled"])
+
+    def verify_mfa_code(self, principal_id: str, code: str) -> bool:
+        account = self._store.get_account(principal_id)
+        if account is None or not account["mfa_enrolled"]:
+            return False
+        return self._check_mfa(account, code)
+
     def disable_mfa(self, principal_id: str, keep_session_id: str = "") -> None:
         self._store.set_account_mfa(principal_id, False, None, None)
         self._sessions.revoke_others_for_principal(principal_id, keep_session_id)

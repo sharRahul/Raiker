@@ -32,9 +32,21 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
     return AuthMiddleware(ws).authenticate(request)
 
 
-# ── Auth: local token mint (unauthenticated; loopback-only, human owner only) ──
+# ── Auth: first-run local token mint ──────────────────────────────────────────
+# Loopback-only, human-owner bootstrap. Available ONLY before the first lock-screen
+# account is registered; once any account exists, this fails closed and callers
+# must authenticate through /api/auth/login (+ MFA). This preserves the owner
+# bootstrap path without leaving an unauthenticated entry to a configured system.
 @router.post("/api/auth/session")
 async def mint_session(body: AuthSessionRequest, request: Request) -> dict[str, Any]:
+    from raiker.storage.sqlite import SQLiteStore
+
+    ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
+    if SQLiteStore(ws).list_accounts():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": "login_required"},
+        )
     service = _service(request)
     result = service.mint_owner_session(body.as_principal)
     if not isinstance(result, AuthSessionView):

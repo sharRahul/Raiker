@@ -175,7 +175,7 @@ def test_stream_cancellation_preserves_cancelled_error() -> None:
     async def main() -> None:
         async def handler(request: httpx.Request) -> httpx.Response:
             raise asyncio.CancelledError()
-        p = AsyncOpenAICompatibleProvider("p", "llama.cpp", "m", "http://127.0.0.1:8080", ModelCapabilities(), client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+        p = AsyncOpenAICompatibleProvider("p", "llama.cpp", "m", "http://127.0.0.1:8080", ModelCapabilities(supports_streaming=True), client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
         with pytest.raises(asyncio.CancelledError):
             async for _ in p.stream_chat(ModelRequest("p", "llama.cpp", "m", [ModelMessage("user", "x")])):
                 pass

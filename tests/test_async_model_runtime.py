@@ -97,7 +97,7 @@ def test_factory_test_provider_gate_and_openai_profiles() -> None:
 
 def _provider(handler: Callable[[httpx.Request], httpx.Response], caps: ModelCapabilities | None = None) -> AsyncOpenAICompatibleProvider:
     if caps is None:
-        caps = ModelCapabilities(supports_tool_calls=True, supports_embeddings=True, supports_reasoning=True, supports_reasoning_effort=True, reasoning_effort_values=("low", "high"))
+        caps = ModelCapabilities(supports_streaming=True, supports_tool_calls=True, supports_embeddings=True, supports_reasoning=True, supports_reasoning_effort=True, reasoning_effort_values=("low", "high"))
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     return AsyncOpenAICompatibleProvider("p", "llama.cpp", "m", "http://127.0.0.1:1/v1", caps, client=client)
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
 import { BOOTSTRAP_ROUTES, stubFetch } from "./lib/test-helpers";
@@ -8,10 +8,18 @@ afterEach(() => {
   window.location.hash = "";
 });
 
+async function signIn() {
+  await waitFor(() => expect(screen.getByLabelText("Username")).toBeInTheDocument());
+  await fireEvent.input(screen.getByLabelText("Username"), { target: { value: "owner" } });
+  await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "pw" } });
+  await fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+}
+
 describe("accessibility landmarks", () => {
   it("exposes a skip link, labelled navigation, and a main landmark", async () => {
     stubFetch(BOOTSTRAP_ROUTES);
     render(App);
+    await signIn();
     await waitFor(() => {
       expect(screen.getByText("Runtime ready")).toBeInTheDocument();
     });
@@ -26,6 +34,7 @@ describe("accessibility landmarks", () => {
     stubFetch(BOOTSTRAP_ROUTES);
     window.location.hash = "#/capabilities";
     render(App);
+    await signIn();
     await waitFor(() => {
       expect(screen.getByRole("link", { name: /capabilities/i })).toHaveAttribute("aria-current", "page");
     });
@@ -39,6 +48,7 @@ describe("accessibility landmarks", () => {
       }),
     );
     render(App);
+    await signIn();
     await waitFor(() => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });

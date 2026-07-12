@@ -3,8 +3,9 @@
   import Sidebar from "./lib/components/Sidebar.svelte";
   import Topbar from "./lib/components/Topbar.svelte";
   import { DEFAULT_ROUTE, navItem, routeFromHash } from "./lib/nav";
-  import { api, connect } from "./lib/api";
+  import { api } from "./lib/api";
   import type { ModelsView as ModelsSnapshot, ProjectsList } from "./lib/apiTypes";
+  import LoginView from "./lib/views/LoginView.svelte";
   import ChatView from "./lib/views/ChatView.svelte";
   import SearchChatView from "./lib/views/SearchChatView.svelte";
   import ProjectsView from "./lib/views/ProjectsView.svelte";
@@ -24,6 +25,7 @@
   );
   const activeItem = $derived(navItem(current));
 
+  let authenticated = $state(false);
   let authState = $state<"connecting" | "ready" | "error">("connecting");
   let principal = $state("—");
   let runtimeMode = $state("—");
@@ -37,14 +39,19 @@
       current = routeFromHash(window.location.hash);
     };
     window.addEventListener("hashchange", handler);
-    void bootstrap();
     return () => window.removeEventListener("hashchange", handler);
   });
 
+  // Called by the lock screen once a full control session exists.
+  function onAuthenticated(principalId: string) {
+    principal = principalId;
+    authenticated = true;
+    authState = "connecting";
+    void bootstrap();
+  }
+
   async function bootstrap() {
     try {
-      const session = await connect();
-      principal = session.principal_id;
       const [mode, diag, modelsView, projectsList] = await Promise.all([
         api.runtimeMode(),
         api.diagnostics(),
@@ -93,6 +100,9 @@
 
 <a class="skip-link" href="#main">Skip to content</a>
 
+{#if !authenticated}
+  <LoginView {onAuthenticated} />
+{:else}
 <div class="app-shell">
   <Sidebar {current} />
   <div class="app-main">
@@ -152,6 +162,7 @@
     </main>
   </div>
 </div>
+{/if}
 
 <style>
   .app-shell {

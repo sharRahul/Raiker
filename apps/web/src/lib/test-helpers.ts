@@ -72,8 +72,17 @@ export function makeGate(partial: Partial<CapabilityGate>): CapabilityGate {
   };
 }
 
+export const LOGIN_RESULT = {
+  stage: "session",
+  principal_id: "prin_owner",
+  token: "test-token",
+  ticket: null,
+};
+
 export const BOOTSTRAP_ROUTES: Record<string, unknown> = {
   "POST /api/auth/session": AUTH_SESSION,
+  "POST /api/auth/login": LOGIN_RESULT,
+  "POST /api/auth/register": LOGIN_RESULT,
   "GET /api/runtime-mode": RUNTIME_MODE,
   "GET /api/diagnostics": DIAGNOSTICS,
   "GET /api/projects": { projects: [], active_project_id: null },

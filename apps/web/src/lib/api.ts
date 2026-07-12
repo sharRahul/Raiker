@@ -94,6 +94,51 @@ export async function connect(): Promise<AuthSession> {
   return session;
 }
 
+// ── Lock screen: local-account auth ─────────────────────────────────────────
+export interface LoginResult {
+  stage: "session" | "mfa_required";
+  principal_id: string;
+  token: string | null;
+  ticket: string | null;
+}
+
+/** On a full 'session' result the bearer token is stored in memory. */
+function adoptSession(result: LoginResult): LoginResult {
+  if (result.stage === "session" && result.token) {
+    setToken(result.token);
+  }
+  return result;
+}
+
+export const auth = {
+  register: (username: string, password: string) =>
+    postJson<LoginResult>("/api/auth/register", { username, password }).then(adoptSession),
+  login: (username: string, password: string) =>
+    postJson<LoginResult>("/api/auth/login", { username, password }).then(adoptSession),
+  verifyMfa: (ticket: string, code: string) =>
+    postJson<LoginResult>("/api/auth/mfa/verify", { ticket, code }).then(adoptSession),
+  logout: async () => {
+    try {
+      await postJson<{ ok: boolean }>("/api/auth/logout", {});
+    } finally {
+      setToken(null);
+    }
+  },
+  elevate: (password?: string, mfaCode?: string) =>
+    postJson<{ token: string }>("/api/auth/elevate", { password, mfa_code: mfaCode }),
+  enrollMfa: () =>
+    postJson<{ secret: string; provisioning_uri: string; backup_codes: string[] }>(
+      "/api/auth/mfa/enroll",
+      {},
+    ),
+  activateMfa: (code: string) => postJson<{ ok: boolean }>("/api/auth/mfa/activate", { code }),
+  changePassword: (oldPassword: string, newPassword: string) =>
+    postJson<{ ok: boolean }>("/api/auth/password", {
+      old_password: oldPassword,
+      new_password: newPassword,
+    }),
+};
+
 export const api = {
   // ── Read-only governed views ──
   capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),

@@ -8,10 +8,19 @@ afterEach(() => {
   window.location.hash = "";
 });
 
+// Drive the lock screen: fill credentials and submit so the app shell mounts.
+async function signIn() {
+  await waitFor(() => expect(screen.getByLabelText("Username")).toBeInTheDocument());
+  await fireEvent.input(screen.getByLabelText("Username"), { target: { value: "owner" } });
+  await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "pw" } });
+  await fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+}
+
 describe("App shell", () => {
-  it("connects, then shows the runtime status and grouped navigation", async () => {
+  it("signs in, then shows the runtime status and grouped navigation", async () => {
     stubFetch(BOOTSTRAP_ROUTES);
     render(App);
+    await signIn();
     await waitFor(() => {
       expect(screen.getByText("Runtime ready")).toBeInTheDocument();
     });
@@ -19,7 +28,8 @@ describe("App shell", () => {
     const nav = screen.getByRole("navigation", { name: /primary/i });
     expect(nav).toBeInTheDocument();
     for (const label of [
-      "Chat",
+      "New Chat",
+      "Search Chat",
       "Approvals",
       "Tasks",
       "Sessions",
@@ -119,6 +129,7 @@ describe("App shell", () => {
 
     window.location.hash = "#/models";
     render(App);
+    await signIn();
     await waitFor(() => {
       expect(screen.getByText(/Local · llama.cpp/)).toBeInTheDocument();
     });
@@ -131,7 +142,7 @@ describe("App shell", () => {
     });
   });
 
-  it("shows an honest connection error when the local API is unreachable", async () => {
+  it("shows an honest auth error at the lock screen when the API is unreachable", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -139,6 +150,16 @@ describe("App shell", () => {
       }),
     );
     render(App);
+    await signIn();
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(/authentication failed/i);
+    });
+  });
+
+  it("shows the connection-error card when bootstrap fails after sign-in", async () => {
+    stubFetch({ "POST /api/auth/login": BOOTSTRAP_ROUTES["POST /api/auth/login"] });
+    render(App);
+    await signIn();
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(/cannot reach the local raiker api/i);
     });

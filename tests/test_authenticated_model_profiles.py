@@ -130,3 +130,21 @@ def test_huggingface_uses_router_and_hf_token(monkeypatch: pytest.MonkeyPatch) -
     assert provider.model == "openai/gpt-oss-120b:cheapest"
     assert provider._headers["Authorization"] == "Bearer hf-secret"
     run(provider.aclose())
+
+def test_env_endpoint_profile_reports_governed_endpoint_kind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Unset: the control surfaces must show the declared off-machine intent
+    # (private network gate), never "unknown".
+    monkeypatch.delenv("LM_STUDIO_BASE_URL", raising=False)
+    remote = ModelProfileRegistry.load().resolve_profile_id("lm-studio-remote-authenticated")
+    assert remote.raw["endpoint_kind"] == "private_network"
+
+    # Configured: the classification follows the owner's actual URL.
+    monkeypatch.setenv("LM_STUDIO_BASE_URL", "https://lm.example.com:8443/v1")
+    remote = ModelProfileRegistry.load().resolve_profile_id("lm-studio-remote-authenticated")
+    assert remote.raw["endpoint_kind"] == "remote_hosted"
+
+    monkeypatch.setenv("LM_STUDIO_BASE_URL", "http://192.168.1.20:1234/v1")
+    remote = ModelProfileRegistry.load().resolve_profile_id("lm-studio-remote-authenticated")
+    assert remote.raw["endpoint_kind"] == "private_network"

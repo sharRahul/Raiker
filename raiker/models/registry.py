@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -101,6 +102,19 @@ class ModelProfileRegistry:
                 except Exception as exc:
                     raise RegistryError(str(exc), entry=entry) from exc
                 entry.setdefault("endpoint_kind", classify_endpoint(str(endpoint)))
+            else:
+                # Env-configured endpoint (e.g. LM_STUDIO_BASE_URL): classify the
+                # owner's configured URL when present so the control surfaces show
+                # the real governing gate. When unset, report the profile's declared
+                # off-machine intent (private_network) rather than "unknown" — the
+                # factory still re-classifies and enforces policy at creation time.
+                endpoint_env = str(entry.get("endpoint_env") or "")
+                if endpoint_env:
+                    configured = os.environ.get(endpoint_env, "").strip()
+                    entry.setdefault(
+                        "endpoint_kind",
+                        classify_endpoint(configured) if configured else "private_network",
+                    )
             entry.setdefault("reasoning_trace_visible", False)
             profiles.append(
                 ModelProfile(

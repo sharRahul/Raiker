@@ -26,6 +26,32 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
 
 ## State as of 2026-07-12 (this session, local, pushed to `main`)
 
+**Connectors window UX refresh COMPLETE (ChatGPT Plugins-style discovery and management).**
+- Replaced the read-only diagnostic list with a searchable connector directory:
+  category tabs (All/Developer/Productivity/Communication), enabled-only filter,
+  responsive connector cards, clear Active/Setup required/Not enabled session
+  state, refresh, empty states, and mobile layout.
+- Each connector now has a focused management dialog with authentication state,
+  owner env guidance (secret values remain server-only), egress state, exposed
+  read actions, session availability, and enable/disable-for-chat controls. The
+  controls reuse the existing governed capability decision-mode API; they grant
+  no new authority and remain disabled until the capability gate is enabled.
+- Added an OpenAPI/Swagger JSON manifest inspector. It validates the document
+  shape and dynamically discovers GET/POST/PUT/PATCH/DELETE operations and
+  operation IDs for review. Inspection is deliberately non-executing: imported
+  endpoints do not receive network access, credentials, installation, or runtime
+  authority without a real governed executor and the existing policy gates.
+- Authentication boundary remains intentional: OAuth/API tokens are configured
+  in the owner-controlled server environment and the UI only reports presence.
+  Raiker does not persist, render, or transmit secret values from this window.
+- Verification: web `check` and `lint` clean; focused `ConnectionsView` suite
+  **4 passed** (including manifest discovery); production build green. Full web
+  run: connector/application tests green, but the pre-existing 5
+  `theme.test.ts` cases fail in this Windows Node invocation because
+  `--localstorage-file` supplies an invalid path and jsdom exposes a nonfunctional
+  `window.localStorage`. No browser connector was callable in this session, so
+  interactive screenshot QA was not available.
+
 **Task 5 COMPLETE: project folders (governance-neutral organizing scope).**
 - **Storage:** `projects` table (project_id `proj_…`, unique name, `root_subpath`,
   created_at) + `active_project` (single-scope row) + `project_id` column on

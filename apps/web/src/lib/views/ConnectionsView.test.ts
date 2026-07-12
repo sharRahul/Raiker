@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ConnectionsView from "./ConnectionsView.svelte";
 import { stubFetch } from "../test-helpers";
@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe("ConnectionsView", () => {
-  it("shows a connector as fail-closed when preconditions are unmet, without exposing a token", async () => {
+  it("shows setup state and keeps credentials inside the management flow", async () => {
     stubFetch({
       "GET /api/connections": {
         connectors: [connector()],
@@ -36,13 +36,14 @@ describe("ConnectionsView", () => {
     });
     render(ConnectionsView);
     await waitFor(() => {
-      expect(screen.getByText("GitHub (read-only)")).toBeInTheDocument();
+      expect(screen.getByText("GitHub")).toBeInTheDocument();
     });
     // Fail-closed status and the missing-precondition guidance are surfaced.
-    expect(screen.getByText("Fail-closed")).toBeInTheDocument();
+    expect(screen.getByText("Setup required")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Open GitHub (read-only)" }));
     expect(screen.getByText(/RAIKER_GITHUB_TOKEN/)).toBeInTheDocument();
     // The env name appears in both the top warning and the egress check detail.
-    expect(screen.getAllByText(/RAIKER_CONNECTOR_EGRESS_ALLOWLIST/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/api.github.com blocked/)).toBeInTheDocument();
     // The read-only surface never renders a credential value — only its env name.
     expect(screen.queryByText(/ghp_/)).not.toBeInTheDocument();
   });
@@ -82,15 +83,13 @@ describe("ConnectionsView", () => {
     });
     render(ConnectionsView);
     await waitFor(() => {
-      expect(screen.getByText("Slack (read-only)")).toBeInTheDocument();
+      expect(screen.getByText("Slack")).toBeInTheDocument();
     });
     // Every connector is listed and each surfaces its own credential env name.
-    expect(screen.getByText("GitHub (read-only)")).toBeInTheDocument();
-    expect(screen.getByText("Gmail (read-only)")).toBeInTheDocument();
-    expect(screen.getByText("Google Calendar (read-only)")).toBeInTheDocument();
-    expect(screen.getByText(/RAIKER_GMAIL_TOKEN/)).toBeInTheDocument();
-    expect(screen.getByText(/RAIKER_GCAL_TOKEN/)).toBeInTheDocument();
-    expect(screen.getByText(/RAIKER_SLACK_TOKEN/)).toBeInTheDocument();
+    expect(screen.getByText("GitHub")).toBeInTheDocument();
+    expect(screen.getByText("Gmail")).toBeInTheDocument();
+    expect(screen.getByText("Google Calendar")).toBeInTheDocument();
+    expect(screen.getAllByText("Productivity")).toHaveLength(3);
   });
 
   it("reports a connector as ready only when every precondition is met", async () => {
@@ -109,8 +108,31 @@ describe("ConnectionsView", () => {
     });
     render(ConnectionsView);
     await waitFor(() => {
-      expect(screen.getByText("Ready")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
     });
-    expect(screen.queryByText("Fail-closed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Setup required")).not.toBeInTheDocument();
+  });
+
+  it("discovers operations from an imported OpenAPI manifest without executing it", async () => {
+    stubFetch({
+      "GET /api/connections": {
+        connectors: [],
+        connector_egress_allowlist_configured: true,
+      },
+    });
+    render(ConnectionsView);
+    await fireEvent.click(screen.getByRole("button", { name: /Import manifest/ }));
+    await fireEvent.input(screen.getByLabelText("Manifest JSON"), {
+      target: {
+        value: JSON.stringify({
+          openapi: "3.0.0",
+          paths: { "/issues": { get: { operationId: "listIssues" } } },
+        }),
+      },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Inspect manifest" }));
+    expect(screen.getByText("1 discovered operation")).toBeInTheDocument();
+    expect(screen.getByText("listIssues")).toBeInTheDocument();
+    expect(screen.getByText(/Discovery does not grant network access/)).toBeInTheDocument();
   });
 });

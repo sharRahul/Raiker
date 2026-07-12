@@ -10,7 +10,7 @@ jobs:
   inventory-test-model-provider:
     runs-on: ubuntu-latest
     steps:
-      - name: Inventory built-in test model provider references
+      - name: Inventory remaining built-in test model provider references
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -19,7 +19,7 @@ jobs:
           git fetch -q --depth=1 origin "${GITHUB_SHA}"
           git checkout -q FETCH_HEAD
           pattern="mock""-test|mock""-deterministic|deterministic""-test|Deterministic""TestProvider|Mock""ModelProvider|RAIKER""_TEST_MODE|allow""_test_provider"
-          git grep -n -E "$pattern" -- . ':(exclude).github/workflows/ci.yml' || true
+          git grep -n -E "$pattern" -- . ':(exclude).github/workflows/ci.yml' | sed -n '46,180p' || true
           exit 1
 
   python:

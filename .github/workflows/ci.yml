@@ -7,6 +7,21 @@ on:
       - main
 
 jobs:
+  inventory-test-model-provider:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inventory built-in test model provider references
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${GITHUB_SHA}"
+          git checkout -q FETCH_HEAD
+          pattern="mock""-test|mock""-deterministic|deterministic""-test|Deterministic""TestProvider|Mock""ModelProvider|RAIKER""_TEST_MODE|allow""_test_provider"
+          git grep -n -E "$pattern" -- . ':(exclude).github/workflows/ci.yml' || true
+          exit 1
+
   python:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
@@ -19,11 +34,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Inventory built-in test model provider references
-        run: |
-          pattern="mock""-test|mock""-deterministic|deterministic""-test|Deterministic""TestProvider|Mock""ModelProvider|RAIKER""_TEST_MODE|allow""_test_provider"
-          git grep -n -E "$pattern" -- . ':(exclude).github/workflows/ci.yml' || true
-          exit 1
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

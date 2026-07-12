@@ -6,6 +6,7 @@
   import { api, connect } from "./lib/api";
   import type { ModelsView as ModelsSnapshot, ProjectsList } from "./lib/apiTypes";
   import ChatView from "./lib/views/ChatView.svelte";
+  import SearchChatView from "./lib/views/SearchChatView.svelte";
   import ProjectsView from "./lib/views/ProjectsView.svelte";
   import ApprovalsView from "./lib/views/ApprovalsView.svelte";
   import TasksView from "./lib/views/TasksView.svelte";
@@ -121,8 +122,10 @@
         </div>
       {:else if authState === "connecting"}
         <p class="loading" role="status">Connecting to the local Raiker runtime…</p>
-      {:else if current === "chat"}
+      {:else if current === "new-chat"}
         <ChatView />
+      {:else if current === "search-chat"}
+        <SearchChatView />
       {:else if current === "approvals"}
         <ApprovalsView />
       {:else if current === "tasks"}

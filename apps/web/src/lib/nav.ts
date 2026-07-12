@@ -18,17 +18,17 @@ export interface NavGroup {
 // the conversation.
 export const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Work",
+    label: "The Hustle",
     items: [
-      { id: "chat", label: "Chat", icon: "chat", hint: "Talk to your governed agent" },
-      { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
+      { id: "new-chat", label: "New Chat", icon: "chat", hint: "Start a fresh governed conversation" },
+      { id: "search-chat", label: "Search Chat", icon: "sessions", hint: "Search your chat history" },
       { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
-      { id: "sessions", label: "Sessions", icon: "sessions", hint: "Past conversations and turns" },
+      { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
       { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },
     ],
   },
   {
-    label: "Governance",
+    label: "Steering",
     items: [
       {
         id: "capabilities",
@@ -49,12 +49,13 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "checkpoints",
         hint: "Rewind metadata for every session",
       },
-      { id: "activity", label: "Audit log", icon: "activity", hint: "The full append-only event record" },
     ],
   },
   {
     label: "System",
     items: [
+      { id: "sessions", label: "Sessions", icon: "sessions", hint: "Past conversations and turns" },
+      { id: "activity", label: "Audit log", icon: "activity", hint: "The full append-only event record" },
       { id: "diagnostics", label: "Diagnostics", icon: "diagnostics", hint: "Runtime readiness and health" },
       { id: "settings", label: "Settings", icon: "settings", hint: "Runtime mode, security posture, appearance" },
     ],
@@ -63,7 +64,7 @@ export const NAV_GROUPS: NavGroup[] = [
 
 export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 
-export const DEFAULT_ROUTE = "chat";
+export const DEFAULT_ROUTE = "new-chat";
 
 export function routeFromHash(hash: string): string {
   const raw = hash.replace(/^#\/?/, "");

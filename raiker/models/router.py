@@ -60,6 +60,12 @@ class ModelRouter:
         self.registry = registry
         self.writer = writer
         self.allow_test_provider = allow_test_provider
+        if runtime_policy is None and writer is not None:
+            from raiker.models.policy_state import provider_runtime_policy_from_gates
+
+            runtime_policy = provider_runtime_policy_from_gates(
+                writer.store, allow_test_provider=allow_test_provider
+            )
         self.runtime_policy = runtime_policy or ProviderRuntimePolicy(
             allow_test_provider=allow_test_provider
         )
@@ -111,11 +117,11 @@ class ModelRouter:
         response_schema_name: str = "raiker_response",
     ) -> ModelResponse:
         profile = self._profile(provider, model)
-        p = self._factory().create(profile)
+        model_provider = self._factory().create(profile)
         request = self._request(
             profile,
-            p.provider,
-            p.model,
+            model_provider.provider,
+            model_provider.model,
             messages,
             tools,
             stream=False,
@@ -123,9 +129,9 @@ class ModelRouter:
             response_schema_name=response_schema_name,
         )
         try:
-            return await p.chat(request)
+            return await model_provider.chat(request)
         finally:
-            await p.aclose()
+            await model_provider.aclose()
 
     async def astream(
         self,
@@ -138,11 +144,11 @@ class ModelRouter:
         response_schema_name: str = "raiker_response",
     ) -> AsyncIterator[ModelStreamEvent]:
         profile = self._profile(provider, model)
-        p = self._factory().create(profile)
+        model_provider = self._factory().create(profile)
         request = self._request(
             profile,
-            p.provider,
-            p.model,
+            model_provider.provider,
+            model_provider.model,
             messages,
             tools,
             stream=True,
@@ -150,48 +156,52 @@ class ModelRouter:
             response_schema_name=response_schema_name,
         )
         try:
-            async for event in p.stream_chat(request):
+            async for event in model_provider.stream_chat(request):
                 yield event
         finally:
-            await p.aclose()
+            await model_provider.aclose()
 
     async def aembed(self, provider: str, model: str, text: str) -> EmbeddingResponse:
         profile = self._profile(provider, model)
-        p = self._factory().create(profile)
-        embedding_model = str(profile.raw.get("embedding_model") or p.model)
-        if not embedding_model or "<" in embedding_model or ">" in embedding_model:
-            await p.aclose()
+        model_provider = self._factory().create(profile)
+        embedding_model = str(profile.raw.get("embedding_model") or model_provider.model)
+        if "<" in embedding_model or ">" in embedding_model:
+            embedding_model = model_provider.model
+        if not embedding_model:
+            await model_provider.aclose()
             raise ProviderConfigurationError("embedding_model_not_configured")
         try:
-            return await p.embed(
-                EmbeddingRequest(profile.profile_id, p.provider, embedding_model, text)
+            return await model_provider.embed(
+                EmbeddingRequest(
+                    profile.profile_id, model_provider.provider, embedding_model, text
+                )
             )
         finally:
-            await p.aclose()
+            await model_provider.aclose()
 
     async def alist_models_for_profile(self, profile: ModelProfile) -> list[ProviderModelInfo]:
         """List models at a profile endpoint without requiring a concrete chat model."""
-        p = self._factory().create(profile, require_model=False)
+        model_provider = self._factory().create(profile, require_model=False)
         try:
-            return await p.list_models()
+            return await model_provider.list_models()
         finally:
-            await p.aclose()
+            await model_provider.aclose()
 
     async def ahealth(self, provider: str, model: str) -> ProviderHealth:
         profile = self._profile(provider, model)
-        p = self._factory().create(profile)
+        model_provider = self._factory().create(profile)
         try:
-            return await p.health()
+            return await model_provider.health()
         finally:
-            await p.aclose()
+            await model_provider.aclose()
 
     async def alist_models(self, provider: str, model: str) -> list[ProviderModelInfo]:
         profile = self._profile(provider, model)
-        p = self._factory().create(profile)
+        model_provider = self._factory().create(profile)
         try:
-            return await p.list_models()
+            return await model_provider.list_models()
         finally:
-            await p.aclose()
+            await model_provider.aclose()
 
     def supports_vision(self, provider: str, model: str) -> bool:
         """Whether the resolved profile declares image input support, fail-closed."""
@@ -240,16 +250,16 @@ class ModelRouter:
             if self.active_profile_id
             else self.registry.list_profiles()[0]
         )
-        caps = capabilities_from_profile(profile)
+        capabilities = capabilities_from_profile(profile)
         if value == "off":
             self.reasoning = ReasoningOptions(enabled=False)
             return "Reasoning controls disabled."
-        if not caps.supports_reasoning:
+        if not capabilities.supports_reasoning:
             raise ProviderPolicyError("reasoning_not_supported")
-        if value in caps.reasoning_effort_values and caps.supports_reasoning_effort:
+        if value in capabilities.reasoning_effort_values and capabilities.supports_reasoning_effort:
             self.reasoning = ReasoningOptions(enabled=True, effort=value)
             return f"Reasoning effort set to {value}."
-        if value in caps.reasoning_modes:
+        if value in capabilities.reasoning_modes:
             self.reasoning = ReasoningOptions(enabled=True)
             return f"Reasoning mode set to {value}."
         raise ProviderPolicyError("reasoning_setting_rejected")
@@ -317,4 +327,6 @@ class ModelRouter:
                     client=client,
                 )
             )
-        return ModelLaunchResult("completed", profile, f"Resolved model profile {profile.profile_id}")
+        return ModelLaunchResult(
+            "completed", profile, f"Resolved model profile {profile.profile_id}"
+        )

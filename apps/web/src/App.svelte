@@ -26,7 +26,7 @@
   const activeItem = $derived(navItem(current));
 
   let authenticated = $state(false);
-  let authState = $state<"connecting" | "ready" | "error">("connecting");
+  let authState = $state<"locked" | "authenticating" | "verifying" | "ready" | "error">("locked");
   let principal = $state("—");
   let runtimeMode = $state("—");
   let ready = $state(false);
@@ -45,8 +45,7 @@
   // Called by the lock screen once a full control session exists.
   function onAuthenticated(principalId: string) {
     principal = principalId;
-    authenticated = true;
-    authState = "connecting";
+    authState = "verifying";
     void bootstrap();
   }
 
@@ -62,8 +61,10 @@
       ready = diag.production_ready_local_single_user_runtime;
       models = modelsView;
       projects = projectsList;
+      authenticated = true;
       authState = "ready";
     } catch {
+      authenticated = false;
       authState = "error";
     }
   }
@@ -101,7 +102,10 @@
 <a class="skip-link" href="#main">Skip to content</a>
 
 {#if !authenticated}
-  <LoginView {onAuthenticated} />
+  <LoginView
+    {onAuthenticated}
+    runtimeState={authState === "verifying" ? "verifying" : authState === "error" ? "verification_failed" : "locked"}
+  />
 {:else}
 <div class="app-shell">
   <Sidebar {current} />
@@ -115,7 +119,7 @@
       {models}
       {projects}
       onProjectSelect={selectProject}
-      connecting={authState === "connecting"}
+      connecting={authState === "verifying"}
     />
     <main id="main" class="content" tabindex="-1">
       {#if authState === "error"}
@@ -130,8 +134,8 @@
             Retry
           </button>
         </div>
-      {:else if authState === "connecting"}
-        <p class="loading" role="status">Connecting to the local Raiker runtime…</p>
+      {:else if authState === "verifying"}
+        <p class="loading" role="status">Verifying the local Raiker runtime…</p>
       {:else if current === "new-chat"}
         <ChatView />
       {:else if current === "search-chat"}

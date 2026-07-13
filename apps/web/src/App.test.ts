@@ -13,7 +13,7 @@ async function signIn() {
   await waitFor(() => expect(screen.getByLabelText("Username")).toBeInTheDocument());
   await fireEvent.input(screen.getByLabelText("Username"), { target: { value: "owner" } });
   await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "pw" } });
-  await fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+  await fireEvent.click(screen.getByRole("button", { name: "Unlock Raiker" }));
 }
 
 describe("App shell", () => {
@@ -156,13 +156,14 @@ describe("App shell", () => {
     });
   });
 
-  it("shows the connection-error card when bootstrap fails after sign-in", async () => {
+  it("keeps the workspace locked when bootstrap fails after sign-in", async () => {
     stubFetch({ "POST /api/auth/login": BOOTSTRAP_ROUTES["POST /api/auth/login"] });
     render(App);
     await signIn();
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent(/cannot reach the local raiker api/i);
+      expect(screen.getByRole("alert")).toHaveTextContent(/runtime verification failed/i);
     });
-    expect(screen.getByText(/never fabricates data/i)).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: /primary/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/I cannot reach my runtime/i)).toBeInTheDocument();
   });
 });

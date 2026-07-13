@@ -141,6 +141,21 @@ export const auth = {
       old_password: oldPassword,
       new_password: newPassword,
     }),
+  listDeviceSessions: () =>
+    request<
+      Array<{
+        session_id: string;
+        created_at: string;
+        last_seen_at: string | null;
+        device_label: string | null;
+        revoked: boolean;
+        scope: string;
+        current: boolean;
+      }>
+    >("/api/auth/sessions"),
+  revokeDeviceSession: (sessionId: string) =>
+    postJson<{ ok: boolean }>(`/api/auth/sessions/${encodeURIComponent(sessionId)}/revoke`, {}),
+  deleteAccount: () => request<{ ok: boolean }>("/api/account", { method: "DELETE" }),
 };
 
 export interface SettingsView {

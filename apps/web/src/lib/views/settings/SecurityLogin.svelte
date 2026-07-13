@@ -21,6 +21,15 @@
   let enrollUri = $state<string | null>(null);
   let activateCode = $state("");
 
+  // Password reset
+  let oldPassword = $state("");
+  let newPassword = $state("");
+
+  // Active device sessions
+  let sessions = $state<
+    Array<{ session_id: string; created_at: string; last_seen_at: string | null; current: boolean; revoked: boolean }>
+  >([]);
+
   async function load() {
     try {
       const s = await api.settings();
@@ -33,6 +42,37 @@
     } catch {
       loaded = true;
       notice = { kind: "error", text: "Could not load security settings." };
+    }
+    await loadSessions();
+  }
+
+  async function loadSessions() {
+    try {
+      sessions = (await api.listDeviceSessions()).filter((s) => !s.revoked);
+    } catch {
+      sessions = [];
+    }
+  }
+
+  async function changePassword() {
+    notice = null;
+    try {
+      await auth.changePassword(oldPassword, newPassword);
+      oldPassword = "";
+      newPassword = "";
+      notice = { kind: "ok", text: "Password changed. Other sessions were signed out." };
+      await loadSessions();
+    } catch (e) {
+      notice = { kind: "error", text: message(e, "Could not change password.") };
+    }
+  }
+
+  async function revokeSession(id: string) {
+    try {
+      await api.revokeDeviceSession(id);
+      await loadSessions();
+    } catch (e) {
+      notice = { kind: "error", text: message(e, "Could not revoke the session.") };
     }
   }
 
@@ -204,6 +244,49 @@
       Require MFA for Vault operations
       {#if !mfaEnrolled}<span class="sub">(enroll in MFA to enable)</span>{/if}
     </label>
+  </div>
+
+  <!-- Password reset -->
+  <div class="field">
+    <div class="field-head"><h3>Password</h3></div>
+    <label>
+      Current password
+      <input type="password" bind:value={oldPassword} autocomplete="current-password" />
+    </label>
+    <label>
+      New password
+      <input type="password" bind:value={newPassword} autocomplete="new-password" />
+    </label>
+    <div class="actions">
+      <button type="button" class="btn btn-primary" disabled={!oldPassword || !newPassword} onclick={changePassword}>
+        Change password
+      </button>
+    </div>
+    <p class="sub">Changing your password signs out all your other devices.</p>
+  </div>
+
+  <!-- Active device sessions -->
+  <div class="field">
+    <div class="field-head"><h3>Active device sessions</h3></div>
+    {#if sessions.length === 0}
+      <p class="sub">No active sessions.</p>
+    {:else}
+      <ul class="sessions">
+        {#each sessions as s (s.session_id)}
+          <li>
+            <span>
+              {s.session_id.slice(0, 16)}…
+              {#if s.current}<span class="pill pill-ok">This device</span>{/if}
+            </span>
+            {#if !s.current}
+              <button type="button" class="btn btn-danger" onclick={() => revokeSession(s.session_id)}>
+                Revoke
+              </button>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </div>
 </section>
 

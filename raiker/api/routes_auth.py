@@ -141,3 +141,35 @@ async def logout(request: Request) -> dict[str, Any]:
     session, _principal = AuthMiddleware(_ws(request)).authenticate(request)
     ApiSessionStore(_ws(request)).revoke_session(session.session_id)
     return {"ok": True}
+
+
+@router.get("/api/auth/sessions")
+async def list_device_sessions(request: Request) -> list[dict[str, Any]]:
+    session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    store = ApiSessionStore(_ws(request))
+    rows = store.list_for_principal(principal.principal_id)
+    for row in rows:
+        row["current"] = row["session_id"] == session.session_id
+    return rows
+
+
+@router.post("/api/auth/sessions/{session_id}/revoke")
+async def revoke_device_session(session_id: str, request: Request) -> dict[str, Any]:
+    _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    store = ApiSessionStore(_ws(request))
+    if not store.owns_session(principal.principal_id, session_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
+    store.revoke_session(session_id)
+    return {"ok": True}
+
+
+@router.delete("/api/account")
+async def delete_account(request: Request) -> dict[str, Any]:
+    # Irreversible: requires an elevated (re-authenticated) session.
+    _session, principal = AuthMiddleware(_ws(request)).authenticate(
+        request, required_scope="elevated"
+    )
+    from raiker.storage.sqlite import SQLiteStore
+
+    SQLiteStore(_ws(request)).purge_account(principal.principal_id)
+    return {"ok": True}

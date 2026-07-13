@@ -53,6 +53,7 @@ other active sessions on the device.
 
 ## Scope note
 
-Connector credentials and per-account settings are isolated per account. Chat history and tasks
-are not yet fully isolated per account — see the limitations in
-`docs/threat-models/local-lock-screen.md`.
+Connector credentials, per-account settings, and chat/task history are isolated per account:
+sessions you create are attributed to your account and another account cannot list or open them.
+Legacy/unattributed sessions (e.g. CLI-created) remain shared. See
+`docs/threat-models/local-lock-screen.md` for the full model.

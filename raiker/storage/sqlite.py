@@ -2120,6 +2120,22 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "DELETE FROM account_credentials WHERE principal_id = ?", (principal_id,)
             )
 
+    def purge_account(self, principal_id: str) -> None:
+        """Irreversibly remove an account and all its per-principal data."""
+        with self.connect() as connection:
+            for sql in (
+                "DELETE FROM account_credentials WHERE principal_id = ?",
+                "DELETE FROM user_settings WHERE principal_id = ?",
+                "DELETE FROM trusted_contacts WHERE principal_id = ?",
+                "DELETE FROM connector_credentials WHERE principal_id = ?",
+                "DELETE FROM connector_installations WHERE principal_id = ?",
+                "DELETE FROM api_sessions WHERE principal_id = ?",
+            ):
+                connection.execute(sql, (principal_id,))
+            connection.execute(
+                "UPDATE principals SET is_active = 0 WHERE principal_id = ?", (principal_id,)
+            )
+
     def list_accounts(self) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(

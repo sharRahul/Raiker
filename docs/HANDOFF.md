@@ -473,12 +473,41 @@ Shipped + tested:
 - Tests: `test_owasp_acceptance.py` (A01/A03/A04/A05/A07 + MFA⟂Vault independence),
   plus per-module unit/route tests; web nav/App/a11y/SecurityLogin.
 
-Remaining (not yet done):
-- Full 9-section settings reorg (General/Notification/Personalisation/Voice/Data
-  Controls/Storage/Trusted Contact/Account) — only Security & Login is built; other
-  sections still use the existing Settings layout.
-- Connector gallery UI rewrite (backend endpoints exist: `/api/connector-store`).
-- Task create/schedule form + its backend, and full principal-scoping of
-  sessions/tasks (chat/task cross-account isolation is the key gap).
-- Pre-existing: 5 `apps/web` theme.test.ts failures (node-25 localStorage env quirk),
-  unrelated to this work.
+Also shipped since (all on main):
+- Chat/task per-account isolation: sessions stamped with the creating account's
+  `user_id` (gateway → SessionManager); `/api/sessions`, `/api/sessions/{id}`,
+  `/api/tasks` filter by the authenticated account; legacy/null sessions stay shared.
+  Tests: `test_session_task_isolation.py`, `test_session_isolation_routes.py`.
+- Security hardening (from automated review): `raiker/auth/secure_io.py` writes key
+  files atomically at 0o600 with O_EXCL/O_TRUNC + O_NOFOLLOW (no world-readable
+  window, symlink-swap defense); vault DELETE takes the MFA code from the
+  `X-MFA-Code` header, never a query param. Tests: `test_secure_io.py`.
+- Full 9-section settings reorg: `SettingsView` is a left-rail shell over
+  `apps/web/src/lib/views/settings/*` (General, Notification, Personalisation, Voice,
+  DataControls, Storage, SecurityLogin, TrustedContact, Account). Backed controls
+  persist to `/api/settings`; unbacked render `NotYetActive`. Security & Login now
+  includes password reset + active device sessions (list/revoke). Account section does
+  real, elevated account deletion. New backend: `purge_account`,
+  `ApiSessionStore.list_for_principal/owns_session`, routes `GET /api/auth/sessions`,
+  `POST /api/auth/sessions/{id}/revoke`, `DELETE /api/account` (elevated). Tests:
+  `test_account_management_routes.py`, web `SettingsView.test.ts`.
+
+Remaining (not yet done) — start here next session:
+- **Connector gallery UI** rewrite: turn `ConnectionsView.svelte` into a
+  browse/search/install/uninstall gallery over the existing backend
+  (`/api/connector-store` list/install/delete/enabled/credentials/actions already
+  exist — this is frontend-only).
+- **Task create/schedule**: a create form (title/description/priority) + date-time
+  scheduling in `TasksView.svelte`, plus a `POST /api/tasks` backend endpoint. Note
+  `insert_task` does NOT yet persist the new schedule columns (priority/scheduled_at/
+  recurrence/reminder_at) — extend it. Tasks attach to a session; decide the
+  per-principal "inbox" session model.
+- Optional: turn-level event-log filtering beyond session ownership; SMS/Email MFA
+  (deliberately deferred).
+- Pre-existing (NOT ours): 5 `apps/web/src/lib/theme.test.ts` failures — a node-25
+  native-localStorage vs jsdom quirk (`--localstorage-file` warning). Present before
+  this work; leave or pin node.
+
+Verify gate for this workstream: `ruff check raiker tests`, `mypy raiker`,
+`pytest` (1590 passed / 2 skipped), and in `apps/web`: `npm run build` +
+`npx vitest run` (99 passed; the 5 theme failures are the known pre-existing set).

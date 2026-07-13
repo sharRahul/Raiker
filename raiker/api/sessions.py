@@ -147,6 +147,25 @@ class ApiSessionStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def list_for_principal(self, principal_id: str) -> list[dict[str, Any]]:
+        """Device sessions for one account (no token material)."""
+        with self._store.connect() as connection:
+            rows = connection.execute(
+                "SELECT session_id, created_at, last_seen_at, device_label, revoked, "
+                "expires_at, scope FROM api_sessions WHERE principal_id = ? "
+                "ORDER BY created_at DESC",
+                (principal_id,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def owns_session(self, principal_id: str, session_id: str) -> bool:
+        with self._store.connect() as connection:
+            row = connection.execute(
+                "SELECT 1 FROM api_sessions WHERE session_id = ? AND principal_id = ?",
+                (session_id, principal_id),
+            ).fetchone()
+        return row is not None
+
     def _deserialize(self, row: dict[str, Any]) -> ApiSession:
         import json
         scopes = tuple(json.loads(row.get("scopes", "[]")))

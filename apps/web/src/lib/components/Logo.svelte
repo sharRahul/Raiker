@@ -15,14 +15,14 @@
     background: center / contain no-repeat url("/raiker-mark.png");
   }
   :global(:root[data-theme="dark"]) .logo {
-    background-image: url("/raiker-tile.png");
+    background-image: url("/raiker-mark-dark.png");
   }
   :global(:root[data-theme="light"]) .logo {
     background-image: url("/raiker-mark.png");
   }
   @media (prefers-color-scheme: dark) {
     :global(:root:not([data-theme])) .logo {
-      background-image: url("/raiker-tile.png");
+      background-image: url("/raiker-mark-dark.png");
     }
   }
 </style>

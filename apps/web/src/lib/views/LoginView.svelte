@@ -346,14 +346,14 @@
     background: center / contain no-repeat url("/raiker-mark.png");
   }
   :global(:root[data-theme="dark"]) .brand-mark {
-    background-image: url("/raiker-tile.png");
+    background-image: url("/raiker-mark-dark.png");
   }
   :global(:root[data-theme="light"]) .brand-mark {
     background-image: url("/raiker-mark.png");
   }
   @media (prefers-color-scheme: dark) {
     :global(:root:not([data-theme])) .brand-mark {
-      background-image: url("/raiker-tile.png");
+      background-image: url("/raiker-mark-dark.png");
     }
   }
   .lock-layout {
@@ -387,10 +387,9 @@
     background: center / contain no-repeat url("/raiker-hero.png");
     filter: drop-shadow(0 1.4rem 2rem rgb(6 14 26 / 0.28));
   }
-  /* Dark theme: the self-contained light tile (rings hidden below). */
+  /* Dark theme: the chrome/silver render, which pops on a dark surface. */
   :global(:root[data-theme="dark"]) .core-img {
-    width: 78%;
-    background-image: url("/raiker-tile.png");
+    background-image: url("/raiker-hero-dark.png");
     filter: drop-shadow(0 1.4rem 2.4rem rgb(0 0 0 / 0.5));
   }
   :global(:root[data-theme="light"]) .core-img {
@@ -398,8 +397,7 @@
   }
   @media (prefers-color-scheme: dark) {
     :global(:root:not([data-theme])) .core-img {
-      width: 78%;
-      background-image: url("/raiker-tile.png");
+      background-image: url("/raiker-hero-dark.png");
       filter: drop-shadow(0 1.4rem 2.4rem rgb(0 0 0 / 0.5));
     }
   }
@@ -424,16 +422,6 @@
     width: 122%;
     height: 122%;
     opacity: 0.28;
-  }
-  /* The dark-mode tile is self-contained; the orbit rings only frame the
-     light-mode floating orb. */
-  :global(:root[data-theme="dark"]) .orbit {
-    display: none;
-  }
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme])) .orbit {
-      display: none;
-    }
   }
   .hero-message {
     min-height: 5.5rem;

@@ -73,6 +73,5 @@ def test_event_catalog_lists_preview_events() -> None:
     assert "proposal_approval_preview_viewed" in content
 
 
-def test_documentation_drift_audit_exists() -> None:
-    content = _read("docs/DOCUMENTATION_DRIFT_AUDIT.md")
-    assert "Phase 3 Slice B" in content
+def test_retired_documentation_drift_audit_is_absent() -> None:
+    assert not Path("docs/DOCUMENTATION_DRIFT_AUDIT.md").exists()

@@ -27,17 +27,22 @@ describe("LoginView", () => {
     expect(screen.getByRole("heading", { name: "Unlock Raiker" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Unlock Raiker" })).toBeInTheDocument();
     // The prompt-eye rests on the exact Γ_ brand mark.
-    expect(screen.getByText("Γ_")).toBeInTheDocument();
+    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
     // The top-left logo reuses the production Γ_ icon file.
     expect(document.querySelector('img[src="/favicon.svg"]')).not.toBeNull();
     await waitFor(() => expect(screen.getByText("I am ready when you are.")).toBeInTheDocument());
     // The greeting and the idle statement are never shown together.
-    expect(screen.queryByText("Hello! I am Raiker. Nice to meet you.")).not.toBeInTheDocument();
-    // No marketing copy or fabricated pre-auth status details.
+    expect(screen.queryByText("Hello! I am Raiker.")).not.toBeInTheDocument();
+    // No marketing copy, fabricated pre-auth status details, or unsupported
+    // auth affordances (the backend has no remember-me or password reset).
     expect(screen.queryByText(/governed AI agent/i)).not.toBeInTheDocument();
     expect(
       screen.queryByText(/workspace locked|ready to unlock|checkpoint|scheduled run|task/i),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText(/remember me/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/forgot password/i)).not.toBeInTheDocument();
+    // The status bar carries only the health-probe-backed item.
+    await waitFor(() => expect(screen.getByText("Runtime operational")).toBeInTheDocument());
   });
 
   it("shows no state message until the health probe resolves", () => {
@@ -128,7 +133,8 @@ describe("LoginView", () => {
     render(LoginView, { props: { onAuthenticated } });
     await fireEvent.click(screen.getByRole("button", { name: "Create local account" }));
     expect(screen.getByRole("heading", { name: "Create local account" })).toBeInTheDocument();
-    expect(screen.getByText("Hello! I am Raiker. Nice to meet you.")).toBeInTheDocument();
+    expect(screen.getByText("Hello! I am Raiker.")).toBeInTheDocument();
+    expect(screen.getByText("Nice to meet you.")).toBeInTheDocument();
     expect(screen.queryByText("I am ready when you are.")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toHaveAttribute("autocomplete", "new-password");
     await fillCredentials("pw1");
@@ -185,15 +191,15 @@ describe("LoginView", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     stubFetch({ ...HEALTH_OK });
     render(LoginView, { props: { onAuthenticated } });
-    expect(screen.getByText("Γ_")).toBeInTheDocument();
+    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
     // First expression starts only after a long rest (9s at random()=0).
     await vi.advanceTimersByTimeAsync(8999);
-    expect(screen.getByText("Γ_")).toBeInTheDocument();
+    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
     await vi.advanceTimersByTimeAsync(1);
-    expect(screen.getByText("TT")).toBeInTheDocument();
+    expect(document.querySelector('[data-eye="TT"]')).not.toBeNull();
     // The blink sequence completes and the eye returns to the brand mark.
     await vi.advanceTimersByTimeAsync(140 * 6);
-    expect(screen.getByText("Γ_")).toBeInTheDocument();
+    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
   });
 
   it("keeps the eye at rest when prefers-reduced-motion is set", async () => {
@@ -210,6 +216,6 @@ describe("LoginView", () => {
     stubFetch({ ...HEALTH_OK });
     render(LoginView, { props: { onAuthenticated } });
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(screen.getByText("Γ_")).toBeInTheDocument();
+    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
   });
 });

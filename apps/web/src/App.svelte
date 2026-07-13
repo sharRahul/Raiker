@@ -112,10 +112,6 @@
     <Topbar
       title={activeItem.label}
       hint={activeItem.hint}
-      {principal}
-      {runtimeMode}
-      {ready}
-      {models}
       {projects}
       onProjectSelect={selectProject}
     />

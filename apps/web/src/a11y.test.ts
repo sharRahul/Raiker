@@ -12,7 +12,7 @@ async function signIn() {
   await waitFor(() => expect(screen.getByLabelText("Username")).toBeInTheDocument());
   await fireEvent.input(screen.getByLabelText("Username"), { target: { value: "owner" } });
   await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "pw" } });
-  await fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+  await fireEvent.click(screen.getByRole("button", { name: "Unlock Raiker" }));
 }
 
 describe("accessibility landmarks", () => {

@@ -17,12 +17,10 @@
     <circle cx="256" cy="256" r="139" fill="#f7f9fc" stroke="#162238" stroke-width="18"/>
     <circle cx="256" cy="256" r="109" fill="url(#core)" stroke="#c9d1dc" stroke-width="10"/>
     <circle cx="256" cy="256" r="88" fill="none" stroke="#303c50" stroke-width="5" opacity="0.75"/>
-    <!-- Grouped and scaled container for the inner prompt symbols -->
-    <g transform="translate(256, 256) scale(0.78) translate(-256, -256)">
-      <!-- "¬" Symbol rotated -90 degrees (left) around its visual center -->
-      <path d="M190 225h65v55" fill="none" stroke="#fff" stroke-width="31" stroke-linecap="round" stroke-linejoin="round" transform="rotate(-90, 222.5, 252.5)"/>
-      <!-- Terminal Underscore Cursor -->
-      <path d="M285 307h40" stroke="#fff" stroke-width="25" stroke-linecap="round"/>
+    <!-- Static Raiker prompt-eye identity: exact Γ_ mark. -->
+    <g transform="translate(256, 256) scale(0.78) translate(-256, -256)" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M245 203h-55v92" stroke-width="31"/>
+      <path d="M288 307h48" stroke-width="25"/>
     </g>
     <path d="M142 180c18-28 43-50 73-63" fill="none" stroke="#fff" stroke-opacity="0.42" stroke-width="7" stroke-linecap="round"/>
   </g>

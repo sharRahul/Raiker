@@ -28,10 +28,17 @@ def atomic_write_private(path: Path, data: bytes, *, exclusive: bool) -> bool:
     """
     ensure_private_dir(path.parent)
     flags = os.O_WRONLY | os.O_CREAT | (os.O_EXCL if exclusive else os.O_TRUNC)
+    # O_NOFOLLOW: never follow a symlink at the final path component. Combined
+    # with O_EXCL (exclusive) or O_TRUNC (replace), this defeats a symlink-swap
+    # attack that would otherwise redirect the write through an attacker's link.
+    flags |= getattr(os, "O_NOFOLLOW", 0)
     try:
         fd = os.open(path, flags, 0o600)
     except FileExistsError:
+        # Exclusive create lost a race (or a file/symlink already sits here).
         return False
+    # Any other OSError (e.g. ELOOP from O_NOFOLLOW hitting a symlink) propagates
+    # so a symlink-swap attack fails loudly instead of writing to the wrong place.
     with os.fdopen(fd, "wb") as handle:
         handle.write(data)
     if os.name == "posix":

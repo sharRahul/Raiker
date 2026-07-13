@@ -26,10 +26,9 @@ describe("LoginView", () => {
     render(LoginView, { props: { onAuthenticated } });
     expect(screen.getByRole("heading", { name: "Unlock Raiker" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Unlock Raiker" })).toBeInTheDocument();
-    // The large Raiker core uses the production rendered icon (with its baked Γ_ eye).
-    expect(document.querySelector('img[src="/raiker-hero.png"]')).not.toBeNull();
-    // The top-left logo reuses the production rendered mark.
-    expect(document.querySelector('img[src="/raiker-mark.png"]')).not.toBeNull();
+    // The large Raiker core and the top-left mark are the production rendered
+    // icon, exposed as labelled images (theme-swapped via CSS background).
+    expect(screen.getAllByRole("img", { name: "Raiker" }).length).toBeGreaterThanOrEqual(2);
     await waitFor(() => expect(screen.getByText("I am ready when you are.")).toBeInTheDocument());
     // The greeting and the idle statement are never shown together.
     expect(screen.queryByText("Hello! I am Raiker.")).not.toBeInTheDocument();

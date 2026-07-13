@@ -146,7 +146,7 @@
 <div class="lock-screen">
   <header class="lock-header">
     <span class="brand">
-      <img src="/raiker-mark.png" alt="" width="44" height="44" />
+      <span class="brand-mark" role="img" aria-label="Raiker"></span>
       <span>RAIKER</span>
     </span>
     <ThemeToggle />
@@ -154,13 +154,15 @@
 
   <main class="lock-layout" aria-busy={isVerifying}>
     <section class="hero">
-      <!-- The Raiker governed core: the production rendered icon, framed by the
-           decorative orbit rings. The Γ_ prompt eye is part of the render. -->
+      <!-- The Raiker governed core: the production rendered icon. Light theme
+           shows the floating orb framed by decorative orbit rings; dark theme
+           shows the light-tiled icon (self-contained, so the rings are hidden).
+           The Γ_ prompt eye is part of the render. -->
       <div class="core">
         <span class="orbit orbit-1" aria-hidden="true"></span>
         <span class="orbit orbit-2" aria-hidden="true"></span>
         <span class="orbit orbit-3" aria-hidden="true"></span>
-        <img class="core-img" src="/raiker-hero.png" alt="Raiker" width="429" height="429" />
+        <span class="core-img" role="img" aria-label="Raiker"></span>
       </div>
       <div class="hero-message" aria-live="polite">
         {#if hero}
@@ -338,6 +340,22 @@
     font-weight: 800;
     letter-spacing: 0.45em;
   }
+  .brand-mark {
+    width: 44px;
+    height: 44px;
+    background: center / contain no-repeat url("/raiker-mark.png");
+  }
+  :global(:root[data-theme="dark"]) .brand-mark {
+    background-image: url("/raiker-tile.png");
+  }
+  :global(:root[data-theme="light"]) .brand-mark {
+    background-image: url("/raiker-mark.png");
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme])) .brand-mark {
+      background-image: url("/raiker-tile.png");
+    }
+  }
   .lock-layout {
     flex: 1;
     display: grid;
@@ -364,9 +382,26 @@
     position: relative;
     z-index: 1;
     width: 86%;
-    height: auto;
+    aspect-ratio: 1;
     display: block;
+    background: center / contain no-repeat url("/raiker-hero.png");
     filter: drop-shadow(0 1.4rem 2rem rgb(6 14 26 / 0.28));
+  }
+  /* Dark theme: the self-contained light tile (rings hidden below). */
+  :global(:root[data-theme="dark"]) .core-img {
+    width: 78%;
+    background-image: url("/raiker-tile.png");
+    filter: drop-shadow(0 1.4rem 2.4rem rgb(0 0 0 / 0.5));
+  }
+  :global(:root[data-theme="light"]) .core-img {
+    background-image: url("/raiker-hero.png");
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme])) .core-img {
+      width: 78%;
+      background-image: url("/raiker-tile.png");
+      filter: drop-shadow(0 1.4rem 2.4rem rgb(0 0 0 / 0.5));
+    }
   }
   /* Decorative concentric orbit rings behind the core (mockup styling). */
   .orbit {
@@ -389,6 +424,16 @@
     width: 122%;
     height: 122%;
     opacity: 0.28;
+  }
+  /* The dark-mode tile is self-contained; the orbit rings only frame the
+     light-mode floating orb. */
+  :global(:root[data-theme="dark"]) .orbit {
+    display: none;
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme])) .orbit {
+      display: none;
+    }
   }
   .hero-message {
     min-height: 5.5rem;

@@ -498,33 +498,15 @@ functional jsdom localStorage only when Node 25 supplies its invalid empty
 localstorage-file stub. The settings shell and Security & Login client calls are
 also type-clean. See the verification gate below for current evidence.
 
-> **Historical note:** The immediately following “Remaining” list and its old
-> verification counts are preserved only as a pre-completion snapshot. They are
-> superseded by this update: the Connector Store gallery, task create/scheduling,
-> and theme-test items are complete. Use the current verification statement below
-> that historical list, plus `docs/IMPLEMENTATION_STATUS.md`, as authoritative.
+**Next eligible build work:** the Tier-4 plugin-runtime remainder: in-process
+import isolation, sandbox-image build/pull management, per-plugin subprocess
+egress, or one activation surface (hooks/MCP/LSP/monitors/panels). Each is an
+independent governed slice: threat model, real fail-closed executor, activation
+requirements, tests, and documentation. Do not treat a bare subprocess as
+network-isolated; create a network container runtime for a real
+platform isolation.
 
-Remaining (not yet done) — start here next session:
-- **Connector gallery UI** rewrite: turn `ConnectionsView.svelte` into a
-  browse/search/install/uninstall gallery over the existing backend
-  (`/api/connector-store` list/install/delete/enabled/credentials/actions already
-  exist — this is frontend-only).
-- **Task create/schedule**: a create form (title/description/priority) + date-time
-  scheduling in `TasksView.svelte`, plus a `POST /api/tasks` backend endpoint. Note
-  `insert_task` does NOT yet persist the new schedule columns (priority/scheduled_at/
-  recurrence/reminder_at) — extend it. Tasks attach to a session; decide the
-  per-principal "inbox" session model.
-- Optional: turn-level event-log filtering beyond session ownership; SMS/Email MFA
-  (deliberately deferred).
-- Pre-existing (NOT ours): 5 `apps/web/src/lib/theme.test.ts` failures — a node-25
-  native-localStorage vs jsdom quirk (`--localstorage-file` warning). Present before
-  this work; leave or pin node.
-
-Verify gate for this workstream: `ruff check raiker tests`, `mypy raiker`,
-`pytest` (1590 passed / 2 skipped), and in `apps/web`: `npm run build` +
-`npx vitest run` (99 passed; the 5 theme failures are the known pre-existing set).
-
-Current 2026-07-13 verification supersedes those old counts: `ruff check`,
+Current 2026-07-13 verification: `ruff check`,
 `mypy raiker`, all five validation scripts, web check/lint, **105** Vitest tests,
 and the production web build pass. This Windows runner's full backend suite has
 three plugin-subprocess failures because restricted token creation returns

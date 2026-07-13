@@ -5,6 +5,7 @@
 .mypy_cache
 .claude
 .tmp
+.playwright-cli
 .worktrees/
 cli_output.txt
 /raiker.egg-info

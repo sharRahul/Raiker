@@ -322,13 +322,13 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Plain terminal client | Line-oriented terminal client with `/help`, `/commands`, slash-command routing, and prompt submission. Rich/native TUI is Phase 8 deferred. | Yes | No direct tool authority; prompts route through gateway/broker/policy. | Implement richer clients only in Phase 8. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Launchable local web dashboard: `apps/web` Svelte SPA over the `raiker-web` loopback API. Read-only governed views + governed prompt/turn/approval/runtime-mutation flows (approval resolution metadata-only); single-user, `127.0.0.1` only. | Yes | No direct tool authority; routes through gateway/RuntimeAuthority/broker exactly as the CLI. | Keep API-contract + frontend test parity; broader clients stay deferred. |
-| Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
+| Dashboard | Launchable local web dashboard via apps/web, with governed views, prompt/turn flows, task creation, Connector Store, settings, and approvals. | Yes | No direct authority; every mutation follows the governed API path. | Keep API and frontend tests in parity; native and mobile dashboards remain deferred. |
 | IDE extension | Specified/deferred; no extension runtime. | No | None. | Define extension transport and auth. |
 | Mobile apps | Specified/deferred; no Apple/Android apps. | No | None. | Build mobile clients after explicit activation scope. |
 | Voice UI | Specified/deferred. | No | None. | Define voice contracts after explicit activation scope. |
 | Browser extension | Specified/deferred. | No | None. | Define extension boundary after explicit activation scope. |
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
-| REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
+| REST/API | Authenticated single-user raiker-web API, loopback by default with explicit public opt-in. | Yes | No direct authority; requests route through the same gateway, RuntimeAuthority, and broker path. | Hosted multi-user API remains deferred. |
 
 
 

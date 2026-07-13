@@ -88,8 +88,8 @@ Current backend implementation labels used across the hardening pass:
 | TUI status bar | fully-specified | phase-2-build | see status ledger for current implementation | `docs/UI_UX_DESIGN_SPEC.md` |
 | Async side questions during work | fully-specified | phase-2-to-4-build | see status ledger for current implementation | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/CHANNELS_SPEC.md` |
 | Desktop UI | fully-specified | phase-3-build | contract-only/readiness-only; no launchable app | `docs/UI_UX_DESIGN_SPEC.md` |
-| Web UI | fully-specified | phase-3-build | contract-only/readiness-only; no launchable app or event-stream UI | `docs/UI_UX_DESIGN_SPEC.md` |
-| Dashboard | fully-specified | phase-3-build | contract-only/metadata-only; no launchable dashboard | `docs/UI_UX_DESIGN_SPEC.md` |
+| Web UI | fully-specified | phase-3-build | launchable local Svelte dashboard over the authenticated loopback raiker-web API; event-stream UI remains deferred | `docs/UI_UX_DESIGN_SPEC.md` |
+| Dashboard | fully-specified | phase-3-build | launchable local dashboard with governed views and mutations; native/mobile variants remain deferred | `docs/UI_UX_DESIGN_SPEC.md` |
 | IDE extension | fully-specified | phase-3-build | deferred; no extension runtime | `docs/UI_UX_DESIGN_SPEC.md` |
 | Apple mobile app | fully-specified | phase-3-build | deferred; connector metadata only; no app runtime | `docs/UI_UX_DESIGN_SPEC.md`, `docs/CHANNELS_SPEC.md`, `config/channel-connectors.json` |
 | Android mobile app | fully-specified | phase-3-build | deferred; connector metadata only; no app runtime | `docs/UI_UX_DESIGN_SPEC.md`, `docs/CHANNELS_SPEC.md`, `config/channel-connectors.json` |
@@ -188,13 +188,13 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Rich TUI panels | Rich/native TUI panels are Phase 8 deferred; no Rich/Textual runtime is active. Plain terminal command catalog is implemented. | Partial (default access shell) | None. | Build advanced/optional panel framework only in a future approved slice. |
 | Desktop UI | Read-only shared contract/view foundation only; no launchable desktop app. | Contract-only | None. | Implement app shell after explicit activation scope. |
 | Web UI | Launchable local web dashboard: `apps/web` Svelte SPA over the `raiker-web` loopback API. Read-only governed views + governed prompt/turn/approval/runtime-mutation flows (approval resolution metadata-only); single-user, `127.0.0.1` only. | Yes | No direct tool authority; routes through gateway/RuntimeAuthority/broker exactly as the CLI. | Keep API-contract + frontend test parity; broader clients stay deferred. |
-| Dashboard | Read-only shared contract/data-parity foundation only; no launchable dashboard. | Contract-only | None. | Implement dashboard views after explicit activation scope. |
+| Dashboard | Launchable local web dashboard via apps/web, with governed views, prompt/turn flows, task creation, Connector Store, settings, and approvals. | Yes | No direct authority; every mutation follows the governed API path. | Keep API and frontend tests in parity; native and mobile dashboards remain deferred. |
 | IDE extension | Specified/deferred; no extension runtime. | No | None. | Define extension transport and auth. |
 | Mobile apps | Specified/deferred; no Apple/Android apps. | No | None. | Build mobile clients after explicit activation scope. |
 | Voice UI | Specified/deferred. | No | None. | Define voice contracts after explicit activation scope. |
 | Browser extension | Specified/deferred. | No | None. | Define extension boundary after explicit activation scope. |
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
-| REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
+| REST/API | Authenticated single-user raiker-web API, loopback by default with explicit public opt-in. | Yes | No direct authority; requests route through the same gateway, RuntimeAuthority, and broker path. | Hosted multi-user API remains deferred. |
 
 ## Current limitations
 

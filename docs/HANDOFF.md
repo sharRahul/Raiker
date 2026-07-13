@@ -83,12 +83,9 @@ Be mindful of token usage — if needed, work in batches. Commit after every pha
   in the owner-controlled server environment and the UI only reports presence.
   Raiker does not persist, render, or transmit secret values from this window.
 - Verification: web `check` and `lint` clean; focused `ConnectionsView` suite
-  **4 passed** (including manifest discovery); production build green. Full web
-  run: connector/application tests green, but the pre-existing 5
-  `theme.test.ts` cases fail in this Windows Node invocation because
-  `--localstorage-file` supplies an invalid path and jsdom exposes a nonfunctional
-  `window.localStorage`. No browser connector was callable in this session, so
-  interactive screenshot QA was not available.
+  **4 passed** (including manifest discovery); production build green. The later
+  Node 25/jsdom localStorage harness failure was fixed without changing browser
+  behavior; current full-suite evidence appears in the verification gate below.
 
 **Task 5 COMPLETE: project folders (governance-neutral organizing scope).**
 - **Storage:** `projects` table (project_id `proj_…`, unique name, `root_subpath`,

@@ -216,7 +216,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Voice UI | Specified/deferred. | No | None. | Define voice contracts after explicit activation scope. |
 | Browser extension | Specified/deferred. | No | None. | Define extension boundary after explicit activation scope. |
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
-| REST/API | Contracts specified/deferred; no launchable REST API server. | No | None. | Build authenticated API after explicit activation scope. |
+| REST/API | Authenticated single-user raiker-web API, loopback by default with explicit public opt-in. | Yes | No direct authority; requests route through the same gateway, RuntimeAuthority, and broker path. | Hosted multi-user API remains deferred. |
 
 ---
 

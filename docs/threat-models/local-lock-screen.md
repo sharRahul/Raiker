@@ -63,9 +63,12 @@ outbound connector routing fail closed (`raiker/runtime/connector_ecosystem.py`)
 
 ## Known limitations (honest scope)
 
-- **Chat/task isolation:** connector credentials and per-account settings are isolated per
-  `principal_id`. Sessions/turns/tasks are **not yet** principal-scoped at the storage layer, so
-  full cross-account isolation of chat history and tasks is a follow-up (schema + query change).
+- **Chat/task isolation:** connector credentials, settings, and now sessions/tasks are scoped
+  per account. Sessions created under an account are stamped with its `user_id`; the dashboard
+  read paths (`/api/sessions`, `/api/sessions/{id}`, `/api/tasks`) filter by the requesting
+  account, so one account cannot list or open another's chats/tasks. Legacy/unattributed
+  sessions (`user_id IS NULL`, e.g. CLI-created) remain visible to any authenticated account by
+  design. Turn-level event logs are not additionally filtered beyond session ownership.
 - **First-run bootstrap:** before any account is registered, the loopback owner-bootstrap mint
   is available; it fails closed once the first account exists.
 - **TLS:** not terminated by the app (loopback only). Networked exposure is out of scope.

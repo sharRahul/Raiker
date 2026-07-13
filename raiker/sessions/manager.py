@@ -29,13 +29,15 @@ class SessionManager:
             session_id=session_id, project_root=self.workspace_root, status="open", title=title
         )
 
-    def get_or_create(self, session_id: str | None = None) -> SessionRecord:
+    def get_or_create(
+        self, session_id: str | None = None, *, user_id: str | None = None
+    ) -> SessionRecord:
         if session_id:
             loaded = self.load_session(session_id)
             if loaded is not None:
                 return loaded
-            return self.create_session(session_id)
-        return self.create_session()
+            return self.create_session(session_id, user_id=user_id)
+        return self.create_session(user_id=user_id)
 
     def load_session(self, session_id: str) -> SessionRecord | None:
         row = self.store.load_session(session_id)

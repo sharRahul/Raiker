@@ -63,18 +63,21 @@ async def list_sessions(
     request: Request,
     limit: int = 50,
     project_id: str | None = None,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
-    return serialize_dto(_service(request).list_sessions(limit=limit, project_id=project_id))
+    user_id = auth_data[1].delegated_by_user_id
+    return serialize_dto(
+        _service(request).list_sessions(limit=limit, project_id=project_id, user_id=user_id)
+    )
 
 
 @router.get("/api/sessions/{session_id}")
 async def get_session(
     session_id: str,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    view = _service(request).get_session(session_id)
+    view = _service(request).get_session(session_id, user_id=auth_data[1].delegated_by_user_id)
     if view is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown session: {session_id}")
     return serialize_dto(view)
@@ -206,9 +209,13 @@ async def list_tasks(
     request: Request,
     session_id: str | None = None,
     task_status: str | None = None,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
-    return serialize_dto(_service(request).list_tasks(session_id=session_id, status=task_status))
+    return serialize_dto(
+        _service(request).list_tasks(
+            session_id=session_id, status=task_status, user_id=auth_data[1].delegated_by_user_id
+        )
+    )
 
 
 @router.get("/api/models")

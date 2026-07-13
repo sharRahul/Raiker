@@ -29,6 +29,15 @@ class AgentGateway:
         self.store = SQLiteStore(self.workspace_root)
         self.writer = EventLogWriter(self.store)
         self.sessions = SessionManager(self.store, self.workspace_root)
+        # Local-account owner for session attribution: sessions this principal
+        # creates are stamped with its user_id so accounts stay isolated. Legacy
+        # principals without a user mapping leave sessions unattributed (shared).
+        principal_row = self.store.get_principal(principal_id)
+        self._owner_user_id = (
+            str(principal_row["delegated_by_user_id"])
+            if principal_row and principal_row.get("delegated_by_user_id")
+            else None
+        )
         self.checkpoints = CheckpointService(self.store)
         policy_engine = PolicyEngine(StaticPolicyConfig(self.workspace_root))
         self.hook_dispatcher = HookDispatcher(
@@ -183,7 +192,7 @@ class AgentGateway:
 
     def _prepare_turn(self, prompt_envelope: PromptEnvelope) -> None:
         existing_session = self.sessions.load_session(prompt_envelope.session_id)
-        self.sessions.get_or_create(prompt_envelope.session_id)
+        self.sessions.get_or_create(prompt_envelope.session_id, user_id=self._owner_user_id)
         self.sessions.track_turn(
             prompt_envelope.session_id,
             prompt_envelope.turn_id,

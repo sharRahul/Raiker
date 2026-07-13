@@ -425,15 +425,24 @@ class DashboardService:
         self.control = RuntimeControlService(self.workspace_root)
 
     # ── Sessions / turns ────────────────────────────────────────────────
-    def list_sessions(self, limit: int = 50, project_id: str | None = None) -> list[SessionView]:
+    def list_sessions(
+        self, limit: int = 50, project_id: str | None = None, user_id: str | None = None
+    ) -> list[SessionView]:
         return [
             self._session_view(row)
-            for row in self.store.list_sessions(limit=limit, project_id=project_id)
+            for row in self.store.list_sessions(limit=limit, project_id=project_id, user_id=user_id)
         ]
 
-    def get_session(self, session_id: str) -> SessionDetailView | None:
+    def get_session(
+        self, session_id: str, user_id: str | None = None
+    ) -> SessionDetailView | None:
         row = self.store.load_session(session_id)
         if row is None:
+            return None
+        # Isolation: an account cannot read another account's session. Legacy
+        # sessions (no owner) remain visible to any authenticated account.
+        owner = row.get("user_id")
+        if user_id is not None and owner is not None and str(owner) != user_id:
             return None
         turns = tuple(self._turn_view(t) for t in self.store.list_turns(session_id))
         return SessionDetailView(session=self._session_view(row), turns=turns)
@@ -568,8 +577,13 @@ class DashboardService:
             selected=(str(row["project_id"]) == active_project_id),
         )
 
-    def list_tasks(self, session_id: str | None = None, status: str | None = None) -> list[TaskView]:
-        return [self._task_view(t) for t in self.store.list_tasks(session_id=session_id, status=status)]
+    def list_tasks(
+        self, session_id: str | None = None, status: str | None = None, user_id: str | None = None
+    ) -> list[TaskView]:
+        return [
+            self._task_view(t)
+            for t in self.store.list_tasks(session_id=session_id, status=status, user_id=user_id)
+        ]
 
     # ── Approvals (read-only views; resolution lives in ApprovalInbox) ───
     def list_approvals(self, status: str = "pending") -> list[ApprovalView]:

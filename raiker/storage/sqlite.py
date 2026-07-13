@@ -577,12 +577,22 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
-    def list_sessions(self, limit: int = 10, project_id: str | None = None) -> list[dict[str, Any]]:
+    def list_sessions(
+        self, limit: int = 10, project_id: str | None = None, user_id: str | None = None
+    ) -> list[dict[str, Any]]:
         query = "SELECT * FROM sessions"
         params: list[Any] = []
+        conditions: list[str] = []
         if project_id is not None:
-            query += " WHERE project_id = ?"
+            conditions.append("project_id = ?")
             params.append(project_id)
+        if user_id is not None:
+            # An account sees its own sessions plus legacy/unattributed ones
+            # (user_id IS NULL); another account's sessions stay hidden.
+            conditions.append("(user_id = ? OR user_id IS NULL)")
+            params.append(user_id)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
         with self.connect() as connection:
@@ -845,7 +855,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return TaskRecord(**dict(row))
 
     def list_tasks(
-        self, session_id: str | None = None, status: str | None = None
+        self, session_id: str | None = None, status: str | None = None, user_id: str | None = None
     ) -> list[TaskRecord]:
         query = "SELECT * FROM tasks"
         params: list[Any] = []
@@ -856,6 +866,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if status is not None:
             conditions.append("status = ?")
             params.append(status)
+        if user_id is not None:
+            # Only tasks whose owning session is visible to this account
+            # (its own sessions plus legacy/unattributed ones).
+            conditions.append(
+                "session_id IN (SELECT session_id FROM sessions "
+                "WHERE user_id = ? OR user_id IS NULL)"
+            )
+            params.append(user_id)
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY created_at DESC"

@@ -36,10 +36,6 @@
   });
   let loadError = $state<string | null>(null);
 
-  const ActiveComponent = $derived(
-    SECTIONS.find((s) => s.id === active)?.comp ?? General,
-  );
-
   async function load() {
     loadError = null;
     try {
@@ -91,7 +87,25 @@
   </nav>
 
   <div class="section-body">
-    <ActiveComponent {settings} {save} {status} {principal} />
+    {#if active === "general"}
+      <General {settings} {save} {principal} />
+    {:else if active === "notification"}
+      <Notification {settings} {save} />
+    {:else if active === "personalisation"}
+      <Personalisation {settings} {save} />
+    {:else if active === "voice"}
+      <Voice />
+    {:else if active === "data"}
+      <DataControls {settings} {save} />
+    {:else if active === "storage"}
+      <Storage {settings} {save} />
+    {:else if active === "security"}
+      <SecurityLogin />
+    {:else if active === "trusted"}
+      <TrustedContact {settings} {save} />
+    {:else}
+      <Account {settings} {save} {status} />
+    {/if}
   </div>
 </div>
 

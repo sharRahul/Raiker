@@ -13,6 +13,7 @@ from raiker.approval_previews import redact_secret_like_text
 from raiker.contracts.ids import new_id
 from raiker.control.dtos import ControlResult
 from raiker.control.service import RuntimeControlService
+from raiker.events.writer import EventLogWriter
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
 from raiker.models.exceptions import ModelProviderError, ProviderPolicyError, safe_error
 from raiker.models.factory import ModelProviderFactory
@@ -27,6 +28,7 @@ from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionS
 from raiker.runtime.authority.models import PrincipalType
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tasks.manager import TaskManager
 from raiker.tools.filesystem import FilesystemSafetyError, proposed_write_snapshot
 
 # Capability states that mean the gate is off / fail-closed.
@@ -167,6 +169,10 @@ class TaskView:
     updated_at: str
     completed_at: str | None
     summary: str | None
+    priority: str | None = None
+    scheduled_at: str | None = None
+    recurrence: str | None = None
+    reminder_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -584,6 +590,37 @@ class DashboardService:
             self._task_view(t)
             for t in self.store.list_tasks(session_id=session_id, status=status, user_id=user_id)
         ]
+
+    def create_task(
+        self,
+        *,
+        title: str,
+        objective: str,
+        user_id: str | None,
+        principal_id: str,
+        priority: str | None = None,
+        scheduled_at: str | None = None,
+        recurrence: str | None = None,
+        reminder_at: str | None = None,
+    ) -> TaskView:
+        """Create a local planning task in the caller's server-owned Inbox session."""
+        inbox_session_id = f"sess_inbox_{principal_id}"
+        self.store.create_session(
+            inbox_session_id,
+            str(self.store.paths.workspace_root),
+            title="Inbox",
+            user_id=user_id,
+        )
+        task = TaskManager(self.store, EventLogWriter(self.store)).create_task(
+            session_id=inbox_session_id,
+            title=title,
+            objective=objective,
+            priority=priority,
+            scheduled_at=scheduled_at,
+            recurrence=recurrence,
+            reminder_at=reminder_at,
+        )
+        return self._task_view(task)
 
     # ── Approvals (read-only views; resolution lives in ApprovalInbox) ───
     def list_approvals(self, status: str = "pending") -> list[ApprovalView]:
@@ -1234,6 +1271,10 @@ class DashboardService:
             updated_at=str(d.get("updated_at", "")),
             completed_at=d.get("completed_at"),
             summary=d.get("summary"),
+            priority=d.get("priority"),
+            scheduled_at=d.get("scheduled_at"),
+            recurrence=d.get("recurrence"),
+            reminder_at=d.get("reminder_at"),
         )
 
 

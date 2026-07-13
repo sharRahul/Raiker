@@ -828,8 +828,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR IGNORE INTO tasks
-                (task_id, session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (task_id, session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.task_id,
@@ -844,6 +844,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     task.created_at,
                     task.updated_at,
                     task.completed_at,
+                    task.priority,
+                    task.scheduled_at,
+                    task.recurrence,
+                    task.reminder_at,
                 ),
             )
 

@@ -14,8 +14,8 @@ import hmac
 import secrets
 
 try:  # pragma: no cover - import guard exercised by environment, not tests
-    from argon2 import PasswordHasher
-    from argon2 import exceptions as _argon2_exc
+    from argon2 import PasswordHasher  # type: ignore[import-not-found]
+    from argon2 import exceptions as _argon2_exc  # type: ignore[import-not-found]
 
     _PH = PasswordHasher(memory_cost=19456, time_cost=2, parallelism=1)
     ARGON2_AVAILABLE = True

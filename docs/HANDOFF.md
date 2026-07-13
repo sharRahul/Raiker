@@ -492,6 +492,15 @@ Also shipped since (all on main):
   `POST /api/auth/sessions/{id}/revoke`, `DELETE /api/account` (elevated). Tests:
   `test_account_management_routes.py`, web `SettingsView.test.ts`.
 
+**2026-07-13 update — the following previously remaining connector-gallery,
+task-create/scheduling, and theme-test items are complete.** Tasks now use a
+server-owned principal Inbox session; title/description, priority, and schedule
+metadata persist, while scheduling is explicitly stored-only (never starts work
+or sends reminders). `TasksView` supplies the create form, and Vitest restores a
+functional jsdom localStorage only when Node 25 supplies its invalid empty
+localstorage-file stub. The settings shell and Security & Login client calls are
+also type-clean. See the verification gate below for current evidence.
+
 Remaining (not yet done) — start here next session:
 - **Connector gallery UI** rewrite: turn `ConnectionsView.svelte` into a
   browse/search/install/uninstall gallery over the existing backend
@@ -511,3 +520,9 @@ Remaining (not yet done) — start here next session:
 Verify gate for this workstream: `ruff check raiker tests`, `mypy raiker`,
 `pytest` (1590 passed / 2 skipped), and in `apps/web`: `npm run build` +
 `npx vitest run` (99 passed; the 5 theme failures are the known pre-existing set).
+
+Current 2026-07-13 verification supersedes those old counts: `ruff check`,
+`mypy raiker`, all five validation scripts, web check/lint, **105** Vitest tests,
+and the production web build pass. This Windows runner's full backend suite has
+three plugin-subprocess failures because restricted token creation returns
+`WinError 1312`; GitHub CI is the authoritative check for those sandboxed cases.

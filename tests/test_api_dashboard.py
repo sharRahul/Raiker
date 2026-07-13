@@ -150,6 +150,40 @@ class TestReads:
             assert resp.status_code == 200
             assert isinstance(resp.json(), list)
 
+    def test_task_create_persists_priority_and_schedule(self, client: TestClient) -> None:
+        token = _token(client)
+        response = client.post(
+            "/api/tasks",
+            headers=_auth_headers(token),
+            json={
+                "title": "Plan release",
+                "description": "Prepare the release notes.",
+                "priority": "high",
+                "scheduled_at": "2026-07-14T09:30:00Z",
+            },
+        )
+
+        assert response.status_code == 201, response.text
+        task = response.json()
+        assert task["title"] == "Plan release"
+        assert task["objective"] == "Prepare the release notes."
+        assert task["priority"] == "high"
+        assert task["scheduled_at"] == "2026-07-14T09:30:00Z"
+
+        listed = client.get("/api/tasks", headers=_auth_headers(token))
+        assert listed.status_code == 200
+        assert any(item["task_id"] == task["task_id"] for item in listed.json())
+
+    def test_task_create_rejects_blank_title(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/tasks",
+            headers=_auth_headers(_token(client)),
+            json={"title": "   "},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == "task_title_required"
+
     def test_unknown_ids_404(self, client: TestClient) -> None:
         token = _token(client)
         assert client.get("/api/sessions/nope", headers=_auth_headers(token)).status_code == 404

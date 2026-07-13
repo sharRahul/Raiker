@@ -180,6 +180,10 @@ export interface EventEntry {
   timestamp: string;
   risk_level: string | null;
   summary: string | null;
+  priority: string | null;
+  scheduled_at: string | null;
+  recurrence: string | null;
+  reminder_at: string | null;
 }
 
 export interface Checkpoint {

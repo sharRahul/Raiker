@@ -298,6 +298,12 @@ export const api = {
   turn: (id: string) => request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
   tasks: (params: { session_id?: string; status?: string } = {}) =>
     request<TaskView[]>(withQuery("/api/tasks", params)),
+  createTask: (body: {
+    title: string;
+    description: string;
+    priority?: string;
+    scheduled_at?: string;
+  }) => postJson<TaskView>("/api/tasks", body),
 
   // ── Prompts / interrupts ──
   // Non-streaming prompt submit; returns the final governed AgentResponse.

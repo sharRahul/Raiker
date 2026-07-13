@@ -14,6 +14,11 @@
   let loadError = $state<string | null>(null);
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
   let busyTask = $state<string | null>(null);
+  let creating = $state(false);
+  let title = $state("");
+  let description = $state("");
+  let priority = $state("normal");
+  let scheduledAt = $state("");
 
   async function load() {
     loadError = null;
@@ -44,6 +49,30 @@
     }
   }
 
+  async function createTask() {
+    if (!title.trim()) return;
+    creating = true;
+    notice = null;
+    try {
+      await api.createTask({
+        title: title.trim(),
+        description: description.trim(),
+        priority,
+        ...(scheduledAt ? { scheduled_at: new Date(scheduledAt).toISOString() } : {}),
+      });
+      title = "";
+      description = "";
+      priority = "normal";
+      scheduledAt = "";
+      notice = { kind: "ok", text: "Task created in your Inbox." };
+      await load();
+    } catch {
+      notice = { kind: "error", text: "Could not create the task." };
+    } finally {
+      creating = false;
+    }
+  }
+
   const active = $derived((tasks ?? []).filter((t) => ACTIVE_STATES.includes(t.status)));
   const finished = $derived((tasks ?? []).filter((t) => !ACTIVE_STATES.includes(t.status)));
 
@@ -60,6 +89,14 @@
     Refresh
   </button>
 </div>
+
+<form class="card create-form" onsubmit={(event) => { event.preventDefault(); void createTask(); }}>
+  <div><h2>Create task</h2><p>Scheduling is stored only; it does not start work or send reminders automatically.</p></div>
+  <label>Task title<input class="input" aria-label="Task title" bind:value={title} required maxlength="240" /></label>
+  <label>Description<textarea class="textarea" aria-label="Description" bind:value={description}></textarea></label>
+  <div class="form-row"><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label><label>Schedule for<input class="input" aria-label="Schedule for" type="datetime-local" bind:value={scheduledAt}/></label></div>
+  <button class="btn btn-primary" disabled={creating || !title.trim()}>{creating ? "Creating…" : "Create task"}</button>
+</form>
 
 {#if notice}
   <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
@@ -151,6 +188,11 @@
     justify-content: space-between;
     gap: var(--space-4);
   }
+  .create-form { display: grid; gap: var(--space-3); margin: var(--space-4) 0; }
+  .create-form h2 { margin: 0; font-size: 1rem; }
+  .create-form p { color: var(--text-2); font-size: .82rem; margin: .2rem 0 0; }
+  .create-form label { display: grid; gap: .35rem; color: var(--text-2); font-size: .8rem; }
+  .form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
   .task-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
@@ -215,4 +257,5 @@
   .loading {
     color: var(--text-2);
   }
+  @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
 </style>

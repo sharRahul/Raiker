@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, auth, getToken, setToken, ApiError } from "../../api";
+  import { auth, getToken, setToken, ApiError } from "../../api";
 
   let {
     settings,
@@ -25,7 +25,7 @@
     try {
       const { token: elevated } = await auth.elevate(deletePassword);
       setToken(elevated);
-      await api.deleteAccount();
+      await auth.deleteAccount();
       // Account gone — drop the session and return to the lock screen.
       setToken(null);
       window.location.reload();

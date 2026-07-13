@@ -12,7 +12,7 @@ _FORBIDDEN = (
     "".join(("RAIKER", "_TEST_MODE")),
     "".join(("allow", "_test_provider")),
 )
-_SKIP_DIRS = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", "node_modules"}
+_SKIP_DIRS = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tmp", "node_modules"}
 
 
 def test_builtin_test_model_provider_is_absent() -> None:

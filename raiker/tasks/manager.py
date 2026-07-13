@@ -20,6 +20,10 @@ class TaskManager:
         objective: str,
         parent_turn_id: str | None = None,
         parent_task_id: str | None = None,
+        priority: str | None = None,
+        scheduled_at: str | None = None,
+        recurrence: str | None = None,
+        reminder_at: str | None = None,
     ) -> TaskRecord:
         now = utc_now()
         task = TaskRecord(
@@ -32,6 +36,10 @@ class TaskManager:
             updated_at=now,
             parent_turn_id=parent_turn_id,
             parent_task_id=parent_task_id,
+            priority=priority,
+            scheduled_at=scheduled_at,
+            recurrence=recurrence,
+            reminder_at=reminder_at,
         )
         self.store.insert_task(task)
         event = make_event(

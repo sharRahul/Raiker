@@ -5,6 +5,15 @@
 
 # Implementation Status
 
+> Current truth update (2026-07-13): The local-owner workstream now includes a
+> principal-scoped Inbox task-create route and Tasks UI. `priority`,
+> `scheduled_at`, `recurrence`, and `reminder_at` persist on tasks; scheduling is
+> stored planning metadata only and never starts work or sends a reminder. The
+> connector gallery is implemented as the governed Connector Store UI. The web
+> test setup also handles Node 25's invalid empty localStorage-file stub without
+> changing browser runtime behavior. Web check/lint/test/build, ruff, mypy, and
+> all repository truthfulness/readiness validators are green.
+
 > Current truth update (2026-07-04): Phase 4 slice 8 promotes `plugin_install`
 > to a real governed executor for local manifest validation and install-record
 > creation only. Phase 4 slice 9 promotes `plugin_execution_cap` only for

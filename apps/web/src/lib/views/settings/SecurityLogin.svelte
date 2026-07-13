@@ -7,7 +7,6 @@
   let vaultState = $state<string>("missing");
   let mfaEnrolled = $state(false);
   let requireMfaForVault = $state(false);
-  let loaded = $state(false);
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
 
   // Vault key editor
@@ -38,9 +37,7 @@
       requireMfaForVault = Boolean(
         (s.settings as Record<string, unknown>)["security.require_mfa_for_vault"],
       );
-      loaded = true;
     } catch {
-      loaded = true;
       notice = { kind: "error", text: "Could not load security settings." };
     }
     await loadSessions();
@@ -48,7 +45,7 @@
 
   async function loadSessions() {
     try {
-      sessions = (await api.listDeviceSessions()).filter((s) => !s.revoked);
+      sessions = (await auth.listDeviceSessions()).filter((s) => !s.revoked);
     } catch {
       sessions = [];
     }
@@ -69,7 +66,7 @@
 
   async function revokeSession(id: string) {
     try {
-      await api.revokeDeviceSession(id);
+      await auth.revokeDeviceSession(id);
       await loadSessions();
     } catch (e) {
       notice = { kind: "error", text: message(e, "Could not revoke the session.") };

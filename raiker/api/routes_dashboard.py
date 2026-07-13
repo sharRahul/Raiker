@@ -13,6 +13,7 @@ from raiker.api.schemas import (
     SetModelAdvisorRequest,
     SetModelFallbackRequest,
     SetModelSelectionRequest,
+    TaskCreateRequest,
     serialize_dto,
 )
 from raiker.api.sessions import ApiSession
@@ -214,6 +215,30 @@ async def list_tasks(
     return serialize_dto(
         _service(request).list_tasks(
             session_id=session_id, status=task_status, user_id=auth_data[1].delegated_by_user_id
+        )
+    )
+
+
+@router.post("/api/tasks", status_code=status.HTTP_201_CREATED)
+async def create_task(
+    body: TaskCreateRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, principal = auth_data
+    title = body.title.strip()
+    if not title:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="task_title_required")
+    return serialize_dto(
+        _service(request).create_task(
+            title=title,
+            objective=body.description.strip(),
+            user_id=principal.delegated_by_user_id,
+            principal_id=session.principal_id,
+            priority=body.priority,
+            scheduled_at=body.scheduled_at,
+            recurrence=body.recurrence,
+            reminder_at=body.reminder_at,
         )
     )
 

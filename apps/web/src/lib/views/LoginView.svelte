@@ -56,63 +56,8 @@
     return null;
   });
 
-  // ── Prompt-eye motion layer ────────────────────────────────────────────────
-  // The resting identity is the exact brand mark Γ_ (drawn with the same
-  // strokes as the favicon/app icons). Animated dual-eye expressions are a
-  // motion behaviour of the large lock-screen character only; the shell never
-  // changes, and reduced motion keeps the eye at rest permanently.
-  const REST_GLYPH = "Γ_";
-  const BLINK_FRAMES = ["TT", "_ _", "Γ Γ", "_ _", "⅂ ⅂", "_ _"];
-  const GLANCE_FRAMES: string[][] = [
-    ["Γ Γ", "⅂ ⅂"], // side to side
-    ["TT", "⟂ ⟂"], // up and down
-  ];
-  let eyeGlyph = $state(REST_GLYPH);
-
   onMount(() => {
     void probeRuntime();
-
-    const reduceMotion =
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduceMotion) return;
-
-    let cancelled = false;
-    let handle: ReturnType<typeof setTimeout> | undefined;
-    const later = (fn: () => void, ms: number) => {
-      handle = setTimeout(fn, ms);
-    };
-    // Long idle rests between short expressions keep the motion restrained.
-    const restDelay = () => 9000 + Math.random() * 5000;
-    const rest = () => {
-      eyeGlyph = REST_GLYPH;
-      later(play, restDelay());
-    };
-    const play = () => {
-      if (cancelled) return;
-      const blink = Math.random() < 0.7;
-      const frames = blink
-        ? BLINK_FRAMES
-        : GLANCE_FRAMES[Math.floor(Math.random() * GLANCE_FRAMES.length)];
-      const stepMs = blink ? 140 : 650;
-      let i = 0;
-      const stepFrame = () => {
-        if (cancelled) return;
-        if (i < frames.length) {
-          eyeGlyph = frames[i];
-          i += 1;
-          later(stepFrame, stepMs);
-        } else {
-          rest();
-        }
-      };
-      stepFrame();
-    };
-    later(play, restDelay());
-    return () => {
-      cancelled = true;
-      if (handle !== undefined) clearTimeout(handle);
-    };
   });
 
   async function probeRuntime() {
@@ -201,7 +146,7 @@
 <div class="lock-screen">
   <header class="lock-header">
     <span class="brand">
-      <img src="/favicon.svg" alt="" width="44" height="44" />
+      <span class="brand-mark" role="img" aria-label="Raiker"></span>
       <span>RAIKER</span>
     </span>
     <ThemeToggle />
@@ -209,66 +154,15 @@
 
   <main class="lock-layout" aria-busy={isVerifying}>
     <section class="hero">
-      <!-- The Raiker governed core: same artwork as the production icon, with
-           only the inner prompt-eye glyph as a separate (animatable) layer. -->
+      <!-- The Raiker governed core: the production rendered icon. Light theme
+           shows the floating orb framed by decorative orbit rings; dark theme
+           shows the light-tiled icon (self-contained, so the rings are hidden).
+           The Γ_ prompt eye is part of the render. -->
       <div class="core">
-        <svg viewBox="0 0 512 512" role="img" aria-label="Raiker">
-          <defs>
-            <radialGradient id="hero-orb" cx="38%" cy="30%" r="85%">
-              <stop offset="0" stop-color="#39465e" />
-              <stop offset="0.45" stop-color="#131b2b" />
-              <stop offset="1" stop-color="#04060c" />
-            </radialGradient>
-            <linearGradient id="hero-silver" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#ffffff" />
-              <stop offset="0.5" stop-color="#dbe3ec" />
-              <stop offset="1" stop-color="#96a3b5" />
-            </linearGradient>
-            <linearGradient id="hero-darkseg" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#333f54" />
-              <stop offset="1" stop-color="#070b13" />
-            </linearGradient>
-            <linearGradient id="hero-ringmetal" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#d6dde6" />
-              <stop offset="1" stop-color="#8492a6" />
-            </linearGradient>
-            <filter id="hero-blur6" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="6" /></filter>
-            <filter id="hero-blur10" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="10" /></filter>
-            <filter id="hero-shadow" x="-25%" y="-25%" width="150%" height="160%">
-              <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#0a1524" flood-opacity="0.35" />
-            </filter>
-          </defs>
-          <g filter="url(#hero-shadow)">
-            <path d="M107 199c24-72 83-126 157-143 35-8 70-6 103 4l-57 69c-17-3-35-2-52 2-38 9-69 35-86 69z" fill="url(#hero-darkseg)" stroke="#05080f" stroke-width="3" />
-            <path d="M379 92c48 34 81 86 90 145 5 33 2 65-8 95l-79-42c4-15 5-31 3-47-5-34-22-64-48-85z" fill="url(#hero-silver)" stroke="#0c1526" stroke-width="3" />
-            <path d="M455 348c-27 55-76 98-135 116-31 9-63 11-93 5l35-83c15 1 30-1 44-5 34-10 63-33 81-62z" fill="url(#hero-darkseg)" stroke="#05080f" stroke-width="3" />
-            <path d="M207 463c-61-14-113-52-145-104-17-27-27-58-29-89l89 12c3 15 8 29 16 42 18 30 47 52 80 62z" fill="url(#hero-silver)" stroke="#0c1526" stroke-width="3" />
-            <path d="M39 248c4-62 32-119 78-159 24-21 52-36 83-44l8 90c-14 5-27 13-38 23-26 23-42 55-44 90z" fill="url(#hero-darkseg)" stroke="#05080f" stroke-width="3" />
-            <circle cx="256" cy="256" r="139" fill="url(#hero-ringmetal)" stroke="#0a1322" stroke-width="10" />
-            <circle cx="256" cy="256" r="126" fill="none" stroke="#3d9bff" stroke-width="9" opacity="0.9" filter="url(#hero-blur6)" />
-            <path d="M150 310a120 120 0 0 0 90 62" fill="none" stroke="#7cc2ff" stroke-width="10" stroke-linecap="round" opacity="0.9" filter="url(#hero-blur6)" />
-            <circle cx="256" cy="256" r="118" fill="url(#hero-orb)" stroke="#0a111d" stroke-width="6" />
-            <circle cx="256" cy="256" r="114" fill="none" stroke="#6ab5ff" stroke-width="3.5" opacity="0.55" />
-            <ellipse cx="212" cy="178" rx="86" ry="52" fill="#ffffff" opacity="0.17" filter="url(#hero-blur10)" />
-            {#if eyeGlyph === REST_GLYPH}
-              <g data-eye="Γ_" transform="translate(256, 256) scale(0.84) translate(-256, -256)" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <g stroke="#8fc6ff" stroke-width="34" opacity="0.6" filter="url(#hero-blur6)">
-                  <path d="M250 220H195v65" />
-                  <path d="M285 307h40" />
-                </g>
-                <g stroke="#ffffff">
-                  <path d="M250 220H195v65" stroke-width="31" />
-                  <path d="M285 307h40" stroke-width="25" />
-                </g>
-              </g>
-            {:else}
-              <g data-eye={eyeGlyph}>
-                <text class="eye eye-glow" x="256" y="252" text-anchor="middle" dominant-baseline="central">{eyeGlyph}</text>
-                <text class="eye" x="256" y="252" text-anchor="middle" dominant-baseline="central">{eyeGlyph}</text>
-              </g>
-            {/if}
-          </g>
-        </svg>
+        <span class="orbit orbit-1" aria-hidden="true"></span>
+        <span class="orbit orbit-2" aria-hidden="true"></span>
+        <span class="orbit orbit-3" aria-hidden="true"></span>
+        <span class="core-img" role="img" aria-label="Raiker"></span>
       </div>
       <div class="hero-message" aria-live="polite">
         {#if hero}
@@ -446,6 +340,22 @@
     font-weight: 800;
     letter-spacing: 0.45em;
   }
+  .brand-mark {
+    width: 44px;
+    height: 44px;
+    background: center / contain no-repeat url("/raiker-mark.png");
+  }
+  :global(:root[data-theme="dark"]) .brand-mark {
+    background-image: url("/raiker-mark-dark.png");
+  }
+  :global(:root[data-theme="light"]) .brand-mark {
+    background-image: url("/raiker-mark.png");
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme])) .brand-mark {
+      background-image: url("/raiker-mark-dark.png");
+    }
+  }
   .lock-layout {
     flex: 1;
     display: grid;
@@ -461,24 +371,57 @@
     text-align: center;
   }
   .core {
-    width: min(24rem, 62vw);
+    position: relative;
+    width: min(26rem, 66vw);
+    aspect-ratio: 1;
     margin: 0 auto var(--space-5);
+    display: grid;
+    place-items: center;
   }
-  .core svg {
-    width: 100%;
-    height: auto;
+  .core-img {
+    position: relative;
+    z-index: 1;
+    width: 86%;
+    aspect-ratio: 1;
     display: block;
+    background: center / contain no-repeat url("/raiker-hero.png");
+    filter: drop-shadow(0 1.4rem 2rem rgb(6 14 26 / 0.28));
   }
-  .core .eye {
-    font-family: var(--font-mono);
-    font-size: 92px;
-    font-weight: 700;
-    fill: #fff;
+  /* Dark theme: the chrome/silver render, which pops on a dark surface. */
+  :global(:root[data-theme="dark"]) .core-img {
+    background-image: url("/raiker-hero-dark.png");
+    filter: drop-shadow(0 1.4rem 2.4rem rgb(0 0 0 / 0.5));
   }
-  .core .eye-glow {
-    fill: #8fc6ff;
-    opacity: 0.6;
-    filter: url(#hero-blur6);
+  :global(:root[data-theme="light"]) .core-img {
+    background-image: url("/raiker-hero.png");
+  }
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme])) .core-img {
+      background-image: url("/raiker-hero-dark.png");
+      filter: drop-shadow(0 1.4rem 2.4rem rgb(0 0 0 / 0.5));
+    }
+  }
+  /* Decorative concentric orbit rings behind the core (mockup styling). */
+  .orbit {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+    opacity: 0.5;
+  }
+  .orbit-1 {
+    width: 100%;
+    height: 100%;
+  }
+  .orbit-2 {
+    width: 78%;
+    height: 78%;
+    border-style: dashed;
+    opacity: 0.35;
+  }
+  .orbit-3 {
+    width: 122%;
+    height: 122%;
+    opacity: 0.28;
   }
   .hero-message {
     min-height: 5.5rem;

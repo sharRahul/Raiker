@@ -68,7 +68,8 @@ def test_change_password_revokes_others(tmp_path) -> None:  # type: ignore[no-un
     sessions = ApiSessionStore(tmp_path)
     stale_tok, _ = sessions.create_session(pid, scope="control")
     svc.change_password(pid, "old-pass", "new-pass")
-    assert sessions.get_by_token(stale_tok).revoked is True
+    stale_session = sessions.get_by_token(stale_tok)
+    assert stale_session is not None and stale_session.revoked is True
     # old password no longer works
     with pytest.raises(AuthError):
         svc.login("alice", "old-pass")

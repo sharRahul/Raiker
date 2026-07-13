@@ -47,7 +47,9 @@ def test_a01_mfa_pending_cannot_reach_governed_routes(client: TestClient) -> Non
 def test_a07_password_change_revokes_other_sessions(client: TestClient, tmp_path) -> None:  # type: ignore[no-untyped-def]
     token = _register(client)["token"]
     sessions = ApiSessionStore(tmp_path)
-    pid = AccountService(tmp_path)._store.get_account_by_username("alice")["principal_id"]  # noqa: SLF001
+    account = AccountService(tmp_path)._store.get_account_by_username("alice")  # noqa: SLF001
+    assert account is not None
+    pid = account["principal_id"]
     stale, _ = sessions.create_session(pid, scope="control")
     assert client.get("/api/sessions", headers=_h(stale)).status_code == 200
     client.post(

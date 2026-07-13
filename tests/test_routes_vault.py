@@ -78,7 +78,9 @@ def test_require_mfa_for_vault_policy(ctx) -> None:  # type: ignore[no-untyped-d
     client.post("/api/auth/mfa/activate", json={"code": pyotp.TOTP(secret).now()}, headers=_h(token))
     # opt in to require-MFA-for-vault
     store = SQLiteStore(ws)
-    pid = store.get_account_by_username("alice")["principal_id"]
+    account = store.get_account_by_username("alice")
+    assert account is not None
+    pid = account["principal_id"]
     store.put_user_settings(
         pid, json.dumps({"security.require_mfa_for_vault": True}), "t0"
     )

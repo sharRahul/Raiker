@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.sessions import ApiSessionStore
@@ -26,7 +27,7 @@ def test_mfa_pending_rejected_on_control_route(tmp_path) -> None:  # type: ignor
     token, _ = sessions.create_session("p1", scope="mfa_pending")
     mw = AuthMiddleware(tmp_path)
     with pytest.raises(HTTPException) as exc:
-        mw.authenticate(_req(token), required_scope="control")
+        mw.authenticate(cast(Request, _req(token)), required_scope="control")
     assert exc.value.status_code == 403
 
 
@@ -36,7 +37,7 @@ def test_control_session_accepted(tmp_path) -> None:  # type: ignore[no-untyped-
     sessions = ApiSessionStore(tmp_path)
     token, _ = sessions.create_session("p1", scope="control")
     mw = AuthMiddleware(tmp_path)
-    session, principal = mw.authenticate(_req(token), required_scope="control")
+    session, principal = mw.authenticate(cast(Request, _req(token)), required_scope="control")
     assert principal.principal_id == "p1"
     assert session.scope == "control"
 
@@ -49,8 +50,10 @@ def test_revoke_others_keeps_current(tmp_path) -> None:  # type: ignore[no-untyp
     tok_b, _ = sessions.create_session("p1", scope="control")
     revoked = sessions.revoke_others_for_principal("p1", keep_session_id=sess_a.session_id)
     assert revoked == 1
-    assert sessions.get_by_token(tok_a).revoked is False
-    assert sessions.get_by_token(tok_b).revoked is True
+    session_a = sessions.get_by_token(tok_a)
+    session_b = sessions.get_by_token(tok_b)
+    assert session_a is not None and session_a.revoked is False
+    assert session_b is not None and session_b.revoked is True
 
 
 def test_absolute_expiry_enforced(tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -63,7 +66,7 @@ def test_absolute_expiry_enforced(tmp_path) -> None:  # type: ignore[no-untyped-
     )
     mw = AuthMiddleware(tmp_path)
     with pytest.raises(HTTPException) as exc:
-        mw.authenticate(_req(token), required_scope="control")
+        mw.authenticate(cast(Request, _req(token)), required_scope="control")
     assert exc.value.status_code == 401
 
 

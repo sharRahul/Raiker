@@ -25,8 +25,11 @@ def _h(token: str) -> dict[str, str]:
 
 
 def _user_id(store: SQLiteStore, username: str) -> str:
-    pid = store.get_account_by_username(username)["principal_id"]
-    return str(store.get_principal(pid)["delegated_by_user_id"])
+    account = store.get_account_by_username(username)
+    assert account is not None
+    principal = store.get_principal(str(account["principal_id"]))
+    assert principal is not None
+    return str(principal["delegated_by_user_id"])
 
 
 def test_sessions_isolated_between_accounts(ctx) -> None:  # type: ignore[no-untyped-def]

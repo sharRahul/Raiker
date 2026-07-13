@@ -99,6 +99,17 @@ export async function connect(): Promise<AuthSession> {
 }
 
 // ── Lock screen: local-account auth ─────────────────────────────────────────
+
+/**
+ * Privacy-safe pre-auth reachability probe. `/api/health` is the only
+ * unauthenticated read and returns nothing beyond `{status: "ok"}` — it backs
+ * the lock screen's "I cannot reach my runtime." state without leaking any
+ * workspace detail before authentication.
+ */
+export function health(): Promise<{ status: string }> {
+  return request<{ status: string }>("/api/health");
+}
+
 export interface LoginResult {
   stage: "session" | "mfa_required";
   principal_id: string;

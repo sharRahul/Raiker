@@ -25,8 +25,10 @@
   );
   const activeItem = $derived(navItem(current));
 
-  let authenticated = $state(false);
-  let authState = $state<"locked" | "authenticating" | "verifying" | "ready" | "error">("locked");
+  // Honest auth/bootstrap state machine. The workspace shell mounts only in
+  // "ready": authentication alone is not enough — the runtime must verify
+  // (bootstrap reads succeed) first, and a failed verification stays locked.
+  let authState = $state<"locked" | "verifying" | "ready" | "verification_failed">("locked");
   let principal = $state("—");
   let runtimeMode = $state("—");
   let ready = $state(false);
@@ -61,11 +63,10 @@
       ready = diag.production_ready_local_single_user_runtime;
       models = modelsView;
       projects = projectsList;
-      authenticated = true;
       authState = "ready";
     } catch {
-      authenticated = false;
-      authState = "error";
+      // Fail closed: the workspace stays unmounted behind the lock screen.
+      authState = "verification_failed";
     }
   }
 
@@ -101,11 +102,8 @@
 
 <a class="skip-link" href="#main">Skip to content</a>
 
-{#if !authenticated}
-  <LoginView
-    {onAuthenticated}
-    runtimeState={authState === "verifying" ? "verifying" : authState === "error" ? "verification_failed" : "locked"}
-  />
+{#if authState !== "ready"}
+  <LoginView {onAuthenticated} runtimeState={authState} />
 {:else}
 <div class="app-shell">
   <Sidebar {current} />
@@ -119,24 +117,9 @@
       {models}
       {projects}
       onProjectSelect={selectProject}
-      connecting={authState === "verifying"}
     />
     <main id="main" class="content" tabindex="-1">
-      {#if authState === "error"}
-        <div class="card conn-error" role="alert">
-          <h2>Cannot reach the local Raiker API</h2>
-          <p>
-            Start the local server with <code>raiker-web</code> and ensure an owner is bootstrapped
-            (<code>raiker</code> → <code>/bootstrap-owner</code>). The UI talks only to the local
-            governed API and never fabricates data.
-          </p>
-          <button type="button" class="btn btn-primary" onclick={() => window.location.reload()}>
-            Retry
-          </button>
-        </div>
-      {:else if authState === "verifying"}
-        <p class="loading" role="status">Verifying the local Raiker runtime…</p>
-      {:else if current === "new-chat"}
+      {#if current === "new-chat"}
         <ChatView />
       {:else if current === "search-chat"}
         <SearchChatView />
@@ -188,11 +171,5 @@
   .content:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: -2px;
-  }
-  .conn-error {
-    max-width: 40rem;
-  }
-  .loading {
-    color: var(--text-2);
   }
 </style>

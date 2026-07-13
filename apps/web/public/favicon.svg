@@ -17,10 +17,11 @@
     <circle cx="256" cy="256" r="139" fill="#f7f9fc" stroke="#162238" stroke-width="18"/>
     <circle cx="256" cy="256" r="109" fill="url(#core)" stroke="#c9d1dc" stroke-width="10"/>
     <circle cx="256" cy="256" r="88" fill="none" stroke="#303c50" stroke-width="5" opacity="0.75"/>
-    <!-- Static Raiker prompt-eye identity: exact Γ_ mark. -->
+    <!-- Static Raiker prompt-eye identity: the exact Γ_ mark, drawn directly.
+         Same rendered geometry as the original mark, so raster icons stay consistent. -->
     <g transform="translate(256, 256) scale(0.78) translate(-256, -256)" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M245 203h-55v92" stroke-width="31"/>
-      <path d="M288 307h48" stroke-width="25"/>
+      <path d="M250 220H195v65" stroke-width="31"/>
+      <path d="M285 307h40" stroke-width="25"/>
     </g>
     <path d="M142 180c18-28 43-50 73-63" fill="none" stroke="#fff" stroke-opacity="0.42" stroke-width="7" stroke-linecap="round"/>
   </g>

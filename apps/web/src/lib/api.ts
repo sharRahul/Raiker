@@ -164,7 +164,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key, mfa_code: mfaCode }),
     }),
-  clearVaultKey: () => request<{ state: string }>("/api/vault/key", { method: "DELETE" }),
+  clearVaultKey: (mfaCode?: string) =>
+    request<{ state: string }>("/api/vault/key", {
+      method: "DELETE",
+      headers: mfaCode ? { "X-MFA-Code": mfaCode } : undefined,
+    }),
 
   // ── Read-only governed views ──
   capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),

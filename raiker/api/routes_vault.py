@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Header, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import VaultKeyRequest
@@ -85,12 +85,17 @@ async def set_vault_key(body: VaultKeyRequest, request: Request) -> dict[str, An
 
 
 @router.delete("/api/vault/key")
-async def delete_vault_key(request: Request, mfa_code: str | None = None) -> dict[str, Any]:
+async def delete_vault_key(
+    request: Request,
+    x_mfa_code: str | None = Header(default=None),
+) -> dict[str, Any]:
+    # The second-factor code is taken from a header (never a query parameter) so
+    # it cannot leak into access logs or browser history.
     _session, principal = AuthMiddleware(_ws(request)).authenticate(
         request, required_scope="elevated"
     )
     ws = _ws(request)
-    _enforce_vault_mfa_policy(ws, principal.principal_id, mfa_code)
+    _enforce_vault_mfa_policy(ws, principal.principal_id, x_mfa_code)
     clear_vault_key(ws)
     os.environ.pop(VAULT_KEY_ENV, None)
     return {"state": vault_status(ws)}

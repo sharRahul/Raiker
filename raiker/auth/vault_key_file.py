@@ -16,6 +16,8 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet
 
+from raiker.auth.secure_io import atomic_write_private
+
 VAULT_KEY_ENV = "RAIKER_CONNECTOR_VAULT_KEY"
 _KEY_DIRNAME = ".raiker"
 _KEY_FILENAME = "vault.key"
@@ -46,10 +48,8 @@ def write_vault_key(workspace_root: str | Path, key: str) -> None:
     if not _is_valid_fernet(key):
         raise ValueError("connector_vault_key_invalid")
     path = vault_key_path(workspace_root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(key, encoding="ascii")
-    if os.name == "posix":
-        os.chmod(path, 0o600)
+    # Replace atomically at mode 0o600 — the key never touches disk world-readable.
+    atomic_write_private(path, key.encode("ascii"), exclusive=False)
 
 
 def clear_vault_key(workspace_root: str | Path) -> None:

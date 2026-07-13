@@ -9,10 +9,11 @@ fail-closed behavior.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from cryptography.fernet import Fernet
+
+from raiker.auth.secure_io import atomic_write_private
 
 _KEY_DIRNAME = ".raiker"
 _KEY_FILENAME = "app.key"
@@ -27,11 +28,11 @@ def ensure_app_key(workspace_root: str | Path) -> bytes:
     path = app_key_path(workspace_root)
     if path.exists():
         return path.read_bytes().strip()
-    path.parent.mkdir(parents=True, exist_ok=True)
     key = Fernet.generate_key()
-    path.write_bytes(key)
-    if os.name == "posix":
-        os.chmod(path, 0o600)
+    # O_EXCL: never follow/overwrite an existing file or symlink (defeats a
+    # symlink-swap race); if a concurrent caller won, adopt its key.
+    if not atomic_write_private(path, key, exclusive=True):
+        return path.read_bytes().strip()
     return key
 
 

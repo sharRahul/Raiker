@@ -26,10 +26,10 @@ describe("LoginView", () => {
     render(LoginView, { props: { onAuthenticated } });
     expect(screen.getByRole("heading", { name: "Unlock Raiker" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Unlock Raiker" })).toBeInTheDocument();
-    // The prompt-eye rests on the exact Γ_ brand mark.
-    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
-    // The top-left logo reuses the production Γ_ icon file.
-    expect(document.querySelector('img[src="/favicon.svg"]')).not.toBeNull();
+    // The large Raiker core uses the production rendered icon (with its baked Γ_ eye).
+    expect(document.querySelector('img[src="/raiker-hero.png"]')).not.toBeNull();
+    // The top-left logo reuses the production rendered mark.
+    expect(document.querySelector('img[src="/raiker-mark.png"]')).not.toBeNull();
     await waitFor(() => expect(screen.getByText("I am ready when you are.")).toBeInTheDocument());
     // The greeting and the idle statement are never shown together.
     expect(screen.queryByText("Hello! I am Raiker.")).not.toBeInTheDocument();
@@ -184,38 +184,5 @@ describe("LoginView", () => {
     expect(screen.getByText("I cannot reach my runtime.")).toBeInTheDocument();
     // The form stays usable so the user can retry.
     expect(screen.getByLabelText("Username")).not.toBeDisabled();
-  });
-
-  it("animates the prompt eye subtly and returns to the Γ_ resting mark", async () => {
-    vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0);
-    stubFetch({ ...HEALTH_OK });
-    render(LoginView, { props: { onAuthenticated } });
-    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
-    // First expression starts only after a long rest (9s at random()=0).
-    await vi.advanceTimersByTimeAsync(8999);
-    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(document.querySelector('[data-eye="TT"]')).not.toBeNull();
-    // The blink sequence completes and the eye returns to the brand mark.
-    await vi.advanceTimersByTimeAsync(140 * 6);
-    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
-  });
-
-  it("keeps the eye at rest when prefers-reduced-motion is set", async () => {
-    vi.useFakeTimers();
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn((query: string) => ({
-        matches: query.includes("prefers-reduced-motion"),
-        media: query,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-      })),
-    );
-    stubFetch({ ...HEALTH_OK });
-    render(LoginView, { props: { onAuthenticated } });
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
   });
 });

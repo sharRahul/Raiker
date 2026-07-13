@@ -80,6 +80,7 @@ export const LOGIN_RESULT = {
 };
 
 export const BOOTSTRAP_ROUTES: Record<string, unknown> = {
+  "GET /api/health": { status: "ok" },
   "POST /api/auth/session": AUTH_SESSION,
   "POST /api/auth/login": LOGIN_RESULT,
   "POST /api/auth/register": LOGIN_RESULT,

@@ -4,9 +4,12 @@ import LoginView from "./LoginView.svelte";
 import { LOGIN_RESULT, stubFetch } from "../test-helpers";
 
 const onAuthenticated = vi.fn();
+const HEALTH_OK = { "GET /api/health": { status: "ok" } };
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   vi.clearAllMocks();
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -18,14 +21,51 @@ async function fillCredentials(password = "pw") {
 }
 
 describe("LoginView", () => {
-  it("renders the approved lock screen with exact identity and button text", () => {
+  it("renders the approved lock screen with exact identity and button text", async () => {
+    stubFetch({ ...HEALTH_OK });
     render(LoginView, { props: { onAuthenticated } });
     expect(screen.getByRole("heading", { name: "Unlock Raiker" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Unlock Raiker" })).toBeInTheDocument();
-    expect(screen.getByText("Γ_")).toBeInTheDocument();
-    expect(screen.getByText("I am ready when you are.")).toBeInTheDocument();
+    // The prompt-eye rests on the exact Γ_ brand mark.
+    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
+    // The top-left logo reuses the production Γ_ icon file.
+    expect(document.querySelector('img[src="/favicon.svg"]')).not.toBeNull();
+    await waitFor(() => expect(screen.getByText("I am ready when you are.")).toBeInTheDocument());
+    // The greeting and the idle statement are never shown together.
+    expect(screen.queryByText("Hello! I am Raiker.")).not.toBeInTheDocument();
+    // No marketing copy, fabricated pre-auth status details, or unsupported
+    // auth affordances (the backend has no remember-me or password reset).
     expect(screen.queryByText(/governed AI agent/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/workspace locked|ready to unlock|checkpoint|scheduled run/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/workspace locked|ready to unlock|checkpoint|scheduled run|task/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/remember me/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/forgot password/i)).not.toBeInTheDocument();
+    // The status bar carries only the health-probe-backed item.
+    await waitFor(() => expect(screen.getByText("Runtime operational")).toBeInTheDocument());
+  });
+
+  it("shows no state message until the health probe resolves", () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>(() => {})),
+    );
+    render(LoginView, { props: { onAuthenticated } });
+    expect(screen.queryByText("I am ready when you are.")).not.toBeInTheDocument();
+    expect(screen.queryByText("I cannot reach my runtime.")).not.toBeInTheDocument();
+  });
+
+  it("reports an unreachable runtime from the real health probe", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("connection refused");
+      }),
+    );
+    render(LoginView, { props: { onAuthenticated } });
+    await waitFor(() =>
+      expect(screen.getByText("I cannot reach my runtime.")).toBeInTheDocument(),
+    );
   });
 
   it("uses an honest busy label while unlocking", async () => {
@@ -48,7 +88,7 @@ describe("LoginView", () => {
   });
 
   it("logs in successfully without persisting the bearer token", async () => {
-    stubFetch({ "POST /api/auth/login": LOGIN_RESULT });
+    stubFetch({ ...HEALTH_OK, "POST /api/auth/login": LOGIN_RESULT });
     render(LoginView, { props: { onAuthenticated } });
     await fillCredentials();
     await fireEvent.click(screen.getByRole("button", { name: "Unlock Raiker" }));
@@ -60,7 +100,10 @@ describe("LoginView", () => {
   it("shows generic login failure", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => ({ ok: false, status: 401, json: async () => ({ detail: "bad" }) }) as Response),
+      vi.fn(
+        async () =>
+          ({ ok: false, status: 401, json: async () => ({ detail: "bad" }) }) as Response,
+      ),
     );
     render(LoginView, { props: { onAuthenticated } });
     await fillCredentials();
@@ -68,26 +111,32 @@ describe("LoginView", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Authentication failed.");
   });
 
-  it("transitions to MFA and verifies the one-time code", async () => {
+  it("transitions to MFA, moves focus, and verifies the one-time code", async () => {
     stubFetch({
+      ...HEALTH_OK,
       "POST /api/auth/login": { stage: "mfa_required", principal_id: "", token: null, ticket: "ticket_1" },
       "POST /api/auth/mfa/verify": LOGIN_RESULT,
     });
     render(LoginView, { props: { onAuthenticated } });
     await fillCredentials();
     await fireEvent.click(screen.getByRole("button", { name: "Unlock Raiker" }));
-    expect(await screen.findByLabelText("Authentication code")).toHaveAttribute("autocomplete", "one-time-code");
-    await fireEvent.input(screen.getByLabelText("Authentication code"), { target: { value: "123456" } });
+    const codeInput = await screen.findByLabelText("Authentication code");
+    expect(codeInput).toHaveAttribute("autocomplete", "one-time-code");
+    await waitFor(() => expect(document.activeElement).toBe(codeInput));
+    await fireEvent.input(codeInput, { target: { value: "123456" } });
     await fireEvent.click(screen.getByRole("button", { name: "Verify" }));
     await waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith("prin_owner"));
   });
 
-  it("keeps registration visually distinct and validates confirmation", async () => {
-    stubFetch({ "POST /api/auth/register": LOGIN_RESULT });
+  it("keeps registration visually distinct, greets, and validates confirmation", async () => {
+    stubFetch({ ...HEALTH_OK, "POST /api/auth/register": LOGIN_RESULT });
     render(LoginView, { props: { onAuthenticated } });
     await fireEvent.click(screen.getByRole("button", { name: "Create local account" }));
     expect(screen.getByRole("heading", { name: "Create local account" })).toBeInTheDocument();
-    expect(screen.getByText("Hello! I am Raiker. Nice to meet you.")).toBeInTheDocument();
+    expect(screen.getByText("Hello! I am Raiker.")).toBeInTheDocument();
+    expect(screen.getByText("Nice to meet you.")).toBeInTheDocument();
+    expect(screen.queryByText("I am ready when you are.")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toHaveAttribute("autocomplete", "new-password");
     await fillCredentials("pw1");
     await fireEvent.input(screen.getByLabelText("Confirm password"), { target: { value: "pw2" } });
     await fireEvent.click(screen.getByRole("button", { name: "Create account" }));
@@ -97,17 +146,76 @@ describe("LoginView", () => {
     await waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith("prin_owner"));
   });
 
-  it("supports password visibility and runtime verification states", async () => {
-    const { rerender } = render(LoginView, { props: { onAuthenticated } });
+  it("supports password visibility with an accessible toggle", async () => {
+    stubFetch({ ...HEALTH_OK });
+    render(LoginView, { props: { onAuthenticated } });
     const password = screen.getByLabelText("Password");
     expect(password).toHaveAttribute("type", "password");
-    await fireEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(password).toHaveAttribute("autocomplete", "current-password");
+    const toggle = screen.getByRole("button", { name: "Show password" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await fireEvent.click(toggle);
     expect(password).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: "Hide password" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("disables the form and announces progress while verifying the runtime", async () => {
+    stubFetch({ ...HEALTH_OK });
+    const { rerender } = render(LoginView, { props: { onAuthenticated } });
     await rerender({ onAuthenticated, runtimeState: "verifying" });
-    expect(screen.getByRole("status")).toHaveTextContent("Verifying runtime…");
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Verifying runtime…");
+    await waitFor(() => expect(document.activeElement).toBe(status));
     expect(screen.getByLabelText("Username")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Unlock Raiker" })).toBeDisabled();
+    expect(screen.getByRole("main")).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("keeps the workspace locked and honest when runtime verification fails", async () => {
+    stubFetch({ ...HEALTH_OK });
+    const { rerender } = render(LoginView, { props: { onAuthenticated } });
     await rerender({ onAuthenticated, runtimeState: "verification_failed" });
-    expect(screen.getByRole("alert")).toHaveTextContent(/workspace remains locked/i);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(/workspace remains locked/i);
+    await waitFor(() => expect(document.activeElement).toBe(alert));
     expect(screen.getByText("I cannot reach my runtime.")).toBeInTheDocument();
+    // The form stays usable so the user can retry.
+    expect(screen.getByLabelText("Username")).not.toBeDisabled();
+  });
+
+  it("animates the prompt eye subtly and returns to the Γ_ resting mark", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    stubFetch({ ...HEALTH_OK });
+    render(LoginView, { props: { onAuthenticated } });
+    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
+    // First expression starts only after a long rest (9s at random()=0).
+    await vi.advanceTimersByTimeAsync(8999);
+    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(document.querySelector('[data-eye="TT"]')).not.toBeNull();
+    // The blink sequence completes and the eye returns to the brand mark.
+    await vi.advanceTimersByTimeAsync(140 * 6);
+    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
+  });
+
+  it("keeps the eye at rest when prefers-reduced-motion is set", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn((query: string) => ({
+        matches: query.includes("prefers-reduced-motion"),
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      })),
+    );
+    stubFetch({ ...HEALTH_OK });
+    render(LoginView, { props: { onAuthenticated } });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(document.querySelector('[data-eye="Γ_"]')).not.toBeNull();
   });
 });

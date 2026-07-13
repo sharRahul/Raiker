@@ -32,7 +32,11 @@ export type IconName =
   | "spark"
   | "mic"
   | "file"
-  | "projects";
+  | "projects"
+  | "user"
+  | "user-plus"
+  | "eye"
+  | "eye-off";
 
 // Each icon is one or more SVG path `d` strings (stroke, round caps).
 export const ICON_PATHS: Record<IconName, string[]> = {
@@ -94,4 +98,21 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   warning: ["M12 4 2.8 20h18.4L12 4Z", "M12 10v4.5", "M12 17.5v.5"],
   info: ["M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18Z", "M12 11v5", "M12 7.5v.5"],
   spark: ["M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"],
+  user: ["M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z", "M4.5 20c1.6-3.2 4.3-5 7.5-5s5.9 1.8 7.5 5"],
+  "user-plus": [
+    "M10 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z",
+    "M3 20c1.4-3 4-4.7 7-4.7 1.1 0 2.2.2 3.2.7",
+    "M18.5 13v6",
+    "M15.5 16h6",
+  ],
+  eye: [
+    "M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z",
+    "M12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
+  ],
+  "eye-off": [
+    "M4 4l16 16",
+    "M9.9 5.9A9 9 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17.4 17.4 0 0 1-3.3 3.9",
+    "M6.1 8.2A17 17 0 0 0 2.5 12S6 18.5 12 18.5c1 0 2-.2 2.9-.5",
+    "M10.2 10.3a2.5 2.5 0 0 0 3.5 3.5",
+  ],
 };

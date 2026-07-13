@@ -5,6 +5,7 @@
 .mypy_cache
 .claude
 .tmp
+.worktrees/
 cli_output.txt
 /raiker.egg-info
 __pycache__/

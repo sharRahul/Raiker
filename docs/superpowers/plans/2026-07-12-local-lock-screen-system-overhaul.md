@@ -1,6 +1,11 @@
 # Local-Owner Lock Screen & System Overhaul — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution status (2026-07-13): COMPLETE.** All 22 tasks in this plan have
+> shipped to `main`, including the final Connector Store gallery, task-create/
+> stored-scheduling slice, 9-section settings integration, documentation, and
+> GitHub CI verification. The unchecked boxes below are the original historical
+> execution checklist; current implementation truth lives in
+> `docs/IMPLEMENTATION_STATUS.md` and `docs/HANDOFF.md`.
 
 **Goal:** Add a device-local, multi-account lock screen (username/password + optional TOTP MFA) that isolates and protects each account's connector credentials, plus the associated nav/settings/chat/task/gallery UI changes.
 

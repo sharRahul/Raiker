@@ -501,6 +501,12 @@ functional jsdom localStorage only when Node 25 supplies its invalid empty
 localstorage-file stub. The settings shell and Security & Login client calls are
 also type-clean. See the verification gate below for current evidence.
 
+> **Historical note:** The immediately following “Remaining” list and its old
+> verification counts are preserved only as a pre-completion snapshot. They are
+> superseded by this update: the Connector Store gallery, task create/scheduling,
+> and theme-test items are complete. Use the current verification statement below
+> that historical list, plus `docs/IMPLEMENTATION_STATUS.md`, as authoritative.
+
 Remaining (not yet done) — start here next session:
 - **Connector gallery UI** rewrite: turn `ConnectionsView.svelte` into a
   browse/search/install/uninstall gallery over the existing backend

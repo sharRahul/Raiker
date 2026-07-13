@@ -4,6 +4,7 @@ import difflib
 import json
 import os
 import re
+import shutil
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -453,6 +454,9 @@ class DashboardService:
         turns = tuple(self._turn_view(t) for t in self.store.list_turns(session_id))
         return SessionDetailView(session=self._session_view(row), turns=turns)
 
+    def search_sessions(self, query: str, user_id: str | None = None) -> list[SessionView]:
+        return [self._session_view(row) for row in self.store.search_sessions(query.strip(), user_id)]
+
     def get_turn(self, turn_id: str) -> TurnDetailView | None:
         row = self.store.load_turn(turn_id)
         if row is None:
@@ -572,6 +576,28 @@ class DashboardService:
             return ControlResult(ok=False, reason_code=f"unknown_project:{cleaned}")
         self.store.save_active_project(cleaned)
         return ControlResult(ok=True, data={"active_project_id": cleaned})
+
+    def delete_project(self, project_id: str, acting_principal_id: str | None) -> ControlResult:
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if not self.control._is_gate_manager(principal):  # noqa: SLF001
+            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        project = self.store.load_project(project_id)
+        if project is None:
+            return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        root = (self.workspace_root.resolve() / str(project["root_subpath"])).resolve()
+        if self.workspace_root.resolve() not in root.parents:
+            return ControlResult(ok=False, reason_code="project_root_escapes_workspace")
+        if not self.store.delete_project(project_id):
+            return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        try:
+            shutil.rmtree(root)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return ControlResult(ok=False, reason_code="project_folder_delete_failed")
+        return ControlResult(ok=True, data={"project_id": project_id})
 
     def _project_view(self, row: dict[str, Any], active_project_id: str | None) -> ProjectView:
         return ProjectView(

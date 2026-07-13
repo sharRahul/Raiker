@@ -599,6 +599,39 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
+    def search_sessions(self, query: str, user_id: str | None = None) -> list[dict[str, Any]]:
+        term = f"%{query}%"
+        conditions = ["(sessions.title LIKE ? OR turns.prompt_text LIKE ? OR turns.summary LIKE ?)"]
+        params: list[Any] = [term, term, term]
+        if user_id is not None:
+            conditions.append("(sessions.user_id = ? OR sessions.user_id IS NULL)")
+            params.append(user_id)
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT sessions.* FROM sessions
+                LEFT JOIN turns ON turns.session_id = sessions.session_id
+                WHERE """ + " AND ".join(conditions) + " GROUP BY sessions.session_id ORDER BY sessions.updated_at DESC",
+                params,
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_project(self, project_id: str) -> bool:
+        with self.connect() as connection:
+            session_ids = [r[0] for r in connection.execute("SELECT session_id FROM sessions WHERE project_id = ?", (project_id,))]
+            if connection.execute("SELECT 1 FROM projects WHERE project_id = ?", (project_id,)).fetchone() is None:
+                return False
+            if session_ids:
+                marks = ",".join("?" for _ in session_ids)
+                action_ids = f"SELECT action_id FROM tool_actions WHERE session_id IN ({marks})"
+                connection.execute(f"DELETE FROM policy_decisions WHERE action_id IN ({action_ids})", session_ids)
+                for table in ("events_index", "tool_actions", "checkpoints", "tasks", "turns", "model_session_state", "model_fallback_sequence", "model_advisor"):
+                    connection.execute(f"DELETE FROM {table} WHERE session_id IN ({marks})", session_ids)
+                connection.execute(f"DELETE FROM sessions WHERE session_id IN ({marks})", session_ids)
+            connection.execute("UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,))
+            connection.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
+        return True
+
     def list_turns(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(

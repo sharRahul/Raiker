@@ -112,6 +112,22 @@ class TestSelectProject:
         assert not result.ok
         assert result.reason_code == "unknown_project:proj_missing"
 
+    def test_delete_removes_scoped_chats_checkpoints_and_project_root(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        project_id = service.create_project("Alpha", OWNER).data["project_id"]
+        service.select_project(project_id, OWNER)
+        service.store.create_session("sess_alpha", str(workspace))
+        _insert_checkpoint(service.store, "ckpt_alpha", "sess_alpha")
+
+        result = service.delete_project(project_id, OWNER)
+
+        assert result.ok, result.reason_code
+        assert service.store.load_session("sess_alpha") is None
+        assert service.store.load_project(project_id) is None
+        assert service.store.get_active_project() is None
+        assert not (workspace / "projects" / "alpha").exists()
+
 
 class TestSessionAssociation:
     def test_new_sessions_are_stamped_with_the_active_project(

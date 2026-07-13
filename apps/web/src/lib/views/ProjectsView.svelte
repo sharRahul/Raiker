@@ -23,6 +23,13 @@
 
   let detail = $state<ProjectDetail | null>(null);
   let detailError = $state<string | null>(null);
+  let deleteError = $state<string | null>(null);
+
+  async function remove(projectId: string) {
+    if (!window.confirm("This will permanently delete all project chats and files in this project folder. To save chats, move them to your chat list or another project before deleting.")) return;
+    try { deleteError = null; await api.deleteProject(projectId); detail = null; await load(); onchanged?.(); }
+    catch (e) { deleteError = e instanceof ApiError ? `Could not delete (${e.status}).` : "Could not delete"; }
+  }
 
   async function load() {
     loadError = null;
@@ -171,6 +178,7 @@
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => void open(p.project_id)}>
               Details
             </button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void remove(p.project_id)}>Delete</button>
           </div>
         </article>
       {/each}
@@ -178,6 +186,7 @@
     {#if selectError}
       <p class="error" role="alert">{selectError}</p>
     {/if}
+    {#if deleteError}<p class="error" role="alert">{deleteError}</p>{/if}
 
     {#if detailError}
       <p class="error" role="alert">{detailError}</p>

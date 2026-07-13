@@ -21,7 +21,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "The Hustle",
     items: [
       { id: "new-chat", label: "New Chat", icon: "chat", hint: "Start a fresh governed conversation" },
-      { id: "search-chat", label: "Search Chat", icon: "sessions", hint: "Search your chat history" },
+      { id: "search-chat", label: "Search Chat", icon: "search", hint: "Search your chat history" },
       { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
       { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
       { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },
@@ -67,7 +67,7 @@ export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 export const DEFAULT_ROUTE = "new-chat";
 
 export function routeFromHash(hash: string): string {
-  const raw = hash.replace(/^#\/?/, "");
+  const raw = hash.replace(/^#\/?/, "").split("?")[0];
   return NAV_ITEMS.some((item) => item.id === raw) ? raw : DEFAULT_ROUTE;
 }
 

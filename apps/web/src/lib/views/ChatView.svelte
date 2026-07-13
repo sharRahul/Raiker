@@ -33,11 +33,13 @@
     error: string | null;
   }
 
+  let { sessionId: continuedSessionId = null }: { sessionId?: string | null } = $props();
   let promptText = $state("");
   let turns = $state<ChatTurn[]>([]);
   let streaming = $state(false);
   // Reuse one session across turns so the governed conversation stays continuous.
   let sessionId = $state<string | null>(null);
+  $effect(() => { sessionId = continuedSessionId; });
   let nextId = 1;
 
   // Optional per-prompt options. Left unset they change nothing — the backend

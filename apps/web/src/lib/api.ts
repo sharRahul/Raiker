@@ -287,6 +287,7 @@ export const api = {
   checkpoint: (id: string) => request<Checkpoint>(`/api/checkpoints/${encodeURIComponent(id)}`),
   sessions: (projectId?: string) =>
     request<SessionSummary[]>(withQuery("/api/sessions", { project_id: projectId })),
+  searchChats: (q: string) => request<SessionSummary[]>(withQuery("/api/chat-search", { q })),
 
   // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
   projects: () => request<ProjectsList>("/api/projects"),
@@ -305,6 +306,8 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project_id }),
     }),
+  deleteProject: (id: string) =>
+    request<{ ok: boolean }>(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" }),
   session: (id: string) => request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
   turn: (id: string) => request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
   tasks: (params: { session_id?: string; status?: string } = {}) =>

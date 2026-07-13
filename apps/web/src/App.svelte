@@ -35,6 +35,7 @@
   let models = $state<ModelsSnapshot | null>(null);
   let projects = $state<ProjectsList | null>(null);
   const activeProjectId = $derived(projects?.active_project_id ?? null);
+  const continuedSessionId = $derived(typeof window === "undefined" ? null : new URLSearchParams(window.location.hash.split("?")[1]).get("session"));
 
   onMount(() => {
     const handler = () => {
@@ -120,7 +121,7 @@
     />
     <main id="main" class="content" tabindex="-1">
       {#if current === "new-chat"}
-        <ChatView />
+        <ChatView sessionId={continuedSessionId} />
       {:else if current === "search-chat"}
         <SearchChatView />
       {:else if current === "approvals"}

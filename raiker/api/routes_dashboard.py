@@ -72,6 +72,15 @@ async def list_sessions(
     )
 
 
+@router.get("/api/chat-search")
+async def search_chat_history(
+    q: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    return serialize_dto(_service(request).search_sessions(q, auth_data[1].delegated_by_user_id))
+
+
 @router.get("/api/sessions/{session_id}")
 async def get_session(
     session_id: str,
@@ -189,6 +198,18 @@ async def get_project(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown project: {project_id}"
         )
     return serialize_dto(view)
+
+
+@router.delete("/api/projects/{project_id}")
+async def delete_project(
+    project_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).delete_project(project_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
 
 
 @router.get("/api/checkpoints/{checkpoint_id}")

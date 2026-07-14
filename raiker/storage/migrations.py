@@ -1245,3 +1245,24 @@ CREATE TABLE IF NOT EXISTS trusted_contacts (
 CREATE INDEX IF NOT EXISTS idx_account_username ON account_credentials(username);
 CREATE INDEX IF NOT EXISTS idx_trusted_contacts_principal ON trusted_contacts(principal_id);
 """
+
+# Reliable memory controls (backlog item 3): a user-visible memory list with
+# pin/bookmark + an incognito opt-out boundary. memory_pins is an organizing
+# label (grants nothing, like session/project pins). memory_settings is a
+# single-row table (one scope id) holding the incognito flag; when it is on,
+# the context gatherer withholds approved project memory from the turn context.
+MEMORY_CONTROLS_MIGRATION_ID = "RAIKER-1008-memory-controls"
+
+MEMORY_CONTROLS_SQL = """
+CREATE TABLE IF NOT EXISTS memory_pins (
+  memory_id TEXT PRIMARY KEY,
+  pinned INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS memory_settings (
+  scope_id TEXT PRIMARY KEY,
+  incognito INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+);
+"""

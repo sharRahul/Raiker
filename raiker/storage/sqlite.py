@@ -60,6 +60,8 @@ from raiker.storage.migrations import (
     EMAIL_DRAFTS_SQL,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
+    MEMORY_CONTROLS_MIGRATION_ID,
+    MEMORY_CONTROLS_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
     MODEL_ADVISOR_SQL,
     MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
@@ -473,6 +475,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             with contextlib.suppress(sqlite3.OperationalError):
                 connection.execute("ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
             self._apply_migration(LOCK_SCREEN_MIGRATION_ID, LOCK_SCREEN_SQL, connection)
+            self._apply_migration(
+                MEMORY_CONTROLS_MIGRATION_ID, MEMORY_CONTROLS_SQL, connection
+            )
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
@@ -749,6 +754,51 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with contextlib.suppress(FileNotFoundError):
             (self.paths.events_dir / f"{session_id}.jsonl").unlink()
         return True
+
+    # ── Memory controls (backlog item 3) ──────────────────────────────────
+    # memory_pins is an organizing label only (like session/project pins) —
+    # it grants nothing and changes no authority. memory_settings.incognito
+    # is a single-row flag (one scope) that, when on, withholds approved
+    # project memory from the turn context (the context gatherer reads it).
+
+    MEMORY_SETTINGS_SCOPE = "local_single_user"
+
+    def set_memory_pinned(self, memory_id: str, pinned: bool) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO memory_pins (memory_id, pinned, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(memory_id) DO UPDATE SET pinned = excluded.pinned, updated_at = excluded.updated_at
+                """,
+                (memory_id, 1 if pinned else 0, utc_now()),
+            )
+
+    def list_pinned_memory_ids(self) -> set[str]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT memory_id FROM memory_pins WHERE pinned = 1"
+            ).fetchall()
+        return {str(row["memory_id"]) for row in rows}
+
+    def is_memory_incognito(self) -> bool:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT incognito FROM memory_settings WHERE scope_id = ?",
+                (self.MEMORY_SETTINGS_SCOPE,),
+            ).fetchone()
+        return bool(row["incognito"]) if row is not None else False
+
+    def set_memory_incognito(self, incognito: bool) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO memory_settings (scope_id, incognito, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(scope_id) DO UPDATE SET incognito = excluded.incognito, updated_at = excluded.updated_at
+                """,
+                (self.MEMORY_SETTINGS_SCOPE, 1 if incognito else 0, utc_now()),
+            )
 
     def list_turns(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
         with self.connect() as connection:

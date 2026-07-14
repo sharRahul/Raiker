@@ -12,6 +12,8 @@ import type {
   EventEntry,
   InterruptRequestBody,
   InterruptResult,
+  MemoryControlView,
+  MemorySettingsView,
   ModelsView,
   ProjectDetail,
   ProjectsList,
@@ -288,6 +290,35 @@ export const api = {
   sessions: (projectId?: string) =>
     request<SessionSummary[]>(withQuery("/api/sessions", { project_id: projectId })),
   searchChats: (q: string) => request<SessionSummary[]>(withQuery("/api/chat-search", { q })),
+
+  // ── Reliable memory controls (backlog item 3) ────────────────────────
+  // User-facing surface over the existing governed memory store. List carries
+  // provenance/scope/sensitivity/confidence/retention + pin; forget reuses
+  // the governed forget path (human-only); incognito withholds approved
+  // project memory from the turn context.
+  memories: (scope?: string) =>
+    request<MemoryControlView[]>(withQuery("/api/memory", { scope })),
+  setMemoryPinned: (id: string, pinned: boolean) =>
+    request<{ ok: boolean; memory_id: string; pinned: boolean }>(
+      `/api/memory/${encodeURIComponent(id)}/pin`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned }),
+      },
+    ),
+  forgetMemory: (id: string) =>
+    request<{ ok: boolean; memory_id: string }>(
+      `/api/memory/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    ),
+  memorySettings: () => request<MemorySettingsView>("/api/memory/settings"),
+  setMemoryIncognito: (incognito: boolean) =>
+    request<{ ok: boolean; incognito: boolean }>("/api/memory/incognito", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ incognito }),
+    }),
 
   // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
   projects: () => request<ProjectsList>("/api/projects"),

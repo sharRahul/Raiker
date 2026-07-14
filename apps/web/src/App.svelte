@@ -8,6 +8,7 @@
   import LoginView from "./lib/views/LoginView.svelte";
   import ChatView from "./lib/views/ChatView.svelte";
   import SearchChatView from "./lib/views/SearchChatView.svelte";
+  import MemoryView from "./lib/views/MemoryView.svelte";
   import ProjectsView from "./lib/views/ProjectsView.svelte";
   import ApprovalsView from "./lib/views/ApprovalsView.svelte";
   import TasksView from "./lib/views/TasksView.svelte";
@@ -103,6 +104,8 @@
         <ChatView sessionId={continuedSessionId} />
       {:else if current === "search-chat"}
         <SearchChatView />
+      {:else if current === "memory"}
+        <MemoryView />
       {:else if current === "approvals"}
         <ApprovalsView />
       {:else if current === "tasks"}

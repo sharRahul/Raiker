@@ -15,6 +15,7 @@ from raiker.contracts.ids import new_id
 from raiker.control.dtos import ControlResult
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
+from raiker.memory.store import list_memory
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
 from raiker.models.exceptions import ModelProviderError, ProviderPolicyError, safe_error
 from raiker.models.factory import ModelProviderFactory
@@ -89,6 +90,59 @@ class EventView:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class MemoryControlView:
+    """User-facing view of one approved memory entry.
+
+    Carries the governance metadata the user needs to trust, scope, and
+    control the memory: provenance, sensitivity, confidence, retention, and
+    an organizing pin flag. The text is the stored memory text (the same
+    data the governed memory store already persists); no new authority is
+    granted by exposing it through this read.
+    """
+
+    memory_id: str
+    text: str
+    scope: str
+    sensitivity: str
+    memory_type: str
+    created_at: str
+    tags: tuple[str, ...]
+    source: str
+    provenance: dict[str, Any]
+    confidence: float
+    trust_score: float
+    retention: str
+    approval_state: str
+    pinned: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "memory_id": self.memory_id,
+            "text": self.text,
+            "scope": self.scope,
+            "sensitivity": self.sensitivity,
+            "memory_type": self.memory_type,
+            "created_at": self.created_at,
+            "tags": list(self.tags),
+            "source": self.source,
+            "provenance": dict(self.provenance),
+            "confidence": self.confidence,
+            "trust_score": self.trust_score,
+            "retention": self.retention,
+            "approval_state": self.approval_state,
+            "pinned": self.pinned,
+        }
+
+
+@dataclass(frozen=True)
+class MemorySettingsView:
+    incognito: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"incognito": self.incognito}
 
 
 @dataclass(frozen=True)
@@ -519,6 +573,103 @@ class DashboardService:
         if not self.store.delete_session(session_id, user_id=user_id):
             return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
         return ControlResult(ok=True, data={"session_id": session_id})
+
+    # ── Reliable memory controls (backlog item 3) ──────────────────────────
+    # The user-facing surface over the EXISTING governed memory store — list
+    # with provenance/scope/sensitivity, pin (organizing label only), forget
+    # (human-only, reuses the governed forget path), and an incognito opt-out
+    # boundary that withholds approved project memory from the turn context.
+    # No second memory system is created; these read/control the same store
+    # the memory_write/memory_forget tools already use.
+
+    def list_memories(self, scope: str | None = None) -> list[MemoryControlView]:
+        """List approved memories with their governance metadata + pin state."""
+        pinned_ids = self.store.list_pinned_memory_ids()
+        entries = list_memory(workspace_root=self.workspace_root, scope=scope, limit=200)
+        return [
+            MemoryControlView(
+                memory_id=e.memory_id,
+                text=e.text,
+                scope=e.scope,
+                sensitivity=e.sensitivity,
+                memory_type=e.memory_type,
+                created_at=e.created_at,
+                tags=e.tags,
+                source=e.source,
+                provenance=e.provenance,
+                confidence=e.confidence,
+                trust_score=e.trust_score,
+                retention=e.retention,
+                approval_state=e.approval_state,
+                pinned=e.memory_id in pinned_ids,
+            )
+            for e in entries
+        ]
+
+    def set_memory_pinned(
+        self, memory_id: str, pinned: bool, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Pin (or unpin) a memory. Organizing label only — grants nothing."""
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        self.store.set_memory_pinned(memory_id, pinned)
+        return ControlResult(ok=True, data={"memory_id": memory_id, "pinned": pinned})
+
+    def forget_memory_controlled(
+        self, memory_id: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Forget a memory through the governed path (human-only).
+
+        Reuses the existing ``forget_memory`` store function which writes a
+        tombstone and marks the db row forgotten. No new authority is
+        granted — the human owner may always forget their own memories.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.store import MemoryForgetGovernance, forget_memory
+
+        governance = MemoryForgetGovernance(
+            source_event_id=new_id("evt_"),
+            source_session_id="",
+            source_turn_id=None,
+            source_type="user_ui",
+            deleted_by=principal.principal_id,
+        )
+        ok = forget_memory(
+            memory_id,
+            workspace_root=self.workspace_root,
+            store=self.store,
+            governance=governance,
+        )
+        if not ok:
+            return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        return ControlResult(ok=True, data={"memory_id": memory_id})
+
+    def get_memory_settings(self) -> MemorySettingsView:
+        return MemorySettingsView(incognito=self.store.is_memory_incognito())
+
+    def set_memory_incognito(
+        self, incognito: bool, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Toggle the incognito opt-out boundary (human-only).
+
+        When on, the context gatherer withholds approved project memory from
+        the turn context even if a project opted in. The memory is not
+        deleted — only excluded from the model's view.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        self.store.set_memory_incognito(incognito)
+        return ControlResult(ok=True, data={"incognito": incognito})
 
     # ── Events / checkpoints / tasks ────────────────────────────────────
     def list_events(

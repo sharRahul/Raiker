@@ -22,6 +22,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: "new-chat", label: "New Chat", icon: "chat", hint: "Start a fresh governed conversation" },
       { id: "search-chat", label: "Search Chat", icon: "search", hint: "Search your chat history" },
+      { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },
       { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
       { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
       { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },

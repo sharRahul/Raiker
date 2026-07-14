@@ -149,6 +149,12 @@ class ContextGatherer:
         project_id = str(project["project_id"])
         instructions = str(project["instructions"]).strip()
         memory_enabled = bool(project["memory_enabled"])
+        # The owner's incognito opt-out (backlog item 3): when on, approved
+        # project memory is withheld from the turn context even if the
+        # project opted in. The memory is not deleted — only excluded from
+        # the model's view until the owner turns incognito off.
+        if memory_enabled and store.is_memory_incognito():
+            memory_enabled = False
         lines = [f"Project: {project['name']}"]
         if instructions:
             lines.extend(["Project instructions:", instructions])

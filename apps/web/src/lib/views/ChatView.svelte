@@ -510,10 +510,10 @@
           {/if}
 
           {#if turn.events.some((e) => e.kind === "lifecycle" || e.kind === "tool")}
-            <details class="under-hood">
+            <details class="under-hood" open={turn.streaming}>
               <summary>
                 <Icon name="shield" size={13} />
-                How this turn was governed
+                {turn.streaming ? "Governing this turn…" : "How this turn was governed"}
               </summary>
               <ol class="phases">
                 {#each groupPhases(turn.events) as row (row.phase)}

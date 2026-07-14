@@ -379,3 +379,26 @@ export interface InterruptRequestBody {
   reason?: string;
   steer_text?: string;
 }
+
+// Reliable memory controls (backlog item 3): user-facing view of one approved
+// memory entry — provenance, scope, sensitivity, confidence, retention, pin.
+export interface MemoryControlView {
+  memory_id: string;
+  text: string;
+  scope: string;
+  sensitivity: string;
+  memory_type: string;
+  created_at: string;
+  tags: string[];
+  source: string;
+  provenance: Record<string, unknown>;
+  confidence: number;
+  trust_score: number;
+  retention: string;
+  approval_state: string;
+  pinned: boolean;
+}
+
+export interface MemorySettingsView {
+  incognito: boolean;
+}

@@ -37,6 +37,20 @@ fail-closed by design.
 
 ## Current product state — 2026-07-14
 
+- Reliable memory controls have landed their first slice (backlog item 3): a
+  user-visible Memory view over the EXISTING governed memory store — list
+  with provenance, scope, sensitivity, confidence, retention; pin/bookmark;
+  forget through the governed path (human-only); and an incognito opt-out
+  boundary that withholds approved project memory from the turn context when
+  on (the memory is not deleted). No second memory system is created.
+- Tool execution defects fixed: `connector_read` was denied by policy
+  (unknown_or_denied_tool) despite having a real executor — now routed as
+  read-shaped like `github_read`; `connector_write` was denied — now routed
+  to the approval path whose intent + execution the broker already owned.
+  The governed connector tools now actually work when the owner enables them.
+- The chat surface opens its "How this turn was governed" timeline while a
+  turn streams, so the agent is not a black box — the user sees gather →
+  plan → act → verify live instead of a generic "Working…".
 - Conversation organisation has landed its first slice: per-session
   pin/bookmark and single + bulk delete in the Sessions view. Pinned
   sessions surface first; deletion is human-only and respects the same
@@ -81,13 +95,12 @@ clients fetch the transparent files instead of retaining an old opaque copy.
 
 ## Next implementation slice — requires design approval
 
-**Reliable memory controls (backlog item 3).** Build a user-visible memory
-list with edit, pin, delete, scope, provenance, expiry, import/export, and
-search-participation controls on top of the existing governed memory store; do
-not create a second memory system. Include a separate opt-out/incognito
-boundary. Conversation organisation (pin/bookmark + bulk/single delete) is
-now implemented; the remaining organisation backlog (nested projects/folders,
-tags, project-only export) can land alongside it.
+**Conversation organisation remainder + real reminders.** Memory controls
+have landed their first slice (list/pin/forget + incognito). The remaining
+organisation backlog (nested projects/folders, tags, project-only export) and
+backlog item 4 (real reminders/routines — an opt-in local scheduler that
+executes approved, bounded actions) are the next assistant-workflow gaps.
+Build one governed vertical slice at a time against the current codebase.
 
 ## Prioritised product backlog
 

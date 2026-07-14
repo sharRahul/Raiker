@@ -98,6 +98,34 @@ fail-closed by design.
 > grants no capability — creating or selecting one changes no gate, mode, or
 > policy. Tests: `tests/test_projects.py` (14) + `ProjectsView.test.ts` (5).
 
+> Current truth update (2026-07-14): reliable memory controls have landed
+> their first slice (backlog item 3) — a user-visible Memory view over the
+> EXISTING governed memory store. No second memory system is created.
+> `DashboardService.list_memories` / `set_memory_pinned` /
+> `forget_memory_controlled` / `get_memory_settings` / `set_memory_incognito`
+> are human-only and reuse the existing governed memory store. API:
+> `GET /api/memory`, `PUT /api/memory/{id}/pin`, `DELETE /api/memory/{id}`,
+> `GET /api/memory/settings`, `PUT /api/memory/incognito`. Storage:
+> `memory_pins` (organizing label, grants nothing) + `memory_settings`
+> (single-row incognito flag) tables. The context gatherer reads the
+> incognito flag and, when it is on, withholds approved project memory from
+> the turn context (the memory is not deleted — only excluded from the
+> model's view). Web: a `MemoryView` (list + pin + forget + incognito
+> toggle) wired into the nav. Tests: `tests/test_memory_controls.py` (12),
+> `MemoryView.test.ts` (4). This is a controls slice — no new capability,
+> gate, policy, or executor is added.
+>
+> Tool policy defect fix (2026-07-14): `connector_read` and
+> `connector_write` were denied by the policy engine
+> (`unknown_or_denied_tool`) despite being advertised to the model and
+> having a real executor / intent handling in the broker — so the governed
+> connector tools silently failed. `connector_read` is now routed as
+> read-shaped (governed inside the tool, like `github_read`); 
+> `connector_write` is now routed to the approval path whose immutable
+> intent + execution the broker already owned. Tests:
+> `tests/test_connector_tool_policy.py` (3). UX: the chat surface opens
+> its governed timeline while a turn streams (not a black box).
+
 > Current truth update (2026-07-14): conversation organisation has landed its
 > first slice — per-session pin/bookmark and single + bulk delete. The
 > `sessions` table gained a `pinned` column (organizing label only, default 0;

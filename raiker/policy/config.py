@@ -34,6 +34,10 @@ class StaticPolicyConfig:
                 "gmail_read",
                 "gcal_read",
                 "slack_read",
+                # Governed inside the tool (connector gate + decision mode +
+                # owner credential + egress allowlist + manifest-driven
+                # operation allowlist); the proposal is read-shaped.
+                "connector_read",
                 "user_create",
                 "user_deactivate",
                 "role_create",
@@ -56,6 +60,10 @@ class StaticPolicyConfig:
             "hosted_model_runtime", "private_network_model_runtime", "advisor_model_runtime",
             "connector_github_runtime", "connector_gmail_runtime",
             "connector_gcal_runtime", "connector_slack_runtime",
+            # A manifest-driven connector write (POST/PUT/PATCH/DELETE). The
+            # broker stores an immutable intent and the approval resolution
+            # path executes the exact approved operation once.
+            "connector_write",
             "scheduled_routines",
             "subagents", "multi_agent_teams",
             "email_runtime", "calendar_runtime", "reminder_runtime",

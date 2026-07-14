@@ -2656,6 +2656,59 @@ def handle_principal_detail(command: str, *, workspace_root: str | Path = ".") -
     return get_principal_detail(principal_id, workspace_root)
 
 
+def handle_principal_create(command: str, *, workspace_root: str | Path = ".") -> str:
+    from raiker.runtime.authority.models import PrincipalType
+
+    parts = shlex.split(command)
+    if len(parts) < 4:
+        return "Usage: /principal create <type> <id> [--display-name <name>] [--role <role_id>] [--scope <domain_scope>] [--expires <iso_datetime>]"
+    principal_type = parts[2]
+    principal_id = parts[3]
+    valid_types = {t.value for t in PrincipalType}
+    if principal_type not in valid_types:
+        return f"Invalid principal type: {principal_type}. Valid types: {', '.join(sorted(valid_types))}"
+    display_name: str | None = None
+    role_ids: list[str] = []
+    domain_scopes: list[str] = []
+    expires_at: str | None = None
+    i = 4
+    while i < len(parts):
+        if parts[i] == "--display-name" and i + 1 < len(parts):
+            display_name = parts[i + 1]
+            i += 2
+        elif parts[i] == "--role" and i + 1 < len(parts):
+            role_ids.append(parts[i + 1])
+            i += 2
+        elif parts[i] == "--scope" and i + 1 < len(parts):
+            domain_scopes.append(parts[i + 1])
+            i += 2
+        elif parts[i] == "--expires" and i + 1 < len(parts):
+            expires_at = parts[i + 1]
+            i += 2
+        else:
+            i += 1
+    denial = _govern_admin_mutation(
+        "admin_mutation",
+        "principal_create",
+        {"principal_id": principal_id, "principal_type": principal_type},
+        workspace_root=workspace_root,
+        risk_level=RiskLevelValue.MEDIUM,
+        domain_scope="",
+    )
+    if denial:
+        return denial
+    store = SQLiteStore(workspace_root)
+    store.insert_principal(
+        principal_id=principal_id,
+        principal_type=principal_type,
+        display_name=display_name or principal_id,
+        role_ids=tuple(role_ids),
+        domain_scopes=tuple(domain_scopes),
+        expires_at=expires_at,
+    )
+    return f"Principal created: {principal_id} (type={principal_type})"
+
+
 def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> str:
     command = command.strip()
     if command in {"/quit", "/exit"}:
@@ -2781,6 +2834,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_whoami(workspace_root=workspace_root)
     if command == "/principals":
         return handle_principals(workspace_root=workspace_root)
+    if command == "/principal create" or command.startswith("/principal create "):
+        return handle_principal_create(command, workspace_root=workspace_root)
     if command == "/principal" or command.startswith("/principal "):
         return handle_principal_detail(command, workspace_root=workspace_root)
     if command == "/users":

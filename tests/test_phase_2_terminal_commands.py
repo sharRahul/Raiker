@@ -131,3 +131,36 @@ class TestTerminalCommands:
         assert handle_slash_command("/memory-forget mem_missing", workspace_root=str(tmp_path)).startswith(
             "Memory forget:\n  status: approval_required"
         )
+
+    def test_principal_create_requires_owner(self, tmp_path: Path) -> None:
+        result = handle_slash_command(
+            "/principal create ai_agent test_agent --display-name Test",
+            workspace_root=str(tmp_path),
+        )
+        assert "No owner principal is configured" in result
+
+    def test_principal_create_invalid_type(self, tmp_path: Path) -> None:
+        handle_slash_command("/bootstrap-owner myuser --display MyUser", workspace_root=str(tmp_path))
+        result = handle_slash_command(
+            "/principal create invalid_type test_agent",
+            workspace_root=str(tmp_path),
+        )
+        assert "Invalid principal type" in result
+        assert "ai_agent" in result
+
+    def test_principal_create_success(self, tmp_path: Path) -> None:
+        handle_slash_command("/bootstrap-owner myuser --display MyUser", workspace_root=str(tmp_path))
+        result = handle_slash_command(
+            '/principal create ai_agent test_agent --display-name "Test Agent" --role developer',
+            workspace_root=str(tmp_path),
+        )
+        assert "Principal created: test_agent" in result
+        # Verify it appears in the listing
+        listing = handle_slash_command("/principals", workspace_root=str(tmp_path))
+        assert "test_agent" in listing
+        assert "ai_agent" in listing
+
+    def test_principal_create_no_args(self, tmp_path: Path) -> None:
+        handle_slash_command("/bootstrap-owner myuser --display MyUser", workspace_root=str(tmp_path))
+        result = handle_slash_command("/principal create", workspace_root=str(tmp_path))
+        assert "Usage:" in result

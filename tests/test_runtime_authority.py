@@ -686,25 +686,27 @@ def test_effective_permissions_intersection(authority: RuntimeAuthority) -> None
 # ── Strict Non-Allow Blocking ──
 
 
-def test_govern_admin_mutation_blocks_deny() -> None:
+def test_govern_admin_mutation_requires_owner(tmp_path: Path) -> None:
     from raiker.cli.commands import _govern_admin_mutation
+    # Without an owner, admin mutation should be denied
     result = _govern_admin_mutation(
         "admin_mutation", "user_create", {"user_id": "test"},
-        risk_level=RiskLevelValue.MEDIUM,
+        workspace_root=str(tmp_path), risk_level=RiskLevelValue.MEDIUM,
     )
-    # admin_mutation is disabled, so should be blocked
     assert result is not None
-    assert "denied" in result
+    assert "No owner principal is configured" in result
 
 
-def test_govern_admin_mutation_blocks_disabled_capability() -> None:
-    from raiker.cli.commands import _govern_admin_mutation
+def test_govern_admin_mutation_allowed_with_owner(tmp_path: Path) -> None:
+    from raiker.cli.commands import _govern_admin_mutation, handle_slash_command
+    # Bootstrap an owner first - this also enables admin_mutation capability gate
+    handle_slash_command('/bootstrap-owner myuser --display MyUser', workspace_root=str(tmp_path))
+    # admin_mutation is enabled during bootstrap, user_create is in allowed_read_actions
     result = _govern_admin_mutation(
-        "admin_mutation", "user_create", {"user_id": "test"},
-        risk_level=RiskLevelValue.MEDIUM,
+        "admin_mutation", "user_create", {"user_id": "test_user"},
+        workspace_root=str(tmp_path), risk_level=RiskLevelValue.MEDIUM,
     )
-    assert result is not None
-    assert "disabled" in result.lower() or "denied" in result.lower()
+    assert result is None  # None means allowed
 
 
 def test_govern_admin_mutation_non_allow_set_exhaustive(authority: RuntimeAuthority) -> None:
@@ -787,13 +789,13 @@ def test_disabled_capability_blocks_mutation(authority: RuntimeAuthority) -> Non
     action = GovernedAction(
         action_id=new_id("act_"),
         principal_id="test_human",
-        action_type="admin_mutation",
-        tool_or_service_name="user_create",
-        arguments={"user_id": "test"},
+        action_type="graph_codemap_indexing",
+        tool_or_service_name="graph_codemap_indexing",
+        arguments={},
         domain_scope="admin",
     )
     result = authority.route_action(action, principal)
-    # admin_mutation is disabled by default, should be blocked
+    # graph_codemap_indexing is disabled by default, should be blocked
     assert result.decision in ("disabled_by_capability_gate", "deny")
 
 

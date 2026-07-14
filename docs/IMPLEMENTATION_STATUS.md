@@ -271,6 +271,16 @@ fail-closed by design.
 > and success), `tests/test_connector_ecosystem.py` has an existing API-level
 > write lifecycle test. Validators: ruff, mypy, pytest (1697) all green.
 >
+> Current truth update (2026-07-14): agent identity and least privilege (backlog
+> item 7) has landed its first slice: `/principal create <type> <id>` creates
+> non-human principals (ai_agent, automation, system) through the governed
+> admin-mutation path with optional roles, domain scopes, and expiry.
+> Bootstrap-owner now enables admin_mutation/role_mutation/policy_mutation
+> capability gates so the owner can manage principals immediately. `principal_create`
+> added to policy allowed_read_actions. Tests: `test_phase_2_terminal_commands.py`
+> (+4: requires owner, invalid type, success, no args), `test_runtime_authority.py`
+> (updated admin mutation governance tests). Validators: ruff, mypy, pytest green.
+
 > Current truth update (2026-07-14): agent evaluation and observability baseline
 > (backlog item 6) has landed: `raiker/trace/` with `TurnTrace` / `PhaseSpan` /
 > `ToolCallSpan` / `ModelCallSpan` dataclasses, `build_turn_trace()` that reads

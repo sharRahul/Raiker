@@ -44,6 +44,7 @@ class StaticPolicyConfig:
                 "role_grant",
                 "role_revoke",
                 "approval_execution_relay",
+                "principal_create",
             }
         )
     )

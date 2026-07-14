@@ -134,6 +134,12 @@ fail-closed by design.
   existing governed path. The `reminders` table has `delivery_status`, `retry_count`,
   `max_retries`, and `delivered_at` columns. `deliver_due` is on-demand (no daemon).
   5 new event types, 7 new tests.
+- Agent identity and least privilege has landed its first slice (backlog item 7):
+  `/principal create <type> <id> [--display-name <name>] [--role <role_id>]...
+  [--scope <domain_scope>]... [--expires <iso_datetime>]` creates non-human
+  principals (ai_agent, automation, system) through the governed admin-mutation
+  path. Bootstrap-owner now enables admin_mutation/role_mutation/policy_mutation
+  capability gates so the owner can manage principals immediately. 4 new tests.
 
 ## Asset status
 
@@ -182,7 +188,8 @@ governed vertical slice at a time.
 7. **Agent identity and least privilege:** distinct agent/service identities,
    short-lived scoped credentials, per-tool grants, and a user-facing access
    review. Existing principal and approval controls are a base, not a complete
-   agent-identity surface.
+   agent-identity surface. First slice landed: `/principal create` for
+   non-human principals through the governed admin-mutation path.
 8. **Reusable governed workflows:** project/user skills and plugin-packaged
    playbooks with clear scope, provenance, review, and versioning. Add
    deterministic pre/post tool and session hooks only where enforcement or
@@ -231,13 +238,12 @@ Primary sources: [Claude support collection](https://support.claude.com/en/colle
 
 ## Next implementation slice — requires design approval
 
-The agent evaluation and observability baseline (backlog item 6) has landed:
-`raiker/trace/` with `TurnTrace` / `PhaseSpan` / `ToolCallSpan` / `ModelCallSpan`
-dataclasses, a `build_turn_trace()` function that reads existing typed events to
-reconstruct the gather → plan → act → verify → respond chain with per-phase
-latency, and a `format_trace()` output. The `/trace <session_id> <turn_id>` CLI
-command surfaces the result. Record/replay regression, outcome review, and
-OTel-compatible export remain for follow-up slices.
+Agent identity and least privilege (backlog item 7) has landed its first slice:
+`/principal create` for non-human principals through the governed admin-mutation
+path, with bootstrap-owner enabling the admin mutation capability gates. Remaining
+work for item 7: short-lived scoped credentials, per-tool grants, and a
+user-facing access review surface. The next backlog item to pick up is item 8
+(reusable governed workflows) or continue item 7 with scoped credentials.
 
 ## Verification and handoff
 

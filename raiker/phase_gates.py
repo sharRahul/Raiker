@@ -156,7 +156,7 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
         else:
             gates[name] = CapabilityGate(name, 4, CapabilityState.DISABLED)
     _TIER1_EXECUTED_CAPS = ("approval_execution_relay", "file_write_execution", "patch_apply_execution",
-                             "memory_write_execution", "memory_forget_execution")
+                         "memory_write_execution", "memory_forget_execution")
     for name in _TIER1_EXECUTED_CAPS:
         gates[name] = CapabilityGate(
             name, 1, CapabilityState.DISABLED,

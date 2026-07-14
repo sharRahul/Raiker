@@ -158,6 +158,21 @@ def bootstrap_owner(
 
     _pre_ack_gov_caps(store, principal_id, now)
 
+    # Enable admin mutation gates for the owner so they can manage principals/roles
+    for cap in ("admin_mutation", "role_mutation", "policy_mutation"):
+        store.upsert_capability_gate_state({
+            "capability": cap,
+            "state": "enabled_runtime",
+            "runtime_mode": "local_single_user_runtime",
+            "requested_by": "system_bootstrap",
+            "requested_at": now,
+            "activated_by": "system_bootstrap",
+            "activated_at": now,
+            "reason": "bootstrap_owner_enable_admin_mutations",
+            "created_at": now,
+            "updated_at": now,
+        })
+
     writer.append(make_event(
         session_id="bootstrap",
         turn_id=None,

@@ -203,7 +203,7 @@ contradictions are recorded honestly. File:line citations are in
      (`raiker/runtime/executors/scheduled.py:95-152`,
      `raiker/runtime/executors/__init__.py:131,211`). The claim is stale.
 
-5. **Connector write reference** — ⚠️ PARTIAL
+5. **Connector write reference** — ✅ CURRENT SLICE COMPLETE
    - ✅ Generic `connector_write` immutable-intent + approval + executor path IS
      wired end-to-end: broker creates intent
      (`raiker/tools/broker.py:485-500`), approval-resolve invokes
@@ -211,13 +211,9 @@ contradictions are recorded honestly. File:line citations are in
      (`raiker/api/routes_approvals.py:120`,
      `raiker/runtime/connector_ecosystem.py:224-280`). Never executes on `ask`
      alone.
-   - ❌ **`GithubConnectorService.create_comment()` is NOT runtime-reachable.**
-     The method exists with full governance and 14 unit tests
-     (`raiker/runtime/connectors.py:211-312`), but `GithubConnectorExecutor`
-     rejects all non-`read` operations
-     (`raiker/runtime/executors/connectors.py:42-47`). No executor dispatch, no
-     API route, no CLI command calls it. A model turn cannot post a GitHub
-     comment through it today.
+   - ✅ `GithubConnectorExecutor` dispatches only `create_comment` in addition
+     to reads, reuses the existing approval/gate path, and returns metadata-only
+     artifacts. Other operations still fail closed.
 
 6. **Agent evaluation and observability** — ⚠️ BASELINE ONLY
    - ✅ `TurnTrace`/`PhaseSpan`/`ToolCallSpan`/`ModelCallSpan` with

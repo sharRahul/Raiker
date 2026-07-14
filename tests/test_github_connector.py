@@ -248,6 +248,22 @@ class TestGithubConnectorExecutor:
         assert result.artifacts["content_redacted"] is True
         assert "login button does nothing" not in str(result.artifacts)
 
+    def test_executor_posts_comment_with_metadata_only_artifacts(
+        self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _configure_creds(monkeypatch)
+        monkeypatch.setattr("raiker.runtime.connectors.post_json_url", _ok_post_json)
+        result = GithubConnectorExecutor(workspace, store).execute(
+            self._action(
+                {"operation": "create_comment", "repo": "octo/repo", "number": "5", "body": "Fixed."}
+            ),
+            None,  # type: ignore[arg-type]
+        )
+        assert result.ok is True
+        assert result.artifacts["comment_id"] == "42"
+        assert result.artifacts["content_redacted"] is True
+        assert "Fixed." not in str(result.artifacts)
+
     def test_activation_requires_threat_model_ack(
         self, workspace: Path, store: SQLiteStore
     ) -> None:

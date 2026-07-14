@@ -463,7 +463,7 @@ file:line citations. Gaps and doc contradictions are recorded honestly.
   `raiker/runtime/executors/__init__.py:131,211`) that runs governed subagent
   work on demand.
 
-### Item 5 — Connector write reference — ⚠️ PARTIAL
+### Item 5 — Connector write reference — ✅ CURRENT SLICE COMPLETE
 
 - ✅ Generic `connector_write` immutable-intent + approval + executor path IS
   wired end-to-end:
@@ -480,13 +480,11 @@ file:line citations. Gaps and doc contradictions are recorded honestly.
     and NOT in the route_action capability map
     (`raiker/runtime/authority/router.py:50-93`).
   - Tests: `tests/test_connector_ecosystem.py:89-189`.
-- ❌ **`GithubConnectorService.create_comment()` is NOT runtime-reachable.**
-  Method exists with full governance + 14 unit tests
-  (`raiker/runtime/connectors.py:211-312`), but `GithubConnectorExecutor`
-  rejects all non-`read` operations
-  (`raiker/runtime/executors/connectors.py:42-47`). No executor dispatch, API
-  route, or CLI command calls it. A model turn cannot post a GitHub comment
-  through it.
+- ✅ **`GithubConnectorService.create_comment()` runtime dispatch:**
+  `GithubConnectorExecutor` accepts only `create_comment`, calls the governed
+  service with its already-routed gate/mode decision, and exposes only repo,
+  issue number, comment ID, and URL as artifacts. Unknown operations remain
+  fail-closed. `tests/test_github_connector.py` covers the path.
 
 ### Item 6 — Agent evaluation and observability — ⚠️ BASELINE ONLY
 

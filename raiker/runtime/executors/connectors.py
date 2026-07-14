@@ -43,12 +43,34 @@ class GithubConnectorExecutor:
         from raiker.runtime.connectors import GithubConnectorService
 
         operation = str(action.arguments.get("operation", "read")).strip()
-        if operation != "read":
-            return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
-
         service = GithubConnectorService(
             self._workspace_root, self._store, fetch_fn=self._fetch_fn
         )
+        if operation == "create_comment":
+            outcome = service.create_comment(
+                str(action.arguments.get("repo", "")),
+                action.arguments.get("number"),
+                str(action.arguments.get("body", "")),
+                enforce_modes=False,
+            )
+            if outcome.get("status") != "success":
+                error = outcome.get("error", {})
+                return self._fail(action.action_id, str(error.get("type", "connector_failed")))
+            return ExecutionResult(
+                ok=True,
+                capability=self.capability,
+                action_id=action.action_id,
+                summary="GitHub comment created; content withheld from artifacts (metadata only).",
+                artifacts={
+                    "repo": outcome.get("repo"),
+                    "number": outcome.get("issue_number"),
+                    "comment_id": outcome.get("comment_id"),
+                    "html_url": outcome.get("html_url"),
+                    "content_redacted": True,
+                },
+            )
+        if operation != "read":
+            return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
         outcome = service.read(
             str(action.arguments.get("resource", "")),
             str(action.arguments.get("repo", "")),

@@ -62,10 +62,13 @@ def build_export_manifest(
     store: SQLiteStore,
     session_id: str | None = None,
     *,
+    project_id: str | None = None,
     redact: bool = True,
     exported_by: str = "cli",
 ) -> ExportManifest | None:
-    events = store.list_event_index(session_id=session_id, limit=10000)
+    events = store.list_event_index(
+        session_id=session_id, project_id=project_id, limit=10000
+    )
     if not events:
         return None
     event_ids = [str(e["event_id"]) for e in events]
@@ -80,6 +83,8 @@ def build_export_manifest(
         "last_timestamp": last_evt["timestamp"],
         "redacted": redact,
     }
+    if project_id is not None:
+        scope["project_id"] = project_id
     hash_input = json.dumps(
         {"event_ids": event_ids, "scope": scope, "exported_by": exported_by},
         sort_keys=True,
@@ -106,15 +111,25 @@ def generate_export(
     store: SQLiteStore,
     session_id: str | None = None,
     *,
+    project_id: str | None = None,
     redact: bool = True,
     exported_by: str = "cli",
 ) -> ExportManifest:
-    manifest = build_export_manifest(store, session_id, redact=redact, exported_by=exported_by)
+    manifest = build_export_manifest(
+        store,
+        session_id,
+        project_id=project_id,
+        redact=redact,
+        exported_by=exported_by,
+    )
     if manifest is None:
+        scope = {"event_count": 0, "redacted": redact}
+        if project_id is not None:
+            scope["project_id"] = project_id
         return ExportManifest(
             export_id=new_id("aex_"),
             manifest_hash="empty",
-            scope_json=json.dumps({"event_count": 0, "redacted": redact}),
+            scope_json=json.dumps(scope),
             redacted=redact,
             event_count=0,
             first_event_id=None,
@@ -130,7 +145,9 @@ def generate_export(
     exports_dir = events_dir.parent / "exports"
     exports_dir.mkdir(parents=True, exist_ok=True)
     export_path = exports_dir / f"{manifest.export_id}.jsonl"
-    event_rows = store.list_event_index(session_id=session_id, limit=10000) if session_id else store.list_event_index(limit=10000)
+    event_rows = store.list_event_index(
+        session_id=session_id, project_id=project_id, limit=10000
+    )
     with export_path.open("w", encoding="utf-8") as out:
         for row in reversed(event_rows):
             path_str = str(row.get("jsonl_path", ""))

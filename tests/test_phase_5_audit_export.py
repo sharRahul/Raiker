@@ -139,6 +139,34 @@ def test_generate_export_with_events(store: SQLiteStore, writer: EventLogWriter)
     assert len(lines) == 5
 
 
+def test_generate_export_scopes_to_direct_project_sessions(
+    store: SQLiteStore, writer: EventLogWriter
+) -> None:
+    parent_id = new_id("proj_")
+    child_id = new_id("proj_")
+    parent_session_id = new_id("sess_")
+    child_session_id = new_id("sess_")
+    store.create_project(parent_id, "Parent", "parent")
+    store.create_project(child_id, "Child", "child", parent_id=parent_id)
+    store.save_active_project(parent_id)
+    store.create_session(parent_session_id, "/parent")
+    store.save_active_project(child_id)
+    store.create_session(child_session_id, "/parent/child")
+    _write_events(writer, count=2, session=parent_session_id)
+    _write_events(writer, count=3, session=child_session_id)
+
+    manifest = generate_export(store, project_id=parent_id)
+
+    assert manifest.event_count == 2
+    assert json.loads(manifest.scope_json)["project_id"] == parent_id
+    assert manifest.export_path is not None
+    exported_session_ids = {
+        json.loads(line)["session_id"]
+        for line in Path(manifest.export_path).read_text(encoding="utf-8").splitlines()
+    }
+    assert exported_session_ids == {parent_session_id}
+
+
 def test_generate_export_redacted(store: SQLiteStore, writer: EventLogWriter) -> None:
     sess_id = new_id("sess_")
     sensitive = make_event(

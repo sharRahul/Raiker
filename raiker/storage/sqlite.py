@@ -1296,6 +1296,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         task_id: str | None = None,
         event_type: str | None = None,
         limit: int = 50,
+        project_id: str | None = None,
     ) -> list[dict]:
         query = "SELECT * FROM events_index"
         params: list[Any] = []
@@ -1312,6 +1313,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if event_type is not None:
             conditions.append("event_type = ?")
             params.append(event_type)
+        if project_id is not None:
+            conditions.append(
+                "session_id IN (SELECT session_id FROM sessions WHERE project_id = ?)"
+            )
+            params.append(project_id)
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY timestamp DESC LIMIT ?"

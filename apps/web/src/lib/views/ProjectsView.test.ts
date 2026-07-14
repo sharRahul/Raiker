@@ -4,11 +4,14 @@
 // activation PUTs the selection.
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { setToken } from "../api";
 import type { ProjectView } from "../apiTypes";
 import { stubFetch } from "../test-helpers";
 import ProjectsView from "./ProjectsView.svelte";
 
 afterEach(() => {
+  setToken(null);
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -108,6 +111,7 @@ describe("ProjectsView", () => {
   });
 
   it("exports a loaded project's redacted JSONL via POST", async () => {
+    vi.useFakeTimers();
     const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = (init?.method ?? "GET").toUpperCase();
@@ -139,6 +143,7 @@ describe("ProjectsView", () => {
       if (tagName === "a") vi.spyOn(element, "click").mockImplementation(click);
       return element;
     }) as typeof document.createElement);
+    setToken("export-token");
 
     render(ProjectsView);
     await waitFor(() => expect(screen.getByText("Details")).toBeInTheDocument());
@@ -147,11 +152,55 @@ describe("ProjectsView", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Export project" }));
 
     await waitFor(() => {
-      expect(mock).toHaveBeenCalledWith("/api/projects/proj_1/export", expect.objectContaining({ method: "POST" }));
+      expect(mock).toHaveBeenCalledWith(
+        "/api/projects/proj_1/export",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({ get: expect.any(Function) }),
+        }),
+      );
       expect(createObjectURL).toHaveBeenCalledOnce();
       expect(click).toHaveBeenCalledOnce();
-      expect(revokeObjectURL).toHaveBeenCalledWith("blob:export");
     });
+    const exportRequest = mock.mock.calls.find((call) => String(call[0]) === "/api/projects/proj_1/export");
+    expect(new Headers(exportRequest![1]!.headers).get("Authorization")).toBe("Bearer export-token");
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+
+    await vi.runAllTimersAsync();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:export");
+  });
+
+  it("renders an accessible error when project export is rejected", async () => {
+    const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "GET" && url === "/api/projects") {
+        return { ok: true, status: 200, json: async () => ({ projects: [project({})], active_project_id: null }) } as Response;
+      }
+      if (method === "GET" && url === "/api/projects/tree") {
+        return { ok: true, status: 200, json: async () => [] } as Response;
+      }
+      if (method === "GET" && url === "/api/projects/proj_1") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ project: project({}), context: { instructions: "", attachment_ids: [], memory_enabled: false }, sessions: [], checkpoints: [] }),
+        } as Response;
+      }
+      if (method === "POST" && url === "/api/projects/proj_1/export") {
+        return { ok: false, status: 403, json: async () => ({ detail: { reason_code: "forbidden" } }) } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    });
+    vi.stubGlobal("fetch", mock);
+
+    render(ProjectsView);
+    await waitFor(() => expect(screen.getByText("Details")).toBeInTheDocument());
+    await fireEvent.click(screen.getByText("Details"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Export project" })).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: "Export project" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not export (403).");
   });
 
   it("surfaces an honest server rejection on create", async () => {

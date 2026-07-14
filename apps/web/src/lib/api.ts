@@ -348,14 +348,11 @@ export const api = {
     const path = `/api/projects/${encodeURIComponent(id)}/export`;
     const blob = await requestBlob(path, { method: "POST" });
     const url = URL.createObjectURL(blob);
-    try {
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `project-${id}.jsonl`;
-      anchor.click();
-    } finally {
-      URL.revokeObjectURL(url);
-    }
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `project-${id}.jsonl`;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url));
   },
   // Create a named project for the authenticated local human.
   // The root subpath is derived and contained server-side — no path is sent.

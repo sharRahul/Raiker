@@ -48,7 +48,7 @@ CHECKPOINT = {
     "checkpoint_id", "session_id", "turn_id", "task_id", "checkpoint_type", "created_at",
     "summary", "last_event_id", "can_restore_state", "can_restore_files",
 }
-SESSION_SUMMARY = {"session_id", "title", "status", "created_at", "updated_at", "turn_count", "pinned"}
+SESSION_SUMMARY = {"session_id", "title", "status", "created_at", "updated_at", "turn_count", "pinned", "tags"}
 TASK_VIEW = {
     "task_id", "session_id", "status", "title", "objective", "current_step", "progress_percent",
     "created_at", "updated_at", "completed_at", "summary",

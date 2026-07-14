@@ -165,6 +165,16 @@ class SetSessionPinnedRequest(BaseModel):
     pinned: bool
 
 
+class SetSessionTagsRequest(BaseModel):
+    # Replace the tag set for one session. Tags are organizing labels only —
+    # they grant nothing. The server normalizes (trim, lowercase, dedupe,
+    # length/count caps) and rejects invalid input. extra="forbid" rejects
+    # unknown fields.
+    model_config = ConfigDict(extra="forbid")
+
+    tags: list[str]
+
+
 class SetModelFallbackRequest(BaseModel):
     # Ordered list of model profile ids to try (in order) when the selected
     # provider is unavailable. extra="forbid" rejects unknown fields.

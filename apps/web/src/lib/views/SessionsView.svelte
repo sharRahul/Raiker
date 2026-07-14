@@ -26,15 +26,28 @@
   let actionError = $state<string | null>(null);
   let deleting = $state(false);
 
+  // Conversation organisation remainder: per-session tags. Tags are organizing
+  // labels only — they grant nothing. The view renders chips, lets the user
+  // add/remove a tag inline, and filter the list by a tag substring.
+  let tagDraft = $state<Record<string, string>>({});
+  let tagFilter = $state("");
+
   // Pinned sessions first, then most-recently-updated. The sort is display-only
-  // — the backend list order is unchanged.
+  // — the backend list order is unchanged. A non-empty tag filter further
+  // narrows the list to sessions carrying a tag that contains the substring.
   const ordered = $derived(
     sessions === null
       ? null
-      : [...sessions].sort((a, b) => {
-          if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-          return b.updated_at.localeCompare(a.updated_at);
-        }),
+      : [...sessions]
+          .filter((s) => {
+            const q = tagFilter.trim().toLowerCase();
+            if (q === "") return true;
+            return s.tags.some((t) => t.toLowerCase().includes(q));
+          })
+          .sort((a, b) => {
+            if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+            return b.updated_at.localeCompare(a.updated_at);
+          }),
   );
 
   function toggleSelected(id: string) {
@@ -52,6 +65,36 @@
     } catch (e) {
       actionError =
         e instanceof ApiError ? `Could not update pin (${e.status}).` : "Could not update pin.";
+    }
+  }
+
+  // Add or remove a single tag by replacing the session's full tag set. The
+  // server normalizes and dedupes, so we send the desired next set and let
+  // the backend be the source of truth.
+  async function addTag(s: SessionSummary) {
+    const draft = (tagDraft[s.session_id] ?? "").trim();
+    if (draft === "") return;
+    actionError = null;
+    const next = [...s.tags, draft];
+    try {
+      await api.setSessionTags(s.session_id, next);
+      tagDraft[s.session_id] = "";
+      await load();
+    } catch (e) {
+      actionError =
+        e instanceof ApiError ? `Could not add tag (${e.status}).` : "Could not add tag.";
+    }
+  }
+
+  async function removeTag(s: SessionSummary, tag: string) {
+    actionError = null;
+    const next = s.tags.filter((t) => t !== tag);
+    try {
+      await api.setSessionTags(s.session_id, next);
+      await load();
+    } catch (e) {
+      actionError =
+        e instanceof ApiError ? `Could not remove tag (${e.status}).` : "Could not remove tag.";
     }
   }
 
@@ -145,10 +188,21 @@
   <p class="page-lead">
     Every conversation with the runtime, with its turns and the governed events behind each turn.
   </p>
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh sessions">
-    <Icon name="refresh" size={15} />
-    Refresh
-  </button>
+  <div class="head-actions">
+    <label class="tag-filter">
+      <span class="sr-only">Filter by tag</span>
+      <input
+        type="text"
+        placeholder="Filter by tag…"
+        bind:value={tagFilter}
+        aria-label="Filter sessions by tag"
+      />
+    </label>
+    <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh sessions">
+      <Icon name="refresh" size={15} />
+      Refresh
+    </button>
+  </div>
 </div>
 
 {#if loadError}
@@ -193,6 +247,7 @@
             <th>Session</th>
             <th>Status</th>
             <th>Turns</th>
+            <th>Tags</th>
             <th>Updated</th>
             <th></th>
           </tr>
@@ -219,6 +274,45 @@
               </td>
               <td onclick={() => openSession(s.session_id)}><Badge variant={s.status === "active" ? "active" : "idle"} label={s.status} /></td>
               <td onclick={() => openSession(s.session_id)}>{s.turn_count}</td>
+              <td class="tags-col" onclick={(e) => e.stopPropagation()}>
+                <span class="tag-chips">
+                  {#each s.tags as t (t)}
+                    <span class="tag-chip">
+                      {t}
+                      <button
+                        type="button"
+                        class="tag-x"
+                        aria-label={`Remove tag ${t} from ${s.title ?? shortId(s.session_id)}`}
+                        title="Remove tag"
+                        onclick={() => void removeTag(s, t)}
+                      >×</button>
+                    </span>
+                  {/each}
+                </span>
+                <span class="tag-add">
+                  <input
+                    type="text"
+                    class="tag-input"
+                    placeholder="Add tag…"
+                    value={tagDraft[s.session_id] ?? ""}
+                    oninput={(e) => (tagDraft = { ...tagDraft, [s.session_id]: e.currentTarget.value })}
+                    onkeydown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void addTag(s);
+                      }
+                    }}
+                    aria-label={`Add a tag to ${s.title ?? shortId(s.session_id)}`}
+                  />
+                  <button
+                    type="button"
+                    class="tag-add-btn"
+                    aria-label={`Add tag to ${s.title ?? shortId(s.session_id)}`}
+                    title="Add tag"
+                    onclick={() => void addTag(s)}
+                  >+</button>
+                </span>
+              </td>
               <td onclick={() => openSession(s.session_id)} title={s.updated_at}>{relativeTime(s.updated_at)}</td>
               <td class="row-actions">
                 <button
@@ -308,6 +402,33 @@
     justify-content: space-between;
     gap: var(--space-4);
   }
+  .head-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .tag-filter input {
+    font: inherit;
+    font-size: 0.86rem;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--bg);
+    color: var(--text-1);
+    min-width: 12rem;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
   .bulk-bar {
     display: flex;
     align-items: center;
@@ -352,8 +473,72 @@
     cursor: pointer;
   }
   .row-actions,
-  .check-col {
+  .check-col,
+  .tags-col {
     cursor: default;
+  }
+  .tags-col {
+    max-width: 22rem;
+  }
+  .tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+    margin-bottom: 0.2rem;
+  }
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    color: var(--text-1);
+    border-radius: 999px;
+    padding: 0.05rem 0.45rem;
+    font-size: 0.74rem;
+    line-height: 1.4;
+  }
+  .tag-x {
+    border: none;
+    background: none;
+    color: var(--text-3);
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0 0.1rem;
+    border-radius: 999px;
+  }
+  .tag-x:hover {
+    color: var(--danger);
+  }
+  .tag-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+  .tag-input {
+    font: inherit;
+    font-size: 0.78rem;
+    padding: 0.15rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--bg);
+    color: var(--text-1);
+    width: 8rem;
+  }
+  .tag-add-btn {
+    border: 1px solid var(--border);
+    background: var(--neutral-soft);
+    color: var(--text-2);
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--r-sm);
+  }
+  .tag-add-btn:hover {
+    color: var(--text-1);
+    border-color: var(--accent-border);
   }
   .session-title {
     display: block;

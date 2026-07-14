@@ -16,6 +16,7 @@ const SESSIONS_ROUTE = {
       updated_at: "2026-07-10T00:01:00Z",
       turn_count: 1,
       pinned: false,
+      tags: ["alpha"],
     },
     {
       session_id: "sess_a",
@@ -25,6 +26,7 @@ const SESSIONS_ROUTE = {
       updated_at: "2026-07-09T00:00:30Z",
       turn_count: 2,
       pinned: true,
+      tags: [],
     },
   ],
 };
@@ -134,5 +136,90 @@ describe("SessionsView organisation", () => {
         (c) => String(c[0]) === "/api/sessions/sess_b" && c[1]?.method === "DELETE",
       ),
     ).toBe(true);
+  });
+
+  it("renders tag chips for sessions that carry tags", async () => {
+    stubFetch(SESSIONS_ROUTE);
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
+    // The "alpha" chip is rendered for sess_b (which carries ["alpha"]).
+    expect(screen.getByText("alpha")).toBeInTheDocument();
+    // sess_a has no tags, so it has no chip — only one chip text node.
+    expect(screen.getAllByText("alpha").length).toBe(1);
+  });
+
+  it("adds a tag by typing and clicking the add button, then refreshes", async () => {
+    const fetchMock = stubFetch({
+      ...SESSIONS_ROUTE,
+      "PUT /api/sessions/sess_a/tags": { ok: true, session_id: "sess_a", tags: ["beta"] },
+    });
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Pinned chat")).toBeInTheDocument());
+    // Target the add-tag input inside the "Pinned chat" row (sess_a), since
+    // that row has no chips yet.
+    const row = screen.getByText("Pinned chat").closest("tr")!;
+    const input = row.querySelector('input[aria-label^="Add a tag to"]') as HTMLInputElement;
+    await fireEvent.input(input, { target: { value: "beta" } });
+
+    const addBtn = row.querySelector('button[aria-label^="Add tag to"]') as HTMLButtonElement;
+    await fireEvent.click(addBtn);
+
+    await waitFor(() => {
+      const putCall = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/api/sessions/sess_a/tags" && c[1]?.method === "PUT",
+      );
+      expect(putCall).toBeDefined();
+      const body = JSON.parse(String(putCall![1]!.body));
+      expect(body.tags).toEqual(["beta"]);
+    });
+    // The list is reloaded after the toggle.
+    await waitFor(() => {
+      const listCalls = fetchMock.mock.calls.filter(
+        (c) => String(c[0]) === "/api/sessions" && (c[1]?.method ?? "GET") === "GET",
+      );
+      expect(listCalls.length).toBeGreaterThan(1);
+    });
+  });
+
+  it("removes a tag by clicking the chip × button", async () => {
+    const fetchMock = stubFetch({
+      ...SESSIONS_ROUTE,
+      "PUT /api/sessions/sess_b/tags": { ok: true, session_id: "sess_b", tags: [] },
+    });
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
+    // sess_b carries ["alpha"]; the remove button is labelled "Remove tag alpha from Second chat".
+    const removeBtn = screen.getByRole("button", { name: /remove tag alpha from second chat/i });
+    await fireEvent.click(removeBtn);
+
+    await waitFor(() => {
+      const putCall = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/api/sessions/sess_b/tags" && c[1]?.method === "PUT",
+      );
+      expect(putCall).toBeDefined();
+      const body = JSON.parse(String(putCall![1]!.body));
+      // The remove path sends the remaining tags (alpha filtered out → []).
+      expect(body.tags).toEqual([]);
+    });
+  });
+
+  it("filters the list down to sessions whose tags contain the query", async () => {
+    stubFetch(SESSIONS_ROUTE);
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Pinned chat")).toBeInTheDocument());
+    // Both sessions are visible before filtering.
+    expect(screen.getByText("Second chat")).toBeInTheDocument();
+    expect(screen.getByText("Pinned chat")).toBeInTheDocument();
+
+    const filterInput = screen.getByLabelText("Filter sessions by tag");
+    await fireEvent.input(filterInput, { target: { value: "alpha" } });
+
+    // Only sess_b carries the "alpha" tag; sess_a is filtered out.
+    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
+    expect(screen.queryByText("Pinned chat")).toBeNull();
   });
 });

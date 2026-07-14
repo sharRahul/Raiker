@@ -48,6 +48,11 @@ class SessionView:
     # Conversation organisation: a per-session pin/bookmark flag. Organizing
     # label only — grants nothing and changes no authority.
     pinned: bool = False
+    # Conversation organisation remainder: per-session tags. Organizing labels
+    # only — like `pinned` and `projects`, they grant nothing and change no
+    # gate, policy, or authority. The tuple is the normalized, ordered set
+    # (deduplicated, lowercase, length/count-capped).
+    tags: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -573,6 +578,71 @@ class DashboardService:
         if not self.store.delete_session(session_id, user_id=user_id):
             return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
         return ControlResult(ok=True, data={"session_id": session_id})
+
+    # ── Session tags (conversation organisation remainder) ──────────────────
+    # A tag is an organizing label only (like the per-session `pinned` flag
+    # and the `projects` table) — it grants nothing and changes no gate,
+    # policy, or authority. Mutations are human-only and respect the same
+    # user/session visibility boundary as set_session_pinned / delete_session
+    # — an account cannot retag another account's session. Normalization is
+    # applied here so the storage layer never sees an unvalidated tag: trim,
+    # collapse internal whitespace, lowercase, allow `[a-z0-9][a-z0-9 _-]*`,
+    # 1..32 chars each, max 12 tags per session, dedupe, drop empties.
+
+    _TAG_MAX_LEN = 32
+    _TAG_MAX_COUNT = 12
+    _TAG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9 &._-]*$")
+
+    def _normalize_tags(self, tags: list[str]) -> tuple[tuple[str, ...], str | None]:
+        """Return (normalized, reason_code). reason_code is None when the
+        tag set is acceptable."""
+        seen: set[str] = set()
+        out: list[str] = []
+        for raw in tags:
+            if not isinstance(raw, str):
+                return (), "invalid_tag:not_a_string"
+            tag = re.sub(r"\s+", " ", raw.strip()).lower()
+            if not tag:
+                continue
+            if len(tag) > self._TAG_MAX_LEN:
+                return (), f"invalid_tag:too_long:{tag[:16]}"
+            if not self._TAG_PATTERN.match(tag):
+                return (), f"invalid_tag:bad_chars:{tag[:16]}"
+            if tag not in seen:
+                seen.add(tag)
+                out.append(tag)
+        if len(out) > self._TAG_MAX_COUNT:
+            return (), f"invalid_tag:too_many:{len(out)}"
+        return tuple(out), None
+
+    def set_session_tags(
+        self,
+        session_id: str,
+        tags: list[str],
+        acting_principal_id: str | None,
+    ) -> ControlResult:
+        """Replace the tag set for one session (human-only).
+
+        Tags are organizing labels only — they grant nothing. The supplied
+        list is normalized (trim, lowercase, dedupe, length/count caps) and
+        stored as the session's full tag set. Respects user/session
+        visibility: an account cannot retag another account's session.
+        """
+        normalized, reason = self._normalize_tags(tags)
+        if reason is not None:
+            return ControlResult(ok=False, reason_code=reason)
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        user_id = principal.delegated_by_user_id
+        if not self.store.set_session_tags(session_id, list(normalized), user_id=user_id):
+            return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
+        return ControlResult(
+            ok=True,
+            data={"session_id": session_id, "tags": list(normalized)},
+        )
 
     # ── Reliable memory controls (backlog item 3) ──────────────────────────
     # The user-facing surface over the EXISTING governed memory store — list
@@ -1387,6 +1457,7 @@ class DashboardService:
             updated_at=str(row.get("updated_at", "")),
             turn_count=len(self.store.list_turns(session_id, limit=1000)),
             pinned=bool(row.get("pinned", 0)),
+            tags=tuple(self.store.list_session_tags(session_id)),
         )
 
     @staticmethod

@@ -1,11 +1,12 @@
-"""Conversation organisation (backlog item 2): session pin/bookmark + delete.
+"""Conversation organisation (backlog item 2): session pin/bookmark + delete
++ tags.
 
-Pinning and deleting sessions are organizing actions, governance-neutral like
-projects: they grant nothing and change no gate, policy, or authority. Deletion
-is human-only and respects the same user/session visibility boundary as every
-governed read — an account cannot pin or delete another account's session,
-and legacy unattributed sessions remain visible/deletable by any authenticated
-human.
+Pinning, deleting, and tagging sessions are organizing actions,
+governance-neutral like projects: they grant nothing and change no gate,
+policy, or authority. Deletion is human-only and respects the same
+user/session visibility boundary as every governed read — an account cannot
+pin, delete, or retag another account's session, and legacy unattributed
+sessions remain visible/deletable/taggable by any authenticated human.
 """
 from __future__ import annotations
 
@@ -80,6 +81,82 @@ class TestPinSession:
         result = service.set_session_pinned("sess_a", True, "principal_ai")
         assert not result.ok
         assert result.reason_code == "not_authorized_human"
+
+
+class TestSessionTags:
+    def test_set_tags_round_trips_and_surfaces_in_the_session_view(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        _seed_session(service.store, "sess_a", workspace)
+
+        result = service.set_session_tags(
+            "sess_a", ["  Research ", "R&D", "research"], OWNER
+        )
+        assert result.ok, result.reason_code
+        # Normalized: trim, lowercase, dedupe. The service returns the
+        # normalized input order (research first, then r&d; the third
+        # "research" is a duplicate and dropped).
+        assert result.data == {"session_id": "sess_a", "tags": ["research", "r&d"]}
+
+        sessions = service.list_sessions()
+        assert sessions[0].session_id == "sess_a"
+        # Storage returns tags sorted alphabetically (r&d before research).
+        assert sessions[0].tags == ("r&d", "research")
+
+        # Full-replace: an empty list clears the set.
+        cleared = service.set_session_tags("sess_a", [], OWNER)
+        assert cleared.ok
+        assert cleared.data == {"session_id": "sess_a", "tags": []}
+        assert service.list_sessions()[0].tags == ()
+
+    def test_unknown_session_fails_closed(self, service: DashboardService) -> None:
+        result = service.set_session_tags("sess_missing", ["x"], OWNER)
+        assert not result.ok
+        assert result.reason_code == "unknown_session:sess_missing"
+
+    def test_ai_principal_cannot_tag(self, service: DashboardService, workspace: Path) -> None:
+        from raiker.contracts.ids import utc_now
+
+        with service.store.connect() as connection:
+            connection.execute(
+                """INSERT OR IGNORE INTO principals
+                   (principal_id, principal_type, display_name, role_ids, domain_scopes,
+                    max_runtime_mode, created_at, is_active)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                ("principal_ai", "ai_agent", "AI", "[]", "[]", "development_preview", utc_now(), 1),
+            )
+        _seed_session(service.store, "sess_a", workspace)
+        result = service.set_session_tags("sess_a", ["x"], "principal_ai")
+        assert not result.ok
+        assert result.reason_code == "not_authorized_human"
+
+    def test_invalid_tags_are_rejected_before_storage(self, service: DashboardService, workspace: Path) -> None:
+        _seed_session(service.store, "sess_a", workspace)
+        # Bad characters (upper-case forced lower is fine, but leading space-only tag is dropped,
+        # and a tag starting with a symbol fails the pattern).
+        bad = service.set_session_tags("sess_a", ["!invalid"], OWNER)
+        assert not bad.ok
+        assert (bad.reason_code or "").startswith("invalid_tag:bad_chars")
+        # Too-long tag (>32 chars) is rejected.
+        long_tag = "a" * 33
+        too_long = service.set_session_tags("sess_a", [long_tag], OWNER)
+        assert not too_long.ok
+        assert (too_long.reason_code or "").startswith("invalid_tag:too_long")
+        # More than 12 tags is rejected.
+        too_many = service.set_session_tags("sess_a", [f"t{i}" for i in range(13)], OWNER)
+        assert not too_many.ok
+        assert (too_many.reason_code or "").startswith("invalid_tag:too_many")
+
+    def test_tags_are_cleared_when_the_session_is_deleted(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        _seed_session(service.store, "sess_a", workspace)
+        assert service.set_session_tags("sess_a", ["alpha", "beta"], OWNER).ok
+        assert service.store.list_session_tags("sess_a") == ["alpha", "beta"]
+
+        assert service.delete_session("sess_a", OWNER).ok
+        # The cascade removed the tag rows.
+        assert service.store.list_session_tags("sess_a") == []
 
 
 class TestDeleteSession:
@@ -192,6 +269,55 @@ class TestSessionOrganisationApi:
     def test_delete_routes_require_auth(self, client: TestClient) -> None:
         assert client.delete("/api/sessions/sess_a").status_code == 401
 
+    def test_set_tags_round_trip_through_the_api(self, client: TestClient, workspace: Path) -> None:
+        headers = self._headers(client)
+        SQLiteStore(workspace).create_session("sess_a", str(workspace))
+
+        resp = client.put(
+            "/api/sessions/sess_a/tags",
+            json={"tags": ["  Research ", "R&D", "research"]},
+            headers=headers,
+        )
+        assert resp.status_code == 200, resp.text
+        # The PUT response echoes the normalized input order.
+        assert resp.json()["tags"] == ["research", "r&d"]
+
+        listing = client.get("/api/sessions", headers=headers).json()
+        # The listing view reads storage, which returns tags sorted.
+        assert listing[0]["tags"] == ["r&d", "research"]
+
+        # Clear via empty list.
+        cleared = client.put(
+            "/api/sessions/sess_a/tags", json={"tags": []}, headers=headers
+        )
+        assert cleared.status_code == 200
+        assert client.get("/api/sessions", headers=headers).json()[0]["tags"] == []
+
+    def test_tags_routes_require_auth(self, client: TestClient) -> None:
+        assert client.put(
+            "/api/sessions/sess_a/tags", json={"tags": ["x"]}
+        ).status_code == 401
+
+    def test_invalid_tags_return_422(self, client: TestClient, workspace: Path) -> None:
+        headers = self._headers(client)
+        SQLiteStore(workspace).create_session("sess_a", str(workspace))
+
+        resp = client.put(
+            "/api/sessions/sess_a/tags",
+            json={"tags": ["!bad"]},
+            headers=headers,
+        )
+        assert resp.status_code == 422
+        assert resp.json()["detail"]["reason_code"].startswith("invalid_tag")
+
+    def test_unknown_session_tags_is_a_403(self, client: TestClient) -> None:
+        headers = self._headers(client)
+        resp = client.put(
+            "/api/sessions/sess_missing/tags", json={"tags": ["x"]}, headers=headers
+        )
+        assert resp.status_code == 403
+        assert resp.json()["detail"]["reason_code"] == "unknown_session:sess_missing"
+
 
 class TestSessionIsolation:
     """An account cannot pin or delete another account's session."""
@@ -244,3 +370,46 @@ class TestSessionIsolation:
         assert (
             client.get("/api/sessions/sess_bob", headers=bob_headers).status_code == 200
         )
+
+    def test_account_cannot_retag_another_accounts_session(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        # Bob registers and owns sess_bob.
+        bob_token = client.post(
+            "/api/auth/register", json={"username": "bob2", "password": "right-pass-123"}
+        ).json()["token"]
+        bob_headers = {"Authorization": f"Bearer {bob_token}"}
+        store = SQLiteStore(workspace)
+        bob_account = store.get_account_by_username("bob2")
+        assert bob_account is not None
+        bob_principal = store.get_principal(str(bob_account["principal_id"]))
+        assert bob_principal is not None
+        bob_user_id = str(bob_principal["delegated_by_user_id"])
+        store.create_session("sess_bob2", str(workspace), user_id=bob_user_id)
+
+        # Alex registers as a separate account.
+        registered = client.post(
+            "/api/auth/register", json={"username": "alex2", "password": "right-pass-123"}
+        )
+        assert registered.status_code == 200, registered.text
+        alex_headers = {"Authorization": f"Bearer {registered.json()['token']}"}
+
+        # Alex cannot retag Bob's session — refused as unknown_session
+        # because of user isolation (mirrors delete).
+        resp = client.put(
+            "/api/sessions/sess_bob2/tags",
+            json={"tags": ["alex-tag"]},
+            headers=alex_headers,
+        )
+        assert resp.status_code == 403
+        assert resp.json()["detail"]["reason_code"] == "unknown_session:sess_bob2"
+        # Bob's session carries no tags from Alex.
+        assert store.list_session_tags("sess_bob2") == []
+        # Bob can retag his own session.
+        bob_resp = client.put(
+            "/api/sessions/sess_bob2/tags",
+            json={"tags": ["bob-tag"]},
+            headers=bob_headers,
+        )
+        assert bob_resp.status_code == 200
+        assert store.list_session_tags("sess_bob2") == ["bob-tag"]

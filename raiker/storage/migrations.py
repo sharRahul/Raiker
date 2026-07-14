@@ -1266,3 +1266,21 @@ CREATE TABLE IF NOT EXISTS memory_settings (
   updated_at TEXT NOT NULL
 );
 """
+
+# Conversation organisation (backlog item 2 remainder): session tags. A tag is
+# an organizing label only — like the per-session `pinned` flag and the
+# `projects` table, it grants nothing and changes no gate, policy, or
+# authority. Many-to-many: one session may carry many tags and the same tag
+# may be reused across sessions. FK ON DELETE CASCADE mirrors the explicit
+# cascade in delete_session/delete_project so rows are never orphaned.
+SESSION_TAGS_MIGRATION_ID = "RAIKER-1011-session-tags"
+
+SESSION_TAGS_SQL = """
+CREATE TABLE IF NOT EXISTS session_tags (
+  session_id TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+  tag TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (session_id, tag)
+);
+CREATE INDEX IF NOT EXISTS idx_session_tags_tag ON session_tags(tag);
+"""

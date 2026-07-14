@@ -370,6 +370,19 @@ export const api = {
         headers: { "X-Session-Delete-Confirm": id },
       },
     ),
+  // Replace the tag set for one session. Tags are organizing labels only —
+  // they grant nothing. The server normalizes (trim, lowercase, dedupe,
+  // length/count caps). Human-only; an account cannot retag another account's
+  // session.
+  setSessionTags: (id: string, tags: string[]) =>
+    request<{ ok: boolean; session_id: string; tags: string[] }>(
+      `/api/sessions/${encodeURIComponent(id)}/tags`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tags }),
+      },
+    ),
   turn: (id: string) => request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
   tasks: (params: { session_id?: string; status?: string } = {}) =>
     request<TaskView[]>(withQuery("/api/tasks", params)),

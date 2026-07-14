@@ -49,6 +49,18 @@ fail-closed by design.
 - The chat surface opens its "How this turn was governed" timeline while a
   turn streams, so the agent is not a black box — the user sees gather →
   plan → act → verify live instead of a generic "Working…".
+- Conversation organisation has landed a second slice: per-session tags.
+  Tags are organizing labels only (like the per-session `pinned` flag and
+  the `projects` table) — they grant nothing and change no gate, policy, or
+  authority. A `session_tags` table holds a many-to-many tag set;
+  `DashboardService.set_session_tags` is human-only, normalizes input
+  (trim/lowercase/dedupe/length+count caps), and reuses the same
+  user/session visibility boundary (an account cannot retag another
+  account's session). `delete_session` and `delete_project` cascade
+  `session_tags`. API: `PUT /api/sessions/{id}/tags`; the Sessions view
+  renders chips with per-chip × remove, an inline add-tag input, and a
+  tag-substring filter. Nested projects/folders and project-only export
+  remain deferred.
 - Conversation organisation has landed its first slice: per-session
   pin/bookmark and single + bulk delete in the Sessions view. Pinned
   sessions surface first; deletion is human-only and respects the same
@@ -94,11 +106,13 @@ clients fetch the transparent files instead of retaining an old opaque copy.
 ## Next implementation slice — requires design approval
 
 **Conversation organisation remainder + real reminders.** Memory controls
-have landed their first slice (list/pin/forget + incognito). The remaining
-organisation backlog (nested projects/folders, tags, project-only export) and
-backlog item 4 (real reminders/routines — an opt-in local scheduler that
-executes approved, bounded actions) are the next assistant-workflow gaps.
-Build one governed vertical slice at a time against the current codebase.
+have landed their first slice (list/pin/forget + incognito) and
+conversation organisation has landed two slices (pin/bookmark + delete,
+and per-session tags). The remaining organisation backlog (nested
+projects/folders, project-only export) and backlog item 4 (real
+reminders/routines — an opt-in local scheduler that executes approved,
+bounded actions) are the next assistant-workflow gaps. Build one governed
+vertical slice at a time against the current codebase.
 
 ## Prioritised product backlog
 

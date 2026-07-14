@@ -216,6 +216,9 @@ export interface SessionSummary {
   // Conversation organisation: a per-session pin/bookmark flag. Pinned
   // sessions surface first in the Sessions list. Organizing label only.
   pinned: boolean;
+  // Conversation organisation remainder: per-session tags. Organizing labels
+  // only — like `pinned`, they grant nothing. Storage returns them sorted.
+  tags: string[];
 }
 
 export interface TurnSummary {

@@ -15,6 +15,7 @@ from raiker.api.schemas import (
     SetModelFallbackRequest,
     SetModelSelectionRequest,
     SetSessionPinnedRequest,
+    SetSessionTagsRequest,
     TaskCreateRequest,
     serialize_dto,
 )
@@ -139,6 +140,37 @@ async def delete_session(
         )
     result = _service(request).delete_session(session_id, auth_data[0].principal_id)
     if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/sessions/{session_id}/tags")
+async def set_session_tags(
+    session_id: str,
+    body: SetSessionTagsRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Replace the tag set for one session (human-only).
+
+    Tags are organizing labels only — they surface as chips on the session
+    row and grant nothing. The server normalizes the list (trim, lowercase,
+    dedupe, length/count caps) and rejects invalid input with 422. Respects
+    user/session visibility — an account cannot retag another account's session.
+    """
+    result = _service(request).set_session_tags(
+        session_id, body.tags, auth_data[0].principal_id
+    )
+    if not result.ok:
+        reason = result.reason_code or ""
+        if reason.startswith("invalid_tag"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"ok": False, "reason_code": result.reason_code},
+            )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"ok": False, "reason_code": result.reason_code},

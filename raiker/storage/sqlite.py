@@ -158,6 +158,8 @@ from raiker.storage.migrations import (
     PROJECTS_SQL,
     REMINDERS_MIGRATION_ID,
     REMINDERS_SQL,
+    SESSION_TAGS_MIGRATION_ID,
+    SESSION_TAGS_SQL,
     THREAT_MODEL_ACKS_MIGRATION_ID,
     THREAT_MODEL_ACKS_SQL,
 )
@@ -478,6 +480,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MEMORY_CONTROLS_MIGRATION_ID, MEMORY_CONTROLS_SQL, connection
             )
+            self._apply_migration(
+                SESSION_TAGS_MIGRATION_ID, SESSION_TAGS_SQL, connection
+            )
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
@@ -673,7 +678,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 marks = ",".join("?" for _ in session_ids)
                 action_ids = f"SELECT action_id FROM tool_actions WHERE session_id IN ({marks})"
                 connection.execute(f"DELETE FROM policy_decisions WHERE action_id IN ({action_ids})", session_ids)
-                for table in ("events_index", "tool_actions", "checkpoints", "tasks", "turns", "model_session_state", "model_fallback_sequence", "model_advisor"):
+                for table in ("events_index", "tool_actions", "checkpoints", "tasks", "turns", "model_session_state", "model_fallback_sequence", "model_advisor", "session_tags"):
                     connection.execute(f"DELETE FROM {table} WHERE session_id IN ({marks})", session_ids)
                 connection.execute(f"DELETE FROM sessions WHERE session_id IN ({marks})", session_ids)
             connection.execute("UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,))
@@ -714,6 +719,57 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
         return True
 
+    # ── Session tags (conversation organisation remainder) ─────────────────
+    # A tag is an organizing label only (like the `pinned` flag and the
+    # `projects` table) — it grants nothing and changes no gate, policy, or
+    # authority. Many-to-many: a session carries an ordered set of tags; the
+    # same tag may be reused across sessions. Setters are full-replace so the
+    # caller's normalized list is the single source of truth. User/session
+    # visibility mirrors set_session_pinned — an account cannot retag another
+    # account's session.
+
+    def list_session_tags(self, session_id: str) -> list[str]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT tag FROM session_tags WHERE session_id = ? ORDER BY tag",
+                (session_id,),
+            ).fetchall()
+        return [str(row["tag"]) for row in rows]
+
+    def set_session_tags(
+        self, session_id: str, tags: list[str], user_id: str | None = None
+    ) -> bool:
+        """Full-replace the tag set for one session. ``tags`` is the already
+        normalized, deduplicated, ordered list. Returns False if the session
+        does not exist or is owned by another account (mirrors
+        set_session_pinned). FK ON DELETE CASCADE keeps rows consistent if the
+        session is removed out-of-band, but the explicit delete_session
+        cascade also clears them."""
+        with self.connect() as connection:
+            exists, owner = self._session_owner(connection, session_id)
+            if not exists:
+                return False
+            if (
+                user_id is not None
+                and owner is not None
+                and str(owner) != user_id
+            ):
+                return False
+            connection.execute(
+                "DELETE FROM session_tags WHERE session_id = ?", (session_id,)
+            )
+            if tags:
+                now = utc_now()
+                connection.executemany(
+                    "INSERT OR IGNORE INTO session_tags (session_id, tag, created_at) VALUES (?, ?, ?)",
+                    [(session_id, tag, now) for tag in tags],
+                )
+            connection.execute(
+                "UPDATE sessions SET updated_at = ? WHERE session_id = ?",
+                (utc_now(), session_id),
+            )
+        return True
+
     def delete_session(self, session_id: str, user_id: str | None = None) -> bool:
         """Delete one session and its cascaded rows (turns, events index, tool
         actions, policy decisions, checkpoints, tasks). Returns False if the
@@ -744,6 +800,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "model_session_state",
                 "model_fallback_sequence",
                 "model_advisor",
+                "session_tags",
             ):
                 connection.execute(
                     f"DELETE FROM {table} WHERE session_id = ?", (session_id,)

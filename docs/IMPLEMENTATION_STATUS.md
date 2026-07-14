@@ -146,6 +146,30 @@ fail-closed by design.
 > `tests/test_session_organisation.py` (13), `SessionsView.test.ts` (4), and
 > `tests/test_api_contract_schemas.py` now guards `pinned` on `SessionSummary`.
 > This is an organizing slice — no new capability, gate, policy, or executor.
+>
+> Conversation organisation remainder (2026-07-14): per-session tags have
+> landed. A `session_tags` table (session_id, tag, created_at; FK ON DELETE
+> CASCADE; index on tag) holds a many-to-many organizing label set — like
+> the `pinned` column and the `projects` table, it grants nothing and
+> changes no gate, policy, or authority. `DashboardService.set_session_tags`
+> is human-only, normalizes input (trim, collapse whitespace, lowercase,
+> dedupe, `[a-z0-9][a-z0-9 &._-]*`, 1..32 chars each, max 12 tags), and
+> reuses the same user/session visibility boundary as `set_session_pinned`
+> (an account cannot retag another account's session). Full-replace semantics
+> (empty list clears the set). `delete_session` and `delete_project` cascade
+> `session_tags` so rows are never orphaned (FK cascade is the belt; the
+> explicit cascade is the suspenders). `SessionView` carries `tags`; the
+> storage layer returns them sorted alphabetically. API:
+> `PUT /api/sessions/{id}/tags` (422 on invalid input, 403 on unknown/not-
+> owned session, 200 on success). Web: `SessionsView` renders tag chips
+> with per-chip × remove, an inline add-tag input + button per row, and a
+> tag-substring filter input in the head row. Tests:
+> `tests/test_session_organisation.py` (+7: round-trip, unknown session,
+> AI principal denied, invalid tags rejected, tags cleared on delete, API
+> round-trip, isolation), `SessionsView.test.ts` (+4: chip render, add,
+> remove, filter), `tests/test_api_contract_schemas.py` now guards `tags`
+> on `SessionSummary`. Nested projects/folders and project-only export
+> remain deferred.
 
 > Current truth update (2026-07-14): chat search now hydrates the persisted
 > transcript when a result is reopened. `ChatView` calls the existing governed

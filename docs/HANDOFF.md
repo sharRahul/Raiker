@@ -36,8 +36,12 @@ fail-closed by design.
 ## Current product state — 2026-07-14
 
 - Chat search is a real full-history search over chat titles, prompts, and
-  summaries. Results show session titles, but reopening a result does not yet
-  restore its saved transcript; see the next slice below.
+  summaries. Reopening a search result now hydrates its persisted turns in the
+  chat surface (prompt + the agent's response message + status) and lets the
+  user continue the same session — no new session is created merely to view
+  history. The live per-event timeline is not replayed for restored turns; new
+  turns stream as usual. The backend `/api/sessions/{id}` read enforces the
+  same user/session visibility boundary as every governed read.
 - Projects create/select/delete storage-backed project scopes. Deleting a
   project permanently deletes its chats and project directory after an explicit
   warning; project deletion does not delete chats outside that project.
@@ -68,15 +72,11 @@ clients fetch the transparent files instead of retaining an old opaque copy.
 
 ## Next implementation slice — requires design approval
 
-**Conversation history restoration.**
-
-Make an existing chat result open its persisted turns in the chat surface, then
-allow the user to continue it. Preserve user/session visibility boundaries and
-do not create a new session merely to view history. Keep search as a discovery
-surface rather than conflating it with the Sessions record.
-
-This is deliberately separate from search indexing: the search query works;
-the missing transcript hydration is the defect to fix.
+**Conversation organisation (backlog item 2).** Search now opens a chat's
+persisted transcript, so the next assistant-workflow gap is organisation:
+nested projects/folders, tags, pin/bookmark, bulk move/delete/export, and
+project-only export. Build one governed vertical slice at a time against the
+current codebase; do not conflate it with the Sessions record.
 
 ## Prioritised product backlog
 

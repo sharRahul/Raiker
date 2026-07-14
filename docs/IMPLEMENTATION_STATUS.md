@@ -98,6 +98,19 @@ fail-closed by design.
 > grants no capability — creating or selecting one changes no gate, mode, or
 > policy. Tests: `tests/test_projects.py` (14) + `ProjectsView.test.ts` (5).
 
+> Current truth update (2026-07-14): chat search now hydrates the persisted
+> transcript when a result is reopened. `ChatView` calls the existing governed
+> `GET /api/sessions/{id}` read on mount when a `session` query param is
+> present and renders each persisted turn (prompt + the agent's response
+> message from `turn.summary` + status) so the user can continue the same
+> session — no new session is created merely to view history. The live
+> per-event timeline is not replayed for restored turns; new turns stream as
+> usual. The backend read is Bearer-authenticated and enforces the same
+> user/session visibility boundary as every governed read (an account cannot
+> read another account's session; legacy unattributed sessions remain
+> visible). No new capability, gate, policy, or executor is added. Tests:
+> `ChatView.test.ts` (+2).
+
 > Current truth update (2026-07-14): project folders now have a bounded,
 > explicit context record: project instructions, validated references to
 > uploaded attachments, and opt-in approved memory scoped as

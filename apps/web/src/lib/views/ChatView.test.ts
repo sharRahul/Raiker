@@ -393,4 +393,81 @@ describe("ChatView streaming transcript", () => {
     });
     expect(screen.queryByText(/working/i)).not.toBeInTheDocument();
   });
+
+  it("hydrates persisted turns when opened with a session id and continues that session", async () => {
+    stubFetch({
+      ...MODELS_ROUTE,
+      "GET /api/sessions/sess_hist": {
+        session: {
+          session_id: "sess_hist",
+          title: "Prior chat",
+          status: "open",
+          created_at: "2026-07-10T00:00:00Z",
+          updated_at: "2026-07-10T00:01:00Z",
+          turn_count: 2,
+        },
+        turns: [
+          {
+            turn_id: "turn_1",
+            session_id: "sess_hist",
+            turn_type: "prompt",
+            status: "completed",
+            prompt_text: "what is 2+2",
+            created_at: "2026-07-10T00:00:00Z",
+            completed_at: "2026-07-10T00:00:10Z",
+            summary: "It is 4.",
+          },
+          {
+            turn_id: "turn_2",
+            session_id: "sess_hist",
+            turn_type: "prompt",
+            status: "completed",
+            prompt_text: "thanks",
+            created_at: "2026-07-10T00:00:20Z",
+            completed_at: "2026-07-10T00:00:30Z",
+            summary: "You're welcome.",
+          },
+        ],
+      },
+    });
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: { ...finalResponse("Sure."), session_id: "sess_hist" },
+        } as StreamEvent);
+      },
+    );
+
+    render(ChatView, { props: { sessionId: "sess_hist" } });
+
+    // Both the prior prompt and the restored agent answer must render — the
+    // transcript is hydrated, not a blank composer.
+    await waitFor(() => expect(screen.getByText("what is 2+2")).toBeInTheDocument());
+    expect(screen.getByText("It is 4.")).toBeInTheDocument();
+    expect(screen.getByText("thanks")).toBeInTheDocument();
+    expect(screen.getByText("You're welcome.")).toBeInTheDocument();
+
+    // Continuing the conversation must reuse the same session id — a new
+    // session must not be created merely to view history.
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "again" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledOnce());
+    const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(body.session_id).toBe("sess_hist");
+  });
+
+  it("shows an honest error when persisted history cannot be loaded", async () => {
+    stubFetch(MODELS_ROUTE);
+    render(ChatView, { props: { sessionId: "sess_missing" } });
+
+    await waitFor(() =>
+      expect(screen.getByText(/could not load history/i)).toBeInTheDocument(),
+    );
+  });
 });

@@ -4,7 +4,7 @@
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import { api, ApiError, streamPrompt } from "../api";
-  import type { AgentResponse, ModelProfile, ProviderModelList, StreamEvent } from "../apiTypes";
+  import type { AgentResponse, ModelProfile, ProviderModelList, SessionDetail, StreamEvent } from "../apiTypes";
   import { groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { responseBadge } from "../statusMaps";
   import { collectText } from "../turnPhases";
@@ -255,7 +255,53 @@
 
   onMount(() => {
     void loadProfiles();
+    if (continuedSessionId !== null) void loadHistory(continuedSessionId);
   });
+
+  // Hydrate the persisted transcript for a continued session so a search result
+  // (or any link into an existing chat) opens its prior turns in the chat surface
+  // instead of a blank composer. The backend `/api/sessions/{id}` read is
+  // Bearer-authenticated and enforces the same user/session visibility boundary
+  // as every other governed read, so no new session is created merely to view
+  // history — the restored turns reuse the continued session id and the user
+  // can keep typing into it. Restored turns carry only what is persisted: the
+  // prompt, the agent's response message (turn.summary), and the turn status.
+  // The live per-event timeline is not replayed; new turns stream as usual.
+  let historyError = $state<string | null>(null);
+
+  async function loadHistory(id: string) {
+    try {
+      const detail = await api.session(id);
+      turns = detail.turns.map((t) => restoredTurn(t, id));
+      nextId = turns.length + 1;
+      void scrollToEnd();
+    } catch (e) {
+      historyError =
+        e instanceof ApiError ? `Could not load history (${e.status}).` : "Could not load history.";
+    }
+  }
+
+  function restoredTurn(t: SessionDetail["turns"][number], sessionId: string): ChatTurn {
+    return {
+      id: nextId++,
+      prompt: t.prompt_text ?? "",
+      attachments: [],
+      events: [],
+      response: {
+        request_id: "",
+        session_id: sessionId,
+        turn_id: t.turn_id,
+        status: t.status,
+        message: t.summary ?? "",
+        events_path: null,
+        checkpoint_path: null,
+        approval: null,
+        last_event_id: null,
+      },
+      streaming: false,
+      error: null,
+    };
+  }
 
   async function loadProfiles() {
     try {
@@ -380,6 +426,9 @@
 
 <div class="chat">
   <div class="thread" bind:this={scrollEl}>
+    {#if historyError !== null}
+      <p class="error-line" role="alert">{historyError}</p>
+    {/if}
     {#if turns.length === 0}
       <EmptyState
         icon="chat"

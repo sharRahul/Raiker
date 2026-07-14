@@ -21,7 +21,7 @@ SECRET_PATTERNS = (
     "authorization",
     "private_key",
     "private-key",
-    "-----BEGIN",
+    "-----begin",
 )
 
 

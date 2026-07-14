@@ -123,6 +123,16 @@ def test_redact_event_payload_redacts_secret_strings_in_lists() -> None:
     assert redacted["items"] == ["***REDACTED***", "visible", 42, ["***REDACTED***"]]
 
 
+def test_redact_event_payload_redacts_pem_strings_in_values_and_lists() -> None:
+    pem = "-----BEGIN PRIVATE KEY-----\nsecret-key-material\n-----END PRIVATE KEY-----"
+    payload = {"certificate": pem, "items": [pem, "visible"]}
+
+    redacted = redact_event_payload(payload)
+
+    assert redacted["certificate"] == "***REDACTED***"
+    assert redacted["items"] == ["***REDACTED***", "visible"]
+
+
 # ── Build export manifest ──
 
 

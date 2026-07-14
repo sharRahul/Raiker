@@ -13,3 +13,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 .claude
+project-map.md
+docs/specs
+docs/plans
+docs/superpowers

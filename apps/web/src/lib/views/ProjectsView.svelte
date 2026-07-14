@@ -27,7 +27,7 @@
 
   async function remove(projectId: string) {
     if (!window.confirm("This will permanently delete all project chats and files in this project folder. To save chats, move them to your chat list or another project before deleting.")) return;
-    try { deleteError = null; await api.deleteProject(projectId); detail = null; await load(); onchanged?.(); }
+    try { deleteError = null; await api.deleteProject(projectId, true); detail = null; await load(); onchanged?.(); }
     catch (e) { deleteError = e instanceof ApiError ? `Could not delete (${e.status}).` : "Could not delete"; }
   }
 

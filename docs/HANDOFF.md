@@ -83,14 +83,15 @@ governed vertical slice at a time.
 
 1. **Project context:** project instructions, shared attachments, and an
    opt-in project-memory boundary. Chats moved into a project must inherit that
-   bounded context; moving out must remove it. This is the clearest assistant
-   workflow gap.
+   bounded context; moving out must remove it. Project schedules must remain
+   project-scoped. This is the clearest assistant workflow gap.
 2. **Conversation organisation:** nested projects/folders, tags, pin/bookmark,
    bulk move/delete/export, and project-only export. Search exists; these do
    not.
 3. **Reliable memory controls:** user-visible memory list with edit, pin,
-   delete, scope, provenance, and expiry controls. Reuse the governed memory
-   store; do not create a second memory system.
+   delete, scope, provenance, expiry, import/export, and search-participation
+   controls. Include a separate opt-out/incognito boundary. Reuse the governed
+   memory store; do not create a second memory system.
 4. **Real reminders and routines:** an opt-in local scheduler that executes
    only an approved, bounded reminder/action, with delivery status, retries,
    pause, and cancellation. Stored-only task metadata is not automation.
@@ -99,7 +100,8 @@ governed vertical slice at a time.
    executor. Never make a write action execute on `ask` alone.
 6. **Agent evaluation and observability:** trace a goal/plan/tool/approval
    chain with latency, cost, outcome, and user feedback; add record/replayable
-   regression scenarios and outcome review before making autonomy broader.
+   regression scenarios, outcome review, and an OpenTelemetry-compatible export
+   with configurable prompt/content redaction before making autonomy broader.
 7. **Agent identity and least privilege:** distinct agent/service identities,
    short-lived scoped credentials, per-tool grants, and a user-facing access
    review. Existing principal and approval controls are a base, not a complete
@@ -115,9 +117,14 @@ governed vertical slice at a time.
    disabled.
 10. **Always-available channel gateway:** a local, long-lived, paired-device
     gateway for approved messaging channels, with per-channel session routing,
-    idempotent delivery, connection health, and explicit remote-access trust.
-    Build on the existing webhook reference channel; do not turn inbound
-    messages into trusted instructions.
+    idempotent delivery, connection health, resume/reconnect across approved
+    devices, and explicit remote-access trust. Build on the existing webhook
+    reference channel; do not turn inbound messages into trusted instructions.
+11. **Supervised computer use:** only after connector writes and the gateway
+    are mature, add a connector-first fallback for browser/screen interaction.
+    Require per-application approval and blocklists, keep sensitive domains
+    excluded, label screen content untrusted, and make every side effect
+    approval-gated and auditable.
 
 ### Research basis (2026-07-14)
 
@@ -125,8 +132,10 @@ This backlog is informed by provider documentation, not only OpenAI research:
 
 - **Claude and Claude Cowork:** projects have isolated chat history, knowledge,
   attachments, and instructions; Cowork combines connected tools, scheduled
-  work, plugins, explicit folder/tool bounds, deletion approval, and enterprise
-  observability. This reinforces items 1, 4, 5, 6, and 7.
+  work, plugins, explicit folder/tool bounds, deletion approval, computer-use
+  safeguards, and enterprise observability. Claude also separates project chat
+  search/memory and supports memory import/export. This reinforces items 1, 3,
+  4, 5, 6, 7, and 11.
 - **Claude Code:** persistent project context, skills, isolated subagents and
   teams, MCP, lifecycle hooks, and distributable plugins separate reusable
   workflows from deterministic guardrails. This informs items 6, 8, and 9.
@@ -141,7 +150,7 @@ This backlog is informed by provider documentation, not only OpenAI research:
   device pairing, typed events, health, and idempotent side effects. This
   informs item 10.
 
-Primary sources: [Claude Projects](https://support.claude.com/en/articles/9517075-what-are-projects), [Claude Cowork](https://claude.com/product/cowork), [Claude Code extensions](https://code.claude.com/docs/en/features-overview), [Claude Code hooks](https://code.claude.com/docs/en/agent-sdk/hooks), [OpenAI Codex manual](https://developers.openai.com/codex/codex-manual.md), [Hermes Agent documentation](https://hermes-agent.nousresearch.com/docs), [OpenClaw overview](https://docs.openclaw.ai/), and [OpenClaw gateway architecture](https://docs.openclaw.ai/concepts/architecture).
+Primary sources: [Claude support collection](https://support.claude.com/en/collections/4078531-claude), [Claude Projects](https://support.claude.com/en/articles/9517075-what-are-projects), [Claude chat search and memory](https://support.claude.com/en/articles/11817273-use-claude-s-chat-search-and-memory-to-build-on-previous-context), [Claude memory import/export](https://support.claude.com/en/articles/12123587-import-and-export-your-memory-from-claude), [Cowork support collection](https://support.claude.com/en/collections/19667525-claude-cowork), [Cowork project tasks](https://support.claude.com/en/articles/14116274-organize-your-tasks-with-projects-in-claude-cowork), [Cowork computer use](https://support.claude.com/en/articles/14128542-let-claude-use-your-computer-in-cowork), [Cowork OpenTelemetry](https://support.claude.com/en/articles/14477985-monitor-claude-cowork-activity-with-opentelemetry), [Claude Code documentation](https://code.claude.com/docs/en/), [Claude Code extensions](https://code.claude.com/docs/en/features-overview), [Claude Code hooks](https://code.claude.com/docs/en/agent-sdk/hooks), [OpenAI Codex manual](https://developers.openai.com/codex/codex-manual.md), [Hermes Agent documentation](https://hermes-agent.nousresearch.com/docs), [OpenClaw overview](https://docs.openclaw.ai/), and [OpenClaw gateway architecture](https://docs.openclaw.ai/concepts/architecture).
 
 ## Verification and handoff
 

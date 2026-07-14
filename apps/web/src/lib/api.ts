@@ -292,7 +292,7 @@ export const api = {
   // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
   projects: () => request<ProjectsList>("/api/projects"),
   project: (id: string) => request<ProjectDetail>(`/api/projects/${encodeURIComponent(id)}`),
-  // Create a named project (human gate-manager only, enforced server-side).
+  // Create a named project for the authenticated local human.
   // The root subpath is derived and contained server-side — no path is sent.
   createProject: (name: string) =>
     postJson<{ ok: boolean; project_id: string; name: string; root_subpath: string }>(
@@ -306,8 +306,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project_id }),
     }),
-  deleteProject: (id: string) =>
-    request<{ ok: boolean }>(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  deleteProject: (id: string, confirmed = false) =>
+    request<{ ok: boolean }>(`/api/projects/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: confirmed ? { "X-Project-Delete-Confirm": id } : undefined,
+    }),
   session: (id: string) => request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
   turn: (id: string) => request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
   tasks: (params: { session_id?: string; status?: string } = {}) =>

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
@@ -151,7 +151,7 @@ async def create_project(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    """Create a named project (human gate-manager only).
+    """Create a named project for the authenticated local human.
 
     The project root is derived server-side and always contained inside the
     workspace; a project grants no authority.
@@ -172,7 +172,7 @@ async def select_project(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    """Set (or clear) the active project (human gate-manager only).
+    """Set (or clear) the active project for the authenticated local human.
 
     New sessions are stamped with the active project; selecting grants nothing.
     """
@@ -205,7 +205,13 @@ async def delete_project(
     project_id: str,
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    x_project_delete_confirm: str | None = Header(default=None),
 ) -> dict[str, Any]:
+    if x_project_delete_confirm != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": "project_delete_confirmation_required"},
+        )
     result = _service(request).delete_project(project_id, auth_data[0].principal_id)
     if not result.ok:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})

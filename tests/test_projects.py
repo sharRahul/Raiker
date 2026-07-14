@@ -229,6 +229,42 @@ class TestProjectsApi:
         assert resp.status_code == 403
         assert resp.json()["detail"]["reason_code"] == "invalid_project_name"
 
+    def test_authenticated_human_can_confirm_project_deletion(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        owner_headers = self._headers(client)
+        project_id = client.post(
+            "/api/projects", json={"name": "Alpha"}, headers=owner_headers
+        ).json()["project_id"]
+        registered = client.post(
+            "/api/auth/register", json={"username": "alex", "password": "right-pass-123"}
+        )
+        assert registered.status_code == 200, registered.text
+
+        response = client.delete(
+            f"/api/projects/{project_id}",
+            headers={
+                "Authorization": f"Bearer {registered.json()['token']}",
+                "X-Project-Delete-Confirm": project_id,
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        assert not (workspace / "projects" / "alpha").exists()
+
+    def test_project_deletion_requires_an_explicit_confirmation(
+        self, client: TestClient
+    ) -> None:
+        headers = self._headers(client)
+        project_id = client.post(
+            "/api/projects", json={"name": "Alpha"}, headers=headers
+        ).json()["project_id"]
+
+        response = client.delete(f"/api/projects/{project_id}", headers=headers)
+
+        assert response.status_code == 409
+        assert response.json()["detail"]["reason_code"] == "project_delete_confirmation_required"
+
     def test_sessions_and_checkpoints_accept_a_project_filter(
         self, client: TestClient, workspace: Path
     ) -> None:

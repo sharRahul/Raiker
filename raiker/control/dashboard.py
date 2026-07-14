@@ -532,8 +532,8 @@ class DashboardService:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
-        if not self.control._is_gate_manager(principal):  # noqa: SLF001
-            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
         cleaned = (name or "").strip()
         if not cleaned or len(cleaned) > self._PROJECT_NAME_MAX:
             return ControlResult(ok=False, reason_code="invalid_project_name")
@@ -566,8 +566,8 @@ class DashboardService:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
-        if not self.control._is_gate_manager(principal):  # noqa: SLF001
-            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
         cleaned = (project_id or "").strip()
         if not cleaned:
             self.store.save_active_project(None)
@@ -581,8 +581,8 @@ class DashboardService:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
-        if not self.control._is_gate_manager(principal):  # noqa: SLF001
-            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
         project = self.store.load_project(project_id)
         if project is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")

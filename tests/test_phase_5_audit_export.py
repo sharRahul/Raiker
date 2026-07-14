@@ -115,6 +115,14 @@ def test_redact_event_payload_redacts_dictionaries_in_nested_lists() -> None:
     ]
 
 
+def test_redact_event_payload_redacts_secret_strings_in_lists() -> None:
+    payload = {"items": ["Bearer token", "visible", 42, ["api_key=value"]]}
+
+    redacted = redact_event_payload(payload)
+
+    assert redacted["items"] == ["***REDACTED***", "visible", 42, ["***REDACTED***"]]
+
+
 # ── Build export manifest ──
 
 

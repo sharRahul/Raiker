@@ -36,6 +36,10 @@ def _redact_list_values(values: list[Any]) -> list[Any]:
         if isinstance(value, dict)
         else _redact_list_values(value)
         if isinstance(value, list)
+        else "***REDACTED***"
+        if isinstance(value, str)
+        and len(value) > 0
+        and any(p in value.lower() for p in SECRET_PATTERNS)
         else value
         for value in values
     ]

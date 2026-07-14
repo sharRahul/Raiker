@@ -116,11 +116,22 @@ def test_redact_event_payload_redacts_dictionaries_in_nested_lists() -> None:
 
 
 def test_redact_event_payload_redacts_secret_strings_in_lists() -> None:
-    payload = {"items": ["Bearer token", "visible", 42, ["api_key=value"]]}
+    payload = {
+        "direct": "sk-1234567890abcdef",
+        "items": ["Bearer token", "visible", 42, ["api_key=value", "sk-abcdef0123456789"]],
+        "nested": {"credential": "sk-0123456789abcdef"},
+    }
 
     redacted = redact_event_payload(payload)
 
-    assert redacted["items"] == ["***REDACTED***", "visible", 42, ["***REDACTED***"]]
+    assert redacted["direct"] == "[REDACTED_TOKEN]"
+    assert redacted["items"] == [
+        "***REDACTED***",
+        "visible",
+        42,
+        ["[REDACTED_SECRET]", "[REDACTED_TOKEN]"],
+    ]
+    assert redacted["nested"]["credential"] == "[REDACTED_TOKEN]"
 
 
 def test_redact_event_payload_redacts_pem_strings_in_values_and_lists() -> None:
@@ -129,8 +140,8 @@ def test_redact_event_payload_redacts_pem_strings_in_values_and_lists() -> None:
 
     redacted = redact_event_payload(payload)
 
-    assert redacted["certificate"] == "***REDACTED***"
-    assert redacted["items"] == ["***REDACTED***", "visible"]
+    assert redacted["certificate"] == "[REDACTED_PRIVATE_KEY]"
+    assert redacted["items"] == ["[REDACTED_PRIVATE_KEY]", "visible"]
 
 
 # ── Build export manifest ──
@@ -255,7 +266,9 @@ def test_generate_export_project_forces_redaction(
             payload={
                 "api_key": "sk-project-secret",
                 "data": "normal",
-                "items": [{"token": "nested-project-secret"}],
+                "direct": "sk-1234567890abcdef",
+                "items": [{"token": "nested-project-secret"}, "sk-abcdef0123456789"],
+                "nested": {"credential": "sk-0123456789abcdef"},
             },
         )
     )
@@ -268,6 +281,9 @@ def test_generate_export_project_forces_redaction(
     assert exported["payload"]["api_key"] == "***REDACTED***"
     assert exported["payload"]["data"] == "normal"
     assert exported["payload"]["items"][0]["token"] == "***REDACTED***"
+    assert exported["payload"]["direct"] == "[REDACTED_TOKEN]"
+    assert exported["payload"]["items"][1] == "[REDACTED_TOKEN]"
+    assert exported["payload"]["nested"]["credential"] == "[REDACTED_TOKEN]"
 
 
 def test_generate_export_redacted(store: SQLiteStore, writer: EventLogWriter) -> None:

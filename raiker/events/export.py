@@ -7,6 +7,7 @@ from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ExportManifest
+from raiker.context.redaction import redact_text
 from raiker.events.writer import EventLogWriter
 from raiker.storage.sqlite import SQLiteStore
 
@@ -36,13 +37,18 @@ def _redact_list_values(values: list[Any]) -> list[Any]:
         if isinstance(value, dict)
         else _redact_list_values(value)
         if isinstance(value, list)
-        else "***REDACTED***"
+        else _redact_string_value(value)
         if isinstance(value, str)
-        and len(value) > 0
-        and any(p in value.lower() for p in SECRET_PATTERNS)
         else value
         for value in values
     ]
+
+
+def _redact_string_value(value: str) -> str:
+    redacted, changed = redact_text(value)
+    if changed:
+        return redacted
+    return "***REDACTED***" if any(p in value.lower() for p in SECRET_PATTERNS) else value
 
 
 def redact_event_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -55,11 +61,8 @@ def redact_event_payload(payload: dict[str, Any]) -> dict[str, Any]:
             redacted[key] = redact_event_payload(value)
         elif isinstance(value, list):
             redacted[key] = _redact_list_values(value)
-        elif isinstance(value, str) and len(value) > 0:
-            if any(p in value.lower() for p in SECRET_PATTERNS):
-                redacted[key] = "***REDACTED***"
-            else:
-                redacted[key] = value
+        elif isinstance(value, str):
+            redacted[key] = _redact_string_value(value)
         else:
             redacted[key] = value
     return redacted
@@ -81,12 +84,17 @@ def build_export_manifest(
     *,
     project_id: str | None = None,
     user_id: str | None = None,
+    apply_user_visibility_filter: bool = False,
     redact: bool = True,
     exported_by: str = "cli",
 ) -> ExportManifest | None:
     redact = redact or project_id is not None
     events = store.list_event_index(
-        session_id=session_id, project_id=project_id, user_id=user_id, limit=10000
+        session_id=session_id,
+        project_id=project_id,
+        user_id=user_id,
+        apply_user_visibility_filter=apply_user_visibility_filter,
+        limit=10000,
     )
     if not events:
         return None
@@ -132,6 +140,7 @@ def generate_export(
     *,
     project_id: str | None = None,
     user_id: str | None = None,
+    apply_user_visibility_filter: bool = False,
     redact: bool = True,
     exported_by: str = "cli",
 ) -> ExportManifest:
@@ -141,6 +150,7 @@ def generate_export(
         session_id,
         project_id=project_id,
         user_id=user_id,
+        apply_user_visibility_filter=apply_user_visibility_filter,
         redact=redact,
         exported_by=exported_by,
     )
@@ -168,7 +178,11 @@ def generate_export(
     exports_dir.mkdir(parents=True, exist_ok=True)
     export_path = exports_dir / f"{manifest.export_id}.jsonl"
     event_rows = store.list_event_index(
-        session_id=session_id, project_id=project_id, user_id=user_id, limit=10000
+        session_id=session_id,
+        project_id=project_id,
+        user_id=user_id,
+        apply_user_visibility_filter=apply_user_visibility_filter,
+        limit=10000,
     )
     with export_path.open("w", encoding="utf-8") as out:
         for row in reversed(event_rows):

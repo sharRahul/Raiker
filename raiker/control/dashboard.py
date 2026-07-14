@@ -821,6 +821,7 @@ class DashboardService:
             self.store,
             project_id=project_id,
             user_id=principal.delegated_by_user_id,
+            apply_user_visibility_filter=True,
         )
         return ControlResult(ok=True, data={"export_path": manifest.export_path})
 

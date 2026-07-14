@@ -299,7 +299,7 @@ class TestProjectsApi:
         records = [json.loads(line) for line in response.text.splitlines()]
         assert [record["payload"]["message"] for record in records] == ["first", "second"]
 
-    def test_export_excludes_other_accounts_project_sessions(
+    def test_export_applies_visibility_to_bootstrap_and_named_accounts(
         self, client: TestClient, workspace: Path
     ) -> None:
         owner_headers = self._headers(client)
@@ -311,16 +311,23 @@ class TestProjectsApi:
         )
         assert registered.status_code == 200, registered.text
         alex_headers = {"Authorization": f"Bearer {registered.json()['token']}"}
+        maria_registered = client.post(
+            "/api/auth/register", json={"username": "maria", "password": "right-pass-123"}
+        )
+        assert maria_registered.status_code == 200, maria_registered.text
         store = SQLiteStore(workspace)
         alex_principal = store.get_principal(registered.json()["principal_id"])
         assert alex_principal is not None
         alex_user_id = str(alex_principal["delegated_by_user_id"])
+        maria_principal = store.get_principal(maria_registered.json()["principal_id"])
+        assert maria_principal is not None
+        maria_user_id = str(maria_principal["delegated_by_user_id"])
         store.save_active_project(project_id)
         store.create_session("sess_alex", str(workspace), user_id=alex_user_id)
-        store.create_session("sess_owner", str(workspace), user_id="rahul")
+        store.create_session("sess_maria", str(workspace), user_id=maria_user_id)
         store.create_session("sess_legacy", str(workspace))
         writer = EventLogWriter(store)
-        for session_id in ("sess_alex", "sess_owner", "sess_legacy"):
+        for session_id in ("sess_alex", "sess_maria", "sess_legacy"):
             writer.append(
                 make_event(
                     session_id=session_id,
@@ -334,7 +341,7 @@ class TestProjectsApi:
         owner_response = client.post(f"/api/projects/{project_id}/export", headers=owner_headers)
         assert owner_response.status_code == 200, owner_response.text
         owner_exported = [json.loads(line)["session_id"] for line in owner_response.text.splitlines()]
-        assert set(owner_exported) == {"sess_alex", "sess_owner", "sess_legacy"}
+        assert set(owner_exported) == {"sess_legacy"}
 
         response = client.post(f"/api/projects/{project_id}/export", headers=alex_headers)
 

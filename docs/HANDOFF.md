@@ -118,8 +118,10 @@ fail-closed by design.
   of the existing redacted JSONL audit timeline. It includes exactly the
   project's direct sessions, never descendant-project sessions, and applies
   the same account visibility as project sessions, including legacy unowned
-  sessions. The download response exposes no filesystem path. Attachments,
-  project memory, and reminder scheduling are excluded.
+  sessions. Each export is capped at the 10,000 most recent matching events;
+  one bounded event-index snapshot supplies both its manifest and JSONL rows.
+  The download response exposes no filesystem path. Attachments, project
+  memory, and reminder scheduling are excluded.
 - Tasks can persist schedules and recurrence, but scheduling is stored-only:
   it never runs work or sends a reminder.
 

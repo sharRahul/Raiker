@@ -184,6 +184,38 @@ def test_generate_export_with_events(store: SQLiteStore, writer: EventLogWriter)
     assert len(lines) == 5
 
 
+def test_generate_export_uses_one_event_index_snapshot(store: SQLiteStore, writer: EventLogWriter, monkeypatch) -> None:
+    event = _write_events(writer, count=1)[0]
+    original_list_event_index = store.list_event_index
+    calls = 0
+
+    def snapshot_then_append(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        rows = original_list_event_index(*args, **kwargs)
+        if calls == 1:
+            writer.append(
+                make_event(
+                    session_id=event.session_id,
+                    turn_id=None,
+                    event_type="action_proposed",
+                    actor="test",
+                    payload={"message": "appended after snapshot"},
+                )
+            )
+        return rows
+
+    monkeypatch.setattr(store, "list_event_index", snapshot_then_append)
+
+    manifest = generate_export(store, session_id=event.session_id)
+
+    assert calls == 1
+    assert manifest.event_count == 1
+    assert manifest.export_path is not None
+    exported = [json.loads(line) for line in Path(manifest.export_path).read_text().splitlines()]
+    assert [row["event_id"] for row in exported] == [event.event_id]
+
+
 def test_generate_export_scopes_to_direct_project_sessions(
     store: SQLiteStore, writer: EventLogWriter
 ) -> None:

@@ -96,6 +96,23 @@ def build_export_manifest(
         apply_user_visibility_filter=apply_user_visibility_filter,
         limit=10000,
     )
+    return _build_export_manifest(
+        events,
+        session_id=session_id,
+        project_id=project_id,
+        redact=redact,
+        exported_by=exported_by,
+    )
+
+
+def _build_export_manifest(
+    events: list[dict[str, Any]],
+    *,
+    session_id: str | None,
+    project_id: str | None,
+    redact: bool,
+    exported_by: str,
+) -> ExportManifest | None:
     if not events:
         return None
     event_ids = [str(e["event_id"]) for e in events]
@@ -145,12 +162,17 @@ def generate_export(
     exported_by: str = "cli",
 ) -> ExportManifest:
     redact = redact or project_id is not None
-    manifest = build_export_manifest(
-        store,
-        session_id,
+    event_rows = store.list_event_index(
+        session_id=session_id,
         project_id=project_id,
         user_id=user_id,
         apply_user_visibility_filter=apply_user_visibility_filter,
+        limit=10000,
+    )
+    manifest = _build_export_manifest(
+        event_rows,
+        session_id=session_id,
+        project_id=project_id,
         redact=redact,
         exported_by=exported_by,
     )
@@ -177,13 +199,6 @@ def generate_export(
     exports_dir = events_dir.parent / "exports"
     exports_dir.mkdir(parents=True, exist_ok=True)
     export_path = exports_dir / f"{manifest.export_id}.jsonl"
-    event_rows = store.list_event_index(
-        session_id=session_id,
-        project_id=project_id,
-        user_id=user_id,
-        apply_user_visibility_filter=apply_user_visibility_filter,
-        limit=10000,
-    )
     with export_path.open("w", encoding="utf-8") as out:
         for row in reversed(event_rows):
             path_str = str(row.get("jsonl_path", ""))

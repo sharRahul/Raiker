@@ -108,6 +108,7 @@ currently exposes. It is the source of truth checked by `scripts/validate_repo_t
 /semantic-memory
 /export [--session <session_id>] [--no-redact]
 /export --verify --session <session_id>
+/trace <session_id> <turn_id>
 /routines
 /budgets
 /retention

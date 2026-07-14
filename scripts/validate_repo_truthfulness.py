@@ -91,6 +91,7 @@ REQUIRED_COMMANDS = {
     "/proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>] [--approval-preview]",
     "/doctor",
     "/channels",
+    "/trace <session_id> <turn_id>",
     "/launch --provider <provider> --model <model>",
     "/quit",
     "/runtime-mode",
@@ -142,7 +143,11 @@ def _literal_command_prefixes() -> set[str]:
     tree = ast.parse((ROOT / "raiker/cli/commands.py").read_text(encoding="utf-8"))
     prefixes: set[str] = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.startswith("/"):
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.startswith("/")
+        ):
             prefixes.add(node.value.split()[0])
     return {prefix for prefix in prefixes if prefix not in {"/exit", "/"}}
 
@@ -151,7 +156,9 @@ def _validate_snippet(name: str, text: str) -> list[str]:
     lowered = text.lower()
     errors: list[str] = []
     if (
-        any(token in name for token in ("IMPLEMENTATION_STATUS", "SECURITY", "TOOL", "ARCHITECTURE"))
+        any(
+            token in name for token in ("IMPLEMENTATION_STATUS", "SECURITY", "TOOL", "ARCHITECTURE")
+        )
         and "metadata-only" not in lowered
         and "metadata only" not in lowered
     ):
@@ -184,7 +191,9 @@ def main() -> int:
         text = path.read_text(encoding="utf-8")
         errors.extend(_validate_snippet(str(path.relative_to(ROOT)), text))
 
-    combined = "\n".join(path.read_text(encoding="utf-8") for path in CANONICAL_DOCS if path.exists())
+    combined = "\n".join(
+        path.read_text(encoding="utf-8") for path in CANONICAL_DOCS if path.exists()
+    )
     for status in CANONICAL_STATUSES:
         if status not in combined:
             errors.append(f"missing_canonical_status:{status}")

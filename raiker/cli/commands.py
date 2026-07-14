@@ -412,10 +412,14 @@ def handle_plugins(*, workspace_root: str | Path = ".") -> str:
     store = SQLiteStore(workspace_root)
     records = store.list_plugin_install_records()
     if not records:
-        return "No plugin install records. Use /plugin-plan <manifest_path> to plan a plugin install."
+        return (
+            "No plugin install records. Use /plugin-plan <manifest_path> to plan a plugin install."
+        )
     lines = ["Plugin install records:"]
     for r in records:
-        lines.append(f"- {r['plugin_id']} v={r['version']} trust={r['trust_level']} status={r['status']} checksum={'yes' if r.get('checksum') else 'no'} signature={'yes' if r.get('signature') else 'no'}")
+        lines.append(
+            f"- {r['plugin_id']} v={r['version']} trust={r['trust_level']} status={r['status']} checksum={'yes' if r.get('checksum') else 'no'} signature={'yes' if r.get('signature') else 'no'}"
+        )
     return "\n".join(lines)
 
 
@@ -443,6 +447,7 @@ def handle_plugin_plan(command: str, *, workspace_root: str | Path = ".") -> str
     if install_flag and plan["status"] != "denied":
         supply_chain = manifest.get("supply_chain") or {}
         from raiker.plugins.registry import record_plugin_install
+
         record = record_plugin_install(
             store=SQLiteStore(workspace_root),
             plugin_id=str(plan["plugin_id"]),
@@ -774,7 +779,9 @@ def _parse_approval_previews_command(command: str) -> dict[str, object] | str:
     return {"as_json": as_json, "status": status, "limit": limit}
 
 
-def handle_approval_previews(command: str = "/approval-previews", *, workspace_root: str | Path = ".") -> str:
+def handle_approval_previews(
+    command: str = "/approval-previews", *, workspace_root: str | Path = "."
+) -> str:
     from raiker.review.approval_preview import (
         ProposalApprovalPreviewStore,
         previews_to_json,
@@ -832,9 +839,7 @@ def handle_memory_approval_preview(
     return render_approval_preview(preview)
 
 
-_APPROVAL_PREVIEW_DETAIL_USAGE = (
-    "Usage: /approval-preview <preview_id> [--json]"
-)
+_APPROVAL_PREVIEW_DETAIL_USAGE = "Usage: /approval-preview <preview_id> [--json]"
 
 
 def _parse_approval_preview_detail_command(command: str) -> dict[str, object] | str:
@@ -1149,15 +1154,11 @@ def handle_review(command: str = "/review", *, workspace_root: str | Path = ".")
     if isinstance(limit, int):
         findings = findings[:limit]
     if findings != list(result.findings) or propose_fixes:
-        result = rebuild_review_result_with_findings(
-            result, findings, propose_fixes=propose_fixes
-        )
+        result = rebuild_review_result_with_findings(result, findings, propose_fixes=propose_fixes)
 
     if save_proposals and result.action_proposals:
         store = ProposalLifecycleStore(SQLiteStore(workspace_root))
-        saved = store.save_proposals(
-            result.action_proposals, review_id=result.review_id
-        )
+        saved = store.save_proposals(result.action_proposals, review_id=result.review_id)
         result_metadata = dict(result.event_metadata)
         result_metadata["saved_proposal_count"] = len(saved)
         result_metadata["saved_proposal_ids"] = [r.proposal_id for r in saved]
@@ -1504,9 +1505,7 @@ def handle_approval_resolution(command: str, *, workspace_root: str | Path = "."
         resolution = inbox.resolve(parts[1], approve=parts[0] == "/approve")
     except ValueError as exc:
         return f"Approval resolution failed: {exc}"
-    return (
-        f"Approval {resolution.approval_id} {resolution.status} for action {resolution.action_id}. Metadata only; no action was executed."
-    )
+    return f"Approval {resolution.approval_id} {resolution.status} for action {resolution.action_id}. Metadata only; no action was executed."
 
 
 def _profile_status(profile: ModelProfile) -> str:
@@ -1624,7 +1623,9 @@ async def handle_model_command_async(command: str, *, workspace_root: str | Path
                 )
                 return message
             effective = (
-                profile if resolved_model == profile.model else profile_with_model(profile, resolved_model)
+                profile
+                if resolved_model == profile.model
+                else profile_with_model(profile, resolved_model)
             )
             # Validate the effective profile (concrete model + endpoint + provider policy) without connecting.
             validator = ModelProviderFactory(policy=router.runtime_policy).create(effective)
@@ -1660,6 +1661,7 @@ def handle_model_command(command: str, *, workspace_root: str | Path = ".") -> s
     except RuntimeError:
         return asyncio.run(handle_model_command_async(command, workspace_root=workspace_root))
     return "Model command requires async command path; use handle_model_command_async."
+
 
 def _render_profile_current(profile: ModelProfile) -> str:
     return "\n".join(
@@ -1846,13 +1848,24 @@ def handle_user_create(command: str, *, workspace_root: str | Path = ".") -> str
         else:
             i += 1
     denial = _govern_admin_mutation(
-        "admin_mutation", "user_create", {"user_id": user_id, "display_name": display_name},
-        workspace_root=workspace_root, risk_level=RiskLevelValue.MEDIUM, domain_scope="",
+        "admin_mutation",
+        "user_create",
+        {"user_id": user_id, "display_name": display_name},
+        workspace_root=workspace_root,
+        risk_level=RiskLevelValue.MEDIUM,
+        domain_scope="",
     )
     if denial:
         return denial
     now = utc_now()
-    user = User(user_id=user_id, display_name=display_name, email=email, is_active=True, created_at=now, updated_at=now)
+    user = User(
+        user_id=user_id,
+        display_name=display_name,
+        email=email,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
     store = SQLiteStore(workspace_root)
     store.insert_user(user)
     return f"User created: {user_id}"
@@ -1863,8 +1876,11 @@ def handle_user_deactivate(command: str, *, workspace_root: str | Path = ".") ->
     if len(parts) != 3:
         return "Usage: /user deactivate <user_id>"
     denial = _govern_admin_mutation(
-        "admin_mutation", "user_deactivate", {"user_id": parts[2]},
-        workspace_root=workspace_root, risk_level=RiskLevelValue.MEDIUM,
+        "admin_mutation",
+        "user_deactivate",
+        {"user_id": parts[2]},
+        workspace_root=workspace_root,
+        risk_level=RiskLevelValue.MEDIUM,
     )
     if denial:
         return denial
@@ -1901,13 +1917,18 @@ def handle_role_create(command: str, *, workspace_root: str | Path = ".") -> str
         else:
             i += 1
     denial = _govern_admin_mutation(
-        "role_mutation", "role_create", {"role_id": role_id, "name": name},
-        workspace_root=workspace_root, risk_level=RiskLevelValue.MEDIUM,
+        "role_mutation",
+        "role_create",
+        {"role_id": role_id, "name": name},
+        workspace_root=workspace_root,
+        risk_level=RiskLevelValue.MEDIUM,
     )
     if denial:
         return denial
     now = utc_now()
-    role = Role(role_id=role_id, name=name, description=description, is_system_role=False, created_at=now)
+    role = Role(
+        role_id=role_id, name=name, description=description, is_system_role=False, created_at=now
+    )
     store = SQLiteStore(workspace_root)
     store.insert_role(role)
     return f"Role created: {role_id} ({name})"
@@ -1920,8 +1941,11 @@ def handle_role_grant(command: str, *, workspace_root: str | Path = ".") -> str:
     role_id = parts[2]
     user_id = parts[3]
     denial = _govern_admin_mutation(
-        "role_mutation", "role_grant", {"role_id": role_id, "user_id": user_id},
-        workspace_root=workspace_root, risk_level=RiskLevelValue.MEDIUM,
+        "role_mutation",
+        "role_grant",
+        {"role_id": role_id, "user_id": user_id},
+        workspace_root=workspace_root,
+        risk_level=RiskLevelValue.MEDIUM,
     )
     if denial:
         return denial
@@ -1945,8 +1969,11 @@ def handle_role_revoke(command: str, *, workspace_root: str | Path = ".") -> str
     role_id = parts[2]
     user_id = parts[3]
     denial = _govern_admin_mutation(
-        "role_mutation", "role_revoke", {"role_id": role_id, "user_id": user_id},
-        workspace_root=workspace_root, risk_level=RiskLevelValue.MEDIUM,
+        "role_mutation",
+        "role_revoke",
+        {"role_id": role_id, "user_id": user_id},
+        workspace_root=workspace_root,
+        risk_level=RiskLevelValue.MEDIUM,
     )
     if denial:
         return denial
@@ -1973,7 +2000,9 @@ def handle_runtime_mode_status(*, workspace_root: str | Path = ".") -> str:
         lines.append(f"Reason: {view.reason}")
     principal_ref, _ = service.resolve_principal()
     if principal_ref is not None:
-        lines.append(f"Acting principal: {principal_ref.principal_id} ({principal_ref.display_name})")
+        lines.append(
+            f"Acting principal: {principal_ref.principal_id} ({principal_ref.display_name})"
+        )
     else:
         lines.append("Acting principal: none (run /bootstrap-owner first)")
     return "\n".join(lines)
@@ -2034,6 +2063,7 @@ def handle_runtime_mode_disable(command: str, *, workspace_root: str | Path = ".
 
 def handle_capability_gates(*, workspace_root: str | Path = ".") -> str:
     from raiker.phase_gates import RUNTIME_DOMAIN_CAPABILITIES
+
     service = RuntimeControlService(workspace_root)
     lines = ["Capability gates:"]
     for cap in sorted(RUNTIME_DOMAIN_CAPABILITIES):
@@ -2049,6 +2079,7 @@ def handle_capability_gate_detail(command: str, *, workspace_root: str | Path = 
         return "Usage: /capability-gate <capability>"
     capability = parts[1]
     from raiker.phase_gates import ALL_CAPABILITIES
+
     if capability not in ALL_CAPABILITIES:
         return f"Unknown capability: {capability}"
     service = RuntimeControlService(workspace_root)
@@ -2103,7 +2134,11 @@ def handle_capability_gate_enable(command: str, *, workspace_root: str | Path = 
     if principal_ref is None:
         return f"Capability transition denied: {err}"
     result = service.set_capability_state(
-        capability, target_state, explicit_principal, reason, confirmation_token=confirmation_token,
+        capability,
+        target_state,
+        explicit_principal,
+        reason,
+        confirmation_token=confirmation_token,
     )
     if not result.ok:
         return f"Capability transition denied: {result.reason_code}"
@@ -2116,7 +2151,9 @@ def handle_capability_gate_enable(command: str, *, workspace_root: str | Path = 
 def handle_capability_gate_disable(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
     if len(parts) < 3:
-        return "Usage: /capability-gate disable <capability> [--reason <reason>] [--as <principal_id>]"
+        return (
+            "Usage: /capability-gate disable <capability> [--reason <reason>] [--as <principal_id>]"
+        )
     capability = parts[2]
     reason = ""
     explicit_principal = None
@@ -2204,21 +2241,23 @@ def handle_runtime_readiness(*, workspace_root: str | Path = ".") -> str:
 
     store = SQLiteStore(workspace_root)
     writer = EventLogWriter(store)
-    writer.append(make_event(
-        turn_id=None,
-        session_id="authz",
-        event_type="runtime_readiness_checked",
-        actor="system",
-        payload={
-            "current_runtime_mode": mode_name,
-            "runtime_mode_status": mode_status,
-            "owner_bootstrapped": owner_bootstrapped,
-            "acting_principal_available": acting_principal_available,
-            "runtime_gate_manager_available": gate_manager_available,
-            "dangerous_capabilities_disabled": dangerous_caps_disabled,
-            "production_ready_local_single_user_runtime": production_ready,
-        },
-    ))
+    writer.append(
+        make_event(
+            turn_id=None,
+            session_id="authz",
+            event_type="runtime_readiness_checked",
+            actor="system",
+            payload={
+                "current_runtime_mode": mode_name,
+                "runtime_mode_status": mode_status,
+                "owner_bootstrapped": owner_bootstrapped,
+                "acting_principal_available": acting_principal_available,
+                "runtime_gate_manager_available": gate_manager_available,
+                "dangerous_capabilities_disabled": dangerous_caps_disabled,
+                "production_ready_local_single_user_runtime": production_ready,
+            },
+        )
+    )
 
     lines = [
         f"Current runtime mode: {mode_name}",
@@ -2279,7 +2318,9 @@ def handle_routines(*, workspace_root: str | Path = ".") -> str:
     lines = ["Hosted routines:"]
     for r in routines:
         enabled = "enabled" if r.get("enabled") else "disabled"
-        lines.append(f"- {r['routine_id']} name={r.get('name', '')} type={r.get('routine_type', '')} {enabled}")
+        lines.append(
+            f"- {r['routine_id']} name={r.get('name', '')} type={r.get('routine_type', '')} {enabled}"
+        )
     return "\n".join(lines)
 
 
@@ -2291,8 +2332,14 @@ def handle_budgets(*, workspace_root: str | Path = ".") -> str:
     lines = ["Budget records:"]
     for b in budgets:
         enabled = "enabled" if b.get("enabled") else "disabled"
-        pct = (float(b.get("current_cost", 0)) / float(b.get("max_cost", 1))) * 100 if float(b.get("max_cost", 0)) > 0 else 0
-        lines.append(f"- {b['budget_id']} name={b.get('name', '')} cost={b.get('current_cost', 0)}/{b.get('max_cost', 0)} {b.get('currency', 'USD')} ({pct:.0f}%) {enabled}")
+        pct = (
+            (float(b.get("current_cost", 0)) / float(b.get("max_cost", 1))) * 100
+            if float(b.get("max_cost", 0)) > 0
+            else 0
+        )
+        lines.append(
+            f"- {b['budget_id']} name={b.get('name', '')} cost={b.get('current_cost', 0)}/{b.get('max_cost', 0)} {b.get('currency', 'USD')} ({pct:.0f}%) {enabled}"
+        )
     return "\n".join(lines)
 
 
@@ -2305,12 +2352,16 @@ def handle_retention(*, workspace_root: str | Path = ".") -> str:
     for p in policies:
         hold = "legal_hold" if p.get("legal_hold") else ""
         enabled = "enabled" if p.get("enabled") else "disabled"
-        lines.append(f"- {p['policy_id']} target={p.get('target_type', '')} days={p.get('retention_days', 0)} {hold} {enabled}")
+        lines.append(
+            f"- {p['policy_id']} target={p.get('target_type', '')} days={p.get('retention_days', 0)} {hold} {enabled}"
+        )
     backups = store.list_backup_manifests(limit=5)
     if backups:
         lines.append("Recent backup manifests:")
         for b in backups:
-            lines.append(f"  - {b['manifest_id']} type={b.get('backup_type', '')} size={b.get('size_bytes', 'N/A')}")
+            lines.append(
+                f"  - {b['manifest_id']} type={b.get('backup_type', '')} size={b.get('size_bytes', 'N/A')}"
+            )
     return "\n".join(lines)
 
 
@@ -2322,7 +2373,9 @@ def handle_channel_pair(*, workspace_root: str | Path = ".") -> str:
     lines = ["Channel pairings:"]
     for p in pairings:
         enabled = "enabled" if p.get("enabled") else "disabled"
-        lines.append(f"- {p['pairing_id']} connector={p.get('connector_id', '')} type={p.get('channel_type', '')} {enabled}")
+        lines.append(
+            f"- {p['pairing_id']} connector={p.get('connector_id', '')} type={p.get('channel_type', '')} {enabled}"
+        )
     return "\n".join(lines)
 
 
@@ -2337,7 +2390,9 @@ def handle_subagents(*, workspace_root: str | Path = ".") -> str:
         return "No subagent contracts. Subagent spawning is disabled by default."
     lines = ["Subagent contracts:"]
     for c in contracts:
-        lines.append(f"- {c['subagent_id']} name={c.get('name', '')} mode={c.get('mode', '')} status={c.get('status', '')}")
+        lines.append(
+            f"- {c['subagent_id']} name={c.get('name', '')} mode={c.get('mode', '')} status={c.get('status', '')}"
+        )
     return "\n".join(lines)
 
 
@@ -2348,7 +2403,9 @@ def handle_teams(*, workspace_root: str | Path = ".") -> str:
         return "No team ledgers. Multi-agent team coordination is disabled by default."
     lines = ["Team ledgers:"]
     for t in teams:
-        lines.append(f"- {t['team_id']} name={t.get('name', '')} mode={t.get('mode', '')} status={t.get('status', '')}")
+        lines.append(
+            f"- {t['team_id']} name={t.get('name', '')} mode={t.get('mode', '')} status={t.get('status', '')}"
+        )
     return "\n".join(lines)
 
 
@@ -2360,7 +2417,9 @@ def handle_remote_exec_profiles(*, workspace_root: str | Path = ".") -> str:
     lines = ["Remote execution profiles:"]
     for p in profiles:
         enabled = "enabled" if p.get("enabled") else "disabled"
-        lines.append(f"- {p['profile_id']} name={p.get('name', '')} type={p.get('profile_type', '')} {enabled}")
+        lines.append(
+            f"- {p['profile_id']} name={p.get('name', '')} type={p.get('profile_type', '')} {enabled}"
+        )
     return "\n".join(lines)
 
 
@@ -2371,7 +2430,9 @@ def handle_plugin_exec(*, workspace_root: str | Path = ".") -> str:
         return "No plugin execution records. Plugin execution is denied by default."
     lines = ["Plugin execution records:"]
     for r in records:
-        lines.append(f"- {r['execution_id']} plugin={r.get('plugin_id', '')} status={r.get('status', '')}")
+        lines.append(
+            f"- {r['execution_id']} plugin={r.get('plugin_id', '')} status={r.get('status', '')}"
+        )
     return "\n".join(lines)
 
 
@@ -2382,7 +2443,9 @@ def handle_graph_index(*, workspace_root: str | Path = ".") -> str:
         return "No graph index records. Graph indexing is denied by default."
     lines = ["Graph index records:"]
     for r in records:
-        lines.append(f"- {r['index_id']} status={r.get('status', '')} nodes={r.get('nodes_count', 0)} edges={r.get('edges_count', 0)}")
+        lines.append(
+            f"- {r['index_id']} status={r.get('status', '')} nodes={r.get('nodes_count', 0)} edges={r.get('edges_count', 0)}"
+        )
     return "\n".join(lines)
 
 
@@ -2393,7 +2456,9 @@ def handle_semantic_write(*, workspace_root: str | Path = ".") -> str:
         return "No semantic memory write records. Semantic writes are denied by default."
     lines = ["Semantic memory write records:"]
     for r in records:
-        lines.append(f"- {r['write_id']} model={r.get('embedding_model', '')} vectors={r.get('vector_count', 0)} status={r.get('status', '')}")
+        lines.append(
+            f"- {r['write_id']} model={r.get('embedding_model', '')} vectors={r.get('vector_count', 0)} status={r.get('status', '')}"
+        )
     return "\n".join(lines)
 
 
@@ -2404,7 +2469,9 @@ def handle_vector_index(*, workspace_root: str | Path = ".") -> str:
         return "No vector index records. Vector index is empty."
     lines = ["Vector index records:"]
     for r in records:
-        lines.append(f"- {r['vector_id']} model={r.get('embedding_model', '')} dims={r.get('dimensions', 0)} scope={r.get('scope', '')} sensitivity={r.get('sensitivity', '')}")
+        lines.append(
+            f"- {r['vector_id']} model={r.get('embedding_model', '')} dims={r.get('dimensions', 0)} scope={r.get('scope', '')} sensitivity={r.get('sensitivity', '')}"
+        )
     return "\n".join(lines)
 
 
@@ -2426,7 +2493,9 @@ def handle_project_graph(*, workspace_root: str | Path = ".") -> str:
         return "No project graphs. Build a project graph to see module dependencies."
     lines = ["Project graphs:"]
     for g in graphs:
-        lines.append(f"- {g['graph_id']} modules={g.get('module_count', 0)} dependencies={g.get('dependency_count', 0)}")
+        lines.append(
+            f"- {g['graph_id']} modules={g.get('module_count', 0)} dependencies={g.get('dependency_count', 0)}"
+        )
     return "\n".join(lines)
 
 
@@ -2434,10 +2503,14 @@ def handle_skill_candidates(*, workspace_root: str | Path = ".") -> str:
     store = SQLiteStore(workspace_root)
     candidates = store.list_skill_candidates()
     if not candidates:
-        return "No skill candidates. Skill candidates are generated from repeated verified workflows."
+        return (
+            "No skill candidates. Skill candidates are generated from repeated verified workflows."
+        )
     lines = ["Skill candidates:"]
     for c in candidates:
-        lines.append(f"- {c['candidate_id']} name={c.get('name', '')} status={c.get('status', '')} provenance={c.get('provenance', '')}")
+        lines.append(
+            f"- {c['candidate_id']} name={c.get('name', '')} status={c.get('status', '')} provenance={c.get('provenance', '')}"
+        )
     return "\n".join(lines)
 
 
@@ -2462,6 +2535,7 @@ def handle_export_command(command: str, *, workspace_root: str | Path = ".") -> 
     store = SQLiteStore(workspace_root)
     if verify:
         from raiker.events.integrity import verify_session_events
+
         if not session_id:
             return "Usage: /export --verify --session <session_id>"
         result = verify_session_events(store, session_id)
@@ -2477,6 +2551,7 @@ def handle_export_command(command: str, *, workspace_root: str | Path = ".") -> 
                 lines.append(f"  FAIL: event={d['event_id']} error={d.get('error', 'chain_gap')}")
         return "\n".join(lines)
     from raiker.events.export import generate_export
+
     manifest = generate_export(store, session_id, redact=redact)
     lines = [
         f"Export created: {manifest.export_id}",
@@ -2509,7 +2584,7 @@ def handle_bootstrap_owner(command: str, *, workspace_root: str | Path = ".") ->
 
     if is_recovery:
         idx = parts.index("--recover")
-        rest = parts[idx + 1:]
+        rest = parts[idx + 1 :]
         if rest:
             user_id = rest[0]
         i = 1 if not rest else 1
@@ -2554,7 +2629,9 @@ def handle_bootstrap_owner(command: str, *, workspace_root: str | Path = ".") ->
         return "Error: user_id and --display <name> are required."
 
     return bootstrap_owner(
-        user_id, display_name, email,
+        user_id,
+        display_name,
+        email,
         workspace_root=workspace_root,
         is_recovery=is_recovery,
         force_recover=force_recover,
@@ -2728,7 +2805,11 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_runtime_mode_disable(command, workspace_root=workspace_root)
     if command == "/capability-gates":
         return handle_capability_gates(workspace_root=workspace_root)
-    if command == "/capability-gate" or (command.startswith("/capability-gate ") and not command.startswith("/capability-gate enable ") and not command.startswith("/capability-gate disable ")):
+    if command == "/capability-gate" or (
+        command.startswith("/capability-gate ")
+        and not command.startswith("/capability-gate enable ")
+        and not command.startswith("/capability-gate disable ")
+    ):
         return handle_capability_gate_detail(command, workspace_root=workspace_root)
     if command.startswith("/capability-gate enable "):
         return handle_capability_gate_enable(command, workspace_root=workspace_root)
@@ -2783,7 +2864,24 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
             return handle_launch(command, workspace_root=workspace_root)
         except (RegistryError, SystemExit, ValueError) as exc:
             return f"Launch failed: {exc}"
+    if command == "/trace" or command.startswith("/trace "):
+        return handle_trace(command, workspace_root=workspace_root)
     return f"Unknown command: {command}"
+
+
+def handle_trace(command: str, *, workspace_root: str | Path = ".") -> str:
+    from raiker.trace.builder import build_turn_trace, format_trace
+
+    parts = shlex.split(command)
+    if len(parts) < 3:
+        return "Usage: /trace <session_id> <turn_id>"
+    session_id = parts[1]
+    turn_id = parts[2]
+    store = SQLiteStore(workspace_root)
+    trace = build_turn_trace(store, session_id, turn_id)
+    if trace is None:
+        return f"No trace found for session={session_id} turn={turn_id}"
+    return format_trace(trace)
 
 
 def submit_terminal_prompt(prompt: str, *, workspace_root: str | Path = ".") -> str:

@@ -231,11 +231,13 @@ Primary sources: [Claude support collection](https://support.claude.com/en/colle
 
 ## Next implementation slice — requires design approval
 
-**Agent evaluation and observability.** The connector write reference (backlog
-item 5) has landed. The next backlog item is a trace of a goal/plan/tool/approval
-chain with latency, cost, outcome, and user feedback; add record/replayable
-regression scenarios, outcome review, and an OpenTelemetry-compatible export
-with configurable prompt/content redaction before making autonomy broader.
+The agent evaluation and observability baseline (backlog item 6) has landed:
+`raiker/trace/` with `TurnTrace` / `PhaseSpan` / `ToolCallSpan` / `ModelCallSpan`
+dataclasses, a `build_turn_trace()` function that reads existing typed events to
+reconstruct the gather → plan → act → verify → respond chain with per-phase
+latency, and a `format_trace()` output. The `/trace <session_id> <turn_id>` CLI
+command surfaces the result. Record/replay regression, outcome review, and
+OTel-compatible export remain for follow-up slices.
 
 ## Verification and handoff
 

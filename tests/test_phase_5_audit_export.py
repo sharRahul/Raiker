@@ -238,7 +238,12 @@ def test_generate_export_project_filters_by_user_in_manifest_and_jsonl(
     for session_id in ("sess_visible", "sess_hidden", "sess_legacy"):
         _write_events(writer, count=1, session=session_id)
 
-    manifest = generate_export(store, project_id=project_id, user_id=user_id)
+    manifest = generate_export(
+        store,
+        project_id=project_id,
+        user_id=user_id,
+        apply_user_visibility_filter=True,
+    )
 
     assert manifest.event_count == 2
     assert manifest.export_path is not None
@@ -247,6 +252,44 @@ def test_generate_export_project_filters_by_user_in_manifest_and_jsonl(
     assert json.loads(manifest.scope_json)["event_count"] == len(exported)
     assert manifest.first_event_id == exported[0]["event_id"]
     assert manifest.last_event_id == exported[-1]["event_id"]
+
+
+def test_list_event_index_applies_user_filter_only_when_requested(
+    store: SQLiteStore, writer: EventLogWriter
+) -> None:
+    user_id = "user_visible"
+    other_user_id = "user_hidden"
+    now = utc_now()
+    for account_id in (user_id, other_user_id):
+        store.insert_user(
+            User(
+                user_id=account_id,
+                display_name=account_id,
+                email=None,
+                is_active=True,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    store.create_session("sess_visible", "/visible", user_id=user_id)
+    store.create_session("sess_hidden", "/hidden", user_id=other_user_id)
+    store.create_session("sess_legacy", "/legacy")
+    for session_id in ("sess_visible", "sess_hidden", "sess_legacy"):
+        _write_events(writer, count=1, session=session_id)
+
+    legacy_rows = store.list_event_index(user_id=user_id, limit=10)
+    filtered_rows = store.list_event_index(
+        user_id=user_id,
+        apply_user_visibility_filter=True,
+        limit=10,
+    )
+
+    assert {row["session_id"] for row in legacy_rows} == {
+        "sess_visible",
+        "sess_hidden",
+        "sess_legacy",
+    }
+    assert {row["session_id"] for row in filtered_rows} == {"sess_visible", "sess_legacy"}
 
 
 def test_generate_export_project_forces_redaction(

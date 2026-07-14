@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ExportManifest
-from raiker.context.redaction import redact_text
 from raiker.events.writer import EventLogWriter
 from raiker.storage.sqlite import SQLiteStore
 

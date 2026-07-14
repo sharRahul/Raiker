@@ -817,7 +817,11 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="not_authorized_human")
         if self.store.load_project(project_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
-        manifest = generate_export(self.store, project_id=project_id)
+        manifest = generate_export(
+            self.store,
+            project_id=project_id,
+            user_id=principal.delegated_by_user_id,
+        )
         return ControlResult(ok=True, data={"export_path": manifest.export_path})
 
     def create_project(self, name: str, acting_principal_id: str | None, parent_id: str | None = None) -> ControlResult:

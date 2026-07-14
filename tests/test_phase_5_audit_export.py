@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import AgentEvent, ExportManifest
+from raiker.contracts.models import AgentEvent, ExportManifest, User
 from raiker.events.export import build_export_manifest, generate_export, redact_event_payload
 from raiker.events.integrity import compute_session_root_hash, verify_session_events
 from raiker.events.types import make_event
@@ -199,6 +199,43 @@ def test_generate_export_scopes_to_direct_project_sessions(
         for line in Path(manifest.export_path).read_text(encoding="utf-8").splitlines()
     }
     assert exported_session_ids == {parent_session_id}
+
+
+def test_generate_export_project_filters_by_user_in_manifest_and_jsonl(
+    store: SQLiteStore, writer: EventLogWriter
+) -> None:
+    project_id = new_id("proj_")
+    user_id = "user_visible"
+    other_user_id = "user_hidden"
+    now = utc_now()
+    for account_id in (user_id, other_user_id):
+        store.insert_user(
+            User(
+                user_id=account_id,
+                display_name=account_id,
+                email=None,
+                is_active=True,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    store.create_project(project_id, "Project", "project")
+    store.save_active_project(project_id)
+    store.create_session("sess_visible", "/project", user_id=user_id)
+    store.create_session("sess_hidden", "/project", user_id=other_user_id)
+    store.create_session("sess_legacy", "/project")
+    for session_id in ("sess_visible", "sess_hidden", "sess_legacy"):
+        _write_events(writer, count=1, session=session_id)
+
+    manifest = generate_export(store, project_id=project_id, user_id=user_id)
+
+    assert manifest.event_count == 2
+    assert manifest.export_path is not None
+    exported = [json.loads(line) for line in Path(manifest.export_path).read_text().splitlines()]
+    assert {event["session_id"] for event in exported} == {"sess_visible", "sess_legacy"}
+    assert json.loads(manifest.scope_json)["event_count"] == len(exported)
+    assert manifest.first_event_id == exported[0]["event_id"]
+    assert manifest.last_event_id == exported[-1]["event_id"]
 
 
 def test_generate_export_project_forces_redaction(

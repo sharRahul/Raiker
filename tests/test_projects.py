@@ -263,8 +263,84 @@ class TestProjectsApi:
         assert response.status_code == 200, response.text
         assert response.headers["content-type"].startswith("application/x-ndjson")
         assert "attachment" in response.headers["content-disposition"]
-        assert json.loads(response.text)["payload"]["message"] == "export me"
+        lines = response.text.splitlines()
+        assert len(lines) == 1
+        assert response.content.endswith(b"\n")
+        assert json.loads(lines[0])["payload"]["message"] == "export me"
         assert str(workspace) not in response.text
+
+    def test_export_preserves_multiple_ndjson_records(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        headers = self._headers(client)
+        project_id = client.post(
+            "/api/projects", json={"name": "Alpha"}, headers=headers
+        ).json()["project_id"]
+        client.put("/api/projects/selection", json={"project_id": project_id}, headers=headers)
+        store = SQLiteStore(workspace)
+        store.create_session("sess_alpha", str(workspace))
+        writer = EventLogWriter(store)
+        for message in ("first", "second"):
+            writer.append(
+                make_event(
+                    session_id="sess_alpha",
+                    turn_id=None,
+                    event_type="action_proposed",
+                    actor="test",
+                    payload={"message": message},
+                )
+            )
+
+        response = client.post(f"/api/projects/{project_id}/export", headers=headers)
+
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"].startswith("application/x-ndjson")
+        assert response.content.endswith(b"\n")
+        records = [json.loads(line) for line in response.text.splitlines()]
+        assert [record["payload"]["message"] for record in records] == ["first", "second"]
+
+    def test_export_excludes_other_accounts_project_sessions(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        owner_headers = self._headers(client)
+        project_id = client.post(
+            "/api/projects", json={"name": "Alpha"}, headers=owner_headers
+        ).json()["project_id"]
+        registered = client.post(
+            "/api/auth/register", json={"username": "alex", "password": "right-pass-123"}
+        )
+        assert registered.status_code == 200, registered.text
+        alex_headers = {"Authorization": f"Bearer {registered.json()['token']}"}
+        store = SQLiteStore(workspace)
+        alex_principal = store.get_principal(registered.json()["principal_id"])
+        assert alex_principal is not None
+        alex_user_id = str(alex_principal["delegated_by_user_id"])
+        store.save_active_project(project_id)
+        store.create_session("sess_alex", str(workspace), user_id=alex_user_id)
+        store.create_session("sess_owner", str(workspace), user_id="rahul")
+        store.create_session("sess_legacy", str(workspace))
+        writer = EventLogWriter(store)
+        for session_id in ("sess_alex", "sess_owner", "sess_legacy"):
+            writer.append(
+                make_event(
+                    session_id=session_id,
+                    turn_id=None,
+                    event_type="action_proposed",
+                    actor="test",
+                    payload={"session": session_id},
+                )
+            )
+
+        owner_response = client.post(f"/api/projects/{project_id}/export", headers=owner_headers)
+        assert owner_response.status_code == 200, owner_response.text
+        owner_exported = [json.loads(line)["session_id"] for line in owner_response.text.splitlines()]
+        assert set(owner_exported) == {"sess_alex", "sess_owner", "sess_legacy"}
+
+        response = client.post(f"/api/projects/{project_id}/export", headers=alex_headers)
+
+        assert response.status_code == 200, response.text
+        exported = [json.loads(line)["session_id"] for line in response.text.splitlines()]
+        assert set(exported) == {"sess_alex", "sess_legacy"}
 
     def test_export_of_empty_project_returns_empty_attachment(
         self, client: TestClient

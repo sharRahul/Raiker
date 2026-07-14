@@ -80,12 +80,13 @@ def build_export_manifest(
     session_id: str | None = None,
     *,
     project_id: str | None = None,
+    user_id: str | None = None,
     redact: bool = True,
     exported_by: str = "cli",
 ) -> ExportManifest | None:
     redact = redact or project_id is not None
     events = store.list_event_index(
-        session_id=session_id, project_id=project_id, limit=10000
+        session_id=session_id, project_id=project_id, user_id=user_id, limit=10000
     )
     if not events:
         return None
@@ -130,6 +131,7 @@ def generate_export(
     session_id: str | None = None,
     *,
     project_id: str | None = None,
+    user_id: str | None = None,
     redact: bool = True,
     exported_by: str = "cli",
 ) -> ExportManifest:
@@ -138,6 +140,7 @@ def generate_export(
         store,
         session_id,
         project_id=project_id,
+        user_id=user_id,
         redact=redact,
         exported_by=exported_by,
     )
@@ -165,7 +168,7 @@ def generate_export(
     exports_dir.mkdir(parents=True, exist_ok=True)
     export_path = exports_dir / f"{manifest.export_id}.jsonl"
     event_rows = store.list_event_index(
-        session_id=session_id, project_id=project_id, limit=10000
+        session_id=session_id, project_id=project_id, user_id=user_id, limit=10000
     )
     with export_path.open("w", encoding="utf-8") as out:
         for row in reversed(event_rows):

@@ -44,6 +44,17 @@ _REDACTION_EXEMPT_PATHS = frozenset(
 )
 
 
+def _is_project_export_request(scope: Scope, path: str) -> bool:
+    parts = path.split("/")
+    return (
+        scope.get("method") == "POST"
+        and len(parts) == 5
+        and parts[1:3] == ["api", "projects"]
+        and bool(parts[3])
+        and parts[4] == "export"
+    )
+
+
 class RedactionMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -57,7 +68,11 @@ class RedactionMiddleware:
         # Only governed JSON API responses are buffered + redacted. Everything else (the static
         # web UI: index.html, hashed JS/CSS assets) is served untouched — no buffering, and no risk
         # of the redactor mangling a bundle that happens to contain a secret-like literal.
-        if not path.startswith("/api") or path in _REDACTION_EXEMPT_PATHS:
+        if (
+            not path.startswith("/api")
+            or path in _REDACTION_EXEMPT_PATHS
+            or _is_project_export_request(scope, path)
+        ):
             await self.app(scope, receive, send)
             return
 

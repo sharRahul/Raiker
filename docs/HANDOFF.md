@@ -35,8 +35,6 @@ fail-closed by design.
 
 ## Current product state — 2026-07-14
 
-## Current product state — 2026-07-14
-
 - Reliable memory controls have landed their first slice (backlog item 3): a
   user-visible Memory view over the EXISTING governed memory store — list
   with provenance, scope, sensitivity, confidence, retention; pin/bookmark;

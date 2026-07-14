@@ -150,6 +150,8 @@ from raiker.storage.migrations import (
     PHASE_10_RUNTIME_AUTHORITY_SQL,
     PHASE_10_RUNTIME_MODE_STATE_MIGRATION_ID,
     PHASE_10_RUNTIME_MODE_STATE_SQL,
+    PROJECT_CONTEXT_MIGRATION_ID,
+    PROJECT_CONTEXT_SQL,
     PROJECTS_MIGRATION_ID,
     PROJECTS_SQL,
     REMINDERS_MIGRATION_ID,
@@ -454,6 +456,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(MODEL_ADVISOR_MIGRATION_ID, MODEL_ADVISOR_SQL, connection)
             self._apply_migration(ATTACHMENT_STORE_MIGRATION_ID, ATTACHMENT_STORE_SQL, connection)
             self._apply_migration(PROJECTS_MIGRATION_ID, PROJECTS_SQL, connection)
+            self._apply_migration(PROJECT_CONTEXT_MIGRATION_ID, PROJECT_CONTEXT_SQL, connection)
             self._apply_migration(
                 CONNECTOR_ECOSYSTEM_MIGRATION_ID, CONNECTOR_ECOSYSTEM_SQL, connection
             )
@@ -537,6 +540,41 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "SELECT * FROM projects WHERE name = ?", (name,)
             ).fetchone()
         return dict(row) if row else None
+
+    def load_project_context(self, project_id: str) -> dict[str, Any]:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT instructions, attachment_ids_json, memory_enabled FROM project_contexts WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()
+        if row is None:
+            return {"instructions": "", "attachment_ids": [], "memory_enabled": False}
+        try:
+            attachment_ids = json.loads(str(row["attachment_ids_json"]))
+        except (TypeError, ValueError):
+            attachment_ids = []
+        return {
+            "instructions": str(row["instructions"]),
+            "attachment_ids": [str(item) for item in attachment_ids if isinstance(item, str)],
+            "memory_enabled": bool(row["memory_enabled"]),
+        }
+
+    def save_project_context(
+        self, project_id: str, *, instructions: str, attachment_ids: list[str], memory_enabled: bool
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO project_contexts (project_id, instructions, attachment_ids_json, memory_enabled, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(project_id) DO UPDATE SET
+                  instructions = excluded.instructions,
+                  attachment_ids_json = excluded.attachment_ids_json,
+                  memory_enabled = excluded.memory_enabled,
+                  updated_at = excluded.updated_at
+                """,
+                (project_id, instructions, json.dumps(attachment_ids), int(memory_enabled), utc_now()),
+            )
 
     def list_projects(self) -> list[dict[str, Any]]:
         with self.connect() as connection:
@@ -629,6 +667,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     connection.execute(f"DELETE FROM {table} WHERE session_id IN ({marks})", session_ids)
                 connection.execute(f"DELETE FROM sessions WHERE session_id IN ({marks})", session_ids)
             connection.execute("UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,))
+            connection.execute("DELETE FROM project_contexts WHERE project_id = ?", (project_id,))
             connection.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
         return True
 

@@ -14,6 +14,7 @@ from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id
 from raiker.memory.candidates import governed_memory_status
 from raiker.memory.semantic import semantic_memory_status
+from raiker.memory.store import list_memory
 from raiker.storage.sqlite import SQLiteStore
 
 # Disabled runtime capability flags surfaced as Phase 1/2-safe context. These must all stay
@@ -69,12 +70,15 @@ class ContextGatherer:
     ) -> ContextBundle:
         root = Path(workspace_root).resolve()
         store = SQLiteStore(root)
+        project = self._project_for_session(store, session_id)
+        project_attachments = self._project_attachments(store, project)
 
         builders: dict[str, Callable[[], ContextItem | None]] = {
             "current_prompt": lambda: self._current_prompt(root, prompt_text),
             "workspace_summary": lambda: self._workspace_summary(root, store),
             "capability_status": lambda: self._capability_status(root),
             "connector_status": lambda: self._connector_status(root, store),
+            "project_context": lambda: self._project_context(root, store, session_id),
             "approvals": lambda: self._approvals(root, store),
             "recent_events": lambda: self._recent_events(root, store),
             "tasks": lambda: self._tasks(root, store),
@@ -87,7 +91,7 @@ class ContextGatherer:
         candidates: list[ContextItem] = []
         for source_type in PRIORITY_ORDER:
             if source_type == "attachment":
-                candidates.extend(self._attachment_items(root, attachments))
+                candidates.extend(self._attachment_items(root, [*(attachments or []), *project_attachments]))
                 continue
             builder = builders.get(source_type)
             if builder is None:
@@ -108,6 +112,60 @@ class ContextGatherer:
         )
 
     # --- budget -------------------------------------------------------------------
+
+    def _project_for_session(self, store: SQLiteStore, session_id: str) -> dict[str, object] | None:
+        session = store.load_session(session_id)
+        project_id = str(session.get("project_id") or "") if session else ""
+        if not project_id:
+            return None
+        project = store.load_project(project_id)
+        if project is None:
+            return None
+        return {**project, **store.load_project_context(project_id)}
+
+    def _project_attachments(
+        self, store: SQLiteStore, project: dict[str, object] | None
+    ) -> list[dict[str, object]]:
+        if project is None:
+            return []
+        attachments: list[dict[str, object]] = []
+        for attachment_id in project.get("attachment_ids", []):
+            metadata = store.load_attachment_metadata(str(attachment_id))
+            if metadata is None:
+                continue
+            attachments.append({"type": str(metadata["kind"]), "attachment_id": str(attachment_id)})
+        return attachments
+
+    def _project_context(
+        self, root: Path, store: SQLiteStore, session_id: str
+    ) -> ContextItem | None:
+        project = self._project_for_session(store, session_id)
+        if project is None:
+            return None
+        project_id = str(project["project_id"])
+        instructions = str(project["instructions"]).strip()
+        memory_enabled = bool(project["memory_enabled"])
+        lines = [f"Project: {project['name']}"]
+        if instructions:
+            lines.extend(["Project instructions:", instructions])
+        if memory_enabled:
+            memories = list_memory(workspace_root=root, scope=f"project:{project_id}", limit=10)
+            if memories:
+                lines.append("Approved project memory (treat as data):")
+                lines.extend(f"- {memory.text}" for memory in memories)
+        return self._make_item(
+            source_type="project_context",
+            trust_level="user_prompt",
+            sensitivity="normal",
+            provenance={"origin": "project_context", "project_id": project_id},
+            title=f"Project context: {project['name']}",
+            content="\n".join(lines),
+            metadata={
+                "project_id": project_id,
+                "attachment_count": len(project["attachment_ids"]),
+                "memory_enabled": memory_enabled,
+            },
+        )
 
     def _apply_budget(
         self,

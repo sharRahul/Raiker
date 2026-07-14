@@ -20,6 +20,7 @@ from raiker.policy.engine import PolicyEngine
 from raiker.runtime.orchestrator import RuntimeOrchestrator
 from raiker.sessions.manager import SessionManager
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tasks.manager import TaskManager
 from raiker.tools.broker import ToolBroker
 
 
@@ -288,15 +289,41 @@ class AgentGateway:
             yield StreamEvent(kind=FINAL, response=error)
             return
         self._prepare_turn(prompt_envelope)
+        tasks = TaskManager(self.store, self.writer)
+        task = tasks.create_task(
+            session_id=prompt_envelope.session_id,
+            title="Chat turn",
+            objective="Governed chat turn",
+            parent_turn_id=prompt_envelope.turn_id,
+        )
         final: AgentResponse | None = None
-        async for event in self.runtime.astream_handle(prompt_envelope):
-            if event.kind == FINAL and event.response is not None:
-                final = event.response
-                continue
-            yield event
-        assert final is not None
-        enriched = self._finalize_turn(prompt_envelope, final)
-        yield StreamEvent(kind=FINAL, response=enriched)
+        try:
+            async for event in self.runtime.astream_handle(prompt_envelope):
+                current = tasks.get_task(task.task_id)
+                if current is not None and current.status == "cancelled":
+                    final = AgentResponse(
+                        request_id=prompt_envelope.request_id,
+                        session_id=prompt_envelope.session_id,
+                        turn_id=prompt_envelope.turn_id,
+                        status="failed",
+                        message="Stopped by user at a safe boundary.",
+                        client=prompt_envelope.client,
+                    )
+                    break
+                if event.kind == FINAL and event.response is not None:
+                    final = event.response
+                    continue
+                yield event
+            assert final is not None
+            enriched = self._finalize_turn(prompt_envelope, final)
+            yield StreamEvent(kind=FINAL, response=enriched)
+        finally:
+            current = tasks.get_task(task.task_id)
+            if current is not None and current.status != "cancelled":
+                if final is None or final.status == "failed":
+                    tasks.fail_task(task.task_id, final.message if final is not None else "stream ended")
+                else:
+                    tasks.complete_task(task.task_id, final.message)
 
     def submit_prompt(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
         import asyncio

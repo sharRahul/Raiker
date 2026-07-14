@@ -148,12 +148,14 @@ class ProjectDetailView:
     project: ProjectView
     sessions: tuple[SessionView, ...]
     checkpoints: tuple[CheckpointView, ...]
+    context: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "project": self.project.to_dict(),
             "sessions": [s.to_dict() for s in self.sessions],
             "checkpoints": [c.to_dict() for c in self.checkpoints],
+            "context": dict(self.context),
         }
 
 
@@ -519,7 +521,10 @@ class DashboardService:
         )
         row["session_count"] = len(sessions)
         return ProjectDetailView(
-            project=self._project_view(row, active), sessions=sessions, checkpoints=checkpoints
+            project=self._project_view(row, active),
+            sessions=sessions,
+            checkpoints=checkpoints,
+            context=self.store.load_project_context(project_id),
         )
 
     def create_project(self, name: str, acting_principal_id: str | None) -> ControlResult:
@@ -598,6 +603,41 @@ class DashboardService:
         except OSError:
             return ControlResult(ok=False, reason_code="project_folder_delete_failed")
         return ControlResult(ok=True, data={"project_id": project_id})
+
+    def save_project_context(
+        self,
+        project_id: str,
+        *,
+        instructions: str,
+        attachment_ids: list[str],
+        memory_enabled: bool,
+        acting_principal_id: str | None,
+    ) -> ControlResult:
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if self.store.load_project(project_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        cleaned = instructions.strip()
+        if len(cleaned) > 4000:
+            return ControlResult(ok=False, reason_code="project_instructions_too_long")
+        unique_ids = list(dict.fromkeys(item.strip() for item in attachment_ids if item.strip()))
+        if len(unique_ids) > 20:
+            return ControlResult(ok=False, reason_code="too_many_project_attachments")
+        if any(self.store.load_attachment_metadata(attachment_id) is None for attachment_id in unique_ids):
+            return ControlResult(ok=False, reason_code="unknown_project_attachment")
+        self.store.save_project_context(
+            project_id,
+            instructions=cleaned,
+            attachment_ids=unique_ids,
+            memory_enabled=memory_enabled,
+        )
+        return ControlResult(
+            ok=True,
+            data={"instructions": cleaned, "attachment_ids": unique_ids, "memory_enabled": memory_enabled},
+        )
 
     def _project_view(self, row: dict[str, Any], active_project_id: str | None) -> ProjectView:
         return ProjectView(

@@ -9,6 +9,7 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
     AuthSessionRequest,
     CreateProjectRequest,
+    SaveProjectContextRequest,
     SelectProjectRequest,
     SetModelAdvisorRequest,
     SetModelFallbackRequest,
@@ -198,6 +199,28 @@ async def get_project(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown project: {project_id}"
         )
     return serialize_dto(view)
+
+
+@router.put("/api/projects/{project_id}/context")
+async def save_project_context(
+    project_id: str,
+    body: SaveProjectContextRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).save_project_context(
+        project_id,
+        instructions=body.instructions,
+        attachment_ids=body.attachment_ids,
+        memory_enabled=body.memory_enabled,
+        acting_principal_id=auth_data[0].principal_id,
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
 
 
 @router.delete("/api/projects/{project_id}")

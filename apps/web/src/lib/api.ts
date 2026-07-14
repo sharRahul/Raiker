@@ -311,6 +311,12 @@ export const api = {
       method: "DELETE",
       headers: confirmed ? { "X-Project-Delete-Confirm": id } : undefined,
     }),
+  saveProjectContext: (id: string, context: { instructions: string; attachment_ids: string[]; memory_enabled: boolean }) =>
+    request<{ ok: boolean }>(`/api/projects/${encodeURIComponent(id)}/context`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(context),
+    }),
   session: (id: string) => request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
   turn: (id: string) => request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
   tasks: (params: { session_id?: string; status?: string } = {}) =>

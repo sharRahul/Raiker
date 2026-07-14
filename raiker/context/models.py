@@ -16,6 +16,7 @@ SOURCE_TYPES = (
     "model_profile",
     "capability_status",
     "connector_status",
+    "project_context",
 )
 
 # Deterministic priority order used by the gatherer when applying the budget. Higher in the
@@ -25,6 +26,7 @@ PRIORITY_ORDER = (
     # User-attached workspace paths (web-app task 3): explicitly attached by the
     # user this turn, so they outrank ambient metadata when the budget is tight.
     "attachment",
+    "project_context",
     "workspace_summary",
     "capability_status",
     "connector_status",

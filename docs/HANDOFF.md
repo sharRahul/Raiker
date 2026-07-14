@@ -36,14 +36,17 @@ fail-closed by design.
 ## Current product state — 2026-07-14
 
 - Chat search is a real full-history search over chat titles, prompts, and
-  summaries. Results show session titles and reopen the selected chat.
+  summaries. Results show session titles, but reopening a result does not yet
+  restore its saved transcript; see the next slice below.
 - Projects create/select/delete storage-backed project scopes. Deleting a
   project permanently deletes its chats and project directory after an explicit
   warning; project deletion does not delete chats outside that project.
 - The web topbar is deliberately minimal. It does not display a raw principal
   ID, runtime-ready label, or model chip.
-- Projects currently organise sessions only. They do **not** yet provide
-  project-specific instructions, shared files, or project-scoped memory.
+- Projects provide bounded, explicit context for their assigned chats:
+  instructions, shared attachment references, and an opt-in approved-memory
+  boundary (`project:<project_id>`). A chat outside the project receives none
+  of that context.
 - The generic connector store, four governed read connectors (GitHub, Gmail,
   Calendar, Slack), approvals, audit events, budgets, and the connector web
   surface are implemented. The first real write action remains unimplemented.
@@ -65,16 +68,15 @@ clients fetch the transparent files instead of retaining an old opaque copy.
 
 ## Next implementation slice — requires design approval
 
-**First real connector write action.**
+**Conversation history restoration.**
 
-Implement one narrow service mutation (recommended: a GitHub issue comment)
-through the connector store's immutable write intent and approval path. It must
-use an actual service executor, server-built URL, owner credential and egress
-allowlist, metadata-only audit, replay protection, and an approval before the
-network request. It must never execute merely because the capability is `ask`.
+Make an existing chat result open its persisted turns in the chat surface, then
+allow the user to continue it. Preserve user/session visibility boundaries and
+do not create a new session merely to view history. Keep search as a discovery
+surface rather than conflating it with the Sessions record.
 
-Do not broaden it to arbitrary OpenAPI mutations in the same slice. Write a
-threat model, tests, and implementation plan first.
+This is deliberately separate from search indexing: the search query works;
+the missing transcript hydration is the defect to fix.
 
 ## Prioritised product backlog
 

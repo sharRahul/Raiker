@@ -149,6 +149,14 @@ class SelectProjectRequest(BaseModel):
     project_id: str | None = None
 
 
+class SaveProjectContextRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    instructions: str = ""
+    attachment_ids: list[str] = []
+    memory_enabled: bool = False
+
+
 class SetModelFallbackRequest(BaseModel):
     # Ordered list of model profile ids to try (in order) when the selected
     # provider is unavailable. extra="forbid" rejects unknown fields.

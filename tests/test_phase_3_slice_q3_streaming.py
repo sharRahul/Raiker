@@ -133,6 +133,30 @@ def test_gateway_stream_and_submit_reach_same_status_offline() -> None:
     assert streamed_final.response.status == submitted.status == "failed"
 
 
+def test_gateway_stream_stops_when_its_tracked_task_is_cancelled() -> None:
+    tmp = Path(tempfile.mkdtemp())
+    gateway = AgentGateway(tmp)
+    gateway.runtime.model_router = StreamingRouter(["first", "second"])  # type: ignore[assignment]
+    env = build_prompt_envelope("hello")
+
+    async def main() -> StreamEvent | None:
+        stream = gateway.astream_prompt(env).__aiter__()
+        await anext(stream)
+        task = gateway.store.list_tasks(session_id=env.session_id)[0]
+        gateway.store.cancel_task(task.task_id, "user requested stop")
+        final: StreamEvent | None = None
+        async for event in stream:
+            if event.kind == FINAL:
+                final = event
+        return final
+
+    final = asyncio.run(main())
+    assert final is not None and final.response is not None
+    assert final.response.status == "failed"
+    assert final.response.message == "Stopped by user at a safe boundary."
+    assert gateway.store.list_tasks(session_id=env.session_id)[0].status == "cancelled"
+
+
 async def _last_final(gateway: AgentGateway, text: str) -> StreamEvent | None:
     final: StreamEvent | None = None
     async for ev in gateway.astream_prompt(build_prompt_envelope(text)):

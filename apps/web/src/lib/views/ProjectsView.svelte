@@ -24,6 +24,21 @@
   let detail = $state<ProjectDetail | null>(null);
   let detailError = $state<string | null>(null);
   let deleteError = $state<string | null>(null);
+  let savingContext = $state(false);
+  let contextError = $state<string | null>(null);
+
+  async function saveContext() {
+    if (detail === null || savingContext) return;
+    savingContext = true;
+    contextError = null;
+    try {
+      await api.saveProjectContext(detail.project.project_id, detail.context);
+    } catch (e) {
+      contextError = e instanceof ApiError ? `Could not save context (${e.status}).` : "Could not save context.";
+    } finally {
+      savingContext = false;
+    }
+  }
 
   async function remove(projectId: string) {
     if (!window.confirm("This will permanently delete all project chats and files in this project folder. To save chats, move them to your chat list or another project before deleting.")) return;
@@ -199,6 +214,13 @@
             Close
           </button>
         </div>
+        <h3 class="kicker">Project context</h3>
+        <p class="sub">Instructions and shared files are included only in chats already assigned to this project. Project memory is opt-in.</p>
+        <textarea class="input context-input" aria-label="Project instructions" bind:value={detail.context.instructions} maxlength="4000" placeholder="Project-specific instructions…"></textarea>
+        <label class="check-row"><input type="checkbox" bind:checked={detail.context.memory_enabled} /> Include approved project memory</label>
+        <p class="sub">Shared attachment IDs: {detail.context.attachment_ids.length ? detail.context.attachment_ids.join(", ") : "none"}</p>
+        <button type="button" class="btn btn-sm" onclick={() => void saveContext()} disabled={savingContext}>{savingContext ? "Saving…" : "Save context"}</button>
+        {#if contextError}<p class="error" role="alert">{contextError}</p>{/if}
         <h3 class="kicker">Sessions</h3>
         {#if detail.sessions.length === 0}
           <p class="sub">No sessions yet — chats started while this project is active land here.</p>

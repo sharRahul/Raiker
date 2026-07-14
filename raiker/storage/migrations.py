@@ -1131,6 +1131,17 @@ CREATE TABLE IF NOT EXISTS attachments (
 );
 """
 
+PROJECT_CONTEXT_MIGRATION_ID = "RAIKER-1010-project-context"
+PROJECT_CONTEXT_SQL = """
+CREATE TABLE IF NOT EXISTS project_contexts (
+  project_id TEXT PRIMARY KEY REFERENCES projects(project_id) ON DELETE CASCADE,
+  instructions TEXT NOT NULL DEFAULT '',
+  attachment_ids_json TEXT NOT NULL DEFAULT '[]',
+  memory_enabled INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+);
+"""
+
 # Manifest-driven outbound connector ecosystem. Catalog metadata remains in a
 # versioned config file; these tables hold only per-principal lifecycle state,
 # encrypted credentials, validated manifests, and action-bound write intents.

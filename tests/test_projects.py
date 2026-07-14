@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.context.gatherer import ContextGatherer
 from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.storage.sqlite import SQLiteStore
@@ -180,6 +181,40 @@ class TestSessionAssociation:
         assert service.get_project("proj_missing") is None
 
 
+class TestProjectContext:
+    def test_project_context_is_explicit_and_only_reaches_its_sessions(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        project_id = service.create_project("Alpha", OWNER).data["project_id"]
+        service.select_project(project_id, OWNER)
+        service.store.create_session("sess_alpha", str(workspace))
+        service.select_project(None, OWNER)
+        service.store.create_session("sess_other", str(workspace))
+
+        service.store.save_project_context(
+            project_id, instructions="Use the Alpha conventions.", attachment_ids=[], memory_enabled=True
+        )
+
+        included = ContextGatherer().gather(
+            workspace_root=workspace,
+            session_id="sess_alpha",
+            turn_id="turn_alpha",
+            prompt_text="hello",
+        ).included_items
+        context = [item for item in included if item.source.source_type == "project_context"]
+        assert len(context) == 1
+        assert "Use the Alpha conventions." in context[0].content
+        assert context[0].metadata["memory_enabled"] is True
+
+        other = ContextGatherer().gather(
+            workspace_root=workspace,
+            session_id="sess_other",
+            turn_id="turn_other",
+            prompt_text="hello",
+        ).included_items
+        assert all(item.source.source_type != "project_context" for item in other)
+
+
 class TestProjectsApi:
     @pytest.fixture
     def app(self, workspace: Path) -> FastAPI:
@@ -228,6 +263,20 @@ class TestProjectsApi:
         resp = client.post("/api/projects", json={"name": "   "}, headers=headers)
         assert resp.status_code == 403
         assert resp.json()["detail"]["reason_code"] == "invalid_project_name"
+
+    def test_project_context_roundtrip(self, client: TestClient) -> None:
+        headers = self._headers(client)
+        pid = client.post("/api/projects", json={"name": "Alpha"}, headers=headers).json()["project_id"]
+        saved = client.put(
+            f"/api/projects/{pid}/context",
+            json={"instructions": "Keep changes focused.", "attachment_ids": [], "memory_enabled": True},
+            headers=headers,
+        )
+        assert saved.status_code == 200, saved.text
+        detail = client.get(f"/api/projects/{pid}", headers=headers).json()
+        assert detail["context"] == {
+            "instructions": "Keep changes focused.", "attachment_ids": [], "memory_enabled": True
+        }
 
     def test_authenticated_human_can_confirm_project_deletion(
         self, client: TestClient, workspace: Path

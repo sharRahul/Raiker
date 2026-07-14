@@ -169,6 +169,13 @@ export interface ProjectDetail {
   project: ProjectView;
   sessions: SessionSummary[];
   checkpoints: Checkpoint[];
+  context: ProjectContext;
+}
+
+export interface ProjectContext {
+  instructions: string;
+  attachment_ids: string[];
+  memory_enabled: boolean;
 }
 
 export interface EventEntry {

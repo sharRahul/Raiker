@@ -104,6 +104,9 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     r["plugin_sandboxed_runtime_cap"] = _req(
         "plugin_sandboxed_runtime_cap", "4", threat_ack=True, human_confirm=True,
         notes="Network-isolated container plugin runtime; owner plugin + image allowlist.")
+    r["plugin_sandbox_image_pull_cap"] = _req(
+        "plugin_sandbox_image_pull_cap", "4", threat_ack=True, human_confirm=True,
+        notes="Owner-allowlisted Docker image pull for the sandboxed plugin runtime.")
 
     # Tier 5
     for cap in ("external_channel_runtime", "channel_approval_relay"):

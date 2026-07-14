@@ -4,7 +4,7 @@
   import Topbar from "./lib/components/Topbar.svelte";
   import { DEFAULT_ROUTE, navItem, routeFromHash } from "./lib/nav";
   import { api } from "./lib/api";
-  import type { ModelsView as ModelsSnapshot, ProjectsList } from "./lib/apiTypes";
+  import type { ProjectsList } from "./lib/apiTypes";
   import LoginView from "./lib/views/LoginView.svelte";
   import ChatView from "./lib/views/ChatView.svelte";
   import SearchChatView from "./lib/views/SearchChatView.svelte";
@@ -30,9 +30,6 @@
   // (bootstrap reads succeed) first, and a failed verification stays locked.
   let authState = $state<"locked" | "verifying" | "ready" | "verification_failed">("locked");
   let principal = $state("—");
-  let runtimeMode = $state("—");
-  let ready = $state(false);
-  let models = $state<ModelsSnapshot | null>(null);
   let projects = $state<ProjectsList | null>(null);
   const activeProjectId = $derived(projects?.active_project_id ?? null);
   const continuedSessionId = $derived(typeof window === "undefined" ? null : new URLSearchParams(window.location.hash.split("?")[1]).get("session"));
@@ -54,30 +51,16 @@
 
   async function bootstrap() {
     try {
-      const [mode, diag, modelsView, projectsList] = await Promise.all([
+      const [, , projectsList] = await Promise.all([
         api.runtimeMode(),
         api.diagnostics(),
-        api.models(),
         api.projects(),
       ]);
-      runtimeMode = mode.mode_name;
-      ready = diag.production_ready_local_single_user_runtime;
-      models = modelsView;
       projects = projectsList;
       authState = "ready";
     } catch {
       // Fail closed: the workspace stays unmounted behind the lock screen.
       authState = "verification_failed";
-    }
-  }
-
-  // Re-read the models snapshot when the Models view changes the selection so
-  // the topbar chip keeps telling the truth without a full reload.
-  async function refreshModels() {
-    try {
-      models = await api.models();
-    } catch {
-      // Keep the last known snapshot; the chip never fabricates data.
     }
   }
 
@@ -131,7 +114,7 @@
       {:else if current === "capabilities"}
         <CapabilitiesView {principal} />
       {:else if current === "models"}
-        <ModelsView onchanged={refreshModels} />
+        <ModelsView />
       {:else if current === "connections"}
         <ConnectionsView />
       {:else if current === "checkpoints"}

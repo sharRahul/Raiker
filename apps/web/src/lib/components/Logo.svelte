@@ -12,17 +12,17 @@
     display: block;
     width: var(--sz);
     height: var(--sz);
-    background: center / contain no-repeat url("/raiker-mark.png");
+    background: center / contain no-repeat url("/raiker-mark.png?v=20260714");
   }
   :global(:root[data-theme="dark"]) .logo {
-    background-image: url("/raiker-mark-dark.png");
+    background-image: url("/raiker-mark-dark.png?v=20260714");
   }
   :global(:root[data-theme="light"]) .logo {
-    background-image: url("/raiker-mark.png");
+    background-image: url("/raiker-mark.png?v=20260714");
   }
   @media (prefers-color-scheme: dark) {
     :global(:root:not([data-theme])) .logo {
-      background-image: url("/raiker-mark-dark.png");
+      background-image: url("/raiker-mark-dark.png?v=20260714");
     }
   }
 </style>

@@ -65,6 +65,7 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "plugin_revocation_cap": "plugin_revocation_cap",
     "plugin_runtime_cap": "plugin_runtime_cap",
     "plugin_sandboxed_runtime_cap": "plugin_sandboxed_runtime_cap",
+    "plugin_sandbox_image_pull_cap": "plugin_sandbox_image_pull_cap",
     "external_channel_runtime": "external_channel_runtime",
     "channel_approval_relay": "channel_approval_relay",
     "remote_execution_cap": "remote_execution_cap",

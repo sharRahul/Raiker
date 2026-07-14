@@ -343,17 +343,17 @@
   .brand-mark {
     width: 44px;
     height: 44px;
-    background: center / contain no-repeat url("/raiker-mark.png");
+    background: center / contain no-repeat url("/raiker-mark.png?v=20260714");
   }
   :global(:root[data-theme="dark"]) .brand-mark {
-    background-image: url("/raiker-mark-dark.png");
+    background-image: url("/raiker-mark-dark.png?v=20260714");
   }
   :global(:root[data-theme="light"]) .brand-mark {
-    background-image: url("/raiker-mark.png");
+    background-image: url("/raiker-mark.png?v=20260714");
   }
   @media (prefers-color-scheme: dark) {
     :global(:root:not([data-theme])) .brand-mark {
-      background-image: url("/raiker-mark-dark.png");
+      background-image: url("/raiker-mark-dark.png?v=20260714");
     }
   }
   .lock-layout {
@@ -384,20 +384,20 @@
     width: 86%;
     aspect-ratio: 1;
     display: block;
-    background: center / contain no-repeat url("/raiker-hero.png");
+    background: center / contain no-repeat url("/raiker-hero.png?v=20260714");
     filter: drop-shadow(0 1.4rem 2rem rgb(6 14 26 / 0.28));
   }
   /* Dark theme: the chrome/silver render, which pops on a dark surface. */
   :global(:root[data-theme="dark"]) .core-img {
-    background-image: url("/raiker-hero-dark.png");
+    background-image: url("/raiker-hero-dark.png?v=20260714");
     filter: drop-shadow(0 1.4rem 2.4rem rgb(0 0 0 / 0.5));
   }
   :global(:root[data-theme="light"]) .core-img {
-    background-image: url("/raiker-hero.png");
+    background-image: url("/raiker-hero.png?v=20260714");
   }
   @media (prefers-color-scheme: dark) {
     :global(:root:not([data-theme])) .core-img {
-      background-image: url("/raiker-hero-dark.png");
+      background-image: url("/raiker-hero-dark.png?v=20260714");
       filter: drop-shadow(0 1.4rem 2.4rem rgb(0 0 0 / 0.5));
     }
   }

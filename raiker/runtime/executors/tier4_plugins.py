@@ -50,6 +50,18 @@ def plugin_runtime_image() -> str:
     return os.environ.get("RAIKER_PLUGIN_RUNTIME_IMAGE", "").strip()
 
 
+def plugin_image_registry_allowlist() -> frozenset[str]:
+    """Owner allowlist of registries permitted for sandbox image pulls."""
+    raw = os.environ.get("RAIKER_PLUGIN_IMAGE_REGISTRY_ALLOWLIST", "")
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
+def _image_registry(image: str) -> str:
+    """Return the registry implied by an exact Docker image reference."""
+    first = image.split("/", 1)[0]
+    return first if "." in first or ":" in first or first == "localhost" else "docker.io"
+
+
 def plugin_runtime_allowlist() -> frozenset[str]:
     """Owner allowlist of plugin ids permitted to run code (``plugin_runtime_cap``).
 
@@ -967,3 +979,68 @@ class PluginSandboxedRuntimeExecutor:
         )
         self._store.insert_plugin_execution_record(record)
         return record
+
+
+class PluginSandboxImagePullExecutor:
+    """Pull one owner-allowlisted sandbox image without running it."""
+
+    capability = "plugin_sandbox_image_pull_cap"
+
+    def __init__(
+        self,
+        workspace_root: str | Path,
+        *,
+        runner: CommandRunner | None = None,
+    ) -> None:
+        self._workspace_root = Path(workspace_root).resolve()
+        self._runner: CommandRunner = runner or run_command
+
+    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        from raiker.runtime.executors.containers import container_image_allowlist
+
+        raw_image = action.arguments.get("image")
+        if not isinstance(raw_image, str) or not raw_image.strip():
+            return self._failed(action, "missing_argument:image")
+        image = raw_image.strip()
+        if image not in container_image_allowlist():
+            return self._failed(action, "image_not_allowed")
+        registry = _image_registry(image)
+        if registry not in plugin_image_registry_allowlist():
+            return self._failed(action, "image_registry_not_allowed")
+        try:
+            result = self._runner(
+                ["docker", "pull", image],
+                timeout=_PLUGIN_SANDBOX_MAX_TIMEOUT,
+                max_output_bytes=_PLUGIN_RUNTIME_MAX_OUTPUT_BYTES,
+                allowlist=frozenset({"docker"}),
+                cwd=self._workspace_root,
+            )
+        except SandboxError as exc:
+            code = "docker_unavailable" if str(exc).startswith("command_not_found") else str(exc)
+            return self._failed(action, code)
+        returncode = int(result.get("returncode", 1))
+        return ExecutionResult(
+            ok=returncode == 0,
+            capability=self.capability,
+            action_id=action.action_id,
+            reason_code=None if returncode == 0 else f"plugin_image_pull_exit:{returncode}",
+            summary="Owner-allowlisted sandbox image pulled; output is not included in runtime artifacts.",
+            artifacts={
+                "image": image,
+                "registry": registry,
+                "returncode": returncode,
+                "stdout_bytes": result.get("stdout_bytes", 0),
+                "stderr_bytes": result.get("stderr_bytes", 0),
+                "truncated": result.get("truncated", False),
+                "output_redacted": True,
+            },
+        )
+
+    def _failed(self, action: GovernedAction, reason_code: str) -> ExecutionResult:
+        return ExecutionResult(
+            ok=False,
+            capability=self.capability,
+            action_id=action.action_id,
+            reason_code=reason_code,
+            summary="Sandbox image pull failed closed.",
+        )

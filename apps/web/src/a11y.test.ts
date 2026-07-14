@@ -21,7 +21,7 @@ describe("accessibility landmarks", () => {
     render(App);
     await signIn();
     await waitFor(() => {
-      expect(screen.getByText("Runtime ready")).toBeInTheDocument();
+      expect(screen.getByRole("navigation", { name: /primary/i })).toBeInTheDocument();
     });
     const skip = screen.getByText(/skip to content/i);
     expect(skip).toHaveAttribute("href", "#main");

@@ -18,6 +18,10 @@ function project(partial: Partial<ProjectView>): ProjectView {
     created_at: "2026-07-12T00:00:00Z",
     session_count: 0,
     selected: false,
+    parent_id: null,
+    path: "/",
+    is_archived: false,
+    archived_at: null,
     ...partial,
   };
 }
@@ -32,6 +36,7 @@ describe("ProjectsView", () => {
         ],
         active_project_id: "proj_1",
       },
+      "GET /api/projects/tree": [],
     });
     render(ProjectsView);
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
@@ -41,7 +46,7 @@ describe("ProjectsView", () => {
   });
 
   it("shows the empty state when no projects exist", async () => {
-    stubFetch({ "GET /api/projects": { projects: [], active_project_id: null } });
+    stubFetch({ "GET /api/projects": { projects: [], active_project_id: null }, "GET /api/projects/tree": [] });
     render(ProjectsView);
     await waitFor(() => expect(screen.getByText("No projects yet")).toBeInTheDocument());
   });
@@ -49,6 +54,7 @@ describe("ProjectsView", () => {
   it("creates a project by POSTing only the name and notifies the shell", async () => {
     const mock = stubFetch({
       "GET /api/projects": { projects: [], active_project_id: null },
+      "GET /api/projects/tree": [],
       "POST /api/projects": {
         ok: true,
         project_id: "proj_new",
@@ -80,6 +86,7 @@ describe("ProjectsView", () => {
         projects: [project({ project_id: "proj_1", name: "Alpha" })],
         active_project_id: null,
       },
+      "GET /api/projects/tree": [],
       "PUT /api/projects/selection": { ok: true, active_project_id: "proj_1" },
     });
     render(ProjectsView);
@@ -99,6 +106,7 @@ describe("ProjectsView", () => {
 
   it("surfaces an honest server rejection on create", async () => {
     const mock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(_input);
       const method = (init?.method ?? "GET").toUpperCase();
       if (method === "POST") {
         return {
@@ -110,7 +118,8 @@ describe("ProjectsView", () => {
       return {
         ok: true,
         status: 200,
-        json: async () => ({ projects: [], active_project_id: null }),
+        json: async () =>
+          url.includes("/api/projects/tree") ? [] : { projects: [], active_project_id: null },
       } as Response;
     });
     vi.stubGlobal("fetch", mock);

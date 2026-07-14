@@ -16,6 +16,7 @@ import type {
   MemorySettingsView,
   ModelsView,
   ProjectDetail,
+  ProjectTreeNode,
   ProjectsList,
   PromptRequestBody,
   ProviderModelList,
@@ -348,6 +349,22 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(context),
     }),
+  // Nested projects/folders: tree, move, archive
+  projectTree: () => request<ProjectTreeNode[]>("/api/projects/tree"),
+  moveProject: (id: string, parent_id: string | null) =>
+    request<{ ok: boolean; project_id: string; new_parent_id: string | null }>(
+      `/api/projects/${encodeURIComponent(id)}/move`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parent_id }),
+      },
+    ),
+  archiveProject: (id: string) =>
+    request<{ ok: boolean; project_id: string }>(
+      `/api/projects/${encodeURIComponent(id)}/archive`,
+      { method: "PUT" },
+    ),
   session: (id: string) => request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
   // Pin (or unpin) a session. Organizing label only — grants nothing.
   setSessionPinned: (id: string, pinned: boolean) =>

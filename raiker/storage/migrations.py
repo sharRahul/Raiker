@@ -1284,3 +1284,21 @@ CREATE TABLE IF NOT EXISTS session_tags (
 );
 CREATE INDEX IF NOT EXISTS idx_session_tags_tag ON session_tags(tag);
 """
+
+# Nested projects/folders (conversation organisation remainder): arbitrary-depth
+# folder hierarchy via hybrid adjacency list + materialized path. Parent
+# reference uses ON DELETE SET NULL so children survive parent hard-delete.
+# Path trigger auto-syncs on parent_id change. Partial index on active tree.
+PROJECTS_NESTING_MIGRATION_ID = "RAIKER-1012-projects-nesting"
+
+PROJECTS_NESTING_SQL = """
+ALTER TABLE projects ADD COLUMN parent_id TEXT REFERENCES projects(project_id) ON DELETE SET NULL;
+ALTER TABLE projects ADD COLUMN path TEXT NOT NULL DEFAULT '/';
+ALTER TABLE projects ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE projects ADD COLUMN archived_at TEXT;
+ALTER TABLE projects ADD COLUMN updated_at TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_projects_parent ON projects(parent_id);
+CREATE INDEX IF NOT EXISTS idx_active_projects_path ON projects(path) WHERE is_archived = 0;
+CREATE INDEX IF NOT EXISTS idx_all_projects_path ON projects(path);
+"""

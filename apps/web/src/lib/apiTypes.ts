@@ -158,6 +158,10 @@ export interface ProjectView {
   created_at: string;
   session_count: number;
   selected: boolean;
+  parent_id: string | null;
+  path: string;
+  is_archived: boolean;
+  archived_at: string | null;
 }
 
 export interface ProjectsList {
@@ -176,6 +180,17 @@ export interface ProjectContext {
   instructions: string;
   attachment_ids: string[];
   memory_enabled: boolean;
+}
+
+/** A node in the project tree hierarchy. Recursive — each node may have
+ * children. Represents an active (non-archived) project/folder. */
+export interface ProjectTreeNode {
+  project_id: string;
+  name: string;
+  root_subpath: string;
+  created_at: string;
+  session_count: number;
+  children: ProjectTreeNode[];
 }
 
 export interface EventEntry {

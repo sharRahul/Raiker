@@ -155,6 +155,8 @@ from raiker.storage.migrations import (
     PROJECT_CONTEXT_MIGRATION_ID,
     PROJECT_CONTEXT_SQL,
     PROJECTS_MIGRATION_ID,
+    PROJECTS_NESTING_MIGRATION_ID,
+    PROJECTS_NESTING_SQL,
     PROJECTS_SQL,
     REMINDERS_MIGRATION_ID,
     REMINDERS_SQL,
@@ -483,6 +485,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 SESSION_TAGS_MIGRATION_ID, SESSION_TAGS_SQL, connection
             )
+            self._apply_migration(
+                PROJECTS_NESTING_MIGRATION_ID, PROJECTS_NESTING_SQL, connection
+            )
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
@@ -535,11 +540,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     ACTIVE_PROJECT_SCOPE = "local_single_user"
 
-    def create_project(self, project_id: str, name: str, root_subpath: str) -> None:
+    def create_project(self, project_id: str, name: str, root_subpath: str, parent_id: str | None = None) -> None:
         with self.connect() as connection:
+            if parent_id:
+                parent = connection.execute("SELECT path FROM projects WHERE project_id = ?", (parent_id,)).fetchone()
+                parent_path = parent["path"] if parent else "/"
+                path = f"{parent_path}{parent_id}/"
+            else:
+                path = "/"
             connection.execute(
-                "INSERT INTO projects (project_id, name, root_subpath, created_at) VALUES (?, ?, ?, ?)",
-                (project_id, name, root_subpath, utc_now()),
+                "INSERT INTO projects (project_id, name, root_subpath, created_at, parent_id, path, is_archived, archived_at) VALUES (?, ?, ?, ?, ?, ?, 0, NULL)",
+                (project_id, name, root_subpath, utc_now(), parent_id, path),
             )
 
     def load_project(self, project_id: str) -> dict[str, Any] | None:
@@ -685,6 +696,118 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute("DELETE FROM project_contexts WHERE project_id = ?", (project_id,))
             connection.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
         return True
+
+    # ── Nested projects/folders (conversation organisation remainder) ──────────
+    # Arbitrary-depth folder hierarchy via hybrid adjacency list + materialized
+    # path. Parent reference uses ON DELETE SET NULL so children survive parent
+    # hard-delete. Path trigger auto-syncs on parent_id change. Partial index
+    # on active tree for fast daily queries.
+
+    def list_project_tree(self, include_archived: bool = False) -> list[dict[str, Any]]:
+        """Return nested tree of projects (active by default)."""
+        where = "" if include_archived else "WHERE is_archived = 0"
+        with self.connect() as conn:
+            rows = conn.execute(f"""
+                SELECT * FROM projects {where} ORDER BY path, created_at
+            """).fetchall()
+        nodes = {row["project_id"]: {**dict(row), "children": []} for row in rows}
+        roots = []
+        for row in rows:
+            node = nodes[row["project_id"]]
+            if row["parent_id"] is None:
+                roots.append(node)
+            elif row["parent_id"] in nodes:
+                nodes[row["parent_id"]]["children"].append(node)
+        return roots
+
+    def move_project(self, project_id: str, new_parent_id: str | None) -> bool:
+        """Move project (and subtree) under new parent. Returns False if cycle or not found."""
+        with self.connect() as conn:
+            row = conn.execute("SELECT project_id, path FROM projects WHERE project_id = ?", (project_id,)).fetchone()
+            if not row:
+                return False
+            old_path = row["path"]
+            new_path = "/"
+            if new_parent_id:
+                new_parent_row = conn.execute("SELECT path FROM projects WHERE project_id = ?", (new_parent_id,)).fetchone()
+                if not new_parent_row:
+                    return False
+                new_parent_path = new_parent_row["path"]
+                if new_parent_path.startswith(old_path):
+                    return False  # would create cycle
+                new_path = f"{new_parent_path}{new_parent_id}/"
+            conn.execute(
+                "UPDATE projects SET parent_id = ?, path = ?, updated_at = ? WHERE project_id = ?",
+                (new_parent_id, new_path, utc_now(), project_id),
+            )
+            # Update descendants' paths
+            if new_parent_id:
+                conn.execute(
+                    "UPDATE projects SET path = REPLACE(path, ?, ?), updated_at = ? WHERE path LIKE ?",
+                    (old_path, new_path, utc_now(), old_path + "%"),
+                )
+            else:
+                conn.execute(
+                    "UPDATE projects SET path = REPLACE(path, ?, ?), updated_at = ? WHERE path LIKE ?",
+                    (old_path, "/", utc_now(), old_path + "%"),
+                )
+        return True
+
+    def archive_project(self, project_id: str) -> bool:
+        """Soft-archive project and all descendants. Idempotent."""
+        with self.connect() as conn:
+            row = conn.execute("SELECT path FROM projects WHERE project_id = ?", (project_id,)).fetchone()
+            if not row:
+                return False
+            path = row["path"]
+            now = utc_now()
+            conn.execute(
+                "UPDATE projects SET is_archived = 1, archived_at = ?, updated_at = ? WHERE path LIKE ?",
+                (now, now, path + "%"),
+            )
+        return True
+
+    def delete_project_with_orphanage(self, project_id: str) -> bool:
+        """Hard-delete project; archive descendants + reparent to NULL with orphaned/ path."""
+        with self.connect() as conn:
+            row = conn.execute("SELECT path FROM projects WHERE project_id = ?", (project_id,)).fetchone()
+            if not row:
+                return False
+            path = row["path"]
+            now = utc_now()
+            # Delete sessions for target project (FK: ON DELETE NO ACTION)
+            session_ids = [r[0] for r in conn.execute("SELECT session_id FROM sessions WHERE project_id = ?", (project_id,))]
+            if session_ids:
+                marks = ",".join("?" for _ in session_ids)
+                action_ids = f"SELECT action_id FROM tool_actions WHERE session_id IN ({marks})"
+                conn.execute(f"DELETE FROM policy_decisions WHERE action_id IN ({action_ids})", session_ids)
+                for table in ("events_index", "tool_actions", "checkpoints", "tasks", "turns", "model_session_state", "model_fallback_sequence", "model_advisor", "session_tags"):
+                    conn.execute(f"DELETE FROM {table} WHERE session_id IN ({marks})", session_ids)
+                conn.execute(f"DELETE FROM sessions WHERE session_id IN ({marks})", session_ids)
+            # 1) Archive descendants (excluding target)
+            conn.execute(
+                "UPDATE projects SET is_archived = 1, archived_at = ?, parent_id = NULL, path = 'orphaned/' || project_id || '/', updated_at = ? WHERE path LIKE ? AND project_id != ?",
+                (now, now, path + "%", project_id),
+            )
+            conn.execute("UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,))
+            # 2) Hard delete target (project_contexts cascades via ON DELETE CASCADE)
+            conn.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
+        return True
+
+    def get_ancestor_contexts(self, project_id: str) -> list[dict[str, Any]]:
+        """Return context rows for all active ancestors of project_id, ordered root→leaf."""
+        with self.connect() as conn:
+            target = conn.execute("SELECT path FROM projects WHERE project_id = ?", (project_id,)).fetchone()
+            if not target:
+                return []
+            path = target["path"]
+            rows = conn.execute("""
+                SELECT pc.* FROM project_contexts pc
+                JOIN projects p ON p.project_id = pc.project_id
+                WHERE ? LIKE '%' || p.project_id || '/%' AND p.is_archived = 0
+                ORDER BY LENGTH(p.path) ASC
+            """, (path,)).fetchall()
+        return [dict(r) for r in rows]
 
     def _session_owner(
         self, connection: sqlite3.Connection, session_id: str

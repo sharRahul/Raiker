@@ -9,6 +9,7 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
     AuthSessionRequest,
     CreateProjectRequest,
+    MoveProjectRequest,
     SaveProjectContextRequest,
     SelectProjectRequest,
     SetModelAdvisorRequest,
@@ -242,7 +243,7 @@ async def create_project(
     workspace; a project grants no authority.
     """
     session, _principal = _auth_data
-    result = _service(request).create_project(body.name, session.principal_id)
+    result = _service(request).create_project(body.name, session.principal_id, parent_id=body.parent_id)
     if not result.ok:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -269,6 +270,15 @@ async def select_project(
             detail={"ok": False, "reason_code": result.reason_code},
         )
     return {"ok": True, **result.data}
+
+
+@router.get("/api/projects/tree")
+async def list_project_tree(
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict]:
+    """Return the full project tree (active, non-archived only)."""
+    return _service(request).list_project_tree()
 
 
 @router.get("/api/projects/{project_id}")
@@ -319,7 +329,38 @@ async def delete_project(
             status_code=status.HTTP_409_CONFLICT,
             detail={"ok": False, "reason_code": "project_delete_confirmation_required"},
         )
-    result = _service(request).delete_project(project_id, auth_data[0].principal_id)
+    result = _service(request).delete_project(project_id, auth_data[0].principal_id, confirm=True)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/projects/{project_id}/move")
+async def move_project(
+    project_id: str,
+    body: MoveProjectRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Move a project to a new parent folder (human-only).
+    
+    ``body.parent_id`` may be null to reparent to root. A cycle check is
+    performed server-side — a descendant cannot become its own ancestor.
+    """
+    result = _service(request).move_project(project_id, body.parent_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/projects/{project_id}/archive")
+async def archive_project(
+    project_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Soft-delete a project subtree (human-only)."""
+    result = _service(request).archive_project(project_id, auth_data[0].principal_id)
     if not result.ok:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
     return {"ok": True, **result.data}

@@ -3,15 +3,15 @@
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import ProjectTreeNode from "../components/ProjectTreeNode.svelte";
   import { api, ApiError } from "../api";
-  import type { ProjectDetail, ProjectsList } from "../apiTypes";
+  import type { ProjectDetail, ProjectsList, ProjectTreeNode as TreeNode } from "../apiTypes";
   import { relativeTime, shortId } from "../format";
 
-  // The shell owns the active-project state for the topbar switcher; it passes
-  // onchanged so a change here is reflected there without a full reload.
   let { onchanged }: { onchanged?: () => void } = $props();
 
   let list = $state<ProjectsList | null>(null);
+  let tree = $state<TreeNode[]>([]);
   let loadError = $state<string | null>(null);
 
   let newName = $state("");
@@ -26,6 +26,14 @@
   let deleteError = $state<string | null>(null);
   let savingContext = $state(false);
   let contextError = $state<string | null>(null);
+
+  let moveTarget = $state<string | null>(null);
+  let moveParentId = $state<string | null>(null);
+  let moving = $state(false);
+  let moveError = $state<string | null>(null);
+
+  let archiving = $state<string | null>(null);
+  let archiveError = $state<string | null>(null);
 
   async function saveContext() {
     if (detail === null || savingContext) return;
@@ -49,9 +57,12 @@
   async function load() {
     loadError = null;
     try {
-      list = await api.projects();
+      const [projects, projectTree] = await Promise.all([api.projects(), api.projectTree()]);
+      list = projects;
+      tree = projectTree;
     } catch (e) {
       list = null;
+      tree = [];
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
     }
   }
@@ -102,6 +113,45 @@
       detailError =
         e instanceof ApiError ? `Could not load project (${e.status}).` : "Could not load project.";
     }
+  }
+
+  async function archiveProject(projectId: string) {
+    archiving = projectId;
+    archiveError = null;
+    try {
+      await api.archiveProject(projectId);
+      await load();
+    } catch (e) {
+      archiveError = e instanceof ApiError ? `Could not archive (${e.status}).` : "Could not archive.";
+    } finally {
+      archiving = null;
+    }
+  }
+
+  async function startMove(projectId: string) {
+    moveTarget = projectId;
+    moveParentId = null;
+    moveError = null;
+  }
+
+  async function confirmMove() {
+    if (moveTarget === null || moving) return;
+    moving = true;
+    moveError = null;
+    try {
+      await api.moveProject(moveTarget, moveParentId);
+      moveTarget = null;
+      await load();
+    } catch (e) {
+      moveError = e instanceof ApiError ? `Could not move (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""}).` : "Could not move.";
+    } finally {
+      moving = false;
+    }
+  }
+
+  function flatProjects(): { project_id: string; name: string }[] {
+    if (!list) return [];
+    return list.projects.map((p) => ({ project_id: p.project_id, name: p.name }));
   }
 
   onMount(load);
@@ -193,11 +243,48 @@
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => void open(p.project_id)}>
               Details
             </button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void archiveProject(p.project_id)} disabled={archiving === p.project_id}>
+              Archive
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void startMove(p.project_id)}>
+              Move
+            </button>
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => void remove(p.project_id)}>Delete</button>
           </div>
         </article>
       {/each}
     </div>
+
+    {#if archiveError}
+      <p class="error" role="alert">{archiveError}</p>
+    {/if}
+
+    {#if moveTarget !== null}
+      <div class="card move-dialog">
+        <h3 class="kicker">Move project</h3>
+        <label class="move-row">
+          <span>New parent:</span>
+          <select bind:value={moveParentId} class="input">
+            <option value={null}>Root (no parent)</option>
+            {#each flatProjects() as fp}
+              {#if fp.project_id !== moveTarget}
+                <option value={fp.project_id}>{fp.name}</option>
+              {/if}
+            {/each}
+          </select>
+        </label>
+        <div class="move-actions">
+          <button type="button" class="btn btn-sm" onclick={() => void confirmMove()} disabled={moving}>
+            {moving ? "Moving…" : "Confirm move"}
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick={() => (moveTarget = null)}>
+            Cancel
+          </button>
+        </div>
+        {#if moveError}<p class="error" role="alert">{moveError}</p>{/if}
+      </div>
+    {/if}
+
     {#if selectError}
       <p class="error" role="alert">{selectError}</p>
     {/if}
@@ -251,6 +338,17 @@
         {/if}
       </section>
     {/if}
+
+    {#if tree.length > 0}
+      <section class="card tree-section" aria-labelledby="tree-h">
+        <h3 id="tree-h" class="kicker">Folder tree</h3>
+        <ul class="tree-root">
+          {#each tree as node (node.project_id)}
+            <ProjectTreeNode {node} />
+          {/each}
+        </ul>
+      </section>
+    {/if}
   </div>
 {/if}
 
@@ -300,11 +398,35 @@
     display: flex;
     gap: 0.4rem;
     margin-top: 0.6rem;
+    flex-wrap: wrap;
   }
   .detail-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+  .move-dialog {
+    padding: var(--space-3);
+  }
+  .move-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .move-row select {
+    max-width: 16rem;
+  }
+  .move-actions {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .tree-section {
+    padding: var(--space-3);
+  }
+  .tree-root {
+    margin: 0;
+    padding: 0;
   }
   .plain-list {
     list-style: none;

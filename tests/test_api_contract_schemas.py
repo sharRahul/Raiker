@@ -62,6 +62,11 @@ AGENT_RESPONSE = {
     "request_id", "session_id", "turn_id", "status", "message", "events_path", "checkpoint_path",
     "approval", "last_event_id",
 }
+PROJECT_VIEW = {
+    "project_id", "name", "root_subpath", "created_at", "session_count", "selected",
+    "parent_id", "path", "is_archived", "archived_at",
+}
+PROJECTS_LIST = {"projects", "active_project_id"}
 
 
 @pytest.fixture
@@ -167,3 +172,10 @@ class TestListContracts:
         detail = client.get("/api/approvals/appr_c", headers=h).json()
         _assert_contract(APPROVAL_DETAIL, detail, "ApprovalDetailView")
         _assert_contract(APPROVAL_VIEW, detail["approval"], "ApprovalView (detail.approval)")
+
+    def test_projects(self, client: TestClient) -> None:
+        h = _headers(_token(client))
+        client.post("/api/projects", json={"name": "Alpha"}, headers=h)
+        listing = client.get("/api/projects", headers=h).json()
+        _assert_contract(PROJECTS_LIST, listing, "ProjectsList")
+        _assert_contract(PROJECT_VIEW, listing["projects"][0], "ProjectView")

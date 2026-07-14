@@ -121,7 +121,7 @@ class TestSelectProject:
         service.store.create_session("sess_alpha", str(workspace))
         _insert_checkpoint(service.store, "ckpt_alpha", "sess_alpha")
 
-        result = service.delete_project(project_id, OWNER)
+        result = service.delete_project(project_id, OWNER, confirm=True)
 
         assert result.ok, result.reason_code
         assert service.store.load_session("sess_alpha") is None
@@ -333,3 +333,41 @@ class TestProjectsApi:
         assert [s["session_id"] for s in sessions] == ["sess_p"]
         checkpoints = client.get(f"/api/checkpoints?project_id={pid}", headers=headers).json()
         assert [c["checkpoint_id"] for c in checkpoints] == ["ckpt_p"]
+
+    # ── Nested projects/folders API ────────────────────────────────────────────
+
+    def test_tree_list_returns_project_hierarchy(self, client: TestClient, workspace: Path) -> None:
+        headers = self._headers(client)
+        # Create root and child via store (service create_project doesn't accept parent_id)
+        store = SQLiteStore(workspace)
+        store.create_project("p_root", "Root", "projects/root")
+        store.create_project("p_child", "Child", "projects/root/child", parent_id="p_root")
+        tree = client.get("/api/projects/tree", headers=headers).json()
+        assert isinstance(tree, list)
+        assert len(tree) == 1
+        assert tree[0]["project_id"] == "p_root"
+        assert len(tree[0]["children"]) == 1
+
+    def test_move_project_happy_path(self, client: TestClient, workspace: Path) -> None:
+        headers = self._headers(client)
+        store = SQLiteStore(workspace)
+        store.create_project("p1", "Root", "projects/root")
+        store.create_project("p2", "Child", "projects/root/child", parent_id="p1")
+        resp = client.put("/api/projects/p2/move", json={"parent_id": None}, headers=headers)
+        assert resp.status_code == 200, resp.text
+
+    def test_move_project_rejects_unknown_field(self, client: TestClient) -> None:
+        headers = self._headers(client)
+        resp = client.put(
+            "/api/projects/proj_x/move", json={"parent_id": None, "smuggled": True}, headers=headers
+        )
+        assert resp.status_code == 422
+
+    def test_archive_project_happy_path(self, client: TestClient, workspace: Path) -> None:
+        headers = self._headers(client)
+        store = SQLiteStore(workspace)
+        store.create_project("p1", "Root", "projects/root")
+        resp = client.put("/api/projects/p1/archive", json={}, headers=headers)
+        assert resp.status_code == 200, resp.text
+        p1 = store.load_project("p1")
+        assert p1 is not None and p1["is_archived"] == 1

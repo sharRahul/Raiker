@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import difflib
 import json
 import os
@@ -188,6 +189,11 @@ class ProjectView:
     created_at: str
     session_count: int
     selected: bool
+    # Nested projects/folders: parent reference, materialized path, soft-archive state
+    parent_id: str | None = None
+    path: str = "/"
+    is_archived: bool = False
+    archived_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -800,12 +806,14 @@ class DashboardService:
             context=self.store.load_project_context(project_id),
         )
 
-    def create_project(self, name: str, acting_principal_id: str | None) -> ControlResult:
+    def create_project(self, name: str, acting_principal_id: str | None, parent_id: str | None = None) -> ControlResult:
         """Create a named project folder (human gate-manager only).
 
         The root subpath is derived server-side from the name (slug under
         ``projects/``) and verified to stay inside the workspace — a name can
-        never place a project root outside it (fail closed).
+        never place a project root outside it (fail closed). When
+        ``parent_id`` is supplied the project is created as a nested child of
+        that parent folder.
         """
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
@@ -820,6 +828,8 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="invalid_project_name")
         if self.store.load_project_by_name(cleaned) is not None:
             return ControlResult(ok=False, reason_code="duplicate_project_name")
+        if parent_id is not None and self.store.load_project(parent_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_parent:{parent_id}")
         root_subpath = f"projects/{slug}"
         workspace = self.workspace_root.resolve()
         resolved = (workspace / root_subpath).resolve()
@@ -829,10 +839,10 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="duplicate_project_root")
         project_id = new_id("proj_")
         resolved.mkdir(parents=True, exist_ok=True)
-        self.store.create_project(project_id, cleaned, root_subpath)
+        self.store.create_project(project_id, cleaned, root_subpath, parent_id=parent_id)
         return ControlResult(
             ok=True,
-            data={"project_id": project_id, "name": cleaned, "root_subpath": root_subpath},
+            data={"project_id": project_id, "name": cleaned, "root_subpath": root_subpath, "parent_id": parent_id},
         )
 
     def select_project(self, project_id: str | None, acting_principal_id: str | None) -> ControlResult:
@@ -855,19 +865,22 @@ class DashboardService:
         self.store.save_active_project(cleaned)
         return ControlResult(ok=True, data={"active_project_id": cleaned})
 
-    def delete_project(self, project_id: str, acting_principal_id: str | None) -> ControlResult:
+    def delete_project(self, project_id: str, acting_principal_id: str | None, confirm: bool = False) -> ControlResult:
+        """Human-only hard delete with orphanage cascade. Requires confirmed=True."""
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
+        if not confirm:
+            return ControlResult(ok=False, reason_code="project_delete_confirmation_required")
         project = self.store.load_project(project_id)
         if project is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
         root = (self.workspace_root.resolve() / str(project["root_subpath"])).resolve()
         if self.workspace_root.resolve() not in root.parents:
             return ControlResult(ok=False, reason_code="project_root_escapes_workspace")
-        if not self.store.delete_project(project_id):
+        if not self.store.delete_project_with_orphanage(project_id):
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
         try:
             shutil.rmtree(root)
@@ -912,6 +925,68 @@ class DashboardService:
             data={"instructions": cleaned, "attachment_ids": unique_ids, "memory_enabled": memory_enabled},
         )
 
+    # ── Nested projects/folders (conversation organisation remainder) ─────
+    # Organizing scopes only — like all project operations, they grant nothing
+    # and change no gate, policy, or authority.
+
+    def list_project_tree(self) -> list[dict]:
+        """Return the full project tree (active, non-archived only)."""
+        return self.store.list_project_tree()
+
+    def archive_project(self, project_id: str, acting_principal_id: str | None) -> ControlResult:
+        """AI-autonomous soft-archive of a project subtree. No confirmation required."""
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if self.store.load_project(project_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        self.store.archive_project(project_id)
+        return ControlResult(ok=True, data={"project_id": project_id, "archived": True})
+
+    def move_project(self, project_id: str, new_parent_id: str | None, acting_principal_id: str | None) -> ControlResult:
+        """Move a project to a new parent (human-only)."""
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if self.store.load_project(project_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        if new_parent_id is not None and self.store.load_project(new_parent_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_parent:{new_parent_id}")
+        ok = self.store.move_project(project_id, new_parent_id)
+        if not ok:
+            return ControlResult(ok=False, reason_code="move_failed_or_cycle")
+        return ControlResult(ok=True, data={"project_id": project_id, "new_parent_id": new_parent_id})
+
+    def get_session_context(self, session_id: str) -> dict:
+        """Return the merged session context — own project context overlaid on ancestor chain."""
+        session = self.store.load_session(session_id)
+        if session is None:
+            return {}
+        project_id = session.get("project_id")
+        if not project_id:
+            return {}
+        own = self.store.load_project_context(project_id) or {}
+        ancestors = self.store.get_ancestor_contexts(project_id)
+        merged: dict = dict(own)
+        # Walk ancestor contexts and merge: instructions concatenate,
+        # attachment_ids union, memory_enabled is the leaf's value.
+        for ancestor in ancestors:
+            if ancestor.get("instructions"):
+                merged["instructions"] = (merged.get("instructions") or "") + "\n\n" + ancestor["instructions"]
+            ancestor_attachments: list[str] = []
+            raw = ancestor.get("attachment_ids_json")
+            if raw:
+                with contextlib.suppress(ValueError, TypeError):
+                    ancestor_attachments = json.loads(raw)
+            existing: list[str] = merged.get("attachment_ids", [])
+            if isinstance(existing, str):
+                with contextlib.suppress(ValueError, TypeError):
+                    existing = json.loads(existing)
+            merged["attachment_ids"] = list(dict.fromkeys(existing + ancestor_attachments))
+        return merged
+
     def _project_view(self, row: dict[str, Any], active_project_id: str | None) -> ProjectView:
         return ProjectView(
             project_id=str(row["project_id"]),
@@ -920,6 +995,10 @@ class DashboardService:
             created_at=str(row.get("created_at", "")),
             session_count=int(row.get("session_count", 0) or 0),
             selected=(str(row["project_id"]) == active_project_id),
+            parent_id=row.get("parent_id"),
+            path=str(row.get("path", "/")),
+            is_archived=bool(row.get("is_archived", 0)),
+            archived_at=row.get("archived_at"),
         )
 
     def list_tasks(

@@ -136,9 +136,11 @@ class CreateProjectRequest(BaseModel):
     # Create a named project (web-app task 5). The root subpath is derived
     # server-side from the name and contained inside the workspace — the client
     # never supplies a path. extra="forbid" rejects unknown fields.
+    # parent_id (optional) creates a nested project under the given parent.
     model_config = ConfigDict(extra="forbid")
 
     name: str
+    parent_id: str | None = None
 
 
 class SelectProjectRequest(BaseModel):
@@ -155,6 +157,12 @@ class SaveProjectContextRequest(BaseModel):
     instructions: str = ""
     attachment_ids: list[str] = []
     memory_enabled: bool = False
+
+
+class MoveProjectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    parent_id: str | None = None
 
 
 class SetSessionPinnedRequest(BaseModel):

@@ -127,12 +127,16 @@ fail-closed by design.
   one bounded event-index snapshot supplies both its manifest and JSONL rows.
   The download response exposes no filesystem path. Attachments, project
   memory, and reminder scheduling are excluded.
-- Tasks can persist schedules and recurrence, but scheduling is stored-only:
-  it never runs work or sends a reminder.
+- Tasks can persist schedules and recurrence, but reminder delivery is on-demand
+  (no daemon). `ScheduledRoutinesExecutor` is a real registered executor that
+  runs governed subagent work on demand (`raiker/runtime/executors/scheduled.py`);
+  it is not stored-only as previously claimed — the earlier claim was stale.
 - Real reminders have landed their first governed slice: `ReminderRuntimeExecutor`
   now supports `deliver_due`, `pause`, `cancel`, and `retry` operations through the
   existing governed path. The `reminders` table has `delivery_status`, `retry_count`,
   `max_retries`, and `delivered_at` columns. `deliver_due` is on-demand (no daemon).
+  Caveat: `_deliver_due` never produces a failure path (hard-codes success), so
+  retry machinery is structural-only; `max_retries` is validated but not persisted.
   5 new event types, 7 new tests.
 - Agent identity and least privilege has landed its first slice (backlog item 7):
   `/principal create <type> <id> [--display-name <name>] [--role <role_id>]...
@@ -140,6 +144,8 @@ fail-closed by design.
   principals (ai_agent, automation, system) through the governed admin-mutation
   path. Bootstrap-owner now enables admin_mutation/role_mutation/policy_mutation
   capability gates so the owner can manage principals immediately. 4 new tests.
+  Missing: scoped credentials, per-tool grants, user-facing access review (see
+  code-verified audit below).
 
 ## Asset status
 
@@ -148,14 +154,94 @@ with transparent pixels. The web CSS uses them as direct transparent background
 images. Their public URLs now include a deployment version query, so existing
 clients fetch the transparent files instead of retaining an old opaque copy.
 
-## Next implementation slice — requires design approval
+## Code-verified backlog audit — 2026-07-14
 
-**Connector write reference.** Conversation organisation has landed four
-slices, memory controls have landed their first slice, and real reminders
-now have basic lifecycle delivery (create, deliver_due, pause, cancel, retry).
-The next backlog item is a narrow, real service write (e.g. GitHub issue
-comment) through immutable intent + approval + an actual executor. Build one
-governed vertical slice at a time against the current codebase.
+Each backlog item was verified against the actual codebase (not docs). Gaps and
+contradictions are recorded honestly. File:line citations are in
+`docs/IMPLEMENTATION_STATUS.md`.
+
+1. **Project context** — ⚠️ PARTIAL
+   - ✅ Project instructions, shared attachments, opt-in project-memory boundary
+     all wired into the live context gatherer
+     (`raiker/context/gatherer.py:126-165`).
+   - ✅ Incognito override enforced at runtime
+     (`raiker/context/gatherer.py:152-157`).
+   - ❌ **Chat move in/out of a project is NOT implemented.** There is no
+     `move_session`, `set_session_project`, or any `UPDATE sessions SET
+     project_id` anywhere in the codebase. A session's `project_id` is stamped
+     only at creation (`raiker/storage/sqlite.py:532-545`).
+   - ❌ **Project-scoped schedules are NOT enforced.** The `tasks` table has no
+     `project_id` column (`raiker/storage/migrations.py:41-55`); dashboard
+     `create_task` routes into `sess_inbox_{principal_id}`, not the active
+     project (`raiker/control/dashboard.py:1043-1058`); no project filter on the
+     task list API (`raiker/api/routes_dashboard.py:415-426`).
+   - ⚠️ **Ancestor-context inheritance is built but dormant.**
+     `DashboardService.get_session_context` merges ancestor contexts
+     (`raiker/control/dashboard.py:981-1007`), but the live gatherer uses
+     leaf-only `load_project_context` (`raiker/context/gatherer.py:116-124`).
+     The merge path is reachable only from tests.
+
+2. **Conversation organisation** — ⚠️ MOSTLY DONE
+   - ✅ Nested projects/folders, tags, pin/bookmark, project-only export, search
+     with transcript hydration — all implemented with schema, storage, service,
+     API, and web.
+   - ⚠️ **Bulk delete is client-side only.** No server-side bulk endpoint exists;
+     `SessionsView` loops N single-delete calls
+     (`apps/web/src/lib/views/SessionsView.svelte:118-143`). Non-transactional.
+
+3. **Reliable memory controls** — ⚠️ FIRST SLICE
+   - ✅ List, pin, delete (governed), scope filter, provenance display, incognito
+     boundary, store reuse.
+   - ❌ **Missing (zero code): edit, expiry controls, import/export,
+     per-memory search-participation controls.**
+
+4. **Real reminders and routines** — ⚠️ FIRST SLICE + DOC CONTRADICTION
+   - ✅ Create/list/deliver_due/pause/cancel/retry with `delivery_status`,
+     `retry_count`, `max_retries`, `delivered_at` columns and governance gating.
+   - ❌ **No real scheduler** — `deliver_due` is on-demand only (no daemon, no
+     timer, no clock).
+   - ⚠️ `_deliver_due` never produces a failure path (hard-codes `True` at
+     `raiker/runtime/executors/reminders.py:123`), so retry machinery is
+     structural-only. `max_retries` is validated but not persisted to the row
+     (`raiker/storage/sqlite.py:2861-2880`).
+   - ❌ **DOC CONTRADICTION:** HANDOFF.md says "scheduled-task automation remains
+     stored-only" (`docs/HANDOFF.md:180`), but `ScheduledRoutinesExecutor` is a
+     real, registered executor that runs governed subagent work on demand
+     (`raiker/runtime/executors/scheduled.py:95-152`,
+     `raiker/runtime/executors/__init__.py:131,211`). The claim is stale.
+
+5. **Connector write reference** — ⚠️ PARTIAL
+   - ✅ Generic `connector_write` immutable-intent + approval + executor path IS
+     wired end-to-end: broker creates intent
+     (`raiker/tools/broker.py:485-500`), approval-resolve invokes
+     `ConnectorInvoker.invoke`
+     (`raiker/api/routes_approvals.py:120`,
+     `raiker/runtime/connector_ecosystem.py:224-280`). Never executes on `ask`
+     alone.
+   - ❌ **`GithubConnectorService.create_comment()` is NOT runtime-reachable.**
+     The method exists with full governance and 14 unit tests
+     (`raiker/runtime/connectors.py:211-312`), but `GithubConnectorExecutor`
+     rejects all non-`read` operations
+     (`raiker/runtime/executors/connectors.py:42-47`). No executor dispatch, no
+     API route, no CLI command calls it. A model turn cannot post a GitHub
+     comment through it today.
+
+6. **Agent evaluation and observability** — ⚠️ BASELINE ONLY
+   - ✅ `TurnTrace`/`PhaseSpan`/`ToolCallSpan`/`ModelCallSpan` with
+     `build_turn_trace()` and `/trace` CLI
+     (`raiker/trace/builder.py:103-281`).
+   - ❌ **Missing (zero code): user feedback, $cost model, record/replay
+     scenarios, outcome review, OpenTelemetry export, configurable trace-layer
+     redaction.**
+
+7. **Agent identity and least privilege** — ⚠️ FIRST SLICE
+   - ✅ `/principal create` for ai_agent/automation/system through governed
+     admin-mutation, with roles, domain scopes, and `expires_at`
+     (`raiker/cli/commands.py:2659-2709`).
+   - ❌ **Missing (zero code): short-lived scoped credentials (as an
+     agent-identity feature), per-tool grants, user-facing access review.**
+     Authorisation is by role + global capability gate, not per-principal
+     per-tool grants.
 
 ## Prioritised product backlog
 
@@ -165,7 +251,9 @@ governed vertical slice at a time.
 1. **Project context:** project instructions, shared attachments, and an
    opt-in project-memory boundary. Chats moved into a project must inherit that
    bounded context; moving out must remove it. Project schedules must remain
-   project-scoped. This is the clearest assistant workflow gap.
+   project-scoped. First three sub-features are wired into the live gatherer;
+   chat move in/out and project-scoped schedules are NOT yet implemented
+   (see code-verified audit above).
 2. **Conversation organisation:** nested projects/folders, tags, pin/bookmark,
    bulk delete, and project-only export have landed. Search exists and
    hydrates persisted transcripts on reopen.
@@ -174,13 +262,18 @@ governed vertical slice at a time.
    controls. Include a separate opt-out/incognito boundary. Reuse the governed
    memory store; do not create a second memory system.
  4. **Real reminders and routines:** an opt-in local scheduler that executes
-    only an approved, bounded reminder/action, with delivery status, retries,
-    pause, and cancellation. First slice landed: `deliver_due`, `pause`,
-    `cancel`, `retry` on `ReminderRuntimeExecutor` with delivery status
-    tracking. Scheduled-task automation remains stored-only.
-5. **Connector write reference:** one narrow, real service write (for example,
-   GitHub issue comment) through immutable intent + approval + an actual
-   executor. Never make a write action execute on `ask` alone.
+     only an approved, bounded reminder/action, with delivery status, retries,
+     pause, and cancellation. First slice landed: `deliver_due`, `pause`,
+     `cancel`, `retry` on `ReminderRuntimeExecutor` with delivery status
+     tracking. No daemon — `deliver_due` is on-demand. `ScheduledRoutinesExecutor`
+     is a real registered executor that runs governed subagent work on demand
+     (not stored-only as previously claimed — corrected above).
+ 5. **Connector write reference:** one narrow, real service write (for example,
+    GitHub issue comment) through immutable intent + approval + an actual
+    executor. Never make a write action execute on `ask` alone. Generic
+    `connector_write` path is wired end-to-end; `GithubConnectorService
+    .create_comment()` exists with governance + tests but is NOT dispatched by
+    any runtime path yet.
 6. **Agent evaluation and observability:** trace a goal/plan/tool/approval
    chain with latency, cost, outcome, and user feedback; add record/replayable
    regression scenarios, outcome review, and an OpenTelemetry-compatible export
@@ -242,8 +335,18 @@ Agent identity and least privilege (backlog item 7) has landed its first slice:
 `/principal create` for non-human principals through the governed admin-mutation
 path, with bootstrap-owner enabling the admin mutation capability gates. Remaining
 work for item 7: short-lived scoped credentials, per-tool grants, and a
-user-facing access review surface. The next backlog item to pick up is item 8
-(reusable governed workflows) or continue item 7 with scoped credentials.
+user-facing access review surface.
+
+The code-verified audit above shows that none of items 1-7 are fully complete.
+The clearest gaps are:
+- Item 1: chat move in/out, project-scoped schedules, ancestor-context on the
+  live gatherer path.
+- Item 3: edit, expiry, import/export, search-participation controls.
+- Item 5: wire `create_comment()` into a runtime executor dispatch.
+- Item 6: user feedback, cost model, record/replay, OTel export, trace redaction.
+- Item 7: scoped credentials, per-tool grants, access review.
+
+Pick one gap and build one governed vertical slice at a time.
 
 ## Verification and handoff
 

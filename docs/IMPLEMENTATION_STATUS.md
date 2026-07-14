@@ -106,8 +106,24 @@ fail-closed by design.
 > daemon), matching the `scheduled_routines` pattern. 5 new event types
 > (`reminder_delivered`, `reminder_paused`, `reminder_cancelled`,
 > `reminder_retried`). 7 new tests. The stored-only reminder metadata from
-> earlier work is now genuinely actionable. Scheduled-task automation remains
-> stored-only. Tests: `tests/test_phase_6_reminder_runtime.py` (+7). Validators:
+> earlier work is now genuinely actionable.
+>
+> **Correction (2026-07-14):** the earlier claim "Scheduled-task automation
+> remains stored-only" is stale and contradicted by code.
+> `ScheduledRoutinesExecutor` is a real, registered executor
+> (`raiker/runtime/executors/scheduled.py:33-158`,
+> `raiker/runtime/executors/__init__.py:131,211`) that runs governed subagent
+> work on demand (no daemon, but real execution when `run_due`/`run` is
+> invoked). The "never runs work" claim was incorrect.
+>
+> **Caveats (2026-07-14):** `_deliver_due` never produces a failure path
+> (hard-codes `True` at `raiker/runtime/executors/reminders.py:123`), so retry
+> machinery is structural-only. `max_retries` is validated by `_create` but
+> not persisted to the row (`raiker/storage/sqlite.py:2861-2880` — the column
+> defaults to 3 at the DB level). `_retry` resets a `delivered` reminder to
+> `active` (re-queue semantic), not a failed-delivery retry.
+>
+> Tests: `tests/test_phase_6_reminder_runtime.py` (+7). Validators:
 > ruff, mypy, pytest (1687) all green.
 >
 > Current truth update (2026-07-14): reliable memory controls have landed
@@ -271,6 +287,17 @@ fail-closed by design.
 > and success), `tests/test_connector_ecosystem.py` has an existing API-level
 > write lifecycle test. Validators: ruff, mypy, pytest (1697) all green.
 >
+> **Correction (2026-07-14):** `GithubConnectorService.create_comment()` exists
+> with full governance and 14 unit tests (`raiker/runtime/connectors.py:211-312`)
+> but is **NOT dispatched by any runtime path.** `GithubConnectorExecutor`
+> rejects all non-`read` operations (`raiker/runtime/executors/connectors.py:42-47`).
+> No executor dispatch, API route, or CLI command calls `create_comment()`. A
+> model turn cannot post a GitHub comment through it today. The generic
+> `connector_write` immutable-intent + approval + executor path IS wired
+> end-to-end (`raiker/tools/broker.py:485-500` →
+> `raiker/api/routes_approvals.py:120` →
+> `raiker/runtime/connector_ecosystem.py:224-280`).
+
 > Current truth update (2026-07-14): agent identity and least privilege (backlog
 > item 7) has landed its first slice: `/principal create <type> <id>` creates
 > non-human principals (ai_agent, automation, system) through the governed
@@ -280,6 +307,13 @@ fail-closed by design.
 > added to policy allowed_read_actions. Tests: `test_phase_2_terminal_commands.py`
 > (+4: requires owner, invalid type, success, no args), `test_runtime_authority.py`
 > (updated admin mutation governance tests). Validators: ruff, mypy, pytest green.
+>
+> **Code-verified gaps for item 7:** scoped credentials, per-tool grants, and
+> user-facing access review have zero code (greps return nothing). Authorisation
+> is by role + global capability gate, not per-principal per-tool grants.
+> `ConnectorVault` stores per-principal per-connector credentials with
+> `expires_at` (`raiker/runtime/connector_ecosystem.py:86-108`) but this is the
+> existing connector-credential vault, not an item-7 agent-identity slice.
 
 > Current truth update (2026-07-14): agent evaluation and observability baseline
 > (backlog item 6) has landed: `raiker/trace/` with `TurnTrace` / `PhaseSpan` /
@@ -291,6 +325,213 @@ fail-closed by design.
 > when timestamps are identical. Tests: `test_trace.py` (9: empty, basic, no
 > tools, model calls, failed, denied, wrong turn, format, empty format).
 > Validators: ruff, mypy, pytest (1708) all green.
+>
+> **Code-verified gaps for item 6:** user feedback, $cost model, record/replay
+> scenarios, outcome review, OpenTelemetry export, and configurable trace-layer
+> redaction all have zero code (greps for `user_feedback`, `record_replay`,
+> `replay_scenario`, `opentelemetry`, `otel`, `otlp`, `redact` in `raiker/trace/`
+> return nothing). Token counts are captured on `ModelCallSpan` but no $/credit
+> cost model exists.
+
+---
+
+## Code-verified backlog audit — 2026-07-14
+
+Each backlog item (1-7) was verified against the actual codebase with
+file:line citations. Gaps and doc contradictions are recorded honestly.
+
+### Item 1 — Project context — ⚠️ PARTIAL
+
+- ✅ Project instructions: schema `project_contexts.instructions`
+  (`raiker/storage/migrations.py:1136-1142`); load/save
+  (`raiker/storage/sqlite.py:578,596`); service
+  (`raiker/control/dashboard.py:912-945`); API `PUT /api/projects/{id}/context`
+  (`raiker/api/routes_dashboard.py:330-349`); folded into turn bundle
+  (`raiker/context/gatherer.py:158-160`).
+- ✅ Shared attachments: `project_contexts.attachment_ids_json`; validated
+  against governed attachment store (max 20,
+  `raiker/control/dashboard.py:931-935`); folded into gatherer
+  (`raiker/context/gatherer.py:126-141`).
+- ✅ Opt-in project-memory boundary: per-project `memory_enabled`
+  (`raiker/storage/migrations.py:1140`); global incognito override
+  (`raiker/storage/migrations.py:1263-1267`,
+  `raiker/control/dashboard.py:734-749`); enforced in gatherer
+  (`raiker/context/gatherer.py:151-165`).
+- ❌ **Chat move in/out of a project:** NOT IMPLEMENTED. No `move_session`,
+  `set_session_project`, or `UPDATE sessions SET project_id` anywhere in the
+  codebase. `project_id` is stamped only at session creation
+  (`raiker/storage/sqlite.py:532-545`). `delete_project_with_orphanage` archives
+  sessions but does not reassign them (`raiker/storage/sqlite.py:778-803`).
+- ❌ **Project-scoped schedules:** NOT ENFORCED. `tasks` table has no
+  `project_id` column (`raiker/storage/migrations.py:41-55`); dashboard
+  `create_task` routes into `sess_inbox_{principal_id}`
+  (`raiker/control/dashboard.py:1043-1058`); no project filter on task list API
+  (`raiker/api/routes_dashboard.py:415-426`). `scheduled_routines` has no
+  `project_id` (`raiker/storage/migrations.py:1043-1056`).
+- ⚠️ **Ancestor-context inheritance:** built but dormant.
+  `DashboardService.get_session_context` merges ancestor contexts
+  (`raiker/control/dashboard.py:981-1007`), but the live gatherer uses
+  leaf-only `load_project_context` (`raiker/context/gatherer.py:116-124`).
+  The merge path is reachable only from tests (`tests/test_nested_projects.py`).
+
+### Item 2 — Conversation organisation — ⚠️ MOSTLY DONE
+
+- ✅ Nested projects/folders: schema
+  (`raiker/storage/migrations.py:1288-1304`); storage
+  (`raiker/storage/sqlite.py:551-562,714-762,764-803`); service
+  (`raiker/control/dashboard.py:828-865,951-979,887-910`); API
+  (`raiker/api/routes_dashboard.py:235-253,276-282,370-398`); web
+  (`apps/web/src/lib/components/ProjectTreeNode.svelte`,
+  `apps/web/src/lib/views/ProjectsView.svelte:278-373`); tests
+  (`tests/test_nested_projects.py` — 18).
+- ✅ Tags: schema (`raiker/storage/migrations.py:1270-1286`); storage
+  (`raiker/storage/sqlite.py:862-902`); service
+  (`raiker/control/dashboard.py:599-652`); API
+  (`raiker/api/routes_dashboard.py:152-180`); web
+  (`apps/web/src/lib/views/SessionsView.svelte:192-315`); tests
+  (`tests/test_session_organisation.py`).
+- ✅ Pin/bookmark: storage (`raiker/storage/sqlite.py:484-488,832-851`);
+  service (`raiker/control/dashboard.py:548-569`); API
+  (`raiker/api/routes_dashboard.py:101-122`); web
+  (`apps/web/src/lib/views/SessionsView.svelte:38-69,317-325`).
+- ⚠️ **Bulk delete:** client-side only. No server-side bulk endpoint exists
+  (greps for `bulk_delete|delete_many|batch_delete` return nothing). The web
+  loops N single-delete calls
+  (`apps/web/src/lib/views/SessionsView.svelte:118-143`); non-transactional,
+  mid-loop failure leaves partial state. The single-delete backend is
+  `DELETE /api/sessions/{id}` (`raiker/api/routes_dashboard.py:125-149`).
+- ✅ Project-only export: service
+  (`raiker/control/dashboard.py:810-826`); export engine
+  (`raiker/events/export.py:154-228`); project filter is direct-assignment only
+  (`raiker/storage/sqlite.py:1326-1329`); API
+  (`raiker/api/routes_dashboard.py:299-327`); web
+  (`apps/web/src/lib/api.ts:347-356`). Attachments, project memory, and
+  reminder scheduling are excluded.
+- ✅ Search + transcript hydration: backend
+  (`raiker/storage/sqlite.py:674-689`,
+  `raiker/control/dashboard.py:528-529`,
+  `raiker/api/routes_dashboard.py:80-86`); web hydration
+  (`apps/web/src/lib/views/ChatView.svelte:261-304`); live per-event timeline
+  not replayed for restored turns.
+
+### Item 3 — Reliable memory controls — ⚠️ FIRST SLICE
+
+- ✅ List: `GET /api/memory` (`raiker/api/routes_memory.py:36-43`,
+  `raiker/control/dashboard.py:662-684`).
+- ✅ Pin: `PUT /api/memory/{id}/pin`
+  (`raiker/api/routes_memory.py:46-63`,
+  `raiker/control/dashboard.py:686-696`,
+  `raiker/storage/sqlite.py:954-970`).
+- ✅ Delete (governed): `DELETE /api/memory/{id}`
+  (`raiker/api/routes_memory.py:66-81`,
+  `raiker/control/dashboard.py:698-729`); reuses
+  `raiker.memory.store.forget_memory` (no second memory system).
+- ✅ Scope (read filter): `list_memories(scope=...)`
+  (`raiker/api/routes_memory.py:39`). No per-memory scope re-assignment.
+- ✅ Provenance (read-only): `MemoryControlView.provenance`
+  (`raiker/control/dashboard.py:102-153`).
+- ✅ Incognito boundary: `PUT /api/memory/incognito`
+  (`raiker/api/routes_memory.py:92-112`,
+  `raiker/control/dashboard.py:734-749`,
+  `raiker/storage/sqlite.py:972-989`); enforced in gatherer
+  (`raiker/context/gatherer.py:152-157`).
+- ❌ **Edit:** MISSING. No `PUT /api/memory/{id}` text-edit endpoint; no
+  `update_memory`/`edit_memory` symbol exists. No edit affordance in
+  `MemoryView.svelte`.
+- ❌ **Expiry controls:** MISSING. `retention` is displayed read-only
+  (`MemoryControlView.retention`); no user control to set/extend/clear.
+- ❌ **Import/export:** MISSING. No `memory_export`/`memory_import` symbols.
+  Project-only export explicitly excludes memory.
+- ❌ **Search-participation controls:** MISSING. `memory_search`
+  (`raiker/tools/memory_tools.py:45-77`) searches every memory unconditionally;
+  no per-memory "include in search" flag. The only opt-out is global incognito
+  (affects context gathering, not search).
+
+### Item 4 — Real reminders and routines — ⚠️ FIRST SLICE + DOC CONTRADICTION
+
+- ✅ Create/list/deliver_due/pause/cancel/retry:
+  `raiker/runtime/executors/reminders.py:20-188`; storage
+  (`raiker/storage/sqlite.py:2861-2921`); schema
+  (`raiker/storage/migrations.py:978-991` + ALTER TABLE at
+  `raiker/storage/sqlite.py:451-459`); tests
+  (`tests/test_phase_6_reminder_runtime.py` — 12).
+- ✅ Delivery status: `delivery_status` column
+  (`active`/`delivered`/`paused`/`cancelled`); `delivered_at` timestamp.
+- ✅ Retries: `retry_count` + `max_retries` columns; `_retry` increments
+  (`raiker/runtime/executors/reminders.py:160-178`).
+- ✅ Governance gating + threat-model ack required; content redaction in
+  artifacts (`tests/test_phase_6_reminder_runtime.py`).
+- ❌ **No real scheduler:** `deliver_due` is on-demand only (no daemon, no
+  timer, no clock). Docs admit this.
+- ⚠️ **`_deliver_due` never fails** (`raiker/runtime/executors/reminders.py:123`
+  hard-codes `True`), so retry machinery is structural-only.
+- ⚠️ **`max_retries` not persisted** — validated by `_create` but not written to
+  the row (`raiker/storage/sqlite.py:2861-2880`); defaults to 3 at DB level.
+- ❌ **DOC CONTRADICTION:** "scheduled-task automation remains stored-only" is
+  stale. `ScheduledRoutinesExecutor` is a real, registered executor
+  (`raiker/runtime/executors/scheduled.py:33-158`,
+  `raiker/runtime/executors/__init__.py:131,211`) that runs governed subagent
+  work on demand.
+
+### Item 5 — Connector write reference — ⚠️ PARTIAL
+
+- ✅ Generic `connector_write` immutable-intent + approval + executor path IS
+  wired end-to-end:
+  - Policy: `approval_required_actions` (`raiker/policy/config.py:67`);
+    classification (`raiker/models/tool_call_validation.py:40`).
+  - Broker intent: `connector_write_intents` table
+    (`raiker/storage/migrations.py:1178-1193`); broker creates intent
+    (`raiker/tools/broker.py:485-500`).
+  - Approval-resolve executor: atomic claim + `ConnectorInvoker.invoke`
+    (`raiker/api/routes_approvals.py:65-148`).
+  - ConnectorInvoker: HTTPS + manifest + egress + vault + OAuth refresh
+    (`raiker/runtime/connector_ecosystem.py:224-280`).
+  - Never on `ask` alone: `connector_write` is in `approval_required_actions`
+    and NOT in the route_action capability map
+    (`raiker/runtime/authority/router.py:50-93`).
+  - Tests: `tests/test_connector_ecosystem.py:89-189`.
+- ❌ **`GithubConnectorService.create_comment()` is NOT runtime-reachable.**
+  Method exists with full governance + 14 unit tests
+  (`raiker/runtime/connectors.py:211-312`), but `GithubConnectorExecutor`
+  rejects all non-`read` operations
+  (`raiker/runtime/executors/connectors.py:42-47`). No executor dispatch, API
+  route, or CLI command calls it. A model turn cannot post a GitHub comment
+  through it.
+
+### Item 6 — Agent evaluation and observability — ⚠️ BASELINE ONLY
+
+- ✅ `TurnTrace`/`PhaseSpan`/`ToolCallSpan`/`ModelCallSpan`
+  (`raiker/trace/models.py:6-46`); `build_turn_trace()`
+  (`raiker/trace/builder.py:103-281`); `/trace` CLI
+  (`raiker/cli/commands.py:2922-2939`); tests
+  (`tests/test_trace.py` — 9).
+- ✅ Per-phase latency (`duration_ms`); turn `total_duration_ms`; token counts
+  on `ModelCallSpan`.
+- ✅ Status/outcome: `completed`/`failed`/`denied`/`last:<event>`
+  (`raiker/trace/builder.py:123-135`).
+- ❌ **Missing (zero code):** user feedback, $cost model, record/replay
+  scenarios, outcome review, OpenTelemetry export, configurable trace-layer
+  redaction.
+
+### Item 7 — Agent identity and least privilege — ⚠️ FIRST SLICE
+
+- ✅ `/principal create <type> <id>` for ai_agent/automation/system through
+  governed admin-mutation (`raiker/cli/commands.py:2659-2709`); dispatch
+  (`raiker/cli/commands.py:2837-2838`); `PrincipalType` enum
+  (`raiker/runtime/authority/models.py:8`).
+- ✅ Roles, domain scopes, `expires_at` on principals
+  (`raiker/storage/sqlite.py:2431-2456`); CLI `--expires`
+  (`raiker/cli/commands.py:2685-2686`).
+- ✅ Bootstrap-owner enables admin_mutation/role_mutation/policy_mutation
+  capability gates (`raiker/cli/principal_resolver.py:162-172`).
+- ✅ `principal_create` in policy `allowed_read_actions`
+  (`raiker/policy/config.py:47`).
+- ✅ Tests: `tests/test_phase_2_terminal_commands.py` (+4),
+  `tests/test_runtime_authority.py` (updated).
+- ❌ **Missing (zero code):** scoped credentials (as agent-identity feature;
+  `ConnectorVault` expiry is unrelated), per-tool grants (authorisation is by
+  role + global gate), user-facing access review (only `/principal <id>` and
+  `/principals` exist — not an access-review surface).
 
 > Current truth (2026-06-22): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Real local executors exist and are governed-flippable for: Tier 1 (`approval_execution_relay`, `file_write_execution`, `patch_apply_execution`, `memory_write_execution`, `memory_forget_execution`), Tier 2 (`shell_execution`, `process_execution`, `web_fetch`, `network_execution` — sandboxed/egress-allowlisted), Tier 3 local code-intelligence (`graph_indexing_runtime`, `semantic_memory_runtime`, `vector_embedding_runtime` — a deterministic local hashing embedding with no model download / no network, persisting a `vector_records` row and supporting cosine `search`/retrieval over the stored local-model vectors (ids+scores, metadata-only) — and `model_provider_runtime` — a provider-backed **semantic** embedding, egress-gated: owner egress allowlist + hosted/private gate state + API-key-from-env, `embed` only), the Phase 4 promoted slices (`subagents`, `multi_agent_teams`, `external_channel_runtime`, `channel_approval_relay`, `container_execution_cap`, `scheduled_routines`), and — Phase 4 slice 7 — `hosted_model_runtime` / `private_network_model_runtime` (owner egress allowlist `RAIKER_MODEL_EGRESS_ALLOWLIST`, empty = fail closed; gate-derived provider policy on the chat path), and — web-app task 2 — `advisor_model_runtime` (a local model may consult one owner-picked advisor profile through the brokered `consult_advisor` tool; default-ask decision mode withholds, provider policy is re-checked per call, and the question/answer never enter audit payloads — see `docs/threat-models/advisor-model.md`), and — web-app task 4 — `connector_github_runtime` (a model may read one GitHub issue/PR through the brokered `github_read` tool; default-ask decision mode withholds, the owner credential is env-only `RAIKER_GITHUB_TOKEN`, the host must be on the owner connector egress allowlist `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` — empty = fail closed — the request URL is built server-side from validated components, the fetched body is returned as untrusted data and never enters audit payloads; reference slice for governed service connectors — see `docs/threat-models/connectors-github.md`), and — web-app task 4, second read connector — `connector_gmail_runtime` (a model may read one Gmail message/thread through the brokered `gmail_read` tool; identical governed pattern — default-ask decision mode withholds, the owner credential is env-only `RAIKER_GMAIL_TOKEN`, the host `gmail.googleapis.com` must be on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, the request URL is built server-side with `format=metadata`, the fetched snippet+headers are returned as untrusted data and never enter audit payloads — see `docs/threat-models/connectors-gmail.md`), and — web-app task 4, third + fourth read connectors — `connector_gcal_runtime` (Google Calendar event/calendar read via the brokered `gcal_read` tool; env-only `RAIKER_GCAL_TOKEN`, host `www.googleapis.com`, server-built path-encoded URL — see `docs/threat-models/connectors-gcal.md`) and `connector_slack_runtime` (Slack channel info/history read via the brokered `slack_read` tool; env-only `RAIKER_SLACK_TOKEN`, host `slack.com`, fixed Web API method with a validated channel id, `ok:false` treated as a bad response — see `docs/threat-models/connectors-slack.md`); all four connectors share the identical fail-closed governed pattern (gate + default-`ask` decision mode + owner egress allowlist + metadata-only audit; reads only). Every other capability — remote/cloud command execution and all still-fail-closed Tier-6 sensitive domains (finance/investment/medical/pregnancy/cctv/home-security/hardware) — has **no real executor and fails closed** (`not_implemented` / `activation_blocked:no_executor`); it cannot be flipped to a working state. Capability-gate default posture (updated): **integrated capabilities — those with a real executor — ship `enabled_runtime` by default**, while capabilities that are not integrated yet (no real executor) stay `disabled` and fail closed. Enabling a gate does not by itself let an AI act unattended: AI-proposed actions are still governed by the per-capability **decision mode (default `ask`)**, the critical-risk human-confirmation floor, PolicyEngine hard-denies, and executor-level env allowlists (model egress / plugin / container image), which are independent of the gate and remain fail-closed. Disabling any gate is owner/`runtime_gate_manager`-only, governed, reversible, and audited. Per-capability detail: [`docs/RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md).
 

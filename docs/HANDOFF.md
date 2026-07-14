@@ -124,6 +124,11 @@ fail-closed by design.
   memory, and reminder scheduling are excluded.
 - Tasks can persist schedules and recurrence, but scheduling is stored-only:
   it never runs work or sends a reminder.
+- Real reminders have landed their first governed slice: `ReminderRuntimeExecutor`
+  now supports `deliver_due`, `pause`, `cancel`, and `retry` operations through the
+  existing governed path. The `reminders` table has `delivery_status`, `retry_count`,
+  `max_retries`, and `delivered_at` columns. `deliver_due` is on-demand (no daemon).
+  5 new event types, 7 new tests.
 
 ## Asset status
 
@@ -134,12 +139,11 @@ clients fetch the transparent files instead of retaining an old opaque copy.
 
 ## Next implementation slice — requires design approval
 
-**Real reminders and routines.** Memory controls have landed their
-first slice (list/pin/forget + incognito), conversation organisation has
-landed four slices (pin/bookmark + delete, per-session tags, nested
-projects/folders with archive/orphanage delete + context inheritance, and
-project-only export). Real reminders/routines — an opt-in local scheduler that
-executes approved, bounded actions — remain the next backlog work. Build one
+**Connector write reference.** Conversation organisation has landed four
+slices, memory controls have landed their first slice, and real reminders
+now have basic lifecycle delivery (create, deliver_due, pause, cancel, retry).
+The next backlog item is a narrow, real service write (e.g. GitHub issue
+comment) through immutable intent + approval + an actual executor. Build one
 governed vertical slice at a time against the current codebase.
 
 ## Prioritised product backlog
@@ -158,9 +162,11 @@ governed vertical slice at a time.
    delete, scope, provenance, expiry, import/export, and search-participation
    controls. Include a separate opt-out/incognito boundary. Reuse the governed
    memory store; do not create a second memory system.
-4. **Real reminders and routines:** an opt-in local scheduler that executes
-   only an approved, bounded reminder/action, with delivery status, retries,
-   pause, and cancellation. Stored-only task metadata is not automation.
+ 4. **Real reminders and routines:** an opt-in local scheduler that executes
+    only an approved, bounded reminder/action, with delivery status, retries,
+    pause, and cancellation. First slice landed: `deliver_due`, `pause`,
+    `cancel`, `retry` on `ReminderRuntimeExecutor` with delivery status
+    tracking. Scheduled-task automation remains stored-only.
 5. **Connector write reference:** one narrow, real service write (for example,
    GitHub issue comment) through immutable intent + approval + an actual
    executor. Never make a write action execute on `ask` alone.
@@ -217,6 +223,12 @@ This backlog is informed by provider documentation, not only OpenAI research:
   informs item 10.
 
 Primary sources: [Claude support collection](https://support.claude.com/en/collections/4078531-claude), [Claude Projects](https://support.claude.com/en/articles/9517075-what-are-projects), [Claude chat search and memory](https://support.claude.com/en/articles/11817273-use-claude-s-chat-search-and-memory-to-build-on-previous-context), [Claude memory import/export](https://support.claude.com/en/articles/12123587-import-and-export-your-memory-from-claude), [Cowork support collection](https://support.claude.com/en/collections/19667525-claude-cowork), [Cowork project tasks](https://support.claude.com/en/articles/14116274-organize-your-tasks-with-projects-in-claude-cowork), [Cowork computer use](https://support.claude.com/en/articles/14128542-let-claude-use-your-computer-in-cowork), [Cowork OpenTelemetry](https://support.claude.com/en/articles/14477985-monitor-claude-cowork-activity-with-opentelemetry), [Claude Code documentation](https://code.claude.com/docs/en/), [Claude Code extensions](https://code.claude.com/docs/en/features-overview), [Claude Code hooks](https://code.claude.com/docs/en/agent-sdk/hooks), [OpenAI Codex manual](https://developers.openai.com/codex/codex-manual.md), [Hermes Agent documentation](https://hermes-agent.nousresearch.com/docs), [OpenClaw overview](https://docs.openclaw.ai/), and [OpenClaw gateway architecture](https://docs.openclaw.ai/concepts/architecture).
+
+## Next implementation slice — requires design approval
+
+**Connector write reference.** Reminders now have basic lifecycle delivery. The next
+backlog item is a narrow, real service write (e.g. GitHub issue comment) through
+immutable intent + approval + an actual executor.
 
 ## Verification and handoff
 

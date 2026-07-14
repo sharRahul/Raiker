@@ -77,6 +77,26 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await resp.json()) as T;
 }
 
+async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> {
+  const headers = new Headers(init.headers);
+  if (token !== null) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const resp = await fetch(path, { ...init, headers });
+  if (!resp.ok) {
+    let reasonCode: string | null = null;
+    try {
+      const body = await resp.json();
+      const detail = body?.detail ?? body;
+      reasonCode = detail?.reason_code ?? null;
+    } catch {
+      reasonCode = null;
+    }
+    throw new ApiError(resp.status, reasonCode, `Request failed: ${resp.status} ${path}`);
+  }
+  return resp.blob();
+}
+
 function withQuery(path: string, params: Record<string, string | number | undefined>): string {
   const q = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -324,6 +344,19 @@ export const api = {
   // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
   projects: () => request<ProjectsList>("/api/projects"),
   project: (id: string) => request<ProjectDetail>(`/api/projects/${encodeURIComponent(id)}`),
+  exportProject: async (id: string): Promise<void> => {
+    const path = `/api/projects/${encodeURIComponent(id)}/export`;
+    const blob = await requestBlob(path, { method: "POST" });
+    const url = URL.createObjectURL(blob);
+    try {
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `project-${id}.jsonl`;
+      anchor.click();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  },
   // Create a named project for the authenticated local human.
   // The root subpath is derived and contained server-side — no path is sent.
   createProject: (name: string) =>

@@ -8,7 +8,10 @@ import type { ProjectView } from "../apiTypes";
 import { stubFetch } from "../test-helpers";
 import ProjectsView from "./ProjectsView.svelte";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 function project(partial: Partial<ProjectView>): ProjectView {
   return {
@@ -101,6 +104,53 @@ describe("ProjectsView", () => {
       );
       expect(put).toBeTruthy();
       expect(JSON.parse(put![1]!.body as string)).toEqual({ project_id: "proj_1" });
+    });
+  });
+
+  it("exports a loaded project's redacted JSONL via POST", async () => {
+    const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "GET" && url === "/api/projects") {
+        return { ok: true, status: 200, json: async () => ({ projects: [project({})], active_project_id: null }) } as Response;
+      }
+      if (method === "GET" && url === "/api/projects/tree") {
+        return { ok: true, status: 200, json: async () => [] } as Response;
+      }
+      if (method === "GET" && url === "/api/projects/proj_1") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ project: project({}), context: { instructions: "", attachment_ids: [], memory_enabled: false }, sessions: [], checkpoints: [] }),
+        } as Response;
+      }
+      if (method === "POST" && url === "/api/projects/proj_1/export") {
+        return { ok: true, status: 200, blob: async () => new Blob(["{}\n"], { type: "application/jsonl" }) } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    });
+    const click = vi.fn();
+    const createObjectURL = vi.fn(() => "blob:export");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("fetch", mock);
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+    vi.spyOn(document, "createElement").mockImplementation(((tagName: string) => {
+      const element = document.createElementNS("http://www.w3.org/1999/xhtml", tagName);
+      if (tagName === "a") vi.spyOn(element, "click").mockImplementation(click);
+      return element;
+    }) as typeof document.createElement);
+
+    render(ProjectsView);
+    await waitFor(() => expect(screen.getByText("Details")).toBeInTheDocument());
+    await fireEvent.click(screen.getByText("Details"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Export project" })).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: "Export project" }));
+
+    await waitFor(() => {
+      expect(mock).toHaveBeenCalledWith("/api/projects/proj_1/export", expect.objectContaining({ method: "POST" }));
+      expect(createObjectURL).toHaveBeenCalledOnce();
+      expect(click).toHaveBeenCalledOnce();
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:export");
     });
   });
 

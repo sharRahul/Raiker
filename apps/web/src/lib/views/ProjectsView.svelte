@@ -23,6 +23,8 @@
 
   let detail = $state<ProjectDetail | null>(null);
   let detailError = $state<string | null>(null);
+  let exporting = $state(false);
+  let exportError = $state<string | null>(null);
   let deleteError = $state<string | null>(null);
   let savingContext = $state(false);
   let contextError = $state<string | null>(null);
@@ -106,12 +108,26 @@
 
   async function open(projectId: string) {
     detailError = null;
+    exportError = null;
     try {
       detail = await api.project(projectId);
     } catch (e) {
       detail = null;
       detailError =
         e instanceof ApiError ? `Could not load project (${e.status}).` : "Could not load project.";
+    }
+  }
+
+  async function exportProject() {
+    if (detail === null || exporting) return;
+    exporting = true;
+    exportError = null;
+    try {
+      await api.exportProject(detail.project.project_id);
+    } catch (e) {
+      exportError = e instanceof ApiError ? `Could not export (${e.status}).` : "Could not export.";
+    } finally {
+      exporting = false;
     }
   }
 
@@ -296,11 +312,17 @@
       <section class="card detail" aria-labelledby="project-detail-h">
         <div class="detail-head">
           <h2 id="project-detail-h">{detail.project.name}</h2>
-          <button type="button" class="btn btn-ghost btn-sm" onclick={() => (detail = null)}>
-            <Icon name="x" size={14} />
-            Close
-          </button>
+          <div class="detail-actions">
+            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void exportProject()} disabled={exporting}>
+              {exporting ? "Exporting…" : "Export project"}
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick={() => (detail = null)}>
+              <Icon name="x" size={14} />
+              Close
+            </button>
+          </div>
         </div>
+        {#if exportError}<p class="error" role="alert">{exportError}</p>{/if}
         <h3 class="kicker">Project context</h3>
         <p class="sub">Instructions and shared files are included only in chats already assigned to this project. Project memory is opt-in.</p>
         <textarea class="input context-input" aria-label="Project instructions" bind:value={detail.context.instructions} maxlength="4000" placeholder="Project-specific instructions…"></textarea>
@@ -404,6 +426,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+  .detail-actions {
+    display: flex;
+    gap: 0.4rem;
   }
   .move-dialog {
     padding: var(--space-3);

@@ -17,6 +17,7 @@ const SESSIONS_ROUTE = {
       turn_count: 1,
       pinned: false,
       tags: ["alpha"],
+      project_id: null,
     },
     {
       session_id: "sess_a",
@@ -27,8 +28,26 @@ const SESSIONS_ROUTE = {
       turn_count: 2,
       pinned: true,
       tags: [],
+      project_id: null,
     },
   ],
+  "GET /api/projects": {
+    projects: [
+      {
+        project_id: "proj_a",
+        name: "Alpha",
+        root_subpath: "alpha",
+        created_at: "2026-07-01T00:00:00Z",
+        session_count: 0,
+        selected: false,
+        parent_id: null,
+        path: "/",
+        is_archived: false,
+        archived_at: null,
+      },
+    ],
+    active_project_id: null,
+  },
 };
 
 afterEach(() => {
@@ -110,8 +129,7 @@ describe("SessionsView organisation", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const fetchMock = stubFetch({
       ...SESSIONS_ROUTE,
-      "DELETE /api/sessions/sess_b": { ok: true, session_id: "sess_b" },
-      "DELETE /api/sessions/sess_a": { ok: true, session_id: "sess_a" },
+      "DELETE /api/sessions/bulk": { ok: true, session_ids: ["sess_a", "sess_b"] },
     });
     render(SessionsView);
 
@@ -126,16 +144,19 @@ describe("SessionsView organisation", () => {
     await fireEvent.click(bulkDelete);
 
     await waitFor(() => {
-      const aDelete = fetchMock.mock.calls.find(
-        (c) => String(c[0]) === "/api/sessions/sess_a" && c[1]?.method === "DELETE",
+      const bulkDelete = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/api/sessions/bulk" && c[1]?.method === "DELETE",
       );
-      expect(aDelete).toBeDefined();
+      expect(bulkDelete).toBeDefined();
+      expect(JSON.parse(String(bulkDelete![1]!.body))).toEqual({ session_ids: ["sess_a", "sess_b"] });
     });
     expect(
       fetchMock.mock.calls.some(
-        (c) => String(c[0]) === "/api/sessions/sess_b" && c[1]?.method === "DELETE",
+        (c) =>
+          (String(c[0]) === "/api/sessions/sess_a" || String(c[0]) === "/api/sessions/sess_b") &&
+          c[1]?.method === "DELETE",
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("renders tag chips for sessions that carry tags", async () => {

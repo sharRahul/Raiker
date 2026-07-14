@@ -417,6 +417,12 @@ export const api = {
         headers: { "X-Session-Delete-Confirm": id },
       },
     ),
+  deleteSessions: (session_ids: string[]) =>
+    request<{ ok: boolean; session_ids: string[] }>("/api/sessions/bulk", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_ids }),
+    }),
   // Replace the tag set for one session. Tags are organizing labels only —
   // they grant nothing. The server normalizes (trim, lowercase, dedupe,
   // length/count caps). Human-only; an account cannot retag another account's
@@ -430,14 +436,31 @@ export const api = {
         body: JSON.stringify({ tags }),
       },
     ),
+  // Move one chat into a project, or out of every project with a null
+  // project_id. A project is an organizing scope — the move grants nothing and
+  // only changes the bounded context the chat receives on its next turn.
+  // Human-only; an account cannot move another account's chat.
+  setSessionProject: (id: string, project_id: string | null) =>
+    request<{ ok: boolean; session_id: string; project_id: string | null }>(
+      `/api/sessions/${encodeURIComponent(id)}/project`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id }),
+      },
+    ),
   turn: (id: string) => request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
-  tasks: (params: { session_id?: string; status?: string } = {}) =>
+  // `project_id` scopes the list to one project's schedules (project-scoped
+  // schedules); omitting it lists every task visible to the account.
+  tasks: (params: { session_id?: string; status?: string; project_id?: string } = {}) =>
     request<TaskView[]>(withQuery("/api/tasks", params)),
   createTask: (body: {
     title: string;
     description: string;
     priority?: string;
     scheduled_at?: string;
+    // Create the task under a specific project. Omitted → the active project.
+    project_id?: string | null;
   }) => postJson<TaskView>("/api/tasks", body),
 
   // ── Prompts / interrupts ──

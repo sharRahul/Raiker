@@ -24,6 +24,7 @@ class TaskManager:
         scheduled_at: str | None = None,
         recurrence: str | None = None,
         reminder_at: str | None = None,
+        project_id: str | None = None,
     ) -> TaskRecord:
         now = utc_now()
         task = TaskRecord(
@@ -40,6 +41,7 @@ class TaskManager:
             scheduled_at=scheduled_at,
             recurrence=recurrence,
             reminder_at=reminder_at,
+            project_id=project_id,
         )
         self.store.insert_task(task)
         event = make_event(

@@ -101,6 +101,10 @@ class TaskCreateRequest(BaseModel):
     scheduled_at: str | None = None
     recurrence: str | None = None
     reminder_at: str | None = None
+    # Project-scoped schedules: create this task under a specific project. When
+    # omitted the active project is used, so a schedule created inside a project
+    # stays scoped to it.
+    project_id: str | None = None
 
 
 class SetModelSelectionRequest(BaseModel):
@@ -171,6 +175,22 @@ class SetSessionPinnedRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     pinned: bool
+
+
+class BulkDeleteSessionsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session_ids: list[str]
+
+
+class SetSessionProjectRequest(BaseModel):
+    # Move a chat into a project, or out of every project with a null
+    # project_id. A project is an organizing scope — the move grants nothing
+    # and only changes the bounded context the chat receives.
+    # extra="forbid" rejects unknown fields.
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: str | None = None
 
 
 class SetSessionTagsRequest(BaseModel):

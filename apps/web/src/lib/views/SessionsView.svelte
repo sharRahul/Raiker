@@ -3,7 +3,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
-  import type { SessionDetail, SessionSummary, TurnDetail } from "../apiTypes";
+  import type { ProjectView, SessionDetail, SessionSummary, TurnDetail } from "../apiTypes";
   import { responseBadge } from "../statusMaps";
   import { humanize, relativeTime, shortId } from "../format";
 
@@ -31,6 +31,13 @@
   // add/remove a tag inline, and filter the list by a tag substring.
   let tagDraft = $state<Record<string, string>>({});
   let tagFilter = $state("");
+
+  // Project context (backlog item 1): a chat can be moved into a project or out
+  // of every project. The project is an organizing scope — the move grants
+  // nothing; it only changes the bounded context (instructions, shared
+  // attachments, opt-in project memory) the chat receives on its next turn.
+  let projects = $state<ProjectView[]>([]);
+  let moving = $state<string | null>(null);
 
   // Pinned sessions first, then most-recently-updated. The sort is display-only
   // — the backend list order is unchanged. A non-empty tag filter further
@@ -98,6 +105,24 @@
     }
   }
 
+  // Move a chat into a project, or out of every project (empty selection).
+  // Moving out removes the project's bounded context from the next turn.
+  async function moveToProject(s: SessionSummary, value: string) {
+    const next = value === "" ? null : value;
+    if (next === s.project_id) return;
+    actionError = null;
+    moving = s.session_id;
+    try {
+      await api.setSessionProject(s.session_id, next);
+      await load();
+    } catch (e) {
+      actionError =
+        e instanceof ApiError ? `Could not move chat (${e.status}).` : "Could not move chat.";
+    } finally {
+      moving = null;
+    }
+  }
+
   async function deleteOne(id: string) {
     if (!window.confirm("Delete this conversation permanently? Its turns and governed events will be removed.")) return;
     actionError = null;
@@ -125,26 +150,28 @@
       return;
     actionError = null;
     deleting = true;
-    let failed = 0;
-    for (const id of [...selected]) {
-      try {
-        await api.deleteSession(id);
-        if (detail?.session.session_id === id) detail = null;
-      } catch {
-        failed += 1;
-      }
+    try {
+      await api.deleteSessions([...selected]);
+      if (detail && selected.has(detail.session.session_id)) detail = null;
+      selected = new Set();
+      await load();
+    } catch (e) {
+      actionError = e instanceof ApiError ? `Could not delete (${e.status}).` : "Could not delete.";
+    } finally {
+      deleting = false;
     }
-    selected = new Set();
-    deleting = false;
-    if (failed > 0) {
-      actionError = `${failed} conversation${failed === 1 ? "" : "s"} could not be deleted.`;
-    }
-    await load();
   }
 
   async function load() {
     loadError = null;
     try {
+      // The project list feeds the per-row move control. A failure here must
+      // not break the session list, so it degrades to "no projects to move to".
+      try {
+        projects = (await api.projects()).projects.filter((p) => !p.is_archived);
+      } catch {
+        projects = [];
+      }
       sessions = await api.sessions(projectId ?? undefined);
       // Drop any selection that no longer exists after a refresh.
       const ids = new Set((sessions ?? []).map((s) => s.session_id));
@@ -247,6 +274,7 @@
             <th>Session</th>
             <th>Status</th>
             <th>Turns</th>
+            <th>Project</th>
             <th>Tags</th>
             <th>Updated</th>
             <th></th>
@@ -274,6 +302,21 @@
               </td>
               <td onclick={() => openSession(s.session_id)}><Badge variant={s.status === "active" ? "active" : "idle"} label={s.status} /></td>
               <td onclick={() => openSession(s.session_id)}>{s.turn_count}</td>
+              <td class="project-col" onclick={(e) => e.stopPropagation()}>
+                <select
+                  class="project-select"
+                  value={s.project_id ?? ""}
+                  disabled={moving === s.session_id}
+                  aria-label={`Project for ${s.title ?? shortId(s.session_id)}`}
+                  title="Move this chat into a project, or out of every project"
+                  onchange={(e) => void moveToProject(s, e.currentTarget.value)}
+                >
+                  <option value="">No project</option>
+                  {#each projects as p (p.project_id)}
+                    <option value={p.project_id}>{p.name}</option>
+                  {/each}
+                </select>
+              </td>
               <td class="tags-col" onclick={(e) => e.stopPropagation()}>
                 <span class="tag-chips">
                   {#each s.tags as t (t)}
@@ -474,8 +517,22 @@
   }
   .row-actions,
   .check-col,
+  .project-col,
   .tags-col {
     cursor: default;
+  }
+  .project-select {
+    font: inherit;
+    font-size: 0.78rem;
+    padding: 0.15rem 0.3rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--bg);
+    color: var(--text-1);
+    max-width: 10rem;
+  }
+  .project-select:hover:not(:disabled) {
+    border-color: var(--accent-border);
   }
   .tags-col {
     max-width: 22rem;

@@ -340,7 +340,7 @@ fail-closed by design.
 Each backlog item (1-7) was verified against the actual codebase with
 file:line citations. Gaps and doc contradictions are recorded honestly.
 
-### Item 1 — Project context — ⚠️ PARTIAL
+### Item 1 — Project context — ✅ CURRENT SLICE COMPLETE
 
 - ✅ Project instructions: schema `project_contexts.instructions`
   (`raiker/storage/migrations.py:1136-1142`); load/save
@@ -357,24 +357,16 @@ file:line citations. Gaps and doc contradictions are recorded honestly.
   (`raiker/storage/migrations.py:1263-1267`,
   `raiker/control/dashboard.py:734-749`); enforced in gatherer
   (`raiker/context/gatherer.py:151-165`).
-- ❌ **Chat move in/out of a project:** NOT IMPLEMENTED. No `move_session`,
-  `set_session_project`, or `UPDATE sessions SET project_id` anywhere in the
-  codebase. `project_id` is stamped only at session creation
-  (`raiker/storage/sqlite.py:532-545`). `delete_project_with_orphanage` archives
-  sessions but does not reassign them (`raiker/storage/sqlite.py:778-803`).
-- ❌ **Project-scoped schedules:** NOT ENFORCED. `tasks` table has no
-  `project_id` column (`raiker/storage/migrations.py:41-55`); dashboard
-  `create_task` routes into `sess_inbox_{principal_id}`
-  (`raiker/control/dashboard.py:1043-1058`); no project filter on task list API
-  (`raiker/api/routes_dashboard.py:415-426`). `scheduled_routines` has no
-  `project_id` (`raiker/storage/migrations.py:1043-1056`).
-- ⚠️ **Ancestor-context inheritance:** built but dormant.
-  `DashboardService.get_session_context` merges ancestor contexts
-  (`raiker/control/dashboard.py:981-1007`), but the live gatherer uses
-  leaf-only `load_project_context` (`raiker/context/gatherer.py:116-124`).
-  The merge path is reachable only from tests (`tests/test_nested_projects.py`).
+- ✅ **Chat move in/out:** human-only `PUT /api/sessions/{id}/project` calls
+  `DashboardService.set_session_project`, applies the normal owner boundary,
+  persists `sessions.project_id`, and emits `session_project_changed`.
+- ✅ **Project-scoped schedules:** nullable `tasks.project_id` persists the
+  explicit or active project, and the task API/UI filter by it.
+- ✅ **Ancestor-context inheritance:** the live gatherer uses
+  `load_effective_project_context`, which combines active ancestors root→leaf
+  once while keeping the leaf memory decision.
 
-### Item 2 — Conversation organisation — ⚠️ MOSTLY DONE
+### Item 2 — Conversation organisation — ✅ CURRENT SLICE COMPLETE
 
 - ✅ Nested projects/folders: schema
   (`raiker/storage/migrations.py:1288-1304`); storage
@@ -394,12 +386,10 @@ file:line citations. Gaps and doc contradictions are recorded honestly.
   service (`raiker/control/dashboard.py:548-569`); API
   (`raiker/api/routes_dashboard.py:101-122`); web
   (`apps/web/src/lib/views/SessionsView.svelte:38-69,317-325`).
-- ⚠️ **Bulk delete:** client-side only. No server-side bulk endpoint exists
-  (greps for `bulk_delete|delete_many|batch_delete` return nothing). The web
-  loops N single-delete calls
-  (`apps/web/src/lib/views/SessionsView.svelte:118-143`); non-transactional,
-  mid-loop failure leaves partial state. The single-delete backend is
-  `DELETE /api/sessions/{id}` (`raiker/api/routes_dashboard.py:125-149`).
+- ✅ **Bulk delete:** human-only `DELETE /api/sessions/bulk` validates all
+  selected sessions against the normal visibility boundary before deleting every
+  validated session through one SQLite transaction. The UI sends one request;
+  an invalid or unauthorized ID leaves every selected session intact.
 - ✅ Project-only export: service
   (`raiker/control/dashboard.py:810-826`); export engine
   (`raiker/events/export.py:154-228`); project filter is direct-assignment only

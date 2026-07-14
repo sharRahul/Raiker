@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import difflib
 import json
 import os
@@ -55,6 +54,10 @@ class SessionView:
     # gate, policy, or authority. The tuple is the normalized, ordered set
     # (deduplicated, lowercase, length/count-capped).
     tags: tuple[str, ...] = ()
+    # The organizing project this chat currently sits in, or None. A chat can
+    # be moved in or out; the project grants nothing and only bounds the
+    # context the chat receives.
+    project_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -245,6 +248,9 @@ class TaskView:
     scheduled_at: str | None = None
     recurrence: str | None = None
     reminder_at: str | None = None
+    # Project-scoped schedules: the organizing project this task was created
+    # under, or None when it was created outside every project.
+    project_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -585,6 +591,59 @@ class DashboardService:
         if not self.store.delete_session(session_id, user_id=user_id):
             return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
         return ControlResult(ok=True, data={"session_id": session_id})
+
+    def delete_sessions(self, session_ids: list[str], acting_principal_id: str | None) -> ControlResult:
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if not self.store.delete_sessions(session_ids, user_id=principal.delegated_by_user_id):
+            return ControlResult(ok=False, reason_code="unknown_or_unauthorized_session")
+        return ControlResult(ok=True, data={"session_ids": session_ids})
+
+    def set_session_project(
+        self, session_id: str, project_id: str | None, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Move one chat into a project, or out of every project (human-only).
+
+        A project is an organizing scope: the move grants nothing and changes
+        no gate, policy, or authority. It changes only the bounded context the
+        chat receives — project instructions, shared attachments, and the
+        opt-in approved-memory boundary. Moving out (``project_id=None``)
+        removes all of it from the next turn's context. Respects user/session
+        visibility: an account cannot move another account's chat.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if project_id is not None and self.store.load_project(project_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        session = self.store.load_session(session_id)
+        previous_project_id = str(session["project_id"]) if session and session.get("project_id") else None
+        user_id = principal.delegated_by_user_id
+        if not self.store.set_session_project(session_id, project_id, user_id=user_id):
+            return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
+        from raiker.events.types import make_event
+
+        EventLogWriter(self.store).append(
+            make_event(
+                session_id=session_id,
+                turn_id=None,
+                event_type="session_project_changed",
+                actor="dashboard_service",
+                payload={
+                    "session_id": session_id,
+                    "from_project_id": previous_project_id,
+                    "to_project_id": project_id,
+                },
+            )
+        )
+        return ControlResult(
+            ok=True, data={"session_id": session_id, "project_id": project_id}
+        )
 
     # ── Session tags (conversation organisation remainder) ──────────────────
     # A tag is an organizing label only (like the per-session `pinned` flag
@@ -979,32 +1038,18 @@ class DashboardService:
         return ControlResult(ok=True, data={"project_id": project_id, "new_parent_id": new_parent_id})
 
     def get_session_context(self, session_id: str) -> dict:
-        """Return the merged session context — own project context overlaid on ancestor chain."""
+        """Return the session's effective project context (ancestors merged in).
+
+        This is the same merge the live context gatherer applies, so what the
+        dashboard shows is what the model sees.
+        """
         session = self.store.load_session(session_id)
         if session is None:
             return {}
         project_id = session.get("project_id")
         if not project_id:
             return {}
-        own = self.store.load_project_context(project_id) or {}
-        ancestors = self.store.get_ancestor_contexts(project_id)
-        merged: dict = dict(own)
-        # Walk ancestor contexts and merge: instructions concatenate,
-        # attachment_ids union, memory_enabled is the leaf's value.
-        for ancestor in ancestors:
-            if ancestor.get("instructions"):
-                merged["instructions"] = (merged.get("instructions") or "") + "\n\n" + ancestor["instructions"]
-            ancestor_attachments: list[str] = []
-            raw = ancestor.get("attachment_ids_json")
-            if raw:
-                with contextlib.suppress(ValueError, TypeError):
-                    ancestor_attachments = json.loads(raw)
-            existing: list[str] = merged.get("attachment_ids", [])
-            if isinstance(existing, str):
-                with contextlib.suppress(ValueError, TypeError):
-                    existing = json.loads(existing)
-            merged["attachment_ids"] = list(dict.fromkeys(existing + ancestor_attachments))
-        return merged
+        return self.store.load_effective_project_context(str(project_id))
 
     def _project_view(self, row: dict[str, Any], active_project_id: str | None) -> ProjectView:
         return ProjectView(
@@ -1021,11 +1066,17 @@ class DashboardService:
         )
 
     def list_tasks(
-        self, session_id: str | None = None, status: str | None = None, user_id: str | None = None
+        self,
+        session_id: str | None = None,
+        status: str | None = None,
+        user_id: str | None = None,
+        project_id: str | None = None,
     ) -> list[TaskView]:
         return [
             self._task_view(t)
-            for t in self.store.list_tasks(session_id=session_id, status=status, user_id=user_id)
+            for t in self.store.list_tasks(
+                session_id=session_id, status=status, user_id=user_id, project_id=project_id
+            )
         ]
 
     def create_task(
@@ -1039,8 +1090,19 @@ class DashboardService:
         scheduled_at: str | None = None,
         recurrence: str | None = None,
         reminder_at: str | None = None,
+        project_id: str | None = None,
     ) -> TaskView:
-        """Create a local planning task in the caller's server-owned Inbox session."""
+        """Create a local planning task in the caller's server-owned Inbox session.
+
+        Project-scoped schedules: the task is stamped with ``project_id`` when
+        given, else with the active project, so a schedule created inside a
+        project stays scoped to it. The stamp is an organizing label — it
+        grants nothing.
+        """
+        if project_id is None:
+            project_id = self.store.get_active_project()
+        elif self.store.load_project(project_id) is None:
+            raise ValueError(f"unknown_project:{project_id}")
         inbox_session_id = f"sess_inbox_{principal_id}"
         self.store.create_session(
             inbox_session_id,
@@ -1056,6 +1118,7 @@ class DashboardService:
             scheduled_at=scheduled_at,
             recurrence=recurrence,
             reminder_at=reminder_at,
+            project_id=project_id,
         )
         return self._task_view(task)
 
@@ -1556,6 +1619,7 @@ class DashboardService:
             turn_count=len(self.store.list_turns(session_id, limit=1000)),
             pinned=bool(row.get("pinned", 0)),
             tags=tuple(self.store.list_session_tags(session_id)),
+            project_id=row.get("project_id"),
         )
 
     @staticmethod
@@ -1714,6 +1778,7 @@ class DashboardService:
             scheduled_at=d.get("scheduled_at"),
             recurrence=d.get("recurrence"),
             reminder_at=d.get("reminder_at"),
+            project_id=d.get("project_id"),
         )
 
 

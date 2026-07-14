@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, Response
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
     AuthSessionRequest,
+    BulkDeleteSessionsRequest,
     CreateProjectRequest,
     MoveProjectRequest,
     SaveProjectContextRequest,
@@ -17,6 +18,7 @@ from raiker.api.schemas import (
     SetModelFallbackRequest,
     SetModelSelectionRequest,
     SetSessionPinnedRequest,
+    SetSessionProjectRequest,
     SetSessionTagsRequest,
     TaskCreateRequest,
     serialize_dto,
@@ -122,6 +124,21 @@ async def set_session_pinned(
     return {"ok": True, **result.data}
 
 
+@router.delete("/api/sessions/bulk")
+async def delete_sessions(
+    body: BulkDeleteSessionsRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).delete_sessions(body.session_ids, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
 @router.delete("/api/sessions/{session_id}")
 async def delete_session(
     session_id: str,
@@ -141,6 +158,33 @@ async def delete_session(
             detail={"ok": False, "reason_code": "session_delete_confirmation_required"},
         )
     result = _service(request).delete_session(session_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/sessions/{session_id}/project")
+async def set_session_project(
+    session_id: str,
+    body: SetSessionProjectRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Move one chat into a project, or out of every project (human-only).
+
+    A project is an organizing scope — the move grants nothing and changes no
+    gate, policy, or authority. It changes only the bounded context the chat
+    receives on its next turn: project instructions, shared attachments, and
+    the opt-in approved-memory boundary. A null `project_id` moves the chat
+    out, removing all of that. Respects user/session visibility — an account
+    cannot move another account's chat.
+    """
+    result = _service(request).set_session_project(
+        session_id, body.project_id, auth_data[0].principal_id
+    )
     if not result.ok:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -417,11 +461,17 @@ async def list_tasks(
     request: Request,
     session_id: str | None = None,
     task_status: str | None = None,
+    project_id: str | None = None,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
+    """List tasks/schedules visible to the account. `project_id` scopes the
+    list to one project's schedules; omitting it lists every visible task."""
     return serialize_dto(
         _service(request).list_tasks(
-            session_id=session_id, status=task_status, user_id=auth_data[1].delegated_by_user_id
+            session_id=session_id,
+            status=task_status,
+            user_id=auth_data[1].delegated_by_user_id,
+            project_id=project_id,
         )
     )
 
@@ -436,8 +486,10 @@ async def create_task(
     title = body.title.strip()
     if not title:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="task_title_required")
-    return serialize_dto(
-        _service(request).create_task(
+    # Project-scoped schedules: an explicit project_id wins; otherwise the task
+    # is stamped with the active project so project work stays project-scoped.
+    try:
+        view = _service(request).create_task(
             title=title,
             objective=body.description.strip(),
             user_id=principal.delegated_by_user_id,
@@ -446,8 +498,14 @@ async def create_task(
             scheduled_at=body.scheduled_at,
             recurrence=body.recurrence,
             reminder_at=body.reminder_at,
+            project_id=body.project_id,
         )
-    )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": str(exc)},
+        ) from exc
+    return serialize_dto(view)
 
 
 @router.get("/api/models")

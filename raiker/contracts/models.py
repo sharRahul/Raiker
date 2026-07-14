@@ -88,6 +88,9 @@ EVENT_TYPES = {
     "reasoning_setting_rejected",
     "model_tool_call_rejected",
     "runtime_error_recorded",
+    # A chat moved into or out of an organizing project. The move grants
+    # nothing; it changes only the bounded context the chat receives.
+    "session_project_changed",
     "task_created",
     "task_started",
     "task_progress",
@@ -631,6 +634,9 @@ class TaskRecord:
     scheduled_at: str | None = None
     recurrence: str | None = None
     reminder_at: str | None = None
+    # Project-scoped schedules: the organizing project the task/schedule was
+    # created under. None for a task created outside any project.
+    project_id: str | None = None
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:

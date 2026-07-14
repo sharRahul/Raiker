@@ -112,7 +112,7 @@ def test_docs_catalog_event_consistency() -> None:
     for path in [
         Path("docs/IMPLEMENTATION_STATUS.md"),
     ]:
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         assert "Slice N" in text
         assert "plugin" in text.lower()
         assert (

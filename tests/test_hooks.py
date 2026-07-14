@@ -109,7 +109,7 @@ def _script(tmp_path: Path, name: str, body: str) -> str:
 
 
 def _events(events_path: str) -> list[str]:
-    return [json.loads(line)["event_type"] for line in Path(events_path).read_text().splitlines()]
+    return [json.loads(line)["event_type"] for line in Path(events_path).read_text(encoding="utf-8").splitlines()]
 
 
 def test_no_hook_events_when_unconfigured(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

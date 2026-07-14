@@ -121,7 +121,10 @@ class ContextGatherer:
         project = store.load_project(project_id)
         if project is None:
             return None
-        return {**project, **store.load_project_context(project_id)}
+        # Nested folders inherit their ancestors' bounded context: instructions
+        # concatenate root→leaf, attachments union, and the leaf's own
+        # memory_enabled decides the approved-memory boundary.
+        return {**project, **store.load_effective_project_context(project_id)}
 
     def _project_attachments(
         self, store: SQLiteStore, project: dict[str, object] | None

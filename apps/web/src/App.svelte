@@ -109,7 +109,7 @@
       {:else if current === "approvals"}
         <ApprovalsView />
       {:else if current === "tasks"}
-        <TasksView />
+        <TasksView projectId={activeProjectId} />
       {:else if current === "sessions"}
         <SessionsView projectId={activeProjectId} />
       {:else if current === "projects"}

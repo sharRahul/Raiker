@@ -269,6 +269,35 @@ class TestSessionOrganisationApi:
     def test_delete_routes_require_auth(self, client: TestClient) -> None:
         assert client.delete("/api/sessions/sess_a").status_code == 401
 
+    def test_bulk_delete_is_atomic_through_the_api(self, client: TestClient, workspace: Path) -> None:
+        headers = self._headers(client)
+        store = SQLiteStore(workspace)
+        store.create_session("sess_a", str(workspace))
+        store.create_session("sess_b", str(workspace))
+
+        rejected = client.request(
+            "DELETE",
+            "/api/sessions/bulk",
+            json={"session_ids": ["sess_a", "sess_missing"]},
+            headers=headers,
+        )
+
+        assert rejected.status_code == 403
+        assert store.load_session("sess_a") is not None
+        assert store.load_session("sess_b") is not None
+
+        deleted = client.request(
+            "DELETE",
+            "/api/sessions/bulk",
+            json={"session_ids": ["sess_a", "sess_b"]},
+            headers=headers,
+        )
+
+        assert deleted.status_code == 200, deleted.text
+        assert deleted.json()["session_ids"] == ["sess_a", "sess_b"]
+        assert store.load_session("sess_a") is None
+        assert store.load_session("sess_b") is None
+
     def test_set_tags_round_trip_through_the_api(self, client: TestClient, workspace: Path) -> None:
         headers = self._headers(client)
         SQLiteStore(workspace).create_session("sess_a", str(workspace))

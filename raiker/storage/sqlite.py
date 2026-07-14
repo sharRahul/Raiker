@@ -505,6 +505,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "ALTER TABLE tasks ADD COLUMN scheduled_at TEXT",
                 "ALTER TABLE tasks ADD COLUMN recurrence TEXT",
                 "ALTER TABLE tasks ADD COLUMN reminder_at TEXT",
+                # Project-scoped schedules (backlog item 1): a task/schedule
+                # belongs to the project it was created under, so project work
+                # stays project-scoped. Organizing scope only — grants nothing.
+                "ALTER TABLE tasks ADD COLUMN project_id TEXT REFERENCES projects(project_id)",
             ):
                 with contextlib.suppress(sqlite3.OperationalError):
                     connection.execute(_alter_sql)
@@ -817,6 +821,38 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             """, (path,)).fetchall()
         return [dict(r) for r in rows]
 
+    def load_effective_project_context(self, project_id: str) -> dict[str, Any]:
+        """Return the project's context merged with every active ancestor's.
+
+        Instructions concatenate root→leaf so the nearest folder speaks last;
+        attachment ids union in the same order; ``memory_enabled`` is the
+        leaf's own value (an ancestor cannot opt a child into project memory).
+        Archived ancestors contribute nothing. This is the single merge used by
+        both the live context gatherer and the dashboard read path.
+        """
+        own = self.load_project_context(project_id)
+        instructions: list[str] = []
+        attachment_ids: list[str] = []
+        for ancestor in self.get_ancestor_contexts(project_id):
+            text = str(ancestor.get("instructions") or "").strip()
+            if text:
+                instructions.append(text)
+            raw = ancestor.get("attachment_ids_json")
+            if raw:
+                with contextlib.suppress(TypeError, ValueError):
+                    attachment_ids.extend(
+                        str(item) for item in json.loads(str(raw)) if isinstance(item, str)
+                    )
+        own_instructions = str(own.get("instructions") or "").strip()
+        if own_instructions:
+            instructions.append(own_instructions)
+        attachment_ids.extend(own.get("attachment_ids", []))
+        return {
+            "instructions": "\n\n".join(instructions),
+            "attachment_ids": list(dict.fromkeys(attachment_ids)),
+            "memory_enabled": bool(own.get("memory_enabled", False)),
+        }
+
     def _session_owner(
         self, connection: sqlite3.Connection, session_id: str
     ) -> tuple[bool, str | None]:
@@ -828,6 +864,31 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if row is None:
             return False, None
         return True, dict(row).get("user_id")
+
+    def set_session_project(
+        self, session_id: str, project_id: str | None, user_id: str | None = None
+    ) -> bool:
+        """Move one session into a project, or out of every project with
+        ``project_id=None``. Returns False if the session does not exist or is
+        owned by another account (user isolation mirrors set_session_pinned).
+        The caller validates that ``project_id`` names a real project — a
+        project is an organizing scope, so the move grants nothing; it only
+        changes the bounded context the chat receives."""
+        with self.connect() as connection:
+            exists, owner = self._session_owner(connection, session_id)
+            if not exists:
+                return False
+            if (
+                user_id is not None
+                and owner is not None
+                and str(owner) != user_id
+            ):
+                return False
+            connection.execute(
+                "UPDATE sessions SET project_id = ?, updated_at = ? WHERE session_id = ?",
+                (project_id, utc_now(), session_id),
+            )
+        return True
 
     def set_session_pinned(
         self, session_id: str, pinned: bool, user_id: str | None = None
@@ -917,30 +978,40 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 and str(owner) != user_id
             ):
                 return False
-            action_ids = "SELECT action_id FROM tool_actions WHERE session_id = ?"
-            connection.execute(
-                f"DELETE FROM policy_decisions WHERE action_id IN ({action_ids})",
-                (session_id,),
-            )
-            for table in (
-                "events_index",
-                "tool_actions",
-                "checkpoints",
-                "tasks",
-                "turns",
-                "model_session_state",
-                "model_fallback_sequence",
-                "model_advisor",
-                "session_tags",
-            ):
-                connection.execute(
-                    f"DELETE FROM {table} WHERE session_id = ?", (session_id,)
-                )
-            connection.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+            self._delete_session_rows(connection, session_id)
         # Remove the per-session events transcript file (best-effort; the db rows
         # above are already the source of truth and are committed).
         with contextlib.suppress(FileNotFoundError):
             (self.paths.events_dir / f"{session_id}.jsonl").unlink()
+        return True
+
+    @staticmethod
+    def _delete_session_rows(connection: sqlite3.Connection, session_id: str) -> None:
+        action_ids = "SELECT action_id FROM tool_actions WHERE session_id = ?"
+        connection.execute(
+            f"DELETE FROM policy_decisions WHERE action_id IN ({action_ids})", (session_id,)
+        )
+        for table in (
+            "events_index", "tool_actions", "checkpoints", "tasks", "turns",
+            "model_session_state", "model_fallback_sequence", "model_advisor", "session_tags",
+        ):
+            connection.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
+        connection.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+
+    def delete_sessions(self, session_ids: list[str], user_id: str | None = None) -> bool:
+        """Atomically delete visible sessions and their cascaded rows."""
+        if not session_ids or len(set(session_ids)) != len(session_ids):
+            return False
+        with self.connect() as connection:
+            for session_id in session_ids:
+                exists, owner = self._session_owner(connection, session_id)
+                if not exists or (user_id is not None and owner is not None and str(owner) != user_id):
+                    return False
+            for session_id in session_ids:
+                self._delete_session_rows(connection, session_id)
+        for session_id in session_ids:
+            with contextlib.suppress(FileNotFoundError):
+                (self.paths.events_dir / f"{session_id}.jsonl").unlink()
         return True
 
     # ── Memory controls (backlog item 3) ──────────────────────────────────
@@ -1217,8 +1288,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR IGNORE INTO tasks
-                (task_id, session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (task_id, session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.task_id,
@@ -1237,6 +1308,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     task.scheduled_at,
                     task.recurrence,
                     task.reminder_at,
+                    task.project_id,
                 ),
             )
 
@@ -1248,7 +1320,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return TaskRecord(**dict(row))
 
     def list_tasks(
-        self, session_id: str | None = None, status: str | None = None, user_id: str | None = None
+        self,
+        session_id: str | None = None,
+        status: str | None = None,
+        user_id: str | None = None,
+        project_id: str | None = None,
     ) -> list[TaskRecord]:
         query = "SELECT * FROM tasks"
         params: list[Any] = []
@@ -1256,6 +1332,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if session_id is not None:
             conditions.append("session_id = ?")
             params.append(session_id)
+        if project_id is not None:
+            # Project-scoped schedules: a project's task list shows only the
+            # tasks created under that project.
+            conditions.append("project_id = ?")
+            params.append(project_id)
         if status is not None:
             conditions.append("status = ?")
             params.append(status)

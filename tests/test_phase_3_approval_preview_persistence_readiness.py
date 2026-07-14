@@ -98,7 +98,7 @@ def test_docs_catalog_event_consistency() -> None:
     for path in [
         Path("docs/IMPLEMENTATION_STATUS.md"),
     ]:
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         assert "Slice L" in text
         assert "approval preview persistence" in text.lower()
         assert (

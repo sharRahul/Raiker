@@ -234,6 +234,9 @@ export interface SessionSummary {
   // Conversation organisation remainder: per-session tags. Organizing labels
   // only — like `pinned`, they grant nothing. Storage returns them sorted.
   tags: string[];
+  // The organizing project this chat sits in, or null. A chat can be moved in
+  // or out; the project only bounds the context the chat receives.
+  project_id: string | null;
 }
 
 export interface TurnSummary {
@@ -350,6 +353,13 @@ export interface TaskView {
   updated_at: string;
   completed_at: string | null;
   summary: string | null;
+  priority?: string | null;
+  scheduled_at?: string | null;
+  recurrence?: string | null;
+  reminder_at?: string | null;
+  // Project-scoped schedules: the project this task/schedule was created
+  // under, or null when it was created outside every project.
+  project_id: string | null;
 }
 
 // POST /api/interrupts response (raiker/api/routes_prompts.py).

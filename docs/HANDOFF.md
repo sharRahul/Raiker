@@ -160,34 +160,27 @@ Each backlog item was verified against the actual codebase (not docs). Gaps and
 contradictions are recorded honestly. File:line citations are in
 `docs/IMPLEMENTATION_STATUS.md`.
 
-1. **Project context** — ⚠️ PARTIAL
+1. **Project context** — ✅ CURRENT SLICE COMPLETE
    - ✅ Project instructions, shared attachments, opt-in project-memory boundary
      all wired into the live context gatherer
      (`raiker/context/gatherer.py:126-165`).
    - ✅ Incognito override enforced at runtime
      (`raiker/context/gatherer.py:152-157`).
-   - ❌ **Chat move in/out of a project is NOT implemented.** There is no
-     `move_session`, `set_session_project`, or any `UPDATE sessions SET
-     project_id` anywhere in the codebase. A session's `project_id` is stamped
-     only at creation (`raiker/storage/sqlite.py:532-545`).
-   - ❌ **Project-scoped schedules are NOT enforced.** The `tasks` table has no
-     `project_id` column (`raiker/storage/migrations.py:41-55`); dashboard
-     `create_task` routes into `sess_inbox_{principal_id}`, not the active
-     project (`raiker/control/dashboard.py:1043-1058`); no project filter on the
-     task list API (`raiker/api/routes_dashboard.py:415-426`).
-   - ⚠️ **Ancestor-context inheritance is built but dormant.**
-     `DashboardService.get_session_context` merges ancestor contexts
-     (`raiker/control/dashboard.py:981-1007`), but the live gatherer uses
-     leaf-only `load_project_context` (`raiker/context/gatherer.py:116-124`).
-     The merge path is reachable only from tests.
+   - ✅ Chats move in/out through human-only `PUT /api/sessions/{id}/project`;
+     the stored project scope changes the next turn's bounded context and emits
+     `session_project_changed`.
+   - ✅ Tasks/schedules persist nullable `project_id`, stamp the selected active
+     project by default, and list filtering keeps project task views scoped.
+   - ✅ The live gatherer uses `load_effective_project_context`, merging active
+     ancestors root→leaf exactly once.
 
-2. **Conversation organisation** — ⚠️ MOSTLY DONE
+2. **Conversation organisation** — ✅ CURRENT SLICE COMPLETE
    - ✅ Nested projects/folders, tags, pin/bookmark, project-only export, search
      with transcript hydration — all implemented with schema, storage, service,
      API, and web.
-   - ⚠️ **Bulk delete is client-side only.** No server-side bulk endpoint exists;
-     `SessionsView` loops N single-delete calls
-     (`apps/web/src/lib/views/SessionsView.svelte:118-143`). Non-transactional.
+   - ✅ Bulk delete is one human-only `DELETE /api/sessions/bulk` request. It
+     validates every selected visible session before one transactional cascade,
+     so invalid or unauthorized selections delete none.
 
 3. **Reliable memory controls** — ⚠️ FIRST SLICE
    - ✅ List, pin, delete (governed), scope filter, provenance display, incognito
@@ -250,10 +243,9 @@ governed vertical slice at a time.
 
 1. **Project context:** project instructions, shared attachments, and an
    opt-in project-memory boundary. Chats moved into a project must inherit that
-   bounded context; moving out must remove it. Project schedules must remain
-   project-scoped. First three sub-features are wired into the live gatherer;
-   chat move in/out and project-scoped schedules are NOT yet implemented
-   (see code-verified audit above).
+   bounded context; moving out must remove it. Project schedules remain
+   project-scoped. The complete slice is now wired through storage, service,
+   API, web, and the live gatherer (see code-verified audit above).
 2. **Conversation organisation:** nested projects/folders, tags, pin/bookmark,
    bulk delete, and project-only export have landed. Search exists and
    hydrates persisted transcripts on reopen.

@@ -213,7 +213,7 @@ def test_generate_export_uses_one_event_index_snapshot(store: SQLiteStore, write
     assert calls == 1
     assert manifest.event_count == 1
     assert manifest.export_path is not None
-    exported = [json.loads(line) for line in Path(manifest.export_path).read_text().splitlines()]
+    exported = [json.loads(line) for line in Path(manifest.export_path).read_text(encoding="utf-8").splitlines()]
     assert [row["event_id"] for row in exported] == [event.event_id]
 
 
@@ -280,7 +280,7 @@ def test_generate_export_project_filters_by_user_in_manifest_and_jsonl(
 
     assert manifest.event_count == 2
     assert manifest.export_path is not None
-    exported = [json.loads(line) for line in Path(manifest.export_path).read_text().splitlines()]
+    exported = [json.loads(line) for line in Path(manifest.export_path).read_text(encoding="utf-8").splitlines()]
     assert {event["session_id"] for event in exported} == {"sess_visible", "sess_legacy"}
     assert json.loads(manifest.scope_json)["event_count"] == len(exported)
     assert manifest.first_event_id == exported[0]["event_id"]

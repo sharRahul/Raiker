@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
@@ -9,6 +8,12 @@
   import { relativeTime, shortId } from "../format";
 
   const ACTIVE_STATES = ["queued", "running", "paused"];
+
+  // Project-scoped schedules (backlog item 1): when a project is active
+  // (topbar switcher) the task list shows only that project's schedules, and a
+  // new task is created under it. The scope is an organizing label — it grants
+  // nothing and changes no gate, policy, or authority.
+  let { projectId = null }: { projectId?: string | null } = $props();
 
   let tasks = $state<TaskView[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -23,7 +28,7 @@
   async function load() {
     loadError = null;
     try {
-      tasks = await api.tasks();
+      tasks = await api.tasks(projectId ? { project_id: projectId } : {});
     } catch (e) {
       tasks = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
@@ -59,12 +64,18 @@
         description: description.trim(),
         priority,
         ...(scheduledAt ? { scheduled_at: new Date(scheduledAt).toISOString() } : {}),
+        ...(projectId ? { project_id: projectId } : {}),
       });
       title = "";
       description = "";
       priority = "normal";
       scheduledAt = "";
-      notice = { kind: "ok", text: "Task created in your Inbox." };
+      notice = {
+        kind: "ok",
+        text: projectId
+          ? "Task created in your Inbox, scoped to the active project."
+          : "Task created in your Inbox.",
+      };
       await load();
     } catch {
       notice = { kind: "error", text: "Could not create the task." };
@@ -76,7 +87,12 @@
   const active = $derived((tasks ?? []).filter((t) => ACTIVE_STATES.includes(t.status)));
   const finished = $derived((tasks ?? []).filter((t) => !ACTIVE_STATES.includes(t.status)));
 
-  onMount(load);
+  // Load on mount and again whenever the active project changes, so the list
+  // stays scoped to the active project.
+  $effect(() => {
+    void projectId;
+    void load();
+  });
 </script>
 
 <div class="head-row">

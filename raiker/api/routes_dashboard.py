@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi.responses import FileResponse, Response
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
@@ -293,6 +294,37 @@ async def get_project(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown project: {project_id}"
         )
     return serialize_dto(view)
+
+
+@router.post("/api/projects/{project_id}/export")
+async def export_project(
+    project_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> Response:
+    result = _service(request).export_project(project_id, auth_data[0].principal_id)
+    if not result.ok:
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if result.reason_code == f"unknown_project:{project_id}"
+            else status.HTTP_403_FORBIDDEN
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    export_path = result.data["export_path"]
+    if export_path is not None:
+        return FileResponse(
+            export_path,
+            media_type="application/x-ndjson",
+            filename="project-export.ndjson",
+        )
+    return Response(
+        content=b"",
+        media_type="application/x-ndjson",
+        headers={"Content-Disposition": 'attachment; filename="project-export.ndjson"'},
+    )
 
 
 @router.put("/api/projects/{project_id}/context")

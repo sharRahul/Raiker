@@ -15,6 +15,7 @@ from raiker.approval_previews import redact_secret_like_text
 from raiker.contracts.ids import new_id
 from raiker.control.dtos import ControlResult
 from raiker.control.service import RuntimeControlService
+from raiker.events.export import generate_export
 from raiker.events.writer import EventLogWriter
 from raiker.memory.store import list_memory
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
@@ -805,6 +806,19 @@ class DashboardService:
             checkpoints=checkpoints,
             context=self.store.load_project_context(project_id),
         )
+
+    def export_project(
+        self, project_id: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if self.store.load_project(project_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        manifest = generate_export(self.store, project_id=project_id)
+        return ControlResult(ok=True, data={"export_path": manifest.export_path})
 
     def create_project(self, name: str, acting_principal_id: str | None, parent_id: str | None = None) -> ControlResult:
         """Create a named project folder (human gate-manager only).

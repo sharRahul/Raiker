@@ -8,6 +8,7 @@ name, then verified — fail closed).
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,8 @@ from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.context.gatherer import ContextGatherer
 from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import DashboardService
+from raiker.events.types import make_event
+from raiker.events.writer import EventLogWriter
 from raiker.storage.sqlite import SQLiteStore
 
 OWNER = "principal_rahul"
@@ -233,6 +236,58 @@ class TestProjectsApi:
         assert client.get("/api/projects").status_code == 401
         assert client.post("/api/projects", json={"name": "P"}).status_code == 401
         assert client.put("/api/projects/selection", json={"project_id": None}).status_code == 401
+        assert client.post("/api/projects/proj_x/export").status_code == 401
+
+    def test_export_returns_direct_project_events_as_ndjson_attachment(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        headers = self._headers(client)
+        project_id = client.post(
+            "/api/projects", json={"name": "Alpha"}, headers=headers
+        ).json()["project_id"]
+        client.put("/api/projects/selection", json={"project_id": project_id}, headers=headers)
+        session_id = "sess_alpha"
+        SQLiteStore(workspace).create_session(session_id, str(workspace))
+        EventLogWriter(SQLiteStore(workspace)).append(
+            make_event(
+                session_id=session_id,
+                turn_id=None,
+                event_type="action_proposed",
+                actor="test",
+                payload={"message": "export me"},
+            )
+        )
+
+        response = client.post(f"/api/projects/{project_id}/export", headers=headers)
+
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"].startswith("application/x-ndjson")
+        assert "attachment" in response.headers["content-disposition"]
+        assert json.loads(response.text)["payload"]["message"] == "export me"
+        assert str(workspace) not in response.text
+
+    def test_export_of_empty_project_returns_empty_attachment(
+        self, client: TestClient
+    ) -> None:
+        headers = self._headers(client)
+        project_id = client.post(
+            "/api/projects", json={"name": "Empty"}, headers=headers
+        ).json()["project_id"]
+
+        response = client.post(f"/api/projects/{project_id}/export", headers=headers)
+
+        assert response.status_code == 200, response.text
+        assert response.headers["content-type"].startswith("application/x-ndjson")
+        assert "attachment" in response.headers["content-disposition"]
+        assert response.content == b""
+
+    def test_export_of_unknown_project_returns_404(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/projects/proj_missing/export", headers=self._headers(client)
+        )
+
+        assert response.status_code == 404
+        assert response.json()["detail"]["reason_code"] == "unknown_project:proj_missing"
 
     def test_create_list_select_detail_roundtrip(self, client: TestClient, workspace: Path) -> None:
         headers = self._headers(client)

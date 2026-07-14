@@ -17,15 +17,17 @@ from raiker.runtime.executors.sandbox import (
     SandboxError,
     connector_egress_allowlist,
     get_url,
+    post_json_url,
 )
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
-# ── GitHub read-only connector (reference slice for Task 4) ────────────────────
+# ── GitHub read-only connector + write reference (Tasks 4 / 5) ────────────────
 #
 # The first governed service connector: a local-model turn may read a GitHub
-# issue or pull request through the brokered ``github_read`` tool. Governance
+# issue or pull request through the brokered ``github_read`` tool, or create an
+# issue comment through the generic ``connector_write`` path. Governance
 # mirrors :class:`raiker.runtime.advisor.AdvisorService` — gate + per-capability
 # decision mode + owner credential (env only) + owner egress allowlist — and the
 # fetched content is returned as **untrusted external data, never instructions**.
@@ -52,7 +54,7 @@ _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
 class GithubConnectorService:
-    """Governed, **default-ask** read of a GitHub issue or pull request.
+    """Governed, **default-ask** read and write operations for GitHub.
 
     Enforces, in order: the ``connector_github_runtime`` gate (disabled ⇒ fail
     closed), the per-capability decision mode (**default ``ask`` ⇒ withheld**;
@@ -62,9 +64,11 @@ class GithubConnectorService:
     (``api.github.com`` absent ⇒ fail closed), and validated request components
     (the request URL is built here, never accepted raw from the model).
 
-    The response body is returned as an untrusted-data block for the calling
-    model. Event/audit payloads carry metadata only (the ToolBroker scrubs
-    ``github_read`` arguments/results; see ``_METADATA_ONLY_TOOLS``).
+    ``read()`` returns the response body as an untrusted-data block for the
+    calling model. ``create_comment()`` is the narrow write reference — it
+    posts one issue comment through the same governance path.
+    Event/audit payloads carry metadata only (the ToolBroker scrubs arguments
+    and results; see ``_METADATA_ONLY_TOOLS`` / ``_CONTENT_RESULT_TOOLS``).
     """
 
     def __init__(
@@ -201,6 +205,110 @@ class GithubConnectorService:
             "state": summary["state"],
             "content_length": summary["content_length"],
             "content_truncated": summary["content_truncated"] or bool(fetched.get("truncated")),
+        }
+
+    # ── Write (reference slice for backlog item 5) ──────────────────────
+    def create_comment(
+        self,
+        repo: str,
+        issue_number: Any,
+        body: str,
+        *,
+        enforce_modes: bool = True,
+    ) -> dict[str, Any]:
+        """Post one governed comment on a GitHub issue or pull request.
+
+        ``enforce_modes=False`` skips the gate/decision-mode layer for callers
+        that already passed through governance (the ``route_action`` + approval
+        path applies those layers itself). Everything else — credential, egress,
+        and argument validation — is always enforced.
+        """
+        repo = (repo or "").strip()
+        if not _REPO_RE.match(repo):
+            return _failed("invalid_repo", "repo must be 'owner/name'.")
+        try:
+            number_int = int(str(issue_number).strip())
+        except (TypeError, ValueError):
+            return _failed("invalid_number", "issue_number must be a positive integer.")
+        if number_int <= 0:
+            return _failed("invalid_number", "issue_number must be a positive integer.")
+        body_text = (body or "").strip()
+        if not body_text:
+            return _failed("empty_body", "comment body must not be empty.")
+
+        if enforce_modes:
+            if not self._gate_enabled():
+                return _denied(
+                    "connector_gate_disabled",
+                    "GitHub write denied: the connector_github_runtime gate is disabled (fail closed).",
+                )
+            mode = self._mode()
+            if mode == DecisionMode.DENY:
+                return _denied(
+                    "connector_denied_by_decision_mode",
+                    "GitHub write denied by the owner's decision mode.",
+                )
+            if mode == DecisionMode.ASK or (
+                mode == DecisionMode.AUTO and auto_requires_approval(_READ_RISK)
+            ):
+                return _denied(
+                    f"connector_withheld_{mode.value}",
+                    "GitHub write withheld: reaching the GitHub API with the owner token "
+                    "needs a standing owner decision — raise the connector_github_runtime "
+                    "decision mode to allow.",
+                )
+
+        if not self.credential_configured():
+            return _denied(
+                "connector_not_configured",
+                f"GitHub write denied: no owner credential is configured ({GITHUB_TOKEN_ENV}).",
+            )
+        if not self.egress_allowed():
+            return _denied(
+                "connector_egress_denied",
+                f"GitHub write denied: {GITHUB_HOST} is not on the owner connector egress allowlist.",
+            )
+
+        url = f"https://{GITHUB_HOST}/repos/{repo}/issues/{number_int}/comments"
+        token = os.environ.get(GITHUB_TOKEN_ENV, "").strip()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "raiker-connector",
+        }
+        try:
+            resp = post_json_url(
+                url,
+                {"body": body_text},
+                egress_allowlist=connector_egress_allowlist(),
+                headers=headers,
+            )
+        except SandboxError as exc:
+            return _denied(f"connector_fetch_failed:{exc}", "GitHub write failed closed.")
+        except Exception:  # noqa: BLE001 — every transport failure fails closed
+            return _denied("connector_fetch_failed", "GitHub write failed closed.")
+
+        try:
+            data = json.loads(resp["body_text"])
+        except (json.JSONDecodeError, TypeError):
+            return _failed("connector_bad_response", "GitHub returned an unparseable response.")
+        if not isinstance(data, dict):
+            return _failed("connector_bad_response", "GitHub returned an unexpected response.")
+        comment_id = str(data.get("id", ""))
+        html_url = str(data.get("html_url", ""))
+        return {
+            "status": "success",
+            "comment_id": comment_id,
+            "html_url": html_url,
+            "repo": repo,
+            "issue_number": number_int,
+            "untrusted": True,
+            # Untrusted-data framing for the calling model; never instruction authority.
+            "content": (
+                f"GitHub comment created (untrusted data):\n{html_url}"
+            ),
+            "content_length": len(body_text),
         }
 
 

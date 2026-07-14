@@ -35,6 +35,11 @@ fail-closed by design.
 
 ## Current product state — 2026-07-14
 
+- The connector write reference (backlog item 5) has landed:
+  `GithubConnectorService.create_comment()` is a governed GitHub issue comment
+  POST through the same gate + decision mode + credential + egress path as the
+  existing `read()` method. The `post_json_url()` sandbox helper supports
+  governed POST-with-response-body for connector writes. 14 new tests.
 - Conversation organisation has landed its third slice: nested projects/folders.
   Arbitrary-depth folder nesting via hybrid adjacency list (`parent_id`) +
   materialized path (`path`) on the `projects` table. Two deletion modes:
@@ -226,9 +231,11 @@ Primary sources: [Claude support collection](https://support.claude.com/en/colle
 
 ## Next implementation slice — requires design approval
 
-**Connector write reference.** Reminders now have basic lifecycle delivery. The next
-backlog item is a narrow, real service write (e.g. GitHub issue comment) through
-immutable intent + approval + an actual executor.
+**Agent evaluation and observability.** The connector write reference (backlog
+item 5) has landed. The next backlog item is a trace of a goal/plan/tool/approval
+chain with latency, cost, outcome, and user feedback; add record/replayable
+regression scenarios, outcome review, and an OpenTelemetry-compatible export
+with configurable prompt/content redaction before making autonomy broader.
 
 ## Verification and handoff
 

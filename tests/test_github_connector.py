@@ -105,6 +105,22 @@ def _ok_fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
     return {"status": 200, "body_bytes": len(_ISSUE_JSON), "body_text": _ISSUE_JSON, "truncated": False}
 
 
+def _ok_post_json(
+    url: str,
+    payload: dict[str, object],
+    *,
+    egress_allowlist: frozenset[str] | None = None,
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 200_000,
+    timeout: float = 15.0,
+) -> dict[str, object]:
+    """Mock for ``post_json_url`` used by ``create_comment``."""
+    assert url.startswith("https://api.github.com/repos/")
+    assert headers is not None and "Authorization" in headers
+    comment_resp = json.dumps({"id": 42, "html_url": "https://github.com/octo/repo/issues/5#issuecomment-42"})
+    return {"status": 201, "body_bytes": len(comment_resp), "body_text": comment_resp, "truncated": False}
+
+
 class TestGithubConnectorGovernance:
     def test_gate_disabled_fails_closed(self, workspace: Path, store: SQLiteStore) -> None:
         outcome = GithubConnectorService(workspace, store, fetch_fn=_ok_fetch).read(
@@ -313,3 +329,99 @@ class TestGithubReadTool:
         assert "login button does nothing" not in events_text
         assert "ghp_secrettoken" not in events_text
         assert "octo/repo" in events_text
+
+
+class TestGithubConnectorWrite:
+    """Backlog item 5 — connector write reference: ``create_comment()``."""
+
+    def _service(self, workspace: Path, store: SQLiteStore) -> GithubConnectorService:
+        return GithubConnectorService(workspace, store)
+
+    # ── Argument validation ────────────────────────────────────────────
+    @pytest.mark.parametrize(
+        ("repo", "issue_number", "body", "reason"),
+        [
+            ("not-a-repo", 5, "hello", "invalid_repo"),
+            ("octo/repo", 0, "hello", "invalid_number"),
+            ("octo/repo", "abc", "hello", "invalid_number"),
+            ("octo/repo", 5, "", "empty_body"),
+            ("octo/repo", 5, "  ", "empty_body"),
+        ],
+    )
+    def test_argument_validation_fails_closed(
+        self,
+        workspace: Path,
+        store: SQLiteStore,
+        monkeypatch: pytest.MonkeyPatch,
+        repo: str,
+        issue_number: object,
+        body: str,
+        reason: str,
+    ) -> None:
+        _configure_creds(monkeypatch)
+        _allow(_enable_gate(workspace, store))
+        outcome = self._service(workspace, store).create_comment(repo, issue_number, body)
+        assert outcome["status"] == "failed"
+        assert outcome["error"]["type"] == reason
+
+    # ── Governance ─────────────────────────────────────────────────────
+    def test_gate_disabled_fails_closed(self, workspace: Path, store: SQLiteStore) -> None:
+        outcome = self._service(workspace, store).create_comment("octo/repo", 5, "hello")
+        assert outcome["status"] == "denied"
+        assert outcome["error"]["type"] == "connector_gate_disabled"
+
+    def test_default_ask_withholds(self, workspace: Path, store: SQLiteStore) -> None:
+        _enable_gate(workspace, store)
+        outcome = self._service(workspace, store).create_comment("octo/repo", 5, "hello")
+        assert outcome["error"]["type"] == "connector_withheld_ask"
+
+    def test_deny_mode_blocks(self, workspace: Path, store: SQLiteStore) -> None:
+        ctrl = _enable_gate(workspace, store)
+        ctrl.set_capability_decision_mode(_CAP, "deny", "principal_rahul", "test")
+        outcome = self._service(workspace, store).create_comment("octo/repo", 5, "hello")
+        assert outcome["error"]["type"] == "connector_denied_by_decision_mode"
+
+    def test_without_credential_fails_closed(
+        self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv(GITHUB_TOKEN_ENV, raising=False)
+        monkeypatch.setenv("RAIKER_CONNECTOR_EGRESS_ALLOWLIST", "api.github.com")
+        _allow(_enable_gate(workspace, store))
+        outcome = self._service(workspace, store).create_comment("octo/repo", 5, "hello")
+        assert outcome["error"]["type"] == "connector_not_configured"
+
+    def test_without_egress_fails_closed(
+        self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv(GITHUB_TOKEN_ENV, "ghp_x")
+        monkeypatch.delenv("RAIKER_CONNECTOR_EGRESS_ALLOWLIST", raising=False)
+        _allow(_enable_gate(workspace, store))
+        outcome = self._service(workspace, store).create_comment("octo/repo", 5, "hello")
+        assert outcome["error"]["type"] == "connector_egress_denied"
+
+    # ── Success path ───────────────────────────────────────────────────
+    def test_create_comment_fully_governed(
+        self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _configure_creds(monkeypatch)
+        _allow(_enable_gate(workspace, store))
+        monkeypatch.setattr("raiker.runtime.connectors.post_json_url", _ok_post_json)
+        outcome = self._service(workspace, store).create_comment("octo/repo", 5, "Fixed in latest build.")
+        assert outcome["status"] == "success"
+        assert outcome["comment_id"] == "42"
+        assert outcome["html_url"] == "https://github.com/octo/repo/issues/5#issuecomment-42"
+        assert outcome["repo"] == "octo/repo"
+        assert outcome["issue_number"] == 5
+        assert outcome["untrusted"] is True
+        assert "untrusted data" in outcome["content"]
+
+    def test_allow_without_enforce_modes_skips_gate_and_mode(
+        self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _configure_creds(monkeypatch)
+        monkeypatch.setattr("raiker.runtime.connectors.post_json_url", _ok_post_json)
+        outcome = self._service(workspace, store).create_comment(
+            "octo/repo", 5, "Fixed.", enforce_modes=False
+        )
+        assert outcome["status"] == "success"
+        assert outcome["comment_id"] == "42"

@@ -167,6 +167,33 @@ def test_generate_export_scopes_to_direct_project_sessions(
     assert exported_session_ids == {parent_session_id}
 
 
+def test_generate_export_project_forces_redaction(
+    store: SQLiteStore, writer: EventLogWriter
+) -> None:
+    project_id = new_id("proj_")
+    session_id = new_id("sess_")
+    store.create_project(project_id, "Project", "project")
+    store.save_active_project(project_id)
+    store.create_session(session_id, "/project")
+    writer.append(
+        make_event(
+            session_id=session_id,
+            turn_id=None,
+            event_type="action_proposed",
+            actor="test",
+            payload={"api_key": "sk-project-secret", "data": "normal"},
+        )
+    )
+
+    manifest = generate_export(store, project_id=project_id, redact=False)
+
+    assert manifest.redacted is True
+    assert manifest.export_path is not None
+    exported = json.loads(Path(manifest.export_path).read_text(encoding="utf-8"))
+    assert exported["payload"]["api_key"] == "***REDACTED***"
+    assert exported["payload"]["data"] == "normal"
+
+
 def test_generate_export_redacted(store: SQLiteStore, writer: EventLogWriter) -> None:
     sess_id = new_id("sess_")
     sensitive = make_event(

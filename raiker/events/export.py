@@ -66,6 +66,7 @@ def build_export_manifest(
     redact: bool = True,
     exported_by: str = "cli",
 ) -> ExportManifest | None:
+    redact = redact or project_id is not None
     events = store.list_event_index(
         session_id=session_id, project_id=project_id, limit=10000
     )
@@ -115,6 +116,7 @@ def generate_export(
     redact: bool = True,
     exported_by: str = "cli",
 ) -> ExportManifest:
+    redact = redact or project_id is not None
     manifest = build_export_manifest(
         store,
         session_id,

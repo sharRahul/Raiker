@@ -184,6 +184,46 @@ fail-closed by design.
 > visible). No new capability, gate, policy, or executor is added. Tests:
 > `ChatView.test.ts` (+2).
 
+> Current truth update (2026-07-14): nested projects/folders have landed
+> (conversation organisation remainder, third slice). Arbitrary-depth folder
+> nesting via hybrid adjacency list (`parent_id` FK, `ON DELETE SET NULL`)
+> + materialized path (`path`, e.g. `/p1/p4/p12/`) on the `projects` table.
+> Migration `RAIKER-1012-projects-nesting` adds `parent_id`, `path`,
+> `is_archived`, `archived_at` columns + three indexes. Path management is
+> done in Python (not a DB trigger) for reliability — the trigger approach
+> caused `NOT NULL` constraint failures when explicit Python path updates
+> ran alongside trigger logic. Two deletion modes: **archive**
+> (AI-autonomous — any authenticated principal may soft-archive a subtree;
+> idempotent) and **delete** (human-only, always requires `confirm=True`;
+> hard-deletes target, orphans + archives descendants with
+> `path='orphaned/<id>/'`). `delete_project_with_orphanage` cleans up
+> sessions for the target project (FK: `ON DELETE NO ACTION`) and clears
+> `active_project` if referencing the target. Context inheritance:
+> `DashboardService.get_session_context` merges ancestor contexts into the
+> session's project context — instructions concatenate root→leaf, attachment
+> IDs union, leaf's `memory_enabled` wins. `create_project` accepts
+> `parent_id` for nested creation. Storage methods: `create_project`
+> (with `parent_id` + path computation), `list_project_tree`,
+> `move_project` (cycle check + REPLACE-based descendant path update),
+> `archive_project`, `delete_project_with_orphanage`, `get_ancestor_contexts`.
+> API: `GET /api/projects/tree`, `PUT /api/projects/{id}/move` (human-only),
+> `PUT /api/projects/{id}/archive` (any authenticated), `POST /api/projects`
+> accepts `parent_id`, `DELETE /api/projects/{id}` always requires
+> `X-Project-Delete-Confirm` header. `MoveProjectRequest` schema with
+> `extra="forbid"`. Web: `ProjectTreeNode` type + `ProjectTreeNode.svelte`
+> recursive Svelte 5 component, `projectTree`/`moveProject`/`archiveProject`
+> API client, `ProjectsView` tree section with archive/move/delete actions.
+> `ProjectView` (Python DTO + TS interface) includes `parent_id`, `path`,
+> `is_archived`, `archived_at`. Tests: `tests/test_nested_projects.py` (18:
+> migration, tree queries, move + cycle, archive + idempotent, delete +
+> orphanage, ancestor contexts, service AI-autonomous archive, human-only
+> move/delete, context merge), `tests/test_projects.py` (+4 API: tree list,
+> move happy path, move 422, archive happy path),
+> `tests/test_api_contract_schemas.py` guards `PROJECT_VIEW` and
+> `PROJECTS_LIST`. This is an organizing slice — no new capability, gate,
+> policy, or executor is added. Project-only export remains deferred.
+> Validators: ruff, mypy, pytest (49 focused), tsc, vitest (129) all green.
+
 > Current truth update (2026-07-14): project folders now have a bounded,
 > explicit context record: project instructions, validated references to
 > uploaded attachments, and opt-in approved memory scoped as

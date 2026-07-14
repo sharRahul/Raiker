@@ -35,6 +35,24 @@ fail-closed by design.
 
 ## Current product state — 2026-07-14
 
+- Conversation organisation has landed its third slice: nested projects/folders.
+  Arbitrary-depth folder nesting via hybrid adjacency list (`parent_id`) +
+  materialized path (`path`) on the `projects` table. Two deletion modes:
+  **archive** (AI-autonomous, soft — archives entire subtree) and **delete**
+  (human-only, hard with orphanage cascade — descendants reparented to NULL,
+  archived, path prefixed with `orphaned/`). Context inheritance: ancestor
+  contexts merge into a session's project context (instructions concatenate
+  root→leaf, attachments union, leaf's `memory_enabled` wins). Path
+  management is done in Python (not a DB trigger) for reliability. API:
+  `GET /api/projects/tree`, `PUT /api/projects/{id}/move` (human-only),
+  `PUT /api/projects/{id}/archive` (any authenticated principal),
+  `POST /api/projects` accepts `parent_id` for nested creation,
+  `DELETE /api/projects/{id}` always requires `confirm=True`. Web:
+  `ProjectTreeNode.svelte` recursive component, `ProjectsView` tree section
+  with archive/move/delete actions. `ProjectView` includes `parent_id`,
+  `path`, `is_archived`, `archived_at`. Tests: `tests/test_nested_projects.py`
+  (18), `tests/test_projects.py` (+4 API), `test_api_contract_schemas.py`
+  guards `ProjectView` nesting fields. Project-only export remains deferred.
 - Reliable memory controls have landed their first slice (backlog item 3): a
   user-visible Memory view over the EXISTING governed memory store — list
   with provenance, scope, sensitivity, confidence, retention; pin/bookmark;
@@ -59,15 +77,13 @@ fail-closed by design.
   account's session). `delete_session` and `delete_project` cascade
   `session_tags`. API: `PUT /api/sessions/{id}/tags`; the Sessions view
   renders chips with per-chip × remove, an inline add-tag input, and a
-  tag-substring filter. Nested projects/folders and project-only export
-  remain deferred.
+  tag-substring filter. Project-only export remains deferred.
 - Conversation organisation has landed its first slice: per-session
   pin/bookmark and single + bulk delete in the Sessions view. Pinned
   sessions surface first; deletion is human-only and respects the same
   user/session visibility boundary as every governed read (an account
   cannot delete or pin another account's session). The per-session events
-  transcript file is removed on delete so it is not orphaned. Nested
-  projects/folders, tags, and project-only export remain deferred.
+  transcript file is removed on delete so it is not orphaned.
 - Chat search is a real full-history search over chat titles, prompts, and
   summaries. Reopening a search result now hydrates its persisted turns in
   the chat surface (prompt + the agent's response message + status) and lets
@@ -78,12 +94,15 @@ fail-closed by design.
 - Projects create/select/delete storage-backed project scopes. Deleting a
   project permanently deletes its chats and project directory after an explicit
   warning; project deletion does not delete chats outside that project.
+  Nested projects/folders now support arbitrary-depth hierarchy, move, and
+  archive operations (see above).
 - The web topbar is deliberately minimal. It does not display a raw principal
   ID, runtime-ready label, or model chip.
 - Projects provide bounded, explicit context for their assigned chats:
   instructions, shared attachment references, and an opt-in approved-memory
   boundary (`project:<project_id>`). A chat outside the project receives none
-  of that context.
+  of that context. Nested folders inherit ancestor context via
+  `DashboardService.get_session_context`.
 - The generic connector store, four governed read connectors (GitHub, Gmail,
   Calendar, Slack), approvals, audit events, budgets, and the connector web
   surface are implemented. The first real write action remains unimplemented.
@@ -105,14 +124,14 @@ clients fetch the transparent files instead of retaining an old opaque copy.
 
 ## Next implementation slice — requires design approval
 
-**Conversation organisation remainder + real reminders.** Memory controls
-have landed their first slice (list/pin/forget + incognito) and
-conversation organisation has landed two slices (pin/bookmark + delete,
-and per-session tags). The remaining organisation backlog (nested
-projects/folders, project-only export) and backlog item 4 (real
-reminders/routines — an opt-in local scheduler that executes approved,
-bounded actions) are the next assistant-workflow gaps. Build one governed
-vertical slice at a time against the current codebase.
+**Project-only export + real reminders.** Memory controls have landed their
+first slice (list/pin/forget + incognito), conversation organisation has
+landed three slices (pin/bookmark + delete, per-session tags, and nested
+projects/folders with archive/orphanage delete + context inheritance). The
+remaining organisation backlog (project-only export) and backlog item 4
+(real reminders/routines — an opt-in local scheduler that executes
+approved, bounded actions) are the next assistant-workflow gaps. Build one
+governed vertical slice at a time against the current codebase.
 
 ## Prioritised product backlog
 
@@ -124,8 +143,8 @@ governed vertical slice at a time.
    bounded context; moving out must remove it. Project schedules must remain
    project-scoped. This is the clearest assistant workflow gap.
 2. **Conversation organisation:** nested projects/folders, tags, pin/bookmark,
-   bulk move/delete/export, and project-only export. Search exists; these do
-   not.
+   and bulk delete/export have landed. Project-only export remains deferred.
+   Search exists and hydrates persisted transcripts on reopen.
 3. **Reliable memory controls:** user-visible memory list with edit, pin,
    delete, scope, provenance, expiry, import/export, and search-participation
    controls. Include a separate opt-out/incognito boundary. Reuse the governed

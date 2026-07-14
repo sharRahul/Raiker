@@ -11,7 +11,7 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
-from raiker.runtime.authority.models import Principal, RiskLevelValue
+from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
 from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES, build_default_executor_registry
 from raiker.runtime.executors.sandbox import SandboxError
 from raiker.runtime.executors.tier4_plugins import PluginSandboxImagePullExecutor
@@ -112,6 +112,14 @@ def _fake_action(image: object) -> Any:
     return SimpleNamespace(action_id="act_image", arguments={"image": image})
 
 
+def _principal() -> Principal:
+    return Principal(
+        principal_id="principal_rahul",
+        principal_type=PrincipalType.HUMAN,
+        display_name="Rahul",
+    )
+
+
 def test_image_pull_uses_only_docker_pull_and_redacts_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _full_env(monkeypatch)
     captured: dict[str, Any] = {}
@@ -122,7 +130,7 @@ def test_image_pull_uses_only_docker_pull_and_redacts_output(tmp_path: Path, mon
         return {"returncode": 0, "stdout_bytes": 23, "stderr_bytes": 0, "truncated": False}
 
     result = PluginSandboxImagePullExecutor(tmp_path, runner=fake_runner).execute(
-        _fake_action(_IMAGE), SimpleNamespace(principal_id="principal_rahul")
+        _fake_action(_IMAGE), _principal()
     )
     assert result.ok is True
     assert captured["command"] == ["docker", "pull", _IMAGE]
@@ -145,7 +153,7 @@ def test_image_pull_maps_missing_docker_to_unavailable(tmp_path: Path, monkeypat
         raise SandboxError("command_not_found:docker")
 
     result = PluginSandboxImagePullExecutor(tmp_path, runner=fake_runner).execute(
-        _fake_action(_IMAGE), SimpleNamespace(principal_id="principal_rahul")
+        _fake_action(_IMAGE), _principal()
     )
     assert result.ok is False
     assert result.reason_code == "docker_unavailable"
@@ -158,7 +166,7 @@ def test_image_pull_nonzero_exit_is_failure(tmp_path: Path, monkeypatch: pytest.
         return {"returncode": 2, "stdout_bytes": 0, "stderr_bytes": 10, "truncated": False}
 
     result = PluginSandboxImagePullExecutor(tmp_path, runner=fake_runner).execute(
-        _fake_action(_IMAGE), SimpleNamespace(principal_id="principal_rahul")
+        _fake_action(_IMAGE), _principal()
     )
     assert result.ok is False
     assert result.reason_code == "plugin_image_pull_exit:2"

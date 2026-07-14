@@ -98,6 +98,27 @@ fail-closed by design.
 > grants no capability — creating or selecting one changes no gate, mode, or
 > policy. Tests: `tests/test_projects.py` (14) + `ProjectsView.test.ts` (5).
 
+> Current truth update (2026-07-14): conversation organisation has landed its
+> first slice — per-session pin/bookmark and single + bulk delete. The
+> `sessions` table gained a `pinned` column (organizing label only, default 0;
+> like `projects`, it grants nothing and changes no gate, policy, or
+> authority). `DashboardService.set_session_pinned` /
+> `delete_session` are human-only and resolve the acting principal through
+> the existing `RuntimeControlService`; they reuse the same
+> user/session visibility boundary as `list_sessions` (an account cannot pin
+> or delete another account's session; legacy unattributed sessions remain
+> visible/deletable by any authenticated human). `delete_session` cascades
+> turns, events_index, tool_actions, policy_decisions, checkpoints, tasks,
+> and removes the per-session events JSONL transcript file so it is not
+> orphaned (mirrors `delete_project`'s cascade scope). API:
+> `PUT /api/sessions/{id}/pin` and `DELETE /api/sessions/{id}` (the latter
+> requires `X-Session-Delete-Confirm: <id>` like project deletion). Web:
+> `SessionsView` surfaces pinned sessions first, offers a per-row pin toggle,
+> multi-select checkboxes, and a bulk-delete bar. Tests:
+> `tests/test_session_organisation.py` (13), `SessionsView.test.ts` (4), and
+> `tests/test_api_contract_schemas.py` now guards `pinned` on `SessionSummary`.
+> This is an organizing slice — no new capability, gate, policy, or executor.
+
 > Current truth update (2026-07-14): chat search now hydrates the persisted
 > transcript when a result is reopened. `ChatView` calls the existing governed
 > `GET /api/sessions/{id}` read on mount when a `session` query param is

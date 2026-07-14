@@ -35,13 +35,22 @@ fail-closed by design.
 
 ## Current product state — 2026-07-14
 
+## Current product state — 2026-07-14
+
+- Conversation organisation has landed its first slice: per-session
+  pin/bookmark and single + bulk delete in the Sessions view. Pinned
+  sessions surface first; deletion is human-only and respects the same
+  user/session visibility boundary as every governed read (an account
+  cannot delete or pin another account's session). The per-session events
+  transcript file is removed on delete so it is not orphaned. Nested
+  projects/folders, tags, and project-only export remain deferred.
 - Chat search is a real full-history search over chat titles, prompts, and
-  summaries. Reopening a search result now hydrates its persisted turns in the
-  chat surface (prompt + the agent's response message + status) and lets the
-  user continue the same session — no new session is created merely to view
-  history. The live per-event timeline is not replayed for restored turns; new
-  turns stream as usual. The backend `/api/sessions/{id}` read enforces the
-  same user/session visibility boundary as every governed read.
+  summaries. Reopening a search result now hydrates its persisted turns in
+  the chat surface (prompt + the agent's response message + status) and lets
+  the user continue the same session — no new session is created merely to
+  view history. The live per-event timeline is not replayed for restored
+  turns; new turns stream as usual. The backend `/api/sessions/{id}` read
+  enforces the same user/session visibility boundary as every governed read.
 - Projects create/select/delete storage-backed project scopes. Deleting a
   project permanently deletes its chats and project directory after an explicit
   warning; project deletion does not delete chats outside that project.
@@ -72,11 +81,13 @@ clients fetch the transparent files instead of retaining an old opaque copy.
 
 ## Next implementation slice — requires design approval
 
-**Conversation organisation (backlog item 2).** Search now opens a chat's
-persisted transcript, so the next assistant-workflow gap is organisation:
-nested projects/folders, tags, pin/bookmark, bulk move/delete/export, and
-project-only export. Build one governed vertical slice at a time against the
-current codebase; do not conflate it with the Sessions record.
+**Reliable memory controls (backlog item 3).** Build a user-visible memory
+list with edit, pin, delete, scope, provenance, expiry, import/export, and
+search-participation controls on top of the existing governed memory store; do
+not create a second memory system. Include a separate opt-out/incognito
+boundary. Conversation organisation (pin/bookmark + bulk/single delete) is
+now implemented; the remaining organisation backlog (nested projects/folders,
+tags, project-only export) can land alongside it.
 
 ## Prioritised product backlog
 

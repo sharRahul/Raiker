@@ -157,6 +157,14 @@ class SaveProjectContextRequest(BaseModel):
     memory_enabled: bool = False
 
 
+class SetSessionPinnedRequest(BaseModel):
+    # Pin (or unpin) a session. Pinning is an organizing label only — it grants
+    # nothing. extra="forbid" rejects unknown fields.
+    model_config = ConfigDict(extra="forbid")
+
+    pinned: bool
+
+
 class SetModelFallbackRequest(BaseModel):
     # Ordered list of model profile ids to try (in order) when the selected
     # provider is unavailable. extra="forbid" rejects unknown fields.

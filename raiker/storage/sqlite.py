@@ -467,6 +467,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection.execute(
                     "ALTER TABLE sessions ADD COLUMN project_id TEXT REFERENCES projects(project_id)"
                 )
+            # Conversation organisation: a per-session pin/bookmark flag. It is
+            # an organizing label only (like projects) — it grants nothing and
+            # changes no gate, policy, or authority. Default 0 (unpinned).
+            with contextlib.suppress(sqlite3.OperationalError):
+                connection.execute("ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
             self._apply_migration(LOCK_SCREEN_MIGRATION_ID, LOCK_SCREEN_SQL, connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -669,6 +674,80 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute("UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,))
             connection.execute("DELETE FROM project_contexts WHERE project_id = ?", (project_id,))
             connection.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
+        return True
+
+    def _session_owner(
+        self, connection: sqlite3.Connection, session_id: str
+    ) -> tuple[bool, str | None]:
+        """Return (exists, owner_user_id). ``exists`` is False when the session
+        does not exist; ``owner`` is None for legacy unattributed sessions."""
+        row = connection.execute(
+            "SELECT user_id FROM sessions WHERE session_id = ?", (session_id,)
+        ).fetchone()
+        if row is None:
+            return False, None
+        return True, dict(row).get("user_id")
+
+    def set_session_pinned(
+        self, session_id: str, pinned: bool, user_id: str | None = None
+    ) -> bool:
+        """Pin (or unpin) a session. Returns False if the session does not exist
+        or is owned by another account (user isolation mirrors list_sessions)."""
+        with self.connect() as connection:
+            exists, owner = self._session_owner(connection, session_id)
+            if not exists:
+                return False
+            if (
+                user_id is not None
+                and owner is not None
+                and str(owner) != user_id
+            ):
+                return False
+            connection.execute(
+                "UPDATE sessions SET pinned = ?, updated_at = ? WHERE session_id = ?",
+                (1 if pinned else 0, utc_now(), session_id),
+            )
+        return True
+
+    def delete_session(self, session_id: str, user_id: str | None = None) -> bool:
+        """Delete one session and its cascaded rows (turns, events index, tool
+        actions, policy decisions, checkpoints, tasks). Returns False if the
+        session does not exist or is owned by another account. The per-session
+        events JSONL file is removed too — it is the append-only transcript and
+        must not be left orphaned. Mirrors delete_project's cascade scope."""
+        with self.connect() as connection:
+            exists, owner = self._session_owner(connection, session_id)
+            if not exists:
+                return False
+            if (
+                user_id is not None
+                and owner is not None
+                and str(owner) != user_id
+            ):
+                return False
+            action_ids = "SELECT action_id FROM tool_actions WHERE session_id = ?"
+            connection.execute(
+                f"DELETE FROM policy_decisions WHERE action_id IN ({action_ids})",
+                (session_id,),
+            )
+            for table in (
+                "events_index",
+                "tool_actions",
+                "checkpoints",
+                "tasks",
+                "turns",
+                "model_session_state",
+                "model_fallback_sequence",
+                "model_advisor",
+            ):
+                connection.execute(
+                    f"DELETE FROM {table} WHERE session_id = ?", (session_id,)
+                )
+            connection.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+        # Remove the per-session events transcript file (best-effort; the db rows
+        # above are already the source of truth and are committed).
+        with contextlib.suppress(FileNotFoundError):
+            (self.paths.events_dir / f"{session_id}.jsonl").unlink()
         return True
 
     def list_turns(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:

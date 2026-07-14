@@ -1,0 +1,138 @@
+// Conversation organisation: pin/bookmark + bulk delete in the Sessions view.
+// These are organizing actions only — they grant nothing. The view surfaces
+// pinned sessions first and lets the user select and delete one or many.
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import SessionsView from "./SessionsView.svelte";
+import { stubFetch } from "../test-helpers";
+
+const SESSIONS_ROUTE = {
+  "GET /api/sessions": [
+    {
+      session_id: "sess_b",
+      title: "Second chat",
+      status: "open",
+      created_at: "2026-07-10T00:00:00Z",
+      updated_at: "2026-07-10T00:01:00Z",
+      turn_count: 1,
+      pinned: false,
+    },
+    {
+      session_id: "sess_a",
+      title: "Pinned chat",
+      status: "open",
+      created_at: "2026-07-09T00:00:00Z",
+      updated_at: "2026-07-09T00:00:30Z",
+      turn_count: 2,
+      pinned: true,
+    },
+  ],
+};
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe("SessionsView organisation", () => {
+  it("surfaces pinned sessions first", async () => {
+    stubFetch(SESSIONS_ROUTE);
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Pinned chat")).toBeInTheDocument());
+
+    // The pinned session must appear before the unpinned one regardless of
+    // the backend's updated_at order. Skip the header row.
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows[0].textContent).toContain("Pinned chat");
+    expect(rows[1].textContent).toContain("Second chat");
+  });
+
+  it("pins a session by toggling the star and refreshes", async () => {
+    const fetchMock = stubFetch({
+      ...SESSIONS_ROUTE,
+      "PUT /api/sessions/sess_b/pin": { ok: true, session_id: "sess_b", pinned: true },
+    });
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Pinned chat")).toBeInTheDocument());
+    // "Pin session" (exact) targets the unpinned row only; the pinned row's
+    // button is labelled "Unpin session".
+    const pinBtn = screen.getByRole("button", { name: /^pin session$/i });
+    await fireEvent.click(pinBtn);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/sessions/sess_b/pin",
+        expect.objectContaining({ method: "PUT" }),
+      );
+    });
+    // The list is reloaded after the toggle.
+    await waitFor(() => {
+      const listCalls = fetchMock.mock.calls.filter(
+        (c) => String(c[0]) === "/api/sessions" && (c[1]?.method ?? "GET") === "GET",
+      );
+      expect(listCalls.length).toBeGreaterThan(1);
+    });
+  });
+
+  it("deletes a single session after confirmation and refreshes", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const fetchMock = stubFetch({
+      ...SESSIONS_ROUTE,
+      "DELETE /api/sessions/sess_b": { ok: true, session_id: "sess_b" },
+    });
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
+    // Target the delete button inside the "Second chat" row (sess_b), since
+    // pinned sessions sort first and would otherwise shift the index.
+    const row = screen.getByText("Second chat").closest("tr")!;
+    const delBtn = row.querySelector('button[aria-label="Delete session"]') as HTMLButtonElement;
+    await fireEvent.click(delBtn);
+
+    // The DELETE call must carry the confirmation header. `request()` wraps
+    // headers in a Headers object, so read it back through `.get`.
+    await waitFor(() => {
+      const deleteCall = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/api/sessions/sess_b" && c[1]?.method === "DELETE",
+      );
+      expect(deleteCall).toBeDefined();
+      const headers = deleteCall![1]!.headers as Headers;
+      expect(headers.get("X-Session-Delete-Confirm")).toBe("sess_b");
+    });
+    expect(confirmSpy).toHaveBeenCalled();
+  });
+
+  it("deletes multiple selected sessions via the bulk bar", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const fetchMock = stubFetch({
+      ...SESSIONS_ROUTE,
+      "DELETE /api/sessions/sess_b": { ok: true, session_id: "sess_b" },
+      "DELETE /api/sessions/sess_a": { ok: true, session_id: "sess_a" },
+    });
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Pinned chat")).toBeInTheDocument());
+    // Select both sessions.
+    const checkboxes = screen.getAllByRole("checkbox");
+    for (const cb of checkboxes) await fireEvent.click(cb);
+
+    // The bulk bar appears with the count and a delete button.
+    expect(screen.getByText(/2 selected/i)).toBeInTheDocument();
+    const bulkDelete = screen.getByRole("button", { name: /delete selected/i });
+    await fireEvent.click(bulkDelete);
+
+    await waitFor(() => {
+      const aDelete = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/api/sessions/sess_a" && c[1]?.method === "DELETE",
+      );
+      expect(aDelete).toBeDefined();
+    });
+    expect(
+      fetchMock.mock.calls.some(
+        (c) => String(c[0]) === "/api/sessions/sess_b" && c[1]?.method === "DELETE",
+      ),
+    ).toBe(true);
+  });
+});

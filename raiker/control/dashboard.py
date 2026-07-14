@@ -44,6 +44,9 @@ class SessionView:
     created_at: str
     updated_at: str
     turn_count: int
+    # Conversation organisation: a per-session pin/bookmark flag. Organizing
+    # label only — grants nothing and changes no authority.
+    pinned: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -467,6 +470,55 @@ class DashboardService:
             self._event_view(e) for e in self.store.list_event_index(turn_id=turn_id, limit=500)
         )
         return TurnDetailView(turn=self._turn_view(row), events=events)
+
+    # ── Session organisation (pin/bookmark + delete) ──────────────────────
+    # These are organizing actions, governance-neutral like projects: pinning
+    # or deleting a session grants nothing and changes no gate, policy, or
+    # authority. Deletion is human-only and respects the same user/session
+    # visibility boundary as every governed read — an account cannot delete
+    # another account's session, and legacy unattributed sessions remain
+    # deletable by any authenticated human.
+
+    def set_session_pinned(
+        self,
+        session_id: str,
+        pinned: bool,
+        acting_principal_id: str | None,
+    ) -> ControlResult:
+        """Pin (or unpin) a session for the authenticated local human.
+
+        Pinned sessions surface first in the Sessions list. Pinning is an
+        organizing label only — it grants nothing.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        user_id = principal.delegated_by_user_id
+        if not self.store.set_session_pinned(session_id, pinned, user_id=user_id):
+            return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
+        return ControlResult(
+            ok=True, data={"session_id": session_id, "pinned": pinned}
+        )
+
+    def delete_session(
+        self, session_id: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Permanently delete one session and its cascaded rows (human-only).
+
+        Respects user/session visibility: an account cannot delete another
+        account's session. The per-session events transcript file is removed.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        user_id = principal.delegated_by_user_id
+        if not self.store.delete_session(session_id, user_id=user_id):
+            return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
+        return ControlResult(ok=True, data={"session_id": session_id})
 
     # ── Events / checkpoints / tasks ────────────────────────────────────
     def list_events(
@@ -1183,6 +1235,7 @@ class DashboardService:
             created_at=str(row.get("created_at", "")),
             updated_at=str(row.get("updated_at", "")),
             turn_count=len(self.store.list_turns(session_id, limit=1000)),
+            pinned=bool(row.get("pinned", 0)),
         )
 
     @staticmethod

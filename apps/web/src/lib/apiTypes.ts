@@ -213,6 +213,9 @@ export interface SessionSummary {
   created_at: string;
   updated_at: string;
   turn_count: number;
+  // Conversation organisation: a per-session pin/bookmark flag. Pinned
+  // sessions surface first in the Sessions list. Organizing label only.
+  pinned: boolean;
 }
 
 export interface TurnSummary {

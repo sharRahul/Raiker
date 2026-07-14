@@ -3,7 +3,6 @@ from pathlib import Path
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.control.dashboard import DashboardService
 
-
 OWNER = "principal_rahul"
 
 

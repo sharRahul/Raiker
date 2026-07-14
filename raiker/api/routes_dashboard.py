@@ -14,6 +14,7 @@ from raiker.api.schemas import (
     SetModelAdvisorRequest,
     SetModelFallbackRequest,
     SetModelSelectionRequest,
+    SetSessionPinnedRequest,
     TaskCreateRequest,
     serialize_dto,
 )
@@ -92,6 +93,57 @@ async def get_session(
     if view is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown session: {session_id}")
     return serialize_dto(view)
+
+
+@router.put("/api/sessions/{session_id}/pin")
+async def set_session_pinned(
+    session_id: str,
+    body: SetSessionPinnedRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Pin (or unpin) a session for the authenticated local human.
+
+    Pinning is an organizing label only — it surfaces the session first in the
+    Sessions list and grants nothing. Human-only; an account cannot pin another
+    account's session.
+    """
+    result = _service(request).set_session_pinned(
+        session_id, body.pinned, auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.delete("/api/sessions/{session_id}")
+async def delete_session(
+    session_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    x_session_delete_confirm: str | None = Header(default=None),
+) -> dict[str, Any]:
+    """Permanently delete one session and its cascaded rows (human-only).
+
+    Requires an explicit confirmation header matching the session id (mirrors
+    project deletion). Respects user/session visibility — an account cannot
+    delete another account's session.
+    """
+    if x_session_delete_confirm != session_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": "session_delete_confirmation_required"},
+        )
+    result = _service(request).delete_session(session_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
 
 
 @router.get("/api/turns/{turn_id}")

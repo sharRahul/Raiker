@@ -318,6 +318,27 @@ export const api = {
       body: JSON.stringify(context),
     }),
   session: (id: string) => request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
+  // Pin (or unpin) a session. Organizing label only — grants nothing.
+  setSessionPinned: (id: string, pinned: boolean) =>
+    request<{ ok: boolean; session_id: string; pinned: boolean }>(
+      `/api/sessions/${encodeURIComponent(id)}/pin`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned }),
+      },
+    ),
+  // Permanently delete one session and its cascaded rows. Requires the explicit
+  // confirmation header (mirrors project deletion). Human-only; an account
+  // cannot delete another account's session.
+  deleteSession: (id: string) =>
+    request<{ ok: boolean; session_id: string }>(
+      `/api/sessions/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+        headers: { "X-Session-Delete-Confirm": id },
+      },
+    ),
   turn: (id: string) => request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
   tasks: (params: { session_id?: string; status?: string } = {}) =>
     request<TaskView[]>(withQuery("/api/tasks", params)),

@@ -52,7 +52,8 @@ fail-closed by design.
   with archive/move/delete actions. `ProjectView` includes `parent_id`,
   `path`, `is_archived`, `archived_at`. Tests: `tests/test_nested_projects.py`
   (18), `tests/test_projects.py` (+4 API), `test_api_contract_schemas.py`
-  guards `ProjectView` nesting fields. Project-only export remains deferred.
+  guards `ProjectView` nesting fields. Project-only export has landed; its
+  bounded scope is recorded below.
 - Reliable memory controls have landed their first slice (backlog item 3): a
   user-visible Memory view over the EXISTING governed memory store — list
   with provenance, scope, sensitivity, confidence, retention; pin/bookmark;
@@ -77,7 +78,8 @@ fail-closed by design.
   account's session). `delete_session` and `delete_project` cascade
   `session_tags`. API: `PUT /api/sessions/{id}/tags`; the Sessions view
   renders chips with per-chip × remove, an inline add-tag input, and a
-  tag-substring filter. Project-only export remains deferred.
+  tag-substring filter. Project-only export has landed; its bounded scope is
+  recorded below.
 - Conversation organisation has landed its first slice: per-session
   pin/bookmark and single + bulk delete in the Sessions view. Pinned
   sessions surface first; deletion is human-only and respects the same
@@ -112,6 +114,12 @@ fail-closed by design.
 - The sandbox image has a governed, pull-only acquisition capability. It accepts
   only an exact owner-allowlisted image/registry, invokes only `docker pull`,
   and never builds or runs an image.
+- Project-only export has landed as an authenticated, human-initiated download
+  of the existing redacted JSONL audit timeline. It includes exactly the
+  project's direct sessions, never descendant-project sessions, and applies
+  the same account visibility as project sessions, including legacy unowned
+  sessions. The download response exposes no filesystem path. Attachments,
+  project memory, and reminder scheduling are excluded.
 - Tasks can persist schedules and recurrence, but scheduling is stored-only:
   it never runs work or sends a reminder.
 
@@ -124,13 +132,12 @@ clients fetch the transparent files instead of retaining an old opaque copy.
 
 ## Next implementation slice — requires design approval
 
-**Project-only export + real reminders.** Memory controls have landed their
+**Real reminders and routines.** Memory controls have landed their
 first slice (list/pin/forget + incognito), conversation organisation has
-landed three slices (pin/bookmark + delete, per-session tags, and nested
-projects/folders with archive/orphanage delete + context inheritance). The
-remaining organisation backlog (project-only export) and backlog item 4
-(real reminders/routines — an opt-in local scheduler that executes
-approved, bounded actions) are the next assistant-workflow gaps. Build one
+landed four slices (pin/bookmark + delete, per-session tags, nested
+projects/folders with archive/orphanage delete + context inheritance, and
+project-only export). Real reminders/routines — an opt-in local scheduler that
+executes approved, bounded actions — remain the next backlog work. Build one
 governed vertical slice at a time against the current codebase.
 
 ## Prioritised product backlog
@@ -143,8 +150,8 @@ governed vertical slice at a time.
    bounded context; moving out must remove it. Project schedules must remain
    project-scoped. This is the clearest assistant workflow gap.
 2. **Conversation organisation:** nested projects/folders, tags, pin/bookmark,
-   and bulk delete/export have landed. Project-only export remains deferred.
-   Search exists and hydrates persisted transcripts on reopen.
+   bulk delete, and project-only export have landed. Search exists and
+   hydrates persisted transcripts on reopen.
 3. **Reliable memory controls:** user-visible memory list with edit, pin,
    delete, scope, provenance, expiry, import/export, and search-participation
    controls. Include a separate opt-out/incognito boundary. Reuse the governed

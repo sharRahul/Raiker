@@ -30,6 +30,17 @@ def _is_secret_key(key: str) -> bool:
     return any(p in lower for p in SECRET_PATTERNS)
 
 
+def _redact_list_values(values: list[Any]) -> list[Any]:
+    return [
+        redact_event_payload(value)
+        if isinstance(value, dict)
+        else _redact_list_values(value)
+        if isinstance(value, list)
+        else value
+        for value in values
+    ]
+
+
 def redact_event_payload(payload: dict[str, Any]) -> dict[str, Any]:
     redacted: dict[str, Any] = {}
     for key, value in payload.items():
@@ -38,6 +49,8 @@ def redact_event_payload(payload: dict[str, Any]) -> dict[str, Any]:
             continue
         if isinstance(value, dict):
             redacted[key] = redact_event_payload(value)
+        elif isinstance(value, list):
+            redacted[key] = _redact_list_values(value)
         elif isinstance(value, str) and len(value) > 0:
             if any(p in value.lower() for p in SECRET_PATTERNS):
                 redacted[key] = "***REDACTED***"
@@ -125,7 +138,7 @@ def generate_export(
         exported_by=exported_by,
     )
     if manifest is None:
-        scope = {"event_count": 0, "redacted": redact}
+        scope: dict[str, object] = {"event_count": 0, "redacted": redact}
         if project_id is not None:
             scope["project_id"] = project_id
         return ExportManifest(

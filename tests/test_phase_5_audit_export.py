@@ -99,6 +99,22 @@ def test_redact_preserves_non_secret() -> None:
     assert redacted["count"] == 42
 
 
+def test_redact_event_payload_redacts_dictionaries_in_nested_lists() -> None:
+    payload = {
+        "items": [
+            {"token": "first-secret", "data": "visible"},
+            [{"password": "second-secret"}],
+        ]
+    }
+
+    redacted = redact_event_payload(payload)
+
+    assert redacted["items"] == [
+        {"token": "***REDACTED***", "data": "visible"},
+        [{"password": "***REDACTED***"}],
+    ]
+
+
 # ── Build export manifest ──
 
 
@@ -181,7 +197,11 @@ def test_generate_export_project_forces_redaction(
             turn_id=None,
             event_type="action_proposed",
             actor="test",
-            payload={"api_key": "sk-project-secret", "data": "normal"},
+            payload={
+                "api_key": "sk-project-secret",
+                "data": "normal",
+                "items": [{"token": "nested-project-secret"}],
+            },
         )
     )
 
@@ -192,6 +212,7 @@ def test_generate_export_project_forces_redaction(
     exported = json.loads(Path(manifest.export_path).read_text(encoding="utf-8"))
     assert exported["payload"]["api_key"] == "***REDACTED***"
     assert exported["payload"]["data"] == "normal"
+    assert exported["payload"]["items"][0]["token"] == "***REDACTED***"
 
 
 def test_generate_export_redacted(store: SQLiteStore, writer: EventLogWriter) -> None:

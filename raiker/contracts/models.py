@@ -216,6 +216,10 @@ EVENT_TYPES = {
     "action_failed",
     "attachment_image_included",
     "attachment_image_withheld",
+    "reminder_delivered",
+    "reminder_paused",
+    "reminder_cancelled",
+    "reminder_retried",
 }
 INTENTS = {
     "chat",

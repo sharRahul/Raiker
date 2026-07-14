@@ -152,3 +152,92 @@ def test_reminder_list_returns_count_only(tmp_path: Path) -> None:
     assert list_artifacts is not None
     assert list_artifacts["count"] == 2
     assert list_artifacts["content_redacted"] is True
+
+
+def test_deliver_due_delivers_active_reminders(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    past = "2020-01-01T00:00:00Z"
+    future = "2099-01-01T00:00:00Z"
+    authority.route_action(_action(principal.principal_id, title="past", due_at=past), principal)
+    authority.route_action(_action(principal.principal_id, title="future", due_at=future), principal)
+    result = authority.route_action(_action(principal.principal_id, action="deliver_due"), principal)
+    assert result.decision == "allow"
+    store = SQLiteStore(ws)
+    rows = store.list_reminders()
+    delivered = [r for r in rows if r.get("delivery_status") == "delivered"]
+    active = [r for r in rows if r.get("delivery_status") == "active"]
+    assert len(delivered) == 1
+    assert len(active) == 1
+
+
+def test_deliver_due_fail_closed_when_gate_disabled(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    RuntimeControlService(ws).disable_capability("reminder_runtime", None, "test")
+    authority, principal = _authority(ws)
+    result = authority.route_action(_action(principal.principal_id, action="deliver_due"), principal)
+    assert result.decision == "disabled_by_capability_gate"
+
+
+def test_pause_and_cancel_reminder(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    result = authority.route_action(_action(principal.principal_id, title="test"), principal)
+    assert result.decision == "allow"
+    store = SQLiteStore(ws)
+    rows = store.list_reminders()
+    rid = str(rows[0]["reminder_id"])
+    pause = authority.route_action(_action(principal.principal_id, action="pause", reminder_id=rid), principal)
+    assert pause.decision == "allow"
+    rows = store.list_reminders()
+    assert rows[0]["delivery_status"] == "paused"
+    cancel = authority.route_action(_action(principal.principal_id, action="cancel", reminder_id=rid), principal)
+    assert cancel.decision == "allow"
+    rows = store.list_reminders()
+    assert rows[0]["delivery_status"] == "cancelled"
+
+
+def test_pause_missing_reminder_id_fails(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    result = authority.route_action(_action(principal.principal_id, action="pause"), principal)
+    assert result.error == "missing_argument:reminder_id"
+
+
+def test_cancel_nonexistent_reminder_fails(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    result = authority.route_action(_action(principal.principal_id, action="cancel", reminder_id="rem_nonexistent"), principal)
+    assert result.error == "reminder_not_found"
+
+
+def test_retry_resets_failed_reminder(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    result = authority.route_action(_action(principal.principal_id, title="retry-me", due_at="2020-01-01T00:00:00Z"), principal)
+    assert result.decision == "allow"
+    store = SQLiteStore(ws)
+    rows = store.list_reminders()
+    rid = str(rows[0]["reminder_id"])
+    deliver = authority.route_action(_action(principal.principal_id, action="deliver_due"), principal)
+    assert deliver.decision == "allow"
+    rows = store.list_reminders()
+    assert rows[0]["delivery_status"] == "delivered"
+    retry_res = authority.route_action(_action(principal.principal_id, action="retry", reminder_id=rid), principal)
+    assert retry_res.decision == "allow"
+    rows = store.list_reminders()
+    assert rows[0]["delivery_status"] == "active"
+
+
+def test_unknown_action_fails_closed(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    authority, principal = _authority(ws)
+    result = authority.route_action(_action(principal.principal_id, action="delete"), principal)
+    assert result.error == "unknown_action:delete"

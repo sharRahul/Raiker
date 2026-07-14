@@ -4,6 +4,7 @@ import json
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -184,12 +185,12 @@ def test_generate_export_with_events(store: SQLiteStore, writer: EventLogWriter)
     assert len(lines) == 5
 
 
-def test_generate_export_uses_one_event_index_snapshot(store: SQLiteStore, writer: EventLogWriter, monkeypatch) -> None:
+def test_generate_export_uses_one_event_index_snapshot(store: SQLiteStore, writer: EventLogWriter, monkeypatch: Any) -> None:
     event = _write_events(writer, count=1)[0]
     original_list_event_index = store.list_event_index
     calls = 0
 
-    def snapshot_then_append(*args, **kwargs):
+    def snapshot_then_append(*args: Any, **kwargs: Any) -> Any:
         nonlocal calls
         calls += 1
         rows = original_list_event_index(*args, **kwargs)

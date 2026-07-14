@@ -449,6 +449,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 CAPABILITY_DECISION_MODE_MIGRATION_ID, CAPABILITY_DECISION_MODE_SQL, connection
             )
             self._apply_migration(REMINDERS_MIGRATION_ID, REMINDERS_SQL, connection)
+            for _col in (
+                "ALTER TABLE reminders ADD COLUMN delivery_status TEXT NOT NULL DEFAULT 'active'",
+                "ALTER TABLE reminders ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE reminders ADD COLUMN max_retries INTEGER NOT NULL DEFAULT 3",
+                "ALTER TABLE reminders ADD COLUMN delivered_at TEXT",
+            ):
+                with contextlib.suppress(sqlite3.OperationalError):
+                    connection.execute(_col)
             self._apply_migration(CALENDAR_EVENTS_MIGRATION_ID, CALENDAR_EVENTS_SQL, connection)
             self._apply_migration(EMAIL_DRAFTS_MIGRATION_ID, EMAIL_DRAFTS_SQL, connection)
             self._apply_migration(API_SESSIONS_MIGRATION_ID, API_SESSIONS_SQL, connection)
@@ -2883,6 +2891,34 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     (status,),
                 ).fetchall()
         return [dict(row) for row in rows]
+
+    def list_due_reminders(self, due_before: str, *, delivery_status: str = "active") -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM reminders WHERE delivery_status = ? AND due_at IS NOT NULL AND due_at <= ? ORDER BY due_at ASC",
+                (delivery_status, due_before),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def update_reminder_status(self, reminder_id: str, status: str, *, delivery_status: str | None = None, delivered_at: str | None = None, retry_count: int | None = None, updated_at: str) -> bool:
+        sets = ["status = ?", "updated_at = ?"]
+        params: list[Any] = [status, updated_at]
+        if delivery_status is not None:
+            sets.append("delivery_status = ?")
+            params.append(delivery_status)
+        if delivered_at is not None:
+            sets.append("delivered_at = ?")
+            params.append(delivered_at)
+        if retry_count is not None:
+            sets.append("retry_count = ?")
+            params.append(retry_count)
+        params.append(reminder_id)
+        with self.connect() as connection:
+            cur = connection.execute(
+                f"UPDATE reminders SET {', '.join(sets)} WHERE reminder_id = ?",
+                params,
+            )
+        return cur.rowcount > 0
 
     # ── Calendar events (local-only calendar_runtime) ─────────────────────────
 

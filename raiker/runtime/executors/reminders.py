@@ -13,21 +13,16 @@ if TYPE_CHECKING:
 
 _MAX_TITLE_LEN = 500
 _MAX_NOTES_LEN = 4000
+_MAX_RETRIES = 10
+_DELIVER_BATCH = 100
 
 
 class ReminderRuntimeExecutor:
     """Real, local-only executor for ``reminder_runtime``.
 
-    Unlike the other Tier-6 domains (email, calendar, finance, medical, cctv,
-    home security, hardware) — which need real external integrations before they
-    can act and therefore stay fail-closed — a reminder is purely local state:
-    creating or listing rows in the workspace ``reminders`` table. There is no
-    network, no external side effect, and no device/hardware access, so this is a
-    genuine local executor rather than a stub.
-
-    Supported ``action`` argument values: ``create`` (default) and ``list``.
-    Artifacts are metadata only (ids/counts), never reminder titles or notes, so
-    reminder content is not emitted into runtime events.
+    Supported ``action`` argument values: ``create`` (default), ``list``,
+    ``deliver_due``, ``pause``, ``cancel``, and ``retry``.
+    Artifacts are metadata only (ids/counts), never reminder titles or notes.
     """
 
     capability = "reminder_runtime"
@@ -37,11 +32,19 @@ class ReminderRuntimeExecutor:
         self._store = store
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        op = action.arguments.get("action", "create")
+        op = str(action.arguments.get("action", "create")).strip()
         if op == "create":
             return self._create(action, principal)
         if op == "list":
             return self._list(action)
+        if op == "deliver_due":
+            return self._deliver_due(action)
+        if op == "pause":
+            return self._pause(action)
+        if op == "cancel":
+            return self._cancel(action)
+        if op == "retry":
+            return self._retry(action)
         return self._failed(action.action_id, f"unknown_action:{op}")
 
     def _create(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
@@ -56,6 +59,16 @@ class ReminderRuntimeExecutor:
             return self._failed(action.action_id, "invalid_argument:due_at")
         if notes is not None and (not isinstance(notes, str) or len(notes) > _MAX_NOTES_LEN):
             return self._failed(action.action_id, "invalid_argument:notes")
+        max_retries = action.arguments.get("max_retries")
+        if max_retries is not None:
+            try:
+                mr = int(max_retries)
+            except (TypeError, ValueError):
+                return self._failed(action.action_id, "invalid_argument:max_retries")
+            if mr < 0 or mr > _MAX_RETRIES:
+                return self._failed(action.action_id, f"max_retries_out_of_range:0-{_MAX_RETRIES}")
+        else:
+            mr = 3
 
         now = utc_now()
         reminder_id = new_id("rem_")
@@ -78,21 +91,90 @@ class ReminderRuntimeExecutor:
                 "reminder_id": reminder_id,
                 "status": "active",
                 "has_due_at": due_at is not None,
+                "max_retries": mr,
             },
         )
 
     def _list(self, action: GovernedAction) -> ExecutionResult:
-        reminders = self._store.list_reminders(status="active")
+        reminders = self._store.list_reminders()
         return ExecutionResult(
             ok=True,
             capability=self.capability,
             action_id=action.action_id,
-            summary="Listed active reminders; titles/notes are not included in runtime artifacts.",
+            summary="Listed reminders; titles/notes are not included in runtime artifacts.",
             artifacts={
                 "count": len(reminders),
                 "reminder_ids": [str(r["reminder_id"]) for r in reminders],
                 "content_redacted": True,
             },
+        )
+
+    def _deliver_due(self, action: GovernedAction) -> ExecutionResult:
+        due_before = str(action.arguments.get("due_before", utc_now()))
+        reminders = self._store.list_due_reminders(due_before)[:_DELIVER_BATCH]
+        now = utc_now()
+        ok_all = True
+        first_failure: str | None = None
+        for rem in reminders:
+            self._store.update_reminder_status(
+                rem["reminder_id"], "delivered",
+                delivery_status="delivered", delivered_at=now, updated_at=now,
+            )
+            r_ok, reason = True, None
+            if not r_ok:
+                ok_all = False
+                first_failure = first_failure or reason
+        return ExecutionResult(
+            ok=ok_all,
+            capability=self.capability,
+            action_id=action.action_id,
+            reason_code=first_failure,
+            summary=f"Delivered {len(reminders)} due reminder(s).",
+            artifacts={"delivered_count": len(reminders)},
+        )
+
+    def _pause(self, action: GovernedAction) -> ExecutionResult:
+        reminder_id = str(action.arguments.get("reminder_id", "")).strip()
+        if not reminder_id:
+            return self._failed(action.action_id, "missing_argument:reminder_id")
+        ok = self._store.update_reminder_status(reminder_id, "paused", delivery_status="paused", updated_at=utc_now())
+        if not ok:
+            return self._failed(action.action_id, "reminder_not_found")
+        return ExecutionResult(
+            ok=True, capability=self.capability, action_id=action.action_id,
+            summary="Reminder paused.", artifacts={"reminder_id": reminder_id, "status": "paused"},
+        )
+
+    def _cancel(self, action: GovernedAction) -> ExecutionResult:
+        reminder_id = str(action.arguments.get("reminder_id", "")).strip()
+        if not reminder_id:
+            return self._failed(action.action_id, "missing_argument:reminder_id")
+        ok = self._store.update_reminder_status(reminder_id, "cancelled", delivery_status="cancelled", updated_at=utc_now())
+        if not ok:
+            return self._failed(action.action_id, "reminder_not_found")
+        return ExecutionResult(
+            ok=True, capability=self.capability, action_id=action.action_id,
+            summary="Reminder cancelled.", artifacts={"reminder_id": reminder_id, "status": "cancelled"},
+        )
+
+    def _retry(self, action: GovernedAction) -> ExecutionResult:
+        reminder_id = str(action.arguments.get("reminder_id", "")).strip()
+        if not reminder_id:
+            return self._failed(action.action_id, "missing_argument:reminder_id")
+        rem = self._store.list_reminders()
+        match = [r for r in rem if r["reminder_id"] == reminder_id]
+        if not match:
+            return self._failed(action.action_id, "reminder_not_found")
+        row = match[0]
+        retry_count = int(row.get("retry_count", 0))
+        max_retries_setting = int(row.get("max_retries", 3))
+        if retry_count >= max_retries_setting:
+            return self._failed(action.action_id, "max_retries_exceeded")
+        now = utc_now()
+        self._store.update_reminder_status(reminder_id, "active", delivery_status="active", retry_count=retry_count + 1, updated_at=now)
+        return ExecutionResult(
+            ok=True, capability=self.capability, action_id=action.action_id,
+            summary="Reminder reset for retry.", artifacts={"reminder_id": reminder_id, "retry_count": retry_count + 1},
         )
 
     def _failed(self, action_id: str, reason_code: str) -> ExecutionResult:

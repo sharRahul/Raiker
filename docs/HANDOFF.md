@@ -3,6 +3,26 @@
 Read this file and `docs/IMPLEMENTATION_STATUS.md` before beginning work. Deep
 history belongs in git; this is intentionally only the current pick-up point.
 
+## Goal
+
+Make Raiker a secure AI product that combines an AI assistant, a governed AI
+agent, and an extensible agent platform.
+
+As an assistant, Raiker should help users understand, reason, decide, and
+communicate through a polished conversational experience. As an agent, Raiker
+should be able to plan tasks, gather context, use tools, execute approved
+actions, verify outcomes, and explain what it did. As a platform, Raiker should
+provide the governed runtime foundation for models, tools, plugins, interfaces,
+memory, approvals, audit events, checkpoints, and integrations.
+
+Raiker must support user-owned model choice across LLM backends — local models
+such as llama.cpp, Ollama, and LM Studio; home-lab runtimes such as vLLM;
+private-network providers; and hosted API providers such as Anthropic, OpenAI,
+Gemini, and OpenRouter. No model, interface, plugin, or capability should
+bypass governance. Every action must remain policy-aware, observable,
+auditable, approval-driven where required, human-governed, user-controlled, and
+fail-closed by design.
+
 ## Non-negotiable runtime rules
 
 - Fail closed: a missing gate, policy, credential, allowlist, executor, or
@@ -78,27 +98,50 @@ governed vertical slice at a time.
    GitHub issue comment) through immutable intent + approval + an actual
    executor. Never make a write action execute on `ask` alone.
 6. **Agent evaluation and observability:** trace a goal/plan/tool/approval
-   chain with latency, cost, outcome, and user feedback; add replayable
-   regression scenarios before making autonomy broader.
+   chain with latency, cost, outcome, and user feedback; add record/replayable
+   regression scenarios and outcome review before making autonomy broader.
 7. **Agent identity and least privilege:** distinct agent/service identities,
    short-lived scoped credentials, per-tool grants, and a user-facing access
    review. Existing principal and approval controls are a base, not a complete
    agent-identity surface.
-8. **Interoperability activation:** a governed MCP activation surface with
+8. **Reusable governed workflows:** project/user skills and plugin-packaged
+   playbooks with clear scope, provenance, review, and versioning. Add
+   deterministic pre/post tool and session hooks only where enforcement or
+   audit must be guaranteed; route them through the existing policy and event
+   paths. Current plugin hooks remain deliberately inactive.
+9. **Interoperability activation:** a governed MCP activation surface with
    capability manifests, per-server permissions, approval-aware calls, and
    lifecycle/audit state. Current MCP startup readiness is intentionally
    disabled.
+10. **Always-available channel gateway:** a local, long-lived, paired-device
+    gateway for approved messaging channels, with per-channel session routing,
+    idempotent delivery, connection health, and explicit remote-access trust.
+    Build on the existing webhook reference channel; do not turn inbound
+    messages into trusted instructions.
 
-### Research signals behind the backlog
+### Research basis (2026-07-14)
 
-- Users repeatedly ask for project-only memory, files/instructions, nested
-  folders, tags, and export: [OpenAI Projects documentation](https://help.openai.com/en/articles/10169521-projects-in-chatgpt), [Reddit folder/tag/export request](https://www.reddit.com/r/ChatGPT/comments/1shhv7z/openai_gave_us_projects_instead_of_folders_and/), and [Reddit project-memory discussion](https://www.reddit.com/r/ChatGPT/comments/1r9uk8s/i_tried_using_chatgpt_projects_to_organize_400/).
-- Reminders and recurring tasks are a mainstream assistant expectation:
-  [ChatGPT scheduled-task coverage](https://techcrunch.com/2025/01/14/chatgpt-now-lets-you-schedule-reminders-and-recurring-tasks/).
-- Mature agent platforms emphasise policy/tool permissions/approvals and
-  observability: [Observe.AI Agent Platform](https://www.observe.ai/platform/agent-platform),
-  [Microsoft Entra Agent ID](https://learn.microsoft.com/en-us/entra/agent-id/authorization-agent-id),
-  and the [MIT AI Agent Index](https://aiagentindex.mit.edu/data/2025-AI-Agent-Index.pdf).
+This backlog is informed by provider documentation, not only OpenAI research:
+
+- **Claude and Claude Cowork:** projects have isolated chat history, knowledge,
+  attachments, and instructions; Cowork combines connected tools, scheduled
+  work, plugins, explicit folder/tool bounds, deletion approval, and enterprise
+  observability. This reinforces items 1, 4, 5, 6, and 7.
+- **Claude Code:** persistent project context, skills, isolated subagents and
+  teams, MCP, lifecycle hooks, and distributable plugins separate reusable
+  workflows from deterministic guardrails. This informs items 6, 8, and 9.
+- **OpenAI Codex:** skills, plugins, scheduled work, sandboxed task execution,
+  and record/replay demonstrate the value of maintainable, testable automation.
+  This informs items 4, 6, and 8.
+- **Hermes Agent:** persistent memory, self-created/reused skills, command
+  approval/container isolation, cron delivery, and a messaging gateway make
+  memory controls, bounded automation, and transport governance product-level
+  concerns. This informs items 3, 4, 8, and 10.
+- **OpenClaw:** a single self-hosted gateway owns channel routing, sessions,
+  device pairing, typed events, health, and idempotent side effects. This
+  informs item 10.
+
+Primary sources: [Claude Projects](https://support.claude.com/en/articles/9517075-what-are-projects), [Claude Cowork](https://claude.com/product/cowork), [Claude Code extensions](https://code.claude.com/docs/en/features-overview), [Claude Code hooks](https://code.claude.com/docs/en/agent-sdk/hooks), [OpenAI Codex manual](https://developers.openai.com/codex/codex-manual.md), [Hermes Agent documentation](https://hermes-agent.nousresearch.com/docs), [OpenClaw overview](https://docs.openclaw.ai/), and [OpenClaw gateway architecture](https://docs.openclaw.ai/concepts/architecture).
 
 ## Verification and handoff
 

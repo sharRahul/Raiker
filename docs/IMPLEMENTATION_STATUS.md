@@ -5,6 +5,26 @@
 
 # Implementation Status
 
+## Goal
+
+Make Raiker a secure AI product that combines an AI assistant, a governed AI
+agent, and an extensible agent platform.
+
+As an assistant, Raiker should help users understand, reason, decide, and
+communicate through a polished conversational experience. As an agent, Raiker
+should be able to plan tasks, gather context, use tools, execute approved
+actions, verify outcomes, and explain what it did. As a platform, Raiker should
+provide the governed runtime foundation for models, tools, plugins, interfaces,
+memory, approvals, audit events, checkpoints, and integrations.
+
+Raiker must support user-owned model choice across LLM backends — local models
+such as llama.cpp, Ollama, and LM Studio; home-lab runtimes such as vLLM;
+private-network providers; and hosted API providers such as Anthropic, OpenAI,
+Gemini, and OpenRouter. No model, interface, plugin, or capability should
+bypass governance. Every action must remain policy-aware, observable,
+auditable, approval-driven where required, human-governed, user-controlled, and
+fail-closed by design.
+
 > Current truth update (2026-07-13): The local-owner workstream now includes a
 > principal-scoped Inbox task-create route and Tasks UI. `priority`,
 > `scheduled_at`, `recurrence`, and `reminder_at` persist on tasks; scheduling is

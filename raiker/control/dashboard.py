@@ -613,11 +613,10 @@ class DashboardService:
             node_id = f"session:{session.session_id}"
             nodes.append(BrainNodeView(node_id, "session", session.title or "Untitled session", session.status))
             edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "owns"))
-        active_task_states = {"queued", "running", "paused"}
         for task in tasks:
             node_id = f"task:{task.task_id}"
             nodes.append(BrainNodeView(node_id, "task", task.title or "Untitled task", task.status, task.current_step, task.progress_percent))
-            edges.append(BrainEdgeView(f"session:{task.session_id}", node_id, "tracks", task.status in active_task_states))
+            edges.append(BrainEdgeView(f"session:{task.session_id}", node_id, "tracks", task.status == "running"))
             if task.scheduled_at:
                 schedule_id = f"schedule:{task.task_id}"
                 nodes.append(BrainNodeView(schedule_id, "schedule", "Scheduled work", "waiting", task.scheduled_at))

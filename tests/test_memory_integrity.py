@@ -60,3 +60,16 @@ def test_memory_edit_immediately_deactivates_ineligible_projections(tmp_path: Pa
     store.link_memory_projection(memory.memory_id, "vector", "vec_searchable", "v1")
     update_memory(memory.memory_id, workspace_root=tmp_path, store=store, search_enabled=False)
     assert store.list_memory_projections(memory.memory_id)[0]["active"] == 0
+
+
+def test_durable_memory_persists_a_content_checksum(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    memory = write_memory(
+        "Checksummed fact.", workspace_root=tmp_path, store=store,
+        governance=MemoryGovernance("evt", "sess", None, "test", 1, 1, "until_forget", "approved", "test"),
+    )
+    with store.connect() as connection:
+        row = connection.execute(
+            "SELECT content_checksum FROM approved_memory WHERE memory_id = ?", (memory.memory_id,)
+        ).fetchone()
+    assert row["content_checksum"] == "1d85c37471356f4373bd42b5f5ffaa6c27ee7b64ae946c005593359e907709e5"

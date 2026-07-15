@@ -245,7 +245,8 @@ and persisted aggregate lexical evaluation runs. `memory-eval-v1` reports
 precision, Recall@k, MRR, nDCG, policy leaks, p50/p95 latency, token use, and
 local compute/storage cost. Versioned corpus fixtures and CI thresholds remain
 the next Stage F slice. `memory-eval-v1` now provides a deterministic
-scope/archive/supersession corpus and CI enforces zero policy leaks plus exact
+scoped, sensitive, archived, forgotten, corrected, and time-qualified corpus
+and CI enforces zero policy leaks plus exact
 precision/recall for that corpus; broader workload, latency, and cost budgets
 remain pending. `RetrievalBudget` now also gates token and retrieved-storage
 regressions; production thresholds still require the live benchmark.

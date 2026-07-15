@@ -72,6 +72,8 @@ from raiker.storage.migrations import (
     MEMORY_AUDIT_RATE_LIMIT_SQL,
     MEMORY_BACKUP_CATALOG_MIGRATION_ID,
     MEMORY_BACKUP_CATALOG_SQL,
+    MEMORY_CONTENT_CHECKSUM_MIGRATION_ID,
+    MEMORY_CONTENT_CHECKSUM_SQL,
     MEMORY_CONTROLS_MIGRATION_ID,
     MEMORY_CONTROLS_SQL,
     MEMORY_ENTITY_GRAPH_MIGRATION_ID,
@@ -555,6 +557,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 MEMORY_TEMPORAL_EVALUATION_MIGRATION_ID,
                 MEMORY_TEMPORAL_EVALUATION_SQL,
                 connection,
+            )
+            self._apply_migration(
+                MEMORY_CONTENT_CHECKSUM_MIGRATION_ID,
+                MEMORY_CONTENT_CHECKSUM_SQL,
+                connection,
+            )
+            rows = connection.execute(
+                "SELECT memory_id, text FROM approved_memory WHERE content_checksum IS NULL"
+            ).fetchall()
+            connection.executemany(
+                "UPDATE approved_memory SET content_checksum = ? WHERE memory_id = ?",
+                ((hashlib.sha256(str(row["text"]).encode()).hexdigest(), row["memory_id"]) for row in rows),
             )
             self._apply_migration(
                 MEMORY_ENTITY_GRAPH_MIGRATION_ID, MEMORY_ENTITY_GRAPH_SQL, connection
@@ -1718,8 +1732,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO approved_memory
-                (memory_id, text, scope, sensitivity, source_event_id, memory_type, created_at, tags_json, source, provenance_json, confidence, trust_score, retention, approval_state, created_by, updated_at, deleted_at, archived_at, search_enabled, expires_at, valid_from, valid_until, supersedes_memory_id, superseded_at, remembered_reason)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (memory_id, text, scope, sensitivity, source_event_id, memory_type, created_at, tags_json, source, provenance_json, confidence, trust_score, retention, approval_state, created_by, updated_at, deleted_at, archived_at, search_enabled, expires_at, valid_from, valid_until, supersedes_memory_id, superseded_at, remembered_reason, content_checksum)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     entry.memory_id,
@@ -1747,6 +1761,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     entry.supersedes_memory_id,
                     entry.superseded_at,
                     entry.remembered_reason,
+                    hashlib.sha256(entry.text.encode()).hexdigest(),
                 ),
             )
             self._sync_memory_fts(connection, entry.memory_id)
@@ -1755,12 +1770,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def update_approved_memory(self, entry: Any) -> bool:
         with self.connect() as connection:
             cursor = connection.execute(
-                """UPDATE approved_memory SET text = ?, sensitivity = ?, tags_json = ?, updated_at = ?,
+                """UPDATE approved_memory SET text = ?, content_checksum = ?, sensitivity = ?, tags_json = ?, updated_at = ?,
                 search_enabled = ?, expires_at = ?, valid_from = ?, valid_until = ?,
                 supersedes_memory_id = ?, superseded_at = ?, remembered_reason = ?
                 WHERE memory_id = ? AND deleted_at IS NULL""",
                 (
                     entry.text,
+                    hashlib.sha256(entry.text.encode()).hexdigest(),
                     entry.sensitivity,
                     json.dumps(list(entry.tags)),
                     entry.updated_at,

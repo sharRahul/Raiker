@@ -1399,6 +1399,11 @@ CREATE TABLE IF NOT EXISTS memory_evaluation_runs (
 );
 """
 
+MEMORY_CONTENT_CHECKSUM_MIGRATION_ID = "RAIKER-2016-memory-content-checksum"
+MEMORY_CONTENT_CHECKSUM_SQL = """
+ALTER TABLE approved_memory ADD COLUMN content_checksum TEXT;
+"""
+
 MEMORY_ENTITY_GRAPH_MIGRATION_ID = "RAIKER-2011-memory-entity-graph"
 MEMORY_ENTITY_GRAPH_SQL = """
 CREATE TABLE IF NOT EXISTS memory_entities (

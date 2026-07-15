@@ -276,11 +276,11 @@ scope, workload, and latency distribution.
 
 ### Stage G — gated semantic and entity retrieval
 
-**In progress (first slice).** Active approved memories can now be projected
-through the existing governed local-vector capability; the vector mapping and
+**In progress (first slice).** Active non-sensitive approved memories can now be projected
+through the existing governed local-vector or provider-vector capability; the vector mapping and
 entity graph edges are evidence-bound and lifecycle-filtered. The bounded hybrid
 assembler deduplicates active lexical/vector/graph candidates. Provider-backed
-projection, entity extraction/review, and runtime integration remain pending.
+runtime retrieval, entity extraction/review, and runtime integration remain pending.
 
 1. Implement approved-memory vector projection using the existing
    `vector_embedding_runtime` capability, with model/version, checksum, and

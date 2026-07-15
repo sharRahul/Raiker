@@ -19,6 +19,7 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.control.service import RuntimeControlService
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
+from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.models.contracts import EmbeddingResponse
 from raiker.models.exceptions import ProviderUnsupportedCapabilityError
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
@@ -222,3 +223,45 @@ def test_embed_persists_provider_vector_without_leaking_text(
     assert artifacts["provider_backed"] is True
     assert artifacts["content_redacted"] is True
     assert artifacts["embedding_model"] == "openai:text-embedding-3-small"
+
+
+def test_project_memory_records_provider_projection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
+    ws = _ws(tmp_path)
+    _enable(ws)
+    store = SQLiteStore(ws)
+    memory = write_memory(
+        "Approved provider projection.", workspace_root=ws, store=store,
+        governance=MemoryGovernance("evt", "sess", None, "test", 1, 1, "until_forget", "approved", "test"),
+    )
+    authority, principal = _authority(ws, embedder=_fake_embedder([0.1, 0.2, 0.3]))
+    result = authority.route_action(
+        _action(principal.principal_id, operation="project_memory", memory_id=memory.memory_id,
+                provider="openai", model="text-embedding-3-small"), principal,
+    )
+    assert result.decision == "allow"
+    projections = store.list_memory_projections(memory.memory_id)
+    assert projections[0]["projection_type"] == "vector"
+    assert projections[0]["source_version"] == "openai:text-embedding-3-small"
+
+
+def test_project_memory_rejects_sensitive_memory_before_provider_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
+    ws = _ws(tmp_path)
+    _enable(ws)
+    store = SQLiteStore(ws)
+    memory = write_memory(
+        "api_key=abcdefghijklmnop", workspace_root=ws, store=store,
+        governance=MemoryGovernance("evt", "sess", None, "test", 1, 1, "until_forget", "approved", "test"),
+    )
+    authority, principal = _authority(ws, embedder=_fake_embedder([0.1, 0.2, 0.3]))
+    result = authority.route_action(
+        _action(principal.principal_id, operation="project_memory", memory_id=memory.memory_id,
+                provider="openai", model="text-embedding-3-small"), principal,
+    )
+    assert result.error == "memory_not_active_or_not_found"
+    assert store.list_vector_records() == []

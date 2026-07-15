@@ -150,9 +150,11 @@ def test_models_live_listing_and_policy_redaction(
         return httpx.Response(200, json={"data": [{"id": "local-gguf"}, {"id": "qwen2.5-coder"}]})
 
     router = ModelRouter(registry)
-    router._factory = lambda profile=None: ModelProviderFactory(  # type: ignore[method-assign]
-        client=httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    )
+
+    def factory(profile: object | None = None) -> ModelProviderFactory:
+        return ModelProviderFactory(client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+
+    router._factory = factory  # type: ignore[method-assign]
     out = asyncio.run(render_models_async(workspace_root=tmp_path, router=router))
     assert "raiker-local-llama-cpp (selected)" in out
     assert "status: available" in out and "qwen2.5-coder" in out
@@ -175,7 +177,10 @@ def test_models_unavailable(tmp_path: Path) -> None:
         def create(self, profile: object) -> object:
             raise ProviderConnectionError("boom")
 
-    router._factory = lambda profile=None: BadFactory()  # type: ignore[method-assign, assignment, return-value]
+    def bad_factory(profile: object | None = None) -> BadFactory:
+        return BadFactory()
+
+    router._factory = bad_factory  # type: ignore[method-assign, assignment]
     out = asyncio.run(render_models_async(workspace_root=tmp_path, router=router))
     assert "status: unavailable" in out
     assert "reason: provider_unreachable" in out

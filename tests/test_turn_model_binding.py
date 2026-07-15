@@ -15,6 +15,16 @@ def _gateway(tmp_path: Path) -> AgentGateway:
     return AgentGateway(tmp_path)
 
 
+def _select_anthropic(gateway: AgentGateway, model: str = "claude-opus-4-8") -> None:
+    gateway.store.save_model_session_state(
+        ModelSessionState(
+            session_id=TERMINAL_MODEL_SESSION_ID,
+            profile_id="anthropic-hosted",
+            model=model,
+        )
+    )
+
+
 class TestPromptOptionsDefault:
     def test_model_profile_defaults_to_operator_selection_not_mock(self) -> None:
         assert PromptOptions().model_profile == ""
@@ -24,8 +34,10 @@ class TestPromptOptionsDefault:
 
 
 class TestResolveProfileForTurn:
-    def test_resolves_concrete_hosted_profile(self, tmp_path: Path) -> None:
+    def test_hosted_placeholder_requires_concrete_selection(self, tmp_path: Path) -> None:
         gateway = _gateway(tmp_path)
+        assert gateway._resolve_profile_for_turn("anthropic-hosted") is None
+        _select_anthropic(gateway)
         resolved = gateway._resolve_profile_for_turn("anthropic-hosted")
         assert resolved == ("anthropic", "claude-opus-4-8")
 
@@ -62,13 +74,7 @@ class TestResolveProfileForTurn:
         self, tmp_path: Path
     ) -> None:
         gateway = _gateway(tmp_path)
-        gateway.store.save_model_session_state(
-            ModelSessionState(
-                session_id=TERMINAL_MODEL_SESSION_ID,
-                profile_id="anthropic-hosted",
-                model=None,
-            )
-        )
+        _select_anthropic(gateway)
         resolved = gateway._resolve_profile_for_turn(
             "anthropic-hosted", "claude-haiku-4-5-20251001"
         )
@@ -96,13 +102,7 @@ class TestContextModelProfileItem:
         from raiker.context.gatherer import ContextGatherer
 
         gateway = _gateway(tmp_path)  # creates the workspace store
-        gateway.store.save_model_session_state(
-            ModelSessionState(
-                session_id=TERMINAL_MODEL_SESSION_ID,
-                profile_id="anthropic-hosted",
-                model=None,
-            )
-        )
+        _select_anthropic(gateway)
         item = ContextGatherer()._model_profile(tmp_path)
         assert item is not None
         assert "profile_id: anthropic-hosted" in item.content
@@ -144,6 +144,7 @@ class TestOrchestratorTurnProvider:
                 options=PromptOptions(model_profile=profile),
             )
 
+        _select_anthropic(gateway)
         assert runtime._turn_provider(envelope("anthropic-hosted")) == (
             "anthropic",
             "claude-opus-4-8",

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import json
 import asyncio
+import json
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
@@ -179,7 +180,7 @@ def create_app(
     hsts: bool = False,
 ) -> FastAPI:
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from raiker.tasks.scheduler import TaskScheduler
 
         stop = asyncio.Event()
@@ -188,16 +189,16 @@ def create_app(
             while not stop.is_set():
                 with suppress(Exception):
                     await scheduler.run_due()
-                try:
+                with suppress(TimeoutError):
                     await asyncio.wait_for(stop.wait(), timeout=15)
-                except TimeoutError:
-                    pass
         worker = asyncio.create_task(tick())
         try:
             yield
         finally:
-            stop.set(); worker.cancel()
-            with suppress(asyncio.CancelledError): await worker
+            stop.set()
+            worker.cancel()
+            with suppress(asyncio.CancelledError):
+                await worker
 
     app = FastAPI(
         title="Raiker API",

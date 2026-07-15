@@ -1516,7 +1516,7 @@ class DashboardService:
             raise ValueError(f"unknown_project:{project_id}")
         if parent_task_id is not None:
             parent = self.store.load_task(parent_task_id)
-            parent_session = parent and self.store.load_session(parent.session_id)
+            parent_session = self.store.load_session(parent.session_id) if parent is not None else None
             if parent is None or parent_session is None or (
                 user_id is not None
                 and parent_session.get("user_id") not in (None, user_id)
@@ -1795,7 +1795,11 @@ class DashboardService:
             return ControlResult(ok=False, reason_code=f"unknown_profile:{cleaned}")
         if bool(profile.raw.get("test_only", False)):
             return ControlResult(ok=False, reason_code=f"test_profile_not_allowed:{cleaned}")
-        if not profile.model or "<" in profile.model:
+        state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        effective_model = profile.model
+        if state is not None and state.profile_id == profile.profile_id and state.model:
+            effective_model = state.model
+        if not effective_model or "<" in effective_model:
             return ControlResult(ok=False, reason_code=f"model_required_for_profile:{cleaned}")
         self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, profile.profile_id)
         return ControlResult(ok=True, data={"advisor_profile_id": profile.profile_id})

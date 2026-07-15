@@ -172,7 +172,7 @@ Record this evidence in the PR body or `docs/IMPLEMENTATION_STATUS.md`:
 9. Files changed
 10. Commit SHA
 11. Remaining risks
-12. Statement that CI triggers are configured, hosted CI may be red/unavailable due quota, local validation evidence is required, and `phase-status.yml` remains manual if still true
+12. Statement that CI triggers are configured, hosted CI may be red/unavailable due quota, and local validation evidence is required
 
 ## Documentation alignment validation
 
@@ -190,7 +190,7 @@ Run `python scripts/validate_runtime_enablement_readiness.py` after any authorit
 
 ## Re-enable requirement
 
-Keep `pull_request` and `push` triggers for CI configured. If `phase-status.yml` remains `workflow_dispatch`-only, keep that manual status explicit. Hosted CI must be made reliable again before future release tagging when Actions quota is available.
+Keep `pull_request` and `push` triggers for CI configured for both the main CI and phase-status validation workflows. Hosted CI must be made reliable before future release tagging; local validation evidence remains required when hosted CI is unavailable.
 
 ## Phase 3 Slice H lifecycle retention reference
 

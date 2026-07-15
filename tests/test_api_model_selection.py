@@ -15,15 +15,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from cryptography.fernet import Fernet
 
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.auth.vault_key_file import write_vault_key
-from raiker.storage.sqlite import SQLiteStore
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.storage.sqlite import SQLiteStore
 
 
 @pytest.fixture

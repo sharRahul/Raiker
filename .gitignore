@@ -1,4 +1,5 @@
 .venv
+poetry.lock
 .ruff_cache
 .raiker
 .pytest_cache

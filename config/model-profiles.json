@@ -190,7 +190,7 @@
       "profile_id": "anthropic-hosted",
       "provider": "anthropic",
       "backend": "anthropic_messages",
-      "model": "claude-opus-4-8",
+      "model": "<model>",
       "endpoint": "https://api.anthropic.com",
       "build_phase": "phase_4",
       "default_state": "disabled_until_policy_approved",

@@ -31,6 +31,16 @@ def _gateway(tmp_path: Path) -> AgentGateway:
     return AgentGateway(tmp_path)
 
 
+def _select_anthropic(gw: AgentGateway, model: str = "claude-opus-4-8") -> None:
+    gw.store.save_model_session_state(
+        ModelSessionState(
+            session_id=TERMINAL_MODEL_SESSION_ID,
+            profile_id="anthropic-hosted",
+            model=model,
+        )
+    )
+
+
 def _envelope() -> PromptEnvelope:
     return PromptEnvelope(
         request_id=new_id("req_"),
@@ -68,6 +78,7 @@ class TestStoreRoundTrip:
 class TestResolveFallbackChain:
     def test_resolves_concrete_profiles_in_order(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)
+        _select_anthropic(gw)
         gw.store.save_model_fallback_sequence(
             TERMINAL_MODEL_SESSION_ID, ["anthropic-hosted", "raiker-local-llama-cpp"]
         )
@@ -97,6 +108,7 @@ class TestResolveFallbackChain:
 class TestProviderChain:
     def test_primary_then_fallback_deduped(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)
+        _select_anthropic(gw)
         # Primary is the native llama.cpp default; fallback lists it again + anthropic.
         gw.store.save_model_fallback_sequence(
             TERMINAL_MODEL_SESSION_ID, ["raiker-local-llama-cpp", "anthropic-hosted"]
@@ -109,6 +121,7 @@ class TestProviderChain:
 class TestFallbackEngagement:
     def test_fallback_engages_when_primary_fails(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)
+        _select_anthropic(gw)
         gw.store.save_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID, ["anthropic-hosted"])
 
         async def fake_achat(provider, model, messages, tools=None):  # type: ignore[no-untyped-def]
@@ -123,6 +136,7 @@ class TestFallbackEngagement:
 
     def test_emits_fallback_event(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)
+        _select_anthropic(gw)
         gw.store.save_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID, ["anthropic-hosted"])
         env = _envelope()
 

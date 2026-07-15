@@ -34,7 +34,7 @@ from raiker.control.dashboard import DashboardService
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
 from raiker.models.contracts import ToolCallProposal
-from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
+from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 from raiker.models.tool_call_validation import default_tool_specs, validate_tool_call
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
@@ -93,7 +93,19 @@ def _allow(ctrl: RuntimeControlService) -> None:
     assert result.ok, result.reason_code
 
 
+def _select_model(workspace: Path, profile_id: str, model: str) -> None:
+    SQLiteStore(workspace).save_model_session_state(
+        ModelSessionState(
+            session_id=TERMINAL_MODEL_SESSION_ID,
+            profile_id=profile_id,
+            model=model,
+        )
+    )
+
+
 def _set_advisor(workspace: Path, profile_id: str = "anthropic-hosted") -> None:
+    if profile_id == "anthropic-hosted":
+        _select_model(workspace, profile_id, "claude-opus-4-8")
     result = DashboardService(workspace).set_model_advisor(profile_id, "principal_owner")
     assert result.ok, result.reason_code
 
@@ -380,8 +392,9 @@ class TestModelAdvisorApi:
         assert resp.json()["detail"]["reason_code"].startswith("model_required_for_profile")
 
     def test_set_and_clear_reflected_on_models_view(
-        self, client: TestClient, owner_token: str
+        self, workspace: Path, client: TestClient, owner_token: str
     ) -> None:
+        _select_model(workspace, "anthropic-hosted", "claude-opus-4-8")
         resp = client.put(
             "/api/model-advisor",
             json={"profile_id": "anthropic-hosted"},

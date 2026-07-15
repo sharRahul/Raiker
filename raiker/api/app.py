@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
@@ -179,7 +180,7 @@ def create_app(
     hsts: bool = False,
 ) -> FastAPI:
     @asynccontextmanager
-    async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from raiker.tasks.scheduler import TaskScheduler
 
         stop = asyncio.Event()

@@ -125,7 +125,7 @@ class AdvisorService:
                 "Advisor consult denied: no advisor model is configured (Models → Advisor model).",
             )
         try:
-            from raiker.models.registry import ModelProfileRegistry
+            from raiker.models.registry import ModelProfileRegistry, profile_with_model
 
             profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
         except Exception:  # noqa: BLE001 — a stale/unknown persisted id fails closed
@@ -138,6 +138,9 @@ class AdvisorService:
                 f"advisor_profile_not_allowed:{profile_id}",
                 "Advisor consult denied: test-harness profiles cannot advise.",
             )
+        state = self._store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        if state is not None and state.profile_id == profile.profile_id and state.model:
+            profile = profile_with_model(profile, state.model)
         if not profile.model or "<" in profile.model:
             return _denied(
                 f"advisor_model_unresolved:{profile_id}",

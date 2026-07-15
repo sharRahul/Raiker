@@ -198,7 +198,14 @@ class TestReads:
         task_node = next(node for node in body["nodes"] if node["node_id"] == f"task:{created.json()['task_id']}")
         assert task_node["label"] == "Map the runtime"
         assert any(node["node_id"] == f"schedule:{created.json()['task_id']}" for node in body["nodes"])
-        assert any(edge["target"] == task_node["node_id"] and edge["relationship"] == "tracks" for edge in body["edges"])
+        tracks_edge = next(
+            edge
+            for edge in body["edges"]
+            if edge["target"] == task_node["node_id"] and edge["relationship"] == "tracks"
+        )
+        # A queued schedule is visible, but its edge must not animate as though
+        # execution has already started.
+        assert tracks_edge["is_active"] is False
 
     def test_task_create_rejects_blank_title(self, client: TestClient) -> None:
         response = client.post(

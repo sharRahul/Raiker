@@ -28,20 +28,23 @@ def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) 
         active_memory_count = int(connection.execute(
             """SELECT COUNT(*) FROM approved_memory WHERE deleted_at IS NULL AND archived_at IS NULL
             AND search_enabled = 1 AND (expires_at IS NULL OR expires_at > ?)
-            AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL""", (now, now)
+            AND (valid_from IS NULL OR valid_from <= ?)
+            AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL""", (now, now, now)
         ).fetchone()[0])
         fts_count = int(connection.execute("SELECT COUNT(*) FROM approved_memory_fts").fetchone()[0])
         stale_projection_count = int(connection.execute(
             """SELECT COUNT(*) FROM memory_projections p WHERE p.active = 1 AND NOT EXISTS (
             SELECT 1 FROM approved_memory m WHERE m.memory_id = p.memory_id AND m.deleted_at IS NULL
             AND m.archived_at IS NULL AND m.search_enabled = 1 AND (m.expires_at IS NULL OR m.expires_at > ?)
-            AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL)""", (now, now)
+            AND (m.valid_from IS NULL OR m.valid_from <= ?)
+            AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL)""", (now, now, now)
         ).fetchone()[0])
         stale_graph_edge_count = int(connection.execute(
             """SELECT COUNT(*) FROM memory_entity_relationships r WHERE r.active = 1 AND NOT EXISTS (
             SELECT 1 FROM approved_memory m WHERE m.memory_id = r.evidence_memory_id AND m.deleted_at IS NULL
             AND m.archived_at IS NULL AND m.search_enabled = 1 AND (m.expires_at IS NULL OR m.expires_at > ?)
-            AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL)""", (now, now)
+            AND (m.valid_from IS NULL OR m.valid_from <= ?)
+            AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL)""", (now, now, now)
         ).fetchone()[0])
         rows = connection.execute("SELECT memory_id FROM approved_memory WHERE deleted_at IS NULL").fetchall()
     memory_dir = Path(workspace_root).resolve() / ".raiker" / "memory"

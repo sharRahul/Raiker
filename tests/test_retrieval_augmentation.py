@@ -123,6 +123,10 @@ def test_allow_injects_retrieved_context(tmp_path: Path) -> None:
     assert plan.metadata["count"] >= 1
     assert vid in plan.metadata["vector_ids"]
     assert plan.metadata["content_redacted"] is True
+    assert "trust=untrusted_memory_data" in plan.context_text
+    assert "source=mem_" in plan.context_text
+    with SQLiteStore(ws).connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM memory_lifecycle_audit WHERE action = 'recall'").fetchone()[0] >= 1
 
 
 def test_allow_with_empty_store_does_not_augment(tmp_path: Path) -> None:

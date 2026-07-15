@@ -8,7 +8,13 @@ from raiker.memory.evaluation import (
     enforce_retrieval_budget,
     evaluate_lexical_retrieval,
 )
-from raiker.memory.store import MemoryGovernance, correct_memory, set_memory_archived, write_memory
+from raiker.memory.store import (
+    MemoryGovernance,
+    correct_memory,
+    list_memory,
+    set_memory_archived,
+    write_memory,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -51,6 +57,7 @@ def test_correction_supersedes_old_fact_and_removes_it_from_retrieval(tmp_path: 
     assert replacement is not None and replacement.supersedes_memory_id == original
     assert store.search_approved_memory("Vim", scope="project:alpha") == []
     assert [row["memory_id"] for row in store.search_approved_memory("VS Code", scope="project:alpha")] == [replacement.memory_id]
+    assert [entry.memory_id for entry in list_memory(workspace_root=tmp_path, store=store)] == [replacement.memory_id]
 
 
 def test_evaluation_budget_rejects_policy_leaks(tmp_path: Path) -> None:

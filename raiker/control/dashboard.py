@@ -727,7 +727,7 @@ class DashboardService:
     def list_memories(self, scope: str | None = None) -> list[MemoryControlView]:
         """List approved memories with their governance metadata + pin state."""
         pinned_ids = self.store.list_pinned_memory_ids()
-        entries = list_memory(workspace_root=self.workspace_root, scope=scope, limit=200)
+        entries = list_memory(workspace_root=self.workspace_root, scope=scope, limit=200, store=self.store)
         return [
             MemoryControlView(
                 memory_id=e.memory_id,

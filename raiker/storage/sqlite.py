@@ -1750,6 +1750,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ),
             )
             self._sync_memory_fts(connection, entry.memory_id)
+            self._sync_memory_projection_eligibility(connection, entry.memory_id)
 
     def update_approved_memory(self, entry: Any) -> bool:
         with self.connect() as connection:
@@ -1774,6 +1775,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ),
             )
             self._sync_memory_fts(connection, entry.memory_id)
+            self._sync_memory_projection_eligibility(connection, entry.memory_id)
         return cursor.rowcount > 0
 
     def supersede_approved_memory(self, memory_id: str, replacement_id: str, *, at: str) -> bool:
@@ -1784,6 +1786,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (at, at, at, memory_id),
             )
             self._sync_memory_fts(connection, memory_id)
+            self._sync_memory_projection_eligibility(connection, memory_id)
             connection.execute(
                 "UPDATE approved_memory SET supersedes_memory_id = ? WHERE memory_id = ?",
                 (memory_id, replacement_id),
@@ -1837,8 +1840,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         JOIN approved_memory m ON m.memory_id = r.evidence_memory_id
         WHERE r.active = 1 AND (r.subject_entity_id = ? OR r.object_entity_id = ?)
           AND m.deleted_at IS NULL AND m.archived_at IS NULL AND m.search_enabled = 1
-          AND (m.expires_at IS NULL OR m.expires_at > ?) AND m.superseded_at IS NULL"""
-        params: list[Any] = [entity_id, entity_id, now]
+          AND (m.expires_at IS NULL OR m.expires_at > ?)
+          AND (m.valid_from IS NULL OR m.valid_from <= ?)
+          AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL"""
+        params: list[Any] = [entity_id, entity_id, now, now, now]
         if scope:
             query += " AND m.scope = ?"
             params.append(scope)
@@ -1859,6 +1864,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ("forgotten", deleted_at, updated_at, memory_id),
             )
             self._sync_memory_fts(connection, memory_id)
+            self._sync_memory_projection_eligibility(connection, memory_id)
         return cursor.rowcount > 0
 
     def set_approved_memory_archived(self, memory_id: str, *, archived_at: str | None, updated_at: str | None) -> bool:
@@ -1868,6 +1874,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (archived_at, updated_at, memory_id),
             )
             self._sync_memory_fts(connection, memory_id)
+            self._sync_memory_projection_eligibility(connection, memory_id)
         return cursor.rowcount > 0
 
     def create_memory_purge_record(self, purge_id: str, memory_id: str, requested_by: str, confirmed_at: str, disposition: dict[str, Any]) -> None:
@@ -1880,19 +1887,36 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def set_memory_projections_active(self, memory_id: str, active: bool) -> None:
         with self.connect() as connection:
-            connection.execute("UPDATE memory_projections SET active = ? WHERE memory_id = ?", (int(active), memory_id))
+            self._sync_memory_projection_eligibility(connection, memory_id, enabled=active)
+
+    @staticmethod
+    def _sync_memory_projection_eligibility(
+        connection: sqlite3.Connection, memory_id: str, *, enabled: bool = True
+    ) -> None:
+        now = utc_now()
+        connection.execute(
+            """UPDATE memory_projections SET active = CASE WHEN ? = 1 AND EXISTS (
+                SELECT 1 FROM approved_memory m WHERE m.memory_id = memory_projections.memory_id
+                AND m.deleted_at IS NULL AND m.archived_at IS NULL AND m.search_enabled = 1
+                AND (m.expires_at IS NULL OR m.expires_at > ?)
+                AND (m.valid_from IS NULL OR m.valid_from <= ?)
+                AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL
+            ) THEN 1 ELSE 0 END WHERE memory_id = ?""",
+            (int(enabled), now, now, now, memory_id),
+        )
 
     def link_memory_projection(self, memory_id: str, projection_type: str, projection_id: str, source_version: str) -> None:
         if projection_type not in {"fts", "vector", "graph"}:
             raise ValueError("invalid_memory_projection_type")
         with self.connect() as connection:
-            row = connection.execute("SELECT deleted_at, archived_at FROM approved_memory WHERE memory_id = ?", (memory_id,)).fetchone()
+            row = connection.execute("SELECT 1 FROM approved_memory WHERE memory_id = ?", (memory_id,)).fetchone()
             if row is None:
                 raise ValueError("unknown_memory")
             connection.execute(
                 "INSERT OR REPLACE INTO memory_projections (memory_id, projection_type, projection_id, source_version, active) VALUES (?, ?, ?, ?, ?)",
-                (memory_id, projection_type, projection_id, source_version, int(row["deleted_at"] is None and row["archived_at"] is None)),
+                (memory_id, projection_type, projection_id, source_version, 0),
             )
+            self._sync_memory_projection_eligibility(connection, memory_id)
 
     def list_memory_projections(self, memory_id: str) -> list[dict[str, Any]]:
         with self.connect() as connection:
@@ -1914,11 +1938,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def reconcile_memory_projections(self) -> dict[str, int]:
         with self.connect() as connection:
+            now = utc_now()
             cursor = connection.execute(
                 """UPDATE memory_projections SET active = CASE WHEN EXISTS (
                     SELECT 1 FROM approved_memory m WHERE m.memory_id = memory_projections.memory_id
-                    AND m.deleted_at IS NULL AND m.archived_at IS NULL
-                ) THEN 1 ELSE 0 END"""
+                    AND m.deleted_at IS NULL AND m.archived_at IS NULL AND m.search_enabled = 1
+                    AND (m.expires_at IS NULL OR m.expires_at > ?)
+                    AND (m.valid_from IS NULL OR m.valid_from <= ?)
+                    AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL
+                ) THEN 1 ELSE 0 END""",
+                (now, now, now),
             )
             self._rebuild_memory_fts(connection)
         return {"projection_rows_reconciled": cursor.rowcount}
@@ -1981,8 +2010,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute("DELETE FROM approved_memory WHERE memory_id = ?", (memory_id,))
 
     def list_approved_memory(self, scope: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
-        query = "SELECT * FROM approved_memory WHERE deleted_at IS NULL AND archived_at IS NULL AND search_enabled = 1 AND (expires_at IS NULL OR expires_at > ?)"
-        params: list[Any] = [utc_now()]
+        now = utc_now()
+        query = """SELECT * FROM approved_memory WHERE deleted_at IS NULL AND archived_at IS NULL
+        AND search_enabled = 1 AND (expires_at IS NULL OR expires_at > ?)
+        AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)
+        AND superseded_at IS NULL"""
+        params: list[Any] = [now, now, now]
         if scope is not None:
             query += " AND scope = ?"
             params.append(scope)

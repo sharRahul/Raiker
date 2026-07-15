@@ -103,13 +103,13 @@ fail-closed by design.
   migration also verifies conversion cleanup and encrypted-database access.
 - Still pending for production memory: a representative consented benchmark
   and live quality/latency/cost thresholds; provider-backed runtime retrieval,
-  entity extraction/review, and runtime hybrid integration; principal/workspace
-  isolation and managed per-workspace key lifecycle; real encrypted backup and
-  restore/erasure drills; monitoring, daemon/worker operation, load/soak/chaos
+  entity extraction/review, and runtime hybrid integration; user-controlled
+  NAS/mounted-drive/cloud backup destinations and recovery; real encrypted
+  backup and restore/erasure drills; monitoring, daemon/worker operation, load/soak/chaos
   evidence; and independent security, privacy, and pilot/benchmark evidence.
 - The next memory program is staged in `HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`
   (Stages F–J): retrieval-authority/evaluation, gated semantic + entity
-  retrieval, tenancy/encryption/backup operations, reliability/scale, then
+  retrieval, local-first encryption/backup operations, reliability/scale, then
   independent benchmark evidence. Do not market the current implementation as
   “best”; that claim requires the Stage J evidence.
 - The roadmap explicitly covers the full production checklist: FTS/vector/graph
@@ -136,8 +136,8 @@ fail-closed by design.
   and an owner-started integrity report finds stale indexes/projections/edges.
   Stage H's backup catalog records retention, legal hold, restore verification,
   and erasure disposition. SQLCipher now encrypts the SQLite database, FTS4,
-  vectors, and graph rows using a workspace-derived key; tenant isolation,
-  telemetry, and operational proof remain required.
+  vectors, and graph rows using a workspace-derived key; local workspace
+  isolation, telemetry, and operational proof remain required.
 - The first maintenance-job primitive is now present: idempotent `reconcile`
   and `integrity_scan` jobs have SQLite leases, retries, and dead-letter state,
   per-workspace rate limits, and lifecycle audit rows, but no daemon, telemetry,

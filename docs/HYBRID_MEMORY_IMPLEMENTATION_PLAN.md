@@ -236,6 +236,16 @@ market leadership. The following work is required before Raiker can make a
 defensible production-grade memory claim. Each stage has an explicit exit
 criterion; later stages do not weaken the completed safety rules.
 
+### Deployment scope
+
+Raiker is a local-first, single-user application for personal devices and
+user-owned AI hardware. It is intended to run on laptops, desktops, Macs,
+local AI devices, and optional home NAS hardware—not as a shared enterprise
+service. Long-term backup is opt-in: users may keep it local or select a NAS,
+mounted drive, or supported cloud-storage provider. Raiker must encrypt and
+verify those backups, expose their retention/deletion disposition, and never
+silently upload a workspace or require an account.
+
 ### Stage F — retrieval authority and measured quality
 
 **In progress.** `RAIKER-2009` makes approved-memory SQLite rows and active-only
@@ -301,7 +311,7 @@ queue until an explicit approval creates the graph edge.
 **Exit:** capability-off and policy-denied paths are proven no-ops; enabled
 retrieval meets the Stage F recall/latency budgets without a visibility leak.
 
-### Stage H — security, tenancy, and privacy operations
+### Stage H — local-first security, backup, and privacy operations
 
 **In progress (backup catalog slice).** Backup manifests now record encryption
 key identifiers, retention/legal-hold state, restore verification, erasure
@@ -311,24 +321,28 @@ workspace app key derives the SQLCipher key and legacy plaintext databases are
 converted without retaining a plaintext copy. This distribution provides FTS4,
 not FTS5, so lexical ranking is deterministic recency order rather than BM25.
 Memory and backup lifecycle actions are metadata-audited, and lifecycle-audit
-rows are append-only at the SQLite layer. Principal/workspace isolation and
-independent key-management review remain pending.
+rows are append-only at the SQLite layer. Raiker targets one user-owned
+workspace per device, not shared enterprise tenancy. User-selected NAS, mounted
+drive, and cloud backup destinations remain pending.
 
-1. Enforce principal/workspace ownership in every memory row and projection;
-   add tenant-isolation and confused-deputy tests.
+1. Keep each local workspace physically isolated, bind every memory operation
+   to its workspace root, and test that one workspace cannot read, write, or
+   restore another workspace's memory or backup catalog.
 2. Encrypt durable rows, artifacts, indexes, and backups at rest with a
-   per-workspace data-encryption key wrapped by an owner/user-managed key;
-   define key rotation, revocation, recovery, and multi-user key-access rules.
-3. Replace the local backup notice with a backup catalog that records encrypted
-   snapshots, retention/legal-hold deadlines, restore tests, erasure requests,
-   deletion completion, and every backup still pending expiry or erasure.
+   local workspace key. Define user-controlled recovery, key rotation, and
+   revocation without requiring an account, enterprise KMS, or shared-user
+   key hierarchy.
+3. Add opt-in NAS, mounted-drive, and cloud-provider backup adapters. The
+   catalog must record encrypted snapshots, destination, retention/hold
+   deadlines, restore tests, erasure requests, deletion completion, and every
+   backup still pending expiry or erasure.
 4. Add immutable lifecycle audit records for recall, correction, export,
    import, archive, forget, purge, legal-hold changes, backup access, and admin
    access.
 
-**Exit:** external security review, restoration drill, migration rollback drill,
-verified-erasure/pending-backup disposition drill, and tenant-isolation suite
-all pass with documented evidence.
+**Exit:** local-device security review, restoration and migration-rollback
+drills, verified-erasure/pending-backup disposition drill, and workspace
+isolation suite all pass with documented evidence.
 
 ### Stage I — reliability and scale
 
@@ -344,12 +358,13 @@ restore, forget, purge, and correction. Monitoring and load/failure exercises
 remain pending.
 
 1. Move projection/reconciliation work to owner-enabled, idempotent jobs with
-   leases, retries, dead-letter reporting, bounded concurrency, per-tenant rate
+   leases, retries, dead-letter reporting, bounded concurrency, per-workspace rate
    limits, and queue/worker/latency/error monitoring.
 2. Add integrity scanners for orphaned artifacts, stale FTS/vector/graph rows,
    checksum mismatches, path inconsistencies, and failed purge locations.
-3. Load-test realistic corpus sizes and concurrent users; set published p50/p95
-   latency, availability, recovery-time, and recovery-point objectives.
+3. Load-test realistic local corpus sizes, backup destinations, and concurrent
+   local operations; set published p50/p95 latency, recovery-time, and
+   recovery-point objectives.
 4. Run load, soak, and chaos/failure-injection tests for interrupted writes,
    queue duplication, index rebuilds, restore, migration rollback, key rotation,
    backup corruption, and provider outages.
@@ -411,19 +426,18 @@ for every step before changing the corresponding stage status.
    any inability to restore, erase, or report a pending backup as a release
    blocker.
 
-### 3. Security and tenancy review
+### 3. Local security and recovery review
 
 1. Have an independent reviewer inspect key creation, storage, rotation,
    revocation, recovery, logs, exports, backups, and SQLCipher connection
    initialization. Confirm keys and raw memory never appear in logs or error
    telemetry.
-2. Implement and run the remaining principal/workspace isolation suite before
-   any multi-user release. Test cross-workspace reads, writes, retrieval,
-   projections, exports, backups, job execution, and confused-deputy attempts.
-3. Document owner/user-managed key access, rotation cadence, incident response,
-   and the evidence produced by each review. These controls are pending; the
-   current local app-key derivation is not a substitute for a managed key
-   hierarchy.
+2. Run the workspace-isolation suite. Test that separate local workspaces
+   cannot read, write, retrieve, project, export, back up, or restore each
+   other's data.
+3. Document user-controlled recovery, key rotation, incident response, and
+   NAS/mounted-drive/cloud backup setup. The current local app-key derivation
+   is not a substitute for documented backup-key recovery.
 
 ### 4. Retrieval benchmark and pilot
 
@@ -441,7 +455,7 @@ for every step before changing the corresponding stage status.
 
 ### 5. Operational load and failure testing
 
-1. Define target corpus sizes, concurrent users, p50/p95 latency, availability,
+1. Define target local corpus sizes, concurrent operations, p50/p95 latency,
    RPO, and RTO. Run load and soak tests at those targets and retain reports.
 2. Inject interrupted writes, duplicate jobs, expired leases, index rebuilds,
    provider outages, backup corruption, key rotation, and restore failures.
@@ -454,8 +468,8 @@ for every step before changing the corresponding stage status.
 ### Completion evidence checklist
 
 Keep links to the following beside the relevant stage exit criterion: CI run,
-dependency/SBOM scan, security review, encrypted-backup and restore report,
-erasure disposition report, tenancy-suite report, benchmark report, pilot
+dependency/SBOM scan, local security review, encrypted-backup and restore
+report, erasure disposition report, workspace-isolation report, benchmark, pilot
 report, load/soak/chaos reports, and independent runbook exercise. Until that
 evidence exists, Stages F--J remain in progress and Raiker must not be marketed
 as the best or as production-proven.

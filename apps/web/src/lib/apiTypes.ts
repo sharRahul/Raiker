@@ -433,3 +433,29 @@ export interface MemoryControlView {
 export interface MemorySettingsView {
   incognito: boolean;
 }
+
+// raiker/control/dashboard.py BrainView.to_dict(). Nodes and edges are stored
+// runtime relationships; the UI may add clearly labelled illustrative motion.
+export interface BrainNode {
+  node_id: string;
+  node_type: string;
+  label: string;
+  status: string;
+  detail: string | null;
+  progress_percent: number | null;
+  is_real: boolean;
+}
+
+export interface BrainEdge {
+  source: string;
+  target: string;
+  relationship: string;
+  is_active: boolean;
+}
+
+export interface BrainView {
+  generated_at: string;
+  nodes: BrainNode[];
+  edges: BrainEdge[];
+  illustrative_motion_notice: string;
+}

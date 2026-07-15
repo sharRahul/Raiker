@@ -12,6 +12,7 @@
   import ProjectsView from "./lib/views/ProjectsView.svelte";
   import ApprovalsView from "./lib/views/ApprovalsView.svelte";
   import TasksView from "./lib/views/TasksView.svelte";
+  import BrainView from "./lib/views/BrainView.svelte";
   import SessionsView from "./lib/views/SessionsView.svelte";
   import CapabilitiesView from "./lib/views/CapabilitiesView.svelte";
   import ModelsView from "./lib/views/ModelsView.svelte";
@@ -110,6 +111,8 @@
         <ApprovalsView />
       {:else if current === "tasks"}
         <TasksView projectId={activeProjectId} />
+      {:else if current === "brain"}
+        <BrainView />
       {:else if current === "sessions"}
         <SessionsView projectId={activeProjectId} />
       {:else if current === "projects"}

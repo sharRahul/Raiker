@@ -252,6 +252,21 @@ async def list_events(
     )
 
 
+@router.get("/api/brain")
+async def get_brain(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Return the authenticated user's redacted runtime relationship graph."""
+    session, principal = auth_data
+    return serialize_dto(
+        _service(request).brain_view(
+            principal_id=session.principal_id,
+            user_id=principal.delegated_by_user_id,
+        )
+    )
+
+
 @router.get("/api/checkpoints")
 async def list_checkpoints(
     request: Request,

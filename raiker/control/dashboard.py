@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from raiker.approval_previews import redact_secret_like_text
-from raiker.contracts.ids import new_id
+from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import ControlResult
 from raiker.control.service import RuntimeControlService
 from raiker.events.export import generate_export
@@ -100,6 +100,48 @@ class EventView:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class BrainNodeView:
+    node_id: str
+    node_type: str
+    label: str
+    status: str
+    detail: str | None = None
+    progress_percent: int | None = None
+    is_real: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class BrainEdgeView:
+    source: str
+    target: str
+    relationship: str
+    is_active: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class BrainView:
+    generated_at: str
+    nodes: tuple[BrainNodeView, ...]
+    edges: tuple[BrainEdgeView, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "generated_at": self.generated_at,
+            "nodes": [node.to_dict() for node in self.nodes],
+            "edges": [edge.to_dict() for edge in self.edges],
+            "illustrative_motion_notice": (
+                "Animated pulses indicate visual activity only; every node and connection is stored runtime data."
+            ),
+        }
 
 
 @dataclass(frozen=True)
@@ -534,6 +576,84 @@ class DashboardService:
             self._session_view(row)
             for row in self.store.list_sessions(limit=limit, project_id=project_id, user_id=user_id)
         ]
+
+    def brain_view(self, *, principal_id: str, user_id: str | None) -> BrainView:
+        """A redacted, read-only relationship graph for the authenticated user."""
+        sessions = self.list_sessions(limit=100, user_id=user_id)
+        session_ids = {session.session_id for session in sessions}
+        tasks = self.list_tasks(user_id=user_id)
+        task_ids = {task.task_id for task in tasks}
+        tasks_by_id = {task.task_id: task for task in tasks}
+        events = [
+            self._event_view(row)
+            for row in self.store.list_event_index(limit=250)
+            if str(row.get("session_id", "")) in session_ids
+        ]
+        approvals = [
+            self._approval_view(row)
+            for row in self.store.list_approvals()
+            if str(row.get("session_id", "")) in session_ids
+        ]
+        subagents = [
+            row for row in self.store.list_subagent_contracts()
+            if str(row.get("parent_task_id", "")) in task_ids
+        ]
+        memories = [
+            memory
+            for memory in list_memory(workspace_root=self.workspace_root, store=self.store, limit=100)
+            if memory.created_by == principal_id
+        ]
+        backups = [
+            row for row in self.store.list_backup_manifests()
+            if str(row.get("created_by", "")) == principal_id
+        ]
+        nodes = [BrainNodeView(f"principal:{principal_id}", "user", "You", "active")]
+        edges: list[BrainEdgeView] = []
+        for session in sessions:
+            node_id = f"session:{session.session_id}"
+            nodes.append(BrainNodeView(node_id, "session", session.title or "Untitled session", session.status))
+            edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "owns"))
+        active_task_states = {"queued", "running", "paused"}
+        for task in tasks:
+            node_id = f"task:{task.task_id}"
+            nodes.append(BrainNodeView(node_id, "task", task.title or "Untitled task", task.status, task.current_step, task.progress_percent))
+            edges.append(BrainEdgeView(f"session:{task.session_id}", node_id, "tracks", task.status in active_task_states))
+            if task.scheduled_at:
+                schedule_id = f"schedule:{task.task_id}"
+                nodes.append(BrainNodeView(schedule_id, "schedule", "Scheduled work", "waiting", task.scheduled_at))
+                edges.append(BrainEdgeView(schedule_id, node_id, "starts"))
+        for agent in subagents:
+            node_id = f"agent:{agent['subagent_id']}"
+            parent_task = tasks_by_id.get(str(agent["parent_task_id"]))
+            nodes.append(
+                BrainNodeView(
+                    node_id,
+                    "agent",
+                    str(agent["name"]),
+                    str(agent["status"]),
+                    parent_task.title if parent_task else None,
+                )
+            )
+            edges.append(BrainEdgeView(f"task:{agent['parent_task_id']}", node_id, "delegates", str(agent["status"]) == "running"))
+        event_ids = {event.event_id for event in events}
+        for event in events:
+            node_id = f"event:{event.event_id}"
+            nodes.append(BrainNodeView(node_id, "tool", event.event_type.replace("_", " "), "recorded", event.summary))
+            edges.append(BrainEdgeView(f"session:{event.session_id}", node_id, "recorded"))
+        for memory in memories:
+            node_id = f"memory:{memory.memory_id}"
+            nodes.append(BrainNodeView(node_id, "memory", f"Memory · {memory.scope}", "available", memory.sensitivity))
+            if memory.source_event_id in event_ids:
+                edges.append(BrainEdgeView(f"event:{memory.source_event_id}", node_id, "remembered"))
+        for approval in approvals:
+            node_id = f"approval:{approval.approval_id}"
+            nodes.append(BrainNodeView(node_id, "approval", approval.tool_name, approval.status, approval.capability))
+            edges.append(BrainEdgeView(f"session:{approval.session_id}", node_id, "requires"))
+        for backup in backups:
+            node_id = f"backup:{backup['manifest_id']}"
+            nodes.append(BrainNodeView(node_id, "backup", "Backup", "verified" if backup.get("restore_verified_at") else "catalogued"))
+            edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "backs_up"))
+        return BrainView(utc_now(), tuple(nodes), tuple(edges))
 
     def get_session(
         self, session_id: str, user_id: str | None = None

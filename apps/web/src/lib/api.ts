@@ -3,6 +3,7 @@ import type {
   ApprovalDetailView,
   ApprovalView,
   AuthSession,
+  BrainView,
   CapabilityDecisionMode,
   CapabilityGate,
   Checkpoint,
@@ -303,6 +304,7 @@ export const api = {
     postJson<UploadedAttachment>("/api/attachments", body),
   events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
     request<EventEntry[]>(withQuery("/api/events", params)),
+  brain: () => request<BrainView>("/api/brain"),
   checkpoints: (sessionId?: string, projectId?: string) =>
     request<Checkpoint[]>(
       withQuery("/api/checkpoints", { session_id: sessionId, project_id: projectId }),

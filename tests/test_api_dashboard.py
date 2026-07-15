@@ -18,6 +18,7 @@ PROTECTED_GET_ROUTES = [
     "/api/sessions",
     "/api/turns/turn_x",
     "/api/events",
+    "/api/brain",
     "/api/checkpoints",
     "/api/tasks",
     "/api/models",
@@ -149,6 +150,9 @@ class TestReads:
             resp = client.get(route, headers=_auth_headers(token))
             assert resp.status_code == 200
             assert isinstance(resp.json(), list)
+        brain = client.get("/api/brain", headers=_auth_headers(token))
+        assert brain.status_code == 200
+        assert brain.json()["nodes"][0]["node_type"] == "user"
 
     def test_task_create_persists_priority_and_schedule(self, client: TestClient) -> None:
         token = _token(client)
@@ -173,6 +177,28 @@ class TestReads:
         listed = client.get("/api/tasks", headers=_auth_headers(token))
         assert listed.status_code == 200
         assert any(item["task_id"] == task["task_id"] for item in listed.json())
+
+    def test_brain_returns_only_stored_work_relationships(self, client: TestClient) -> None:
+        token = _token(client)
+        created = client.post(
+            "/api/tasks",
+            headers=_auth_headers(token),
+            json={
+                "title": "Map the runtime",
+                "description": "Show only actual records.",
+                "scheduled_at": "2026-07-14T09:30:00Z",
+            },
+        )
+        assert created.status_code == 201, created.text
+
+        response = client.get("/api/brain", headers=_auth_headers(token))
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert "visual activity only" in body["illustrative_motion_notice"]
+        task_node = next(node for node in body["nodes"] if node["node_id"] == f"task:{created.json()['task_id']}")
+        assert task_node["label"] == "Map the runtime"
+        assert any(node["node_id"] == f"schedule:{created.json()['task_id']}" for node in body["nodes"])
+        assert any(edge["target"] == task_node["node_id"] and edge["relationship"] == "tracks" for edge in body["edges"])
 
     def test_task_create_rejects_blank_title(self, client: TestClient) -> None:
         response = client.post(
@@ -229,6 +255,7 @@ class TestReadsDoNotMutate:
         # Pure list reads write nothing. (Diagnostics is excluded: it audits principal resolution,
         # the same governed behavior as the CLI — an audit log entry, not a state mutation.)
         client.get("/api/events", headers=_auth_headers(token))
+        client.get("/api/brain", headers=_auth_headers(token))
         client.get("/api/sessions", headers=_auth_headers(token))
         client.get("/api/models", headers=_auth_headers(token))
         assert store.count_events() == before

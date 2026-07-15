@@ -80,6 +80,19 @@ class TestMemoryList:
         assert m.valid_from == m.created_at
         assert m.pinned is False
 
+    def test_authenticated_memory_list_is_audited(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        _seed_memory(service.store, workspace)
+        assert service.list_memories(acting_principal_id=OWNER)
+        with service.store.connect() as connection:
+            row = connection.execute(
+                "SELECT actor_id, details_json FROM memory_lifecycle_audit "
+                "WHERE memory_id = 'workspace_memory_control' AND action = 'admin_access'"
+            ).fetchone()
+        assert row["actor_id"] == OWNER
+        assert '"operation": "list"' in row["details_json"]
+
     def test_list_can_filter_by_scope(self, service: DashboardService, workspace: Path) -> None:
         _seed_memory(service.store, workspace, scope="project:alpha")
         _seed_memory(service.store, workspace, text="other", scope="project:beta")

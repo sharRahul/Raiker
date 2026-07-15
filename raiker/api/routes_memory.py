@@ -39,10 +39,12 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
 async def list_memories(
     request: Request,
     scope: str | None = None,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
     """List approved memories with governance metadata + pin state."""
-    return serialize_dto(_service(request).list_memories(scope=scope))
+    return serialize_dto(
+        _service(request).list_memories(scope=scope, acting_principal_id=auth_data[0].principal_id)
+    )
 
 
 @router.put("/api/memory/{memory_id}/pin")

@@ -736,7 +736,9 @@ class DashboardService:
     # No second memory system is created; these read/control the same store
     # the memory_write/memory_forget tools already use.
 
-    def list_memories(self, scope: str | None = None) -> list[MemoryControlView]:
+    def list_memories(
+        self, scope: str | None = None, *, acting_principal_id: str | None = None
+    ) -> list[MemoryControlView]:
         """List approved memories with their governance metadata + pin state."""
         pinned_ids = self.store.list_pinned_memory_ids()
         entries = list_memory(
@@ -746,7 +748,7 @@ class DashboardService:
             store=self.store,
             include_search_disabled=True,
         )
-        return [
+        views = [
             MemoryControlView(
                 memory_id=e.memory_id,
                 text=e.text,
@@ -774,6 +776,12 @@ class DashboardService:
             )
             for e in entries
         ]
+        if acting_principal_id:
+            self.store.record_memory_lifecycle_event(
+                "workspace_memory_control", "admin_access", acting_principal_id,
+                {"operation": "list", "scope": scope, "memory_count": len(views)},
+            )
+        return views
 
     def set_memory_pinned(
         self, memory_id: str, pinned: bool, acting_principal_id: str | None

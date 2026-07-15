@@ -105,7 +105,7 @@ fail-closed by design.
   and live quality/latency/cost thresholds; provider-backed runtime retrieval,
   entity extraction/review, and runtime hybrid integration; same-device
   multi-user principal/workspace isolation; user-controlled NAS/mounted-drive/
-  cloud backup destinations and recovery; real encrypted
+  NAS backup first, with mounted-drive/cloud destinations optional; real encrypted
   backup and restore/erasure drills; monitoring, daemon/worker operation, load/soak/chaos
   evidence; and independent security, privacy, and pilot/benchmark evidence.
 - The next memory program is staged in `HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`

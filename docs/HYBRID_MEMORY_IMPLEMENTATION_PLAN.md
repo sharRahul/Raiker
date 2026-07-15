@@ -238,13 +238,14 @@ criterion; later stages do not weaken the completed safety rules.
 
 ### Deployment scope
 
-Raiker is a self-hosted, multi-user application for a single personal device
-or user-owned AI host: laptops, desktops, Macs, local AI devices, and optional
-home NAS hardware. Each local user has a separate principal and workspace; it
-is not a shared enterprise service or a hosted SaaS. Long-term backup is
-opt-in: users may keep it local or select a NAS, mounted drive, or supported
-cloud-storage provider. Raiker must encrypt and verify those backups, expose
-their retention/deletion disposition, and never silently upload a workspace.
+Raiker is a self-hosted, multi-user application for one user-owned host: a
+home-lab machine, Mac mini, Mac Studio, NVIDIA GB10-class AI device, laptop,
+desktop, or comparable local AI hardware. Each local user has a separate
+principal and workspace; it is not a shared enterprise service or a hosted
+SaaS. Long-term backup is opt-in, with a user-owned NAS as the primary target;
+mounted drives and supported cloud-storage providers are optional alternatives.
+Raiker must encrypt and verify those backups, expose their retention/deletion
+disposition, and never silently upload a workspace.
 
 ### Stage F — retrieval authority and measured quality
 
@@ -334,8 +335,8 @@ destinations remain pending.
    per-workspace data key. Define local device-owner/user recovery, key
    rotation, revocation, and access rules without requiring hosted enterprise
    KMS or SaaS accounts.
-3. Add opt-in NAS, mounted-drive, and cloud-provider backup adapters. The
-   catalog must record encrypted snapshots, destination, retention/hold
+3. Add an opt-in NAS backup adapter first, then mounted-drive and cloud-provider
+   adapters. The catalog must record encrypted snapshots, destination, retention/hold
    deadlines, restore tests, erasure requests, deletion completion, and every
    backup still pending expiry or erasure.
 4. Add immutable lifecycle audit records for recall, correction, export,

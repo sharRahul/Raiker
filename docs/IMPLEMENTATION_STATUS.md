@@ -126,21 +126,23 @@ fail-closed by design.
 > Tests: `tests/test_phase_6_reminder_runtime.py` (+7). Validators:
 > ruff, mypy, pytest (1687) all green.
 >
-> Current truth update (2026-07-14): reliable memory controls have landed
-> their first slice (backlog item 3) — a user-visible Memory view over the
+> Current truth update (2026-07-15): reliable memory controls are complete for
+> the current backlog item 3 slice — a user-visible Memory view over the
 > EXISTING governed memory store. No second memory system is created.
-> `DashboardService.list_memories` / `set_memory_pinned` /
-> `forget_memory_controlled` / `get_memory_settings` / `set_memory_incognito`
-> are human-only and reuse the existing governed memory store. API:
-> `GET /api/memory`, `PUT /api/memory/{id}/pin`, `DELETE /api/memory/{id}`,
+> `DashboardService` exposes list, edit, pin, governed forget, per-memory search
+> participation, expiry set/clear, import/export, settings, and incognito. API:
+> `GET /api/memory`, `PUT /api/memory/{id}`,
+> `PUT /api/memory/{id}/pin`, `PUT /api/memory/{id}/search`,
+> `PUT /api/memory/{id}/expiry`, `DELETE /api/memory/{id}`,
+> `GET /api/memory/export`, `POST /api/memory/import`,
 > `GET /api/memory/settings`, `PUT /api/memory/incognito`. Storage:
 > `memory_pins` (organizing label, grants nothing) + `memory_settings`
 > (single-row incognito flag) tables. The context gatherer reads the
 > incognito flag and, when it is on, withholds approved project memory from
 > the turn context (the memory is not deleted — only excluded from the
-> model's view). Web: a `MemoryView` (list + pin + forget + incognito
-> toggle) wired into the nav. Tests: `tests/test_memory_controls.py` (12),
-> `MemoryView.test.ts` (4). This is a controls slice — no new capability,
+> model's view). Web: `MemoryView` now supports list/edit/pin/forget/search
+> toggle/expiry/import/export/incognito. Tests: `tests/test_memory_controls.py`,
+> `tests/test_api_contract_schemas.py`, `MemoryView.test.ts`. This is a controls slice — no new capability,
 > gate, policy, or executor is added.
 >
 > Tool policy defect fix (2026-07-14): `connector_read` and
@@ -404,38 +406,23 @@ file:line citations. Gaps and doc contradictions are recorded honestly.
   (`apps/web/src/lib/views/ChatView.svelte:261-304`); live per-event timeline
   not replayed for restored turns.
 
-### Item 3 — Reliable memory controls — ⚠️ FIRST SLICE
+### Item 3 — Reliable memory controls — ✅ CURRENT SLICE COMPLETE
 
-- ✅ List: `GET /api/memory` (`raiker/api/routes_memory.py:36-43`,
-  `raiker/control/dashboard.py:662-684`).
-- ✅ Pin: `PUT /api/memory/{id}/pin`
-  (`raiker/api/routes_memory.py:46-63`,
-  `raiker/control/dashboard.py:686-696`,
-  `raiker/storage/sqlite.py:954-970`).
-- ✅ Delete (governed): `DELETE /api/memory/{id}`
-  (`raiker/api/routes_memory.py:66-81`,
-  `raiker/control/dashboard.py:698-729`); reuses
-  `raiker.memory.store.forget_memory` (no second memory system).
-- ✅ Scope (read filter): `list_memories(scope=...)`
-  (`raiker/api/routes_memory.py:39`). No per-memory scope re-assignment.
-- ✅ Provenance (read-only): `MemoryControlView.provenance`
-  (`raiker/control/dashboard.py:102-153`).
-- ✅ Incognito boundary: `PUT /api/memory/incognito`
-  (`raiker/api/routes_memory.py:92-112`,
-  `raiker/control/dashboard.py:734-749`,
-  `raiker/storage/sqlite.py:972-989`); enforced in gatherer
-  (`raiker/context/gatherer.py:152-157`).
-- ❌ **Edit:** MISSING. No `PUT /api/memory/{id}` text-edit endpoint; no
-  `update_memory`/`edit_memory` symbol exists. No edit affordance in
-  `MemoryView.svelte`.
-- ❌ **Expiry controls:** MISSING. `retention` is displayed read-only
-  (`MemoryControlView.retention`); no user control to set/extend/clear.
-- ❌ **Import/export:** MISSING. No `memory_export`/`memory_import` symbols.
-  Project-only export explicitly excludes memory.
-- ❌ **Search-participation controls:** MISSING. `memory_search`
-  (`raiker/tools/memory_tools.py:45-77`) searches every memory unconditionally;
-  no per-memory "include in search" flag. The only opt-out is global incognito
-  (affects context gathering, not search).
+- ✅ List/scope/provenance/pin/delete/incognito reuse the existing governed
+  markdown memory store; no second memory system was added.
+- ✅ Edit is wired through `PUT /api/memory/{id}`,
+  `DashboardService.edit_memory_controlled`, and `raiker.memory.store.update_memory`.
+- ✅ Expiry set/clear is wired through `PUT /api/memory/{id}/expiry` and the
+  stored `expires_at` metadata; expired memories are hidden from list/search/get
+  while still updateable for clearing expiry.
+- ✅ Import/export is wired through `GET /api/memory/export` and
+  `POST /api/memory/import`; imports write through the governed memory store.
+- ✅ Search participation is wired through `PUT /api/memory/{id}/search` and the
+  stored `search_enabled` metadata; `search_memory` skips disabled entries.
+- ✅ Web UI exposes edit, pin, forget, include-in-search, expiry, import/export,
+  and incognito controls in `MemoryView.svelte`.
+- ✅ Contract and regression coverage: `tests/test_memory_controls.py`,
+  `tests/test_api_contract_schemas.py`, and `MemoryView.test.ts`.
 
 ### Item 4 — Real reminders and routines — ⚠️ FIRST SLICE + DOC CONTRADICTION
 

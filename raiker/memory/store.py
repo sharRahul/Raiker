@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +29,8 @@ class MemoryEntry:
     created_by: str
     updated_at: str | None = None
     deleted_at: str | None = None
+    search_enabled: bool = True
+    expires_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -81,6 +83,8 @@ def _encode_frontmatter(entry: MemoryEntry) -> str:
         "created_by": entry.created_by,
         "updated_at": entry.updated_at,
         "deleted_at": entry.deleted_at,
+        "search_enabled": entry.search_enabled,
+        "expires_at": entry.expires_at,
     }
     return json.dumps(meta, sort_keys=True)
 
@@ -185,12 +189,14 @@ def search_memory(
             created_by=str(meta.get("created_by", "system")),
             updated_at=meta.get("updated_at"),
             deleted_at=meta.get("deleted_at"),
+            search_enabled=bool(meta.get("search_enabled", True)),
+            expires_at=meta.get("expires_at"),
         )
-        if entry.deleted_at is not None:
+        if entry.deleted_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
             continue
         if scope is not None and entry.scope != scope:
             continue
-        if query_lower in body.lower() or query_lower in str(meta.get("tags", [])):
+        if entry.search_enabled and (query_lower in body.lower() or query_lower in str(meta.get("tags", []))):
             results.append(entry)
     return results
 
@@ -298,8 +304,10 @@ def list_memory(
             created_by=str(meta.get("created_by", "system")),
             updated_at=meta.get("updated_at"),
             deleted_at=meta.get("deleted_at"),
+            search_enabled=bool(meta.get("search_enabled", True)),
+            expires_at=meta.get("expires_at"),
         )
-        if entry.deleted_at is not None:
+        if entry.deleted_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
             continue
         if scope is not None and entry.scope != scope:
             continue
@@ -311,6 +319,7 @@ def get_memory(
     memory_id: str,
     *,
     workspace_root: str | Path = ".",
+    include_expired: bool = False,
 ) -> MemoryEntry | None:
     mem_dir = _memory_dir(workspace_root)
     path = _entry_path(mem_dir, memory_id)
@@ -338,8 +347,12 @@ def get_memory(
             created_by=str(meta.get("created_by", "system")),
             updated_at=meta.get("updated_at"),
             deleted_at=meta.get("deleted_at"),
+            search_enabled=bool(meta.get("search_enabled", True)),
+            expires_at=meta.get("expires_at"),
         )
-        if entry.deleted_at is not None:
+        if entry.deleted_at is not None or (
+            not include_expired and entry.expires_at is not None and entry.expires_at <= utc_now()
+        ):
             return None
         return entry
     for p in mem_dir.glob("*.md"):
@@ -366,12 +379,38 @@ def get_memory(
                 approval_state=str(meta.get("approval_state", "approved")),
                 created_by=str(meta.get("created_by", "system")),
                 updated_at=meta.get("updated_at"),
-                deleted_at=meta.get("deleted_at"),
+            deleted_at=meta.get("deleted_at"),
+            search_enabled=bool(meta.get("search_enabled", True)),
+            expires_at=meta.get("expires_at"),
             )
-            if entry.deleted_at is not None:
+            if entry.deleted_at is not None or (
+                not include_expired and entry.expires_at is not None and entry.expires_at <= utc_now()
+            ):
                 return None
             return entry
     return None
+
+
+def update_memory(
+    memory_id: str, *, workspace_root: str | Path = ".", text: str | None = None,
+    search_enabled: bool | None = None, expires_at: str | None = None,
+    update_expires_at: bool = False,
+) -> MemoryEntry | None:
+    entry = get_memory(memory_id, workspace_root=workspace_root, include_expired=True)
+    if entry is None:
+        return None
+    updated = replace(
+        entry,
+        text=entry.text if text is None else text,
+        sensitivity=entry.sensitivity if text is None else classify_memory_sensitivity(text).value,
+        search_enabled=entry.search_enabled if search_enabled is None else search_enabled,
+        expires_at=expires_at if update_expires_at else entry.expires_at,
+        updated_at=utc_now(),
+    )
+    _entry_path(_memory_dir(workspace_root), memory_id).write_text(
+        _encode_frontmatter(updated) + "\n" + updated.text, encoding="utf-8"
+    )
+    return updated
 
 
 def memory_status(*, workspace_root: str | Path = ".") -> dict[str, object]:

@@ -328,6 +328,38 @@ export const api = {
         body: JSON.stringify({ pinned }),
       },
     ),
+  editMemory: (id: string, text: string) =>
+    request<{ ok: boolean; memory_id: string }>(`/api/memory/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }),
+  setMemorySearchEnabled: (id: string, enabled: boolean) =>
+    request<{ ok: boolean; memory_id: string; search_enabled: boolean }>(
+      `/api/memory/${encodeURIComponent(id)}/search`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      },
+    ),
+  setMemoryExpiry: (id: string, expiresAt: string | null) =>
+    request<{ ok: boolean; memory_id: string; expires_at: string | null }>(
+      `/api/memory/${encodeURIComponent(id)}/expiry`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ expires_at: expiresAt }),
+      },
+    ),
+  exportMemories: () =>
+    request<{ ok: boolean; memories: MemoryControlView[] }>("/api/memory/export"),
+  importMemories: (memories: Array<Partial<MemoryControlView> & { text: string }>) =>
+    request<{ ok: boolean; count: number }>("/api/memory/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memories }),
+    }),
   forgetMemory: (id: string) =>
     request<{ ok: boolean; memory_id: string }>(
       `/api/memory/${encodeURIComponent(id)}`,

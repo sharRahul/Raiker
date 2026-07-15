@@ -30,6 +30,8 @@ describe("MemoryView", () => {
           retention: "until_forget",
           approval_state: "approved",
           pinned: false,
+          search_enabled: true,
+          expires_at: null,
         },
       ],
       "GET /api/memory/settings": { incognito: false },
@@ -97,6 +99,8 @@ describe("MemoryView", () => {
           retention: "until_forget",
           approval_state: "approved",
           pinned: false,
+          search_enabled: true,
+          expires_at: null,
         },
       ],
       "GET /api/memory/settings": { incognito: false },
@@ -121,6 +125,81 @@ describe("MemoryView", () => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/memory/mem_1",
         expect.objectContaining({ method: "DELETE" }),
+      ),
+    );
+  });
+
+  it("edits search participation expiry import and export controls", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/memory": [
+        {
+          memory_id: "mem_1",
+          text: "remember this",
+          scope: "project:alpha",
+          sensitivity: "normal",
+          memory_type: "project",
+          created_at: "2026-07-12T00:00:00Z",
+          tags: [],
+          source: "agent",
+          provenance: {},
+          confidence: 0.5,
+          trust_score: 0.5,
+          retention: "until_forget",
+          approval_state: "approved",
+          pinned: false,
+          search_enabled: true,
+          expires_at: null,
+        },
+      ],
+      "GET /api/memory/settings": { incognito: false },
+      "PUT /api/memory/mem_1": { ok: true, memory_id: "mem_1" },
+      "PUT /api/memory/mem_1/search": { ok: true, memory_id: "mem_1", search_enabled: false },
+      "PUT /api/memory/mem_1/expiry": { ok: true, memory_id: "mem_1", expires_at: "2030-01-01T00:00:00Z" },
+      "GET /api/memory/export": { ok: true, memories: [{ text: "remember this" }] },
+      "POST /api/memory/import": { ok: true, count: 1 },
+    });
+    render(MemoryView);
+
+    await waitFor(() => expect(screen.getByText("remember this")).toBeInTheDocument());
+
+    await fireEvent.click(screen.getByRole("button", { name: /edit memory/i }));
+    await fireEvent.input(screen.getByLabelText(/memory text/i), { target: { value: "updated" } });
+    await fireEvent.click(screen.getByRole("button", { name: /^save memory$/i }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/memory/mem_1",
+        expect.objectContaining({ method: "PUT", body: JSON.stringify({ text: "updated" }) }),
+      ),
+    );
+
+    await fireEvent.click(screen.getByRole("checkbox", { name: /include memory in search/i }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/memory/mem_1/search",
+        expect.objectContaining({ method: "PUT", body: JSON.stringify({ enabled: false }) }),
+      ),
+    );
+
+    await fireEvent.input(screen.getByLabelText(/^memory expiry$/i), { target: { value: "2030-01-01T00:00" } });
+    await fireEvent.click(screen.getByRole("button", { name: /save memory expiry/i }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/memory/mem_1/expiry",
+        expect.objectContaining({ method: "PUT", body: JSON.stringify({ expires_at: "2030-01-01T00:00:00Z" }) }),
+      ),
+    );
+
+    await fireEvent.click(screen.getByRole("button", { name: /export memories/i }));
+    await waitFor(() =>
+      expect((screen.getByLabelText(/memory export json/i) as HTMLTextAreaElement).value).toContain("remember this"),
+    );
+
+    await fireEvent.input(screen.getByLabelText(/memory import json/i), { target: { value: '[{"text":"Imported memory"}]' } });
+    await fireEvent.click(screen.getByRole("button", { name: /import memories/i }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/memory/import",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ memories: [{ text: "Imported memory" }] }) }),
       ),
     );
   });

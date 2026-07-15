@@ -425,6 +425,8 @@ export interface MemoryControlView {
   retention: string;
   approval_state: string;
   pinned: boolean;
+  search_enabled: boolean;
+  expires_at: string | null;
 }
 
 export interface MemorySettingsView {

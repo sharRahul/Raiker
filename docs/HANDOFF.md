@@ -59,12 +59,13 @@ fail-closed by design.
   (18), `tests/test_projects.py` (+4 API), `test_api_contract_schemas.py`
   guards `ProjectView` nesting fields. Project-only export has landed; its
   bounded scope is recorded below.
-- Reliable memory controls have landed their first slice (backlog item 3): a
+- Reliable memory controls are complete for the current backlog item 3 slice: a
   user-visible Memory view over the EXISTING governed memory store — list
-  with provenance, scope, sensitivity, confidence, retention; pin/bookmark;
-  forget through the governed path (human-only); and an incognito opt-out
-  boundary that withholds approved project memory from the turn context when
-  on (the memory is not deleted). No second memory system is created.
+  with provenance, scope, sensitivity, confidence, retention; edit; pin/bookmark;
+  forget through the governed path (human-only); per-memory search participation;
+  expiry set/clear; import/export; and an incognito opt-out boundary that
+  withholds approved project memory from the turn context when on (the memory is
+  not deleted). No second memory system is created.
 - Tool execution defects fixed: `connector_read` was denied by policy
   (unknown_or_denied_tool) despite having a real executor — now routed as
   read-shaped like `github_read`; `connector_write` was denied — now routed
@@ -182,11 +183,12 @@ contradictions are recorded honestly. File:line citations are in
      validates every selected visible session before one transactional cascade,
      so invalid or unauthorized selections delete none.
 
-3. **Reliable memory controls** — ⚠️ FIRST SLICE
+3. **Reliable memory controls** — ✅ CURRENT SLICE COMPLETE
    - ✅ List, pin, delete (governed), scope filter, provenance display, incognito
      boundary, store reuse.
-   - ❌ **Missing (zero code): edit, expiry controls, import/export,
-     per-memory search-participation controls.**
+   - ✅ Edit, expiry set/clear, import/export, and per-memory
+     search-participation controls are wired through store, service, API, web UI,
+     and tests.
 
 4. **Real reminders and routines** — ⚠️ FIRST SLICE + DOC CONTRADICTION
    - ✅ Create/list/deliver_due/pause/cancel/retry with `delivery_status`,
@@ -325,12 +327,10 @@ path, with bootstrap-owner enabling the admin mutation capability gates. Remaini
 work for item 7: short-lived scoped credentials, per-tool grants, and a
 user-facing access review surface.
 
-The code-verified audit above shows that none of items 1-7 are fully complete.
-The clearest gaps are:
-- Item 1: chat move in/out, project-scoped schedules, ancestor-context on the
-  live gatherer path.
-- Item 3: edit, expiry, import/export, search-participation controls.
-- Item 5: wire `create_comment()` into a runtime executor dispatch.
+The code-verified audit above shows that remaining gaps from items 1-7 are now
+concentrated in:
+- Item 4: local scheduler daemon, real delivery failure/retry behavior, persisted
+  `max_retries`, and stale reminder docs.
 - Item 6: user feedback, cost model, record/replay, OTel export, trace redaction.
 - Item 7: scoped credentials, per-tool grants, access review.
 

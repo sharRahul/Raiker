@@ -14,7 +14,7 @@ from raiker.api.app import create_app
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.context.gatherer import ContextGatherer
 from raiker.control.dashboard import DashboardService
-from raiker.memory.store import MemoryGovernance, write_memory
+from raiker.memory.store import MemoryGovernance, get_memory, search_memory, write_memory
 from raiker.storage.sqlite import SQLiteStore
 
 OWNER = "principal_rahul"
@@ -144,6 +144,39 @@ class TestMemoryForget:
         assert result.reason_code == "not_authorized_human"
 
 
+class TestMemoryEditAndSearchParticipation:
+    def test_human_can_edit_a_memory_and_exclude_it_from_search(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        mid = _seed_memory(service.store, workspace, text="Use tabs.")
+
+        edited = service.edit_memory_controlled(mid, "Use spaces.", OWNER)
+        assert edited.ok
+        stored = get_memory(mid, workspace_root=workspace)
+        assert stored is not None
+        assert stored.text == "Use spaces."
+
+        assert service.set_memory_search_enabled(mid, False, OWNER).ok
+        assert search_memory("spaces", workspace_root=workspace) == []
+
+    def test_expiry_hides_memory_and_export_import_round_trips(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        mid = _seed_memory(service.store, workspace, text="Portable memory")
+        assert service.set_memory_expiry(mid, "2000-01-01T00:00:00Z", OWNER).ok
+        assert service.list_memories() == []
+        assert service.set_memory_expiry(mid, None, OWNER).ok
+        assert [m.text for m in service.list_memories()] == ["Portable memory"]
+        assert service.set_memory_expiry(mid, "2000-01-01T00:00:00Z", OWNER).ok
+        exported = service.export_memories(OWNER)
+        assert exported.ok and exported.data["memories"] == []
+        imported = service.import_memories(
+            [{"text": "Imported memory", "scope": "project:proj_alpha"}], OWNER
+        )
+        assert imported.ok
+        assert [m.text for m in service.list_memories()] == ["Imported memory"]
+
+
 class TestIncognitoBoundary:
     def test_incognito_round_trips(self, service: DashboardService) -> None:
         assert service.get_memory_settings().incognito is False
@@ -228,3 +261,41 @@ class TestMemoryApi:
         resp = client.put("/api/memory/incognito", json={"incognito": True}, headers=headers)
         assert resp.status_code == 200
         assert client.get("/api/memory/settings", headers=headers).json()["incognito"] is True
+
+    def test_edit_and_search_participation_routes(self, client: TestClient, workspace: Path) -> None:
+        headers = self._headers(client)
+        mid = _seed_memory(SQLiteStore(workspace), workspace, text="Use tabs.")
+        edited = client.put(f"/api/memory/{mid}", json={"text": "Use spaces."}, headers=headers)
+        assert edited.status_code == 200, edited.text
+        hidden = client.put(f"/api/memory/{mid}/search", json={"enabled": False}, headers=headers)
+        assert hidden.status_code == 200, hidden.text
+        listed = client.get("/api/memory", headers=headers).json()
+        assert listed[0]["text"] == "Use spaces."
+        assert listed[0]["search_enabled"] is False
+        assert listed[0]["expires_at"] is None
+
+    def test_expiry_export_and_import_routes(self, client: TestClient, workspace: Path) -> None:
+        headers = self._headers(client)
+        mid = _seed_memory(SQLiteStore(workspace), workspace, text="Portable memory")
+
+        expired = client.put(
+            f"/api/memory/{mid}/expiry",
+            json={"expires_at": "2000-01-01T00:00:00Z"},
+            headers=headers,
+        )
+        assert expired.status_code == 200, expired.text
+        assert client.get("/api/memory", headers=headers).json() == []
+
+        cleared = client.put(f"/api/memory/{mid}/expiry", json={"expires_at": None}, headers=headers)
+        assert cleared.status_code == 200, cleared.text
+        exported = client.get("/api/memory/export", headers=headers)
+        assert exported.status_code == 200, exported.text
+        assert exported.json()["memories"][0]["text"] == "Portable memory"
+
+        imported = client.post(
+            "/api/memory/import",
+            json={"memories": [{"text": "Imported memory", "scope": "project:proj_alpha"}]},
+            headers=headers,
+        )
+        assert imported.status_code == 200, imported.text
+        assert imported.json()["count"] == 1

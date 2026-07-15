@@ -127,6 +127,8 @@ class MemoryControlView:
     retention: str
     approval_state: str
     pinned: bool
+    search_enabled: bool = True
+    expires_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -144,6 +146,8 @@ class MemoryControlView:
             "retention": self.retention,
             "approval_state": self.approval_state,
             "pinned": self.pinned,
+            "search_enabled": self.search_enabled,
+            "expires_at": self.expires_at,
         }
 
 
@@ -738,6 +742,8 @@ class DashboardService:
                 retention=e.retention,
                 approval_state=e.approval_state,
                 pinned=e.memory_id in pinned_ids,
+                search_enabled=e.search_enabled,
+                expires_at=e.expires_at,
             )
             for e in entries
         ]
@@ -786,6 +792,99 @@ class DashboardService:
         if not ok:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
         return ControlResult(ok=True, data={"memory_id": memory_id})
+
+    def edit_memory_controlled(self, memory_id: str, text: str, acting_principal_id: str | None) -> ControlResult:
+        return self._update_memory_controlled(
+            memory_id, text=text, search_enabled=None, acting_principal_id=acting_principal_id
+        )
+
+    def set_memory_search_enabled(self, memory_id: str, search_enabled: bool, acting_principal_id: str | None) -> ControlResult:
+        return self._update_memory_controlled(
+            memory_id, text=None, search_enabled=search_enabled, acting_principal_id=acting_principal_id
+        )
+
+    def set_memory_expiry(self, memory_id: str, expires_at: str | None, acting_principal_id: str | None) -> ControlResult:
+        return self._update_memory_controlled(
+            memory_id,
+            text=None,
+            search_enabled=None,
+            expires_at=expires_at,
+            update_expires_at=True,
+            acting_principal_id=acting_principal_id,
+        )
+
+    def export_memories(self, acting_principal_id: str | None) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        return ControlResult(ok=True, data={"memories": [m.to_dict() for m in self.list_memories()]})
+
+    def import_memories(self, memories: list[dict[str, Any]], acting_principal_id: str | None) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.store import MemoryGovernance, update_memory, write_memory
+        for item in memories:
+            text = str(item.get("text", "")).strip()
+            if not text:
+                return ControlResult(ok=False, reason_code="empty_memory_text")
+            entry = write_memory(
+                text,
+                workspace_root=self.workspace_root,
+                scope=str(item.get("scope", "project")),
+                store=self.store,
+                governance=MemoryGovernance(
+                    new_id("evt_"), "", None, "user_import", 1.0, 1.0,
+                    str(item.get("retention", "until_forget")), "approved", acting_principal_id or "",
+                ),
+            )
+            update_memory(
+                entry.memory_id,
+                workspace_root=self.workspace_root,
+                search_enabled=bool(item.get("search_enabled", True)),
+                expires_at=item.get("expires_at"),
+                update_expires_at="expires_at" in item,
+            )
+        return ControlResult(ok=True, data={"count": len(memories)})
+
+    def _is_human(self, acting_principal_id: str | None) -> bool:
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        return principal is not None and principal.principal_type == PrincipalType.HUMAN
+
+    def _update_memory_controlled(
+        self,
+        memory_id: str,
+        *,
+        text: str | None,
+        search_enabled: bool | None,
+        acting_principal_id: str | None,
+        expires_at: str | None = None,
+        update_expires_at: bool = False,
+    ) -> ControlResult:
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if text is not None and not text.strip():
+            return ControlResult(ok=False, reason_code="empty_memory_text")
+        from raiker.memory.store import update_memory
+        updated = update_memory(
+            memory_id,
+            workspace_root=self.workspace_root,
+            text=text,
+            search_enabled=search_enabled,
+            expires_at=expires_at,
+            update_expires_at=update_expires_at,
+        )
+        if updated is None:
+            return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        return ControlResult(
+            ok=True,
+            data={
+                "memory_id": memory_id,
+                "search_enabled": updated.search_enabled,
+                "expires_at": updated.expires_at,
+            },
+        )
 
     def get_memory_settings(self) -> MemorySettingsView:
         return MemorySettingsView(incognito=self.store.is_memory_incognito())

@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from raiker.api.app import create_app
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.models import ToolAction
+from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.storage.sqlite import SQLiteStore
 
 # Key sets transcribed from apps/web/src/lib/apiTypes.ts (required, client-read fields).
@@ -67,6 +68,11 @@ PROJECT_VIEW = {
     "parent_id", "path", "is_archived", "archived_at",
 }
 PROJECTS_LIST = {"projects", "active_project_id"}
+MEMORY_CONTROL = {
+    "memory_id", "text", "scope", "sensitivity", "memory_type", "created_at", "tags",
+    "source", "provenance", "confidence", "trust_score", "retention", "approval_state",
+    "pinned", "search_enabled", "expires_at",
+}
 
 
 @pytest.fixture
@@ -179,3 +185,15 @@ class TestListContracts:
         listing = client.get("/api/projects", headers=h).json()
         _assert_contract(PROJECTS_LIST, listing, "ProjectsList")
         _assert_contract(PROJECT_VIEW, listing["projects"][0], "ProjectView")
+
+    def test_memories(self, workspace: Path, client: TestClient) -> None:
+        write_memory(
+            "Remember this",
+            workspace_root=workspace,
+            store=SQLiteStore(workspace),
+            governance=MemoryGovernance(
+                "evt_c", "", None, "test", 1.0, 1.0, "until_forget", "approved", "principal_rahul"
+            ),
+        )
+        h = _headers(_token(client))
+        _assert_contract(MEMORY_CONTROL, client.get("/api/memory", headers=h).json()[0], "MemoryControlView")

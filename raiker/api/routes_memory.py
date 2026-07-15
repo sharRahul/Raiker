@@ -7,6 +7,7 @@ scope, sensitivity, confidence, retention, and a pin flag. Forget reuses the
 governed forget path (human-only). An incognito opt-out boundary withholds
 approved project memory from the turn context.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -52,9 +53,7 @@ async def set_memory_pinned(
 ) -> dict[str, Any]:
     """Pin (or unpin) a memory. Organizing label only — grants nothing."""
     pinned = bool(body.get("pinned", False))
-    result = _service(request).set_memory_pinned(
-        memory_id, pinned, auth_data[0].principal_id
-    )
+    result = _service(request).set_memory_pinned(memory_id, pinned, auth_data[0].principal_id)
     if not result.ok:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -63,16 +62,29 @@ async def set_memory_pinned(
     return {"ok": True, **result.data}
 
 
-@router.delete("/api/memory/{memory_id}")
-async def forget_memory(
-    memory_id: str,
+@router.get("/api/memory/export")
+async def export_memories(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    """Forget a memory through the governed path (human-only)."""
-    result = _service(request).forget_memory_controlled(
-        memory_id, auth_data[0].principal_id
-    )
+    result = _service(request).export_memories(auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/memory/import")
+async def import_memories(
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    raw_memories = body.get("memories", [])
+    memories = raw_memories if isinstance(raw_memories, list) else []
+    result = _service(request).import_memories(memories, auth_data[0].principal_id)
     if not result.ok:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -101,9 +113,77 @@ async def set_memory_incognito(
     turn context even if a project opted in. The memory is not deleted.
     """
     incognito = bool(body.get("incognito", False))
-    result = _service(request).set_memory_incognito(
-        incognito, auth_data[0].principal_id
+    result = _service(request).set_memory_incognito(incognito, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.delete("/api/memory/{memory_id}")
+async def forget_memory(
+    memory_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Forget a memory through the governed path (human-only)."""
+    result = _service(request).forget_memory_controlled(memory_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/memory/{memory_id}")
+async def edit_memory(
+    memory_id: str,
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).edit_memory_controlled(
+        memory_id, str(body.get("text", "")), auth_data[0].principal_id
     )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/memory/{memory_id}/search")
+async def set_memory_search_enabled(
+    memory_id: str,
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).set_memory_search_enabled(
+        memory_id, bool(body.get("enabled", True)), auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/memory/{memory_id}/expiry")
+async def set_memory_expiry(
+    memory_id: str,
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    raw_expires_at = body.get("expires_at")
+    expires_at = None if raw_expires_at in (None, "") else str(raw_expires_at)
+    result = _service(request).set_memory_expiry(memory_id, expires_at, auth_data[0].principal_id)
     if not result.ok:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

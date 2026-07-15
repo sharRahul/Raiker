@@ -73,3 +73,16 @@ def test_durable_memory_persists_a_content_checksum(tmp_path: Path) -> None:
             "SELECT content_checksum FROM approved_memory WHERE memory_id = ?", (memory.memory_id,)
         ).fetchone()
     assert row["content_checksum"] == "1d85c37471356f4373bd42b5f5ffaa6c27ee7b64ae946c005593359e907709e5"
+
+
+def test_integrity_reports_durable_memory_checksum_mismatch(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    memory = write_memory(
+        "Checksummed fact.", workspace_root=tmp_path, store=store,
+        governance=MemoryGovernance("evt", "sess", None, "test", 1, 1, "until_forget", "approved", "test"),
+    )
+    with store.connect() as connection:
+        connection.execute("UPDATE approved_memory SET text = ? WHERE memory_id = ?", ("Tampered.", memory.memory_id))
+    report = inspect_memory_integrity(store=store, workspace_root=tmp_path)
+    assert report.checksum_mismatch_count == 1
+    assert not report.clean

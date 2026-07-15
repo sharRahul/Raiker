@@ -1,6 +1,7 @@
 """Owner-started, read-only integrity checks for the hybrid memory store."""
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,10 +17,17 @@ class MemoryIntegrityReport:
     missing_markdown_count: int
     stale_projection_count: int
     stale_graph_edge_count: int
+    checksum_mismatch_count: int
 
     @property
     def clean(self) -> bool:
-        return not any((self.stale_fts_count, self.missing_markdown_count, self.stale_projection_count, self.stale_graph_edge_count))
+        return not any((
+            self.stale_fts_count,
+            self.missing_markdown_count,
+            self.stale_projection_count,
+            self.stale_graph_edge_count,
+            self.checksum_mismatch_count,
+        ))
 
 
 def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) -> MemoryIntegrityReport:
@@ -46,7 +54,21 @@ def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) 
             AND (m.valid_from IS NULL OR m.valid_from <= ?)
             AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL)""", (now, now, now)
         ).fetchone()[0])
-        rows = connection.execute("SELECT memory_id FROM approved_memory WHERE deleted_at IS NULL").fetchall()
+        rows = connection.execute(
+            "SELECT memory_id, text, content_checksum FROM approved_memory WHERE deleted_at IS NULL"
+        ).fetchall()
     memory_dir = Path(workspace_root).resolve() / ".raiker" / "memory"
     missing_markdown_count = sum(not (memory_dir / f"{row['memory_id']}.md").exists() for row in rows)
-    return MemoryIntegrityReport(active_memory_count, fts_count, abs(active_memory_count - fts_count), missing_markdown_count, stale_projection_count, stale_graph_edge_count)
+    checksum_mismatch_count = sum(
+        str(row["content_checksum"] or "") != hashlib.sha256(str(row["text"]).encode()).hexdigest()
+        for row in rows
+    )
+    return MemoryIntegrityReport(
+        active_memory_count,
+        fts_count,
+        abs(active_memory_count - fts_count),
+        missing_markdown_count,
+        stale_projection_count,
+        stale_graph_edge_count,
+        checksum_mismatch_count,
+    )

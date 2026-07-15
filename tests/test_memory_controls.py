@@ -156,6 +156,21 @@ class TestMemoryForget:
         assert service.purge_memory(mid, mid, OWNER).ok
         assert service.list_memories() == []
 
+    def test_owner_can_reconcile_memory_indexes(self, service: DashboardService, workspace: Path) -> None:
+        _seed_memory(service.store, workspace)
+        result = service.reconcile_memory_indexes(OWNER)
+        assert result.ok and result.data["projection_rows_reconciled"] >= 0
+
+    def test_eidetic_cleanup_is_human_and_preview_bound(self, service: DashboardService) -> None:
+        from raiker.memory.eidetic import record_observation
+
+        observation = record_observation(
+            store=service.store, source_event_id="evt_1", session_id="sess_1",
+            summary="temporary", content="temporary", retention="turn_only"
+        )
+        assert not service.cleanup_expired_observations({observation.observation_id}, "2100-01-01T00:00:00Z", "principal_missing").ok
+        assert service.cleanup_expired_observations({observation.observation_id}, "2100-01-01T00:00:00Z", OWNER).ok
+
 
 class TestMemoryEditAndSearchParticipation:
     def test_human_can_edit_a_memory_and_exclude_it_from_search(

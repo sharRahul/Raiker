@@ -1356,3 +1356,13 @@ CREATE TABLE IF NOT EXISTS memory_projections (
 );
 CREATE INDEX IF NOT EXISTS idx_memory_projections_active ON memory_projections(projection_type, projection_id) WHERE active = 1;
 """
+
+MEMORY_FTS_MIGRATION_ID = "RAIKER-2008-memory-fts"
+MEMORY_FTS_SQL = """
+CREATE VIRTUAL TABLE IF NOT EXISTS approved_memory_fts USING fts5(
+  memory_id UNINDEXED, text, tags
+);
+INSERT INTO approved_memory_fts(memory_id, text, tags)
+SELECT memory_id, text, tags_json FROM approved_memory
+WHERE deleted_at IS NULL AND archived_at IS NULL;
+"""

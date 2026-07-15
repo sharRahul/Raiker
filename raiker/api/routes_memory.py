@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.runtime.authority.models import Principal
 
@@ -90,6 +91,31 @@ async def import_memories(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"ok": False, "reason_code": result.reason_code},
         )
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/memory/reconcile")
+async def reconcile_memory_indexes(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """Owner-started reconciliation for FTS and projection lifecycle state."""
+    result = _service(request).reconcile_memory_indexes(auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/memory/eidetic/cleanup")
+async def cleanup_expired_observations(
+    request: Request, body: dict[str, Any], auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    raw_ids = body.get("observation_ids", [])
+    observation_ids = {str(item) for item in raw_ids} if isinstance(raw_ids, list) else set()
+    result = _service(request).cleanup_expired_observations(
+        observation_ids, str(body.get("now", utc_now())), auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"ok": False, "reason_code": result.reason_code})
     return {"ok": True, **result.data}
 
 

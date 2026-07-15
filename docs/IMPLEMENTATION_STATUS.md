@@ -126,6 +126,16 @@ fail-closed by design.
 > Tests: `tests/test_phase_6_reminder_runtime.py` (+7). Validators:
 > ruff, mypy, pytest (1687) all green.
 >
+> Current truth update (2026-07-15): the hybrid-memory implementation plan is
+> complete for the local SQLite deployment. It now has active-only SQLite FTS,
+> source-versioned lifecycle mappings for `fts`/`vector`/`graph` projections,
+> owner-started reconciliation, review-only gist records, and exact-ID
+> owner-confirmed eidetic cleanup. Archive, restore, forget, and purge update
+> retrieval eligibility; purge records completed local locations and retained
+> backup disposition. Vector/graph writes remain existing capability-gated
+> adapters—there is no autonomous raw capture, cleanup worker, or model purge
+> tool.
+
 > Current truth update (2026-07-15): reliable memory controls are complete for
 > the current backlog item 3 slice — a user-visible Memory view over the
 > EXISTING governed memory store. No second memory system is created.

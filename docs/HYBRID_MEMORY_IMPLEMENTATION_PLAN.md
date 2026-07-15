@@ -7,14 +7,12 @@ memory system. It is intentionally incremental: existing governed memory,
 SQLite event storage, project context, and capability gates remain the source
 of truth until each phase below is implemented and verified.
 
-The completed foundation is limited to safe project-tree correction:
-
-- self-inclusive materialized project paths (`/root/child/`);
-- transactional subtree move/archive updates;
-- tri-state inherited project-memory mode (`inherit`, `enabled`, `disabled`).
-
-No raw-observation worker, automatic durable-memory promotion, graph write, or
-unattended cleanup is enabled by this plan.
+All five phases below are implemented for the local SQLite deployment and
+verified by focused lifecycle tests. The deliberate boundary remains: no
+raw-content capture worker, automatic durable-memory promotion, unattended
+cleanup, external graph service, or vector/HNSW deployment. Existing gated
+vector/graph runtimes can register source-versioned projections while SQLite
+remains authoritative and filters every recalled source record.
 
 ## Product rules
 
@@ -120,6 +118,10 @@ deny. Retrieval never treats memory as system or user instruction.
 
 ### Phase A — hierarchy and context correctness
 
+**Complete.** Self-inclusive paths, parent/path validation, deterministic
+nearest-ancestor context merge, subtree isolation, and archive/restore tests
+are in place.
+
 - Migrate legacy paths to self-inclusive paths and validate parent/path parity.
 - Add tri-state memory inheritance with backward-compatible Boolean input.
 - Add archive/restore visibility and test sibling/subtree isolation.
@@ -127,6 +129,10 @@ deny. Retrieval never treats memory as system or user instruction.
   active explicit context setting is deterministic.
 
 ### Phase B — durable-memory lifecycle normalization
+
+**Complete.** SQLite is the retrieval authority; Markdown is the readable
+export/cache. Archive/restore, tombstones, human-confirmed purge preview and
+disposition records are implemented. The model has no purge executor.
 
 - Consolidate approved-memory metadata into SQLite as the retrieval authority;
   Markdown remains a human-readable export/cache, not a competing store.
@@ -136,6 +142,11 @@ deny. Retrieval never treats memory as system or user instruction.
   no agent-triggered hard delete path exists.
 
 ### Phase C — eidetic observations and gists
+
+**Complete.** Eidetic records store only checksum/provenance/retention and an
+optional artifact reference. Gists remain `pending_review`; owner-confirmed
+expiry cleanup accepts only IDs returned by the preview and never touches a
+durable memory.
 
 - Persist raw observation metadata with immutable artifact refs, checksum,
   provenance, sensitivity, and retention class.
@@ -147,6 +158,12 @@ deny. Retrieval never treats memory as system or user instruction.
 
 ### Phase D — retrieval indexes and graph projection
 
+**Complete.** SQLite FTS indexes only active durable records. Source-versioned
+`fts`, `vector`, and `graph` projection mappings are lifecycle-aware; archive,
+restore, forget, and purge update eligibility. Owner-started reconciliation
+repairs mappings and rebuilds FTS. Actual vector/graph creation remains behind
+the existing capability gates.
+
 - Add SQLite FTS synchronization for active durable-memory records.
 - Add vector and graph projections behind existing capability gates.
 - Record projection source/version so archive, forget, correction, and purge
@@ -155,6 +172,11 @@ deny. Retrieval never treats memory as system or user instruction.
   authorized source records and disclose provenance.
 
 ### Phase E — purge, backup disposition, and operations
+
+**Complete.** Exact-ID human confirmation performs the purge and records both
+completed locations and the retained-backup notice. Owner-started export,
+import, and reconciliation are available; no cleanup/reconciliation daemon is
+enabled.
 
 - Implement the human-confirmed purge executor and dependency completion log.
 - Define backup retention/disposition reporting; do not claim immediate backup

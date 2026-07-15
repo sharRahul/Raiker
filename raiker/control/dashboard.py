@@ -823,8 +823,11 @@ class DashboardService:
         from raiker.contracts.ids import utc_now
         path = self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md"
         path.unlink(missing_ok=True)
+        projections = self.store.list_memory_projections(memory_id)
+        self.store.deactivate_memory_projections(memory_id)
         self.store.delete_approved_memory(memory_id)
-        self.store.create_memory_purge_record(new_id("mem_"), memory_id, acting_principal_id or "", utc_now(), preview.data)
+        disposition = {**preview.data, "projections": projections, "completed_storage_locations": ["markdown_export", "sqlite_approved_memory", "sqlite_fts", "projection_mappings"]}
+        self.store.create_memory_purge_record(new_id("pur_"), memory_id, acting_principal_id or "", utc_now(), disposition)
         return ControlResult(ok=True, data={"memory_id": memory_id, "purged": True, "backup_disposition": preview.data["backup_disposition"]})
 
     def edit_memory_controlled(self, memory_id: str, text: str, acting_principal_id: str | None) -> ControlResult:
@@ -878,6 +881,27 @@ class DashboardService:
                 update_expires_at="expires_at" in item,
             )
         return ControlResult(ok=True, data={"count": len(memories)})
+
+    def reconcile_memory_indexes(self, acting_principal_id: str | None) -> ControlResult:
+        """Owner-started repair; never runs as an autonomous background worker."""
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        return ControlResult(ok=True, data=self.store.reconcile_memory_projections())
+
+    def cleanup_expired_observations(
+        self, observation_ids: set[str], now: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.eidetic import cleanup_expired_observations
+
+        try:
+            deleted = cleanup_expired_observations(
+                store=self.store, now=now, confirmed_ids=observation_ids
+            )
+        except PermissionError as error:
+            return ControlResult(ok=False, reason_code=str(error))
+        return ControlResult(ok=True, data={"deleted_observation_ids": deleted})
 
     def _is_human(self, acting_principal_id: str | None) -> bool:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001

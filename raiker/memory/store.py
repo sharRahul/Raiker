@@ -265,6 +265,7 @@ def forget_memory(
     target.write_text(_encode_frontmatter(tombstone) + "\n", encoding="utf-8")
     if store is not None:
         store.mark_approved_memory_forgotten(memory_id, deleted_at=now, updated_at=now)
+        store.deactivate_memory_projections(memory_id)
     return True
 
 
@@ -281,8 +282,7 @@ def set_memory_archived(
     )
     if store is not None:
         store.set_approved_memory_archived(memory_id, archived_at=updated.archived_at, updated_at=updated.updated_at)
-        if archived:
-            store.deactivate_memory_projections(memory_id)
+        store.set_memory_projections_active(memory_id, not archived)
     return updated
 
 

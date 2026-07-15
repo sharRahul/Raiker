@@ -190,6 +190,21 @@ def test_archive_memory_is_reversible_and_excluded_from_retrieval(workspace: Pat
     assert get_memory(memory_id, workspace_root=workspace) is not None
 
 
+def test_fts_and_projection_mappings_follow_memory_lifecycle(workspace: Path) -> None:
+    broker = _governed_broker(workspace)
+    result, _ = broker.execute(_memory_write_action("FTS indexed durable fact."), session_id="sess_test_memory", turn_id="turn_test_memory")
+    memory_id = str(result.output["memory_id"])  # type: ignore[index]
+    store = SQLiteStore(workspace)
+    assert [row["memory_id"] for row in store.search_approved_memory("indexed")] == [memory_id]
+    store.link_memory_projection(memory_id, "vector", "vec_test", "v1")
+    set_memory_archived(memory_id, archived=True, workspace_root=workspace, store=store)
+    assert store.search_approved_memory("indexed") == []
+    assert store.list_memory_projections(memory_id)[0]["active"] == 0
+    set_memory_archived(memory_id, archived=False, workspace_root=workspace, store=store)
+    assert store.list_memory_projections(memory_id)[0]["active"] == 1
+    assert store.reconcile_memory_projections()["projection_rows_reconciled"] >= 1
+
+
 def test_forget_nonexistent_memory(workspace: Path) -> None:
     broker = _governed_broker(workspace)
     result, _ = broker.execute(

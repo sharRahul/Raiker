@@ -82,6 +82,12 @@ fail-closed by design.
   match the memory ID. It removes the live Markdown/SQLite record and records a
   disposition; retained backups are explicitly disclosed rather than claimed
   erased.
+- The hybrid-memory delivery plan is complete for local SQLite: active-only
+  FTS, source-versioned `fts`/`vector`/`graph` projection mappings, lifecycle
+  fan-out, owner-started reconciliation (`POST /api/memory/reconcile`),
+  review-only gist candidates, and explicit owner-confirmed eidetic expiry
+  cleanup. Vector/graph creation remains capability-gated; no autonomous raw
+  capture, cleanup worker, or model purge authority was introduced.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

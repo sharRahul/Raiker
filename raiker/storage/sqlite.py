@@ -68,6 +68,8 @@ from raiker.storage.migrations import (
     MEMORY_ARCHIVE_SQL,
     MEMORY_CONTROLS_MIGRATION_ID,
     MEMORY_CONTROLS_SQL,
+    MEMORY_FTS_MIGRATION_ID,
+    MEMORY_FTS_SQL,
     MEMORY_PROJECTIONS_MIGRATION_ID,
     MEMORY_PROJECTIONS_SQL,
     MEMORY_PURGE_MIGRATION_ID,
@@ -520,6 +522,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(MEMORY_PURGE_MIGRATION_ID, MEMORY_PURGE_SQL, connection)
             self._apply_migration(GIST_MEMORY_MIGRATION_ID, GIST_MEMORY_SQL, connection)
             self._apply_migration(MEMORY_PROJECTIONS_MIGRATION_ID, MEMORY_PROJECTIONS_SQL, connection)
+            self._apply_migration(MEMORY_FTS_MIGRATION_ID, MEMORY_FTS_SQL, connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
@@ -1666,6 +1669,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     entry.deleted_at,
                 ),
             )
+            self._sync_memory_fts(connection, entry.memory_id)
 
     def mark_approved_memory_forgotten(
         self, memory_id: str, *, deleted_at: str, updated_at: str
@@ -1679,6 +1683,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """,
                 ("forgotten", deleted_at, updated_at, memory_id),
             )
+            self._sync_memory_fts(connection, memory_id)
         return cursor.rowcount > 0
 
     def set_approved_memory_archived(self, memory_id: str, *, archived_at: str | None, updated_at: str | None) -> bool:
@@ -1687,6 +1692,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "UPDATE approved_memory SET archived_at = ?, updated_at = ? WHERE memory_id = ? AND deleted_at IS NULL",
                 (archived_at, updated_at, memory_id),
             )
+            self._sync_memory_fts(connection, memory_id)
         return cursor.rowcount > 0
 
     def create_memory_purge_record(self, purge_id: str, memory_id: str, requested_by: str, confirmed_at: str, disposition: dict[str, Any]) -> None:
@@ -1697,8 +1703,71 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             connection.execute("UPDATE memory_projections SET active = 0 WHERE memory_id = ?", (memory_id,))
 
+    def set_memory_projections_active(self, memory_id: str, active: bool) -> None:
+        with self.connect() as connection:
+            connection.execute("UPDATE memory_projections SET active = ? WHERE memory_id = ?", (int(active), memory_id))
+
+    def link_memory_projection(self, memory_id: str, projection_type: str, projection_id: str, source_version: str) -> None:
+        if projection_type not in {"fts", "vector", "graph"}:
+            raise ValueError("invalid_memory_projection_type")
+        with self.connect() as connection:
+            row = connection.execute("SELECT deleted_at, archived_at FROM approved_memory WHERE memory_id = ?", (memory_id,)).fetchone()
+            if row is None:
+                raise ValueError("unknown_memory")
+            connection.execute(
+                "INSERT OR REPLACE INTO memory_projections (memory_id, projection_type, projection_id, source_version, active) VALUES (?, ?, ?, ?, ?)",
+                (memory_id, projection_type, projection_id, source_version, int(row["deleted_at"] is None and row["archived_at"] is None)),
+            )
+
+    def list_memory_projections(self, memory_id: str) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute("SELECT * FROM memory_projections WHERE memory_id = ? ORDER BY projection_type, projection_id", (memory_id,)).fetchall()
+        return [dict(row) for row in rows]
+
+    def reconcile_memory_projections(self) -> dict[str, int]:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE memory_projections SET active = CASE WHEN EXISTS (
+                    SELECT 1 FROM approved_memory m WHERE m.memory_id = memory_projections.memory_id
+                    AND m.deleted_at IS NULL AND m.archived_at IS NULL
+                ) THEN 1 ELSE 0 END"""
+            )
+            self._rebuild_memory_fts(connection)
+        return {"projection_rows_reconciled": cursor.rowcount}
+
+    @staticmethod
+    def _sync_memory_fts(connection: sqlite3.Connection, memory_id: str) -> None:
+        connection.execute("DELETE FROM approved_memory_fts WHERE memory_id = ?", (memory_id,))
+        connection.execute(
+            """INSERT INTO approved_memory_fts(memory_id, text, tags)
+            SELECT memory_id, text, tags_json FROM approved_memory
+            WHERE memory_id = ? AND deleted_at IS NULL AND archived_at IS NULL""",
+            (memory_id,),
+        )
+
+    @staticmethod
+    def _rebuild_memory_fts(connection: sqlite3.Connection) -> None:
+        connection.execute("DELETE FROM approved_memory_fts")
+        connection.execute("""INSERT INTO approved_memory_fts(memory_id, text, tags)
+            SELECT memory_id, text, tags_json FROM approved_memory
+            WHERE deleted_at IS NULL AND archived_at IS NULL""")
+
+    def search_approved_memory(self, query: str, scope: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+        sql = """SELECT m.* FROM approved_memory_fts f JOIN approved_memory m ON m.memory_id = f.memory_id
+        WHERE approved_memory_fts MATCH ? AND m.deleted_at IS NULL AND m.archived_at IS NULL"""
+        params: list[Any] = [query]
+        if scope is not None:
+            sql += " AND m.scope = ?"
+            params.append(scope)
+        sql += " ORDER BY bm25(approved_memory_fts) LIMIT ?"
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
     def delete_approved_memory(self, memory_id: str) -> None:
         with self.connect() as connection:
+            connection.execute("DELETE FROM approved_memory_fts WHERE memory_id = ?", (memory_id,))
             connection.execute("DELETE FROM approved_memory WHERE memory_id = ?", (memory_id,))
 
     def list_approved_memory(self, scope: str | None = None, limit: int = 50) -> list[dict[str, Any]]:

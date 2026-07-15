@@ -65,7 +65,7 @@ _ERROR_JSON = json.dumps({"ok": False, "error": "channel_not_found"})
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "slack"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 
@@ -76,22 +76,22 @@ def store(workspace: Path) -> SQLiteStore:
 
 def _enable_gate(workspace: Path, store: SQLiteStore) -> RuntimeControlService:
     ctrl = RuntimeControlService(workspace)
-    ctrl.activate_runtime_mode("local_single_user_runtime", "principal_rahul", "test")
+    ctrl.activate_runtime_mode("local_single_user_runtime", "principal_owner", "test")
     with store.connect() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref)"
             " VALUES (?, ?, ?, ?)",
-            (_CAP, "principal_rahul", utc_now(), "docs/threat-models/connectors-slack.md"),
+            (_CAP, "principal_owner", utc_now(), "docs/threat-models/connectors-slack.md"),
         )
     result = ctrl.set_capability_state(
-        _CAP, "enabled_runtime", "principal_rahul", "test", confirmation_token="CONFIRM"
+        _CAP, "enabled_runtime", "principal_owner", "test", confirmation_token="CONFIRM"
     )
     assert result.ok, result.reason_code
     return ctrl
 
 
 def _allow(ctrl: RuntimeControlService) -> None:
-    result = ctrl.set_capability_decision_mode(_CAP, "allow", "principal_rahul", "test")
+    result = ctrl.set_capability_decision_mode(_CAP, "allow", "principal_owner", "test")
     assert result.ok, result.reason_code
 
 
@@ -128,7 +128,7 @@ class TestSlackConnectorGovernance:
 
     def test_auto_withholds(self, workspace: Path, store: SQLiteStore) -> None:
         ctrl = _enable_gate(workspace, store)
-        ctrl.set_capability_decision_mode(_CAP, "auto", "principal_rahul", "test")
+        ctrl.set_capability_decision_mode(_CAP, "auto", "principal_owner", "test")
         outcome = SlackConnectorService(workspace, store, fetch_fn=_ok_fetch).read(
             "channel_info", "C123ABC"
         )
@@ -136,7 +136,7 @@ class TestSlackConnectorGovernance:
 
     def test_deny_mode_blocks(self, workspace: Path, store: SQLiteStore) -> None:
         ctrl = _enable_gate(workspace, store)
-        ctrl.set_capability_decision_mode(_CAP, "deny", "principal_rahul", "test")
+        ctrl.set_capability_decision_mode(_CAP, "deny", "principal_owner", "test")
         outcome = SlackConnectorService(workspace, store, fetch_fn=_ok_fetch).read(
             "channel_info", "C123ABC"
         )
@@ -233,7 +233,7 @@ class TestSlackConnectorExecutor:
     def _action(self, arguments: dict[str, object]) -> GovernedAction:
         return GovernedAction(
             action_id=new_id("act_"),
-            principal_id="principal_rahul",
+            principal_id="principal_owner",
             action_type="connector_slack_runtime",
             tool_or_service_name="connector_slack_runtime",
             arguments=arguments,
@@ -262,9 +262,9 @@ class TestSlackConnectorExecutor:
         self, workspace: Path, store: SQLiteStore
     ) -> None:
         ctrl = RuntimeControlService(workspace)
-        ctrl.activate_runtime_mode("local_single_user_runtime", "principal_rahul", "test")
+        ctrl.activate_runtime_mode("local_single_user_runtime", "principal_owner", "test")
         result = ctrl.set_capability_state(
-            _CAP, "enabled_runtime", "principal_rahul", "test", confirmation_token="CONFIRM"
+            _CAP, "enabled_runtime", "principal_owner", "test", confirmation_token="CONFIRM"
         )
         assert result.ok is False
         assert result.reason_code is not None and "no_threat_model_ack" in result.reason_code

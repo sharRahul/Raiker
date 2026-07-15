@@ -35,7 +35,7 @@ def temp_workspace(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def bootstrapped_workspace(temp_workspace: Path) -> Path:
-    bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+    bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
     return temp_workspace
 
 
@@ -82,7 +82,7 @@ class TestAuthMint:
         assert resp.status_code == 200
         body = resp.json()
         assert body["token"]
-        assert body["principal_id"] == "principal_rahul"
+        assert body["principal_id"] == "principal_owner"
         assert "session_id" in body
 
     def test_no_owner_is_rejected(self, temp_workspace: Path) -> None:

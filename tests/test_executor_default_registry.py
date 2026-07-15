@@ -78,7 +78,7 @@ def test_stub_executors_fail_closed(tmp_path: Path) -> None:
 
 def test_activation_blocks_capability_without_executor(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     # medical_runtime has no real executor -> cannot be flipped on.
@@ -90,7 +90,7 @@ def test_activation_blocks_capability_without_executor(tmp_path: Path) -> None:
 
 def test_real_capability_enables_and_executes(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     enable = svc.set_capability_state("file_write_execution", "enabled_runtime", None, "test")
@@ -100,12 +100,12 @@ def test_real_capability_enables_and_executes(tmp_path: Path) -> None:
     writer = EventLogWriter(store)
     registry = build_default_executor_registry(ws, store)
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
-    raw = store.get_principal("principal_rahul")
+    raw = store.get_principal("principal_owner")
     assert raw is not None
     principal = Principal(**raw)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="write_file",
         tool_or_service_name="write_file",
         arguments={"path": "out.txt", "text": "real work"},

@@ -45,14 +45,14 @@ def _ws(tmp_path: Path) -> Path:
 
 
 def _enable(ws: Path) -> None:
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     store = SQLiteStore(ws)
     with store.connect() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-            (_CAP, "principal_rahul", utc_now(), _DOC),
+            (_CAP, "principal_owner", utc_now(), _DOC),
         )
     result = svc.set_capability_state(_CAP, "enabled_runtime", None, "test", confirmation_token="confirm")
     assert result.ok is True, result.reason_code
@@ -71,7 +71,7 @@ def _authority(ws: Path, *, embedder: Embedder | None = None) -> tuple[RuntimeAu
     if embedder is not None:
         registry.register(_CAP, ModelProviderExecutor(ws, store, embedder=embedder))
     authority = RuntimeAuthority(store, EventLogWriter(store), executor_registry=registry)
-    raw = store.get_principal("principal_rahul")
+    raw = store.get_principal("principal_owner")
     assert raw is not None
     return authority, Principal(**raw)
 
@@ -104,7 +104,7 @@ def test_model_provider_is_real_executor(tmp_path: Path) -> None:
 def test_gate_disabled_blocks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
     RuntimeControlService(ws).disable_capability("model_provider_runtime", None, "test")
     authority, principal = _authority(ws, embedder=_fake_embedder([0.1, 0.2, 0.3]))
@@ -115,7 +115,7 @@ def test_gate_disabled_blocks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
 
 def test_enable_requires_threat_model_ack(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     result = svc.set_capability_state(_CAP, "enabled_runtime", None, "test", confirmation_token="confirm")

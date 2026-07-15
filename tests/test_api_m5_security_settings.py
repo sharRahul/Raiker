@@ -16,7 +16,7 @@ from raiker.storage.sqlite import SQLiteStore
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 
@@ -26,7 +26,7 @@ def client(workspace: Path) -> TestClient:
 
 
 def _owner_headers(workspace: Path) -> dict[str, str]:
-    raw, _ = ApiSessionStore(workspace).create_session("principal_rahul")
+    raw, _ = ApiSessionStore(workspace).create_session("principal_owner")
     return {"Authorization": f"Bearer {raw}"}
 
 
@@ -93,7 +93,7 @@ class TestRuntimeMutations:
             connection.execute(
                 "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref)"
                 " VALUES (?, ?, ?, ?)",
-                ("web_fetch", "principal_rahul", utc_now(), "m5"),
+                ("web_fetch", "principal_owner", utc_now(), "m5"),
             )
         # Without the token the activation check blocks it.
         without = client.post(

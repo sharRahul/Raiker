@@ -31,14 +31,14 @@ def _ws(tmp_path: Path) -> Path:
 
 
 def _enable(ws: Path) -> None:
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     service = RuntimeControlService(ws)
     service.activate_runtime_mode("local_single_user_runtime", None, "test")
     store = SQLiteStore(ws)
     with store.connect() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-            (_CAP, "principal_rahul", utc_now(), _DOC),
+            (_CAP, "principal_owner", utc_now(), _DOC),
         )
     result = service.set_capability_state(_CAP, "enabled_runtime", None, "test", confirmation_token="confirm")
     assert result.ok is True, result.reason_code
@@ -49,7 +49,7 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
     authority = RuntimeAuthority(
         store, EventLogWriter(store), executor_registry=build_default_executor_registry(ws, store)
     )
-    raw = store.get_principal("principal_rahul")
+    raw = store.get_principal("principal_owner")
     assert raw is not None
     return authority, Principal(**raw)
 
@@ -80,7 +80,7 @@ def test_image_pull_cap_is_real_executor(tmp_path: Path) -> None:
 
 def test_image_pull_gate_disabled_blocks(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     RuntimeControlService(ws).disable_capability(_CAP, None, "test")
     authority, principal = _authority(ws)
     result = authority.route_action(_action(principal.principal_id, image=_IMAGE), principal)
@@ -114,9 +114,9 @@ def _fake_action(image: object) -> Any:
 
 def _principal() -> Principal:
     return Principal(
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         principal_type=PrincipalType.HUMAN,
-        display_name="Rahul",
+        display_name="Owner",
     )
 
 

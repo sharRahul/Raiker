@@ -21,14 +21,14 @@ from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.control.dashboard import DashboardService
 from raiker.storage.sqlite import SQLiteStore
 
-OWNER = "principal_rahul"
+OWNER = "principal_owner"
 
 
 @pytest.fixture
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 

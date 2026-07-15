@@ -32,7 +32,7 @@ _SENSITIVE_CAP = "medical_runtime"
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "api_decision_modes"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 
@@ -43,7 +43,7 @@ def app(workspace: Path) -> FastAPI:
 
 @pytest.fixture
 def owner_token(workspace: Path) -> str:
-    raw, _ = ApiSessionStore(workspace).create_session("principal_rahul")
+    raw, _ = ApiSessionStore(workspace).create_session("principal_owner")
     return raw
 
 
@@ -162,7 +162,7 @@ class TestAiCannotSetMode:
         assert "gate operations" in detail["reason_code"]
 
         # And the mode is unchanged — still the safe default.
-        owner_raw, _ = ApiSessionStore(workspace).create_session("principal_rahul")
+        owner_raw, _ = ApiSessionStore(workspace).create_session("principal_owner")
         read = client.get(f"/api/capability-modes/{_REAL_CAP}", headers=_auth(owner_raw))
         assert read.json()["decision_mode"] == "ask"
 

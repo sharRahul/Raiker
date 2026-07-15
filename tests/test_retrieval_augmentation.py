@@ -46,7 +46,7 @@ def _ws(tmp_path: Path) -> Path:
 
 
 def _enable(ws: Path, *, mode: str | None = None) -> None:
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "t")
     r = svc.set_capability_state(_CAP, "enabled_runtime", None, "t", confirmation_token="confirm")
@@ -83,7 +83,7 @@ def _seed(ws: Path, text: str) -> str:
 
 def test_disabled_gate_is_noop(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     plan = RetrievalAugmentor(ws, SQLiteStore(ws)).plan("anything")
     assert plan.decision == "disabled"
     assert plan.augmented is False
@@ -193,7 +193,7 @@ def _augmentation_events(ws: Path) -> list[dict]:
 
 def test_turn_emits_no_event_when_gate_disabled(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     router = _FakeRouter("done")
     import asyncio
 

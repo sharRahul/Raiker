@@ -17,14 +17,14 @@ from raiker.control.dashboard import DashboardService
 from raiker.memory.store import MemoryGovernance, get_memory, search_memory, write_memory
 from raiker.storage.sqlite import SQLiteStore
 
-OWNER = "principal_rahul"
+OWNER = "principal_owner"
 
 
 @pytest.fixture
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 

@@ -394,13 +394,13 @@ class TestUploadApi:
 
     @pytest.fixture
     def client(self, workspace: Path) -> TestClient:
-        bootstrap_owner("rahul", "Rahul", workspace_root=workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=workspace)
         app: FastAPI = create_app(workspace)
         return TestClient(app)
 
     @pytest.fixture
     def owner_token(self, workspace: Path) -> str:
-        raw, _ = ApiSessionStore(workspace).create_session("principal_rahul")
+        raw, _ = ApiSessionStore(workspace).create_session("principal_owner")
         return raw
 
     def _upload(self, client: TestClient, token: str, **overrides: str) -> Any:

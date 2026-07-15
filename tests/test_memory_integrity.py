@@ -86,3 +86,18 @@ def test_integrity_reports_durable_memory_checksum_mismatch(tmp_path: Path) -> N
     report = inspect_memory_integrity(store=store, workspace_root=tmp_path)
     assert report.checksum_mismatch_count == 1
     assert not report.clean
+
+
+def test_integrity_reports_orphaned_artifacts_and_failed_purge_locations(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    memory_dir = tmp_path / ".raiker" / "memory"
+    memory_dir.mkdir(parents=True)
+    (memory_dir / "mem_orphan.md").write_text("orphan", encoding="utf-8")
+    store.create_memory_purge_record(
+        "pur_test", "mem_removed", "owner", "2026-01-01T00:00:00Z",
+        {"failed_storage_locations": ["artifact_store"]},
+    )
+    report = inspect_memory_integrity(store=store, workspace_root=tmp_path)
+    assert report.orphaned_markdown_count == 1
+    assert report.failed_purge_location_count == 1
+    assert not report.clean

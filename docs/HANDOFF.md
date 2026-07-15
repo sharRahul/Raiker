@@ -104,6 +104,17 @@ fail-closed by design.
   synchronized. `raiker.memory.evaluation` provides the initial
   `memory-eval-v1` lexical quality/safety harness; it is not yet a persisted
   benchmark service or an external comparison.
+- `RAIKER-2010` extends Stage F with temporal correction: a human correction
+  creates a replacement memory, preserves the old fact as superseded evidence,
+  and removes it from active retrieval. Aggregate evaluation runs are persisted
+  locally; corpus fixtures and regression thresholds remain outstanding.
+- Stage G/I early slices are implemented but not complete: governed durable
+  memory can project to local vectors; entity relationships require active
+  evidence; hybrid retrieval deduplicates active lexical/vector/graph results;
+  and an owner-started integrity report finds stale indexes/projections/edges.
+  Stage H's backup catalog records retention, legal hold, restore verification,
+  and erasure disposition. Encryption of memory content/indexes, tenant
+  isolation, background jobs, and operational proof remain required.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

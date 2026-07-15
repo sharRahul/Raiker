@@ -835,6 +835,26 @@ class DashboardService:
             memory_id, text=text, search_enabled=None, acting_principal_id=acting_principal_id
         )
 
+    def correct_memory_controlled(
+        self, memory_id: str, text: str, reason: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.store import MemoryGovernance, correct_memory
+
+        replacement = correct_memory(
+            memory_id, text, workspace_root=self.workspace_root, store=self.store,
+            remembered_reason=reason,
+            governance=MemoryGovernance(
+                source_event_id=new_id("evt_"), source_session_id="", source_turn_id=None,
+                source_type="human_correction", confidence=1.0, trust_score=1.0,
+                retention="until_forget", approval_state="approved", created_by=acting_principal_id or "",
+            ),
+        )
+        if replacement is None:
+            return ControlResult(ok=False, reason_code="invalid_memory_correction")
+        return ControlResult(ok=True, data={"memory_id": replacement.memory_id, "supersedes_memory_id": memory_id})
+
     def set_memory_search_enabled(self, memory_id: str, search_enabled: bool, acting_principal_id: str | None) -> ControlResult:
         return self._update_memory_controlled(
             memory_id, text=None, search_enabled=search_enabled, acting_principal_id=acting_principal_id

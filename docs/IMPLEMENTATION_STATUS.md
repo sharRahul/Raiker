@@ -158,6 +158,20 @@ fail-closed by design.
 > Recall@k, MRR, nDCG, policy leaks, and p95 latency for deterministic lexical
 > cases. It is a CI-quality foundation, not a published benchmark.
 
+> **Implementation update (2026-07-15):** `RAIKER-2010-memory-temporal-
+> evaluation` adds human-only corrections with immutable supersession links and
+> temporal retrieval eligibility. It persists aggregate lexical evaluation runs
+> (precision, recall, MRR, nDCG, policy leaks, p50/p95, local token/storage
+> usage); no raw evaluation query or result text is persisted.
+
+> **Implementation update (2026-07-15):** the first Stage G/H/I slices add
+> governed active-memory vector projection, evidence-bound entity graph edges,
+> bounded hybrid retrieval, backup erasure/restore/legal-hold catalog fields,
+> and a read-only hybrid-memory integrity scanner. They are foundational only:
+> provider-vector projection, entity review, encryption of memory content and
+> indexes, multi-tenant isolation, job workers, and operational benchmarks are
+> not yet complete.
+
 > Current truth update (2026-07-15): reliable memory controls are complete for
 > the current backlog item 3 slice — a user-visible Memory view over the
 > EXISTING governed memory store. No second memory system is created.

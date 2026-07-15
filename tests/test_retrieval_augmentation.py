@@ -26,6 +26,7 @@ from raiker.contracts.models import (
 from raiker.control.service import RuntimeControlService
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
+from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.models.contracts import ModelMessage, ModelResponse, ToolSpec
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
@@ -57,7 +58,12 @@ def _enable(ws: Path, *, mode: str | None = None) -> None:
 
 def _seed(ws: Path, text: str) -> str:
     vector_id = new_id("vec_")
-    SQLiteStore(ws).insert_vector_record(VectorRecord(
+    store = SQLiteStore(ws)
+    memory = write_memory(
+        text, workspace_root=ws, scope="default", store=store,
+        governance=MemoryGovernance("evt_rag", "sess_rag", None, "test", 1, 1, "until_forget", "approved", "test"),
+    )
+    store.insert_vector_record(VectorRecord(
         vector_id=vector_id,
         content_hash="h",
         content_preview=text[:120],
@@ -68,6 +74,7 @@ def _seed(ws: Path, text: str) -> str:
         created_at=utc_now(),
         embedding=json.dumps(embed_text(text, 384)),
     ))
+    store.link_memory_projection(memory.memory_id, "vector", vector_id, LOCAL_EMBEDDING_MODEL)
     return vector_id
 
 

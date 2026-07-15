@@ -32,6 +32,11 @@ class MemoryEntry:
     archived_at: str | None = None
     search_enabled: bool = True
     expires_at: str | None = None
+    valid_from: str | None = None
+    valid_until: str | None = None
+    supersedes_memory_id: str | None = None
+    superseded_at: str | None = None
+    remembered_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -87,6 +92,11 @@ def _encode_frontmatter(entry: MemoryEntry) -> str:
         "archived_at": entry.archived_at,
         "search_enabled": entry.search_enabled,
         "expires_at": entry.expires_at,
+        "valid_from": entry.valid_from,
+        "valid_until": entry.valid_until,
+        "supersedes_memory_id": entry.supersedes_memory_id,
+        "superseded_at": entry.superseded_at,
+        "remembered_reason": entry.remembered_reason,
     }
     return json.dumps(meta, sort_keys=True)
 
@@ -196,6 +206,9 @@ def search_memory(
             archived_at=meta.get("archived_at"),
             search_enabled=bool(meta.get("search_enabled", True)),
             expires_at=meta.get("expires_at"),
+            valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
+            supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
+            remembered_reason=meta.get("remembered_reason"),
         )
         if entry.deleted_at is not None or entry.archived_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
             continue
@@ -330,6 +343,9 @@ def list_memory(
             archived_at=meta.get("archived_at"),
             search_enabled=bool(meta.get("search_enabled", True)),
             expires_at=meta.get("expires_at"),
+            valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
+            supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
+            remembered_reason=meta.get("remembered_reason"),
         )
         if entry.deleted_at is not None or entry.archived_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
             continue
@@ -375,6 +391,9 @@ def get_memory(
             archived_at=meta.get("archived_at"),
             search_enabled=bool(meta.get("search_enabled", True)),
             expires_at=meta.get("expires_at"),
+            valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
+            supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
+            remembered_reason=meta.get("remembered_reason"),
         )
         if entry.deleted_at is not None or (not include_archived and entry.archived_at is not None) or (
             not include_expired and entry.expires_at is not None and entry.expires_at <= utc_now()
@@ -409,6 +428,9 @@ def get_memory(
                 archived_at=meta.get("archived_at"),
                 search_enabled=bool(meta.get("search_enabled", True)),
                 expires_at=meta.get("expires_at"),
+                valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
+                supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
+                remembered_reason=meta.get("remembered_reason"),
             )
             if entry.deleted_at is not None or (
                 not include_expired and entry.expires_at is not None and entry.expires_at <= utc_now()
@@ -443,6 +465,29 @@ def update_memory(
     return updated
 
 
+def correct_memory(
+    memory_id: str, text: str, *, workspace_root: str | Path = ".", store: SQLiteStore,
+    governance: MemoryGovernance, remembered_reason: str,
+) -> MemoryEntry | None:
+    """Create a replacement fact, preserving the corrected record as evidence."""
+    original = get_memory(memory_id, workspace_root=workspace_root, include_expired=True, include_archived=True)
+    if original is None or not text.strip() or not remembered_reason.strip():
+        return None
+    replacement = write_memory(
+        text, workspace_root=workspace_root, scope=original.scope, source_event_id=governance.source_event_id,
+        memory_type=original.memory_type, tags=original.tags, source="human_correction", store=store,
+        governance=governance,
+    )
+    replacement = replace(replacement, remembered_reason=remembered_reason.strip(), supersedes_memory_id=memory_id)
+    _entry_path(_memory_dir(workspace_root), replacement.memory_id).write_text(
+        _encode_frontmatter(replacement) + "\n" + replacement.text, encoding="utf-8"
+    )
+    store.update_approved_memory(replacement)
+    if not store.supersede_approved_memory(memory_id, replacement.memory_id, at=utc_now()):
+        return None
+    return replacement
+
+
 def _entry_from_row(row: dict[str, Any]) -> MemoryEntry:
     return MemoryEntry(
         memory_id=str(row["memory_id"]), text=str(row["text"]), scope=str(row["scope"]),
@@ -454,6 +499,9 @@ def _entry_from_row(row: dict[str, Any]) -> MemoryEntry:
         approval_state=str(row["approval_state"]), created_by=str(row["created_by"]),
         updated_at=row["updated_at"], deleted_at=row["deleted_at"], archived_at=row["archived_at"],
         search_enabled=bool(row["search_enabled"]), expires_at=row["expires_at"],
+        valid_from=row["valid_from"], valid_until=row["valid_until"],
+        supersedes_memory_id=row["supersedes_memory_id"], superseded_at=row["superseded_at"],
+        remembered_reason=row["remembered_reason"],
     )
 
 

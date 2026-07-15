@@ -206,6 +206,18 @@ async def edit_memory(
     return {"ok": True, **result.data}
 
 
+@router.post("/api/memory/{memory_id}/correct")
+async def correct_memory(
+    memory_id: str, request: Request, body: dict[str, Any], auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    result = _service(request).correct_memory_controlled(
+        memory_id, str(body.get("text", "")), str(body.get("reason", "")), auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
 @router.put("/api/memory/{memory_id}/search")
 async def set_memory_search_enabled(
     memory_id: str,

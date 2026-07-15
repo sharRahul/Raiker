@@ -238,11 +238,12 @@ criterion; later stages do not weaken the completed safety rules.
 
 ### Stage F — retrieval authority and measured quality
 
-**In progress (first slice).** `RAIKER-2009` makes approved-memory SQLite rows
-and active-only FTS authoritative for governed retrieval. Corrections, search
-opt-outs, and expiry now synchronize the same source/index; `memory-eval-v1`
-is a reproducible lexical evaluation harness reporting Recall@k, MRR, nDCG,
-policy leaks, and p95 latency. Persisted aggregate runs and CI thresholds are
+**In progress.** `RAIKER-2009` makes approved-memory SQLite rows and active-only
+FTS authoritative for governed retrieval. `RAIKER-2010` adds immutable
+correction/supersession links, temporal eligibility, human correction control,
+and persisted aggregate lexical evaluation runs. `memory-eval-v1` reports
+precision, Recall@k, MRR, nDCG, policy leaks, p50/p95 latency, token use, and
+local compute/storage cost. Versioned corpus fixtures and CI thresholds remain
 the next Stage F slice.
 
 1. Make SQLite's active-memory row and its FTS record the single retrieval
@@ -268,6 +269,12 @@ scope, workload, and latency distribution.
 
 ### Stage G — gated semantic and entity retrieval
 
+**In progress (first slice).** Active approved memories can now be projected
+through the existing governed local-vector capability; the vector mapping and
+entity graph edges are evidence-bound and lifecycle-filtered. The bounded hybrid
+assembler deduplicates active lexical/vector/graph candidates. Provider-backed
+projection, entity extraction/review, and runtime integration remain pending.
+
 1. Implement approved-memory vector projection using the existing
    `vector_embedding_runtime` capability, with model/version, checksum, and
    projection mapping recorded for every vector.
@@ -287,6 +294,11 @@ retrieval meets the Stage F recall/latency budgets without a visibility leak.
 
 ### Stage H — security, tenancy, and privacy operations
 
+**In progress (backup catalog slice).** Backup manifests now record encryption
+key identifiers, retention/legal-hold state, restore verification, erasure
+requests, and completed erasure. Memory content/index encryption and
+principal/workspace isolation remain pending.
+
 1. Enforce principal/workspace ownership in every memory row and projection;
    add tenant-isolation and confused-deputy tests.
 2. Encrypt durable rows, artifacts, indexes, and backups at rest with a
@@ -304,6 +316,11 @@ verified-erasure/pending-backup disposition drill, and tenant-isolation suite
 all pass with documented evidence.
 
 ### Stage I — reliability and scale
+
+**In progress (integrity slice).** An owner-started read-only integrity report
+detects stale FTS/projection/graph state and missing Markdown artifacts. Repair
+jobs, queues, rate limits, monitoring, and load/failure exercises remain
+pending.
 
 1. Move projection/reconciliation work to owner-enabled, idempotent jobs with
    leases, retries, dead-letter reporting, bounded concurrency, per-tenant rate

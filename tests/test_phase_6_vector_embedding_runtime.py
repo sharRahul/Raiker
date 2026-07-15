@@ -17,6 +17,7 @@ from raiker.contracts.models import VectorRecord
 from raiker.control.service import RuntimeControlService
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
+from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES, build_default_executor_registry
@@ -139,6 +140,23 @@ def test_embed_persists_record_without_leaking_text(tmp_path: Path) -> None:
     assert "SECRETPHRASE" not in dumped
     assert payload["payload"]["artifacts"]["content_redacted"] is True
     assert payload["payload"]["artifacts"]["dimensions"] == 384
+
+
+def test_governed_projection_links_only_active_durable_memory(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    store = SQLiteStore(ws)
+    memory = write_memory(
+        "Approved durable retrieval fact.", workspace_root=ws, store=store,
+        governance=MemoryGovernance("evt", "sess", None, "test", 1, 1, "until_forget", "approved", "test"),
+    )
+    authority, principal = _authority(ws)
+    result = authority.route_action(
+        _action(principal.principal_id, action="project_memory", memory_id=memory.memory_id), principal
+    )
+    assert result.decision == "allow"
+    assert len(store.list_active_memory_vector_embeddings(LOCAL_EMBEDDING_MODEL)) == 1
+    assert store.list_memory_projections(memory.memory_id)[0]["projection_type"] == "vector"
 
 
 def test_missing_text_fails_closed(tmp_path: Path) -> None:

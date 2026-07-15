@@ -114,7 +114,7 @@ class RetrievalAugmentor:
             return []
         query_vector = embed_text(prompt_text, _DIMENSIONS)
         index = VectorIndex(_DIMENSIONS)
-        for row in self._store.list_vector_embeddings(LOCAL_EMBEDDING_MODEL):
+        for row in self._store.list_active_memory_vector_embeddings(LOCAL_EMBEDDING_MODEL):
             raw = row.get("embedding")
             if not raw:
                 continue

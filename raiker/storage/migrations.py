@@ -1372,3 +1372,50 @@ MEMORY_RETRIEVAL_AUTHORITY_SQL = """
 ALTER TABLE approved_memory ADD COLUMN search_enabled INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE approved_memory ADD COLUMN expires_at TEXT;
 """
+
+MEMORY_TEMPORAL_EVALUATION_MIGRATION_ID = "RAIKER-2010-memory-temporal-evaluation"
+MEMORY_TEMPORAL_EVALUATION_SQL = """
+ALTER TABLE approved_memory ADD COLUMN valid_from TEXT;
+ALTER TABLE approved_memory ADD COLUMN valid_until TEXT;
+ALTER TABLE approved_memory ADD COLUMN supersedes_memory_id TEXT REFERENCES approved_memory(memory_id);
+ALTER TABLE approved_memory ADD COLUMN superseded_at TEXT;
+ALTER TABLE approved_memory ADD COLUMN remembered_reason TEXT;
+UPDATE approved_memory SET valid_from = created_at WHERE valid_from IS NULL;
+CREATE INDEX IF NOT EXISTS idx_approved_memory_temporal ON approved_memory(scope, valid_from, valid_until)
+  WHERE deleted_at IS NULL AND archived_at IS NULL;
+CREATE TABLE IF NOT EXISTS memory_evaluation_runs (
+  evaluation_id TEXT PRIMARY KEY, corpus_version TEXT NOT NULL, strategy TEXT NOT NULL,
+  case_count INTEGER NOT NULL, precision_at_k REAL NOT NULL, recall_at_k REAL NOT NULL,
+  mean_reciprocal_rank REAL NOT NULL, ndcg_at_k REAL NOT NULL, policy_leak_count INTEGER NOT NULL,
+  p50_latency_ms REAL NOT NULL, p95_latency_ms REAL NOT NULL, token_count INTEGER NOT NULL,
+  compute_cost_usd REAL NOT NULL, storage_bytes INTEGER NOT NULL, created_at TEXT NOT NULL
+);
+"""
+
+MEMORY_ENTITY_GRAPH_MIGRATION_ID = "RAIKER-2011-memory-entity-graph"
+MEMORY_ENTITY_GRAPH_SQL = """
+CREATE TABLE IF NOT EXISTS memory_entities (
+  entity_id TEXT PRIMARY KEY, normalized_name TEXT NOT NULL, display_name TEXT NOT NULL,
+  entity_type TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE(normalized_name, entity_type)
+);
+CREATE TABLE IF NOT EXISTS memory_entity_relationships (
+  relationship_id TEXT PRIMARY KEY, subject_entity_id TEXT NOT NULL REFERENCES memory_entities(entity_id),
+  predicate TEXT NOT NULL, object_entity_id TEXT NOT NULL REFERENCES memory_entities(entity_id),
+  evidence_memory_id TEXT NOT NULL REFERENCES approved_memory(memory_id), confidence REAL NOT NULL,
+  created_at TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
+  UNIQUE(subject_entity_id, predicate, object_entity_id, evidence_memory_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_entity_relationships_subject ON memory_entity_relationships(subject_entity_id) WHERE active = 1;
+CREATE INDEX IF NOT EXISTS idx_memory_entity_relationships_object ON memory_entity_relationships(object_entity_id) WHERE active = 1;
+"""
+
+MEMORY_BACKUP_CATALOG_MIGRATION_ID = "RAIKER-2012-memory-backup-catalog"
+MEMORY_BACKUP_CATALOG_SQL = """
+ALTER TABLE backup_manifests ADD COLUMN encryption_key_id TEXT;
+ALTER TABLE backup_manifests ADD COLUMN retention_until TEXT;
+ALTER TABLE backup_manifests ADD COLUMN legal_hold INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE backup_manifests ADD COLUMN erasure_requested_at TEXT;
+ALTER TABLE backup_manifests ADD COLUMN erased_at TEXT;
+ALTER TABLE backup_manifests ADD COLUMN restore_verified_at TEXT;
+"""

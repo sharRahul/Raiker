@@ -66,8 +66,12 @@ from raiker.storage.migrations import (
     LOCK_SCREEN_SQL,
     MEMORY_ARCHIVE_MIGRATION_ID,
     MEMORY_ARCHIVE_SQL,
+    MEMORY_BACKUP_CATALOG_MIGRATION_ID,
+    MEMORY_BACKUP_CATALOG_SQL,
     MEMORY_CONTROLS_MIGRATION_ID,
     MEMORY_CONTROLS_SQL,
+    MEMORY_ENTITY_GRAPH_MIGRATION_ID,
+    MEMORY_ENTITY_GRAPH_SQL,
     MEMORY_FTS_MIGRATION_ID,
     MEMORY_FTS_SQL,
     MEMORY_PROJECTIONS_MIGRATION_ID,
@@ -76,6 +80,8 @@ from raiker.storage.migrations import (
     MEMORY_PURGE_SQL,
     MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
     MEMORY_RETRIEVAL_AUTHORITY_SQL,
+    MEMORY_TEMPORAL_EVALUATION_MIGRATION_ID,
+    MEMORY_TEMPORAL_EVALUATION_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
     MODEL_ADVISOR_SQL,
     MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
@@ -529,6 +535,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
                 MEMORY_RETRIEVAL_AUTHORITY_SQL,
                 connection,
+            )
+            self._apply_migration(
+                MEMORY_TEMPORAL_EVALUATION_MIGRATION_ID,
+                MEMORY_TEMPORAL_EVALUATION_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MEMORY_ENTITY_GRAPH_MIGRATION_ID, MEMORY_ENTITY_GRAPH_SQL, connection
+            )
+            self._apply_migration(
+                MEMORY_BACKUP_CATALOG_MIGRATION_ID, MEMORY_BACKUP_CATALOG_SQL, connection
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -1654,8 +1671,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO approved_memory
-                (memory_id, text, scope, sensitivity, source_event_id, memory_type, created_at, tags_json, source, provenance_json, confidence, trust_score, retention, approval_state, created_by, updated_at, deleted_at, archived_at, search_enabled, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (memory_id, text, scope, sensitivity, source_event_id, memory_type, created_at, tags_json, source, provenance_json, confidence, trust_score, retention, approval_state, created_by, updated_at, deleted_at, archived_at, search_enabled, expires_at, valid_from, valid_until, supersedes_memory_id, superseded_at, remembered_reason)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     entry.memory_id,
@@ -1678,6 +1695,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     entry.archived_at,
                     int(entry.search_enabled),
                     entry.expires_at,
+                    entry.valid_from or entry.created_at,
+                    entry.valid_until,
+                    entry.supersedes_memory_id,
+                    entry.superseded_at,
+                    entry.remembered_reason,
                 ),
             )
             self._sync_memory_fts(connection, entry.memory_id)
@@ -1686,7 +1708,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             cursor = connection.execute(
                 """UPDATE approved_memory SET text = ?, sensitivity = ?, tags_json = ?, updated_at = ?,
-                search_enabled = ?, expires_at = ? WHERE memory_id = ? AND deleted_at IS NULL""",
+                search_enabled = ?, expires_at = ?, valid_from = ?, valid_until = ?,
+                supersedes_memory_id = ?, superseded_at = ?, remembered_reason = ?
+                WHERE memory_id = ? AND deleted_at IS NULL""",
                 (
                     entry.text,
                     entry.sensitivity,
@@ -1694,11 +1718,86 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     entry.updated_at,
                     int(entry.search_enabled),
                     entry.expires_at,
+                    entry.valid_from or entry.created_at,
+                    entry.valid_until,
+                    entry.supersedes_memory_id,
+                    entry.superseded_at,
+                    entry.remembered_reason,
                     entry.memory_id,
                 ),
             )
             self._sync_memory_fts(connection, entry.memory_id)
         return cursor.rowcount > 0
+
+    def supersede_approved_memory(self, memory_id: str, replacement_id: str, *, at: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE approved_memory SET approval_state = 'superseded', valid_until = ?, superseded_at = ?,
+                updated_at = ? WHERE memory_id = ? AND deleted_at IS NULL AND superseded_at IS NULL""",
+                (at, at, at, memory_id),
+            )
+            self._sync_memory_fts(connection, memory_id)
+            connection.execute(
+                "UPDATE approved_memory SET supersedes_memory_id = ? WHERE memory_id = ?",
+                (memory_id, replacement_id),
+            )
+        return cursor.rowcount > 0
+
+    def create_memory_evaluation_run(self, report: Any, *, strategy: str = "lexical_fts") -> str:
+        from raiker.contracts.ids import new_id
+
+        evaluation_id = new_id("mev_")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO memory_evaluation_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (evaluation_id, report.corpus_version, strategy, report.case_count, report.precision_at_k,
+                 report.recall_at_k, report.mean_reciprocal_rank, report.ndcg_at_k,
+                 report.policy_leak_count, report.p50_latency_ms, report.p95_latency_ms,
+                 report.token_count, report.compute_cost_usd, report.storage_bytes, utc_now()),
+            )
+        return evaluation_id
+
+    def upsert_memory_entity(self, entity_id: str, name: str, entity_type: str) -> None:
+        normalized_name = " ".join(name.casefold().split())
+        if not normalized_name or not entity_type.strip():
+            raise ValueError("invalid_memory_entity")
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO memory_entities VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(normalized_name, entity_type) DO UPDATE SET display_name = excluded.display_name, updated_at = excluded.updated_at""",
+                (entity_id, normalized_name, name.strip(), entity_type.strip(), now, now),
+            )
+
+    def link_memory_entities(
+        self, relationship_id: str, subject_entity_id: str, predicate: str, object_entity_id: str,
+        evidence_memory_id: str, confidence: float,
+    ) -> None:
+        if not predicate.strip() or not 0 <= confidence <= 1 or self.get_active_approved_memory(evidence_memory_id) is None:
+            raise ValueError("invalid_memory_relationship")
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO memory_entity_relationships VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+                (relationship_id, subject_entity_id, predicate.strip(), object_entity_id, evidence_memory_id, confidence, utc_now()),
+            )
+        self.link_memory_projection(evidence_memory_id, "graph", relationship_id, "memory-entity-v1")
+
+    def list_memory_entity_neighborhood(self, entity_id: str, scope: str | None = None) -> list[dict[str, Any]]:
+        now = utc_now()
+        query = """SELECT r.*, s.display_name AS subject_name, o.display_name AS object_name
+        FROM memory_entity_relationships r JOIN memory_entities s ON s.entity_id = r.subject_entity_id
+        JOIN memory_entities o ON o.entity_id = r.object_entity_id
+        JOIN approved_memory m ON m.memory_id = r.evidence_memory_id
+        WHERE r.active = 1 AND (r.subject_entity_id = ? OR r.object_entity_id = ?)
+          AND m.deleted_at IS NULL AND m.archived_at IS NULL AND m.search_enabled = 1
+          AND (m.expires_at IS NULL OR m.expires_at > ?) AND m.superseded_at IS NULL"""
+        params: list[Any] = [entity_id, entity_id, now]
+        if scope:
+            query += " AND m.scope = ?"
+            params.append(scope)
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
 
     def mark_approved_memory_forgotten(
         self, memory_id: str, *, deleted_at: str, updated_at: str
@@ -1753,6 +1852,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute("SELECT * FROM memory_projections WHERE memory_id = ? ORDER BY projection_type, projection_id", (memory_id,)).fetchall()
         return [dict(row) for row in rows]
 
+    def get_active_approved_memory(self, memory_id: str) -> dict[str, Any] | None:
+        now = utc_now()
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM approved_memory WHERE memory_id = ? AND deleted_at IS NULL
+                AND archived_at IS NULL AND search_enabled = 1
+                AND (expires_at IS NULL OR expires_at > ?)
+                AND (valid_from IS NULL OR valid_from <= ?)
+                AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL""",
+                (memory_id, now, now, now),
+            ).fetchone()
+        return dict(row) if row else None
+
     def reconcile_memory_projections(self) -> dict[str, int]:
         with self.connect() as connection:
             cursor = connection.execute(
@@ -1771,8 +1883,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             """INSERT INTO approved_memory_fts(memory_id, text, tags)
             SELECT memory_id, text, tags_json FROM approved_memory
             WHERE memory_id = ? AND deleted_at IS NULL AND archived_at IS NULL
-              AND search_enabled = 1 AND (expires_at IS NULL OR expires_at > ?)""",
-            (memory_id, utc_now()),
+              AND search_enabled = 1 AND (expires_at IS NULL OR expires_at > ?)
+              AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)
+              AND superseded_at IS NULL""",
+            (memory_id, utc_now(), utc_now(), utc_now()),
         )
 
     @staticmethod
@@ -1781,7 +1895,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         connection.execute("""INSERT INTO approved_memory_fts(memory_id, text, tags)
             SELECT memory_id, text, tags_json FROM approved_memory
             WHERE deleted_at IS NULL AND archived_at IS NULL AND search_enabled = 1
-              AND (expires_at IS NULL OR expires_at > ?)""", (utc_now(),))
+              AND (expires_at IS NULL OR expires_at > ?)
+              AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)
+              AND superseded_at IS NULL""", (utc_now(), utc_now(), utc_now()))
 
     def search_approved_memory(self, query: str, scope: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
         terms = [term for term in query.replace('"', " ").split() if term]
@@ -1789,8 +1905,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             return []
         sql = """SELECT m.* FROM approved_memory_fts f JOIN approved_memory m ON m.memory_id = f.memory_id
         WHERE approved_memory_fts MATCH ? AND m.deleted_at IS NULL AND m.archived_at IS NULL
-          AND m.search_enabled = 1 AND (m.expires_at IS NULL OR m.expires_at > ?)"""
-        params: list[Any] = [" AND ".join(f'"{term}"' for term in terms), utc_now()]
+          AND m.search_enabled = 1 AND (m.expires_at IS NULL OR m.expires_at > ?)
+          AND (m.valid_from IS NULL OR m.valid_from <= ?) AND (m.valid_until IS NULL OR m.valid_until > ?)
+          AND m.superseded_at IS NULL"""
+        now = utc_now()
+        params: list[Any] = [" AND ".join(f'"{term}"' for term in terms), now, now, now]
         if scope is not None:
             sql += " AND m.scope = ?"
             params.append(scope)
@@ -2184,10 +2303,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO backup_manifests
-                (manifest_id, backup_type, scope_json, path, checksum, size_bytes, created_by, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (manifest_id, backup_type, scope_json, path, checksum, size_bytes, created_by, created_at,
+                 encryption_key_id, retention_until, legal_hold, erasure_requested_at, erased_at, restore_verified_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (manifest.manifest_id, manifest.backup_type, manifest.scope_json, manifest.path, manifest.checksum, manifest.size_bytes, manifest.created_by, manifest.created_at),
+                (manifest.manifest_id, manifest.backup_type, manifest.scope_json, manifest.path, manifest.checksum, manifest.size_bytes, manifest.created_by, manifest.created_at, manifest.encryption_key_id, manifest.retention_until, int(manifest.legal_hold), manifest.erasure_requested_at, manifest.erased_at, manifest.restore_verified_at),
             )
 
     def list_backup_manifests(self, limit: int = 20) -> list[dict[str, Any]]:
@@ -2196,6 +2316,30 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "SELECT * FROM backup_manifests ORDER BY created_at DESC LIMIT ?", (limit,)
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def request_backup_erasure(self, manifest_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE backup_manifests SET erasure_requested_at = ? WHERE manifest_id = ? AND legal_hold = 0 AND erased_at IS NULL",
+                (utc_now(), manifest_id),
+            )
+        return cursor.rowcount > 0
+
+    def record_backup_erased(self, manifest_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE backup_manifests SET erased_at = ? WHERE manifest_id = ? AND erasure_requested_at IS NOT NULL AND legal_hold = 0",
+                (utc_now(), manifest_id),
+            )
+        return cursor.rowcount > 0
+
+    def record_backup_restore_verified(self, manifest_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE backup_manifests SET restore_verified_at = ? WHERE manifest_id = ? AND erased_at IS NULL",
+                (utc_now(), manifest_id),
+            )
+        return cursor.rowcount > 0
 
     # ── Phase 6: Channels & Relay ──
 
@@ -2484,6 +2628,28 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             query += " AND scope = ?"
             params.append(scope)
         query += " ORDER BY created_at"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_active_memory_vector_embeddings(
+        self, embedding_model: str, scope: str | None = None
+    ) -> list[dict[str, Any]]:
+        now = utc_now()
+        query = """SELECT v.vector_id, v.embedding, p.memory_id FROM vector_records v
+        JOIN memory_projections p ON p.projection_id = v.vector_id
+          AND p.projection_type = 'vector' AND p.active = 1
+        JOIN approved_memory m ON m.memory_id = p.memory_id
+        WHERE v.embedding_model = ? AND v.embedding IS NOT NULL
+          AND m.deleted_at IS NULL AND m.archived_at IS NULL AND m.search_enabled = 1
+          AND (m.expires_at IS NULL OR m.expires_at > ?)
+          AND (m.valid_from IS NULL OR m.valid_from <= ?)
+          AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL"""
+        params: list[Any] = [embedding_model, now, now, now]
+        if scope:
+            query += " AND m.scope = ?"
+            params.append(scope)
+        query += " ORDER BY v.created_at"
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]

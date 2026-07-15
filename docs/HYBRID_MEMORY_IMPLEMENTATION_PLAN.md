@@ -308,8 +308,9 @@ use SQLCipher through `pysqlcipher3static` (the `pysqlcipher3` DB-API); the
 workspace app key derives the SQLCipher key and legacy plaintext databases are
 converted without retaining a plaintext copy. This distribution provides FTS4,
 not FTS5, so lexical ranking is deterministic recency order rather than BM25.
-Memory and backup lifecycle actions are metadata-audited. Principal/workspace
-isolation and independent key-management review remain pending.
+Memory and backup lifecycle actions are metadata-audited, and lifecycle-audit
+rows are append-only at the SQLite layer. Principal/workspace isolation and
+independent key-management review remain pending.
 
 1. Enforce principal/workspace ownership in every memory row and projection;
    add tenant-isolation and confused-deputy tests.

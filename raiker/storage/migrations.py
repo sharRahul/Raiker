@@ -1412,6 +1412,20 @@ ALTER TABLE memory_evaluation_runs ADD COLUMN workload TEXT NOT NULL DEFAULT 're
 ALTER TABLE memory_evaluation_runs ADD COLUMN latency_distribution_json TEXT NOT NULL DEFAULT '{}';
 """
 
+MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_MIGRATION_ID = "RAIKER-2018-memory-lifecycle-audit-immutability"
+MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_SQL = """
+CREATE TRIGGER IF NOT EXISTS prevent_memory_lifecycle_audit_update
+BEFORE UPDATE ON memory_lifecycle_audit
+BEGIN
+  SELECT RAISE(ABORT, 'memory_lifecycle_audit_immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS prevent_memory_lifecycle_audit_delete
+BEFORE DELETE ON memory_lifecycle_audit
+BEGIN
+  SELECT RAISE(ABORT, 'memory_lifecycle_audit_immutable');
+END;
+"""
+
 MEMORY_ENTITY_GRAPH_MIGRATION_ID = "RAIKER-2011-memory-entity-graph"
 MEMORY_ENTITY_GRAPH_SQL = """
 CREATE TABLE IF NOT EXISTS memory_entities (

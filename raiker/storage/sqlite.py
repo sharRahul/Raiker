@@ -84,6 +84,8 @@ from raiker.storage.migrations import (
     MEMORY_FTS_SQL,
     MEMORY_JOBS_MIGRATION_ID,
     MEMORY_JOBS_SQL,
+    MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_MIGRATION_ID,
+    MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_SQL,
     MEMORY_PROJECTIONS_MIGRATION_ID,
     MEMORY_PROJECTIONS_SQL,
     MEMORY_PURGE_MIGRATION_ID,
@@ -586,6 +588,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(MEMORY_JOBS_MIGRATION_ID, MEMORY_JOBS_SQL, connection)
             self._apply_migration(
                 MEMORY_AUDIT_RATE_LIMIT_MIGRATION_ID, MEMORY_AUDIT_RATE_LIMIT_SQL, connection
+            )
+            self._apply_migration(
+                MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_MIGRATION_ID,
+                MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_SQL,
+                connection,
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (

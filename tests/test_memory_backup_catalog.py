@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import BackupManifest
 from raiker.storage.sqlite import SQLiteStore
@@ -41,3 +43,13 @@ def test_backup_legal_hold_change_is_audited(tmp_path: Path) -> None:
             "SELECT action FROM memory_lifecycle_audit WHERE memory_id = ? ORDER BY created_at DESC LIMIT 1",
             (f"backup:{manifest.manifest_id}",),
         ).fetchone()["action"] == "legal_hold"
+
+
+def test_memory_lifecycle_audit_rows_are_append_only(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    audit_id = store.record_memory_lifecycle_event("mem_test", "admin_access", "principal_owner")
+    with store.connect() as connection:
+        with pytest.raises(Exception, match="memory_lifecycle_audit_immutable"):
+            connection.execute("UPDATE memory_lifecycle_audit SET actor_id = 'other' WHERE audit_id = ?", (audit_id,))
+        with pytest.raises(Exception, match="memory_lifecycle_audit_immutable"):
+            connection.execute("DELETE FROM memory_lifecycle_audit WHERE audit_id = ?", (audit_id,))

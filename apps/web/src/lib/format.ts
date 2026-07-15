@@ -21,6 +21,32 @@ export function formatTimestamp(iso: string | null | undefined): string {
   return then === null ? iso : then.toLocaleString();
 }
 
+/** Group timestamped items by the viewer's local calendar day. */
+export function groupByDay<T extends { updated_at: string }>(
+  items: T[],
+  now: Date = new Date(),
+): Array<{ label: string; items: T[] }> {
+  const groups = new Map<string, { label: string; items: T[] }>();
+  for (const item of items) {
+    const label = dayLabel(item.updated_at, now);
+    const group = groups.get(label);
+    if (group) group.items.push(item);
+    else groups.set(label, { label, items: [item] });
+  }
+  return [...groups.values()];
+}
+
+function dayLabel(iso: string, now: Date): string {
+  const then = parseTimestamp(iso);
+  if (then === null) return "Unknown date";
+  const key = (date: Date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  if (key(then) === key(now)) return "Today";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (key(then) === key(yesterday)) return "Yesterday";
+  return then.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+}
+
 function parseTimestamp(iso: string): Date | null {
   const value = new Date(iso.endsWith("Z") || iso.includes("+") ? iso : `${iso}Z`);
   return Number.isNaN(value.getTime()) ? null : value;

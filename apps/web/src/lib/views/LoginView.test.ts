@@ -145,6 +145,16 @@ describe("LoginView", () => {
     await waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith("prin_owner"));
   });
 
+  it("creates a separate same-server instance from the login screen", async () => {
+    stubFetch({ ...HEALTH_OK, "POST /api/instances": { name: "alex", url: "/instances/alex/" } });
+    const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
+    render(LoginView, { props: { onAuthenticated } });
+    await fireEvent.click(screen.getByRole("button", { name: "Create separate instance" }));
+    await fireEvent.input(screen.getByLabelText("Instance name"), { target: { value: "alex" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Create and open instance" }));
+    await waitFor(() => expect(open).toHaveBeenCalledWith("/instances/alex/", "_blank", "noopener"));
+  });
+
   it("supports password visibility with an accessible toggle", async () => {
     stubFetch({ ...HEALTH_OK });
     render(LoginView, { props: { onAuthenticated } });

@@ -33,7 +33,7 @@ fail-closed by design.
   log, or commit them.
 - Add a typed event to `EVENT_TYPES` before emitting it.
 
-## Current product state — 2026-07-14
+## Current product state — 2026-07-15
 
 - The connector write reference (backlog item 5) has landed:
   `GithubConnectorService.create_comment()` is a governed GitHub issue comment
@@ -42,12 +42,16 @@ fail-closed by design.
   governed POST-with-response-body for connector writes. 14 new tests.
 - Conversation organisation has landed its third slice: nested projects/folders.
   Arbitrary-depth folder nesting via hybrid adjacency list (`parent_id`) +
-  materialized path (`path`) on the `projects` table. Two deletion modes:
+  materialized path (`path`) on the `projects` table. Paths are self-inclusive
+  (`/root/child/`), so move/archive operations address exactly one subtree,
+  never siblings. Two deletion modes:
   **archive** (AI-autonomous, soft — archives entire subtree) and **delete**
   (human-only, hard with orphanage cascade — descendants reparented to NULL,
-  archived, path prefixed with `orphaned/`). Context inheritance: ancestor
+  archived, path prefixed with `/orphaned/`). Context inheritance: ancestor
   contexts merge into a session's project context (instructions concatenate
-  root→leaf, attachments union, leaf's `memory_enabled` wins). Path
+  root→leaf, attachments union, nearest explicit `memory_mode` wins).
+  `memory_mode` is `inherit`, `enabled`, or `disabled`; old Boolean clients
+  remain compatible. Path
   management is done in Python (not a DB trigger) for reliability. API:
   `GET /api/projects/tree`, `PUT /api/projects/{id}/move` (human-only),
   `PUT /api/projects/{id}/archive` (any authenticated principal),
@@ -66,6 +70,87 @@ fail-closed by design.
   expiry set/clear; import/export; and an incognito opt-out boundary that
   withholds approved project memory from the turn context when on (the memory is
   not deleted). No second memory system is created.
+- Hybrid-memory lifecycle now adds reversible archive/restore for governed
+  durable memories. Archived records remain preserved but are excluded from
+  normal list, exact lookup, and keyword retrieval; forget remains the separate
+  human-only tombstone action. The human-only control/API is
+  `PUT /api/memory/{memory_id}/archive` with `{ "archived": true|false }`.
+- Eidetic observations now persist only provenance metadata, retention class,
+  artifact reference, and a SHA-256 checksum of the observed content. Raw
+  payload capture and automatic promotion remain deliberately disabled.
+- Memory purge is human-only and requires `X-Memory-Purge-Confirm` to exactly
+  match the memory ID. It removes the live Markdown/SQLite record and records a
+  disposition; retained backups are explicitly disclosed rather than claimed
+  erased.
+- The hybrid-memory delivery plan is complete for local SQLite: active-only
+  FTS, source-versioned `fts`/`vector`/`graph` projection mappings, lifecycle
+  fan-out, owner-started reconciliation (`POST /api/memory/reconcile`),
+  review-only gist candidates, and explicit owner-confirmed eidetic expiry
+  cleanup. Vector/graph creation remains capability-gated; no autonomous raw
+  capture, cleanup worker, or model purge authority was introduced.
+- Post-handoff memory hardening has shipped: retrieval eligibility excludes
+  disabled, expired, future-dated, and superseded memories before FTS, vector,
+  graph, or runtime ranking. Vector/hybrid results expose provenance, scope,
+  sensitivity, confidence, retention, an untrusted-data label, and score
+  contributions. Recall, import/export, backup catalog operations, and backup
+  legal-hold changes are lifecycle-audited; the Memory control response exposes
+  source, creator, validity, supersession, and remembered-reason metadata,
+  including search-disabled records so users can re-enable them. Integrity
+  scans now detect checksum mismatches, orphaned artifacts, project-path
+  inconsistencies, and failed purge locations; the evaluation corpus covers
+  scoped, sensitive, archived, forgotten, corrected, and time-qualified
+  records with token and retrieved-storage regression budgets. SQLCipher
+  migration also verifies conversion cleanup and encrypted-database access.
+- Still pending for production memory: a representative consented benchmark
+  and live quality/latency/cost thresholds; provider-backed runtime retrieval,
+  entity extraction/review, and runtime hybrid integration; same-device
+  cross-instance isolation and recovery drills; user-controlled NAS/mounted-drive/
+  NAS backup first, with mounted-drive/cloud destinations optional; real encrypted
+  backup and restore/erasure drills; monitoring, daemon/worker operation, load/soak/chaos
+  evidence; and independent security, privacy, and pilot/benchmark evidence.
+- The next memory program is staged in `HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`
+  (Stages F–J): retrieval-authority/evaluation, gated semantic + entity
+  retrieval, self-hosted multi-user encryption/backup operations, reliability/scale, then
+  independent benchmark evidence. Do not market the current implementation as
+  “best”; that claim requires the Stage J evidence.
+- The roadmap explicitly covers the full production checklist: FTS/vector/graph
+  retrieval with filtering before ranking; precision/recall/latency/cost;
+  corrections and temporal/supersession states; per-workspace encrypted data
+  keys; legal holds and verified/pending backup erasure; rate-limited,
+  idempotent jobs; recovery/rollback/integrity/load/chaos evidence; and
+  human controls, review queues, and evidence-preserving consolidation.
+- Stage F has begun: `RAIKER-2009` makes SQLite + active-only FTS authoritative
+  for governed memory retrieval and keeps corrections/search opt-outs/expiry
+  synchronized. `raiker.memory.evaluation` provides the initial
+  `memory-eval-v1` lexical quality/safety harness; it is not yet a persisted
+  benchmark service or an external comparison.
+- `RAIKER-2010` extends Stage F with temporal correction: a human correction
+  creates a replacement memory, preserves the old fact as superseded evidence,
+  and removes it from active retrieval. Aggregate evaluation runs are persisted
+  locally; corpus fixtures and regression thresholds remain outstanding.
+- `memory-eval-v1` now includes deterministic scope, archive, and supersession
+  fixtures with a CI precision/recall/zero-leak regression check. It is still a
+  small local corpus, not the representative benchmark required by Stage J.
+- Stage G/I early slices are implemented but not complete: governed durable
+  memory can project to local vectors; entity relationships require active
+  evidence; hybrid retrieval deduplicates active lexical/vector/graph results;
+  and an owner-started integrity report finds stale indexes/projections/edges.
+  Stage H's backup catalog records retention, legal hold, restore verification,
+  and erasure disposition. SQLCipher now encrypts the SQLite database, FTS4,
+  vectors, and graph rows using a workspace-derived key; local workspace
+  isolation, telemetry, and operational proof remain required.
+- The first maintenance-job primitive is now present: idempotent `reconcile`
+  and `integrity_scan` jobs have SQLite leases, retries, and dead-letter state,
+  per-workspace rate limits, and lifecycle audit rows, but no daemon, telemetry,
+  or load/chaos proof exists yet.
+- SQLCipher is provided by `pysqlcipher3static` (imported as `pysqlcipher3`).
+  The bundled build lacks FTS5, so Raiker uses encrypted FTS4 and deterministic
+  recency ordering. Legacy plaintext databases are converted once and the
+  transient plaintext source is removed after success.
+- The phased contract for the remaining archive-first eidetic-memory work is
+  [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
+  It keeps SQLite authoritative, separates project hierarchy from entity graph,
+  and requires human-confirmed multi-store purge rather than a model delete tool.
 - Tool execution defects fixed: `connector_read` was denied by policy
   (unknown_or_denied_tool) despite having a real executor — now routed as
   read-shaped like `github_read`; `connector_write` was denied — now routed
@@ -113,7 +198,9 @@ fail-closed by design.
   `DashboardService.get_session_context`.
 - The generic connector store, four governed read connectors (GitHub, Gmail,
   Calendar, Slack), approvals, audit events, budgets, and the connector web
-  surface are implemented. The first real write action remains unimplemented.
+  surface are implemented. GitHub issue-comment creation is the one shipped,
+  governed connector write reference; other connector write operations remain
+  unimplemented and fail closed.
 - Plugin code has two real, governed runtimes: bounded subprocess and a
   no-network/read-only container. Host in-process import of plugin code is an
   explicit security non-goal, not a deferred implementation task.
@@ -261,9 +348,9 @@ governed vertical slice at a time.
  5. **Connector write reference:** one narrow, real service write (for example,
     GitHub issue comment) through immutable intent + approval + an actual
     executor. Never make a write action execute on `ask` alone. Generic
-    `connector_write` path is wired end-to-end; `GithubConnectorService
-    .create_comment()` exists with governance + tests but is NOT dispatched by
-    any runtime path yet.
+    `connector_write` path is wired end-to-end; `GithubConnectorExecutor`
+    dispatches `GithubConnectorService.create_comment()` through the same
+    approval path. Other connector write operations remain fail closed.
 6. **Agent evaluation and observability:** trace a goal/plan/tool/approval
    chain with latency, cost, outcome, and user feedback; add record/replayable
    regression scenarios, outcome review, and an OpenTelemetry-compatible export

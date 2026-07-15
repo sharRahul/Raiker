@@ -13,11 +13,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import serialize_dto
 from raiker.api.sessions import ApiSession
+from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.runtime.authority.models import Principal
 
@@ -38,10 +39,12 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
 async def list_memories(
     request: Request,
     scope: str | None = None,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
     """List approved memories with governance metadata + pin state."""
-    return serialize_dto(_service(request).list_memories(scope=scope))
+    return serialize_dto(
+        _service(request).list_memories(scope=scope, acting_principal_id=auth_data[0].principal_id)
+    )
 
 
 @router.put("/api/memory/{memory_id}/pin")
@@ -93,6 +96,31 @@ async def import_memories(
     return {"ok": True, **result.data}
 
 
+@router.post("/api/memory/reconcile")
+async def reconcile_memory_indexes(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """Owner-started reconciliation for FTS and projection lifecycle state."""
+    result = _service(request).reconcile_memory_indexes(auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/memory/eidetic/cleanup")
+async def cleanup_expired_observations(
+    request: Request, body: dict[str, Any], auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    raw_ids = body.get("observation_ids", [])
+    observation_ids = {str(item) for item in raw_ids} if isinstance(raw_ids, list) else set()
+    result = _service(request).cleanup_expired_observations(
+        observation_ids, str(body.get("now", utc_now())), auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
 @router.get("/api/memory/settings")
 async def get_memory_settings(
     request: Request,
@@ -138,6 +166,30 @@ async def forget_memory(
     return {"ok": True, **result.data}
 
 
+@router.put("/api/memory/{memory_id}/archive")
+async def set_memory_archived(memory_id: str, request: Request, body: dict[str, Any], auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
+    result = _service(request).set_memory_archived(memory_id, bool(body.get("archived", True)), auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
+@router.get("/api/memory/{memory_id}/purge-preview")
+async def preview_memory_purge(memory_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
+    result = _service(request).preview_memory_purge(memory_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
+@router.delete("/api/memory/{memory_id}/purge")
+async def purge_memory(memory_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth), x_memory_purge_confirm: str | None = Header(default=None)) -> dict[str, Any]:
+    result = _service(request).purge_memory(memory_id, x_memory_purge_confirm, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT if result.reason_code == "memory_purge_confirmation_required" else status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
 @router.put("/api/memory/{memory_id}")
 async def edit_memory(
     memory_id: str,
@@ -153,6 +205,18 @@ async def edit_memory(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"ok": False, "reason_code": result.reason_code},
         )
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/memory/{memory_id}/correct")
+async def correct_memory(
+    memory_id: str, request: Request, body: dict[str, Any], auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    result = _service(request).correct_memory_controlled(
+        memory_id, str(body.get("text", "")), str(body.get("reason", "")), auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"ok": False, "reason_code": result.reason_code})
     return {"ok": True, **result.data}
 
 

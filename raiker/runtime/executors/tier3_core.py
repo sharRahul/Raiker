@@ -47,6 +47,8 @@ class SemanticMemoryExecutor:
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         from raiker.memory.store import search_memory
+        from raiker.storage.sqlite import SQLiteStore
+
         query = str(action.arguments.get("query", ""))
         if not query:
             return ExecutionResult(
@@ -54,7 +56,7 @@ class SemanticMemoryExecutor:
                 reason_code="missing_argument:query",
                 summary="Semantic memory query denied: no query provided.",
             )
-        results = search_memory(query, workspace_root=self._workspace_root)
+        results = search_memory(query, workspace_root=self._workspace_root, store=SQLiteStore(self._workspace_root))
         return ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
             summary=f"Semantic memory search returned {len(results)} results.",
@@ -86,6 +88,8 @@ class VectorEmbeddingExecutor:
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         op = action.arguments.get("action", "embed")
+        if op == "project_memory":
+            return self._project_memory(action)
         if op == "embed":
             return self._embed(action)
         if op == "list":
@@ -138,6 +142,34 @@ class VectorEmbeddingExecutor:
                 "content_hash": content_hash,
                 "content_redacted": True,
             },
+        )
+
+    def _project_memory(self, action: GovernedAction) -> ExecutionResult:
+        import json
+
+        memory_id = action.arguments.get("memory_id")
+        if not isinstance(memory_id, str) or not memory_id:
+            return self._failed(action.action_id, "missing_argument:memory_id")
+        memory = self._store.get_active_approved_memory(memory_id)
+        if memory is None:
+            return self._failed(action.action_id, "memory_not_active_or_not_found")
+        from raiker.contracts.ids import new_id, utc_now
+        from raiker.contracts.models import VectorRecord
+        from raiker.vector import LOCAL_EMBEDDING_MODEL, VectorIndex, embed_text
+
+        text = str(memory["text"])
+        vector_id = new_id("vec_")
+        self._store.insert_vector_record(VectorRecord(
+            vector_id=vector_id, content_hash=VectorIndex.compute_content_hash(text),
+            content_preview=text[:_PREVIEW_LEN], embedding_model=LOCAL_EMBEDDING_MODEL,
+            dimensions=384, scope=str(memory["scope"]), sensitivity=str(memory["sensitivity"]),
+            created_at=utc_now(), embedding=json.dumps(embed_text(text, 384)),
+        ))
+        self._store.link_memory_projection(memory_id, "vector", vector_id, LOCAL_EMBEDDING_MODEL)
+        return ExecutionResult(
+            ok=True, capability=self.capability, action_id=action.action_id,
+            summary="Approved durable memory projected to a local vector; source text not emitted.",
+            artifacts={"memory_id": memory_id, "vector_id": vector_id, "content_redacted": True},
         )
 
     def _list(self, action: GovernedAction) -> ExecutionResult:

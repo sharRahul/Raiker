@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.routing import Mount
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from raiker.api.redaction import redact_response_body
@@ -16,6 +20,7 @@ from raiker.api.routes_channels import router as channels_router
 from raiker.api.routes_connectors import router as connectors_router
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
+from raiker.api.routes_instances import router as instances_router
 from raiker.api.routes_memory import router as memory_router
 from raiker.api.routes_prompts import router as prompts_router
 from raiker.api.routes_settings import router as settings_router
@@ -122,6 +127,49 @@ def _try_redact_json_body(raw: bytes) -> Any | None:
     return redact_response_body(parsed)
 
 
+def _instances_registry(root: Path) -> Path:
+    return root / ".raiker" / "instances.json"
+
+
+def _stored_instance_names(root: Path) -> list[str]:
+    try:
+        raw = json.loads(_instances_registry(root).read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return []
+    return [name for name in raw if isinstance(name, str) and name]
+
+
+def _write_instance_names(root: Path, names: list[str]) -> None:
+    registry = _instances_registry(root)
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text(json.dumps(names), encoding="utf-8")
+
+
+def _mount_instance(app: FastAPI, name: str, workspace: Path) -> None:
+    if any(getattr(route, "path", "") == f"/instances/{name}" for route in app.router.routes):
+        return
+    ui_dir = getattr(app.state, "instance_ui_dir", None)
+    instance = create_app(workspace, ui_dir=ui_dir)
+    route = Mount(f"/instances/{name}", app=instance, name=f"instance-{name}")
+    static_index = next(
+        (index for index, item in enumerate(app.router.routes) if getattr(item, "name", "") == "web-ui"),
+        len(app.router.routes),
+    )
+    app.router.routes.insert(static_index, route)
+
+
+def create_and_mount_instance(app: FastAPI, name: str, root: Path) -> Path:
+    """Create one isolated workspace and mount its independent ASGI app."""
+    workspace = root / ".raiker" / "instances" / name
+    if workspace.exists():
+        raise FileExistsError(name)
+    workspace.mkdir(parents=True)
+    names = _stored_instance_names(root)
+    _write_instance_names(root, [*names, name])
+    _mount_instance(app, name, workspace)
+    return workspace
+
+
 def create_app(
     workspace_root: str | Path = ".",
     executor_registry: ExecutorRegistry | None = None,
@@ -131,22 +179,42 @@ def create_app(
     max_body_bytes: int = 1_000_000,
     hsts: bool = False,
 ) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        from raiker.tasks.scheduler import TaskScheduler
+
+        stop = asyncio.Event()
+        async def tick() -> None:
+            scheduler = TaskScheduler(app.state.workspace_root)
+            while not stop.is_set():
+                with suppress(Exception):
+                    await scheduler.run_due()
+                with suppress(TimeoutError):
+                    await asyncio.wait_for(stop.wait(), timeout=15)
+        worker = asyncio.create_task(tick())
+        try:
+            yield
+        finally:
+            stop.set()
+            worker.cancel()
+            with suppress(asyncio.CancelledError):
+                await worker
+
     app = FastAPI(
         title="Raiker API",
         version="0.1.0",
         docs_url="/api/docs",
         redoc_url="/api/redoc",
         openapi_url="/api/openapi.json",
+        lifespan=lifespan,
     )
     app.state.workspace_root = Path(workspace_root).resolve()
+    app.state.instance_ui_dir = Path(ui_dir) if ui_dir is not None else None
     # Boot key material: ensure the internal app key exists (encrypts MFA seeds)
     # and load the connector vault key-file into the environment when the env var
     # is unset. The vault key remains fail-closed if neither is present.
     from raiker.auth.app_key import ensure_app_key
-    from raiker.auth.vault_key_file import load_vault_key_into_env
-
     ensure_app_key(app.state.workspace_root)
-    load_vault_key_into_env(app.state.workspace_root)
     if executor_registry is not None:
         app.state.executor_registry = executor_registry
     app.add_middleware(RedactionMiddleware)
@@ -164,6 +232,7 @@ def create_app(
     app.add_middleware(RateLimitMiddleware, max_requests=rate_limit_per_minute, window_seconds=60.0)
     app.add_middleware(SecurityHeadersMiddleware, hsts=hsts)
     app.include_router(auth_router)
+    app.include_router(instances_router)
     app.include_router(vault_router)
     app.include_router(settings_router)
     app.include_router(control_router)
@@ -182,4 +251,8 @@ def create_app(
         ui_path = Path(ui_dir)
         if ui_path.is_dir() and (ui_path / "index.html").is_file():
             app.mount("/", StaticFiles(directory=ui_path, html=True), name="web-ui")
+    for instance_name in _stored_instance_names(app.state.workspace_root):
+        workspace = app.state.workspace_root / ".raiker" / "instances" / instance_name
+        if workspace.is_dir():
+            _mount_instance(app, instance_name, workspace)
     return app

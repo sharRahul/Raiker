@@ -1302,3 +1302,194 @@ CREATE INDEX IF NOT EXISTS idx_projects_parent ON projects(parent_id);
 CREATE INDEX IF NOT EXISTS idx_active_projects_path ON projects(path) WHERE is_archived = 0;
 CREATE INDEX IF NOT EXISTS idx_all_projects_path ON projects(path);
 """
+
+# Project context memory is a nearest-ancestor override, not a Boolean default.
+# Existing rows retain their explicit legacy choice; new rows can inherit.
+PROJECT_MEMORY_INHERITANCE_MIGRATION_ID = "RAIKER-1013-project-memory-inheritance"
+PROJECT_MEMORY_INHERITANCE_SQL = """
+ALTER TABLE project_contexts ADD COLUMN memory_mode TEXT NOT NULL DEFAULT 'inherit'
+  CHECK (memory_mode IN ('inherit', 'enabled', 'disabled'));
+UPDATE project_contexts
+SET memory_mode = CASE memory_enabled WHEN 1 THEN 'enabled' ELSE 'disabled' END;
+"""
+
+PROJECT_SELF_INCLUSIVE_PATH_MIGRATION_ID = "RAIKER-1014-project-self-inclusive-path"
+
+MEMORY_ARCHIVE_MIGRATION_ID = "RAIKER-2003-memory-archive-lifecycle"
+MEMORY_ARCHIVE_SQL = """
+ALTER TABLE approved_memory ADD COLUMN archived_at TEXT;
+CREATE INDEX IF NOT EXISTS idx_approved_memory_active ON approved_memory(scope) WHERE deleted_at IS NULL AND archived_at IS NULL;
+"""
+
+EIDETIC_OBSERVATIONS_MIGRATION_ID = "RAIKER-2004-eidetic-observations"
+EIDETIC_OBSERVATIONS_SQL = """
+CREATE TABLE IF NOT EXISTS eidetic_observations (
+  observation_id TEXT PRIMARY KEY, source_event_id TEXT NOT NULL, session_id TEXT NOT NULL,
+  summary TEXT NOT NULL, content_sha256 TEXT NOT NULL, retention TEXT NOT NULL,
+  artifact_ref TEXT, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_eidetic_observations_session ON eidetic_observations(session_id, created_at);
+"""
+
+MEMORY_PURGE_MIGRATION_ID = "RAIKER-2005-memory-purge-preview"
+MEMORY_PURGE_SQL = """
+CREATE TABLE IF NOT EXISTS memory_purge_records (
+  purge_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, requested_by TEXT NOT NULL,
+  confirmed_at TEXT NOT NULL, disposition_json TEXT NOT NULL
+);
+"""
+
+GIST_MEMORY_MIGRATION_ID = "RAIKER-2006-gist-memory-review"
+GIST_MEMORY_SQL = """
+CREATE TABLE IF NOT EXISTS gist_memories (
+  gist_id TEXT PRIMARY KEY, observation_id TEXT NOT NULL REFERENCES eidetic_observations(observation_id),
+  summary TEXT NOT NULL, confidence REAL NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL
+);
+"""
+
+MEMORY_PROJECTIONS_MIGRATION_ID = "RAIKER-2007-memory-projections"
+MEMORY_PROJECTIONS_SQL = """
+CREATE TABLE IF NOT EXISTS memory_projections (
+  memory_id TEXT NOT NULL, projection_type TEXT NOT NULL, projection_id TEXT NOT NULL,
+  source_version TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (memory_id, projection_type, projection_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_projections_active ON memory_projections(projection_type, projection_id) WHERE active = 1;
+"""
+
+MEMORY_FTS_MIGRATION_ID = "RAIKER-2008-memory-fts"
+MEMORY_FTS_SQL = """
+CREATE VIRTUAL TABLE IF NOT EXISTS approved_memory_fts USING fts4(
+  memory_id UNINDEXED, text, tags
+);
+INSERT INTO approved_memory_fts(memory_id, text, tags)
+SELECT memory_id, text, tags_json FROM approved_memory
+WHERE deleted_at IS NULL AND archived_at IS NULL;
+"""
+
+MEMORY_SQLCIPHER_FTS_MIGRATION_ID = "RAIKER-2015-sqlcipher-fts4-repair"
+MEMORY_SQLCIPHER_FTS_SQL = """
+CREATE VIRTUAL TABLE IF NOT EXISTS approved_memory_fts USING fts4(
+  memory_id UNINDEXED, text, tags
+);
+"""
+
+MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID = "RAIKER-2009-memory-retrieval-authority"
+MEMORY_RETRIEVAL_AUTHORITY_SQL = """
+ALTER TABLE approved_memory ADD COLUMN search_enabled INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE approved_memory ADD COLUMN expires_at TEXT;
+"""
+
+MEMORY_TEMPORAL_EVALUATION_MIGRATION_ID = "RAIKER-2010-memory-temporal-evaluation"
+MEMORY_TEMPORAL_EVALUATION_SQL = """
+ALTER TABLE approved_memory ADD COLUMN valid_from TEXT;
+ALTER TABLE approved_memory ADD COLUMN valid_until TEXT;
+ALTER TABLE approved_memory ADD COLUMN supersedes_memory_id TEXT REFERENCES approved_memory(memory_id);
+ALTER TABLE approved_memory ADD COLUMN superseded_at TEXT;
+ALTER TABLE approved_memory ADD COLUMN remembered_reason TEXT;
+UPDATE approved_memory SET valid_from = created_at WHERE valid_from IS NULL;
+CREATE INDEX IF NOT EXISTS idx_approved_memory_temporal ON approved_memory(scope, valid_from, valid_until)
+  WHERE deleted_at IS NULL AND archived_at IS NULL;
+CREATE TABLE IF NOT EXISTS memory_evaluation_runs (
+  evaluation_id TEXT PRIMARY KEY, corpus_version TEXT NOT NULL, strategy TEXT NOT NULL,
+  case_count INTEGER NOT NULL, precision_at_k REAL NOT NULL, recall_at_k REAL NOT NULL,
+  mean_reciprocal_rank REAL NOT NULL, ndcg_at_k REAL NOT NULL, policy_leak_count INTEGER NOT NULL,
+  p50_latency_ms REAL NOT NULL, p95_latency_ms REAL NOT NULL, token_count INTEGER NOT NULL,
+  compute_cost_usd REAL NOT NULL, storage_bytes INTEGER NOT NULL, created_at TEXT NOT NULL
+);
+"""
+
+MEMORY_CONTENT_CHECKSUM_MIGRATION_ID = "RAIKER-2016-memory-content-checksum"
+MEMORY_CONTENT_CHECKSUM_SQL = """
+ALTER TABLE approved_memory ADD COLUMN content_checksum TEXT;
+"""
+
+MEMORY_EVALUATION_CONTEXT_MIGRATION_ID = "RAIKER-2017-memory-evaluation-context"
+MEMORY_EVALUATION_CONTEXT_SQL = """
+ALTER TABLE memory_evaluation_runs ADD COLUMN backend_version TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE memory_evaluation_runs ADD COLUMN scope TEXT NOT NULL DEFAULT 'mixed';
+ALTER TABLE memory_evaluation_runs ADD COLUMN workload TEXT NOT NULL DEFAULT 'retrieval_case_set';
+ALTER TABLE memory_evaluation_runs ADD COLUMN latency_distribution_json TEXT NOT NULL DEFAULT '{}';
+"""
+
+MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_MIGRATION_ID = "RAIKER-2018-memory-lifecycle-audit-immutability"
+MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_SQL = """
+CREATE TRIGGER IF NOT EXISTS prevent_memory_lifecycle_audit_update
+BEFORE UPDATE ON memory_lifecycle_audit
+BEGIN
+  SELECT RAISE(ABORT, 'memory_lifecycle_audit_immutable');
+END;
+CREATE TRIGGER IF NOT EXISTS prevent_memory_lifecycle_audit_delete
+BEFORE DELETE ON memory_lifecycle_audit
+BEGIN
+  SELECT RAISE(ABORT, 'memory_lifecycle_audit_immutable');
+END;
+"""
+
+MEMORY_RELATIONSHIP_REVIEW_MIGRATION_ID = "RAIKER-2019-memory-relationship-review"
+MEMORY_RELATIONSHIP_REVIEW_SQL = """
+CREATE TABLE IF NOT EXISTS memory_relationship_candidates (
+  candidate_id TEXT PRIMARY KEY,
+  subject_name TEXT NOT NULL, subject_type TEXT NOT NULL, predicate TEXT NOT NULL,
+  object_name TEXT NOT NULL, object_type TEXT NOT NULL,
+  evidence_memory_id TEXT NOT NULL REFERENCES approved_memory(memory_id),
+  confidence REAL NOT NULL CHECK(confidence >= 0 AND confidence <= 1),
+  decision TEXT NOT NULL CHECK(decision IN ('needs_user_review', 'approved', 'denied')),
+  created_at TEXT NOT NULL, resolved_at TEXT, resolved_by TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_memory_relationship_candidates_review
+  ON memory_relationship_candidates(decision, created_at);
+"""
+
+MEMORY_ENTITY_GRAPH_MIGRATION_ID = "RAIKER-2011-memory-entity-graph"
+MEMORY_ENTITY_GRAPH_SQL = """
+CREATE TABLE IF NOT EXISTS memory_entities (
+  entity_id TEXT PRIMARY KEY, normalized_name TEXT NOT NULL, display_name TEXT NOT NULL,
+  entity_type TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE(normalized_name, entity_type)
+);
+CREATE TABLE IF NOT EXISTS memory_entity_relationships (
+  relationship_id TEXT PRIMARY KEY, subject_entity_id TEXT NOT NULL REFERENCES memory_entities(entity_id),
+  predicate TEXT NOT NULL, object_entity_id TEXT NOT NULL REFERENCES memory_entities(entity_id),
+  evidence_memory_id TEXT NOT NULL REFERENCES approved_memory(memory_id), confidence REAL NOT NULL,
+  created_at TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
+  UNIQUE(subject_entity_id, predicate, object_entity_id, evidence_memory_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_entity_relationships_subject ON memory_entity_relationships(subject_entity_id) WHERE active = 1;
+CREATE INDEX IF NOT EXISTS idx_memory_entity_relationships_object ON memory_entity_relationships(object_entity_id) WHERE active = 1;
+"""
+
+MEMORY_BACKUP_CATALOG_MIGRATION_ID = "RAIKER-2012-memory-backup-catalog"
+MEMORY_BACKUP_CATALOG_SQL = """
+ALTER TABLE backup_manifests ADD COLUMN encryption_key_id TEXT;
+ALTER TABLE backup_manifests ADD COLUMN retention_until TEXT;
+ALTER TABLE backup_manifests ADD COLUMN legal_hold INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE backup_manifests ADD COLUMN erasure_requested_at TEXT;
+ALTER TABLE backup_manifests ADD COLUMN erased_at TEXT;
+ALTER TABLE backup_manifests ADD COLUMN restore_verified_at TEXT;
+"""
+
+MEMORY_JOBS_MIGRATION_ID = "RAIKER-2013-memory-jobs"
+MEMORY_JOBS_SQL = """
+CREATE TABLE IF NOT EXISTS memory_jobs (
+  job_id TEXT PRIMARY KEY, job_type TEXT NOT NULL, dedup_key TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('queued', 'running', 'retry', 'dead_letter', 'completed')),
+  attempts INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3,
+  lease_until TEXT, last_error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE(job_type, dedup_key)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_jobs_ready ON memory_jobs(status, lease_until, created_at);
+"""
+
+MEMORY_AUDIT_RATE_LIMIT_MIGRATION_ID = "RAIKER-2014-memory-audit-rate-limit"
+MEMORY_AUDIT_RATE_LIMIT_SQL = """
+CREATE TABLE IF NOT EXISTS memory_lifecycle_audit (
+  audit_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, action TEXT NOT NULL,
+  actor_id TEXT NOT NULL, details_json TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_memory_lifecycle_audit_memory ON memory_lifecycle_audit(memory_id, created_at);
+CREATE TABLE IF NOT EXISTS memory_job_rate_windows (
+  job_type TEXT NOT NULL, window_started_at TEXT NOT NULL, count INTEGER NOT NULL,
+  PRIMARY KEY(job_type, window_started_at)
+);
+"""

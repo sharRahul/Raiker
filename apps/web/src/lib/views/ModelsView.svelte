@@ -4,7 +4,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
-  import type { ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
+  import type { ModelProfile, ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
   import { humanize, providerName } from "../format";
 
@@ -43,6 +43,57 @@
   let pickerChoice = $state("");
   let selecting = $state(false);
   let selectError = $state<string | null>(null);
+
+  // Endpoint and API key are submitted once into the encrypted, per-instance
+  // vault. They are never returned to this view or rendered again.
+  let connectionFor = $state<string | null>(null);
+  let connectionEndpoint = $state("");
+  let connectionApiKey = $state("");
+  let connectionSaving = $state(false);
+  let connectionError = $state<string | null>(null);
+  let testFor = $state<string | null>(null);
+  let testResult = $state<string | null>(null);
+  let detailsFor = $state<ModelProfile | null>(null);
+
+  function openConnection(profileId: string) {
+    connectionFor = connectionFor === profileId ? null : profileId;
+    connectionEndpoint = "";
+    connectionApiKey = "";
+    connectionError = null;
+  }
+
+  async function saveConnection(profileId: string) {
+    connectionSaving = true;
+    connectionError = null;
+    try {
+      await api.saveModelConnection(profileId, connectionEndpoint.trim(), connectionApiKey.trim());
+      connectionEndpoint = "";
+      connectionApiKey = "";
+      connectionFor = null;
+      await load();
+    } catch (e) {
+      connectionError = e instanceof ApiError
+        ? `Could not save connection (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+        : "Could not save connection";
+    } finally {
+      connectionSaving = false;
+    }
+  }
+
+  async function testConnection(profile: ModelProfile) {
+    testFor = profile.profile_id;
+    testResult = null;
+    try {
+      const result = await api.providerModels(profile.profile_id);
+      testResult = result.status === "available"
+        ? `${providerName(profile.provider)} responded and exposed ${result.models.length} model${result.models.length === 1 ? "" : "s"}.`
+        : pickerNote(result);
+    } catch {
+      testResult = "Raiker could not reach this provider.";
+    } finally {
+      testFor = null;
+    }
+  }
 
   async function openPicker(profileId: string) {
     if (pickerFor === profileId) {
@@ -205,6 +256,26 @@
     }
   }
 
+  function sectionFor(profile: ModelProfile): "Local" | "Hosted" | "Advanced" {
+    if (profile.provider === "openrouter" || profile.provider === "huggingface" || profile.provider === "ollama-cloud" || profile.provider === "openai-compatible") return "Advanced";
+    return profile.requires_network ? "Hosted" : "Local";
+  }
+
+  const sections = ["Local", "Hosted", "Advanced"] as const;
+  const configuredProfiles = $derived((models?.profiles ?? []).filter((p) => p.connection_configured || p.selected));
+  const setupPercent = $derived(models?.profiles.length ? Math.round((configuredProfiles.length / models.profiles.length) * 100) : 0);
+  function profilesFor(section: "Local" | "Hosted" | "Advanced") {
+    return (models?.profiles ?? []).filter((profile) => sectionFor(profile) === section);
+  }
+  function providerHelp(profile: ModelProfile): string {
+    if (profile.provider === "ollama") return "Run Ollama locally, then choose one of its installed models.";
+    if (profile.provider === "lm-studio") return "Start the LM Studio local server, then choose the loaded model.";
+    if (profile.provider === "llama.cpp") return "Start llama-server and expose the model name configured by the server.";
+    if (profile.provider === "openai-compatible") return "Use this for a vLLM, home-lab, or other OpenAI-compatible endpoint you control.";
+    if (profile.provider === "anthropic") return "Save your own Anthropic API key, enable hosted access, then choose a model.";
+    return "Save your own provider key, enable the required policy gate, then choose a model.";
+  }
+
   onMount(load);
 </script>
 
@@ -231,11 +302,31 @@
       <EmptyState icon="models" title="No model profiles configured" body="Add profiles in config/model-profiles.json." />
     </div>
   {:else}
-    <div class="profile-grid">
-      {#each models.profiles as p (p.profile_id)}
+    <section class="setup-overview card" aria-labelledby="model-setup-title">
+      <div>
+        <p class="eyebrow">Model setup</p>
+        <h2 id="model-setup-title">Choose where Raiker thinks</h2>
+        <p class="sub">{configuredProfiles.length} of {models.profiles.length} providers are ready or selected. Each connection belongs only to this Raiker instance.</p>
+      </div>
+      <div class="setup-meter" aria-label={`${setupPercent}% provider setup complete`}>
+        <strong>{setupPercent}%</strong><span>setup complete</span>
+        <div class="meter-track"><span style={`width: ${setupPercent}%`}></span></div>
+      </div>
+    </section>
+
+    {#each sections as section}
+      {@const sectionProfiles = profilesFor(section)}
+      {#if sectionProfiles.length}
+      <section class="provider-section" aria-labelledby={`section-${section}`}>
+        <div class="section-heading">
+          <div><p class="eyebrow">{section}</p><h2 id={`section-${section}`}>{section === "Local" ? "On this device" : section === "Hosted" ? "Your hosted providers" : "Advanced connections"}</h2></div>
+          <p>{section === "Local" ? "Private by default; nothing leaves this device." : section === "Hosted" ? "Use your own account and opt in to network access." : "Custom endpoints and provider routers for power users."}</p>
+        </div>
+        <div class="profile-grid">
+          {#each sectionProfiles as p (p.profile_id)}
         <article class="card profile" class:selected={p.selected}>
           <div class="profile-head">
-            <h2 class="profile-name">{providerName(p.provider)}</h2>
+            <div class="provider-title"><span class="provider-logo" aria-hidden="true">{providerName(p.provider).slice(0, 1)}</span><h3 class="profile-name">{providerName(p.provider)}</h3></div>
             {#if p.selected}
               <Badge variant="active" label="selected" />
             {/if}
@@ -248,6 +339,7 @@
             {/if}
             · <code class="profile-ref" title="Profile id">{p.profile_id}</code>
           </p>
+          <p class="provider-help">{providerHelp(p)}</p>
           <div class="chips">
             <span class="chip">{endpointLabel(p.endpoint_kind)}</span>
             {#if p.local_only}
@@ -272,9 +364,24 @@
                 Cache {p.prompt_cache_ttl}
               </span>
             {/if}
+            {#if p.connection_configured}
+              <span class="chip chip-ok">Connection saved</span>
+            {/if}
           </div>
 
           <div class="select-row">
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onclick={() => openConnection(p.profile_id)}
+              aria-expanded={connectionFor === p.profile_id}
+            >
+              Configure…
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void testConnection(p)} disabled={testFor === p.profile_id}>
+              {testFor === p.profile_id ? "Testing…" : "Test"}
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick={() => detailsFor = p}>Details</button>
             {#if !p.selected && p.model !== "<model>"}
               <button
                 type="button"
@@ -294,6 +401,24 @@
               {p.model === "<model>" ? "Choose model…" : "Change model…"}
             </button>
           </div>
+
+          {#if connectionFor === p.profile_id}
+            <div class="picker">
+              <p class="picker-note">Saved only in this instance’s encrypted vault. Leave the endpoint blank to use the provider default.</p>
+              <input class="picker-input" type="url" placeholder="Custom endpoint (optional)" bind:value={connectionEndpoint} aria-label="Custom provider endpoint" />
+              <input class="picker-input" type="password" placeholder="API key (optional for local runtimes)" bind:value={connectionApiKey} aria-label="Provider API key" autocomplete="off" />
+              <div class="picker-actions">
+                <button type="button" class="btn btn-primary btn-sm" onclick={() => void saveConnection(p.profile_id)} disabled={connectionSaving || (connectionEndpoint.trim() === "" && connectionApiKey.trim() === "")}>
+                  {connectionSaving ? "Saving…" : "Save connection"}
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick={() => openConnection(p.profile_id)}>Cancel</button>
+              </div>
+              {#if connectionError}<p class="error picker-error" role="alert">{connectionError}</p>{/if}
+            </div>
+          {/if}
+          {#if testResult && testFor === null}
+            <p class="test-result" role="status">{testResult}</p>
+          {/if}
 
           {#if pickerFor === p.profile_id}
             <div class="picker">
@@ -341,8 +466,11 @@
             </div>
           {/if}
         </article>
-      {/each}
-    </div>
+          {/each}
+        </div>
+      </section>
+      {/if}
+    {/each}
     {#if selectError && pickerFor === null}
       <p class="error" role="alert">{selectError}</p>
     {/if}
@@ -464,6 +592,23 @@
   </section>
 {/if}
 
+{#if detailsFor}
+  <div class="details-overlay" role="presentation" onclick={(event) => event.target === event.currentTarget && (detailsFor = null)}>
+    <div class="details-dialog card" role="dialog" aria-modal="true" aria-labelledby="model-details-title" tabindex="-1">
+      <button class="close" aria-label="Close model details" onclick={() => detailsFor = null}>×</button>
+      <p class="eyebrow">Model details</p>
+      <h2 id="model-details-title">{providerName(detailsFor.provider)}</h2>
+      <dl class="details-grid">
+        <div><dt>Selected model</dt><dd><code>{detailsFor.selected ? detailsFor.model : "Not selected"}</code></dd></div>
+        <div><dt>Connection</dt><dd>{detailsFor.connection_configured ? "Encrypted instance connection saved" : "Not configured"}</dd></div>
+        <div><dt>Context capacity</dt><dd>Not reported by this provider. Raiker will show a percentage once the selected model exposes a context window.</dd></div>
+        <div><dt>Current context usage</dt><dd>No provider context telemetry has been received for this model yet.</dd></div>
+        <div><dt>Subscription / rate limits</dt><dd>Not available through this connection. Raiker only displays daily or weekly limits when an authorized provider API exposes them.</dd></div>
+      </dl>
+    </div>
+  </div>
+{/if}
+
 <style>
   .head-row {
     display: flex;
@@ -476,6 +621,25 @@
     grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
     gap: var(--space-4);
   }
+  .setup-overview,
+  .section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+  .setup-overview { margin: var(--space-4) 0; }
+  .provider-section { margin-top: var(--space-5); }
+  .section-heading { align-items: end; margin-bottom: var(--space-3); }
+  .section-heading h2,
+  .setup-overview h2 { margin: 0; font-size: 1.1rem; }
+  .section-heading > p { max-width: 28rem; color: var(--text-3); font-size: 0.82rem; margin: 0; }
+  .eyebrow { color: var(--accent); font-size: 0.7rem; font-weight: 750; letter-spacing: 0.08em; margin: 0 0 0.25rem; text-transform: uppercase; }
+  .setup-meter { min-width: 9rem; text-align: right; }
+  .setup-meter strong { display: block; font-size: 1.35rem; }
+  .setup-meter span { color: var(--text-3); font-size: 0.75rem; }
+  .meter-track { background: var(--neutral-soft); border-radius: var(--r-pill); height: 0.42rem; margin-top: 0.35rem; overflow: hidden; }
+  .meter-track span { background: var(--accent); border-radius: inherit; display: block; height: 100%; }
   .profile.selected {
     border-color: var(--accent-border);
     box-shadow: 0 0 0 1px var(--accent-border), var(--shadow-1);
@@ -486,6 +650,8 @@
     justify-content: space-between;
     gap: 0.5rem;
   }
+  .provider-title { align-items: center; display: flex; gap: 0.5rem; }
+  .provider-logo { align-items: center; background: var(--accent-soft); border: 1px solid var(--accent-border); border-radius: 0.55rem; color: var(--accent); display: inline-flex; font-size: 0.86rem; font-weight: 800; height: 1.8rem; justify-content: center; width: 1.8rem; }
   .profile-name {
     font-size: 1rem;
     margin: 0;
@@ -497,6 +663,7 @@
     margin: 0.3rem 0 0.6rem;
     overflow-wrap: anywhere;
   }
+  .provider-help { color: var(--text-3); font-size: 0.78rem; line-height: 1.35; margin: 0 0 0.6rem; min-height: 2.1em; }
   .model-unpinned {
     color: var(--text-3);
     font-style: italic;
@@ -563,6 +730,15 @@
     font-size: 0.78rem;
     margin: 0;
   }
+  .test-result { color: var(--text-2); font-size: 0.76rem; margin: 0.5rem 0 0; }
+  .details-overlay { align-items: center; background: color-mix(in srgb, #000 45%, transparent); display: flex; inset: 0; justify-content: center; padding: var(--space-4); position: fixed; z-index: 30; }
+  .details-dialog { max-width: 42rem; position: relative; width: min(100%, 42rem); }
+  .details-dialog h2 { margin-top: 0; }
+  .close { background: transparent; border: 0; color: var(--text-2); cursor: pointer; font-size: 1.6rem; line-height: 1; position: absolute; right: 0.75rem; top: 0.65rem; }
+  .details-grid { display: grid; gap: 0.85rem; margin: var(--space-4) 0 0; }
+  .details-grid div { border-top: 1px solid var(--border); padding-top: 0.65rem; }
+  .details-grid dt { color: var(--text-3); font-size: 0.73rem; font-weight: 700; text-transform: uppercase; }
+  .details-grid dd { color: var(--text-2); line-height: 1.45; margin: 0.2rem 0 0; }
   .fallback {
     margin-top: var(--space-4);
   }
@@ -676,5 +852,9 @@
   }
   .loading {
     color: var(--text-2);
+  }
+  @media (max-width: 44rem) {
+    .head-row, .setup-overview, .section-heading { align-items: flex-start; flex-direction: column; }
+    .setup-meter { text-align: left; width: 100%; }
   }
 </style>

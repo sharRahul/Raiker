@@ -24,6 +24,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { id: "search-chat", label: "Search Chat", icon: "search", hint: "Search your chat history" },
       { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },
       { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
+      { id: "brain", label: "Brain View", icon: "spark", hint: "Graph of your workspace and Raiker activity" },
+      { id: "work", label: "Work in Action", icon: "tasks", hint: "Live subagent work, queues, and schedules" },
       { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
       { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },
     ],

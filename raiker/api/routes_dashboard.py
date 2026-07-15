@@ -9,8 +9,10 @@ from fastapi.responses import FileResponse, Response
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
     AuthSessionRequest,
+    BrainSourceRequest,
     BulkDeleteSessionsRequest,
     CreateProjectRequest,
+    ModelConnectionRequest,
     MoveProjectRequest,
     SaveProjectContextRequest,
     SelectProjectRequest,
@@ -25,7 +27,12 @@ from raiker.api.schemas import (
 )
 from raiker.api.sessions import ApiSession
 from raiker.control.dashboard import AuthSessionView, DashboardService
+from raiker.models.connections import clear_model_connection, put_model_connection
+from raiker.models.factory import ModelProviderFactory
+from raiker.models.policy_state import provider_runtime_policy_from_gates
+from raiker.models.registry import ModelProfileRegistry
 from raiker.runtime.authority.models import Principal
+from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
 
@@ -252,6 +259,46 @@ async def list_events(
     )
 
 
+@router.get("/api/brain")
+async def get_brain(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Return the authenticated user's redacted runtime relationship graph."""
+    session, principal = auth_data
+    return serialize_dto(
+        _service(request).brain_view(
+            principal_id=session.principal_id,
+            user_id=principal.delegated_by_user_id,
+        )
+    )
+
+
+@router.post("/api/brain/sources")
+async def add_brain_source(
+    body: BrainSourceRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Add one explicit workspace-relative file or folder to the Brain graph."""
+    try:
+        return _service(request).add_brain_source(body.path)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": str(exc)},
+        ) from exc
+
+
+@router.delete("/api/brain/sources")
+async def remove_brain_source(
+    path: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _service(request).remove_brain_source(path)
+
+
 @router.get("/api/checkpoints")
 async def list_checkpoints(
     request: Request,
@@ -280,14 +327,14 @@ async def list_projects(
 async def create_project(
     body: CreateProjectRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Create a named project for the authenticated local human.
 
     The project root is derived server-side and always contained inside the
     workspace; a project grants no authority.
     """
-    session, _principal = _auth_data
+    session, _principal = auth_data
     result = _service(request).create_project(body.name, session.principal_id, parent_id=body.parent_id)
     if not result.ok:
         raise HTTPException(
@@ -301,13 +348,13 @@ async def create_project(
 async def select_project(
     body: SelectProjectRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Set (or clear) the active project for the authenticated local human.
 
     New sessions are stamped with the active project; selecting grants nothing.
     """
-    session, _principal = _auth_data
+    session, _principal = auth_data
     result = _service(request).select_project(body.project_id, session.principal_id)
     if not result.ok:
         raise HTTPException(
@@ -383,6 +430,7 @@ async def save_project_context(
         instructions=body.instructions,
         attachment_ids=body.attachment_ids,
         memory_enabled=body.memory_enabled,
+        memory_mode=body.memory_mode,
         acting_principal_id=auth_data[0].principal_id,
     )
     if not result.ok:
@@ -498,6 +546,7 @@ async def create_task(
             scheduled_at=body.scheduled_at,
             recurrence=body.recurrence,
             reminder_at=body.reminder_at,
+            parent_task_id=body.parent_task_id,
             project_id=body.project_id,
         )
     except ValueError as exc:
@@ -511,15 +560,16 @@ async def create_task(
 @router.get("/api/models")
 async def get_models(
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return serialize_dto(_service(request).get_models())
+    session, _principal = auth_data
+    return serialize_dto(_service(request).get_models(session.principal_id))
 
 
 @router.get("/api/connections")
 async def get_connections(
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Read-only status of governed service connectors (web-app task 4).
 
@@ -529,7 +579,7 @@ async def get_connections(
     Enabling a connector is done through the capability-gate + decision-mode
     control plane (gate-manager only), not here.
     """
-    session, _principal = _auth_data
+    session, _principal = auth_data
     return serialize_dto(_service(request).get_connections(session.principal_id))
 
 
@@ -537,7 +587,7 @@ async def get_connections(
 async def list_provider_models(
     profile_id: str,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """On-demand listing of the models a provider serves for one profile.
 
@@ -545,7 +595,8 @@ async def list_provider_models(
     enforced before any network contact, and failures return an honest empty
     list — model names are never fabricated.
     """
-    view = await _service(request).list_provider_models(profile_id)
+    session, _principal = auth_data
+    view = await _service(request).list_provider_models(profile_id, session.principal_id)
     if view is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown model profile: {profile_id}"
@@ -557,14 +608,14 @@ async def list_provider_models(
 async def set_model_selection(
     body: SetModelSelectionRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Persist the operator's model selection (human gate-manager only).
 
     Placeholder profiles require a concrete model; provider policy is validated
     fail-closed before the selection is saved.
     """
-    session, _principal = _auth_data
+    session, _principal = auth_data
     result = await _service(request).set_model_selection(
         body.profile_id, body.model, session.principal_id
     )
@@ -576,11 +627,45 @@ async def set_model_selection(
     return {"ok": True, **result.data}
 
 
+@router.put("/api/models/{profile_id}/connection")
+async def set_model_connection(
+    profile_id: str,
+    body: ModelConnectionRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Save one user's encrypted provider endpoint/key without exposing either."""
+    session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    try:
+        profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=404, detail={"reason_code": "unknown_model_profile"}) from exc
+    values = {
+        key: value.strip()
+        for key, value in {"endpoint": body.endpoint or "", "api_key": body.api_key or ""}.items()
+        if value.strip()
+    }
+    if not values:
+        clear_model_connection(store, session.principal_id, profile_id)
+        return {"ok": True, "connection_configured": False}
+    try:
+        ModelProviderFactory(
+            policy=provider_runtime_policy_from_gates(store), connection=values
+        ).create(profile, require_model=False)
+        put_model_connection(store, session.principal_id, profile_id, values)
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail={"reason_code": str(exc)}) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=403, detail={"reason_code": str(exc)}) from exc
+    return {"ok": True, "connection_configured": True}
+
+
 @router.put("/api/model-advisor")
 async def set_model_advisor(
     body: SetModelAdvisorRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Persist (or clear) the user-owned advisor model profile (gate-manager only).
 
@@ -588,7 +673,7 @@ async def set_model_advisor(
     advisor_model_runtime capability, its decision mode (default ask), and
     provider policy (hosted/private gate + egress allowlist + key) per call.
     """
-    session, _principal = _auth_data
+    session, _principal = auth_data
     result = _service(request).set_model_advisor(body.profile_id, session.principal_id)
     if not result.ok:
         raise HTTPException(
@@ -602,10 +687,10 @@ async def set_model_advisor(
 async def set_model_fallback(
     body: SetModelFallbackRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Set the user-owned ordered model fallback sequence (human gate-manager only)."""
-    session, _principal = _auth_data
+    session, _principal = auth_data
     result = _service(request).set_model_fallback_sequence(body.profile_ids, session.principal_id)
     if not result.ok:
         raise HTTPException(

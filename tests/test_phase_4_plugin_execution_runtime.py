@@ -39,19 +39,19 @@ def _install(
         checksum="checksum",
         signature="signature-marker",
         status="installed",
-        installed_by="principal_rahul",
+        installed_by="principal_owner",
     )
 
 
 def _enable(ws: Path) -> None:
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     store = SQLiteStore(ws)
     with store.connect() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-            (_CAP, "principal_rahul", utc_now(), _DOC),
+            (_CAP, "principal_owner", utc_now(), _DOC),
         )
     result = svc.set_capability_state(_CAP, "enabled_runtime", None, "test", confirmation_token="confirm")
     assert result.ok is True, result.reason_code
@@ -62,7 +62,7 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
     authority = RuntimeAuthority(
         store, EventLogWriter(store), executor_registry=build_default_executor_registry(ws, store)
     )
-    raw = store.get_principal("principal_rahul")
+    raw = store.get_principal("principal_owner")
     assert raw is not None
     return authority, Principal(**raw)
 
@@ -88,7 +88,7 @@ def test_plugin_execution_cap_is_real_executor(tmp_path: Path) -> None:
 
 def test_plugin_execution_gate_disabled_blocks_before_recording(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
     RuntimeControlService(ws).disable_capability("plugin_execution_cap", None, "test")
     store = SQLiteStore(ws)
@@ -109,7 +109,7 @@ def test_plugin_execution_gate_disabled_blocks_before_recording(tmp_path: Path) 
 
 def test_plugin_execution_requires_threat_model_ack(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     result = svc.set_capability_state(_CAP, "enabled_runtime", None, "test", confirmation_token="confirm")

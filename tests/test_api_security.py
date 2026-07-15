@@ -25,7 +25,7 @@ def temp_workspace(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def bootstrapped_ws(temp_workspace: Path) -> Path:
-    bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+    bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
     return temp_workspace
 
 
@@ -42,7 +42,7 @@ def client(app: FastAPI) -> TestClient:
 @pytest.fixture
 def owner_token(bootstrapped_ws: Path) -> str:
     store = ApiSessionStore(bootstrapped_ws)
-    raw, _ = store.create_session("principal_rahul")
+    raw, _ = store.create_session("principal_owner")
     return raw
 
 
@@ -166,7 +166,7 @@ class TestRedactionGuard:
 class TestTokenRevocation:
     def test_revoked_token_returns_401(self, bootstrapped_ws: Path, app: FastAPI) -> None:
         store = ApiSessionStore(bootstrapped_ws)
-        raw, session = store.create_session("principal_rahul")
+        raw, session = store.create_session("principal_owner")
         store.revoke_session(session.session_id)
         client = TestClient(app)
         resp = client.get(
@@ -182,18 +182,18 @@ class TestTokenRevocation:
 class TestCrossSessionLeakage:
     def test_session_bound_to_principal(self, bootstrapped_ws: Path) -> None:
         store = ApiSessionStore(bootstrapped_ws)
-        raw_a, session_a = store.create_session("principal_rahul")
+        raw_a, session_a = store.create_session("principal_owner")
         _create_second_principal(bootstrapped_ws, "principal_alice")
         raw_b, session_b = store.create_session("principal_alice")
 
-        assert session_a.principal_id == "principal_rahul"
+        assert session_a.principal_id == "principal_owner"
         assert session_b.principal_id == "principal_alice"
 
         s_a = store.get_by_token(raw_a)
         s_b = store.get_by_token(raw_b)
         assert s_a is not None
         assert s_b is not None
-        assert s_a.principal_id == "principal_rahul"
+        assert s_a.principal_id == "principal_owner"
         assert s_b.principal_id == "principal_alice"
         assert s_a.principal_id != s_b.principal_id
 
@@ -204,7 +204,7 @@ class TestCrossSessionLeakage:
 
         resp = client.post(
             "/api/capability-gates/admin_mutation/set",
-            json={"target_state": "enabled_policy_gated", "reason": "x", "as_principal": "principal_rahul"},
+            json={"target_state": "enabled_policy_gated", "reason": "x", "as_principal": "principal_owner"},
             headers={"Authorization": f"Bearer {raw_alice}"},
         )
         assert resp.status_code == 403

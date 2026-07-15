@@ -833,6 +833,12 @@ class BackupManifest:
     size_bytes: int | None
     created_by: str
     created_at: str
+    encryption_key_id: str | None = None
+    retention_until: str | None = None
+    legal_hold: bool = False
+    erasure_requested_at: str | None = None
+    erased_at: str | None = None
+    restore_verified_at: str | None = None
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:

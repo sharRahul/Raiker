@@ -11,6 +11,7 @@ from raiker.events.writer import EventLogWriter
 from raiker.hooks.contracts import HookInput
 from raiker.hooks.dispatcher import HookDispatcher
 from raiker.hooks.registry import HooksRegistry
+from raiker.models.connections import get_model_connection
 from raiker.models.policy_state import provider_runtime_policy_from_gates
 from raiker.models.registry import ModelProfileRegistry, RegistryError, profile_with_model
 from raiker.models.router import ModelRouter
@@ -66,6 +67,9 @@ class AgentGateway:
             self.model_registry,
             self.writer,
             runtime_policy=provider_runtime_policy_from_gates(self.store),
+            connection_resolver=lambda profile_id: get_model_connection(
+                self.store, principal_id, profile_id
+            ),
         )
         # Native default backend: configured llama.cpp profile only; production never falls back to deterministic test providers.
         # Honor the operator's selected model profile (e.g. via `/model use`); fall back to the native default.

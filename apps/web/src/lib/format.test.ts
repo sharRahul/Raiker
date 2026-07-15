@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTimestamp, humanize, providerName, relativeTime, shortId } from "./format";
+import { formatTimestamp, groupByDay, humanize, providerName, relativeTime, shortId } from "./format";
 
 describe("format helpers", () => {
   it("renders compact relative times", () => {
@@ -15,6 +15,17 @@ describe("format helpers", () => {
   it("treats naive timestamps as UTC", () => {
     const now = new Date("2026-07-07T12:10:00Z");
     expect(relativeTime("2026-07-07T12:00:00", now)).toBe("10m ago");
+  });
+
+  it("groups conversations by their local calendar day", () => {
+    const now = new Date("2026-07-07T12:00:00Z");
+    const groups = groupByDay([
+      { updated_at: "2026-07-07T08:00:00Z", id: "today" },
+      { updated_at: "2026-07-06T08:00:00Z", id: "yesterday" },
+      { updated_at: "2026-07-01T08:00:00Z", id: "older" },
+    ], now);
+    expect(groups.map((group) => group.label)).toEqual(["Today", "Yesterday", "Wednesday, July 1, 2026"]);
+    expect(groups[0].items.map((item) => item.id)).toEqual(["today"]);
   });
 
   it("falls back to the raw string for unparseable timestamps", () => {

@@ -10,7 +10,13 @@ from raiker.contracts.ids import new_id
 from raiker.contracts.models import ClientMetadata, PolicyDecision, ToolAction
 from raiker.events.writer import EventLogWriter
 from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
-from raiker.memory.store import get_memory, list_memory, memory_status, search_memory
+from raiker.memory.store import (
+    get_memory,
+    list_memory,
+    memory_status,
+    search_memory,
+    set_memory_archived,
+)
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
@@ -169,6 +175,50 @@ def test_forget_memory_tombstones_record(workspace: Path) -> None:
     assert forget_result.status == "success"
     assert get_memory(memory_id, workspace_root=workspace) is None
     assert all(entry.memory_id != memory_id for entry in list_memory(workspace_root=workspace))
+
+
+def test_archive_memory_is_reversible_and_excluded_from_retrieval(workspace: Path) -> None:
+    broker = _governed_broker(workspace)
+    result, _ = broker.execute(_memory_write_action("Archive this durable fact."), session_id="sess_test_memory", turn_id="turn_test_memory")
+    memory_id = str(result.output["memory_id"])  # type: ignore[index]
+    archived = set_memory_archived(memory_id, archived=True, workspace_root=workspace, store=SQLiteStore(workspace))
+    assert archived is not None and archived.archived_at is not None
+    assert get_memory(memory_id, workspace_root=workspace) is None
+    assert search_memory("durable", workspace_root=workspace) == []
+    restored = set_memory_archived(memory_id, archived=False, workspace_root=workspace, store=SQLiteStore(workspace))
+    assert restored is not None and restored.archived_at is None
+    assert get_memory(memory_id, workspace_root=workspace) is not None
+
+
+def test_fts_and_projection_mappings_follow_memory_lifecycle(workspace: Path) -> None:
+    broker = _governed_broker(workspace)
+    result, _ = broker.execute(_memory_write_action("FTS indexed durable fact."), session_id="sess_test_memory", turn_id="turn_test_memory")
+    memory_id = str(result.output["memory_id"])  # type: ignore[index]
+    store = SQLiteStore(workspace)
+    assert [row["memory_id"] for row in store.search_approved_memory("indexed")] == [memory_id]
+    store.link_memory_projection(memory_id, "vector", "vec_test", "v1")
+    set_memory_archived(memory_id, archived=True, workspace_root=workspace, store=store)
+    assert store.search_approved_memory("indexed") == []
+    assert store.list_memory_projections(memory_id)[0]["active"] == 0
+    set_memory_archived(memory_id, archived=False, workspace_root=workspace, store=store)
+    assert store.list_memory_projections(memory_id)[0]["active"] == 1
+    assert store.reconcile_memory_projections()["projection_rows_reconciled"] >= 1
+
+
+def test_sqlite_retrieval_authority_tracks_edit_search_opt_out_and_expiry(workspace: Path) -> None:
+    broker = _governed_broker(workspace)
+    result, _ = broker.execute(_memory_write_action("Original indexed fact."), session_id="sess_test_memory", turn_id="turn_test_memory")
+    memory_id = str(result.output["memory_id"])  # type: ignore[index]
+    store = SQLiteStore(workspace)
+    from raiker.memory.store import update_memory
+
+    assert update_memory(memory_id, workspace_root=workspace, text="Corrected indexed fact.", store=store) is not None
+    assert store.search_approved_memory("Original") == []
+    assert [row["memory_id"] for row in store.search_approved_memory("Corrected")] == [memory_id]
+    assert update_memory(memory_id, workspace_root=workspace, search_enabled=False, store=store) is not None
+    assert store.search_approved_memory("Corrected") == []
+    assert update_memory(memory_id, workspace_root=workspace, search_enabled=True, expires_at="2000-01-01T00:00:00Z", update_expires_at=True, store=store) is not None
+    assert store.search_approved_memory("Corrected") == []
 
 
 def test_forget_nonexistent_memory(workspace: Path) -> None:

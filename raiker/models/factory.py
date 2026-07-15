@@ -52,14 +52,17 @@ class ModelProviderFactory:
     allow_private_network_provider: bool = False
     require_api_key_for_hosted: bool = True
     client: httpx.AsyncClient | None = None
+    connection: dict[str, str] | None = None
 
     def __init__(
         self,
         client: httpx.AsyncClient | None = None,
         policy: ProviderRuntimePolicy | None = None,
+        connection: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> None:
         object.__setattr__(self, "client", client)
+        object.__setattr__(self, "connection", connection)
         if policy is None:
             policy = ProviderRuntimePolicy(**kwargs)
         object.__setattr__(self, "allow_policy_gated_provider", policy.allow_policy_gated_provider)
@@ -69,8 +72,9 @@ class ModelProviderFactory:
         )
         object.__setattr__(self, "require_api_key_for_hosted", policy.require_api_key_for_hosted)
 
-    @staticmethod
-    def _configured_endpoint(raw: dict[str, Any]) -> str:
+    def _configured_endpoint(self, raw: dict[str, Any]) -> str:
+        if self.connection and self.connection.get("endpoint", "").strip():
+            return self.connection["endpoint"].strip()
         endpoint_env = raw.get("endpoint_env")
         if isinstance(endpoint_env, str) and endpoint_env:
             configured = os.environ.get(endpoint_env, "").strip()
@@ -135,7 +139,9 @@ class ModelProviderFactory:
             raise ProviderPolicyError("hosted_provider_requires_explicit_policy")
         # Off-machine endpoints must also be on the owner egress allowlist —
         # fail closed even when the capability gate / runtime policy allows them.
-        enforce_model_egress(endpoint, kind=endpoint_kind)
+        saved_host = urlparse(str(self.connection.get("endpoint", ""))).hostname if self.connection else None
+        saved_allowlist = frozenset({saved_host.lower()}) if saved_host else None
+        enforce_model_egress(endpoint, kind=endpoint_kind, configured_allowlist=saved_allowlist)
         if provider == "openrouter" and raw.get("default_state") == "enabled":
             raise ProviderPolicyError("openrouter_must_not_be_enabled_by_default")
         headers: dict[str, str] = {}
@@ -149,9 +155,15 @@ class ModelProviderFactory:
                 raise ProviderPolicyError("openrouter_requires_hosted_egress_budget_policy")
             if urlparse(endpoint).scheme != "https":
                 raise ProviderPolicyError("openrouter_requires_https")
-            if not isinstance(api_key_env, str) or not os.environ.get(api_key_env):
+            if not (
+                (self.connection or {}).get("api_key", "").strip()
+                or (isinstance(api_key_env, str) and os.environ.get(api_key_env))
+            ):
                 raise ProviderConfigurationError("openrouter_api_key_missing")
-        api_key = os.environ.get(api_key_env, "") if isinstance(api_key_env, str) else ""
+        api_key = (
+            (self.connection or {}).get("api_key", "").strip()
+            or (os.environ.get(api_key_env, "") if isinstance(api_key_env, str) else "")
+        )
         if bool(raw.get("requires_api_key", False)) and not api_key:
             key_name = api_key_env if isinstance(api_key_env, str) else "api_key_env"
             raise ProviderConfigurationError(f"provider_api_key_missing:{key_name}")

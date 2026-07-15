@@ -58,8 +58,8 @@ end to end through the served stack, bound to `anthropic-hosted` /
 | `POST /api/attachments` stores a real 2-page PDF (156 KB) | ✅ `att_…`, `kind: document` |
 | `POST /api/attachments` stores a real .docx (202 KB) | ✅ `att_…`, `kind: document` |
 | `POST /api/attachments` stores a real 1.76 MB JPEG | ✅ `att_…`, `kind: image`, metadata-only |
-| Governed turn, PDF document → extracted text in context → real Haiku answer | ✅ "Full Name: **Rahul Sharma** … Most Recent Job Title: **Information Security Consultant**" (both facts live only inside the PDF) |
-| Governed turn, .docx document → extracted text → real Haiku answer | ✅ "Full Name: **Gaurav Choudhary** … Over 13 years … Knowledge Management Lead at Mott MacDonald" |
+| Governed turn, PDF document → extracted text in context → real Haiku answer | ✅ document facts were extracted from the uploaded sample; the content remains only inside that document |
+| Governed turn, .docx document → extracted text → real Haiku answer | ✅ document facts were extracted from the uploaded sample; the content remains only inside that document |
 | Governed turn, JPG image (vision) → image block → real Haiku answer | ✅ correctly identified an **HAL Tejas** aircraft cutaway diagram (illustrator, publisher, maiden-flight date — all read from the image) |
 | `model_request_started` bound model | ✅ `provider: anthropic, model: claude-haiku-4-5-20251001` |
 | `model_request_completed` normalised usage | ✅ `{input_tokens: 2694, output_tokens: 37, cache_*: 0}` |
@@ -113,9 +113,9 @@ control plane (threat ack + confirm), decision mode raised to `allow`.
 | Check | Result |
 |---|---|
 | Default `ask` withholds the read (no network contact) | ✅ `connector_withheld_ask` |
-| With mode `allow`: `GithubConnectorService.read` fetches a **real** PR | ✅ `sharrahul/raiker#109` → title "Task 3 complete: governed document attachments (text + PDF + docx)", state `closed`, 5325-char body, untrusted-data framing |
+| With mode `allow`: `GithubConnectorService.read` fetches a **real** PR | ✅ a configured test repository pull request was retrieved with its title, state, body, and untrusted-data framing |
 | Owner token never appears in the tool output | ✅ verified (`token in output: False`) |
-| **End-to-end model turn**: hosted Haiku 4.5 given the `github_read` tool | ✅ model called `github_read(pull_request, sharrahul/raiker, 109)`; tool action recorded `success` |
+| **End-to-end model turn**: hosted Haiku 4.5 given the `github_read` tool | ✅ model called `github_read` for the pull request; tool action recorded `success` |
 | Model answered from the fetched untrusted content | ✅ replied with the exact PR title + an accurate one-sentence summary |
 | Fail-closed without a credential | ✅ `connector_not_configured` (token env unset) |
 | Fail-closed without egress | ✅ `connector_egress_denied` (`api.github.com` not allowlisted) |
@@ -230,13 +230,12 @@ available. Egress hosts must be added to `RAIKER_MODEL_EGRESS_ALLOWLIST`.
 | llama.cpp | `raiker-local-llama-cpp` | local | `127.0.0.1:8080` | — | `cache_prompt: true` (server KV cache) | 🟡 Ready — needs a running llama.cpp server |
 | Ollama | `ollama-local-openai-compatible` | local | `127.0.0.1:11434` | — | automatic server-side | 🟡 Ready — needs Ollama + a concrete model |
 | LM Studio | `lm-studio-local-openai-compatible` | local | `127.0.0.1:1234` | — | automatic server-side | 🟡 Ready — needs LM Studio + a concrete model |
-| vLLM | `vllm-homelab-openai-compatible` | home-lab | `192.168.1.50:8000` | — | automatic prefix caching | 🟡 Ready — needs a reachable vLLM endpoint (egress-gated) |
+| Custom OpenAI-compatible | `generic-openai-compatible` | local or home-lab | user-selected | user vault | provider-dependent | 🟡 Ready — configure the endpoint and model in Raiker |
 
 **Selecting a concrete model.** Profiles that ship a placeholder `<model>`
-(Ollama/LM Studio/vLLM/OpenAI/Gemini/OpenRouter) take the concrete model at
+(Ollama/LM Studio/Custom OpenAI-compatible/OpenAI/Gemini/OpenRouter) take the concrete model at
 selection time (`/model use --provider <p> --model <m>`). `anthropic-hosted`
-ships a concrete model (`claude-opus-4-8`); to run a different Anthropic model
-(e.g. Haiku), select it with an explicit model override — this test used
+also takes a concrete model at selection time; this test used
 `claude-haiku-4-5-20251001`.
 
 ## Fallback sequence — how to test

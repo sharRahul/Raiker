@@ -23,7 +23,7 @@ from raiker.models.providers.anthropic_messages import (
     AsyncAnthropicMessagesProvider,
     _to_anthropic_messages,
 )
-from raiker.models.registry import ModelProfileRegistry
+from raiker.models.registry import ModelProfileRegistry, profile_with_model
 
 
 def _caps() -> ModelCapabilities:
@@ -182,7 +182,9 @@ def test_invalid_cache_ttl_is_ignored() -> None:
 def test_router_reads_prompt_cache_ttl_from_profile() -> None:
     from raiker.models.router import _cache_ttl
 
-    profile = ModelProfileRegistry.load().resolve_profile_id("anthropic-hosted")
+    profile = profile_with_model(
+        ModelProfileRegistry.load().resolve_profile_id("anthropic-hosted"), "claude-sonnet-4"
+    )
     # The shipped hosted-Anthropic profile opts into the default 5-minute cache.
     assert _cache_ttl(profile) == "5m"
 
@@ -270,18 +272,22 @@ def test_hosted_profiles_registered() -> None:
 def test_anthropic_factory_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.anthropic.com")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    profile = ModelProfileRegistry.load().resolve_profile_id("anthropic-hosted")
-    with pytest.raises(ProviderConfigurationError, match="hosted_api_key_missing"):
+    profile = profile_with_model(
+        ModelProfileRegistry.load().resolve_profile_id("anthropic-hosted"), "claude-sonnet-4"
+    )
+    with pytest.raises(ProviderConfigurationError, match="provider_api_key_missing:ANTHROPIC_API_KEY"):
         ModelProviderFactory(policy=_HOSTED_POLICY).create(profile)
 
 
 def test_anthropic_factory_builds_native_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "api.anthropic.com")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-never-real")
-    profile = ModelProfileRegistry.load().resolve_profile_id("anthropic-hosted")
+    profile = profile_with_model(
+        ModelProfileRegistry.load().resolve_profile_id("anthropic-hosted"), "claude-sonnet-4"
+    )
     provider = ModelProviderFactory(policy=_HOSTED_POLICY).create(profile)
     assert isinstance(provider, AsyncAnthropicMessagesProvider)
-    assert provider.model == "claude-opus-4-8"
+    assert provider.model == "claude-sonnet-4"
     asyncio.run(provider.aclose())
 
 

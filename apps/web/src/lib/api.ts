@@ -3,6 +3,8 @@ import type {
   ApprovalDetailView,
   ApprovalView,
   AuthSession,
+  BrainView,
+  BrainSourceResult,
   CapabilityDecisionMode,
   CapabilityGate,
   Checkpoint,
@@ -11,6 +13,7 @@ import type {
   Diagnostics,
   EventEntry,
   InterruptRequestBody,
+  InstanceLaunchResult,
   InterruptResult,
   MemoryControlView,
   MemorySettingsView,
@@ -62,7 +65,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token !== null) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const resp = await fetch(path, { ...init, headers });
+  const resp = await fetch(instancePath(path), { ...init, headers });
   if (!resp.ok) {
     let reasonCode: string | null = null;
     try {
@@ -82,7 +85,7 @@ async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> 
   if (token !== null) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const resp = await fetch(path, { ...init, headers });
+  const resp = await fetch(instancePath(path), { ...init, headers });
   if (!resp.ok) {
     let reasonCode: string | null = null;
     try {
@@ -95,6 +98,12 @@ async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> 
     throw new ApiError(resp.status, reasonCode, `Request failed: ${resp.status} ${path}`);
   }
   return resp.blob();
+}
+
+function instancePath(path: string): string {
+  if (typeof window === "undefined") return path;
+  const match = window.location.pathname.match(/^(\/instances\/[^/]+)/);
+  return match ? `${match[1]}${path}` : path;
 }
 
 function withQuery(path: string, params: Record<string, string | number | undefined>): string {
@@ -131,6 +140,10 @@ export async function connect(): Promise<AuthSession> {
  */
 export function health(): Promise<{ status: string }> {
   return request<{ status: string }>("/api/health");
+}
+
+export function createInstance(name: string): Promise<InstanceLaunchResult> {
+  return postJson<InstanceLaunchResult>("/api/instances", { name });
 }
 
 export interface LoginResult {
@@ -288,6 +301,15 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ profile_id, model: model || null }),
     }),
+  saveModelConnection: (profileId: string, endpoint: string, apiKey: string) =>
+    request<{ ok: boolean; connection_configured: boolean }>(
+      `/api/models/${encodeURIComponent(profileId)}/connection`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: endpoint || null, api_key: apiKey || null }),
+      },
+    ),
   // Persist the user-owned ordered model fallback sequence (human gate-manager only,
   // enforced server-side). Returns the cleaned/de-duplicated sequence.
   setModelFallback: (profile_ids: string[]) =>
@@ -303,6 +325,10 @@ export const api = {
     postJson<UploadedAttachment>("/api/attachments", body),
   events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
     request<EventEntry[]>(withQuery("/api/events", params)),
+  brain: () => request<BrainView>("/api/brain"),
+  addBrainSource: (path: string) => postJson<BrainSourceResult>("/api/brain/sources", { path }),
+  removeBrainSource: (path: string) =>
+    request<BrainSourceResult>(withQuery("/api/brain/sources", { path }), { method: "DELETE" }),
   checkpoints: (sessionId?: string, projectId?: string) =>
     request<Checkpoint[]>(
       withQuery("/api/checkpoints", { session_id: sessionId, project_id: projectId }),
@@ -405,7 +431,7 @@ export const api = {
       method: "DELETE",
       headers: confirmed ? { "X-Project-Delete-Confirm": id } : undefined,
     }),
-  saveProjectContext: (id: string, context: { instructions: string; attachment_ids: string[]; memory_enabled: boolean }) =>
+  saveProjectContext: (id: string, context: { instructions: string; attachment_ids: string[]; memory_enabled: boolean; memory_mode: "inherit" | "enabled" | "disabled" }) =>
     request<{ ok: boolean }>(`/api/projects/${encodeURIComponent(id)}/context`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -491,6 +517,8 @@ export const api = {
     description: string;
     priority?: string;
     scheduled_at?: string;
+    recurrence?: string;
+    parent_task_id?: string;
     // Create the task under a specific project. Omitted → the active project.
     project_id?: string | null;
   }) => postJson<TaskView>("/api/tasks", body),

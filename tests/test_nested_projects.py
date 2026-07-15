@@ -16,14 +16,14 @@ from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.control.dashboard import DashboardService
 from raiker.storage.sqlite import SQLiteStore
 
-OWNER = "principal_rahul"
+OWNER = "principal_owner"
 
 
 @pytest.fixture
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 
@@ -51,9 +51,22 @@ class TestProjectNestingMigration:
         row = store.load_project("p1")
         assert row is not None
         assert row["parent_id"] is None
-        assert row["path"] == "/"
+        assert row["path"] == "/p1/"
         assert row["is_archived"] == 0
         assert row["archived_at"] is None
+
+    def test_backfill_repairs_legacy_paths_from_parent_links(self, workspace: Path, store: SQLiteStore) -> None:
+        store.create_project("p1", "Root", "projects/root")
+        store.create_project("p2", "Child", "projects/root/child", parent_id="p1")
+        with store.connect() as connection:
+            connection.execute("UPDATE projects SET path = '/' WHERE project_id = 'p2'")
+            connection.execute(
+                "DELETE FROM migrations WHERE migration_id = 'RAIKER-1014-project-self-inclusive-path'"
+            )
+
+        repaired = SQLiteStore(workspace).load_project("p2")
+        assert repaired is not None
+        assert repaired["path"] == "/p1/p2/"
 
 
 class TestProjectTreeQueries:
@@ -97,7 +110,18 @@ class TestProjectMove:
         child = store.load_project("p2")
         assert child is not None
         assert child["parent_id"] is None
-        assert child["path"] == "/"
+        assert child["path"] == "/p2/"
+
+    def test_move_project_does_not_move_siblings(self, store: SQLiteStore) -> None:
+        store.create_project("p1", "Root", "projects/root")
+        store.create_project("p2", "First", "projects/root/first", parent_id="p1")
+        store.create_project("p3", "Second", "projects/root/second", parent_id="p1")
+
+        assert store.move_project("p2", "p3")
+        moved = store.load_project("p2")
+        parent = store.load_project("p3")
+        assert moved is not None and moved["path"] == "/p1/p3/p2/"
+        assert parent is not None and parent["path"] == "/p1/p3/"
 
     def test_move_prevents_cycle(self, store: SQLiteStore) -> None:
         store.create_project("p1", "Root", "projects/root")
@@ -125,6 +149,17 @@ class TestProjectArchive:
         p1 = store.load_project("p1")
         assert p1 is not None and p1["is_archived"] == 1
 
+    def test_archive_project_does_not_archive_siblings(self, store: SQLiteStore) -> None:
+        store.create_project("p1", "Root", "projects/root")
+        store.create_project("p2", "First", "projects/root/first", parent_id="p1")
+        store.create_project("p3", "Second", "projects/root/second", parent_id="p1")
+
+        assert store.archive_project("p2")
+        archived = store.load_project("p2")
+        sibling = store.load_project("p3")
+        assert archived is not None and archived["is_archived"] == 1
+        assert sibling is not None and sibling["is_archived"] == 0
+
 
 class TestProjectDeleteWithOrphanage:
     def test_delete_project_orphans_children_and_hard_deletes_target(self, store: SQLiteStore) -> None:
@@ -135,7 +170,7 @@ class TestProjectDeleteWithOrphanage:
         child = store.load_project("p2")
         assert child is not None
         assert child["parent_id"] is None
-        assert child["path"].startswith("orphaned/")
+        assert child["path"].startswith("/orphaned/")
         assert child["is_archived"] == 1
 
 
@@ -149,6 +184,17 @@ class TestAncestorContexts:
         contexts = store.get_ancestor_contexts("p2")
         assert len(contexts) == 1  # Only ancestors, not self
         assert contexts[0]["instructions"] == "Root inst"
+
+    def test_memory_mode_inherits_nearest_explicit_ancestor(self, store: SQLiteStore) -> None:
+        store.create_project("p1", "Root", "projects/root")
+        store.create_project("p2", "Child", "projects/root/child", parent_id="p1")
+        store.create_project("p3", "Leaf", "projects/root/child/leaf", parent_id="p2")
+        store.save_project_context("p1", instructions="", attachment_ids=[], memory_mode="enabled")
+        store.save_project_context("p2", instructions="", attachment_ids=[], memory_mode="inherit")
+        store.save_project_context("p3", instructions="", attachment_ids=[], memory_mode="disabled")
+
+        assert store.load_effective_project_context("p2")["memory_enabled"] is True
+        assert store.load_effective_project_context("p3")["memory_enabled"] is False
 
 
 class TestDashboardServiceNested:

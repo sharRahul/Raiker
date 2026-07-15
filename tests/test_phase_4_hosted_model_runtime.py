@@ -37,14 +37,14 @@ def _ws(tmp_path: Path) -> Path:
 
 
 def _enable(ws: Path, capability: str) -> None:
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     store = SQLiteStore(ws)
     with store.connect() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-            (capability, "principal_rahul", utc_now(), _DOC),
+            (capability, "principal_owner", utc_now(), _DOC),
         )
     result = svc.set_capability_state(capability, "enabled_runtime", None, "test", confirmation_token="confirm")
     assert result.ok is True, result.reason_code
@@ -55,7 +55,7 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
     authority = RuntimeAuthority(
         store, EventLogWriter(store), executor_registry=build_default_executor_registry(ws, store)
     )
-    raw = store.get_principal("principal_rahul")
+    raw = store.get_principal("principal_owner")
     assert raw is not None
     return authority, Principal(**raw)
 
@@ -88,7 +88,7 @@ def test_model_runtime_caps_are_real_executors(tmp_path: Path) -> None:
 
 def test_fail_closed_when_gate_disabled(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
     RuntimeControlService(ws).disable_capability("hosted_model_runtime", None, "test")
     authority, principal = _authority(ws)
@@ -102,7 +102,7 @@ def test_fail_closed_when_gate_disabled(tmp_path: Path) -> None:
 
 def test_enable_requires_threat_model_ack(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     result = svc.set_capability_state(_HOSTED, "enabled_runtime", None, "test", confirmation_token="confirm")
@@ -130,7 +130,7 @@ def test_probe_fails_closed_without_allowlist(tmp_path: Path, monkeypatch: pytes
 def test_probe_rejects_non_allowlisted_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "api.openai.com")
     executor = HostedModelRuntimeExecutor(_ws(tmp_path), prober=_fake_prober)
-    action = _action("principal_rahul", _HOSTED, operation="connectivity_check",
+    action = _action("principal_owner", _HOSTED, operation="connectivity_check",
                      endpoint="https://evil.example.com")
     result = executor.execute(action, None)  # type: ignore[arg-type]
     assert result.ok is False
@@ -140,7 +140,7 @@ def test_probe_rejects_non_allowlisted_host(tmp_path: Path, monkeypatch: pytest.
 def test_hosted_probe_requires_https(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "api.openai.com")
     executor = HostedModelRuntimeExecutor(_ws(tmp_path), prober=_fake_prober)
-    action = _action("principal_rahul", _HOSTED, operation="connectivity_check",
+    action = _action("principal_owner", _HOSTED, operation="connectivity_check",
                      endpoint="http://api.openai.com")
     result = executor.execute(action, None)  # type: ignore[arg-type]
     assert result.ok is False
@@ -150,7 +150,7 @@ def test_hosted_probe_requires_https(tmp_path: Path, monkeypatch: pytest.MonkeyP
 def test_hosted_probe_rejects_local_endpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "*")
     executor = HostedModelRuntimeExecutor(_ws(tmp_path), prober=_fake_prober)
-    action = _action("principal_rahul", _HOSTED, operation="connectivity_check",
+    action = _action("principal_owner", _HOSTED, operation="connectivity_check",
                      endpoint="https://127.0.0.1:8080")
     result = executor.execute(action, None)  # type: ignore[arg-type]
     assert result.ok is False
@@ -162,7 +162,7 @@ def test_private_probe_accepts_allowlisted_private_host(
 ) -> None:
     monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "192.168.1.*")
     executor = PrivateNetworkModelRuntimeExecutor(_ws(tmp_path), prober=_fake_prober)
-    action = _action("principal_rahul", _PRIVATE, operation="connectivity_check",
+    action = _action("principal_owner", _PRIVATE, operation="connectivity_check",
                      endpoint="http://192.168.1.20:8000")
     result = executor.execute(action, None)  # type: ignore[arg-type]
     assert result.ok is True
@@ -179,7 +179,7 @@ def test_probe_governed_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     # Inject a fake prober so CI performs no real network I/O.
     registry.register(_HOSTED, HostedModelRuntimeExecutor(ws, prober=_fake_prober))
     authority = RuntimeAuthority(store, EventLogWriter(store), executor_registry=registry)
-    raw = store.get_principal("principal_rahul")
+    raw = store.get_principal("principal_owner")
     assert raw is not None
     principal = Principal(**raw)
     result = authority.route_action(
@@ -193,7 +193,7 @@ def test_probe_governed_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPat
 def test_unknown_operation_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(MODEL_EGRESS_ALLOWLIST_ENV, "api.openai.com")
     executor = HostedModelRuntimeExecutor(_ws(tmp_path), prober=_fake_prober)
-    action = _action("principal_rahul", _HOSTED, operation="chat", endpoint="https://api.openai.com")
+    action = _action("principal_owner", _HOSTED, operation="chat", endpoint="https://api.openai.com")
     result = executor.execute(action, None)  # type: ignore[arg-type]
     assert result.ok is False
     assert result.reason_code == "unknown_operation:chat"

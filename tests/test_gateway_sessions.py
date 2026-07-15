@@ -17,6 +17,19 @@ def test_session_create_load(tmp_path) -> None:  # type: ignore[no-untyped-def]
     assert loaded.session_id == created.session_id
 
 
+def test_first_prompt_becomes_a_stable_session_title(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    store = SQLiteStore(tmp_path)
+    manager = SessionManager(store, tmp_path)
+    created = manager.create_session()
+
+    manager.track_turn(created.session_id, "turn_1", "  Plan   the   release checklist.  ")
+    manager.track_turn(created.session_id, "turn_2", "This must not replace the first title.")
+
+    loaded = store.load_session(created.session_id)
+    assert loaded is not None
+    assert loaded["title"] == "Plan the release checklist."
+
+
 def test_gateway_preserves_client_metadata_and_writes_events(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.chdir(tmp_path)
     (tmp_path / "config").mkdir()

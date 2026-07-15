@@ -80,11 +80,14 @@ def test_factory_policy_openrouter(monkeypatch: pytest.MonkeyPatch) -> None:
     assert provider.provider == "openrouter"
 
 
-def test_factory_rejects_vllm_without_private_network_policy() -> None:
-    profile = ModelProfileRegistry.load().resolve_profile_id("vllm-homelab-openai-compatible")
-    configured = type(profile)(**{**profile.__dict__, "model": "vllm-model"})
+def test_factory_rejects_custom_remote_endpoint_without_private_network_policy() -> None:
+    profile = ModelProfileRegistry.load().resolve_profile_id("generic-openai-compatible")
+    configured = type(profile)(**{**profile.__dict__, "model": "custom-model"})
     with pytest.raises(ProviderPolicyError):
-        ModelProviderFactory(policy=ProviderRuntimePolicy(allow_policy_gated_provider=True)).create(configured)
+        ModelProviderFactory(
+            policy=ProviderRuntimePolicy(allow_policy_gated_provider=True),
+            connection={"endpoint": "http://192.168.1.20:8000/v1"},
+        ).create(configured)
 
 
 def test_async_openai_success_and_live_urls() -> None:

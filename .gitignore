@@ -1,4 +1,6 @@
 .venv
+poetry.lock
+*.pid
 .ruff_cache
 .raiker
 .pytest_cache
@@ -17,4 +19,3 @@ project-map.md
 docs/specs
 docs/plans
 docs/superpowers
-.superpowers

@@ -77,6 +77,7 @@ export interface ModelProfile {
   runtime_gate: string | null;
   off_machine: boolean;
   selected: boolean;
+  connection_configured?: boolean;
   prompt_cache_ttl: string | null;
 }
 
@@ -180,6 +181,7 @@ export interface ProjectContext {
   instructions: string;
   attachment_ids: string[];
   memory_enabled: boolean;
+  memory_mode: "inherit" | "enabled" | "disabled";
 }
 
 /** A node in the project tree hierarchy. Recursive — each node may have
@@ -360,6 +362,7 @@ export interface TaskView {
   // Project-scoped schedules: the project this task/schedule was created
   // under, or null when it was created outside every project.
   project_id: string | null;
+  parent_task_id?: string | null;
 }
 
 // POST /api/interrupts response (raiker/api/routes_prompts.py).
@@ -431,4 +434,40 @@ export interface MemoryControlView {
 
 export interface MemorySettingsView {
   incognito: boolean;
+}
+
+// raiker/control/dashboard.py BrainView.to_dict(). Nodes and edges are stored
+// runtime relationships; the UI may add clearly labelled illustrative motion.
+export interface BrainNode {
+  node_id: string;
+  node_type: string;
+  label: string;
+  status: string;
+  detail: string | null;
+  progress_percent: number | null;
+  is_real: boolean;
+}
+
+export interface BrainEdge {
+  source: string;
+  target: string;
+  relationship: string;
+  is_active: boolean;
+}
+
+export interface BrainView {
+  generated_at: string;
+  nodes: BrainNode[];
+  edges: BrainEdge[];
+  illustrative_motion_notice: string;
+}
+
+export interface BrainSourceResult {
+  ok: boolean;
+  path: string;
+}
+
+export interface InstanceLaunchResult {
+  name: string;
+  url: string;
 }

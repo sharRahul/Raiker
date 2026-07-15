@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from raiker.approval_previews import redact_secret_like_text
-from raiker.contracts.ids import new_id
+from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import ControlResult
 from raiker.control.service import RuntimeControlService
 from raiker.events.export import generate_export
@@ -103,6 +103,48 @@ class EventView:
 
 
 @dataclass(frozen=True)
+class BrainNodeView:
+    node_id: str
+    node_type: str
+    label: str
+    status: str
+    detail: str | None = None
+    progress_percent: int | None = None
+    is_real: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class BrainEdgeView:
+    source: str
+    target: str
+    relationship: str
+    is_active: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class BrainView:
+    generated_at: str
+    nodes: tuple[BrainNodeView, ...]
+    edges: tuple[BrainEdgeView, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "generated_at": self.generated_at,
+            "nodes": [node.to_dict() for node in self.nodes],
+            "edges": [edge.to_dict() for edge in self.edges],
+            "illustrative_motion_notice": (
+                "Animated pulses indicate visual activity only; every node and connection is stored runtime data."
+            ),
+        }
+
+
+@dataclass(frozen=True)
 class MemoryControlView:
     """User-facing view of one approved memory entry.
 
@@ -129,6 +171,13 @@ class MemoryControlView:
     pinned: bool
     search_enabled: bool = True
     expires_at: str | None = None
+    archived_at: str | None = None
+    source_event_id: str = ""
+    created_by: str = ""
+    valid_from: str | None = None
+    valid_until: str | None = None
+    supersedes_memory_id: str | None = None
+    remembered_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -148,6 +197,13 @@ class MemoryControlView:
             "pinned": self.pinned,
             "search_enabled": self.search_enabled,
             "expires_at": self.expires_at,
+            "archived_at": self.archived_at,
+            "source_event_id": self.source_event_id,
+            "created_by": self.created_by,
+            "valid_from": self.valid_from,
+            "valid_until": self.valid_until,
+            "supersedes_memory_id": self.supersedes_memory_id,
+            "remembered_reason": self.remembered_reason,
         }
 
 
@@ -252,6 +308,7 @@ class TaskView:
     scheduled_at: str | None = None
     recurrence: str | None = None
     reminder_at: str | None = None
+    parent_task_id: str | None = None
     # Project-scoped schedules: the organizing project this task was created
     # under, or None when it was created outside every project.
     project_id: str | None = None
@@ -274,6 +331,7 @@ class ModelProfileView:
     runtime_gate: str | None
     off_machine: bool
     selected: bool
+    connection_configured: bool = False
     # Prompt-cache TTL breakpoint the provider uses for this profile ("5m"/"1h"),
     # or None when the provider/profile does not cache. Read-only status.
     prompt_cache_ttl: str | None = None
@@ -512,6 +570,46 @@ class DashboardService:
         self.store = SQLiteStore(self.workspace_root)
         self.control = RuntimeControlService(self.workspace_root)
 
+    @property
+    def _brain_sources_path(self) -> Path:
+        return self.workspace_root / ".raiker" / "brain-sources.json"
+
+    def _brain_sources(self) -> list[str]:
+        try:
+            raw = json.loads(self._brain_sources_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return []
+        return [item for item in raw if isinstance(item, str) and item]
+
+    def _workspace_source(self, raw_path: str) -> tuple[str, Path]:
+        candidate = raw_path.strip()
+        if not candidate or len(candidate) > 512:
+            raise ValueError("invalid_brain_source_path")
+        root = self.workspace_root.resolve()
+        path = (root / candidate).resolve()
+        if path != root and root not in path.parents:
+            raise ValueError("brain_source_outside_workspace")
+        if not path.exists():
+            raise ValueError("brain_source_not_found")
+        return str(path.relative_to(root)), path
+
+    def add_brain_source(self, raw_path: str) -> dict[str, Any]:
+        relative_path, _path = self._workspace_source(raw_path)
+        sources = list(dict.fromkeys([*self._brain_sources(), relative_path]))
+        self._brain_sources_path.parent.mkdir(parents=True, exist_ok=True)
+        self._brain_sources_path.write_text(json.dumps(sources), encoding="utf-8")
+        return {"ok": True, "path": relative_path}
+
+    def remove_brain_source(self, raw_path: str) -> dict[str, Any]:
+        try:
+            relative_path, _path = self._workspace_source(raw_path)
+        except ValueError:
+            relative_path = raw_path.strip()
+        sources = [source for source in self._brain_sources() if source != relative_path]
+        self._brain_sources_path.parent.mkdir(parents=True, exist_ok=True)
+        self._brain_sources_path.write_text(json.dumps(sources), encoding="utf-8")
+        return {"ok": True, "path": relative_path}
+
     # ── Sessions / turns ────────────────────────────────────────────────
     def list_sessions(
         self, limit: int = 50, project_id: str | None = None, user_id: str | None = None
@@ -520,6 +618,104 @@ class DashboardService:
             self._session_view(row)
             for row in self.store.list_sessions(limit=limit, project_id=project_id, user_id=user_id)
         ]
+
+    def brain_view(self, *, principal_id: str, user_id: str | None) -> BrainView:
+        """A redacted, read-only relationship graph for the authenticated user."""
+        sessions = self.list_sessions(limit=100, user_id=user_id)
+        session_ids = {session.session_id for session in sessions}
+        tasks = self.list_tasks(user_id=user_id)
+        task_ids = {task.task_id for task in tasks}
+        tasks_by_id = {task.task_id: task for task in tasks}
+        events = [
+            self._event_view(row)
+            for row in self.store.list_event_index(limit=250)
+            if str(row.get("session_id", "")) in session_ids
+        ]
+        approvals = [
+            self._approval_view(row)
+            for row in self.store.list_approvals()
+            if str(row.get("session_id", "")) in session_ids
+        ]
+        subagents = [
+            row for row in self.store.list_subagent_contracts()
+            if str(row.get("parent_task_id", "")) in task_ids
+        ]
+        memories = [
+            memory
+            for memory in list_memory(workspace_root=self.workspace_root, store=self.store, limit=100)
+            if memory.created_by == principal_id
+        ]
+        backups = [
+            row for row in self.store.list_backup_manifests()
+            if str(row.get("created_by", "")) == principal_id
+        ]
+        nodes = [BrainNodeView(f"principal:{principal_id}", "user", "You", "active")]
+        edges: list[BrainEdgeView] = []
+        for session in sessions:
+            node_id = f"session:{session.session_id}"
+            nodes.append(BrainNodeView(node_id, "session", session.title or "Untitled session", session.status))
+            edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "owns"))
+        for task in tasks:
+            node_id = f"task:{task.task_id}"
+            nodes.append(BrainNodeView(node_id, "task", task.title or "Untitled task", task.status, task.current_step, task.progress_percent))
+            edges.append(BrainEdgeView(f"session:{task.session_id}", node_id, "tracks", task.status == "running"))
+            if task.scheduled_at:
+                schedule_id = f"schedule:{task.task_id}"
+                nodes.append(BrainNodeView(schedule_id, "schedule", "Scheduled work", "waiting", task.scheduled_at))
+                edges.append(BrainEdgeView(schedule_id, node_id, "starts"))
+        for agent in subagents:
+            node_id = f"agent:{agent['subagent_id']}"
+            parent_task = tasks_by_id.get(str(agent["parent_task_id"]))
+            nodes.append(
+                BrainNodeView(
+                    node_id,
+                    "agent",
+                    str(agent["name"]),
+                    str(agent["status"]),
+                    parent_task.title if parent_task else None,
+                )
+            )
+            edges.append(BrainEdgeView(f"task:{agent['parent_task_id']}", node_id, "delegates", str(agent["status"]) == "running"))
+        event_ids = {event.event_id for event in events}
+        for event in events:
+            node_id = f"event:{event.event_id}"
+            nodes.append(BrainNodeView(node_id, "tool", event.event_type.replace("_", " "), "recorded", event.summary))
+            edges.append(BrainEdgeView(f"session:{event.session_id}", node_id, "recorded"))
+        for memory in memories:
+            node_id = f"memory:{memory.memory_id}"
+            nodes.append(BrainNodeView(node_id, "memory", f"Memory · {memory.scope}", "available", memory.sensitivity))
+            if memory.source_event_id in event_ids:
+                edges.append(BrainEdgeView(f"event:{memory.source_event_id}", node_id, "remembered"))
+        for approval in approvals:
+            node_id = f"approval:{approval.approval_id}"
+            nodes.append(BrainNodeView(node_id, "approval", approval.tool_name, approval.status, approval.capability))
+            edges.append(BrainEdgeView(f"session:{approval.session_id}", node_id, "requires"))
+        for backup in backups:
+            node_id = f"backup:{backup['manifest_id']}"
+            nodes.append(BrainNodeView(node_id, "backup", "Backup", "verified" if backup.get("restore_verified_at") else "catalogued"))
+            edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "backs_up"))
+        root = self.workspace_root.resolve()
+        for source in self._brain_sources():
+            try:
+                relative_path, path = self._workspace_source(source)
+            except ValueError:
+                continue
+            source_id = f"source:{relative_path}"
+            source_type = "folder" if path.is_dir() else "file"
+            nodes.append(BrainNodeView(source_id, source_type, path.name or relative_path, "selected", relative_path))
+            edges.append(BrainEdgeView(f"principal:{principal_id}", source_id, "added"))
+            if path.is_dir():
+                try:
+                    children = sorted(path.iterdir(), key=lambda child: child.name.casefold())[:100]
+                except OSError:
+                    children = []
+                for child in children:
+                    child_path = str(child.resolve().relative_to(root))
+                    child_id = f"source:{child_path}"
+                    child_type = "folder" if child.is_dir() else "file"
+                    nodes.append(BrainNodeView(child_id, child_type, child.name, "available", child_path))
+                    edges.append(BrainEdgeView(source_id, child_id, "contains"))
+        return BrainView(utc_now(), tuple(nodes), tuple(edges))
 
     def get_session(
         self, session_id: str, user_id: str | None = None
@@ -722,11 +918,19 @@ class DashboardService:
     # No second memory system is created; these read/control the same store
     # the memory_write/memory_forget tools already use.
 
-    def list_memories(self, scope: str | None = None) -> list[MemoryControlView]:
+    def list_memories(
+        self, scope: str | None = None, *, acting_principal_id: str | None = None
+    ) -> list[MemoryControlView]:
         """List approved memories with their governance metadata + pin state."""
         pinned_ids = self.store.list_pinned_memory_ids()
-        entries = list_memory(workspace_root=self.workspace_root, scope=scope, limit=200)
-        return [
+        entries = list_memory(
+            workspace_root=self.workspace_root,
+            scope=scope,
+            limit=200,
+            store=self.store,
+            include_search_disabled=True,
+        )
+        views = [
             MemoryControlView(
                 memory_id=e.memory_id,
                 text=e.text,
@@ -744,9 +948,22 @@ class DashboardService:
                 pinned=e.memory_id in pinned_ids,
                 search_enabled=e.search_enabled,
                 expires_at=e.expires_at,
+                archived_at=e.archived_at,
+                source_event_id=e.source_event_id,
+                created_by=e.created_by,
+                valid_from=e.valid_from,
+                valid_until=e.valid_until,
+                supersedes_memory_id=e.supersedes_memory_id,
+                remembered_reason=e.remembered_reason,
             )
             for e in entries
         ]
+        if acting_principal_id:
+            self.store.record_memory_lifecycle_event(
+                "workspace_memory_control", "admin_access", acting_principal_id,
+                {"operation": "list", "scope": scope, "memory_count": len(views)},
+            )
+        return views
 
     def set_memory_pinned(
         self, memory_id: str, pinned: bool, acting_principal_id: str | None
@@ -791,12 +1008,70 @@ class DashboardService:
         )
         if not ok:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        self.store.record_memory_lifecycle_event(memory_id, "forget", principal.principal_id)
         return ControlResult(ok=True, data={"memory_id": memory_id})
+
+    def set_memory_archived(self, memory_id: str, archived: bool, acting_principal_id: str | None) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.store import set_memory_archived
+        entry = set_memory_archived(memory_id, archived=archived, workspace_root=self.workspace_root, store=self.store)
+        if entry is None:
+            return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        self.store.record_memory_lifecycle_event(memory_id, "archive" if archived else "restore", acting_principal_id or "")
+        return ControlResult(ok=True, data={"memory_id": memory_id, "archived": archived})
+
+    def preview_memory_purge(self, memory_id: str, acting_principal_id: str | None) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.store import get_memory
+        memory = get_memory(memory_id, workspace_root=self.workspace_root, include_expired=True, include_archived=True)
+        if memory is None:
+            return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        return ControlResult(ok=True, data={"memory_id": memory_id, "artifacts": [str(self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md")], "backup_disposition": "retained backups are not immediately erased", "requires_confirmation": memory_id})
+
+    def purge_memory(self, memory_id: str, confirmation: str | None, acting_principal_id: str | None) -> ControlResult:
+        preview = self.preview_memory_purge(memory_id, acting_principal_id)
+        if not preview.ok:
+            return preview
+        if confirmation != memory_id:
+            return ControlResult(ok=False, reason_code="memory_purge_confirmation_required")
+        from raiker.contracts.ids import utc_now
+        path = self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md"
+        path.unlink(missing_ok=True)
+        projections = self.store.list_memory_projections(memory_id)
+        self.store.deactivate_memory_projections(memory_id)
+        self.store.delete_approved_memory(memory_id)
+        disposition = {**preview.data, "projections": projections, "completed_storage_locations": ["markdown_export", "sqlite_approved_memory", "sqlite_fts", "projection_mappings"]}
+        self.store.create_memory_purge_record(new_id("pur_"), memory_id, acting_principal_id or "", utc_now(), disposition)
+        self.store.record_memory_lifecycle_event(memory_id, "purge", acting_principal_id or "", disposition)
+        return ControlResult(ok=True, data={"memory_id": memory_id, "purged": True, "backup_disposition": preview.data["backup_disposition"]})
 
     def edit_memory_controlled(self, memory_id: str, text: str, acting_principal_id: str | None) -> ControlResult:
         return self._update_memory_controlled(
             memory_id, text=text, search_enabled=None, acting_principal_id=acting_principal_id
         )
+
+    def correct_memory_controlled(
+        self, memory_id: str, text: str, reason: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.store import MemoryGovernance, correct_memory
+
+        replacement = correct_memory(
+            memory_id, text, workspace_root=self.workspace_root, store=self.store,
+            remembered_reason=reason,
+            governance=MemoryGovernance(
+                source_event_id=new_id("evt_"), source_session_id="", source_turn_id=None,
+                source_type="human_correction", confidence=1.0, trust_score=1.0,
+                retention="until_forget", approval_state="approved", created_by=acting_principal_id or "",
+            ),
+        )
+        if replacement is None:
+            return ControlResult(ok=False, reason_code="invalid_memory_correction")
+        self.store.record_memory_lifecycle_event(memory_id, "correct", acting_principal_id or "", {"replacement_memory_id": replacement.memory_id, "reason": reason})
+        return ControlResult(ok=True, data={"memory_id": replacement.memory_id, "supersedes_memory_id": memory_id})
 
     def set_memory_search_enabled(self, memory_id: str, search_enabled: bool, acting_principal_id: str | None) -> ControlResult:
         return self._update_memory_controlled(
@@ -816,7 +1091,11 @@ class DashboardService:
     def export_memories(self, acting_principal_id: str | None) -> ControlResult:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        return ControlResult(ok=True, data={"memories": [m.to_dict() for m in self.list_memories()]})
+        memories = [m.to_dict() for m in self.list_memories()]
+        self.store.record_memory_lifecycle_event(
+            "workspace_memory_export", "export", acting_principal_id or "", {"memory_count": len(memories)}
+        )
+        return ControlResult(ok=True, data={"memories": memories})
 
     def import_memories(self, memories: list[dict[str, Any]], acting_principal_id: str | None) -> ControlResult:
         if not self._is_human(acting_principal_id):
@@ -842,8 +1121,33 @@ class DashboardService:
                 search_enabled=bool(item.get("search_enabled", True)),
                 expires_at=item.get("expires_at"),
                 update_expires_at="expires_at" in item,
+                store=self.store,
+            )
+            self.store.record_memory_lifecycle_event(
+                entry.memory_id, "import", acting_principal_id or "", {"source": "user_import"}
             )
         return ControlResult(ok=True, data={"count": len(memories)})
+
+    def reconcile_memory_indexes(self, acting_principal_id: str | None) -> ControlResult:
+        """Owner-started repair; never runs as an autonomous background worker."""
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        return ControlResult(ok=True, data=self.store.reconcile_memory_projections())
+
+    def cleanup_expired_observations(
+        self, observation_ids: set[str], now: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.eidetic import cleanup_expired_observations
+
+        try:
+            deleted = cleanup_expired_observations(
+                store=self.store, now=now, confirmed_ids=observation_ids
+            )
+        except PermissionError as error:
+            return ControlResult(ok=False, reason_code=str(error))
+        return ControlResult(ok=True, data={"deleted_observation_ids": deleted})
 
     def _is_human(self, acting_principal_id: str | None) -> bool:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
@@ -874,6 +1178,7 @@ class DashboardService:
             search_enabled=search_enabled,
             expires_at=expires_at,
             update_expires_at=update_expires_at,
+            store=self.store,
         )
         if updated is None:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
@@ -1073,7 +1378,8 @@ class DashboardService:
         *,
         instructions: str,
         attachment_ids: list[str],
-        memory_enabled: bool,
+        memory_enabled: bool | None = None,
+        memory_mode: str | None = None,
         acting_principal_id: str | None,
     ) -> ControlResult:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
@@ -1096,10 +1402,11 @@ class DashboardService:
             instructions=cleaned,
             attachment_ids=unique_ids,
             memory_enabled=memory_enabled,
+            memory_mode=memory_mode,
         )
+        context = self.store.load_project_context(project_id)
         return ControlResult(
-            ok=True,
-            data={"instructions": cleaned, "attachment_ids": unique_ids, "memory_enabled": memory_enabled},
+            ok=True, data=context,
         )
 
     # ── Nested projects/folders (conversation organisation remainder) ─────
@@ -1189,6 +1496,7 @@ class DashboardService:
         scheduled_at: str | None = None,
         recurrence: str | None = None,
         reminder_at: str | None = None,
+        parent_task_id: str | None = None,
         project_id: str | None = None,
     ) -> TaskView:
         """Create a local planning task in the caller's server-owned Inbox session.
@@ -1198,10 +1506,22 @@ class DashboardService:
         project stays scoped to it. The stamp is an organizing label — it
         grants nothing.
         """
+        # An unscheduled task is work requested now; the resident host claims
+        # it on its next scheduler tick. Explicit times remain untouched.
+        if scheduled_at is None:
+            scheduled_at = utc_now()
         if project_id is None:
             project_id = self.store.get_active_project()
         elif self.store.load_project(project_id) is None:
             raise ValueError(f"unknown_project:{project_id}")
+        if parent_task_id is not None:
+            parent = self.store.load_task(parent_task_id)
+            parent_session = self.store.load_session(parent.session_id) if parent is not None else None
+            if parent is None or parent_session is None or (
+                user_id is not None
+                and parent_session.get("user_id") not in (None, user_id)
+            ):
+                raise ValueError(f"unknown_parent_task:{parent_task_id}")
         inbox_session_id = f"sess_inbox_{principal_id}"
         self.store.create_session(
             inbox_session_id,
@@ -1217,6 +1537,7 @@ class DashboardService:
             scheduled_at=scheduled_at,
             recurrence=recurrence,
             reminder_at=reminder_at,
+            parent_task_id=parent_task_id,
             project_id=project_id,
         )
         return self._task_view(task)
@@ -1232,7 +1553,7 @@ class DashboardService:
         return self._approval_detail(row)
 
     # ── Models / diagnostics ────────────────────────────────────────────
-    def get_models(self) -> ModelsView:
+    def get_models(self, acting_principal_id: str | None = None) -> ModelsView:
         registry = ModelProfileRegistry.load()
         state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
         current = state.profile_id if state is not None else None
@@ -1243,6 +1564,8 @@ class DashboardService:
         hosted_gate = self.control.get_capability_gate(HOSTED_MODEL_GATE)
         private_gate = self.control.get_capability_gate(PRIVATE_NETWORK_MODEL_GATE)
         advisor_gate = self.control.get_capability_gate("advisor_model_runtime")
+        from raiker.models.connections import get_model_connection
+
         profiles = tuple(
             ModelProfileView(
                 profile_id=p.profile_id,
@@ -1257,6 +1580,10 @@ class DashboardService:
                 runtime_gate=self._runtime_gate_for_profile(str(p.raw.get("endpoint_kind", "unknown"))),
                 off_machine=str(p.raw.get("endpoint_kind", "unknown")) in {"remote_hosted", "private_network"},
                 selected=(p.profile_id == current),
+                connection_configured=bool(
+                    acting_principal_id
+                    and get_model_connection(self.store, acting_principal_id, p.profile_id)
+                ),
                 prompt_cache_ttl=(str(p.raw.get("prompt_cache_ttl")) if p.raw.get("prompt_cache_ttl") else None),
             )
             for p in registry.list_profiles()
@@ -1264,6 +1591,7 @@ class DashboardService:
             # test mode (the provider factory fails closed), so the web surface
             # lists working backends only.
             if not bool(p.raw.get("test_only", False))
+            and not bool(p.raw.get("setup_hidden", False))
         )
         return ModelsView(
             profiles=profiles,
@@ -1467,12 +1795,18 @@ class DashboardService:
             return ControlResult(ok=False, reason_code=f"unknown_profile:{cleaned}")
         if bool(profile.raw.get("test_only", False)):
             return ControlResult(ok=False, reason_code=f"test_profile_not_allowed:{cleaned}")
-        if not profile.model or "<" in profile.model:
+        state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        effective_model = profile.model
+        if state is not None and state.profile_id == profile.profile_id and state.model:
+            effective_model = state.model
+        if not effective_model or "<" in effective_model:
             return ControlResult(ok=False, reason_code=f"model_required_for_profile:{cleaned}")
         self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, profile.profile_id)
         return ControlResult(ok=True, data={"advisor_profile_id": profile.profile_id})
 
-    async def list_provider_models(self, profile_id: str) -> ProviderModelListView | None:
+    async def list_provider_models(
+        self, profile_id: str, acting_principal_id: str | None = None
+    ) -> ProviderModelListView | None:
         """List the models a provider serves, on explicit user demand.
 
         Returns None for unknown/test-only profiles (the route 404s). This is the
@@ -1489,8 +1823,14 @@ class DashboardService:
             return None
         if bool(profile.raw.get("test_only", False)):
             return None
+        from raiker.models.connections import get_model_connection
+
         router = ModelRouter(
-            registry, runtime_policy=provider_runtime_policy_from_gates(self.store)
+            registry,
+            runtime_policy=provider_runtime_policy_from_gates(self.store),
+            connection_resolver=lambda current_profile_id: get_model_connection(
+                self.store, acting_principal_id or "", current_profile_id
+            ) if acting_principal_id else None,
         )
         try:
             models = await router.alist_models_for_profile(profile)
@@ -1559,8 +1899,11 @@ class DashboardService:
             else profile_with_model(profile, resolved_model)
         )
         try:
+            from raiker.models.connections import get_model_connection
+
             validator = ModelProviderFactory(
-                policy=provider_runtime_policy_from_gates(self.store)
+                policy=provider_runtime_policy_from_gates(self.store),
+                connection=get_model_connection(self.store, principal.principal_id, profile.profile_id),
             ).create(effective)
         except Exception as exc:  # noqa: BLE001 — provider policy failures fail closed
             self._append_model_event(
@@ -1877,6 +2220,7 @@ class DashboardService:
             scheduled_at=d.get("scheduled_at"),
             recurrence=d.get("recurrence"),
             reminder_at=d.get("reminder_at"),
+            parent_task_id=d.get("parent_task_id"),
             project_id=d.get("project_id"),
         )
 

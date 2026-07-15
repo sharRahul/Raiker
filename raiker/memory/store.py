@@ -29,8 +29,14 @@ class MemoryEntry:
     created_by: str
     updated_at: str | None = None
     deleted_at: str | None = None
+    archived_at: str | None = None
     search_enabled: bool = True
     expires_at: str | None = None
+    valid_from: str | None = None
+    valid_until: str | None = None
+    supersedes_memory_id: str | None = None
+    superseded_at: str | None = None
+    remembered_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -83,8 +89,14 @@ def _encode_frontmatter(entry: MemoryEntry) -> str:
         "created_by": entry.created_by,
         "updated_at": entry.updated_at,
         "deleted_at": entry.deleted_at,
+        "archived_at": entry.archived_at,
         "search_enabled": entry.search_enabled,
         "expires_at": entry.expires_at,
+        "valid_from": entry.valid_from,
+        "valid_until": entry.valid_until,
+        "supersedes_memory_id": entry.supersedes_memory_id,
+        "superseded_at": entry.superseded_at,
+        "remembered_reason": entry.remembered_reason,
     }
     return json.dumps(meta, sort_keys=True)
 
@@ -154,6 +166,8 @@ def search_memory(
     max_results: int = 20,
     store: SQLiteStore | None = None,
 ) -> list[MemoryEntry]:
+    if store is not None:
+        return [_entry_from_row(row) for row in store.search_approved_memory(query, scope=scope, limit=max_results)]
     query_lower = query.lower()
     results: list[MemoryEntry] = []
     mem_dir = _memory_dir(workspace_root)
@@ -189,10 +203,14 @@ def search_memory(
             created_by=str(meta.get("created_by", "system")),
             updated_at=meta.get("updated_at"),
             deleted_at=meta.get("deleted_at"),
+            archived_at=meta.get("archived_at"),
             search_enabled=bool(meta.get("search_enabled", True)),
             expires_at=meta.get("expires_at"),
+            valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
+            supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
+            remembered_reason=meta.get("remembered_reason"),
         )
-        if entry.deleted_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
+        if entry.deleted_at is not None or entry.archived_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
             continue
         if scope is not None and entry.scope != scope:
             continue
@@ -262,7 +280,25 @@ def forget_memory(
     target.write_text(_encode_frontmatter(tombstone) + "\n", encoding="utf-8")
     if store is not None:
         store.mark_approved_memory_forgotten(memory_id, deleted_at=now, updated_at=now)
+        store.deactivate_memory_projections(memory_id)
     return True
+
+
+def set_memory_archived(
+    memory_id: str, *, archived: bool, workspace_root: str | Path = ".", store: SQLiteStore | None = None
+) -> MemoryEntry | None:
+    """Archive/restore a memory without changing its content or provenance."""
+    entry = get_memory(memory_id, workspace_root=workspace_root, include_expired=True, include_archived=True)
+    if entry is None:
+        return None
+    updated = replace(entry, archived_at=utc_now() if archived else None, updated_at=utc_now())
+    _entry_path(_memory_dir(workspace_root), memory_id).write_text(
+        _encode_frontmatter(updated) + "\n" + updated.text, encoding="utf-8"
+    )
+    if store is not None:
+        store.set_approved_memory_archived(memory_id, archived_at=updated.archived_at, updated_at=updated.updated_at)
+        store.set_memory_projections_active(memory_id, not archived)
+    return updated
 
 
 def list_memory(
@@ -270,7 +306,16 @@ def list_memory(
     workspace_root: str | Path = ".",
     scope: str | None = None,
     limit: int = 50,
+    store: SQLiteStore | None = None,
+    include_search_disabled: bool = False,
 ) -> list[MemoryEntry]:
+    if store is not None:
+        return [
+            _entry_from_row(row)
+            for row in store.list_approved_memory(
+                scope=scope, limit=limit, include_search_disabled=include_search_disabled
+            )
+        ]
     results: list[MemoryEntry] = []
     mem_dir = _memory_dir(workspace_root)
     if not mem_dir.exists():
@@ -304,10 +349,14 @@ def list_memory(
             created_by=str(meta.get("created_by", "system")),
             updated_at=meta.get("updated_at"),
             deleted_at=meta.get("deleted_at"),
+            archived_at=meta.get("archived_at"),
             search_enabled=bool(meta.get("search_enabled", True)),
             expires_at=meta.get("expires_at"),
+            valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
+            supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
+            remembered_reason=meta.get("remembered_reason"),
         )
-        if entry.deleted_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
+        if entry.deleted_at is not None or entry.archived_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
             continue
         if scope is not None and entry.scope != scope:
             continue
@@ -320,6 +369,7 @@ def get_memory(
     *,
     workspace_root: str | Path = ".",
     include_expired: bool = False,
+    include_archived: bool = False,
 ) -> MemoryEntry | None:
     mem_dir = _memory_dir(workspace_root)
     path = _entry_path(mem_dir, memory_id)
@@ -347,10 +397,14 @@ def get_memory(
             created_by=str(meta.get("created_by", "system")),
             updated_at=meta.get("updated_at"),
             deleted_at=meta.get("deleted_at"),
+            archived_at=meta.get("archived_at"),
             search_enabled=bool(meta.get("search_enabled", True)),
             expires_at=meta.get("expires_at"),
+            valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
+            supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
+            remembered_reason=meta.get("remembered_reason"),
         )
-        if entry.deleted_at is not None or (
+        if entry.deleted_at is not None or (not include_archived and entry.archived_at is not None) or (
             not include_expired and entry.expires_at is not None and entry.expires_at <= utc_now()
         ):
             return None
@@ -379,9 +433,13 @@ def get_memory(
                 approval_state=str(meta.get("approval_state", "approved")),
                 created_by=str(meta.get("created_by", "system")),
                 updated_at=meta.get("updated_at"),
-            deleted_at=meta.get("deleted_at"),
-            search_enabled=bool(meta.get("search_enabled", True)),
-            expires_at=meta.get("expires_at"),
+                deleted_at=meta.get("deleted_at"),
+                archived_at=meta.get("archived_at"),
+                search_enabled=bool(meta.get("search_enabled", True)),
+                expires_at=meta.get("expires_at"),
+                valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
+                supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
+                remembered_reason=meta.get("remembered_reason"),
             )
             if entry.deleted_at is not None or (
                 not include_expired and entry.expires_at is not None and entry.expires_at <= utc_now()
@@ -395,6 +453,7 @@ def update_memory(
     memory_id: str, *, workspace_root: str | Path = ".", text: str | None = None,
     search_enabled: bool | None = None, expires_at: str | None = None,
     update_expires_at: bool = False,
+    store: SQLiteStore | None = None,
 ) -> MemoryEntry | None:
     entry = get_memory(memory_id, workspace_root=workspace_root, include_expired=True)
     if entry is None:
@@ -410,7 +469,49 @@ def update_memory(
     _entry_path(_memory_dir(workspace_root), memory_id).write_text(
         _encode_frontmatter(updated) + "\n" + updated.text, encoding="utf-8"
     )
+    if store is not None:
+        store.update_approved_memory(updated)
     return updated
+
+
+def correct_memory(
+    memory_id: str, text: str, *, workspace_root: str | Path = ".", store: SQLiteStore,
+    governance: MemoryGovernance, remembered_reason: str,
+) -> MemoryEntry | None:
+    """Create a replacement fact, preserving the corrected record as evidence."""
+    original = get_memory(memory_id, workspace_root=workspace_root, include_expired=True, include_archived=True)
+    if original is None or not text.strip() or not remembered_reason.strip():
+        return None
+    replacement = write_memory(
+        text, workspace_root=workspace_root, scope=original.scope, source_event_id=governance.source_event_id,
+        memory_type=original.memory_type, tags=original.tags, source="human_correction", store=store,
+        governance=governance,
+    )
+    replacement = replace(replacement, remembered_reason=remembered_reason.strip(), supersedes_memory_id=memory_id)
+    _entry_path(_memory_dir(workspace_root), replacement.memory_id).write_text(
+        _encode_frontmatter(replacement) + "\n" + replacement.text, encoding="utf-8"
+    )
+    store.update_approved_memory(replacement)
+    if not store.supersede_approved_memory(memory_id, replacement.memory_id, at=utc_now()):
+        return None
+    return replacement
+
+
+def _entry_from_row(row: dict[str, Any]) -> MemoryEntry:
+    return MemoryEntry(
+        memory_id=str(row["memory_id"]), text=str(row["text"]), scope=str(row["scope"]),
+        sensitivity=str(row["sensitivity"]), source_event_id=str(row["source_event_id"]),
+        memory_type=str(row["memory_type"]), created_at=str(row["created_at"]),
+        tags=tuple(json.loads(str(row["tags_json"]))), source=str(row["source"]),
+        provenance=json.loads(str(row["provenance_json"])), confidence=float(row["confidence"]),
+        trust_score=float(row["trust_score"]), retention=str(row["retention"]),
+        approval_state=str(row["approval_state"]), created_by=str(row["created_by"]),
+        updated_at=row["updated_at"], deleted_at=row["deleted_at"], archived_at=row["archived_at"],
+        search_enabled=bool(row["search_enabled"]), expires_at=row["expires_at"],
+        valid_from=row["valid_from"], valid_until=row["valid_until"],
+        supersedes_memory_id=row["supersedes_memory_id"], superseded_at=row["superseded_at"],
+        remembered_reason=row["remembered_reason"],
+    )
 
 
 def memory_status(*, workspace_root: str | Path = ".") -> dict[str, object]:

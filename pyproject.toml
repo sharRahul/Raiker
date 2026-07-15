@@ -21,6 +21,7 @@ dependencies = [
     # in the stdlib) and TOTP multi-factor auth. Both are local-only, no egress.
     "argon2-cffi>=23.1",
     "pyotp>=2.9",
+    "pysqlcipher3static (>=2.0.1,<3.0.0)",
 ]
 
 [project.optional-dependencies]

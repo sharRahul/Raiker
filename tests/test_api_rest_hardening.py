@@ -15,12 +15,12 @@ from raiker.storage.sqlite import SQLiteStore
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 
 def _headers(workspace: Path) -> dict[str, str]:
-    raw, _ = ApiSessionStore(workspace).create_session("principal_rahul")
+    raw, _ = ApiSessionStore(workspace).create_session("principal_owner")
     return {"Authorization": f"Bearer {raw}"}
 
 

@@ -24,14 +24,14 @@ from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.storage.sqlite import SQLiteStore
 
-OWNER = "principal_rahul"
+OWNER = "principal_owner"
 
 
 @pytest.fixture
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 
@@ -413,7 +413,10 @@ class TestProjectsApi:
         assert saved.status_code == 200, saved.text
         detail = client.get(f"/api/projects/{pid}", headers=headers).json()
         assert detail["context"] == {
-            "instructions": "Keep changes focused.", "attachment_ids": [], "memory_enabled": True
+            "instructions": "Keep changes focused.",
+            "attachment_ids": [],
+            "memory_enabled": True,
+            "memory_mode": "enabled",
         }
 
     def test_authenticated_human_can_confirm_project_deletion(

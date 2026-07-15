@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.resources import files
@@ -12,11 +11,11 @@ from urllib.parse import quote, urlencode, urlparse
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
 
+from raiker.auth.vault_key_file import effective_vault_key
 from raiker.contracts.ids import new_id, utc_now
 from raiker.runtime.executors.sandbox import connector_egress_allowlist
 from raiker.storage.sqlite import SQLiteStore
 
-VAULT_KEY_ENV = "RAIKER_CONNECTOR_VAULT_KEY"
 _METHODS = frozenset({"get", "post", "put", "patch", "delete"})
 
 
@@ -62,9 +61,8 @@ class ConnectorVault:
     def __init__(self, store: SQLiteStore) -> None:
         self.store = store
 
-    @staticmethod
-    def configured() -> bool:
-        value = os.environ.get(VAULT_KEY_ENV, "").strip()
+    def configured(self) -> bool:
+        value = effective_vault_key(self.store.paths.workspace_root)
         if not value:
             return False
         try:
@@ -73,9 +71,8 @@ class ConnectorVault:
             return False
         return True
 
-    @staticmethod
-    def _fernet() -> Fernet:
-        value = os.environ.get(VAULT_KEY_ENV, "").strip()
+    def _fernet(self) -> Fernet:
+        value = effective_vault_key(self.store.paths.workspace_root)
         if not value:
             raise ValueError("connector_vault_key_unset")
         try:

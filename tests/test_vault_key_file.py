@@ -49,6 +49,14 @@ def test_env_wins_over_file(tmp_path, monkeypatch) -> None:  # type: ignore[no-u
     assert os.environ.get(ENV) == env_key
 
 
+def test_workspace_file_wins_for_effective_instance_key(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    env_key = Fernet.generate_key().decode("ascii")
+    file_key = Fernet.generate_key().decode("ascii")
+    monkeypatch.setenv(ENV, env_key)
+    vkf.write_vault_key(tmp_path, file_key)
+    assert vkf.effective_vault_key(tmp_path) == file_key
+
+
 def test_clear(tmp_path) -> None:  # type: ignore[no-untyped-def]
     vkf.write_vault_key(tmp_path, Fernet.generate_key().decode("ascii"))
     vkf.clear_vault_key(tmp_path)

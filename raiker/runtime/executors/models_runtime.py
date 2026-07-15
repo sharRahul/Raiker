@@ -133,9 +133,10 @@ class ModelProviderExecutor:
       come **only** from owner env vars, never from action arguments.
     - Unsupported providers fail closed (``embeddings_unsupported``).
 
-    Only ``operation: embed`` is supported in this slice. Artifacts are metadata
-    only (ids/model/dims/hash); the source text and provider credentials never
-    enter runtime events.
+    ``operation: project_memory`` resolves an active, non-sensitive approved
+    memory and records its projection mapping. Artifacts are metadata only
+    (ids/model/dims/hash); source text and provider credentials never enter
+    runtime events.
     """
 
     capability = "model_provider_runtime"
@@ -149,11 +150,30 @@ class ModelProviderExecutor:
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         operation = str(action.arguments.get("operation", "embed")).strip()
-        if operation != "embed":
+        if operation not in {"embed", "project_memory"}:
             return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
 
-        text = action.arguments.get("text")
-        if not isinstance(text, str) or not text.strip():
+        memory_id: str | None = None
+        if operation == "project_memory":
+            memory_id = action.arguments.get("memory_id")
+            if not isinstance(memory_id, str) or not memory_id:
+                return self._fail(action.action_id, "missing_argument:memory_id")
+            memory = self._store.get_active_approved_memory(memory_id)
+            if memory is None:
+                return self._fail(action.action_id, "memory_not_active_or_not_found")
+            if str(memory["sensitivity"]) in {"secret_like", "credential_like"}:
+                return self._fail(action.action_id, "memory_sensitivity_not_projectable")
+            text = str(memory["text"])
+            scope = str(memory["scope"])
+            sensitivity = str(memory["sensitivity"])
+        else:
+            raw_text = action.arguments.get("text")
+            if not isinstance(raw_text, str) or not raw_text.strip():
+                return self._fail(action.action_id, "missing_argument:text")
+            text = raw_text
+            scope = action.arguments.get("scope", "default")
+            sensitivity = action.arguments.get("sensitivity", "public")
+        if not text.strip():
             return self._fail(action.action_id, "missing_argument:text")
         if len(text) > _MAX_EMBED_TEXT_LEN:
             return self._fail(action.action_id, "text_too_long")
@@ -163,8 +183,6 @@ class ModelProviderExecutor:
             return self._fail(action.action_id, "missing_argument:provider")
         if not isinstance(model, str) or not model.strip():
             return self._fail(action.action_id, "missing_argument:model")
-        scope = action.arguments.get("scope", "default")
-        sensitivity = action.arguments.get("sensitivity", "public")
         if not isinstance(scope, str) or not isinstance(sensitivity, str):
             return self._fail(action.action_id, "invalid_argument:scope_or_sensitivity")
 
@@ -205,6 +223,8 @@ class ModelProviderExecutor:
             created_at=utc_now(),
             embedding=_dump_vector(vector),
         ))
+        if memory_id is not None:
+            self._store.link_memory_projection(memory_id, "vector", vector_id, embedding_model)
         return ExecutionResult(
             ok=True,
             capability=self.capability,
@@ -217,6 +237,7 @@ class ModelProviderExecutor:
                 "content_hash": content_hash,
                 "provider_backed": True,
                 "content_redacted": True,
+                **({"memory_id": memory_id} if memory_id is not None else {}),
             },
         )
 

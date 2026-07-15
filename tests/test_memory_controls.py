@@ -17,14 +17,14 @@ from raiker.control.dashboard import DashboardService
 from raiker.memory.store import MemoryGovernance, get_memory, search_memory, write_memory
 from raiker.storage.sqlite import SQLiteStore
 
-OWNER = "principal_rahul"
+OWNER = "principal_owner"
 
 
 @pytest.fixture
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 
@@ -74,7 +74,24 @@ class TestMemoryList:
         assert m.trust_score == 0.8
         assert m.retention == "until_forget"
         assert m.approval_state == "approved"
+        assert m.source_event_id.startswith("evt_")
+        assert m.provenance["source_event_id"] == "evt_seed"
+        assert m.created_by == "test"
+        assert m.valid_from == m.created_at
         assert m.pinned is False
+
+    def test_authenticated_memory_list_is_audited(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        _seed_memory(service.store, workspace)
+        assert service.list_memories(acting_principal_id=OWNER)
+        with service.store.connect() as connection:
+            row = connection.execute(
+                "SELECT actor_id, details_json FROM memory_lifecycle_audit "
+                "WHERE memory_id = 'workspace_memory_control' AND action = 'admin_access'"
+            ).fetchone()
+        assert row["actor_id"] == OWNER
+        assert '"operation": "list"' in row["details_json"]
 
     def test_list_can_filter_by_scope(self, service: DashboardService, workspace: Path) -> None:
         _seed_memory(service.store, workspace, scope="project:alpha")
@@ -143,6 +160,36 @@ class TestMemoryForget:
         assert not result.ok
         assert result.reason_code == "not_authorized_human"
 
+    def test_human_can_archive_and_restore(self, service: DashboardService, workspace: Path) -> None:
+        mid = _seed_memory(service.store, workspace)
+        assert service.set_memory_archived(mid, True, OWNER).ok
+        assert service.list_memories() == []
+        assert service.set_memory_archived(mid, False, OWNER).ok
+        assert [m.memory_id for m in service.list_memories()] == [mid]
+        with service.store.connect() as connection:
+            assert connection.execute("SELECT COUNT(*) FROM memory_lifecycle_audit WHERE memory_id = ?", (mid,)).fetchone()[0] == 2
+
+    def test_purge_requires_exact_confirmation(self, service: DashboardService, workspace: Path) -> None:
+        mid = _seed_memory(service.store, workspace)
+        assert service.purge_memory(mid, None, OWNER).reason_code == "memory_purge_confirmation_required"
+        assert service.purge_memory(mid, mid, OWNER).ok
+        assert service.list_memories() == []
+
+    def test_owner_can_reconcile_memory_indexes(self, service: DashboardService, workspace: Path) -> None:
+        _seed_memory(service.store, workspace)
+        result = service.reconcile_memory_indexes(OWNER)
+        assert result.ok and result.data["projection_rows_reconciled"] >= 0
+
+    def test_eidetic_cleanup_is_human_and_preview_bound(self, service: DashboardService) -> None:
+        from raiker.memory.eidetic import record_observation
+
+        observation = record_observation(
+            store=service.store, source_event_id="evt_1", session_id="sess_1",
+            summary="temporary", content="temporary", retention="turn_only"
+        )
+        assert not service.cleanup_expired_observations({observation.observation_id}, "2100-01-01T00:00:00Z", "principal_missing").ok
+        assert service.cleanup_expired_observations({observation.observation_id}, "2100-01-01T00:00:00Z", OWNER).ok
+
 
 class TestMemoryEditAndSearchParticipation:
     def test_human_can_edit_a_memory_and_exclude_it_from_search(
@@ -175,6 +222,11 @@ class TestMemoryEditAndSearchParticipation:
         )
         assert imported.ok
         assert [m.text for m in service.list_memories()] == ["Imported memory"]
+        with service.store.connect() as connection:
+            actions = [row["action"] for row in connection.execute(
+                "SELECT action FROM memory_lifecycle_audit ORDER BY created_at"
+            ).fetchall()]
+        assert "export" in actions and "import" in actions
 
 
 class TestIncognitoBoundary:

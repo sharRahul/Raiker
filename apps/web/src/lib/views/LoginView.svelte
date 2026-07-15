@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { auth, health, ApiError } from "../api";
+  import { auth, createInstance, health, ApiError } from "../api";
   import Icon from "../components/Icon.svelte";
   import ThemeToggle from "../components/ThemeToggle.svelte";
 
@@ -27,6 +27,8 @@
   let error = $state<string | null>(null);
   let busy = $state(false);
   let showPassword = $state(false);
+  let instanceSetup = $state(false);
+  let instanceName = $state("");
 
   // Privacy-safe pre-auth reachability: /api/health returns only {status: ok}.
   // null = probe not resolved yet — no state message is shown until real data
@@ -141,6 +143,23 @@
       busy = false;
     }
   }
+
+  async function createSeparateInstance() {
+    if (!instanceName.trim()) return;
+    busy = true;
+    error = null;
+    try {
+      const instance = await createInstance(instanceName.trim());
+      const opened = window.open(instance.url, "_blank", "noopener");
+      if (opened === null) window.location.assign(instance.url);
+    } catch (e) {
+      error = e instanceof ApiError && e.status === 409
+        ? "That instance name is already in use on this device."
+        : "Could not create the separate local instance.";
+    } finally {
+      busy = false;
+    }
+  }
 </script>
 
 <div class="lock-screen">
@@ -186,7 +205,17 @@
         </p>
       {/if}
 
-      {#if step === "credentials"}
+      {#if instanceSetup}
+        <h1 id="unlock-title">Create separate instance</h1>
+        <p class="intro">This creates a separate Raiker instance on this server with its own workspace, database, vault, connectors, files, and login. It opens in a new tab.</p>
+        <form onsubmit={(event) => { event.preventDefault(); void createSeparateInstance(); }}>
+          <label for="instance-name">Instance name</label>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="projects" size={17} /></span><input id="instance-name" bind:value={instanceName} placeholder="for example, alex" pattern={"[a-z0-9][a-z0-9-]{0,62}"} required disabled={busy} /></div>
+          {#if error}<p class="error" role="alert">{error}</p>{/if}
+          <button type="submit" class="btn btn-primary submit" disabled={busy || !instanceName.trim()}>{busy ? "Starting…" : "Create and open instance"}</button>
+        </form>
+        <button type="button" class="secondary" onclick={() => { instanceSetup = false; error = null; }} disabled={busy}>Return to login</button>
+      {:else if step === "credentials"}
         <h1 id="unlock-title">{isRegister ? "Create local account" : "Unlock Raiker"}</h1>
         <p class="intro">
           {isRegister
@@ -258,6 +287,11 @@
         <button type="button" class="secondary" onclick={switchMode} disabled={formDisabled}>
           <Icon name={isRegister ? "user" : "user-plus"} size={18} />
           {isRegister ? "Return to unlock" : "Create local account"}
+        </button>
+
+        <button type="button" class="secondary instance-button" onclick={() => { instanceSetup = true; error = null; }} disabled={formDisabled}>
+          <Icon name="projects" size={18} />
+          Create separate instance
         </button>
 
         <div id="privacy-note" class="privacy">

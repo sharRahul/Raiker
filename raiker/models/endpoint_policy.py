@@ -27,7 +27,9 @@ def model_egress_allowlist() -> frozenset[str]:
     return frozenset(part.strip().lower() for part in raw.split(",") if part.strip())
 
 
-def enforce_model_egress(endpoint: str, *, kind: str) -> None:
+def enforce_model_egress(
+    endpoint: str, *, kind: str, configured_allowlist: frozenset[str] | None = None
+) -> None:
     """Fail closed unless *endpoint*'s hostname is on the model egress allowlist.
 
     Applies only to off-machine endpoint kinds (``remote_hosted`` /
@@ -38,7 +40,7 @@ def enforce_model_egress(endpoint: str, *, kind: str) -> None:
     """
     if kind not in {"remote_hosted", "private_network"}:
         return
-    allowlist = model_egress_allowlist()
+    allowlist = configured_allowlist if configured_allowlist is not None else model_egress_allowlist()
     if not allowlist:
         raise ProviderPolicyError("model_egress_denied:no_allowlist")
     parsed = urlparse(endpoint)

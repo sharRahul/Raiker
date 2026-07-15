@@ -18,6 +18,7 @@ PROTECTED_GET_ROUTES = [
     "/api/sessions",
     "/api/turns/turn_x",
     "/api/events",
+    "/api/brain",
     "/api/checkpoints",
     "/api/tasks",
     "/api/models",
@@ -34,7 +35,7 @@ def temp_workspace(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def bootstrapped_workspace(temp_workspace: Path) -> Path:
-    bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+    bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
     return temp_workspace
 
 
@@ -81,7 +82,7 @@ class TestAuthMint:
         assert resp.status_code == 200
         body = resp.json()
         assert body["token"]
-        assert body["principal_id"] == "principal_rahul"
+        assert body["principal_id"] == "principal_owner"
         assert "session_id" in body
 
     def test_no_owner_is_rejected(self, temp_workspace: Path) -> None:
@@ -97,6 +98,37 @@ class TestAuthMint:
         assert resp.status_code == 403
         # resolve_local_principal refuses AI principals before we even check the type.
         assert not resp.json()["detail"]["ok"]
+
+
+class TestInstances:
+    def test_login_launcher_creates_an_isolated_same_server_instance(
+        self, bootstrapped_workspace: Path, client: TestClient
+    ) -> None:
+        response = client.post("/api/instances", json={"name": "alex"})
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["url"] == "/instances/alex/"
+        assert (bootstrapped_workspace / ".raiker" / "instances" / "alex").is_dir()
+        assert client.get("/instances/alex/api/health").status_code == 200
+        # A newly created instance has no inherited accounts; its own login is
+        # therefore the first place its owner establishes credentials.
+        assert client.post("/instances/alex/api/auth/session", json={"as_principal": None}).status_code == 403
+        child_login = client.post(
+            "/instances/alex/api/auth/register",
+            json={"username": "alex", "password": "correct horse battery staple"},
+        )
+        assert child_login.status_code == 200, child_login.text
+        child_headers = _auth_headers(str(child_login.json()["token"]))
+        created = client.post(
+            "/instances/alex/api/tasks",
+            headers=child_headers,
+            json={"title": "Only Alex can see this", "description": "Keep this task isolated."},
+        )
+        assert created.status_code == 201, created.text
+        root_headers = _auth_headers(_token(client))
+        assert all(task["title"] != "Only Alex can see this" for task in client.get("/api/tasks", headers=root_headers).json())
+        assert any(task["title"] == "Only Alex can see this" for task in client.get("/instances/alex/api/tasks", headers=child_headers).json())
+        assert client.post("/api/instances", json={"name": "alex"}).status_code == 409
 
 
 class TestAuthRequired:
@@ -149,6 +181,9 @@ class TestReads:
             resp = client.get(route, headers=_auth_headers(token))
             assert resp.status_code == 200
             assert isinstance(resp.json(), list)
+        brain = client.get("/api/brain", headers=_auth_headers(token))
+        assert brain.status_code == 200
+        assert brain.json()["nodes"][0]["node_type"] == "user"
 
     def test_task_create_persists_priority_and_schedule(self, client: TestClient) -> None:
         token = _token(client)
@@ -173,6 +208,77 @@ class TestReads:
         listed = client.get("/api/tasks", headers=_auth_headers(token))
         assert listed.status_code == 200
         assert any(item["task_id"] == task["task_id"] for item in listed.json())
+
+        child = client.post(
+            "/api/tasks",
+            headers=_auth_headers(token),
+            json={
+                "title": "Daily review",
+                "description": "Review the release plan.",
+                "parent_task_id": task["task_id"],
+                "scheduled_at": "2026-07-15T09:30:00Z",
+                "recurrence": "daily",
+            },
+        )
+        assert child.status_code == 201, child.text
+        assert child.json()["parent_task_id"] == task["task_id"]
+        assert child.json()["recurrence"] == "daily"
+
+    def test_brain_returns_only_stored_work_relationships(self, client: TestClient) -> None:
+        token = _token(client)
+        created = client.post(
+            "/api/tasks",
+            headers=_auth_headers(token),
+            json={
+                "title": "Map the runtime",
+                "description": "Show only actual records.",
+                "scheduled_at": "2026-07-14T09:30:00Z",
+            },
+        )
+        assert created.status_code == 201, created.text
+
+        response = client.get("/api/brain", headers=_auth_headers(token))
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert "visual activity only" in body["illustrative_motion_notice"]
+        task_node = next(node for node in body["nodes"] if node["node_id"] == f"task:{created.json()['task_id']}")
+        assert task_node["label"] == "Map the runtime"
+        assert any(node["node_id"] == f"schedule:{created.json()['task_id']}" for node in body["nodes"])
+        tracks_edge = next(
+            edge
+            for edge in body["edges"]
+            if edge["target"] == task_node["node_id"] and edge["relationship"] == "tracks"
+        )
+        # A queued schedule is visible, but its edge must not animate as though
+        # execution has already started.
+        assert tracks_edge["is_active"] is False
+
+    def test_brain_source_is_explicit_and_workspace_contained(
+        self, bootstrapped_workspace: Path, client: TestClient
+    ) -> None:
+        source = bootstrapped_workspace / "research"
+        source.mkdir()
+        (source / "notes.md").write_text("actual selected file", encoding="utf-8")
+        token = _token(client)
+
+        added = client.post(
+            "/api/brain/sources",
+            headers=_auth_headers(token),
+            json={"path": "research"},
+        )
+        assert added.status_code == 200, added.text
+        assert added.json() == {"ok": True, "path": "research"}
+        graph = client.get("/api/brain", headers=_auth_headers(token)).json()
+        assert any(node["node_id"] == "source:research" and node["node_type"] == "folder" for node in graph["nodes"])
+        assert any(node["node_id"] == "source:research/notes.md" and node["node_type"] == "file" for node in graph["nodes"])
+
+        rejected = client.post(
+            "/api/brain/sources",
+            headers=_auth_headers(token),
+            json={"path": "../outside"},
+        )
+        assert rejected.status_code == 422
+        assert rejected.json()["detail"]["reason_code"] == "brain_source_outside_workspace"
 
     def test_task_create_rejects_blank_title(self, client: TestClient) -> None:
         response = client.post(
@@ -229,6 +335,7 @@ class TestReadsDoNotMutate:
         # Pure list reads write nothing. (Diagnostics is excluded: it audits principal resolution,
         # the same governed behavior as the CLI — an audit log entry, not a state mutation.)
         client.get("/api/events", headers=_auth_headers(token))
+        client.get("/api/brain", headers=_auth_headers(token))
         client.get("/api/sessions", headers=_auth_headers(token))
         client.get("/api/models", headers=_auth_headers(token))
         assert store.count_events() == before

@@ -25,14 +25,14 @@ def _ws(tmp_path: Path) -> Path:
 
 
 def _enable(ws: Path, capability: str) -> RuntimeControlService:
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     store = SQLiteStore(ws)
     with store.connect() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-            (capability, "principal_rahul", utc_now(), "docs/threat-models/subagents.md"),
+            (capability, "principal_owner", utc_now(), "docs/threat-models/subagents.md"),
         )
     result = svc.set_capability_state(capability, "enabled_runtime", None, "test", confirmation_token="confirm")
     assert result.ok is True, result.reason_code
@@ -44,7 +44,7 @@ def _authority(ws: Path) -> tuple[RuntimeAuthority, Principal]:
     writer = EventLogWriter(store)
     registry = build_default_executor_registry(ws, store)
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
-    raw = store.get_principal("principal_rahul")
+    raw = store.get_principal("principal_owner")
     assert raw is not None
     return authority, Principal(**raw)
 
@@ -83,7 +83,7 @@ def test_orchestration_caps_are_real_executors(tmp_path: Path) -> None:
 
 def test_subagents_fail_closed_when_gate_disabled(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     # Default gates are enabled for integrated capabilities; disable this one to test the fail-closed path.
     RuntimeControlService(ws).disable_capability("subagents", None, "test")
     authority, principal = _authority(ws)

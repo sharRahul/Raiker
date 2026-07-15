@@ -22,7 +22,7 @@ def _ws(tmp_path: Path) -> Path:
 
 
 def _owner_service(ws: Path) -> RuntimeControlService:
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     return svc
@@ -70,14 +70,14 @@ def _write_action(principal_id: str, *, risk: str = RiskLevelValue.LOW, name: st
 
 def test_default_mode_is_ask(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     authority = _authority(ws)
     assert authority.get_capability_decision_mode(_CAP) == "ask"
 
 
 def test_owner_can_set_mode_ai_cannot(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     # "always_allow" is accepted as a legacy alias; it normalizes to canonical "allow".
     ok = svc.set_capability_decision_mode(_CAP, "always_allow", None, "test")
@@ -92,7 +92,7 @@ def test_owner_can_set_mode_ai_cannot(tmp_path: Path) -> None:
 
 def test_permissive_mode_requires_executor(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     # medical_runtime has no real executor -> cannot be relaxed to always_allow/auto.
     blocked = svc.set_capability_decision_mode("medical_runtime", "auto", None, "x")
@@ -105,7 +105,7 @@ def test_permissive_mode_requires_executor(tmp_path: Path) -> None:
 
 def test_invalid_mode_and_unknown_capability(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     assert svc.set_capability_decision_mode(_CAP, "bogus", None, "x").reason_code == "invalid_decision_mode:bogus"
     assert svc.set_capability_decision_mode("nope_cap", "ask", None, "x").reason_code == "unknown_capability:nope_cap"

@@ -3,13 +3,13 @@ from pathlib import Path
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.control.dashboard import DashboardService
 
-OWNER = "principal_rahul"
+OWNER = "principal_owner"
 
 
 def service(tmp_path: Path) -> tuple[DashboardService, Path]:
     workspace = tmp_path / "ws"
     workspace.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=workspace)
+    bootstrap_owner("owner", "Owner", workspace_root=workspace)
     return DashboardService(workspace), workspace
 
 

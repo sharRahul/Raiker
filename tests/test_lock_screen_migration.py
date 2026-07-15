@@ -22,7 +22,7 @@ def test_lock_screen_tables_and_columns(tmp_path) -> None:  # type: ignore[no-un
 
 
 def test_account_credentials_username_unique(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    import sqlite3
+    from raiker.storage.sqlite import sqlite3
 
     store = SQLiteStore(tmp_path)
     with store.connect() as c:

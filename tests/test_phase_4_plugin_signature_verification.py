@@ -147,14 +147,14 @@ def _ws(tmp_path: Path) -> Path:
 
 
 def _enable_install(ws: Path) -> None:
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     store = SQLiteStore(ws)
     with store.connect() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-            ("plugin_install", "principal_rahul", utc_now(), "docs/threat-models/plugins.md"),
+            ("plugin_install", "principal_owner", utc_now(), "docs/threat-models/plugins.md"),
         )
     result = svc.set_capability_state(
         "plugin_install", "enabled_runtime", None, "test", confirmation_token="confirm"
@@ -168,11 +168,11 @@ def _install(ws: Path, manifest: dict[str, object]) -> object:
     authority = RuntimeAuthority(
         store, EventLogWriter(store), executor_registry=build_default_executor_registry(ws, store)
     )
-    raw = store.get_principal("principal_rahul")
+    raw = store.get_principal("principal_owner")
     assert raw is not None
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="plugin_install",
         tool_or_service_name="plugin_install",
         arguments={"manifest_path": "manifest.json"},

@@ -26,6 +26,7 @@ from raiker.contracts.models import (
 from raiker.control.service import RuntimeControlService
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
+from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.models.contracts import ModelMessage, ModelResponse, ToolSpec
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
@@ -45,7 +46,7 @@ def _ws(tmp_path: Path) -> Path:
 
 
 def _enable(ws: Path, *, mode: str | None = None) -> None:
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "t")
     r = svc.set_capability_state(_CAP, "enabled_runtime", None, "t", confirmation_token="confirm")
@@ -57,7 +58,12 @@ def _enable(ws: Path, *, mode: str | None = None) -> None:
 
 def _seed(ws: Path, text: str) -> str:
     vector_id = new_id("vec_")
-    SQLiteStore(ws).insert_vector_record(VectorRecord(
+    store = SQLiteStore(ws)
+    memory = write_memory(
+        text, workspace_root=ws, scope="default", store=store,
+        governance=MemoryGovernance("evt_rag", "sess_rag", None, "test", 1, 1, "until_forget", "approved", "test"),
+    )
+    store.insert_vector_record(VectorRecord(
         vector_id=vector_id,
         content_hash="h",
         content_preview=text[:120],
@@ -68,6 +74,7 @@ def _seed(ws: Path, text: str) -> str:
         created_at=utc_now(),
         embedding=json.dumps(embed_text(text, 384)),
     ))
+    store.link_memory_projection(memory.memory_id, "vector", vector_id, LOCAL_EMBEDDING_MODEL)
     return vector_id
 
 
@@ -76,7 +83,7 @@ def _seed(ws: Path, text: str) -> str:
 
 def test_disabled_gate_is_noop(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     plan = RetrievalAugmentor(ws, SQLiteStore(ws)).plan("anything")
     assert plan.decision == "disabled"
     assert plan.augmented is False
@@ -116,6 +123,10 @@ def test_allow_injects_retrieved_context(tmp_path: Path) -> None:
     assert plan.metadata["count"] >= 1
     assert vid in plan.metadata["vector_ids"]
     assert plan.metadata["content_redacted"] is True
+    assert "trust=untrusted_memory_data" in plan.context_text
+    assert "source=mem_" in plan.context_text
+    with SQLiteStore(ws).connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM memory_lifecycle_audit WHERE action = 'recall'").fetchone()[0] >= 1
 
 
 def test_allow_with_empty_store_does_not_augment(tmp_path: Path) -> None:
@@ -182,7 +193,7 @@ def _augmentation_events(ws: Path) -> list[dict]:
 
 def test_turn_emits_no_event_when_gate_disabled(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     router = _FakeRouter("done")
     import asyncio
 

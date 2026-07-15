@@ -19,14 +19,14 @@ from raiker.context.gatherer import ContextGatherer
 from raiker.control.dashboard import DashboardService
 from raiker.storage.sqlite import SQLiteStore
 
-OWNER = "principal_rahul"
+OWNER = "principal_owner"
 
 
 @pytest.fixture
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 
@@ -54,7 +54,7 @@ def _session_project(store: SQLiteStore, session_id: str) -> str | None:
 class TestSessionMove:
     def test_move_session_into_project(self, store: SQLiteStore, service: DashboardService) -> None:
         _project(store, "proj_a", "Alpha")
-        store.create_session("sess_1", str(store.paths.workspace_root), user_id="rahul")
+        store.create_session("sess_1", str(store.paths.workspace_root), user_id="owner")
 
         result = service.set_session_project("sess_1", "proj_a", OWNER)
 
@@ -64,7 +64,7 @@ class TestSessionMove:
 
     def test_move_session_out_of_project(self, store: SQLiteStore, service: DashboardService) -> None:
         _project(store, "proj_a", "Alpha")
-        store.create_session("sess_1", str(store.paths.workspace_root), user_id="rahul")
+        store.create_session("sess_1", str(store.paths.workspace_root), user_id="owner")
         service.set_session_project("sess_1", "proj_a", OWNER)
 
         result = service.set_session_project("sess_1", None, OWNER)
@@ -76,7 +76,7 @@ class TestSessionMove:
     def test_move_to_unknown_project_is_rejected(
         self, store: SQLiteStore, service: DashboardService
     ) -> None:
-        store.create_session("sess_1", str(store.paths.workspace_root), user_id="rahul")
+        store.create_session("sess_1", str(store.paths.workspace_root), user_id="owner")
 
         result = service.set_session_project("sess_1", "proj_missing", OWNER)
 
@@ -97,7 +97,7 @@ class TestSessionMove:
         self, store: SQLiteStore, service: DashboardService
     ) -> None:
         _project(store, "proj_a", "Alpha")
-        store.create_session("sess_1", str(store.paths.workspace_root), user_id="rahul")
+        store.create_session("sess_1", str(store.paths.workspace_root), user_id="owner")
 
         result = service.set_session_project("sess_1", "proj_a", "principal_unknown")
 
@@ -106,7 +106,7 @@ class TestSessionMove:
 
     def test_move_emits_a_typed_event(self, store: SQLiteStore, service: DashboardService) -> None:
         _project(store, "proj_a", "Alpha")
-        store.create_session("sess_1", str(store.paths.workspace_root), user_id="rahul")
+        store.create_session("sess_1", str(store.paths.workspace_root), user_id="owner")
 
         service.set_session_project("sess_1", "proj_a", OWNER)
 
@@ -122,7 +122,7 @@ class TestMoveChangesContext:
         store.save_project_context(
             "proj_a", instructions="Alpha house rules.", attachment_ids=[], memory_enabled=False
         )
-        store.create_session("sess_1", str(store.paths.workspace_root), user_id="rahul")
+        store.create_session("sess_1", str(store.paths.workspace_root), user_id="owner")
         gatherer = ContextGatherer()
 
         def instructions_in_context() -> str:
@@ -156,7 +156,7 @@ class TestAncestorContextIsLive:
             "proj_leaf", instructions="Leaf rule.", attachment_ids=[], memory_enabled=False
         )
         store.save_active_project("proj_leaf")
-        store.create_session("sess_1", str(store.paths.workspace_root), user_id="rahul")
+        store.create_session("sess_1", str(store.paths.workspace_root), user_id="owner")
 
         bundle = ContextGatherer().gather(
             workspace_root=workspace,
@@ -214,7 +214,7 @@ class TestProjectScopedSchedules:
         task = service.create_task(
             title="Weekly review",
             objective="Summarise the week",
-            user_id="rahul",
+            user_id="owner",
             principal_id=OWNER,
             scheduled_at="2026-07-20T09:00:00Z",
             recurrence="weekly",
@@ -232,7 +232,7 @@ class TestProjectScopedSchedules:
         task = service.create_task(
             title="Beta task",
             objective="Do beta work",
-            user_id="rahul",
+            user_id="owner",
             principal_id=OWNER,
             project_id="proj_b",
         )
@@ -243,7 +243,7 @@ class TestProjectScopedSchedules:
         self, service: DashboardService
     ) -> None:
         task = service.create_task(
-            title="Loose task", objective="No project", user_id="rahul", principal_id=OWNER
+            title="Loose task", objective="No project", user_id="owner", principal_id=OWNER
         )
 
         assert task.project_id is None
@@ -254,16 +254,16 @@ class TestProjectScopedSchedules:
         _project(store, "proj_a", "Alpha")
         _project(store, "proj_b", "Beta")
         service.create_task(
-            title="Alpha task", objective="a", user_id="rahul", principal_id=OWNER, project_id="proj_a"
+            title="Alpha task", objective="a", user_id="owner", principal_id=OWNER, project_id="proj_a"
         )
         service.create_task(
-            title="Beta task", objective="b", user_id="rahul", principal_id=OWNER, project_id="proj_b"
+            title="Beta task", objective="b", user_id="owner", principal_id=OWNER, project_id="proj_b"
         )
-        service.create_task(title="Loose task", objective="c", user_id="rahul", principal_id=OWNER)
+        service.create_task(title="Loose task", objective="c", user_id="owner", principal_id=OWNER)
 
-        alpha = service.list_tasks(project_id="proj_a", user_id="rahul")
-        beta = service.list_tasks(project_id="proj_b", user_id="rahul")
-        every = service.list_tasks(user_id="rahul")
+        alpha = service.list_tasks(project_id="proj_a", user_id="owner")
+        beta = service.list_tasks(project_id="proj_b", user_id="owner")
+        every = service.list_tasks(user_id="owner")
 
         assert [t.title for t in alpha] == ["Alpha task"]
         assert [t.title for t in beta] == ["Beta task"]
@@ -274,7 +274,7 @@ class TestProjectScopedSchedules:
             service.create_task(
                 title="Ghost task",
                 objective="x",
-                user_id="rahul",
+                user_id="owner",
                 principal_id=OWNER,
                 project_id="proj_missing",
             )

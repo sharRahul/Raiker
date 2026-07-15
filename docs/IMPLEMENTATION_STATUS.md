@@ -126,6 +126,72 @@ fail-closed by design.
 > Tests: `tests/test_phase_6_reminder_runtime.py` (+7). Validators:
 > ruff, mypy, pytest (1687) all green.
 >
+> Current truth update (2026-07-15): the hybrid-memory implementation plan is
+> complete for the local SQLite deployment. It now has active-only SQLite FTS,
+> source-versioned lifecycle mappings for `fts`/`vector`/`graph` projections,
+> owner-started reconciliation, review-only gist records, and exact-ID
+> owner-confirmed eidetic cleanup. Archive, restore, forget, and purge update
+> retrieval eligibility; purge records completed local locations and retained
+> backup disposition. Vector/graph writes remain existing capability-gated
+> adapters—there is no autonomous raw capture, cleanup worker, or model purge
+> tool.
+
+> Current truth update (2026-07-15): the memory production-readiness roadmap
+> is specified as Stages F–J in `docs/HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`.
+> The next implementation priority is SQLite retrieval authority plus a
+> versioned evaluation corpus and regression budgets. Semantic/entity
+> retrieval, tenancy/encryption, backup cataloging, job reliability, and an
+> independent benchmark remain future work; no market-leading claim is made.
+
+> **Roadmap completeness correction (2026-07-15):** Stages F–I explicitly
+> require precision/recall/latency/cost measurement; correction and temporal
+> supersession; human memory-decision controls and review queues; per-workspace
+> encryption keys; legal-hold and verified/pending-backup erasure evidence;
+> rate-limited idempotent jobs; recovery/migration rollback, integrity, load,
+> soak, and chaos testing. These are requirements, not claims of current
+> implementation.
+
+> **Implementation update (2026-07-15):** Stage F has started with
+> `RAIKER-2009-memory-retrieval-authority`: governed search reads SQLite's
+> active-only FTS source, while edits, search opt-outs, and expiry synchronize
+> the approved row and index. The initial `memory-eval-v1` harness reports
+> Recall@k, MRR, nDCG, policy leaks, and p95 latency for deterministic lexical
+> cases. It is a CI-quality foundation, not a published benchmark.
+
+> **Implementation update (2026-07-15):** `RAIKER-2010-memory-temporal-
+> evaluation` adds human-only corrections with immutable supersession links and
+> temporal retrieval eligibility. It persists aggregate lexical evaluation runs
+> (precision, recall, MRR, nDCG, policy leaks, p50/p95, local token/storage
+> usage); no raw evaluation query or result text is persisted.
+
+> **Implementation update (2026-07-15):** the first Stage G/H/I slices add
+> governed active-memory vector projection, evidence-bound entity graph edges,
+> bounded hybrid retrieval, backup erasure/restore/legal-hold catalog fields,
+> and a read-only hybrid-memory integrity scanner. They are foundational only:
+> provider-vector projection, entity review, encryption of memory content and
+> indexes, multi-tenant isolation, job workers, and operational benchmarks are
+> not yet complete.
+
+> **Implementation update (2026-07-15):** Stage I now has a bounded,
+> owner-started SQLite maintenance-job primitive for idempotent reconciliation
+> and integrity scans, including leases, retry attempts, dead-letter state,
+> per-workspace rate limits, and durable lifecycle audit rows. It deliberately
+> has no autonomous daemon; monitoring and load/chaos evidence remain
+> incomplete.
+
+> **Implementation update (2026-07-15):** `.raiker/raiker.db` now requires
+> SQLCipher through `pysqlcipher3static` (the `pysqlcipher3` DB-API). The
+> workspace-private app key derives the database key before any SQL runs,
+> encrypting SQLite tables, FTS4, vectors, and graph records together. A tested
+> one-time plaintext conversion removes its transient plaintext source on
+> success. The static SQLCipher build lacks FTS5, so the encrypted lexical index
+> uses FTS4 and deterministic recency ordering rather than BM25.
+
+> **Implementation update (2026-07-15):** `memory-eval-v1` now has a versioned
+> deterministic corpus covering scope, archive, and supersession. CI enforces
+> exact precision/recall and zero policy leaks for this corpus; representative
+> workloads and published latency/cost budgets remain future work.
+
 > Current truth update (2026-07-15): reliable memory controls are complete for
 > the current backlog item 3 slice — a user-visible Memory view over the
 > EXISTING governed memory store. No second memory system is created.
@@ -144,6 +210,30 @@ fail-closed by design.
 > toggle/expiry/import/export/incognito. Tests: `tests/test_memory_controls.py`,
 > `tests/test_api_contract_schemas.py`, `MemoryView.test.ts`. This is a controls slice — no new capability,
 > gate, policy, or executor is added.
+
+> Current truth update (2026-07-15): archive-first durable-memory lifecycle
+> has landed. Migration `RAIKER-2003-memory-archive-lifecycle` adds
+> `approved_memory.archived_at`; the existing Markdown record carries the same
+> metadata. `set_memory_archived` preserves text and provenance while excluding
+> archived memories from list, exact lookup, and keyword retrieval. Restore is
+> the same human-only control path with `archived=false`; forget remains a
+> tombstone, not an archive. API: `PUT /api/memory/{id}/archive`. Tests cover
+> archive exclusion and restore in `test_phase_4_memory_mvp.py` and
+> `test_memory_controls.py`.
+
+> Current truth update (2026-07-15): `RAIKER-2004-eidetic-observations`
+> provides the first high-fidelity observation foundation. `record_observation`
+> writes source event/session, human-readable summary, retention, optional
+> artifact reference, and a SHA-256 content checksum to SQLite; it does not
+> persist raw payloads or enable automatic promotion. `obs_` is a registered
+> contract ID prefix. Test: `tests/test_eidetic_observations.py`.
+
+> Current truth update (2026-07-15): the human-only purge path is implemented
+> as `DELETE /api/memory/{id}/purge` and requires
+> `X-Memory-Purge-Confirm: <id>`. It deletes live Markdown/SQLite memory,
+> writes a `memory_purge_records` disposition audit row, and reports retained
+> backups as pending disposition. No agent purge tool exists. Test:
+> `test_purge_requires_exact_confirmation`.
 >
 > Tool policy defect fix (2026-07-14): `connector_read` and
 > `connector_write` were denied by the policy engine
@@ -243,8 +333,21 @@ fail-closed by design.
 > `extra="forbid"`. Web: `ProjectTreeNode` type + `ProjectTreeNode.svelte`
 > recursive Svelte 5 component, `projectTree`/`moveProject`/`archiveProject`
 > API client, `ProjectsView` tree section with archive/move/delete actions.
+
+> **Correction (2026-07-15):** materialized paths now include every node's
+> own ID (`/p1/p4/p12/`), not only its ancestors. The prior representation
+> could make a move or archive of one sibling affect all folders sharing that
+> parent path. Migration `RAIKER-1014-project-self-inclusive-path` backfills
+> legacy paths from `parent_id`; `RAIKER-1013-project-memory-inheritance` adds
+> tri-state `project_contexts.memory_mode` (`inherit|enabled|disabled`), while
+> retaining compatibility with the legacy Boolean `memory_enabled`. Effective
+> project context now uses the nearest explicit mode from active ancestors;
+> instructions still merge root→leaf and attachments still union. Storage path
+> changes occur transactionally and use the self-inclusive prefix. Regression
+> tests prove sibling isolation and nearest-ancestor inheritance in
+> `tests/test_nested_projects.py`.
 > `ProjectView` (Python DTO + TS interface) includes `parent_id`, `path`,
-> `is_archived`, `archived_at`. Tests: `tests/test_nested_projects.py` (18:
+> `is_archived`, `archived_at`. Tests: `tests/test_nested_projects.py` (20:
 > migration, tree queries, move + cycle, archive + idempotent, delete +
 > orphanage, ancestor contexts, service AI-autonomous archive, human-only
 > move/delete, context merge), `tests/test_projects.py` (+4 API: tree list,
@@ -366,7 +469,7 @@ file:line citations. Gaps and doc contradictions are recorded honestly.
   explicit or active project, and the task API/UI filter by it.
 - ✅ **Ancestor-context inheritance:** the live gatherer uses
   `load_effective_project_context`, which combines active ancestors root→leaf
-  once while keeping the leaf memory decision.
+  once while applying the nearest explicit `memory_mode` override.
 
 ### Item 2 — Conversation organisation — ✅ CURRENT SLICE COMPLETE
 
@@ -377,7 +480,7 @@ file:line citations. Gaps and doc contradictions are recorded honestly.
   (`raiker/api/routes_dashboard.py:235-253,276-282,370-398`); web
   (`apps/web/src/lib/components/ProjectTreeNode.svelte`,
   `apps/web/src/lib/views/ProjectsView.svelte:278-373`); tests
-  (`tests/test_nested_projects.py` — 18).
+  (`tests/test_nested_projects.py` — 20).
 - ✅ Tags: schema (`raiker/storage/migrations.py:1270-1286`); storage
   (`raiker/storage/sqlite.py:862-902`); service
   (`raiker/control/dashboard.py:599-652`); API

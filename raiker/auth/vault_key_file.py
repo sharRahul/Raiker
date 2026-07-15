@@ -67,15 +67,21 @@ def load_vault_key_into_env(workspace_root: str | Path) -> None:
         os.environ[VAULT_KEY_ENV] = value
 
 
+def effective_vault_key(workspace_root: str | Path) -> str | None:
+    """Return this workspace's own key, falling back to an injected process key.
+
+    The workspace file deliberately wins so several isolated Raiker instances
+    can share one server process without sharing connector credentials.
+    """
+    return read_vault_key(workspace_root) or os.environ.get(VAULT_KEY_ENV, "").strip() or None
+
+
 def vault_status(workspace_root: str | Path) -> str:
     """Return 'configured_valid' | 'missing' | 'invalid'.
 
     Reflects the effective key: the environment variable wins, then the file.
     """
-    env_value = os.environ.get(VAULT_KEY_ENV, "").strip()
-    if env_value:
-        return "configured_valid" if _is_valid_fernet(env_value) else "invalid"
-    file_value = read_vault_key(workspace_root)
-    if file_value is None:
+    value = effective_vault_key(workspace_root)
+    if value is None:
         return "missing"
-    return "configured_valid" if _is_valid_fernet(file_value) else "invalid"
+    return "configured_valid" if _is_valid_fernet(value) else "invalid"

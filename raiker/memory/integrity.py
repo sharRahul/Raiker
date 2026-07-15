@@ -1,0 +1,115 @@
+"""Owner-started, read-only integrity checks for the hybrid memory store."""
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+from raiker.contracts.ids import utc_now
+from raiker.storage.sqlite import SQLiteStore
+
+
+@dataclass(frozen=True)
+class MemoryIntegrityReport:
+    active_memory_count: int
+    fts_count: int
+    stale_fts_count: int
+    missing_markdown_count: int
+    stale_projection_count: int
+    stale_graph_edge_count: int
+    checksum_mismatch_count: int
+    orphaned_markdown_count: int
+    failed_purge_location_count: int
+    project_path_inconsistency_count: int
+
+    @property
+    def clean(self) -> bool:
+        return not any((
+            self.stale_fts_count,
+            self.missing_markdown_count,
+            self.stale_projection_count,
+            self.stale_graph_edge_count,
+            self.checksum_mismatch_count,
+            self.orphaned_markdown_count,
+            self.failed_purge_location_count,
+            self.project_path_inconsistency_count,
+        ))
+
+
+def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) -> MemoryIntegrityReport:
+    now = utc_now()
+    with store.connect() as connection:
+        active_memory_count = int(connection.execute(
+            """SELECT COUNT(*) FROM approved_memory WHERE deleted_at IS NULL AND archived_at IS NULL
+            AND search_enabled = 1 AND (expires_at IS NULL OR expires_at > ?)
+            AND (valid_from IS NULL OR valid_from <= ?)
+            AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL""", (now, now, now)
+        ).fetchone()[0])
+        fts_count = int(connection.execute("SELECT COUNT(*) FROM approved_memory_fts").fetchone()[0])
+        stale_projection_count = int(connection.execute(
+            """SELECT COUNT(*) FROM memory_projections p WHERE p.active = 1 AND NOT EXISTS (
+            SELECT 1 FROM approved_memory m WHERE m.memory_id = p.memory_id AND m.deleted_at IS NULL
+            AND m.archived_at IS NULL AND m.search_enabled = 1 AND (m.expires_at IS NULL OR m.expires_at > ?)
+            AND (m.valid_from IS NULL OR m.valid_from <= ?)
+            AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL)""", (now, now, now)
+        ).fetchone()[0])
+        stale_graph_edge_count = int(connection.execute(
+            """SELECT COUNT(*) FROM memory_entity_relationships r WHERE r.active = 1 AND NOT EXISTS (
+            SELECT 1 FROM approved_memory m WHERE m.memory_id = r.evidence_memory_id AND m.deleted_at IS NULL
+            AND m.archived_at IS NULL AND m.search_enabled = 1 AND (m.expires_at IS NULL OR m.expires_at > ?)
+            AND (m.valid_from IS NULL OR m.valid_from <= ?)
+            AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL)""", (now, now, now)
+        ).fetchone()[0])
+        rows = connection.execute(
+            "SELECT memory_id, text, content_checksum FROM approved_memory"
+        ).fetchall()
+        purge_rows = connection.execute("SELECT disposition_json FROM memory_purge_records").fetchall()
+        project_rows = connection.execute("SELECT project_id, parent_id, path FROM projects").fetchall()
+    memory_dir = Path(workspace_root).resolve() / ".raiker" / "memory"
+    missing_markdown_count = sum(not (memory_dir / f"{row['memory_id']}.md").exists() for row in rows)
+    known_memory_ids = {str(row["memory_id"]) for row in rows}
+    orphaned_markdown_count = sum(
+        path.stem not in known_memory_ids for path in memory_dir.glob("*.md")
+    ) if memory_dir.exists() else 0
+    checksum_mismatch_count = sum(
+        str(row["content_checksum"] or "") != hashlib.sha256(str(row["text"]).encode()).hexdigest()
+        for row in rows
+    )
+    failed_purge_location_count = sum(
+        len(json.loads(str(row["disposition_json"])).get("failed_storage_locations", []))
+        for row in purge_rows
+    )
+    projects = {
+        str(row["project_id"]): (str(row["parent_id"]) if row["parent_id"] is not None else None, str(row["path"]))
+        for row in project_rows
+    }
+    expected_paths: dict[str, str] = {}
+
+    def expected_path(project_id: str, visiting: set[str]) -> str | None:
+        if project_id in expected_paths:
+            return expected_paths[project_id]
+        if project_id in visiting or project_id not in projects:
+            return None
+        parent_id, _ = projects[project_id]
+        parent_path = "/" if parent_id is None else expected_path(parent_id, visiting | {project_id})
+        if parent_path is None:
+            return None
+        expected_paths[project_id] = f"{parent_path}{project_id}/"
+        return expected_paths[project_id]
+
+    project_path_inconsistency_count = sum(
+        expected_path(project_id, set()) != path for project_id, (_, path) in projects.items()
+    )
+    return MemoryIntegrityReport(
+        active_memory_count,
+        fts_count,
+        abs(active_memory_count - fts_count),
+        missing_markdown_count,
+        stale_projection_count,
+        stale_graph_edge_count,
+        checksum_mismatch_count,
+        orphaned_markdown_count,
+        failed_purge_location_count,
+        project_path_inconsistency_count,
+    )

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -101,6 +101,7 @@ class TaskCreateRequest(BaseModel):
     scheduled_at: str | None = None
     recurrence: str | None = None
     reminder_at: str | None = None
+    parent_task_id: str | None = None
     # Project-scoped schedules: create this task under a specific project. When
     # omitted the active project is used, so a schedule created inside a project
     # stays scoped to it.
@@ -115,6 +116,15 @@ class SetModelSelectionRequest(BaseModel):
 
     profile_id: str
     model: str | None = None
+
+
+class ModelConnectionRequest(BaseModel):
+    """Encrypted per-user endpoint/key data for one model profile."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    endpoint: str | None = None
+    api_key: str | None = None
 
 
 class SetModelAdvisorRequest(BaseModel):
@@ -134,6 +144,22 @@ class UploadAttachmentRequest(BaseModel):
     filename: str
     media_type: str
     data_base64: str
+
+
+class BrainSourceRequest(BaseModel):
+    """An explicit file or folder already placed inside this Raiker workspace."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+
+
+class InstanceCreateRequest(BaseModel):
+    """Name for a new, locally isolated Raiker instance."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
 
 
 class CreateProjectRequest(BaseModel):
@@ -160,7 +186,10 @@ class SaveProjectContextRequest(BaseModel):
 
     instructions: str = ""
     attachment_ids: list[str] = []
-    memory_enabled: bool = False
+    # ``memory_enabled`` remains accepted for older clients. New clients send
+    # a tri-state override so child folders can inherit their nearest ancestor.
+    memory_enabled: bool | None = None
+    memory_mode: Literal["inherit", "enabled", "disabled"] | None = None
 
 
 class MoveProjectRequest(BaseModel):

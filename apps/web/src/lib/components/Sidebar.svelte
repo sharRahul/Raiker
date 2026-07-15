@@ -2,8 +2,22 @@
   import Icon from "./Icon.svelte";
   import Logo from "./Logo.svelte";
   import { NAV_GROUPS } from "../nav";
+  import { api } from "../api";
+  import type { SessionSummary } from "../apiTypes";
+  import { relativeTime } from "../format";
 
   let { current }: { current: string } = $props();
+  let recent = $state<SessionSummary[]>([]);
+
+  async function loadRecent() {
+    try { recent = (await api.sessions()).slice(0, 5); } catch { recent = []; }
+  }
+  $effect(() => {
+    void loadRecent();
+    const refresh = () => void loadRecent();
+    window.addEventListener("raiker:chats-changed", refresh);
+    return () => window.removeEventListener("raiker:chats-changed", refresh);
+  });
 </script>
 
 <nav class="sidebar" aria-label="Primary">
@@ -34,6 +48,16 @@
           </li>
         {/each}
       </ul>
+      {#if group.label === "The Hustle" && recent.length > 0}
+        <div class="recent" aria-label="Recent chats">
+          <p class="recent-label">Recent chats</p>
+          {#each recent as chat (chat.session_id)}
+            <a class="recent-chat" href={`#/new-chat?session=${encodeURIComponent(chat.session_id)}`} title={chat.title ?? "Untitled chat"}>
+              <span>{chat.title ?? "Untitled chat"}</span><small>{relativeTime(chat.updated_at)}</small>
+            </a>
+          {/each}
+        </div>
+      {/if}
     </div>
   {/each}
 
@@ -134,4 +158,10 @@
     color: var(--text-3);
     padding: 0 0.55rem;
   }
+  .recent { border-top: 1px solid var(--border); margin: var(--space-3) 0 0.45rem; padding: var(--space-3) 0.55rem 0; }
+  .recent-label { color: var(--text-3); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; margin: 0 0 0.35rem; text-transform: uppercase; }
+  .recent-chat { color: var(--text-2); display: flex; flex-direction: column; font-size: 0.78rem; gap: 0.1rem; padding: 0.28rem 0; text-decoration: none; }
+  .recent-chat:hover { color: var(--accent); text-decoration: none; }
+  .recent-chat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-chat small { color: var(--text-3); font-size: 0.67rem; }
 </style>

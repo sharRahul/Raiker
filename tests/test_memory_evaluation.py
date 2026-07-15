@@ -84,3 +84,10 @@ def test_evaluation_budget_rejects_token_and_storage_regressions(tmp_path: Path)
         enforce_retrieval_budget(report, RetrievalBudget(max_token_count=0))
     with pytest.raises(AssertionError, match="storage_regression"):
         enforce_retrieval_budget(report, RetrievalBudget(max_storage_bytes=0))
+
+
+def test_secret_like_durable_memory_is_not_retrievable(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    memory_id = _write(store, tmp_path, "api_key=abcdefghijklmnop", "project:alpha")
+    assert store.get_active_approved_memory(memory_id) is None
+    assert store.search_approved_memory("api key", scope="project:alpha") == []

@@ -1856,6 +1856,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         JOIN approved_memory m ON m.memory_id = r.evidence_memory_id
         WHERE r.active = 1 AND (r.subject_entity_id = ? OR r.object_entity_id = ?)
           AND m.deleted_at IS NULL AND m.archived_at IS NULL AND m.search_enabled = 1
+          AND m.sensitivity NOT IN ('secret_like', 'credential_like')
           AND (m.expires_at IS NULL OR m.expires_at > ?)
           AND (m.valid_from IS NULL OR m.valid_from <= ?)
           AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL"""
@@ -1945,6 +1946,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             row = connection.execute(
                 """SELECT * FROM approved_memory WHERE memory_id = ? AND deleted_at IS NULL
                 AND archived_at IS NULL AND search_enabled = 1
+                AND sensitivity NOT IN ('secret_like', 'credential_like')
                 AND (expires_at IS NULL OR expires_at > ?)
                 AND (valid_from IS NULL OR valid_from <= ?)
                 AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL""",
@@ -1959,6 +1961,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """UPDATE memory_projections SET active = CASE WHEN EXISTS (
                     SELECT 1 FROM approved_memory m WHERE m.memory_id = memory_projections.memory_id
                     AND m.deleted_at IS NULL AND m.archived_at IS NULL AND m.search_enabled = 1
+                    AND m.sensitivity NOT IN ('secret_like', 'credential_like')
                     AND (m.expires_at IS NULL OR m.expires_at > ?)
                     AND (m.valid_from IS NULL OR m.valid_from <= ?)
                     AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL
@@ -2006,7 +2009,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             return []
         sql = """SELECT m.* FROM approved_memory_fts f JOIN approved_memory m ON m.memory_id = f.memory_id
         WHERE approved_memory_fts MATCH ? AND m.deleted_at IS NULL AND m.archived_at IS NULL
-          AND m.search_enabled = 1 AND (m.expires_at IS NULL OR m.expires_at > ?)
+          AND m.search_enabled = 1 AND m.sensitivity NOT IN ('secret_like', 'credential_like')
+          AND (m.expires_at IS NULL OR m.expires_at > ?)
           AND (m.valid_from IS NULL OR m.valid_from <= ?) AND (m.valid_until IS NULL OR m.valid_until > ?)
           AND m.superseded_at IS NULL"""
         now = utc_now()
@@ -2828,6 +2832,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         JOIN approved_memory m ON m.memory_id = p.memory_id
         WHERE v.embedding_model = ? AND v.embedding IS NOT NULL
           AND m.deleted_at IS NULL AND m.archived_at IS NULL AND m.search_enabled = 1
+          AND m.sensitivity NOT IN ('secret_like', 'credential_like')
           AND (m.expires_at IS NULL OR m.expires_at > ?)
           AND (m.valid_from IS NULL OR m.valid_from <= ?)
           AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL"""

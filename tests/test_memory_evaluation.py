@@ -63,3 +63,17 @@ def test_evaluation_budget_rejects_policy_leaks(tmp_path: Path) -> None:
     )
     with pytest.raises(AssertionError, match="policy_leak"):
         enforce_retrieval_budget(report, RetrievalBudget())
+
+
+def test_evaluation_budget_rejects_token_and_storage_regressions(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    memory_id = _write(store, tmp_path, "A durable scoped retrieval result.", "project:alpha")
+    report = evaluate_lexical_retrieval(
+        store,
+        corpus_version="memory-eval-v1",
+        cases=(RetrievalCase("budget", "durable retrieval", (memory_id,), scope="project:alpha"),),
+    )
+    with pytest.raises(AssertionError, match="token_regression"):
+        enforce_retrieval_budget(report, RetrievalBudget(max_token_count=0))
+    with pytest.raises(AssertionError, match="storage_regression"):
+        enforce_retrieval_budget(report, RetrievalBudget(max_storage_bytes=0))

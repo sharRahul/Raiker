@@ -247,7 +247,8 @@ local compute/storage cost. Versioned corpus fixtures and CI thresholds remain
 the next Stage F slice. `memory-eval-v1` now provides a deterministic
 scope/archive/supersession corpus and CI enforces zero policy leaks plus exact
 precision/recall for that corpus; broader workload, latency, and cost budgets
-remain pending.
+remain pending. `RetrievalBudget` now also gates token and retrieved-storage
+regressions; production thresholds still require the live benchmark.
 
 1. Make SQLite's active-memory row and its FTS record the single retrieval
    source; synchronize text, search opt-out, expiry, archive, forget, and

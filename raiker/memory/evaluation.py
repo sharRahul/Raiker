@@ -39,6 +39,8 @@ class RetrievalBudget:
     min_recall_at_k: float = 0.0
     max_p95_latency_ms: float = float("inf")
     max_compute_cost_usd: float = float("inf")
+    max_token_count: int = 2**63 - 1
+    max_storage_bytes: int = 2**63 - 1
     max_policy_leaks: int = 0
 
 
@@ -88,3 +90,7 @@ def enforce_retrieval_budget(report: RetrievalEvaluation, budget: RetrievalBudge
         raise AssertionError("memory_retrieval_latency_regression")
     if report.compute_cost_usd > budget.max_compute_cost_usd:
         raise AssertionError("memory_retrieval_cost_regression")
+    if report.token_count > budget.max_token_count:
+        raise AssertionError("memory_retrieval_token_regression")
+    if report.storage_bytes > budget.max_storage_bytes:
+        raise AssertionError("memory_retrieval_storage_regression")

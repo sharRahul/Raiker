@@ -75,6 +75,9 @@ fail-closed by design.
   normal list, exact lookup, and keyword retrieval; forget remains the separate
   human-only tombstone action. The human-only control/API is
   `PUT /api/memory/{memory_id}/archive` with `{ "archived": true|false }`.
+- Eidetic observations now persist only provenance metadata, retention class,
+  artifact reference, and a SHA-256 checksum of the observed content. Raw
+  payload capture and automatic promotion remain deliberately disabled.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

@@ -154,6 +154,13 @@ fail-closed by design.
 > tombstone, not an archive. API: `PUT /api/memory/{id}/archive`. Tests cover
 > archive exclusion and restore in `test_phase_4_memory_mvp.py` and
 > `test_memory_controls.py`.
+
+> Current truth update (2026-07-15): `RAIKER-2004-eidetic-observations`
+> provides the first high-fidelity observation foundation. `record_observation`
+> writes source event/session, human-readable summary, retention, optional
+> artifact reference, and a SHA-256 content checksum to SQLite; it does not
+> persist raw payloads or enable automatic promotion. `obs_` is a registered
+> contract ID prefix. Test: `tests/test_eidetic_observations.py`.
 >
 > Tool policy defect fix (2026-07-14): `connector_read` and
 > `connector_write` were denied by the policy engine

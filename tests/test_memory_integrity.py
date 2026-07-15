@@ -101,3 +101,14 @@ def test_integrity_reports_orphaned_artifacts_and_failed_purge_locations(tmp_pat
     assert report.orphaned_markdown_count == 1
     assert report.failed_purge_location_count == 1
     assert not report.clean
+
+
+def test_integrity_reports_project_parent_path_inconsistency(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    store.create_project("proj_root", "Root", "projects/root")
+    store.create_project("proj_child", "Child", "projects/child", parent_id="proj_root")
+    with store.connect() as connection:
+        connection.execute("UPDATE projects SET path = ? WHERE project_id = ?", ("/wrong/", "proj_child"))
+    report = inspect_memory_integrity(store=store, workspace_root=tmp_path)
+    assert report.project_path_inconsistency_count == 1
+    assert not report.clean

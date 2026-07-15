@@ -37,3 +37,5 @@ documents (executor spec, threat models, implementation ledger, …) stay at the
   about what can execute today.
 - **[Handoff](HANDOFF.md)** — where the current build effort stands and what is
   next.
+- **[Desktop Distribution Design](DESKTOP_DISTRIBUTION_DESIGN.md)** — the
+  installer, per-user background service, update, backup, and release design.

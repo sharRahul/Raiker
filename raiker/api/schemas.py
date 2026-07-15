@@ -101,6 +101,7 @@ class TaskCreateRequest(BaseModel):
     scheduled_at: str | None = None
     recurrence: str | None = None
     reminder_at: str | None = None
+    parent_task_id: str | None = None
     # Project-scoped schedules: create this task under a specific project. When
     # omitted the active project is used, so a schedule created inside a project
     # stays scoped to it.
@@ -115,6 +116,15 @@ class SetModelSelectionRequest(BaseModel):
 
     profile_id: str
     model: str | None = None
+
+
+class ModelConnectionRequest(BaseModel):
+    """Encrypted per-user endpoint/key data for one model profile."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    endpoint: str | None = None
+    api_key: str | None = None
 
 
 class SetModelAdvisorRequest(BaseModel):

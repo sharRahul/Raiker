@@ -26,12 +26,6 @@ def test_authenticated_provider_profiles_are_registered() -> None:
     local_lm = registry.resolve_profile_id("lm-studio-local-openai-compatible")
     assert local_lm.raw["api_key_env"] == "LM_API_TOKEN"
 
-    remote_lm = registry.resolve_profile_id("lm-studio-remote-authenticated")
-    assert remote_lm.provider == "lm-studio-remote"
-    assert remote_lm.raw["endpoint_env"] == "LM_STUDIO_BASE_URL"
-    assert remote_lm.raw["api_key_env"] == "LM_API_TOKEN"
-    assert remote_lm.raw["requires_api_key"] is True
-
     huggingface = registry.resolve_profile_id("huggingface-inference-providers")
     assert huggingface.provider == "huggingface"
     assert huggingface.raw["endpoint"] == "https://router.huggingface.co/v1"
@@ -53,34 +47,6 @@ def test_local_lm_studio_sends_optional_api_token(monkeypatch: pytest.MonkeyPatc
     assert provider._headers["Authorization"] == "Bearer lm-secret"
     run(provider.aclose())
 
-
-def test_remote_lm_studio_requires_endpoint_key_gate_and_allowlist(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    registry = ModelProfileRegistry.load()
-    profile = profile_with_model(
-        registry.resolve_profile_id("lm-studio-remote-authenticated"),
-        "ibm/granite-4-micro",
-    )
-    policy = ProviderRuntimePolicy(
-        allow_policy_gated_provider=True,
-        allow_private_network_provider=True,
-    )
-
-    with pytest.raises(ProviderConfigurationError, match="missing_endpoint_env:LM_STUDIO_BASE_URL"):
-        ModelProviderFactory(policy=policy).create(profile)
-
-    monkeypatch.setenv("LM_STUDIO_BASE_URL", "http://models.home.arpa:1234/v1")
-    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "models.home.arpa")
-    with pytest.raises(ProviderConfigurationError, match="provider_api_key_missing:LM_API_TOKEN"):
-        ModelProviderFactory(policy=policy).create(profile)
-
-    monkeypatch.setenv("LM_API_TOKEN", "lm-remote-secret")
-    provider = ModelProviderFactory(policy=policy).create(profile)
-    assert isinstance(provider, AsyncOpenAICompatibleProvider)
-    assert provider.endpoint == "http://models.home.arpa:1234/v1"
-    assert provider._headers["Authorization"] == "Bearer lm-remote-secret"
-    run(provider.aclose())
 
 
 def test_ollama_cloud_requires_hosted_gate_allowlist_and_key(
@@ -130,21 +96,3 @@ def test_huggingface_uses_router_and_hf_token(monkeypatch: pytest.MonkeyPatch) -
     assert provider.model == "openai/gpt-oss-120b:cheapest"
     assert provider._headers["Authorization"] == "Bearer hf-secret"
     run(provider.aclose())
-
-def test_env_endpoint_profile_reports_governed_endpoint_kind(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # Unset: the control surfaces must show the declared off-machine intent
-    # (private network gate), never "unknown".
-    monkeypatch.delenv("LM_STUDIO_BASE_URL", raising=False)
-    remote = ModelProfileRegistry.load().resolve_profile_id("lm-studio-remote-authenticated")
-    assert remote.raw["endpoint_kind"] == "private_network"
-
-    # Configured: the classification follows the owner's actual URL.
-    monkeypatch.setenv("LM_STUDIO_BASE_URL", "https://lm.example.com:8443/v1")
-    remote = ModelProfileRegistry.load().resolve_profile_id("lm-studio-remote-authenticated")
-    assert remote.raw["endpoint_kind"] == "remote_hosted"
-
-    monkeypatch.setenv("LM_STUDIO_BASE_URL", "http://192.168.1.20:1234/v1")
-    remote = ModelProfileRegistry.load().resolve_profile_id("lm-studio-remote-authenticated")
-    assert remote.raw["endpoint_kind"] == "private_network"

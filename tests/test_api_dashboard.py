@@ -209,6 +209,21 @@ class TestReads:
         assert listed.status_code == 200
         assert any(item["task_id"] == task["task_id"] for item in listed.json())
 
+        child = client.post(
+            "/api/tasks",
+            headers=_auth_headers(token),
+            json={
+                "title": "Daily review",
+                "description": "Review the release plan.",
+                "parent_task_id": task["task_id"],
+                "scheduled_at": "2026-07-15T09:30:00Z",
+                "recurrence": "daily",
+            },
+        )
+        assert child.status_code == 201, child.text
+        assert child.json()["parent_task_id"] == task["task_id"]
+        assert child.json()["recurrence"] == "daily"
+
     def test_brain_returns_only_stored_work_relationships(self, client: TestClient) -> None:
         token = _token(client)
         created = client.post(

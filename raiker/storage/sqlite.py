@@ -844,7 +844,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             params.append(user_id)
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
-        query += " ORDER BY created_at DESC LIMIT ?"
+        query += " ORDER BY updated_at DESC LIMIT ?"
         params.append(limit)
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
@@ -1251,6 +1251,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def insert_turn(
         self, session_id: str, turn_id: str, prompt_text: str, status: str = "running"
     ) -> None:
+        title = " ".join(prompt_text.split())[:80].rstrip()
+        if len(title) == 80:
+            title = f"{title[:-1]}…"
         with self.connect() as connection:
             connection.execute(
                 """
@@ -1259,6 +1262,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (turn_id, session_id, "prompt", status, prompt_text, utc_now()),
+            )
+            # Keep a human-readable conversation name without replacing a
+            # title that was explicitly supplied or generated earlier.
+            connection.execute(
+                """
+                UPDATE sessions SET title = CASE
+                    WHEN (title IS NULL OR TRIM(title) = '') AND ? != '' THEN ?
+                    ELSE title
+                END, updated_at = ?
+                WHERE session_id = ?
+                """,
+                (title, title, utc_now(), session_id),
             )
 
     def complete_turn(self, turn_id: str, status: str, summary: str) -> None:
@@ -1528,6 +1543,26 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [TaskRecord(**dict(row)) for row in rows]
+
+    def claim_due_tasks(self, now: str, limit: int = 10) -> list[TaskRecord]:
+        """Atomically claim scheduled work so two host ticks cannot run it twice."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM tasks WHERE status = 'queued' AND scheduled_at IS NOT NULL
+                   AND scheduled_at <= ? ORDER BY scheduled_at ASC LIMIT ?""",
+                (now, limit),
+            ).fetchall()
+            claimed: list[TaskRecord] = []
+            for row in rows:
+                if connection.execute(
+                    "UPDATE tasks SET status = 'running', current_step = ?, updated_at = ? WHERE task_id = ? AND status = 'queued'",
+                    ("Starting scheduled run", now, row["task_id"]),
+                ).rowcount:
+                    claimed.append(TaskRecord(**dict(row)))
+        return claimed
+
+    def reschedule_task(self, task_id: str, scheduled_at: str, summary: str) -> None:
+        self._update_task(task_id, status="queued", scheduled_at=scheduled_at, current_step="Waiting for next scheduled run", progress_percent=0, completed_at=None, summary=summary)
 
     def _update_task(self, task_id: str, **updates: str | int | None) -> None:
         now = utc_now()

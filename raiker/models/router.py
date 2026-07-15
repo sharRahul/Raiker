@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
 
 from raiker.contracts.models import ClientMetadata, ModelProfile
@@ -55,6 +55,7 @@ class ModelRouter:
         writer: EventLogWriter | None = None,
         *,
         runtime_policy: ProviderRuntimePolicy | None = None,
+        connection_resolver: Callable[[str], dict[str, str] | None] | None = None,
     ) -> None:
         self.registry = registry
         self.writer = writer
@@ -63,11 +64,13 @@ class ModelRouter:
 
             runtime_policy = provider_runtime_policy_from_gates(writer.store)
         self.runtime_policy = runtime_policy or ProviderRuntimePolicy()
+        self.connection_resolver = connection_resolver
         self.active_profile_id: str | None = None
         self.reasoning: ReasoningOptions | None = None
 
-    def _factory(self) -> ModelProviderFactory:
-        return ModelProviderFactory(policy=self.runtime_policy)
+    def _factory(self, profile: ModelProfile) -> ModelProviderFactory:
+        connection = self.connection_resolver(profile.profile_id) if self.connection_resolver else None
+        return ModelProviderFactory(policy=self.runtime_policy, connection=connection)
 
     def _profile(self, provider: str, model: str) -> ModelProfile:
         return self.registry.resolve(provider, model)
@@ -111,7 +114,7 @@ class ModelRouter:
         response_schema_name: str = "raiker_response",
     ) -> ModelResponse:
         profile = self._profile(provider, model)
-        model_provider = self._factory().create(profile)
+        model_provider = self._factory(profile).create(profile)
         request = self._request(
             profile,
             model_provider.provider,
@@ -138,7 +141,7 @@ class ModelRouter:
         response_schema_name: str = "raiker_response",
     ) -> AsyncIterator[ModelStreamEvent]:
         profile = self._profile(provider, model)
-        model_provider = self._factory().create(profile)
+        model_provider = self._factory(profile).create(profile)
         request = self._request(
             profile,
             model_provider.provider,
@@ -157,7 +160,7 @@ class ModelRouter:
 
     async def aembed(self, provider: str, model: str, text: str) -> EmbeddingResponse:
         profile = self._profile(provider, model)
-        model_provider = self._factory().create(profile)
+        model_provider = self._factory(profile).create(profile)
         embedding_model = str(profile.raw.get("embedding_model") or model_provider.model)
         if "<" in embedding_model or ">" in embedding_model:
             embedding_model = model_provider.model
@@ -175,7 +178,7 @@ class ModelRouter:
 
     async def alist_models_for_profile(self, profile: ModelProfile) -> list[ProviderModelInfo]:
         """List models at a profile endpoint without requiring a concrete chat model."""
-        model_provider = self._factory().create(profile, require_model=False)
+        model_provider = self._factory(profile).create(profile, require_model=False)
         try:
             return await model_provider.list_models()
         finally:
@@ -183,7 +186,7 @@ class ModelRouter:
 
     async def ahealth(self, provider: str, model: str) -> ProviderHealth:
         profile = self._profile(provider, model)
-        model_provider = self._factory().create(profile)
+        model_provider = self._factory(profile).create(profile)
         try:
             return await model_provider.health()
         finally:
@@ -191,7 +194,7 @@ class ModelRouter:
 
     async def alist_models(self, provider: str, model: str) -> list[ProviderModelInfo]:
         profile = self._profile(provider, model)
-        model_provider = self._factory().create(profile)
+        model_provider = self._factory(profile).create(profile)
         try:
             return await model_provider.list_models()
         finally:
@@ -234,7 +237,7 @@ class ModelRouter:
 
     def select_profile(self, profile_id: str) -> ModelProfile:
         profile = self.registry.resolve_profile_id(profile_id)
-        self._factory().create(profile)
+        self._factory(profile).create(profile)
         self.active_profile_id = profile.profile_id
         return profile
 

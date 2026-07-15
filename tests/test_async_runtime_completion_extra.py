@@ -150,7 +150,7 @@ def test_models_live_listing_and_policy_redaction(
         return httpx.Response(200, json={"data": [{"id": "local-gguf"}, {"id": "qwen2.5-coder"}]})
 
     router = ModelRouter(registry)
-    router._factory = lambda: ModelProviderFactory(  # type: ignore[method-assign]
+    router._factory = lambda profile=None: ModelProviderFactory(  # type: ignore[method-assign]
         client=httpx.AsyncClient(transport=httpx.MockTransport(handler))
     )
     out = asyncio.run(render_models_async(workspace_root=tmp_path, router=router))
@@ -175,7 +175,7 @@ def test_models_unavailable(tmp_path: Path) -> None:
         def create(self, profile: object) -> object:
             raise ProviderConnectionError("boom")
 
-    router._factory = lambda: BadFactory()  # type: ignore[method-assign, assignment, return-value]
+    router._factory = lambda profile=None: BadFactory()  # type: ignore[method-assign, assignment, return-value]
     out = asyncio.run(render_models_async(workspace_root=tmp_path, router=router))
     assert "status: unavailable" in out
     assert "reason: provider_unreachable" in out
@@ -215,7 +215,6 @@ def test_provider_policy_matrix(monkeypatch: pytest.MonkeyPatch) -> None:
     for profile_id in [
         "ollama-local-openai-compatible",
         "lm-studio-local-openai-compatible",
-        "vllm-homelab-openai-compatible",
         "openrouter-policy-gated",
     ]:
         with pytest.raises(Exception) as excinfo:

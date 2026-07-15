@@ -35,6 +35,7 @@
 
   let { sessionId: continuedSessionId = null }: { sessionId?: string | null } = $props();
   let promptText = $state("");
+  let userName = $state("there");
   let turns = $state<ChatTurn[]>([]);
   let streaming = $state(false);
   // Reuse one session across turns so the governed conversation stays continuous.
@@ -255,6 +256,7 @@
 
   onMount(() => {
     void loadProfiles();
+    void api.settings().then((view) => { userName = view.status.username || "there"; }).catch(() => {});
     if (continuedSessionId !== null) void loadHistory(continuedSessionId);
   });
 
@@ -385,6 +387,7 @@
           if (event.kind === "final" && event.response !== null) {
             turn.response = event.response;
             sessionId = event.response.session_id;
+            window.dispatchEvent(new Event("raiker:chats-changed"));
           } else {
             turn.events = [...turn.events, event];
           }
@@ -432,8 +435,8 @@
     {#if turns.length === 0}
       <EmptyState
         icon="chat"
-        title="Talk to your governed agent"
-        body="Every turn runs gather → plan → act → verify through policy, approvals, and the audit log. Nothing executes outside that path."
+        title={`What would you like to work on, ${userName}?`}
+        body="Start with a question, a task, or a file. Every turn is governed, observable, and stays in this Raiker instance."
       />
     {/if}
 

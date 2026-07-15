@@ -308,6 +308,7 @@ class TaskView:
     scheduled_at: str | None = None
     recurrence: str | None = None
     reminder_at: str | None = None
+    parent_task_id: str | None = None
     # Project-scoped schedules: the organizing project this task was created
     # under, or None when it was created outside every project.
     project_id: str | None = None
@@ -330,6 +331,7 @@ class ModelProfileView:
     runtime_gate: str | None
     off_machine: bool
     selected: bool
+    connection_configured: bool = False
     # Prompt-cache TTL breakpoint the provider uses for this profile ("5m"/"1h"),
     # or None when the provider/profile does not cache. Read-only status.
     prompt_cache_ttl: str | None = None
@@ -1494,6 +1496,7 @@ class DashboardService:
         scheduled_at: str | None = None,
         recurrence: str | None = None,
         reminder_at: str | None = None,
+        parent_task_id: str | None = None,
         project_id: str | None = None,
     ) -> TaskView:
         """Create a local planning task in the caller's server-owned Inbox session.
@@ -1503,10 +1506,22 @@ class DashboardService:
         project stays scoped to it. The stamp is an organizing label — it
         grants nothing.
         """
+        # An unscheduled task is work requested now; the resident host claims
+        # it on its next scheduler tick. Explicit times remain untouched.
+        if scheduled_at is None:
+            scheduled_at = utc_now()
         if project_id is None:
             project_id = self.store.get_active_project()
         elif self.store.load_project(project_id) is None:
             raise ValueError(f"unknown_project:{project_id}")
+        if parent_task_id is not None:
+            parent = self.store.load_task(parent_task_id)
+            parent_session = parent and self.store.load_session(parent.session_id)
+            if parent is None or parent_session is None or (
+                user_id is not None
+                and parent_session.get("user_id") not in (None, user_id)
+            ):
+                raise ValueError(f"unknown_parent_task:{parent_task_id}")
         inbox_session_id = f"sess_inbox_{principal_id}"
         self.store.create_session(
             inbox_session_id,
@@ -1522,6 +1537,7 @@ class DashboardService:
             scheduled_at=scheduled_at,
             recurrence=recurrence,
             reminder_at=reminder_at,
+            parent_task_id=parent_task_id,
             project_id=project_id,
         )
         return self._task_view(task)
@@ -1537,7 +1553,7 @@ class DashboardService:
         return self._approval_detail(row)
 
     # ── Models / diagnostics ────────────────────────────────────────────
-    def get_models(self) -> ModelsView:
+    def get_models(self, acting_principal_id: str | None = None) -> ModelsView:
         registry = ModelProfileRegistry.load()
         state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
         current = state.profile_id if state is not None else None
@@ -1548,6 +1564,8 @@ class DashboardService:
         hosted_gate = self.control.get_capability_gate(HOSTED_MODEL_GATE)
         private_gate = self.control.get_capability_gate(PRIVATE_NETWORK_MODEL_GATE)
         advisor_gate = self.control.get_capability_gate("advisor_model_runtime")
+        from raiker.models.connections import get_model_connection
+
         profiles = tuple(
             ModelProfileView(
                 profile_id=p.profile_id,
@@ -1562,6 +1580,10 @@ class DashboardService:
                 runtime_gate=self._runtime_gate_for_profile(str(p.raw.get("endpoint_kind", "unknown"))),
                 off_machine=str(p.raw.get("endpoint_kind", "unknown")) in {"remote_hosted", "private_network"},
                 selected=(p.profile_id == current),
+                connection_configured=bool(
+                    acting_principal_id
+                    and get_model_connection(self.store, acting_principal_id, p.profile_id)
+                ),
                 prompt_cache_ttl=(str(p.raw.get("prompt_cache_ttl")) if p.raw.get("prompt_cache_ttl") else None),
             )
             for p in registry.list_profiles()
@@ -1569,6 +1591,7 @@ class DashboardService:
             # test mode (the provider factory fails closed), so the web surface
             # lists working backends only.
             if not bool(p.raw.get("test_only", False))
+            and not bool(p.raw.get("setup_hidden", False))
         )
         return ModelsView(
             profiles=profiles,
@@ -1777,7 +1800,9 @@ class DashboardService:
         self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, profile.profile_id)
         return ControlResult(ok=True, data={"advisor_profile_id": profile.profile_id})
 
-    async def list_provider_models(self, profile_id: str) -> ProviderModelListView | None:
+    async def list_provider_models(
+        self, profile_id: str, acting_principal_id: str | None = None
+    ) -> ProviderModelListView | None:
         """List the models a provider serves, on explicit user demand.
 
         Returns None for unknown/test-only profiles (the route 404s). This is the
@@ -1794,8 +1819,14 @@ class DashboardService:
             return None
         if bool(profile.raw.get("test_only", False)):
             return None
+        from raiker.models.connections import get_model_connection
+
         router = ModelRouter(
-            registry, runtime_policy=provider_runtime_policy_from_gates(self.store)
+            registry,
+            runtime_policy=provider_runtime_policy_from_gates(self.store),
+            connection_resolver=lambda current_profile_id: get_model_connection(
+                self.store, acting_principal_id or "", current_profile_id
+            ) if acting_principal_id else None,
         )
         try:
             models = await router.alist_models_for_profile(profile)
@@ -1864,8 +1895,11 @@ class DashboardService:
             else profile_with_model(profile, resolved_model)
         )
         try:
+            from raiker.models.connections import get_model_connection
+
             validator = ModelProviderFactory(
-                policy=provider_runtime_policy_from_gates(self.store)
+                policy=provider_runtime_policy_from_gates(self.store),
+                connection=get_model_connection(self.store, principal.principal_id, profile.profile_id),
             ).create(effective)
         except Exception as exc:  # noqa: BLE001 — provider policy failures fail closed
             self._append_model_event(
@@ -2182,6 +2216,7 @@ class DashboardService:
             scheduled_at=d.get("scheduled_at"),
             recurrence=d.get("recurrence"),
             reminder_at=d.get("reminder_at"),
+            parent_task_id=d.get("parent_task_id"),
             project_id=d.get("project_id"),
         )
 

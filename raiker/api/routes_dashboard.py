@@ -13,6 +13,7 @@ from raiker.api.schemas import (
     BulkDeleteSessionsRequest,
     CreateProjectRequest,
     MoveProjectRequest,
+    ModelConnectionRequest,
     SaveProjectContextRequest,
     SelectProjectRequest,
     SetModelAdvisorRequest,
@@ -26,6 +27,11 @@ from raiker.api.schemas import (
 )
 from raiker.api.sessions import ApiSession
 from raiker.control.dashboard import AuthSessionView, DashboardService
+from raiker.models.connections import clear_model_connection, put_model_connection
+from raiker.models.factory import ModelProviderFactory
+from raiker.models.policy_state import provider_runtime_policy_from_gates
+from raiker.models.registry import ModelProfileRegistry
+from raiker.storage.sqlite import SQLiteStore
 from raiker.runtime.authority.models import Principal
 
 router = APIRouter()
@@ -540,6 +546,7 @@ async def create_task(
             scheduled_at=body.scheduled_at,
             recurrence=body.recurrence,
             reminder_at=body.reminder_at,
+            parent_task_id=body.parent_task_id,
             project_id=body.project_id,
         )
     except ValueError as exc:
@@ -553,15 +560,16 @@ async def create_task(
 @router.get("/api/models")
 async def get_models(
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return serialize_dto(_service(request).get_models())
+    session, _principal = auth_data
+    return serialize_dto(_service(request).get_models(session.principal_id))
 
 
 @router.get("/api/connections")
 async def get_connections(
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Read-only status of governed service connectors (web-app task 4).
 
@@ -579,7 +587,7 @@ async def get_connections(
 async def list_provider_models(
     profile_id: str,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """On-demand listing of the models a provider serves for one profile.
 
@@ -587,7 +595,8 @@ async def list_provider_models(
     enforced before any network contact, and failures return an honest empty
     list — model names are never fabricated.
     """
-    view = await _service(request).list_provider_models(profile_id)
+    session, _principal = auth_data
+    view = await _service(request).list_provider_models(profile_id, session.principal_id)
     if view is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown model profile: {profile_id}"
@@ -616,6 +625,40 @@ async def set_model_selection(
             detail={"ok": False, "reason_code": result.reason_code},
         )
     return {"ok": True, **result.data}
+
+
+@router.put("/api/models/{profile_id}/connection")
+async def set_model_connection(
+    profile_id: str,
+    body: ModelConnectionRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Save one user's encrypted provider endpoint/key without exposing either."""
+    session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    try:
+        profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=404, detail={"reason_code": "unknown_model_profile"}) from exc
+    values = {
+        key: value.strip()
+        for key, value in {"endpoint": body.endpoint or "", "api_key": body.api_key or ""}.items()
+        if value.strip()
+    }
+    if not values:
+        clear_model_connection(store, session.principal_id, profile_id)
+        return {"ok": True, "connection_configured": False}
+    try:
+        ModelProviderFactory(
+            policy=provider_runtime_policy_from_gates(store), connection=values
+        ).create(profile, require_model=False)
+        put_model_connection(store, session.principal_id, profile_id, values)
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail={"reason_code": str(exc)}) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=403, detail={"reason_code": str(exc)}) from exc
+    return {"ok": True, "connection_configured": True}
 
 
 @router.put("/api/model-advisor")

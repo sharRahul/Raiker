@@ -230,13 +230,12 @@ available. Egress hosts must be added to `RAIKER_MODEL_EGRESS_ALLOWLIST`.
 | llama.cpp | `raiker-local-llama-cpp` | local | `127.0.0.1:8080` | — | `cache_prompt: true` (server KV cache) | 🟡 Ready — needs a running llama.cpp server |
 | Ollama | `ollama-local-openai-compatible` | local | `127.0.0.1:11434` | — | automatic server-side | 🟡 Ready — needs Ollama + a concrete model |
 | LM Studio | `lm-studio-local-openai-compatible` | local | `127.0.0.1:1234` | — | automatic server-side | 🟡 Ready — needs LM Studio + a concrete model |
-| vLLM | `vllm-homelab-openai-compatible` | home-lab | `192.168.1.50:8000` | — | automatic prefix caching | 🟡 Ready — needs a reachable vLLM endpoint (egress-gated) |
+| Custom OpenAI-compatible | `generic-openai-compatible` | local or home-lab | user-selected | user vault | provider-dependent | 🟡 Ready — configure the endpoint and model in Raiker |
 
 **Selecting a concrete model.** Profiles that ship a placeholder `<model>`
-(Ollama/LM Studio/vLLM/OpenAI/Gemini/OpenRouter) take the concrete model at
+(Ollama/LM Studio/Custom OpenAI-compatible/OpenAI/Gemini/OpenRouter) take the concrete model at
 selection time (`/model use --provider <p> --model <m>`). `anthropic-hosted`
-ships a concrete model (`claude-opus-4-8`); to run a different Anthropic model
-(e.g. Haiku), select it with an explicit model override — this test used
+also takes a concrete model at selection time; this test used
 `claude-haiku-4-5-20251001`.
 
 ## Fallback sequence — how to test

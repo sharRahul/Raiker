@@ -77,6 +77,7 @@ export interface ModelProfile {
   runtime_gate: string | null;
   off_machine: boolean;
   selected: boolean;
+  connection_configured?: boolean;
   prompt_cache_ttl: string | null;
 }
 
@@ -361,6 +362,7 @@ export interface TaskView {
   // Project-scoped schedules: the project this task/schedule was created
   // under, or null when it was created outside every project.
   project_id: string | null;
+  parent_task_id?: string | null;
 }
 
 // POST /api/interrupts response (raiker/api/routes_prompts.py).

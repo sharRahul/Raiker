@@ -4,274 +4,109 @@
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
   import type { TaskView } from "../apiTypes";
+  import { relativeTime } from "../format";
   import { taskBadge } from "../statusMaps";
-  import { relativeTime, shortId } from "../format";
 
-  const ACTIVE_STATES = ["queued", "running", "paused"];
-
-  // Project-scoped schedules (backlog item 1): when a project is active
-  // (topbar switcher) the task list shows only that project's schedules, and a
-  // new task is created under it. The scope is an organizing label — it grants
-  // nothing and changes no gate, policy, or authority.
   let { projectId = null }: { projectId?: string | null } = $props();
-
   let tasks = $state<TaskView[] | null>(null);
   let loadError = $state<string | null>(null);
-  let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
-  let busyTask = $state<string | null>(null);
+  let notice = $state<string | null>(null);
   let creating = $state(false);
+  let busyTask = $state<string | null>(null);
   let title = $state("");
-  let description = $state("");
+  let objective = $state("");
   let priority = $state("normal");
+  let parentTaskId = $state("");
+  let cadence = $state<"now" | "once" | "daily" | "background">("now");
   let scheduledAt = $state("");
 
-  async function load() {
-    loadError = null;
-    try {
-      tasks = await api.tasks(projectId ? { project_id: projectId } : {});
-    } catch (e) {
-      tasks = null;
-      loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+  const active = $derived((tasks ?? []).filter((task) => ["queued", "running", "paused"].includes(task.status)));
+  const scheduled = $derived(active.filter((task) => task.scheduled_at));
+  const history = $derived((tasks ?? []).filter((task) => !["queued", "running", "paused"].includes(task.status)));
+  const rows = $derived(flatten(active));
+
+  function flatten(items: TaskView[]): Array<{ task: TaskView; depth: number }> {
+    const ids = new Set(items.map((task) => task.task_id));
+    const children = new Map<string, TaskView[]>();
+    for (const task of items) {
+      if (task.parent_task_id && ids.has(task.parent_task_id)) {
+        children.set(task.parent_task_id, [...(children.get(task.parent_task_id) ?? []), task]);
+      }
     }
+    const result: Array<{ task: TaskView; depth: number }> = [];
+    const visit = (task: TaskView, depth: number) => {
+      result.push({ task, depth });
+      for (const child of children.get(task.task_id) ?? []) visit(child, depth + 1);
+    };
+    for (const task of items) if (!task.parent_task_id || !ids.has(task.parent_task_id)) visit(task, 0);
+    return result;
   }
 
-  async function stopTask(task: TaskView) {
-    busyTask = task.task_id;
-    notice = null;
-    try {
-      await api.interrupt({
-        session_id: task.session_id,
-        task_id: task.task_id,
-        action_type: "cancel",
-        reason: "user stopped this task (web UI)",
-      });
-      notice = { kind: "ok", text: `Requested a safe-boundary stop for “${task.title}”.` };
-      await load();
-    } catch {
-      notice = { kind: "error", text: "Could not request the stop." };
-    } finally {
-      busyTask = null;
-    }
+  function scheduleLabel(task: TaskView) {
+    if (!task.scheduled_at) return "Ready when you run it";
+    const when = new Date(task.scheduled_at).toLocaleString();
+    if (task.recurrence === "daily") return `Every day, next run ${when}`;
+    if (task.recurrence === "background") return task.status === "running" ? "Background agent working" : "Background agent ready to start";
+    return `Scheduled for ${when}`;
+  }
+
+  async function load() {
+    try { loadError = null; tasks = await api.tasks(projectId ? { project_id: projectId } : {}); }
+    catch (error) { tasks = null; loadError = error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable"; }
   }
 
   async function createTask() {
-    if (!title.trim()) return;
-    creating = true;
-    notice = null;
+    if (!title.trim() || ((cadence === "once" || cadence === "daily") && !scheduledAt)) return;
+    creating = true; notice = null;
     try {
       await api.createTask({
-        title: title.trim(),
-        description: description.trim(),
-        priority,
-        ...(scheduledAt ? { scheduled_at: new Date(scheduledAt).toISOString() } : {}),
+        title: title.trim(), description: objective.trim(), priority,
+        ...(parentTaskId ? { parent_task_id: parentTaskId } : {}),
+        ...((cadence === "once" || cadence === "daily") ? { scheduled_at: new Date(scheduledAt).toISOString() } : {}),
+        ...(cadence === "daily" ? { recurrence: "daily" } : cadence === "background" ? { recurrence: "background" } : {}),
         ...(projectId ? { project_id: projectId } : {}),
       });
-      title = "";
-      description = "";
-      priority = "normal";
-      scheduledAt = "";
-      notice = {
-        kind: "ok",
-        text: projectId
-          ? "Task created in your Inbox, scoped to the active project."
-          : "Task created in your Inbox.",
-      };
+      title = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; scheduledAt = "";
+      notice = "Saved to your work queue.";
       await load();
-    } catch {
-      notice = { kind: "error", text: "Could not create the task." };
-    } finally {
-      creating = false;
-    }
+    } catch (error) { notice = error instanceof ApiError ? `Could not save task (${error.status}).` : "Could not save task."; }
+    finally { creating = false; }
   }
 
-  const active = $derived((tasks ?? []).filter((t) => ACTIVE_STATES.includes(t.status)));
-  const finished = $derived((tasks ?? []).filter((t) => !ACTIVE_STATES.includes(t.status)));
+  async function stopTask(task: TaskView) {
+    busyTask = task.task_id; notice = null;
+    try {
+      await api.interrupt({ session_id: task.session_id, task_id: task.task_id, action_type: "cancel", reason: "user stopped this task (web UI)" });
+      notice = `Requested a safe-boundary stop for “${task.title}”.`; await load();
+    } catch { notice = "Could not request the stop."; }
+    finally { busyTask = null; }
+  }
 
-  // Load on mount and again whenever the active project changes, so the list
-  // stays scoped to the active project.
-  $effect(() => {
-    void projectId;
-    void load();
-  });
+  $effect(() => { void projectId; void load(); });
 </script>
 
-<div class="head-row">
-  <p class="page-lead">
-    What the agent is working on. Stopping a task requests cancellation at the next
-    <strong>safe boundary</strong> — governed and audited, never a force-kill.
-  </p>
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh tasks">
-    <Icon name="refresh" size={15} />
-    Refresh
-  </button>
-</div>
+<section class="tasks">
+  <header><div><p class="eyebrow">Work orchestration</p><h2>Tasks and routines</h2><p>Create a task, nest it under another task, schedule a routine, or start a persistent background researcher. Every run remains governed and can be stopped at a safe boundary.</p></div><button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size={15} /> Refresh</button></header>
 
-<form class="card create-form" onsubmit={(event) => { event.preventDefault(); void createTask(); }}>
-  <div><h2>Create task</h2><p>Scheduling is stored only; it does not start work or send reminders automatically.</p></div>
-  <label>Task title<input class="input" aria-label="Task title" bind:value={title} required maxlength="240" /></label>
-  <label>Description<textarea class="textarea" aria-label="Description" bind:value={description}></textarea></label>
-  <div class="form-row"><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label><label>Schedule for<input class="input" aria-label="Schedule for" type="datetime-local" bind:value={scheduledAt}/></label></div>
-  <button class="btn btn-primary" disabled={creating || !title.trim()}>{creating ? "Creating…" : "Create task"}</button>
-</form>
+  <form class="card composer" onsubmit={(event) => { event.preventDefault(); void createTask(); }}>
+    <div class="composer-heading"><div><h3>Plan work</h3><p>A routine is a recurring task; a child task becomes a subtask or subroutine. A background agent runs asynchronously until its work is complete or you stop it.</p></div><div class="cadence" role="group" aria-label="When to run"><button type="button" class:chosen={cadence === "now"} onclick={() => cadence = "now"}>Task</button><button type="button" class:chosen={cadence === "once"} onclick={() => cadence = "once"}>Schedule once</button><button type="button" class:chosen={cadence === "daily"} onclick={() => cadence = "daily"}>Daily routine</button><button type="button" class:chosen={cadence === "background"} onclick={() => cadence = "background"}>Background agent</button></div></div>
+    <label>Title<input class="input" aria-label="Task title" bind:value={title} required maxlength="240" placeholder={cadence === "background" ? "e.g. Research local AI news" : cadence === "daily" ? "e.g. Review today’s priorities" : "What should Raiker work on?"} /></label>
+    <label>Instructions<textarea class="textarea" aria-label="Instructions" bind:value={objective} placeholder="Add the outcome, context, or constraints for this work."></textarea></label>
+    <div class="fields"><label>Parent work<select class="select" aria-label="Parent work" bind:value={parentTaskId}><option value="">No parent — top-level work</option>{#each tasks ?? [] as task (task.task_id)}<option value={task.task_id}>{task.title}</option>{/each}</select></label><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>{#if cadence === "once" || cadence === "daily"}<label>Start time<input class="input" aria-label="Start time" type="datetime-local" bind:value={scheduledAt} required /></label>{/if}</div>
+    <button class="btn btn-primary" disabled={creating || !title.trim() || ((cadence === "once" || cadence === "daily") && !scheduledAt)}>{creating ? "Saving…" : cadence === "background" ? "Start background agent" : cadence === "daily" ? "Create daily routine" : cadence === "once" ? "Schedule task" : "Create task"}</button>
+  </form>
 
-{#if notice}
-  <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
-{/if}
-
-{#if loadError}
-  <p class="error" role="alert">Unavailable: {loadError}</p>
-{:else if tasks === null}
-  <p class="loading">Loading…</p>
-{:else if tasks.length === 0}
-  <div class="card">
-    <EmptyState icon="tasks" title="No tasks yet" body="Tasks appear when the agent starts tracked work." />
-  </div>
-{:else}
-  {#if active.length > 0}
-    <h2>Active</h2>
-    <div class="task-grid">
-      {#each active as task (task.task_id)}
-        <article class="card task">
-          <div class="task-head">
-            <h3 class="task-title">{task.title || shortId(task.task_id)}</h3>
-            <Badge variant={taskBadge(task.status)} label={task.status} />
-          </div>
-          {#if task.objective}
-            <p class="task-objective">{task.objective}</p>
-          {/if}
-          {#if task.current_step}
-            <p class="task-step">Now: {task.current_step}</p>
-          {/if}
-          {#if task.progress_percent !== null}
-            <div
-              class="progress"
-              role="progressbar"
-              aria-valuenow={task.progress_percent}
-              aria-valuemin="0"
-              aria-valuemax="100"
-              aria-label="Task progress"
-            >
-              <div class="progress-fill" style={`width:${task.progress_percent}%`}></div>
-            </div>
-          {/if}
-          <div class="task-foot">
-            <span class="task-time" title={task.updated_at}>Updated {relativeTime(task.updated_at)}</span>
-            <button
-              type="button"
-              class="btn btn-danger btn-sm"
-              onclick={() => stopTask(task)}
-              disabled={busyTask === task.task_id}
-            >
-              {busyTask === task.task_id ? "Stopping…" : "Stop"}
-            </button>
-          </div>
-        </article>
-      {/each}
-    </div>
+  {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+  {#if loadError}<p class="error" role="alert">{loadError}</p>
+  {:else if tasks === null}<p class="muted">Loading work…</p>
+  {:else}
+    <div class="summary"><span><strong>{active.length}</strong> open</span><span><strong>{scheduled.length}</strong> scheduled</span><span><strong>{history.length}</strong> finished</span></div>
+    {#if rows.length === 0}<div class="card"><EmptyState icon="tasks" title="No work queued" body="Create a task for immediate work, or schedule a routine for later." /></div>
+    {:else}<section class="work-list" aria-labelledby="open-work"><h3 id="open-work">Open work</h3>{#each rows as row (row.task.task_id)}<article class="card task" style={`--depth:${row.depth}`}><div class="task-main"><div class="task-title"><span class="branch" aria-hidden="true">{row.depth > 0 ? "↳" : ""}</span><div><h4>{row.task.title}</h4><p>{row.task.objective || "No additional instructions."}</p></div></div><Badge variant={taskBadge(row.task.status)} label={row.task.status} /></div>{#if row.task.current_step}<p class="step">Now: {row.task.current_step}</p>{/if}{#if row.task.progress_percent !== null}<div class="progress" role="progressbar" aria-valuenow={row.task.progress_percent} aria-valuemin="0" aria-valuemax="100"><div style={`width:${row.task.progress_percent}%`}></div></div>{/if}<footer><span title={row.task.scheduled_at ?? row.task.updated_at}>{scheduleLabel(row.task)} · updated {relativeTime(row.task.updated_at)}</span>{#if ["queued", "running", "paused"].includes(row.task.status)}<button type="button" class="btn btn-danger btn-sm" onclick={() => stopTask(row.task)} disabled={busyTask === row.task.task_id}>{busyTask === row.task.task_id ? "Stopping…" : "Stop"}</button>{/if}</footer></article>{/each}</section>{/if}
+    {#if history.length > 0}<section class="history"><h3>Completed work</h3>{#each history as task (task.task_id)}<div class="history-row"><span>{task.title}</span><Badge variant={taskBadge(task.status)} label={task.status} /><span>{relativeTime(task.updated_at)}</span></div>{/each}</section>{/if}
   {/if}
-
-  {#if finished.length > 0}
-    <h2 class="finished-h">History</h2>
-    <div class="card list-card">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Task</th>
-            <th>Status</th>
-            <th>Summary</th>
-            <th>Updated</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each finished as task (task.task_id)}
-            <tr>
-              <td>{task.title || shortId(task.task_id)}</td>
-              <td><Badge variant={taskBadge(task.status)} label={task.status} /></td>
-              <td class="summary-cell">{task.summary ?? "—"}</td>
-              <td title={task.updated_at}>{relativeTime(task.updated_at)}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  {/if}
-{/if}
+</section>
 
 <style>
-  .head-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-4);
-  }
-  .create-form { display: grid; gap: var(--space-3); margin: var(--space-4) 0; }
-  .create-form h2 { margin: 0; font-size: 1rem; }
-  .create-form p { color: var(--text-2); font-size: .82rem; margin: .2rem 0 0; }
-  .create-form label { display: grid; gap: .35rem; color: var(--text-2); font-size: .8rem; }
-  .form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
-  .task-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
-    gap: var(--space-4);
-    margin-bottom: var(--space-5);
-  }
-  .task-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.6rem;
-  }
-  .task-title {
-    margin: 0;
-  }
-  .task-objective {
-    color: var(--text-2);
-    font-size: 0.86rem;
-    margin: 0.35rem 0 0;
-  }
-  .task-step {
-    font-size: 0.82rem;
-    color: var(--accent);
-    margin: 0.4rem 0 0;
-  }
-  .progress {
-    height: 6px;
-    border-radius: var(--r-pill);
-    background: var(--sunken);
-    margin-top: 0.6rem;
-    overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    border-radius: var(--r-pill);
-    background: var(--accent);
-    transition: width 300ms var(--ease);
-  }
-  .task-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 0.75rem;
-  }
-  .task-time {
-    font-size: 0.76rem;
-    color: var(--text-3);
-  }
-  .finished-h {
-    margin-top: var(--space-4);
-  }
-  .list-card {
-    padding: var(--space-2) var(--space-3);
-    overflow-x: auto;
-  }
-  .summary-cell {
-    max-width: 26rem;
-  }
-  .error {
-    color: var(--danger);
-  }
-  .loading {
-    color: var(--text-2);
-  }
-  @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
+  .tasks{max-width:64rem}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h2,h3,h4{margin:0}.eyebrow{color:var(--accent);font-size:.72rem;font-weight:750;letter-spacing:.08em;margin:0 0 .25rem;text-transform:uppercase}.tasks header p,.composer p,.task p{color:var(--text-2);font-size:.85rem;margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3)}.composer label{color:var(--text-2);display:grid;font-size:.8rem;gap:.35rem}.cadence{display:flex;flex-wrap:wrap;gap:.4rem}.cadence button{background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-pill);color:var(--text-2);font:inherit;padding:.38rem .65rem}.cadence button.chosen{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:var(--accent);color:var(--text-1)}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:.85rem}.summary strong{color:var(--text-1);font-size:1.1rem}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:.96rem}.step{color:var(--accent)!important}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:.76rem;margin-top:.8rem}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:.8rem}.notice{color:var(--success);margin:var(--space-3) 0}.error{color:var(--danger)}.muted{color:var(--text-2)}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
 </style>

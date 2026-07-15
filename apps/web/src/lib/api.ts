@@ -301,6 +301,15 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ profile_id, model: model || null }),
     }),
+  saveModelConnection: (profileId: string, endpoint: string, apiKey: string) =>
+    request<{ ok: boolean; connection_configured: boolean }>(
+      `/api/models/${encodeURIComponent(profileId)}/connection`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: endpoint || null, api_key: apiKey || null }),
+      },
+    ),
   // Persist the user-owned ordered model fallback sequence (human gate-manager only,
   // enforced server-side). Returns the cleaned/de-duplicated sequence.
   setModelFallback: (profile_ids: string[]) =>
@@ -508,6 +517,8 @@ export const api = {
     description: string;
     priority?: string;
     scheduled_at?: string;
+    recurrence?: string;
+    parent_task_id?: string;
     // Create the task under a specific project. Omitted → the active project.
     project_id?: string | null;
   }) => postJson<TaskView>("/api/tasks", body),

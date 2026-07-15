@@ -17,9 +17,12 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from cryptography.fernet import Fernet
 
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
+from raiker.auth.vault_key_file import write_vault_key
+from raiker.storage.sqlite import SQLiteStore
 from raiker.cli.principal_resolver import bootstrap_owner
 
 
@@ -183,3 +186,25 @@ class TestSetModelSelection:
         )
         assert resp.status_code == 403
         assert resp.json()["detail"]["reason_code"].startswith("model_required_for_profile")
+
+
+def test_model_connection_is_encrypted_and_principal_scoped(
+    client: TestClient, workspace: Path, owner_token: str
+) -> None:
+    write_vault_key(workspace, Fernet.generate_key().decode())
+    response = client.put(
+        "/api/models/generic-openai-compatible/connection",
+        headers=_auth(owner_token),
+        json={"endpoint": "http://127.0.0.1:9000/v1", "api_key": "instance-secret"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {"ok": True, "connection_configured": True}
+    profiles = client.get("/api/models", headers=_auth(owner_token)).json()["profiles"]
+    generic = next(item for item in profiles if item["profile_id"] == "generic-openai-compatible")
+    assert generic["connection_configured"] is True
+    with SQLiteStore(workspace).connect() as connection:
+        row = connection.execute(
+            "SELECT encrypted_payload FROM connector_credentials WHERE principal_id=? AND connector_id=?",
+            ("principal_owner", "model:generic-openai-compatible"),
+        ).fetchone()
+    assert row is not None and b"instance-secret" not in bytes(row["encrypted_payload"])

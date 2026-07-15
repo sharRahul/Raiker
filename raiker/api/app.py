@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
@@ -176,12 +178,34 @@ def create_app(
     max_body_bytes: int = 1_000_000,
     hsts: bool = False,
 ) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        from raiker.tasks.scheduler import TaskScheduler
+
+        stop = asyncio.Event()
+        async def tick() -> None:
+            scheduler = TaskScheduler(app.state.workspace_root)
+            while not stop.is_set():
+                with suppress(Exception):
+                    await scheduler.run_due()
+                try:
+                    await asyncio.wait_for(stop.wait(), timeout=15)
+                except TimeoutError:
+                    pass
+        worker = asyncio.create_task(tick())
+        try:
+            yield
+        finally:
+            stop.set(); worker.cancel()
+            with suppress(asyncio.CancelledError): await worker
+
     app = FastAPI(
         title="Raiker API",
         version="0.1.0",
         docs_url="/api/docs",
         redoc_url="/api/redoc",
         openapi_url="/api/openapi.json",
+        lifespan=lifespan,
     )
     app.state.workspace_root = Path(workspace_root).resolve()
     app.state.instance_ui_dir = Path(ui_dir) if ui_dir is not None else None

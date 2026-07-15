@@ -57,12 +57,12 @@ def test_endpoint_classification_and_policy() -> None:
     assert classify_endpoint("http://localhost:8080") == "local_machine"
     assert classify_endpoint("http://[::1]:8080") == "local_machine"
     assert classify_endpoint("http://0.0.0.0:8080") == "local_machine"
-    assert classify_endpoint("http://192.168.1.50:8000") == "private_network"
+    assert classify_endpoint("http://192.168.1.20:8000") == "private_network"
     assert classify_endpoint("http://10.1.2.3") == "private_network"
     assert classify_endpoint("http://172.16.0.1") == "private_network"
     assert classify_endpoint("https://example.com") == "remote_hosted"
     with pytest.raises(ProviderPolicyError):
-        validate_endpoint_policy("http://192.168.1.50", EndpointPolicy(True, False))
+        validate_endpoint_policy("http://192.168.1.20", EndpointPolicy(True, False))
     with pytest.raises(ProviderPolicyError):
         validate_endpoint_policy("https://example.com", EndpointPolicy(True, False))
     with pytest.raises(ProviderPolicyError):
@@ -77,7 +77,6 @@ def test_factory_openai_profiles() -> None:
     for profile_id in [
         "ollama-local-openai-compatible",
         "lm-studio-local-openai-compatible",
-        "vllm-homelab-openai-compatible",
         "generic-openai-compatible",
         "openrouter-policy-gated",
     ]:

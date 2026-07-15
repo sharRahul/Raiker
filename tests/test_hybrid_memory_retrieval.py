@@ -4,7 +4,7 @@ from pathlib import Path
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import VectorRecord
 from raiker.memory.entities import create_entity, relate_entities
-from raiker.memory.retrieval import retrieve_hybrid_memory
+from raiker.memory.retrieval import HybridRetrievalWeights, retrieve_hybrid_memory
 from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.storage.sqlite import SQLiteStore
 from raiker.vector import LOCAL_EMBEDDING_MODEL, VectorIndex, embed_text
@@ -32,3 +32,14 @@ def test_hybrid_retrieval_deduplicates_governed_lexical_vector_and_graph_hits(tm
     assert result[0].confidence == memory.confidence
     assert result[0].retention == memory.retention
     assert result[0].trust_label == "untrusted_memory_data"
+    assert dict(result[0].score_breakdown)["lexical"] == 3.0
+    assert {source for source, _ in result[0].score_breakdown} == {"graph", "lexical", "vector"}
+
+
+def test_hybrid_retrieval_rejects_negative_weights() -> None:
+    try:
+        HybridRetrievalWeights(vector=-1)
+    except ValueError as error:
+        assert str(error) == "invalid_hybrid_retrieval_weights"
+    else:
+        raise AssertionError("negative weights must fail closed")

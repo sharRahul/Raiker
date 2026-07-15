@@ -20,17 +20,30 @@ class HybridMemoryResult:
     confidence: float
     retention: str
     trust_label: str = "untrusted_memory_data"
+    score_breakdown: tuple[tuple[str, float], ...] = ()
+
+
+@dataclass(frozen=True)
+class HybridRetrievalWeights:
+    lexical: float = 3.0
+    vector: float = 1.0
+    graph: float = 1.0
+
+    def __post_init__(self) -> None:
+        if min(self.lexical, self.vector, self.graph) < 0:
+            raise ValueError("invalid_hybrid_retrieval_weights")
 
 
 def retrieve_hybrid_memory(
     *, store: SQLiteStore, query: str, scope: str | None = None, entity_id: str | None = None,
-    limit: int = 10,
+    limit: int = 10, weights: HybridRetrievalWeights | None = None,
 ) -> list[HybridMemoryResult]:
     if not query.strip() or limit < 1:
         return []
-    candidates: dict[str, tuple[float, set[str]]] = {}
+    weights = weights or HybridRetrievalWeights()
+    candidates: dict[str, tuple[float, set[str], dict[str, float]]] = {}
     for row in store.search_approved_memory(query, scope=scope, limit=limit):
-        candidates[str(row["memory_id"])] = (3.0, {"lexical"})
+        candidates[str(row["memory_id"])] = (weights.lexical, {"lexical"}, {"lexical": weights.lexical})
     index = VectorIndex(384)
     for row in store.list_active_memory_vector_embeddings(LOCAL_EMBEDDING_MODEL, scope=scope):
         try:
@@ -41,15 +54,25 @@ def retrieve_hybrid_memory(
             index.upsert(str(row["vector_id"]), vector, {"memory_id": str(row["memory_id"])})
     for hit in index.search(embed_text(query, 384), top_k=limit):
         memory_id = str(hit["metadata"]["memory_id"])
-        score, sources = candidates.get(memory_id, (0.0, set()))
-        candidates[memory_id] = (score + float(hit["score"]), sources | {"vector"})
+        score, sources, breakdown = candidates.get(memory_id, (0.0, set(), {}))
+        contribution = float(hit["score"]) * weights.vector
+        candidates[memory_id] = (
+            score + contribution,
+            sources | {"vector"},
+            {**breakdown, "vector": contribution},
+        )
     if entity_id:
         for row in store.list_memory_entity_neighborhood(entity_id, scope=scope):
             memory_id = str(row["evidence_memory_id"])
-            score, sources = candidates.get(memory_id, (0.0, set()))
-            candidates[memory_id] = (score + float(row["confidence"]), sources | {"graph"})
+            score, sources, breakdown = candidates.get(memory_id, (0.0, set(), {}))
+            contribution = float(row["confidence"]) * weights.graph
+            candidates[memory_id] = (
+                score + contribution,
+                sources | {"graph"},
+                {**breakdown, "graph": contribution},
+            )
     results: list[HybridMemoryResult] = []
-    for memory_id, (score, sources) in candidates.items():
+    for memory_id, (score, sources, breakdown) in candidates.items():
         memory_row = store.get_active_approved_memory(memory_id)
         if memory_row is not None:
             results.append(
@@ -63,6 +86,7 @@ def retrieve_hybrid_memory(
                     str(memory_row["sensitivity"]),
                     float(memory_row["confidence"]),
                     str(memory_row["retention"]),
+                    score_breakdown=tuple(sorted(breakdown.items())),
                 )
             )
     return sorted(results, key=lambda item: (-item.score, item.memory_id))[:limit]

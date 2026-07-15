@@ -1314,3 +1314,9 @@ SET memory_mode = CASE memory_enabled WHEN 1 THEN 'enabled' ELSE 'disabled' END;
 """
 
 PROJECT_SELF_INCLUSIVE_PATH_MIGRATION_ID = "RAIKER-1014-project-self-inclusive-path"
+
+MEMORY_ARCHIVE_MIGRATION_ID = "RAIKER-2003-memory-archive-lifecycle"
+MEMORY_ARCHIVE_SQL = """
+ALTER TABLE approved_memory ADD COLUMN archived_at TEXT;
+CREATE INDEX IF NOT EXISTS idx_approved_memory_active ON approved_memory(scope) WHERE deleted_at IS NULL AND archived_at IS NULL;
+"""

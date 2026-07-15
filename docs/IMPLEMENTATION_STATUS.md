@@ -144,6 +144,16 @@ fail-closed by design.
 > toggle/expiry/import/export/incognito. Tests: `tests/test_memory_controls.py`,
 > `tests/test_api_contract_schemas.py`, `MemoryView.test.ts`. This is a controls slice — no new capability,
 > gate, policy, or executor is added.
+
+> Current truth update (2026-07-15): archive-first durable-memory lifecycle
+> has landed. Migration `RAIKER-2003-memory-archive-lifecycle` adds
+> `approved_memory.archived_at`; the existing Markdown record carries the same
+> metadata. `set_memory_archived` preserves text and provenance while excluding
+> archived memories from list, exact lookup, and keyword retrieval. Restore is
+> the same human-only control path with `archived=false`; forget remains a
+> tombstone, not an archive. API: `PUT /api/memory/{id}/archive`. Tests cover
+> archive exclusion and restore in `test_phase_4_memory_mvp.py` and
+> `test_memory_controls.py`.
 >
 > Tool policy defect fix (2026-07-14): `connector_read` and
 > `connector_write` were denied by the policy engine

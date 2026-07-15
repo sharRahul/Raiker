@@ -143,6 +143,13 @@ class TestMemoryForget:
         assert not result.ok
         assert result.reason_code == "not_authorized_human"
 
+    def test_human_can_archive_and_restore(self, service: DashboardService, workspace: Path) -> None:
+        mid = _seed_memory(service.store, workspace)
+        assert service.set_memory_archived(mid, True, OWNER).ok
+        assert service.list_memories() == []
+        assert service.set_memory_archived(mid, False, OWNER).ok
+        assert [m.memory_id for m in service.list_memories()] == [mid]
+
 
 class TestMemoryEditAndSearchParticipation:
     def test_human_can_edit_a_memory_and_exclude_it_from_search(

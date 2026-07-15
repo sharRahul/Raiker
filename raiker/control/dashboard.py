@@ -129,6 +129,7 @@ class MemoryControlView:
     pinned: bool
     search_enabled: bool = True
     expires_at: str | None = None
+    archived_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -148,6 +149,7 @@ class MemoryControlView:
             "pinned": self.pinned,
             "search_enabled": self.search_enabled,
             "expires_at": self.expires_at,
+            "archived_at": self.archived_at,
         }
 
 
@@ -744,6 +746,7 @@ class DashboardService:
                 pinned=e.memory_id in pinned_ids,
                 search_enabled=e.search_enabled,
                 expires_at=e.expires_at,
+                archived_at=e.archived_at,
             )
             for e in entries
         ]
@@ -792,6 +795,15 @@ class DashboardService:
         if not ok:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
         return ControlResult(ok=True, data={"memory_id": memory_id})
+
+    def set_memory_archived(self, memory_id: str, archived: bool, acting_principal_id: str | None) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.store import set_memory_archived
+        entry = set_memory_archived(memory_id, archived=archived, workspace_root=self.workspace_root, store=self.store)
+        if entry is None:
+            return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        return ControlResult(ok=True, data={"memory_id": memory_id, "archived": archived})
 
     def edit_memory_controlled(self, memory_id: str, text: str, acting_principal_id: str | None) -> ControlResult:
         return self._update_memory_controlled(

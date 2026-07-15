@@ -29,6 +29,7 @@ class MemoryEntry:
     created_by: str
     updated_at: str | None = None
     deleted_at: str | None = None
+    archived_at: str | None = None
     search_enabled: bool = True
     expires_at: str | None = None
 
@@ -83,6 +84,7 @@ def _encode_frontmatter(entry: MemoryEntry) -> str:
         "created_by": entry.created_by,
         "updated_at": entry.updated_at,
         "deleted_at": entry.deleted_at,
+        "archived_at": entry.archived_at,
         "search_enabled": entry.search_enabled,
         "expires_at": entry.expires_at,
     }
@@ -189,10 +191,11 @@ def search_memory(
             created_by=str(meta.get("created_by", "system")),
             updated_at=meta.get("updated_at"),
             deleted_at=meta.get("deleted_at"),
+            archived_at=meta.get("archived_at"),
             search_enabled=bool(meta.get("search_enabled", True)),
             expires_at=meta.get("expires_at"),
         )
-        if entry.deleted_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
+        if entry.deleted_at is not None or entry.archived_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
             continue
         if scope is not None and entry.scope != scope:
             continue
@@ -265,6 +268,22 @@ def forget_memory(
     return True
 
 
+def set_memory_archived(
+    memory_id: str, *, archived: bool, workspace_root: str | Path = ".", store: SQLiteStore | None = None
+) -> MemoryEntry | None:
+    """Archive/restore a memory without changing its content or provenance."""
+    entry = get_memory(memory_id, workspace_root=workspace_root, include_expired=True, include_archived=True)
+    if entry is None:
+        return None
+    updated = replace(entry, archived_at=utc_now() if archived else None, updated_at=utc_now())
+    _entry_path(_memory_dir(workspace_root), memory_id).write_text(
+        _encode_frontmatter(updated) + "\n" + updated.text, encoding="utf-8"
+    )
+    if store is not None:
+        store.set_approved_memory_archived(memory_id, archived_at=updated.archived_at, updated_at=updated.updated_at)
+    return updated
+
+
 def list_memory(
     *,
     workspace_root: str | Path = ".",
@@ -304,10 +323,11 @@ def list_memory(
             created_by=str(meta.get("created_by", "system")),
             updated_at=meta.get("updated_at"),
             deleted_at=meta.get("deleted_at"),
+            archived_at=meta.get("archived_at"),
             search_enabled=bool(meta.get("search_enabled", True)),
             expires_at=meta.get("expires_at"),
         )
-        if entry.deleted_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
+        if entry.deleted_at is not None or entry.archived_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
             continue
         if scope is not None and entry.scope != scope:
             continue
@@ -320,6 +340,7 @@ def get_memory(
     *,
     workspace_root: str | Path = ".",
     include_expired: bool = False,
+    include_archived: bool = False,
 ) -> MemoryEntry | None:
     mem_dir = _memory_dir(workspace_root)
     path = _entry_path(mem_dir, memory_id)
@@ -347,10 +368,11 @@ def get_memory(
             created_by=str(meta.get("created_by", "system")),
             updated_at=meta.get("updated_at"),
             deleted_at=meta.get("deleted_at"),
+            archived_at=meta.get("archived_at"),
             search_enabled=bool(meta.get("search_enabled", True)),
             expires_at=meta.get("expires_at"),
         )
-        if entry.deleted_at is not None or (
+        if entry.deleted_at is not None or (not include_archived and entry.archived_at is not None) or (
             not include_expired and entry.expires_at is not None and entry.expires_at <= utc_now()
         ):
             return None
@@ -379,9 +401,10 @@ def get_memory(
                 approval_state=str(meta.get("approval_state", "approved")),
                 created_by=str(meta.get("created_by", "system")),
                 updated_at=meta.get("updated_at"),
-            deleted_at=meta.get("deleted_at"),
-            search_enabled=bool(meta.get("search_enabled", True)),
-            expires_at=meta.get("expires_at"),
+                deleted_at=meta.get("deleted_at"),
+                archived_at=meta.get("archived_at"),
+                search_enabled=bool(meta.get("search_enabled", True)),
+                expires_at=meta.get("expires_at"),
             )
             if entry.deleted_at is not None or (
                 not include_expired and entry.expires_at is not None and entry.expires_at <= utc_now()

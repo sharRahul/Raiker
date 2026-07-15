@@ -60,6 +60,8 @@ from raiker.storage.migrations import (
     EMAIL_DRAFTS_SQL,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
+    MEMORY_ARCHIVE_MIGRATION_ID,
+    MEMORY_ARCHIVE_SQL,
     MEMORY_CONTROLS_MIGRATION_ID,
     MEMORY_CONTROLS_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
@@ -505,6 +507,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection,
             )
             self._backfill_self_inclusive_project_paths(connection)
+            self._apply_migration(MEMORY_ARCHIVE_MIGRATION_ID, MEMORY_ARCHIVE_SQL, connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
@@ -1663,6 +1666,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 WHERE memory_id = ? AND deleted_at IS NULL
                 """,
                 ("forgotten", deleted_at, updated_at, memory_id),
+            )
+        return cursor.rowcount > 0
+
+    def set_approved_memory_archived(self, memory_id: str, *, archived_at: str | None, updated_at: str | None) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE approved_memory SET archived_at = ?, updated_at = ? WHERE memory_id = ? AND deleted_at IS NULL",
+                (archived_at, updated_at, memory_id),
             )
         return cursor.rowcount > 0
 

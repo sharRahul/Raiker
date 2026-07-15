@@ -70,6 +70,11 @@ fail-closed by design.
   expiry set/clear; import/export; and an incognito opt-out boundary that
   withholds approved project memory from the turn context when on (the memory is
   not deleted). No second memory system is created.
+- Hybrid-memory lifecycle now adds reversible archive/restore for governed
+  durable memories. Archived records remain preserved but are excluded from
+  normal list, exact lookup, and keyword retrieval; forget remains the separate
+  human-only tombstone action. The human-only control/API is
+  `PUT /api/memory/{memory_id}/archive` with `{ "archived": true|false }`.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

@@ -138,6 +138,14 @@ async def forget_memory(
     return {"ok": True, **result.data}
 
 
+@router.put("/api/memory/{memory_id}/archive")
+async def set_memory_archived(memory_id: str, request: Request, body: dict[str, Any], auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
+    result = _service(request).set_memory_archived(memory_id, bool(body.get("archived", True)), auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
 @router.put("/api/memory/{memory_id}")
 async def edit_memory(
     memory_id: str,

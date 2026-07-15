@@ -1404,6 +1404,14 @@ MEMORY_CONTENT_CHECKSUM_SQL = """
 ALTER TABLE approved_memory ADD COLUMN content_checksum TEXT;
 """
 
+MEMORY_EVALUATION_CONTEXT_MIGRATION_ID = "RAIKER-2017-memory-evaluation-context"
+MEMORY_EVALUATION_CONTEXT_SQL = """
+ALTER TABLE memory_evaluation_runs ADD COLUMN backend_version TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE memory_evaluation_runs ADD COLUMN scope TEXT NOT NULL DEFAULT 'mixed';
+ALTER TABLE memory_evaluation_runs ADD COLUMN workload TEXT NOT NULL DEFAULT 'retrieval_case_set';
+ALTER TABLE memory_evaluation_runs ADD COLUMN latency_distribution_json TEXT NOT NULL DEFAULT '{}';
+"""
+
 MEMORY_ENTITY_GRAPH_MIGRATION_ID = "RAIKER-2011-memory-entity-graph"
 MEMORY_ENTITY_GRAPH_SQL = """
 CREATE TABLE IF NOT EXISTS memory_entities (

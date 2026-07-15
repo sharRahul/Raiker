@@ -241,7 +241,9 @@ criterion; later stages do not weaken the completed safety rules.
 **In progress.** `RAIKER-2009` makes approved-memory SQLite rows and active-only
 FTS authoritative for governed retrieval. `RAIKER-2010` adds immutable
 correction/supersession links, temporal eligibility, human correction control,
-and persisted aggregate lexical evaluation runs. `memory-eval-v1` reports
+and persisted aggregate lexical, vector, graph, and hybrid evaluation runs.
+Each aggregate identifies its backend version, scope, workload, and a
+non-sensitive latency distribution. `memory-eval-v1` reports
 precision, Recall@k, MRR, nDCG, policy leaks, p50/p95 latency, token use, and
 local compute/storage cost. Broader corpus workloads and production thresholds
 remain pending. `memory-eval-v1` now provides a deterministic

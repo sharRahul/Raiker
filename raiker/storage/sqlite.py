@@ -78,6 +78,8 @@ from raiker.storage.migrations import (
     MEMORY_CONTROLS_SQL,
     MEMORY_ENTITY_GRAPH_MIGRATION_ID,
     MEMORY_ENTITY_GRAPH_SQL,
+    MEMORY_EVALUATION_CONTEXT_MIGRATION_ID,
+    MEMORY_EVALUATION_CONTEXT_SQL,
     MEMORY_FTS_MIGRATION_ID,
     MEMORY_FTS_SQL,
     MEMORY_JOBS_MIGRATION_ID,
@@ -561,6 +563,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MEMORY_CONTENT_CHECKSUM_MIGRATION_ID,
                 MEMORY_CONTENT_CHECKSUM_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MEMORY_EVALUATION_CONTEXT_MIGRATION_ID,
+                MEMORY_EVALUATION_CONTEXT_SQL,
                 connection,
             )
             rows = connection.execute(
@@ -1809,17 +1816,25 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
         return cursor.rowcount > 0
 
-    def create_memory_evaluation_run(self, report: Any, *, strategy: str = "lexical_fts") -> str:
+    def create_memory_evaluation_run(self, report: Any, *, strategy: str | None = None) -> str:
         from raiker.contracts.ids import new_id
 
         evaluation_id = new_id("mev_")
         with self.connect() as connection:
             connection.execute(
-                """INSERT INTO memory_evaluation_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (evaluation_id, report.corpus_version, strategy, report.case_count, report.precision_at_k,
+                """INSERT INTO memory_evaluation_runs (
+                    evaluation_id, corpus_version, strategy, case_count, precision_at_k,
+                    recall_at_k, mean_reciprocal_rank, ndcg_at_k, policy_leak_count,
+                    p50_latency_ms, p95_latency_ms, token_count, compute_cost_usd,
+                    storage_bytes, created_at, backend_version, scope, workload,
+                    latency_distribution_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (evaluation_id, report.corpus_version, strategy or report.strategy, report.case_count, report.precision_at_k,
                  report.recall_at_k, report.mean_reciprocal_rank, report.ndcg_at_k,
                  report.policy_leak_count, report.p50_latency_ms, report.p95_latency_ms,
-                 report.token_count, report.compute_cost_usd, report.storage_bytes, utc_now()),
+                 report.token_count, report.compute_cost_usd, report.storage_bytes, utc_now(),
+                 report.backend_version, report.scope, report.workload,
+                 json.dumps(report.latency_distribution, sort_keys=True)),
             )
         return evaluation_id
 

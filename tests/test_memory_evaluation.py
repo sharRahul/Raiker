@@ -6,7 +6,10 @@ from raiker.memory.evaluation import (
     RetrievalBudget,
     RetrievalCase,
     enforce_retrieval_budget,
+    evaluate_graph_retrieval,
+    evaluate_hybrid_retrieval,
     evaluate_lexical_retrieval,
+    evaluate_vector_retrieval,
 )
 from raiker.memory.store import (
     MemoryGovernance,
@@ -16,6 +19,7 @@ from raiker.memory.store import (
     write_memory,
 )
 from raiker.storage.sqlite import SQLiteStore
+from raiker.vector import LOCAL_EMBEDDING_MODEL
 
 
 def _write(store: SQLiteStore, workspace: Path, text: str, scope: str) -> str:
@@ -43,7 +47,41 @@ def test_evaluation_reports_quality_latency_and_policy_leaks(tmp_path: Path) -> 
     evaluation_id = store.create_memory_evaluation_run(report)
     assert evaluation_id.startswith("mev_")
     with store.connect() as connection:
-        assert connection.execute("SELECT policy_leak_count FROM memory_evaluation_runs WHERE evaluation_id = ?", (evaluation_id,)).fetchone()["policy_leak_count"] == 0
+        row = connection.execute(
+            "SELECT policy_leak_count, backend_version, scope, workload, latency_distribution_json "
+            "FROM memory_evaluation_runs WHERE evaluation_id = ?", (evaluation_id,)
+        ).fetchone()
+    assert row["policy_leak_count"] == 0
+    assert row["backend_version"] == "sqlite-fts4"
+    assert row["scope"] == "project:alpha"
+    assert row["workload"] == "retrieval_case_set"
+    assert '"p95_ms"' in row["latency_distribution_json"]
+
+
+def test_all_retrieval_strategies_report_aggregate_context(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    memory_id = _write(store, tmp_path, "A durable scoped retrieval result.", "project:alpha")
+    cases = (RetrievalCase("strategy", "durable retrieval", (memory_id,), scope="project:alpha"),)
+    reports = (
+        evaluate_lexical_retrieval(store, corpus_version="memory-eval-v1", cases=cases),
+        evaluate_vector_retrieval(store, corpus_version="memory-eval-v1", cases=cases),
+        evaluate_graph_retrieval(store, corpus_version="memory-eval-v1", cases=cases),
+        evaluate_hybrid_retrieval(store, corpus_version="memory-eval-v1", cases=cases),
+    )
+    assert {report.backend_version for report in reports} == {
+        "sqlite-fts4", LOCAL_EMBEDDING_MODEL, "memory-entity-graph-v1",
+        f"sqlite-fts4+{LOCAL_EMBEDDING_MODEL}+memory-entity-graph-v1",
+    }
+    for report in reports:
+        assert report.scope == "project:alpha"
+        assert report.workload == "retrieval_case_set"
+        assert report.latency_distribution is not None
+        assert report.latency_distribution["count"] == 1
+    evaluation_id = store.create_memory_evaluation_run(reports[1])
+    with store.connect() as connection:
+        assert connection.execute(
+            "SELECT strategy FROM memory_evaluation_runs WHERE evaluation_id = ?", (evaluation_id,)
+        ).fetchone()["strategy"] == "vector"
 
 
 def test_correction_supersedes_old_fact_and_removes_it_from_retrieval(tmp_path: Path) -> None:

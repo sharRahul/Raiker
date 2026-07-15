@@ -26,7 +26,18 @@ def test_plaintext_database_is_converted_without_leaving_plaintext_backup(tmp_pa
     with sqlite3.connect(db_path) as plaintext:
         plaintext.execute("CREATE TABLE legacy_note (value TEXT)")
         plaintext.execute("INSERT INTO legacy_note VALUES ('preserved')")
+        plaintext.execute(
+            "CREATE VIRTUAL TABLE approved_memory_fts USING fts5("
+            "memory_id UNINDEXED, text, tags)"
+        )
+        plaintext.execute(
+            "INSERT INTO approved_memory_fts VALUES ('legacy', 'discarded projection', '[]')"
+        )
     store = SQLiteStore(tmp_path)
     with store.connect() as encrypted:
         assert encrypted.execute("SELECT value FROM legacy_note").fetchone()[0] == "preserved"
+        fts_sql = encrypted.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'approved_memory_fts'"
+        ).fetchone()[0]
+        assert "fts4" in fts_sql.lower()
     assert not db_path.with_suffix(".plaintext-backup").exists()

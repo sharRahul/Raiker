@@ -413,7 +413,10 @@ class TestProjectsApi:
         assert saved.status_code == 200, saved.text
         detail = client.get(f"/api/projects/{pid}", headers=headers).json()
         assert detail["context"] == {
-            "instructions": "Keep changes focused.", "attachment_ids": [], "memory_enabled": True
+            "instructions": "Keep changes focused.",
+            "attachment_ids": [],
+            "memory_enabled": True,
+            "memory_mode": "enabled",
         }
 
     def test_authenticated_human_can_confirm_project_deletion(

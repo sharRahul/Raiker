@@ -594,8 +594,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         self.db_path.replace(legacy_path)
         try:
             with plaintext_sqlite.connect(legacy_path) as source, self.connect() as encrypted:
-                dump = "\n".join(source.iterdump()).replace("USING fts5(", "USING fts4(")
+                # SQLite dumps do not guarantee parent-before-child INSERT order.
+                # Import under the legacy database's existing integrity state, then
+                # restore enforcement for every normal Raiker connection.
+                encrypted.execute("PRAGMA foreign_keys = OFF")
+                # FTS virtual-table shadow rows are engine-specific. Rebuild this
+                # disposable projection from approved memory after importing.
+                dump = "\n".join(
+                    line for line in source.iterdump() if "approved_memory_fts" not in line
+                ).replace("USING fts5(", "USING fts4(")
                 encrypted.executescript(dump)
+                encrypted.execute("PRAGMA foreign_keys = ON")
             legacy_path.unlink()
         except Exception:
             if self.db_path.exists():
@@ -1929,7 +1938,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     @staticmethod
     def _rebuild_memory_fts(connection: sqlite3.Connection) -> None:
-        connection.execute("DELETE FROM approved_memory_fts")
+        try:
+            connection.execute("DELETE FROM approved_memory_fts")
+        except sqlite3.OperationalError:
+            # Repair a legacy FTS5 dump that was imported by an older SQLCipher
+            # migration. The FTS table is a rebuildable projection, never source.
+            connection.execute("DROP TABLE IF EXISTS approved_memory_fts")
+            connection.execute(
+                "CREATE VIRTUAL TABLE approved_memory_fts USING fts4("
+                "memory_id UNINDEXED, text, tags)"
+            )
         connection.execute("""INSERT INTO approved_memory_fts(memory_id, text, tags)
             SELECT memory_id, text, tags_json FROM approved_memory
             WHERE deleted_at IS NULL AND archived_at IS NULL AND search_enabled = 1

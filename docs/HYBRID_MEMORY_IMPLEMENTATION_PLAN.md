@@ -360,3 +360,92 @@ dashboards and runbooks are exercised by people other than the implementer.
 **Exit:** Raiker may describe itself as production-proven only after the
 published evidence supports that claim. “Best” remains a comparative claim and
 must be tied to a disclosed benchmark, population, and date.
+
+## Live-validation runbook and pending external actions
+
+The items below require a real deployment, people, or infrastructure outside
+this repository. They are deliberately not marked complete by local tests.
+Record the date, operator, environment, inputs, result, and evidence location
+for every step before changing the corresponding stage status.
+
+### 1. Release preflight and encrypted-database conversion
+
+1. Start with a disposable copy of a representative workspace and retain an
+   encrypted backup plus its checksum before upgrading Raiker.
+2. Install locked dependencies with `poetry install`, then verify the runtime
+   by opening the store through Raiker and checking `PRAGMA cipher_version`.
+   Do not use the standard-library `sqlite3` module to inspect the encrypted
+   database.
+3. For a legacy database, start Raiker once and verify that the database header
+   is not `SQLite format 3`, the expected memory rows remain readable through
+   the application, and no `*.plaintext-backup` file remains after a successful
+   conversion. Retain the pre-upgrade encrypted backup until acceptance.
+4. Roll back only by restoring that retained backup with its matching app key;
+   never attempt to decrypt or edit the production file with an unapproved
+   tool. Document the restore time and any incompatibilities found.
+
+### 2. Backup, erasure, and recovery drill
+
+1. Use the production backup system to create an encrypted snapshot, register
+   its key ID, retention deadline, and storage location in Raiker's backup
+   catalog, then perform a restore into an isolated workspace.
+2. Compare restored memory counts, content checksums, FTS search results,
+   vector mappings, graph edges, and audit records against the source. Record
+   RPO/RTO and mark the manifest restore-verified only when this comparison
+   passes.
+3. Exercise legal hold, archive, forget, and confirmed purge on test data. For
+   every purge, show the user the primary-store result and every backup that is
+   still pending expiry or erasure; complete and audit the backup-erasure work
+   when the backup platform supports it.
+4. Perform a migration-rollback and corrupted-backup recovery drill. Escalate
+   any inability to restore, erase, or report a pending backup as a release
+   blocker.
+
+### 3. Security and tenancy review
+
+1. Have an independent reviewer inspect key creation, storage, rotation,
+   revocation, recovery, logs, exports, backups, and SQLCipher connection
+   initialization. Confirm keys and raw memory never appear in logs or error
+   telemetry.
+2. Implement and run the remaining principal/workspace isolation suite before
+   any multi-user release. Test cross-workspace reads, writes, retrieval,
+   projections, exports, backups, job execution, and confused-deputy attempts.
+3. Document owner/user-managed key access, rotation cadence, incident response,
+   and the evidence produced by each review. These controls are pending; the
+   current local app-key derivation is not a substitute for a managed key
+   hierarchy.
+
+### 4. Retrieval benchmark and pilot
+
+1. Build a consented, de-identified, versioned benchmark that includes normal,
+   scoped, sensitive, archived, forgotten, corrected, and temporal facts.
+2. Run lexical, vector, graph, and hybrid retrieval independently. Publish
+   corpus and backend versions, Precision@k, Recall@k, MRR, nDCG, policy leaks,
+   p50/p95 latency, token use, storage/compute cost, and test hardware.
+3. Set explicit release budgets from this baseline and make CI reject
+   regressions. Do not extrapolate the deterministic local `memory-eval-v1`
+   fixture to production quality.
+4. Run a small opt-in pilot with clear remember/why/scope/expiry/correction/
+   forget controls. Collect support incidents and correction/deletion feedback;
+   do not silently promote sensitive, uncertain, or conflicting inferences.
+
+### 5. Operational load and failure testing
+
+1. Define target corpus sizes, concurrent users, p50/p95 latency, availability,
+   RPO, and RTO. Run load and soak tests at those targets and retain reports.
+2. Inject interrupted writes, duplicate jobs, expired leases, index rebuilds,
+   provider outages, backup corruption, key rotation, and restore failures.
+   Confirm idempotency, rate limits, dead-letter visibility, integrity scans,
+   and safe recovery in every case.
+3. Have an operator other than the implementer run the dashboard and recovery
+   runbooks. Publish open incidents and remediation before claiming
+   production-proven reliability.
+
+### Completion evidence checklist
+
+Keep links to the following beside the relevant stage exit criterion: CI run,
+dependency/SBOM scan, security review, encrypted-backup and restore report,
+erasure disposition report, tenancy-suite report, benchmark report, pilot
+report, load/soak/chaos reports, and independent runbook exercise. Until that
+evidence exists, Stages F--J remain in progress and Raiker must not be marketed
+as the best or as production-proven.

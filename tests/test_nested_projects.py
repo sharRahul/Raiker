@@ -118,8 +118,10 @@ class TestProjectMove:
         store.create_project("p3", "Second", "projects/root/second", parent_id="p1")
 
         assert store.move_project("p2", "p3")
-        assert store.load_project("p2")["path"] == "/p1/p3/p2/"
-        assert store.load_project("p3")["path"] == "/p1/p3/"
+        moved = store.load_project("p2")
+        parent = store.load_project("p3")
+        assert moved is not None and moved["path"] == "/p1/p3/p2/"
+        assert parent is not None and parent["path"] == "/p1/p3/"
 
     def test_move_prevents_cycle(self, store: SQLiteStore) -> None:
         store.create_project("p1", "Root", "projects/root")
@@ -153,8 +155,10 @@ class TestProjectArchive:
         store.create_project("p3", "Second", "projects/root/second", parent_id="p1")
 
         assert store.archive_project("p2")
-        assert store.load_project("p2")["is_archived"] == 1
-        assert store.load_project("p3")["is_archived"] == 0
+        archived = store.load_project("p2")
+        sibling = store.load_project("p3")
+        assert archived is not None and archived["is_archived"] == 1
+        assert sibling is not None and sibling["is_archived"] == 0
 
 
 class TestProjectDeleteWithOrphanage:

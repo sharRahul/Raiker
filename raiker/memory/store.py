@@ -156,6 +156,8 @@ def search_memory(
     max_results: int = 20,
     store: SQLiteStore | None = None,
 ) -> list[MemoryEntry]:
+    if store is not None:
+        return [_entry_from_row(row) for row in store.search_approved_memory(query, scope=scope, limit=max_results)]
     query_lower = query.lower()
     results: list[MemoryEntry] = []
     mem_dir = _memory_dir(workspace_root)
@@ -420,6 +422,7 @@ def update_memory(
     memory_id: str, *, workspace_root: str | Path = ".", text: str | None = None,
     search_enabled: bool | None = None, expires_at: str | None = None,
     update_expires_at: bool = False,
+    store: SQLiteStore | None = None,
 ) -> MemoryEntry | None:
     entry = get_memory(memory_id, workspace_root=workspace_root, include_expired=True)
     if entry is None:
@@ -435,7 +438,23 @@ def update_memory(
     _entry_path(_memory_dir(workspace_root), memory_id).write_text(
         _encode_frontmatter(updated) + "\n" + updated.text, encoding="utf-8"
     )
+    if store is not None:
+        store.update_approved_memory(updated)
     return updated
+
+
+def _entry_from_row(row: dict[str, Any]) -> MemoryEntry:
+    return MemoryEntry(
+        memory_id=str(row["memory_id"]), text=str(row["text"]), scope=str(row["scope"]),
+        sensitivity=str(row["sensitivity"]), source_event_id=str(row["source_event_id"]),
+        memory_type=str(row["memory_type"]), created_at=str(row["created_at"]),
+        tags=tuple(json.loads(str(row["tags_json"]))), source=str(row["source"]),
+        provenance=json.loads(str(row["provenance_json"])), confidence=float(row["confidence"]),
+        trust_score=float(row["trust_score"]), retention=str(row["retention"]),
+        approval_state=str(row["approval_state"]), created_by=str(row["created_by"]),
+        updated_at=row["updated_at"], deleted_at=row["deleted_at"], archived_at=row["archived_at"],
+        search_enabled=bool(row["search_enabled"]), expires_at=row["expires_at"],
+    )
 
 
 def memory_status(*, workspace_root: str | Path = ".") -> dict[str, object]:

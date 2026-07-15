@@ -879,6 +879,7 @@ class DashboardService:
                 search_enabled=bool(item.get("search_enabled", True)),
                 expires_at=item.get("expires_at"),
                 update_expires_at="expires_at" in item,
+                store=self.store,
             )
         return ControlResult(ok=True, data={"count": len(memories)})
 
@@ -932,6 +933,7 @@ class DashboardService:
             search_enabled=search_enabled,
             expires_at=expires_at,
             update_expires_at=update_expires_at,
+            store=self.store,
         )
         if updated is None:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")

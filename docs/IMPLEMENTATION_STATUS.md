@@ -136,6 +136,20 @@ fail-closed by design.
 > adapters—there is no autonomous raw capture, cleanup worker, or model purge
 > tool.
 
+> Current truth update (2026-07-15): the memory production-readiness roadmap
+> is specified as Stages F–J in `docs/HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`.
+> The next implementation priority is SQLite retrieval authority plus a
+> versioned evaluation corpus and regression budgets. Semantic/entity
+> retrieval, tenancy/encryption, backup cataloging, job reliability, and an
+> independent benchmark remain future work; no market-leading claim is made.
+
+> **Implementation update (2026-07-15):** Stage F has started with
+> `RAIKER-2009-memory-retrieval-authority`: governed search reads SQLite's
+> active-only FTS source, while edits, search opt-outs, and expiry synchronize
+> the approved row and index. The initial `memory-eval-v1` harness reports
+> Recall@k, MRR, nDCG, policy leaks, and p95 latency for deterministic lexical
+> cases. It is a CI-quality foundation, not a published benchmark.
+
 > Current truth update (2026-07-15): reliable memory controls are complete for
 > the current backlog item 3 slice — a user-visible Memory view over the
 > EXISTING governed memory store. No second memory system is created.

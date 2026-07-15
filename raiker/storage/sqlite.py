@@ -74,6 +74,8 @@ from raiker.storage.migrations import (
     MEMORY_PROJECTIONS_SQL,
     MEMORY_PURGE_MIGRATION_ID,
     MEMORY_PURGE_SQL,
+    MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
+    MEMORY_RETRIEVAL_AUTHORITY_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
     MODEL_ADVISOR_SQL,
     MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
@@ -523,6 +525,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(GIST_MEMORY_MIGRATION_ID, GIST_MEMORY_SQL, connection)
             self._apply_migration(MEMORY_PROJECTIONS_MIGRATION_ID, MEMORY_PROJECTIONS_SQL, connection)
             self._apply_migration(MEMORY_FTS_MIGRATION_ID, MEMORY_FTS_SQL, connection)
+            self._apply_migration(
+                MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
+                MEMORY_RETRIEVAL_AUTHORITY_SQL,
+                connection,
+            )
+            self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
@@ -1646,8 +1654,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO approved_memory
-                (memory_id, text, scope, sensitivity, source_event_id, memory_type, created_at, tags_json, source, provenance_json, confidence, trust_score, retention, approval_state, created_by, updated_at, deleted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (memory_id, text, scope, sensitivity, source_event_id, memory_type, created_at, tags_json, source, provenance_json, confidence, trust_score, retention, approval_state, created_by, updated_at, deleted_at, archived_at, search_enabled, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     entry.memory_id,
@@ -1667,9 +1675,30 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     entry.created_by,
                     entry.updated_at,
                     entry.deleted_at,
+                    entry.archived_at,
+                    int(entry.search_enabled),
+                    entry.expires_at,
                 ),
             )
             self._sync_memory_fts(connection, entry.memory_id)
+
+    def update_approved_memory(self, entry: Any) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE approved_memory SET text = ?, sensitivity = ?, tags_json = ?, updated_at = ?,
+                search_enabled = ?, expires_at = ? WHERE memory_id = ? AND deleted_at IS NULL""",
+                (
+                    entry.text,
+                    entry.sensitivity,
+                    json.dumps(list(entry.tags)),
+                    entry.updated_at,
+                    int(entry.search_enabled),
+                    entry.expires_at,
+                    entry.memory_id,
+                ),
+            )
+            self._sync_memory_fts(connection, entry.memory_id)
+        return cursor.rowcount > 0
 
     def mark_approved_memory_forgotten(
         self, memory_id: str, *, deleted_at: str, updated_at: str
@@ -1741,8 +1770,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         connection.execute(
             """INSERT INTO approved_memory_fts(memory_id, text, tags)
             SELECT memory_id, text, tags_json FROM approved_memory
-            WHERE memory_id = ? AND deleted_at IS NULL AND archived_at IS NULL""",
-            (memory_id,),
+            WHERE memory_id = ? AND deleted_at IS NULL AND archived_at IS NULL
+              AND search_enabled = 1 AND (expires_at IS NULL OR expires_at > ?)""",
+            (memory_id, utc_now()),
         )
 
     @staticmethod
@@ -1750,12 +1780,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         connection.execute("DELETE FROM approved_memory_fts")
         connection.execute("""INSERT INTO approved_memory_fts(memory_id, text, tags)
             SELECT memory_id, text, tags_json FROM approved_memory
-            WHERE deleted_at IS NULL AND archived_at IS NULL""")
+            WHERE deleted_at IS NULL AND archived_at IS NULL AND search_enabled = 1
+              AND (expires_at IS NULL OR expires_at > ?)""", (utc_now(),))
 
     def search_approved_memory(self, query: str, scope: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+        terms = [term for term in query.replace('"', " ").split() if term]
+        if not terms:
+            return []
         sql = """SELECT m.* FROM approved_memory_fts f JOIN approved_memory m ON m.memory_id = f.memory_id
-        WHERE approved_memory_fts MATCH ? AND m.deleted_at IS NULL AND m.archived_at IS NULL"""
-        params: list[Any] = [query]
+        WHERE approved_memory_fts MATCH ? AND m.deleted_at IS NULL AND m.archived_at IS NULL
+          AND m.search_enabled = 1 AND (m.expires_at IS NULL OR m.expires_at > ?)"""
+        params: list[Any] = [" AND ".join(f'"{term}"' for term in terms), utc_now()]
         if scope is not None:
             sql += " AND m.scope = ?"
             params.append(scope)
@@ -1771,8 +1806,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute("DELETE FROM approved_memory WHERE memory_id = ?", (memory_id,))
 
     def list_approved_memory(self, scope: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
-        query = "SELECT * FROM approved_memory WHERE deleted_at IS NULL"
-        params: list[Any] = []
+        query = "SELECT * FROM approved_memory WHERE deleted_at IS NULL AND archived_at IS NULL AND search_enabled = 1 AND (expires_at IS NULL OR expires_at > ?)"
+        params: list[Any] = [utc_now()]
         if scope is not None:
             query += " AND scope = ?"
             params.append(scope)

@@ -205,6 +205,22 @@ def test_fts_and_projection_mappings_follow_memory_lifecycle(workspace: Path) ->
     assert store.reconcile_memory_projections()["projection_rows_reconciled"] >= 1
 
 
+def test_sqlite_retrieval_authority_tracks_edit_search_opt_out_and_expiry(workspace: Path) -> None:
+    broker = _governed_broker(workspace)
+    result, _ = broker.execute(_memory_write_action("Original indexed fact."), session_id="sess_test_memory", turn_id="turn_test_memory")
+    memory_id = str(result.output["memory_id"])  # type: ignore[index]
+    store = SQLiteStore(workspace)
+    from raiker.memory.store import update_memory
+
+    assert update_memory(memory_id, workspace_root=workspace, text="Corrected indexed fact.", store=store) is not None
+    assert store.search_approved_memory("Original") == []
+    assert [row["memory_id"] for row in store.search_approved_memory("Corrected")] == [memory_id]
+    assert update_memory(memory_id, workspace_root=workspace, search_enabled=False, store=store) is not None
+    assert store.search_approved_memory("Corrected") == []
+    assert update_memory(memory_id, workspace_root=workspace, search_enabled=True, expires_at="2000-01-01T00:00:00Z", update_expires_at=True, store=store) is not None
+    assert store.search_approved_memory("Corrected") == []
+
+
 def test_forget_nonexistent_memory(workspace: Path) -> None:
     broker = _governed_broker(workspace)
     result, _ = broker.execute(

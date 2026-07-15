@@ -88,6 +88,16 @@ fail-closed by design.
   review-only gist candidates, and explicit owner-confirmed eidetic expiry
   cleanup. Vector/graph creation remains capability-gated; no autonomous raw
   capture, cleanup worker, or model purge authority was introduced.
+- The next memory program is staged in `HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`
+  (Stages F–J): retrieval-authority/evaluation, gated semantic + entity
+  retrieval, tenancy/encryption/backup operations, reliability/scale, then
+  independent benchmark evidence. Do not market the current implementation as
+  “best”; that claim requires the Stage J evidence.
+- Stage F has begun: `RAIKER-2009` makes SQLite + active-only FTS authoritative
+  for governed memory retrieval and keeps corrections/search opt-outs/expiry
+  synchronized. `raiker.memory.evaluation` provides the initial
+  `memory-eval-v1` lexical quality/safety harness; it is not yet a persisted
+  benchmark service or an external comparison.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

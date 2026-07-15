@@ -228,3 +228,92 @@ enabled.
 - No automatic hard-delete or cleanup worker.
 - No vector/HNSW deployment until corpus size and latency measurements justify
   it; SQLite FTS and exact scoped retrieval come first.
+
+## Production-readiness roadmap
+
+The completed local-first delivery above is the foundation, not a claim of
+market leadership. The following work is required before Raiker can make a
+defensible production-grade memory claim. Each stage has an explicit exit
+criterion; later stages do not weaken the completed safety rules.
+
+### Stage F — retrieval authority and measured quality
+
+**In progress (first slice).** `RAIKER-2009` makes approved-memory SQLite rows
+and active-only FTS authoritative for governed retrieval. Corrections, search
+opt-outs, and expiry now synchronize the same source/index; `memory-eval-v1`
+is a reproducible lexical evaluation harness reporting Recall@k, MRR, nDCG,
+policy leaks, and p95 latency. Persisted aggregate runs and CI thresholds are
+the next Stage F slice.
+
+1. Make SQLite's active-memory row and its FTS record the single retrieval
+   source; synchronize text, search opt-out, expiry, archive, forget, and
+   correction in one transaction.
+2. Add a versioned evaluation corpus with scoped, sensitive, archived,
+   forgotten, corrected, and time-qualified cases.
+3. Measure Recall@k, MRR, nDCG, policy-leak count, and p95 latency per lexical,
+   vector, graph, and hybrid strategy. Persist only aggregate, non-sensitive
+   evaluation results.
+4. Add correction/supersession links so older facts are retained as evidence but
+   never preferred over an active correction.
+
+**Exit:** CI fails on a policy leak or an agreed retrieval-regression budget;
+every reported metric identifies corpus version, backend version, scope, and
+latency distribution.
+
+### Stage G — gated semantic and entity retrieval
+
+1. Implement approved-memory vector projection using the existing
+   `vector_embedding_runtime` capability, with model/version, checksum, and
+   projection mapping recorded for every vector.
+2. Build a separate typed entity/relationship projection for people, projects,
+   decisions, and documents; require evidence IDs and confidence on every edge.
+3. Query lexical, vector, and graph candidates independently, enforce policy
+   and scope before ranking, deduplicate by durable memory ID, then rerank with
+   deterministic, observable weights.
+4. Keep raw content out of runtime events and show source IDs/trust labels in
+   the assembled context.
+
+**Exit:** capability-off and policy-denied paths are proven no-ops; enabled
+retrieval meets the Stage F recall/latency budgets without a visibility leak.
+
+### Stage H — security, tenancy, and privacy operations
+
+1. Enforce principal/workspace ownership in every memory row and projection;
+   add tenant-isolation and confused-deputy tests.
+2. Encrypt durable rows, artifacts, and backups at rest using owner-managed
+   keys; support key rotation and recovery drills.
+3. Replace the local backup notice with a backup catalog that records encrypted
+   snapshots, retention deadlines, restore tests, and deletion completion.
+4. Add immutable lifecycle audit records for recall, correction, export,
+   import, archive, forget, purge, and admin access.
+
+**Exit:** external security review, restoration drill, purge-disposition drill,
+and tenant-isolation suite all pass with documented evidence.
+
+### Stage I — reliability and scale
+
+1. Move projection/reconciliation work to owner-enabled, idempotent jobs with
+   leases, retries, dead-letter reporting, bounded concurrency, and metrics.
+2. Add integrity scanners for orphaned artifacts, stale FTS/vector/graph rows,
+   checksum mismatches, path inconsistencies, and failed purge locations.
+3. Load-test realistic corpus sizes and concurrent users; set published p50/p95
+   latency, availability, recovery-time, and recovery-point objectives.
+4. Run failure-injection tests for interrupted writes, index rebuilds, restore,
+   key rotation, and provider outages.
+
+**Exit:** documented SLOs are met under load and failure injection; operational
+dashboards and runbooks are exercised by people other than the implementer.
+
+### Stage J — evidence of leadership
+
+1. Run a representative pilot with informed users, opt-in data, incident
+   review, and correction/deletion feedback loops.
+2. Publish a reproducible benchmark and methodology comparing retrieval
+   quality, provenance, safety, deletion disposition, and cost against named
+   alternatives.
+3. Obtain an independent security/privacy assessment and regularly repeat the
+   benchmark and disaster-recovery exercises.
+
+**Exit:** Raiker may describe itself as production-proven only after the
+published evidence supports that claim. “Best” remains a comparative claim and
+must be tied to a disclosed benchmark, population, and date.

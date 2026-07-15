@@ -47,6 +47,8 @@ class SemanticMemoryExecutor:
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         from raiker.memory.store import search_memory
+        from raiker.storage.sqlite import SQLiteStore
+
         query = str(action.arguments.get("query", ""))
         if not query:
             return ExecutionResult(
@@ -54,7 +56,7 @@ class SemanticMemoryExecutor:
                 reason_code="missing_argument:query",
                 summary="Semantic memory query denied: no query provided.",
             )
-        results = search_memory(query, workspace_root=self._workspace_root)
+        results = search_memory(query, workspace_root=self._workspace_root, store=SQLiteStore(self._workspace_root))
         return ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
             summary=f"Semantic memory search returned {len(results)} results.",

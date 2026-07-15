@@ -1366,3 +1366,9 @@ INSERT INTO approved_memory_fts(memory_id, text, tags)
 SELECT memory_id, text, tags_json FROM approved_memory
 WHERE deleted_at IS NULL AND archived_at IS NULL;
 """
+
+MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID = "RAIKER-2009-memory-retrieval-authority"
+MEMORY_RETRIEVAL_AUTHORITY_SQL = """
+ALTER TABLE approved_memory ADD COLUMN search_enabled INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE approved_memory ADD COLUMN expires_at TEXT;
+"""

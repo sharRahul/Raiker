@@ -1320,3 +1320,13 @@ MEMORY_ARCHIVE_SQL = """
 ALTER TABLE approved_memory ADD COLUMN archived_at TEXT;
 CREATE INDEX IF NOT EXISTS idx_approved_memory_active ON approved_memory(scope) WHERE deleted_at IS NULL AND archived_at IS NULL;
 """
+
+EIDETIC_OBSERVATIONS_MIGRATION_ID = "RAIKER-2004-eidetic-observations"
+EIDETIC_OBSERVATIONS_SQL = """
+CREATE TABLE IF NOT EXISTS eidetic_observations (
+  observation_id TEXT PRIMARY KEY, source_event_id TEXT NOT NULL, session_id TEXT NOT NULL,
+  summary TEXT NOT NULL, content_sha256 TEXT NOT NULL, retention TEXT NOT NULL,
+  artifact_ref TEXT, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_eidetic_observations_session ON eidetic_observations(session_id, created_at);
+"""

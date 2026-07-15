@@ -88,6 +88,25 @@ fail-closed by design.
   review-only gist candidates, and explicit owner-confirmed eidetic expiry
   cleanup. Vector/graph creation remains capability-gated; no autonomous raw
   capture, cleanup worker, or model purge authority was introduced.
+- Post-handoff memory hardening has shipped: retrieval eligibility excludes
+  disabled, expired, future-dated, and superseded memories before FTS, vector,
+  graph, or runtime ranking. Vector/hybrid results expose provenance, scope,
+  sensitivity, confidence, retention, an untrusted-data label, and score
+  contributions. Recall, import/export, backup catalog operations, and backup
+  legal-hold changes are lifecycle-audited; the Memory control response exposes
+  source, creator, validity, supersession, and remembered-reason metadata,
+  including search-disabled records so users can re-enable them. Integrity
+  scans now detect checksum mismatches, orphaned artifacts, project-path
+  inconsistencies, and failed purge locations; the evaluation corpus covers
+  scoped, sensitive, archived, forgotten, corrected, and time-qualified
+  records with token and retrieved-storage regression budgets. SQLCipher
+  migration also verifies conversion cleanup and encrypted-database access.
+- Still pending for production memory: a representative consented benchmark
+  and live quality/latency/cost thresholds; provider-backed vector projection,
+  entity extraction/review, and runtime hybrid integration; principal/workspace
+  isolation and managed per-workspace key lifecycle; real encrypted backup and
+  restore/erasure drills; monitoring, daemon/worker operation, load/soak/chaos
+  evidence; and independent security, privacy, and pilot/benchmark evidence.
 - The next memory program is staged in `HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`
   (Stages F–J): retrieval-authority/evaluation, gated semantic + entity
   retrieval, tenancy/encryption/backup operations, reliability/scale, then
@@ -178,7 +197,9 @@ fail-closed by design.
   `DashboardService.get_session_context`.
 - The generic connector store, four governed read connectors (GitHub, Gmail,
   Calendar, Slack), approvals, audit events, budgets, and the connector web
-  surface are implemented. The first real write action remains unimplemented.
+  surface are implemented. GitHub issue-comment creation is the one shipped,
+  governed connector write reference; other connector write operations remain
+  unimplemented and fail closed.
 - Plugin code has two real, governed runtimes: bounded subprocess and a
   no-network/read-only container. Host in-process import of plugin code is an
   explicit security non-goal, not a deferred implementation task.
@@ -326,9 +347,9 @@ governed vertical slice at a time.
  5. **Connector write reference:** one narrow, real service write (for example,
     GitHub issue comment) through immutable intent + approval + an actual
     executor. Never make a write action execute on `ask` alone. Generic
-    `connector_write` path is wired end-to-end; `GithubConnectorService
-    .create_comment()` exists with governance + tests but is NOT dispatched by
-    any runtime path yet.
+    `connector_write` path is wired end-to-end; `GithubConnectorExecutor`
+    dispatches `GithubConnectorService.create_comment()` through the same
+    approval path. Other connector write operations remain fail closed.
 6. **Agent evaluation and observability:** trace a goal/plan/tool/approval
    chain with latency, cost, outcome, and user feedback; add record/replayable
    regression scenarios, outcome review, and an OpenTelemetry-compatible export

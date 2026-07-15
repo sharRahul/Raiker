@@ -90,6 +90,8 @@ from raiker.storage.migrations import (
     MEMORY_PROJECTIONS_SQL,
     MEMORY_PURGE_MIGRATION_ID,
     MEMORY_PURGE_SQL,
+    MEMORY_RELATIONSHIP_REVIEW_MIGRATION_ID,
+    MEMORY_RELATIONSHIP_REVIEW_SQL,
     MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
     MEMORY_RETRIEVAL_AUTHORITY_SQL,
     MEMORY_SQLCIPHER_FTS_MIGRATION_ID,
@@ -581,6 +583,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 MEMORY_ENTITY_GRAPH_MIGRATION_ID, MEMORY_ENTITY_GRAPH_SQL, connection
+            )
+            self._apply_migration(
+                MEMORY_RELATIONSHIP_REVIEW_MIGRATION_ID, MEMORY_RELATIONSHIP_REVIEW_SQL, connection
             )
             self._apply_migration(
                 MEMORY_BACKUP_CATALOG_MIGRATION_ID, MEMORY_BACKUP_CATALOG_SQL, connection
@@ -1869,6 +1874,42 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (relationship_id, subject_entity_id, predicate.strip(), object_entity_id, evidence_memory_id, confidence, utc_now()),
             )
         self.link_memory_projection(evidence_memory_id, "graph", relationship_id, "memory-entity-v1")
+
+    def create_memory_relationship_candidate(
+        self, candidate_id: str, *, subject_name: str, subject_type: str, predicate: str,
+        object_name: str, object_type: str, evidence_memory_id: str, confidence: float,
+    ) -> None:
+        if not all(value.strip() for value in (subject_name, subject_type, predicate, object_name, object_type)):
+            raise ValueError("invalid_memory_relationship_candidate")
+        if not 0 <= confidence <= 1 or self.get_active_approved_memory(evidence_memory_id) is None:
+            raise ValueError("invalid_memory_relationship_candidate")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO memory_relationship_candidates VALUES (?, ?, ?, ?, ?, ?, ?, ?,
+                'needs_user_review', ?, NULL, NULL)""",
+                (candidate_id, subject_name.strip(), subject_type.strip(), predicate.strip(), object_name.strip(),
+                 object_type.strip(), evidence_memory_id, confidence, utc_now()),
+            )
+
+    def get_memory_relationship_candidate(self, candidate_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM memory_relationship_candidates WHERE candidate_id = ?", (candidate_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def resolve_memory_relationship_candidate(
+        self, candidate_id: str, *, decision: str, resolved_by: str,
+    ) -> bool:
+        if decision not in {"approved", "denied"} or not resolved_by.strip():
+            raise ValueError("invalid_memory_relationship_resolution")
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE memory_relationship_candidates SET decision = ?, resolved_at = ?, resolved_by = ?
+                WHERE candidate_id = ? AND decision = 'needs_user_review'""",
+                (decision, utc_now(), resolved_by, candidate_id),
+            )
+        return cursor.rowcount > 0
 
     def list_memory_entity_neighborhood(self, entity_id: str, scope: str | None = None) -> list[dict[str, Any]]:
         now = utc_now()

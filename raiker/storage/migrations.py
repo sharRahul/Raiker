@@ -1426,6 +1426,21 @@ BEGIN
 END;
 """
 
+MEMORY_RELATIONSHIP_REVIEW_MIGRATION_ID = "RAIKER-2019-memory-relationship-review"
+MEMORY_RELATIONSHIP_REVIEW_SQL = """
+CREATE TABLE IF NOT EXISTS memory_relationship_candidates (
+  candidate_id TEXT PRIMARY KEY,
+  subject_name TEXT NOT NULL, subject_type TEXT NOT NULL, predicate TEXT NOT NULL,
+  object_name TEXT NOT NULL, object_type TEXT NOT NULL,
+  evidence_memory_id TEXT NOT NULL REFERENCES approved_memory(memory_id),
+  confidence REAL NOT NULL CHECK(confidence >= 0 AND confidence <= 1),
+  decision TEXT NOT NULL CHECK(decision IN ('needs_user_review', 'approved', 'denied')),
+  created_at TEXT NOT NULL, resolved_at TEXT, resolved_by TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_memory_relationship_candidates_review
+  ON memory_relationship_candidates(decision, created_at);
+"""
+
 MEMORY_ENTITY_GRAPH_MIGRATION_ID = "RAIKER-2011-memory-entity-graph"
 MEMORY_ENTITY_GRAPH_SQL = """
 CREATE TABLE IF NOT EXISTS memory_entities (

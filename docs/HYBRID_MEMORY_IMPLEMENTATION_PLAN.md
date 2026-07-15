@@ -280,7 +280,9 @@ scope, workload, and latency distribution.
 through the existing governed local-vector or provider-vector capability; the vector mapping and
 entity graph edges are evidence-bound and lifecycle-filtered. The bounded hybrid
 assembler deduplicates active lexical/vector/graph candidates. Provider-backed
-runtime retrieval, entity extraction/review, and runtime integration remain pending.
+runtime retrieval, entity extraction, and runtime integration remain pending.
+Inferred relationship proposals are evidence-bound and remain in a human review
+queue until an explicit approval creates the graph edge.
 
 1. Implement approved-memory vector projection using the existing
    `vector_embedding_runtime` capability, with model/version, checksum, and

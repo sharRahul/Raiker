@@ -1330,3 +1330,11 @@ CREATE TABLE IF NOT EXISTS eidetic_observations (
 );
 CREATE INDEX IF NOT EXISTS idx_eidetic_observations_session ON eidetic_observations(session_id, created_at);
 """
+
+MEMORY_PURGE_MIGRATION_ID = "RAIKER-2005-memory-purge-preview"
+MEMORY_PURGE_SQL = """
+CREATE TABLE IF NOT EXISTS memory_purge_records (
+  purge_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, requested_by TEXT NOT NULL,
+  confirmed_at TEXT NOT NULL, disposition_json TEXT NOT NULL
+);
+"""

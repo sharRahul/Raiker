@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import serialize_dto
@@ -143,6 +143,22 @@ async def set_memory_archived(memory_id: str, request: Request, body: dict[str, 
     result = _service(request).set_memory_archived(memory_id, bool(body.get("archived", True)), auth_data[0].principal_id)
     if not result.ok:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
+@router.get("/api/memory/{memory_id}/purge-preview")
+async def preview_memory_purge(memory_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
+    result = _service(request).preview_memory_purge(memory_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
+@router.delete("/api/memory/{memory_id}/purge")
+async def purge_memory(memory_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth), x_memory_purge_confirm: str | None = Header(default=None)) -> dict[str, Any]:
+    result = _service(request).purge_memory(memory_id, x_memory_purge_confirm, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT if result.reason_code == "memory_purge_confirmation_required" else status.HTTP_403_FORBIDDEN, detail={"ok": False, "reason_code": result.reason_code})
     return {"ok": True, **result.data}
 
 

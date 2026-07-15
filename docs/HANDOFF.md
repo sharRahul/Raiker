@@ -78,6 +78,10 @@ fail-closed by design.
 - Eidetic observations now persist only provenance metadata, retention class,
   artifact reference, and a SHA-256 checksum of the observed content. Raw
   payload capture and automatic promotion remain deliberately disabled.
+- Memory purge is human-only and requires `X-Memory-Purge-Confirm` to exactly
+  match the memory ID. It removes the live Markdown/SQLite record and records a
+  disposition; retained backups are explicitly disclosed rather than claimed
+  erased.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

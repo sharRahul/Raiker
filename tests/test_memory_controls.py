@@ -150,6 +150,12 @@ class TestMemoryForget:
         assert service.set_memory_archived(mid, False, OWNER).ok
         assert [m.memory_id for m in service.list_memories()] == [mid]
 
+    def test_purge_requires_exact_confirmation(self, service: DashboardService, workspace: Path) -> None:
+        mid = _seed_memory(service.store, workspace)
+        assert service.purge_memory(mid, None, OWNER).reason_code == "memory_purge_confirmation_required"
+        assert service.purge_memory(mid, mid, OWNER).ok
+        assert service.list_memories() == []
+
 
 class TestMemoryEditAndSearchParticipation:
     def test_human_can_edit_a_memory_and_exclude_it_from_search(

@@ -66,6 +66,8 @@ from raiker.storage.migrations import (
     MEMORY_ARCHIVE_SQL,
     MEMORY_CONTROLS_MIGRATION_ID,
     MEMORY_CONTROLS_SQL,
+    MEMORY_PURGE_MIGRATION_ID,
+    MEMORY_PURGE_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
     MODEL_ADVISOR_SQL,
     MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
@@ -511,6 +513,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._backfill_self_inclusive_project_paths(connection)
             self._apply_migration(MEMORY_ARCHIVE_MIGRATION_ID, MEMORY_ARCHIVE_SQL, connection)
             self._apply_migration(EIDETIC_OBSERVATIONS_MIGRATION_ID, EIDETIC_OBSERVATIONS_SQL, connection)
+            self._apply_migration(MEMORY_PURGE_MIGRATION_ID, MEMORY_PURGE_SQL, connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
@@ -1679,6 +1682,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (archived_at, updated_at, memory_id),
             )
         return cursor.rowcount > 0
+
+    def create_memory_purge_record(self, purge_id: str, memory_id: str, requested_by: str, confirmed_at: str, disposition: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute("INSERT INTO memory_purge_records (purge_id, memory_id, requested_by, confirmed_at, disposition_json) VALUES (?, ?, ?, ?, ?)", (purge_id, memory_id, requested_by, confirmed_at, json.dumps(disposition, sort_keys=True)))
 
     def delete_approved_memory(self, memory_id: str) -> None:
         with self.connect() as connection:

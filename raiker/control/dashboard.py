@@ -805,6 +805,28 @@ class DashboardService:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
         return ControlResult(ok=True, data={"memory_id": memory_id, "archived": archived})
 
+    def preview_memory_purge(self, memory_id: str, acting_principal_id: str | None) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.store import get_memory
+        memory = get_memory(memory_id, workspace_root=self.workspace_root, include_expired=True, include_archived=True)
+        if memory is None:
+            return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        return ControlResult(ok=True, data={"memory_id": memory_id, "artifacts": [str(self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md")], "backup_disposition": "retained backups are not immediately erased", "requires_confirmation": memory_id})
+
+    def purge_memory(self, memory_id: str, confirmation: str | None, acting_principal_id: str | None) -> ControlResult:
+        preview = self.preview_memory_purge(memory_id, acting_principal_id)
+        if not preview.ok:
+            return preview
+        if confirmation != memory_id:
+            return ControlResult(ok=False, reason_code="memory_purge_confirmation_required")
+        from raiker.contracts.ids import utc_now
+        path = self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md"
+        path.unlink(missing_ok=True)
+        self.store.delete_approved_memory(memory_id)
+        self.store.create_memory_purge_record(new_id("mem_"), memory_id, acting_principal_id or "", utc_now(), preview.data)
+        return ControlResult(ok=True, data={"memory_id": memory_id, "purged": True, "backup_disposition": preview.data["backup_disposition"]})
+
     def edit_memory_controlled(self, memory_id: str, text: str, acting_principal_id: str | None) -> ControlResult:
         return self._update_memory_controlled(
             memory_id, text=text, search_enabled=None, acting_principal_id=acting_principal_id

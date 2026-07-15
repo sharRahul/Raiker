@@ -405,7 +405,7 @@ export const api = {
       method: "DELETE",
       headers: confirmed ? { "X-Project-Delete-Confirm": id } : undefined,
     }),
-  saveProjectContext: (id: string, context: { instructions: string; attachment_ids: string[]; memory_enabled: boolean }) =>
+  saveProjectContext: (id: string, context: { instructions: string; attachment_ids: string[]; memory_enabled: boolean; memory_mode: "inherit" | "enabled" | "disabled" }) =>
     request<{ ok: boolean }>(`/api/projects/${encodeURIComponent(id)}/context`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

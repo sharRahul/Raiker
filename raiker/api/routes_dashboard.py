@@ -383,6 +383,7 @@ async def save_project_context(
         instructions=body.instructions,
         attachment_ids=body.attachment_ids,
         memory_enabled=body.memory_enabled,
+        memory_mode=body.memory_mode,
         acting_principal_id=auth_data[0].principal_id,
     )
     if not result.ok:

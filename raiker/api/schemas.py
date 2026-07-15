@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -160,7 +160,10 @@ class SaveProjectContextRequest(BaseModel):
 
     instructions: str = ""
     attachment_ids: list[str] = []
-    memory_enabled: bool = False
+    # ``memory_enabled`` remains accepted for older clients. New clients send
+    # a tri-state override so child folders can inherit their nearest ancestor.
+    memory_enabled: bool | None = None
+    memory_mode: Literal["inherit", "enabled", "disabled"] | None = None
 
 
 class MoveProjectRequest(BaseModel):

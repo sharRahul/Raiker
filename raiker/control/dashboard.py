@@ -1073,7 +1073,8 @@ class DashboardService:
         *,
         instructions: str,
         attachment_ids: list[str],
-        memory_enabled: bool,
+        memory_enabled: bool | None = None,
+        memory_mode: str | None = None,
         acting_principal_id: str | None,
     ) -> ControlResult:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
@@ -1096,10 +1097,11 @@ class DashboardService:
             instructions=cleaned,
             attachment_ids=unique_ids,
             memory_enabled=memory_enabled,
+            memory_mode=memory_mode,
         )
+        context = self.store.load_project_context(project_id)
         return ControlResult(
-            ok=True,
-            data={"instructions": cleaned, "attachment_ids": unique_ids, "memory_enabled": memory_enabled},
+            ok=True, data=context,
         )
 
     # ── Nested projects/folders (conversation organisation remainder) ─────

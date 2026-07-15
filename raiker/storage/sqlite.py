@@ -154,6 +154,9 @@ from raiker.storage.migrations import (
     PHASE_10_RUNTIME_MODE_STATE_SQL,
     PROJECT_CONTEXT_MIGRATION_ID,
     PROJECT_CONTEXT_SQL,
+    PROJECT_MEMORY_INHERITANCE_MIGRATION_ID,
+    PROJECT_MEMORY_INHERITANCE_SQL,
+    PROJECT_SELF_INCLUSIVE_PATH_MIGRATION_ID,
     PROJECTS_MIGRATION_ID,
     PROJECTS_NESTING_MIGRATION_ID,
     PROJECTS_NESTING_SQL,
@@ -496,6 +499,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PROJECTS_NESTING_MIGRATION_ID, PROJECTS_NESTING_SQL, connection
             )
+            self._apply_migration(
+                PROJECT_MEMORY_INHERITANCE_MIGRATION_ID,
+                PROJECT_MEMORY_INHERITANCE_SQL,
+                connection,
+            )
+            self._backfill_self_inclusive_project_paths(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
@@ -524,6 +533,38 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         connection.execute(
             "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
             (migration_id, utc_now()),
+        )
+
+    def _backfill_self_inclusive_project_paths(self, connection: sqlite3.Connection) -> None:
+        """Derive paths from the authoritative adjacency list once per database."""
+        if connection.execute(
+            "SELECT 1 FROM migrations WHERE migration_id = ?",
+            (PROJECT_SELF_INCLUSIVE_PATH_MIGRATION_ID,),
+        ).fetchone() is not None:
+            return
+        rows = connection.execute("SELECT project_id, parent_id FROM projects").fetchall()
+        parents = {str(row[0]): str(row[1]) if row[1] is not None else None for row in rows}
+        paths: dict[str, str] = {}
+
+        def resolve(project_id: str, visiting: set[str]) -> str:
+            if project_id in paths:
+                return paths[project_id]
+            if project_id in visiting:
+                raise RuntimeError("project_parent_cycle_detected")
+            parent_id = parents[project_id]
+            parent_path = "/" if parent_id is None else resolve(parent_id, visiting | {project_id})
+            paths[project_id] = f"{parent_path}{project_id}/"
+            return paths[project_id]
+
+        for project_id in parents:
+            resolve(project_id, set())
+        connection.executemany(
+            "UPDATE projects SET path = ?, updated_at = ? WHERE project_id = ?",
+            [(path, utc_now(), project_id) for project_id, path in paths.items()],
+        )
+        connection.execute(
+            "INSERT INTO migrations (migration_id, applied_at) VALUES (?, ?)",
+            (PROJECT_SELF_INCLUSIVE_PATH_MIGRATION_ID, utc_now()),
         )
 
     def table_names(self) -> set[str]:
@@ -557,9 +598,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             if parent_id:
                 parent = connection.execute("SELECT path FROM projects WHERE project_id = ?", (parent_id,)).fetchone()
                 parent_path = parent["path"] if parent else "/"
-                path = f"{parent_path}{parent_id}/"
+                path = f"{parent_path}{project_id}/"
             else:
-                path = "/"
+                path = f"/{project_id}/"
             connection.execute(
                 "INSERT INTO projects (project_id, name, root_subpath, created_at, parent_id, path, is_archived, archived_at) VALUES (?, ?, ?, ?, ?, ?, 0, NULL)",
                 (project_id, name, root_subpath, utc_now(), parent_id, path),
@@ -582,11 +623,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def load_project_context(self, project_id: str) -> dict[str, Any]:
         with self.connect() as connection:
             row = connection.execute(
-                "SELECT instructions, attachment_ids_json, memory_enabled FROM project_contexts WHERE project_id = ?",
+                "SELECT instructions, attachment_ids_json, memory_enabled, memory_mode FROM project_contexts WHERE project_id = ?",
                 (project_id,),
             ).fetchone()
         if row is None:
-            return {"instructions": "", "attachment_ids": [], "memory_enabled": False}
+            return {"instructions": "", "attachment_ids": [], "memory_enabled": False, "memory_mode": "inherit"}
         try:
             attachment_ids = json.loads(str(row["attachment_ids_json"]))
         except (TypeError, ValueError):
@@ -595,23 +636,34 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             "instructions": str(row["instructions"]),
             "attachment_ids": [str(item) for item in attachment_ids if isinstance(item, str)],
             "memory_enabled": bool(row["memory_enabled"]),
+            "memory_mode": str(row["memory_mode"]),
         }
 
     def save_project_context(
-        self, project_id: str, *, instructions: str, attachment_ids: list[str], memory_enabled: bool
+        self,
+        project_id: str,
+        *,
+        instructions: str,
+        attachment_ids: list[str],
+        memory_enabled: bool | None = None,
+        memory_mode: str | None = None,
     ) -> None:
+        mode = memory_mode or ("enabled" if memory_enabled else "disabled")
+        if mode not in {"inherit", "enabled", "disabled"}:
+            raise ValueError("invalid_memory_mode")
         with self.connect() as connection:
             connection.execute(
                 """
-                INSERT INTO project_contexts (project_id, instructions, attachment_ids_json, memory_enabled, updated_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO project_contexts (project_id, instructions, attachment_ids_json, memory_enabled, memory_mode, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(project_id) DO UPDATE SET
                   instructions = excluded.instructions,
                   attachment_ids_json = excluded.attachment_ids_json,
                   memory_enabled = excluded.memory_enabled,
+                  memory_mode = excluded.memory_mode,
                   updated_at = excluded.updated_at
                 """,
-                (project_id, instructions, json.dumps(attachment_ids), int(memory_enabled), utc_now()),
+                (project_id, instructions, json.dumps(attachment_ids), int(mode == "enabled"), mode, utc_now()),
             )
 
     def list_projects(self) -> list[dict[str, Any]]:
@@ -739,7 +791,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             if not row:
                 return False
             old_path = row["path"]
-            new_path = "/"
+            new_path = f"/{project_id}/"
             if new_parent_id:
                 new_parent_row = conn.execute("SELECT path FROM projects WHERE project_id = ?", (new_parent_id,)).fetchone()
                 if not new_parent_row:
@@ -747,22 +799,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 new_parent_path = new_parent_row["path"]
                 if new_parent_path.startswith(old_path):
                     return False  # would create cycle
-                new_path = f"{new_parent_path}{new_parent_id}/"
+                new_path = f"{new_parent_path}{project_id}/"
             conn.execute(
-                "UPDATE projects SET parent_id = ?, path = ?, updated_at = ? WHERE project_id = ?",
-                (new_parent_id, new_path, utc_now(), project_id),
+                "UPDATE projects SET path = ? || substr(path, ?), updated_at = ? WHERE path LIKE ?",
+                (new_path, len(old_path) + 1, utc_now(), old_path + "%"),
             )
-            # Update descendants' paths
-            if new_parent_id:
-                conn.execute(
-                    "UPDATE projects SET path = REPLACE(path, ?, ?), updated_at = ? WHERE path LIKE ?",
-                    (old_path, new_path, utc_now(), old_path + "%"),
-                )
-            else:
-                conn.execute(
-                    "UPDATE projects SET path = REPLACE(path, ?, ?), updated_at = ? WHERE path LIKE ?",
-                    (old_path, "/", utc_now(), old_path + "%"),
-                )
+            conn.execute(
+                "UPDATE projects SET parent_id = ?, updated_at = ? WHERE project_id = ?",
+                (new_parent_id, utc_now(), project_id),
+            )
         return True
 
     def archive_project(self, project_id: str) -> bool:
@@ -798,8 +843,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 conn.execute(f"DELETE FROM sessions WHERE session_id IN ({marks})", session_ids)
             # 1) Archive descendants (excluding target)
             conn.execute(
-                "UPDATE projects SET is_archived = 1, archived_at = ?, parent_id = NULL, path = 'orphaned/' || project_id || '/', updated_at = ? WHERE path LIKE ? AND project_id != ?",
-                (now, now, path + "%", project_id),
+                "UPDATE projects SET is_archived = 1, archived_at = ?, parent_id = CASE WHEN parent_id = ? THEN NULL ELSE parent_id END, path = '/orphaned/' || ? || '/' || substr(path, ?), updated_at = ? WHERE path LIKE ? AND project_id != ?",
+                (now, project_id, project_id, len(path) + 1, now, path + "%", project_id),
             )
             conn.execute("UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,))
             # 2) Hard delete target (project_contexts cascades via ON DELETE CASCADE)
@@ -816,9 +861,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = conn.execute("""
                 SELECT pc.* FROM project_contexts pc
                 JOIN projects p ON p.project_id = pc.project_id
-                WHERE ? LIKE '%' || p.project_id || '/%' AND p.is_archived = 0
+                WHERE ? LIKE p.path || '%' AND p.project_id != ? AND p.is_archived = 0
                 ORDER BY LENGTH(p.path) ASC
-            """, (path,)).fetchall()
+            """, (path, project_id)).fetchall()
         return [dict(r) for r in rows]
 
     def load_effective_project_context(self, project_id: str) -> dict[str, Any]:
@@ -833,6 +878,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         own = self.load_project_context(project_id)
         instructions: list[str] = []
         attachment_ids: list[str] = []
+        memory_mode = "inherit"
         for ancestor in self.get_ancestor_contexts(project_id):
             text = str(ancestor.get("instructions") or "").strip()
             if text:
@@ -843,14 +889,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     attachment_ids.extend(
                         str(item) for item in json.loads(str(raw)) if isinstance(item, str)
                     )
+            if ancestor.get("memory_mode") in {"enabled", "disabled"}:
+                memory_mode = str(ancestor["memory_mode"])
         own_instructions = str(own.get("instructions") or "").strip()
         if own_instructions:
             instructions.append(own_instructions)
         attachment_ids.extend(own.get("attachment_ids", []))
+        if own.get("memory_mode") in {"enabled", "disabled"}:
+            memory_mode = str(own["memory_mode"])
         return {
             "instructions": "\n\n".join(instructions),
             "attachment_ids": list(dict.fromkeys(attachment_ids)),
-            "memory_enabled": bool(own.get("memory_enabled", False)),
+            "memory_enabled": memory_mode == "enabled",
+            "memory_mode": memory_mode,
         }
 
     def _session_owner(

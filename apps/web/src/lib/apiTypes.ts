@@ -180,6 +180,7 @@ export interface ProjectContext {
   instructions: string;
   attachment_ids: string[];
   memory_enabled: boolean;
+  memory_mode: "inherit" | "enabled" | "disabled";
 }
 
 /** A node in the project tree hierarchy. Recursive — each node may have

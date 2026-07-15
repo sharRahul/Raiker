@@ -243,8 +243,21 @@ fail-closed by design.
 > `extra="forbid"`. Web: `ProjectTreeNode` type + `ProjectTreeNode.svelte`
 > recursive Svelte 5 component, `projectTree`/`moveProject`/`archiveProject`
 > API client, `ProjectsView` tree section with archive/move/delete actions.
+
+> **Correction (2026-07-15):** materialized paths now include every node's
+> own ID (`/p1/p4/p12/`), not only its ancestors. The prior representation
+> could make a move or archive of one sibling affect all folders sharing that
+> parent path. Migration `RAIKER-1014-project-self-inclusive-path` backfills
+> legacy paths from `parent_id`; `RAIKER-1013-project-memory-inheritance` adds
+> tri-state `project_contexts.memory_mode` (`inherit|enabled|disabled`), while
+> retaining compatibility with the legacy Boolean `memory_enabled`. Effective
+> project context now uses the nearest explicit mode from active ancestors;
+> instructions still merge root→leaf and attachments still union. Storage path
+> changes occur transactionally and use the self-inclusive prefix. Regression
+> tests prove sibling isolation and nearest-ancestor inheritance in
+> `tests/test_nested_projects.py`.
 > `ProjectView` (Python DTO + TS interface) includes `parent_id`, `path`,
-> `is_archived`, `archived_at`. Tests: `tests/test_nested_projects.py` (18:
+> `is_archived`, `archived_at`. Tests: `tests/test_nested_projects.py` (20:
 > migration, tree queries, move + cycle, archive + idempotent, delete +
 > orphanage, ancestor contexts, service AI-autonomous archive, human-only
 > move/delete, context merge), `tests/test_projects.py` (+4 API: tree list,
@@ -366,7 +379,7 @@ file:line citations. Gaps and doc contradictions are recorded honestly.
   explicit or active project, and the task API/UI filter by it.
 - ✅ **Ancestor-context inheritance:** the live gatherer uses
   `load_effective_project_context`, which combines active ancestors root→leaf
-  once while keeping the leaf memory decision.
+  once while applying the nearest explicit `memory_mode` override.
 
 ### Item 2 — Conversation organisation — ✅ CURRENT SLICE COMPLETE
 
@@ -377,7 +390,7 @@ file:line citations. Gaps and doc contradictions are recorded honestly.
   (`raiker/api/routes_dashboard.py:235-253,276-282,370-398`); web
   (`apps/web/src/lib/components/ProjectTreeNode.svelte`,
   `apps/web/src/lib/views/ProjectsView.svelte:278-373`); tests
-  (`tests/test_nested_projects.py` — 18).
+  (`tests/test_nested_projects.py` — 20).
 - ✅ Tags: schema (`raiker/storage/migrations.py:1270-1286`); storage
   (`raiker/storage/sqlite.py:862-902`); service
   (`raiker/control/dashboard.py:599-652`); API

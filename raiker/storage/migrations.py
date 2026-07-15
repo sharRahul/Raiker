@@ -1302,3 +1302,15 @@ CREATE INDEX IF NOT EXISTS idx_projects_parent ON projects(parent_id);
 CREATE INDEX IF NOT EXISTS idx_active_projects_path ON projects(path) WHERE is_archived = 0;
 CREATE INDEX IF NOT EXISTS idx_all_projects_path ON projects(path);
 """
+
+# Project context memory is a nearest-ancestor override, not a Boolean default.
+# Existing rows retain their explicit legacy choice; new rows can inherit.
+PROJECT_MEMORY_INHERITANCE_MIGRATION_ID = "RAIKER-1013-project-memory-inheritance"
+PROJECT_MEMORY_INHERITANCE_SQL = """
+ALTER TABLE project_contexts ADD COLUMN memory_mode TEXT NOT NULL DEFAULT 'inherit'
+  CHECK (memory_mode IN ('inherit', 'enabled', 'disabled'));
+UPDATE project_contexts
+SET memory_mode = CASE memory_enabled WHEN 1 THEN 'enabled' ELSE 'disabled' END;
+"""
+
+PROJECT_SELF_INCLUSIVE_PATH_MIGRATION_ID = "RAIKER-1014-project-self-inclusive-path"

@@ -324,9 +324,15 @@
         </div>
         {#if exportError}<p class="error" role="alert">{exportError}</p>{/if}
         <h3 class="kicker">Project context</h3>
-        <p class="sub">Instructions and shared files are included only in chats already assigned to this project. Project memory is opt-in.</p>
+        <p class="sub">Instructions and shared files are included only in chats already assigned to this project. Project memory follows this folder's setting or its nearest ancestor.</p>
         <textarea class="input context-input" aria-label="Project instructions" bind:value={detail.context.instructions} maxlength="4000" placeholder="Project-specific instructions…"></textarea>
-        <label class="check-row"><input type="checkbox" bind:checked={detail.context.memory_enabled} /> Include approved project memory</label>
+        <label class="check-row">Project memory
+          <select class="input" bind:value={detail.context.memory_mode} aria-label="Project memory setting">
+            <option value="inherit">Inherit from parent</option>
+            <option value="enabled">Include approved project memory</option>
+            <option value="disabled">Do not include project memory</option>
+          </select>
+        </label>
         <p class="sub">Shared attachment IDs: {detail.context.attachment_ids.length ? detail.context.attachment_ids.join(", ") : "none"}</p>
         <button type="button" class="btn btn-sm" onclick={() => void saveContext()} disabled={savingContext}>{savingContext ? "Saving…" : "Save context"}</button>
         {#if contextError}<p class="error" role="alert">{contextError}</p>{/if}

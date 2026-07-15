@@ -33,7 +33,7 @@ fail-closed by design.
   log, or commit them.
 - Add a typed event to `EVENT_TYPES` before emitting it.
 
-## Current product state — 2026-07-14
+## Current product state — 2026-07-15
 
 - The connector write reference (backlog item 5) has landed:
   `GithubConnectorService.create_comment()` is a governed GitHub issue comment
@@ -42,12 +42,16 @@ fail-closed by design.
   governed POST-with-response-body for connector writes. 14 new tests.
 - Conversation organisation has landed its third slice: nested projects/folders.
   Arbitrary-depth folder nesting via hybrid adjacency list (`parent_id`) +
-  materialized path (`path`) on the `projects` table. Two deletion modes:
+  materialized path (`path`) on the `projects` table. Paths are self-inclusive
+  (`/root/child/`), so move/archive operations address exactly one subtree,
+  never siblings. Two deletion modes:
   **archive** (AI-autonomous, soft — archives entire subtree) and **delete**
   (human-only, hard with orphanage cascade — descendants reparented to NULL,
-  archived, path prefixed with `orphaned/`). Context inheritance: ancestor
+  archived, path prefixed with `/orphaned/`). Context inheritance: ancestor
   contexts merge into a session's project context (instructions concatenate
-  root→leaf, attachments union, leaf's `memory_enabled` wins). Path
+  root→leaf, attachments union, nearest explicit `memory_mode` wins).
+  `memory_mode` is `inherit`, `enabled`, or `disabled`; old Boolean clients
+  remain compatible. Path
   management is done in Python (not a DB trigger) for reliability. API:
   `GET /api/projects/tree`, `PUT /api/projects/{id}/move` (human-only),
   `PUT /api/projects/{id}/archive` (any authenticated principal),
@@ -66,6 +70,10 @@ fail-closed by design.
   expiry set/clear; import/export; and an incognito opt-out boundary that
   withholds approved project memory from the turn context when on (the memory is
   not deleted). No second memory system is created.
+- The phased contract for the remaining archive-first eidetic-memory work is
+  [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
+  It keeps SQLite authoritative, separates project hierarchy from entity graph,
+  and requires human-confirmed multi-store purge rather than a model delete tool.
 - Tool execution defects fixed: `connector_read` was denied by policy
   (unknown_or_denied_tool) despite having a real executor — now routed as
   read-shaped like `github_read`; `connector_write` was denied — now routed

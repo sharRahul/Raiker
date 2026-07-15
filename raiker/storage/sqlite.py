@@ -2422,6 +2422,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """,
                 (manifest.manifest_id, manifest.backup_type, manifest.scope_json, manifest.path, manifest.checksum, manifest.size_bytes, manifest.created_by, manifest.created_at, manifest.encryption_key_id, manifest.retention_until, int(manifest.legal_hold), manifest.erasure_requested_at, manifest.erased_at, manifest.restore_verified_at),
             )
+        self.record_memory_lifecycle_event(
+            f"backup:{manifest.manifest_id}", "backup_access", manifest.created_by, {"operation": "catalog_register"}
+        )
 
     def list_backup_manifests(self, limit: int = 20) -> list[dict[str, Any]]:
         with self.connect() as connection:
@@ -2430,29 +2433,57 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def request_backup_erasure(self, manifest_id: str) -> bool:
+    def request_backup_erasure(self, manifest_id: str, actor_id: str = "system") -> bool:
         with self.connect() as connection:
             cursor = connection.execute(
                 "UPDATE backup_manifests SET erasure_requested_at = ? WHERE manifest_id = ? AND legal_hold = 0 AND erased_at IS NULL",
                 (utc_now(), manifest_id),
             )
-        return cursor.rowcount > 0
+        changed = cursor.rowcount > 0
+        if changed:
+            self.record_memory_lifecycle_event(
+                f"backup:{manifest_id}", "backup_access", actor_id, {"operation": "erasure_requested"}
+            )
+        return changed
 
-    def record_backup_erased(self, manifest_id: str) -> bool:
+    def record_backup_erased(self, manifest_id: str, actor_id: str = "system") -> bool:
         with self.connect() as connection:
             cursor = connection.execute(
                 "UPDATE backup_manifests SET erased_at = ? WHERE manifest_id = ? AND erasure_requested_at IS NOT NULL AND legal_hold = 0",
                 (utc_now(), manifest_id),
             )
-        return cursor.rowcount > 0
+        changed = cursor.rowcount > 0
+        if changed:
+            self.record_memory_lifecycle_event(
+                f"backup:{manifest_id}", "backup_access", actor_id, {"operation": "erased"}
+            )
+        return changed
 
-    def record_backup_restore_verified(self, manifest_id: str) -> bool:
+    def record_backup_restore_verified(self, manifest_id: str, actor_id: str = "system") -> bool:
         with self.connect() as connection:
             cursor = connection.execute(
                 "UPDATE backup_manifests SET restore_verified_at = ? WHERE manifest_id = ? AND erased_at IS NULL",
                 (utc_now(), manifest_id),
             )
-        return cursor.rowcount > 0
+        changed = cursor.rowcount > 0
+        if changed:
+            self.record_memory_lifecycle_event(
+                f"backup:{manifest_id}", "backup_access", actor_id, {"operation": "restore_verified"}
+            )
+        return changed
+
+    def set_backup_legal_hold(self, manifest_id: str, legal_hold: bool, actor_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE backup_manifests SET legal_hold = ? WHERE manifest_id = ? AND erased_at IS NULL",
+                (int(legal_hold), manifest_id),
+            )
+        changed = cursor.rowcount > 0
+        if changed:
+            self.record_memory_lifecycle_event(
+                f"backup:{manifest_id}", "legal_hold", actor_id, {"legal_hold": legal_hold}
+            )
+        return changed
 
     def enqueue_memory_job(self, job_type: str, dedup_key: str, max_attempts: int = 3) -> str:
         from raiker.contracts.ids import new_id
@@ -2525,7 +2556,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def record_memory_lifecycle_event(self, memory_id: str, action: str, actor_id: str, details: dict[str, Any] | None = None) -> str:
         from raiker.contracts.ids import new_id
 
-        if action not in {"archive", "restore", "forget", "purge", "correct", "export", "import", "recall"}:
+        if action not in {
+            "archive", "restore", "forget", "purge", "correct", "export", "import", "recall",
+            "legal_hold", "backup_access", "admin_access",
+        }:
             raise ValueError("invalid_memory_lifecycle_action")
         audit_id = new_id("mla_")
         with self.connect() as connection:

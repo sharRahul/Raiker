@@ -13,10 +13,15 @@ def test_backup_catalog_tracks_restore_and_honest_erasure_state(tmp_path: Path) 
     )
     store.insert_backup_manifest(manifest)
     assert store.record_backup_restore_verified(manifest.manifest_id)
-    assert store.request_backup_erasure(manifest.manifest_id)
-    assert store.record_backup_erased(manifest.manifest_id)
+    assert store.request_backup_erasure(manifest.manifest_id, "owner")
+    assert store.record_backup_erased(manifest.manifest_id, "owner")
     row = store.list_backup_manifests()[0]
     assert row["restore_verified_at"] and row["erased_at"]
+    with store.connect() as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM memory_lifecycle_audit WHERE memory_id = ? AND action = 'backup_access'",
+            (f"backup:{manifest.manifest_id}",),
+        ).fetchone()[0] == 4
 
 
 def test_backup_legal_hold_blocks_erasure(tmp_path: Path) -> None:
@@ -24,3 +29,15 @@ def test_backup_legal_hold_blocks_erasure(tmp_path: Path) -> None:
     manifest = BackupManifest(new_id("bkm_"), "snapshot", "{}", None, None, None, "owner", utc_now(), legal_hold=True)
     store.insert_backup_manifest(manifest)
     assert not store.request_backup_erasure(manifest.manifest_id)
+
+
+def test_backup_legal_hold_change_is_audited(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    manifest = BackupManifest(new_id("bkm_"), "snapshot", "{}", None, None, None, "owner", utc_now())
+    store.insert_backup_manifest(manifest)
+    assert store.set_backup_legal_hold(manifest.manifest_id, True, "owner")
+    with store.connect() as connection:
+        assert connection.execute(
+            "SELECT action FROM memory_lifecycle_audit WHERE memory_id = ? ORDER BY created_at DESC LIMIT 1",
+            (f"backup:{manifest.manifest_id}",),
+        ).fetchone()["action"] == "legal_hold"

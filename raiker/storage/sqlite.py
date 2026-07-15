@@ -60,6 +60,8 @@ from raiker.storage.migrations import (
     EIDETIC_OBSERVATIONS_SQL,
     EMAIL_DRAFTS_MIGRATION_ID,
     EMAIL_DRAFTS_SQL,
+    GIST_MEMORY_MIGRATION_ID,
+    GIST_MEMORY_SQL,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
     MEMORY_ARCHIVE_MIGRATION_ID,
@@ -514,6 +516,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(MEMORY_ARCHIVE_MIGRATION_ID, MEMORY_ARCHIVE_SQL, connection)
             self._apply_migration(EIDETIC_OBSERVATIONS_MIGRATION_ID, EIDETIC_OBSERVATIONS_SQL, connection)
             self._apply_migration(MEMORY_PURGE_MIGRATION_ID, MEMORY_PURGE_SQL, connection)
+            self._apply_migration(GIST_MEMORY_MIGRATION_ID, GIST_MEMORY_SQL, connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",

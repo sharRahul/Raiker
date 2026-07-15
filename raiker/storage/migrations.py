@@ -1338,3 +1338,11 @@ CREATE TABLE IF NOT EXISTS memory_purge_records (
   confirmed_at TEXT NOT NULL, disposition_json TEXT NOT NULL
 );
 """
+
+GIST_MEMORY_MIGRATION_ID = "RAIKER-2006-gist-memory-review"
+GIST_MEMORY_SQL = """
+CREATE TABLE IF NOT EXISTS gist_memories (
+  gist_id TEXT PRIMARY KEY, observation_id TEXT NOT NULL REFERENCES eidetic_observations(observation_id),
+  summary TEXT NOT NULL, confidence REAL NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL
+);
+"""

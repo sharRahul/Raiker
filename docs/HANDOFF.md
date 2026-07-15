@@ -108,6 +108,9 @@ fail-closed by design.
   creates a replacement memory, preserves the old fact as superseded evidence,
   and removes it from active retrieval. Aggregate evaluation runs are persisted
   locally; corpus fixtures and regression thresholds remain outstanding.
+- `memory-eval-v1` now includes deterministic scope, archive, and supersession
+  fixtures with a CI precision/recall/zero-leak regression check. It is still a
+  small local corpus, not the representative benchmark required by Stage J.
 - Stage G/I early slices are implemented but not complete: governed durable
   memory can project to local vectors; entity relationships require active
   evidence; hybrid retrieval deduplicates active lexical/vector/graph results;

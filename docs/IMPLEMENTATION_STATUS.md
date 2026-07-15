@@ -187,6 +187,11 @@ fail-closed by design.
 > success. The static SQLCipher build lacks FTS5, so the encrypted lexical index
 > uses FTS4 and deterministic recency ordering rather than BM25.
 
+> **Implementation update (2026-07-15):** `memory-eval-v1` now has a versioned
+> deterministic corpus covering scope, archive, and supersession. CI enforces
+> exact precision/recall and zero policy leaks for this corpus; representative
+> workloads and published latency/cost budgets remain future work.
+
 > Current truth update (2026-07-15): reliable memory controls are complete for
 > the current backlog item 3 slice — a user-visible Memory view over the
 > EXISTING governed memory store. No second memory system is created.

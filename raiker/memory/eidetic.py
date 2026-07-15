@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.storage.sqlite import SQLiteStore
@@ -48,3 +49,11 @@ def propose_gist(*, store: SQLiteStore, observation_id: str, summary: str, confi
             raise ValueError("unknown_observation")
         connection.execute("INSERT INTO gist_memories VALUES (?, ?, ?, ?, ?, ?)", tuple(gist.__dict__.values()))
     return gist
+
+
+def expiry_preview(*, store: SQLiteStore, now: str) -> list[str]:
+    days = {"turn_only": 0, "short_term_7_days": 7, "short_term_30_days": 30}
+    current = datetime.fromisoformat(now.replace("Z", "+00:00"))
+    with store.connect() as connection:
+        rows = connection.execute("SELECT observation_id, retention, created_at FROM eidetic_observations").fetchall()
+    return [str(row["observation_id"]) for row in rows if row["retention"] in days and datetime.fromisoformat(str(row["created_at"]).replace("Z", "+00:00")) + timedelta(days=days[str(row["retention"])]) <= current]

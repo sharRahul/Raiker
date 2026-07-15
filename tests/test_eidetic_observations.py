@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from raiker.memory.eidetic import propose_gist, record_observation
+from raiker.memory.eidetic import expiry_preview, propose_gist, record_observation
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -18,3 +18,9 @@ def test_gist_is_reviewable_not_automatically_durable(tmp_path: Path) -> None:
     observation = record_observation(store=store, source_event_id="evt_1", session_id="sess_1", summary="tool output", content="exact output")
     gist = propose_gist(store=store, observation_id=observation.observation_id, summary="tool succeeded", confidence=0.8)
     assert gist.status == "pending_review"
+
+
+def test_expiry_preview_never_deletes(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    item = record_observation(store=store, source_event_id="evt_1", session_id="sess_1", summary="tool output", content="exact output", retention="turn_only")
+    assert item.observation_id in expiry_preview(store=store, now="2100-01-01T00:00:00Z")

@@ -335,7 +335,8 @@ missing Markdown artifacts, failed purge locations, and project path
 inconsistencies. SQLite
 now provides idempotent maintenance jobs with leases, retry/dead-letter state,
 bounded one-at-a-time owner execution, and per-workspace rate limits for
-reconciliation and integrity scans. Memory lifecycle audit rows cover archive,
+reconciliation and integrity scans. Aggregate queue depth, worker state,
+dead-letter count, and completion latency are available for monitoring. Memory lifecycle audit rows cover archive,
 restore, forget, purge, and correction. Monitoring and load/failure exercises
 remain pending.
 

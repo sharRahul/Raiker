@@ -2568,6 +2568,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
         return True
 
+    def memory_job_metrics(self) -> dict[str, int | float]:
+        """Return aggregate, non-sensitive queue and worker health metrics."""
+        with self.connect() as connection:
+            counts = {
+                str(row["status"]): int(row["count"])
+                for row in connection.execute(
+                    "SELECT status, COUNT(*) AS count FROM memory_jobs GROUP BY status"
+                ).fetchall()
+            }
+            completed = connection.execute(
+                """SELECT AVG((julianday(updated_at) - julianday(created_at)) * 86400000.0) AS latency_ms
+                FROM memory_jobs WHERE status = 'completed'"""
+            ).fetchone()
+        return {
+            "queue_depth": counts.get("queued", 0) + counts.get("retry", 0),
+            "running_count": counts.get("running", 0),
+            "completed_count": counts.get("completed", 0),
+            "dead_letter_count": counts.get("dead_letter", 0),
+            "average_completion_latency_ms": float(completed["latency_ms"] or 0.0),
+        }
+
     def record_memory_lifecycle_event(self, memory_id: str, action: str, actor_id: str, details: dict[str, Any] | None = None) -> str:
         from raiker.contracts.ids import new_id
 

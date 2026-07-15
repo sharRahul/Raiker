@@ -205,6 +205,11 @@ class TestMemoryEditAndSearchParticipation:
         )
         assert imported.ok
         assert [m.text for m in service.list_memories()] == ["Imported memory"]
+        with service.store.connect() as connection:
+            actions = [row["action"] for row in connection.execute(
+                "SELECT action FROM memory_lifecycle_audit ORDER BY created_at"
+            ).fetchall()]
+        assert "export" in actions and "import" in actions
 
 
 class TestIncognitoBoundary:

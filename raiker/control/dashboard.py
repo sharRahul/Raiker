@@ -727,7 +727,13 @@ class DashboardService:
     def list_memories(self, scope: str | None = None) -> list[MemoryControlView]:
         """List approved memories with their governance metadata + pin state."""
         pinned_ids = self.store.list_pinned_memory_ids()
-        entries = list_memory(workspace_root=self.workspace_root, scope=scope, limit=200, store=self.store)
+        entries = list_memory(
+            workspace_root=self.workspace_root,
+            scope=scope,
+            limit=200,
+            store=self.store,
+            include_search_disabled=True,
+        )
         return [
             MemoryControlView(
                 memory_id=e.memory_id,
@@ -877,7 +883,11 @@ class DashboardService:
     def export_memories(self, acting_principal_id: str | None) -> ControlResult:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        return ControlResult(ok=True, data={"memories": [m.to_dict() for m in self.list_memories()]})
+        memories = [m.to_dict() for m in self.list_memories()]
+        self.store.record_memory_lifecycle_event(
+            "workspace_memory_export", "export", acting_principal_id or "", {"memory_count": len(memories)}
+        )
+        return ControlResult(ok=True, data={"memories": memories})
 
     def import_memories(self, memories: list[dict[str, Any]], acting_principal_id: str | None) -> ControlResult:
         if not self._is_human(acting_principal_id):
@@ -904,6 +914,9 @@ class DashboardService:
                 expires_at=item.get("expires_at"),
                 update_expires_at="expires_at" in item,
                 store=self.store,
+            )
+            self.store.record_memory_lifecycle_event(
+                entry.memory_id, "import", acting_principal_id or "", {"source": "user_import"}
             )
         return ControlResult(ok=True, data={"count": len(memories)})
 

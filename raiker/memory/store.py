@@ -307,9 +307,15 @@ def list_memory(
     scope: str | None = None,
     limit: int = 50,
     store: SQLiteStore | None = None,
+    include_search_disabled: bool = False,
 ) -> list[MemoryEntry]:
     if store is not None:
-        return [_entry_from_row(row) for row in store.list_approved_memory(scope=scope, limit=limit)]
+        return [
+            _entry_from_row(row)
+            for row in store.list_approved_memory(
+                scope=scope, limit=limit, include_search_disabled=include_search_disabled
+            )
+        ]
     results: list[MemoryEntry] = []
     mem_dir = _memory_dir(workspace_root)
     if not mem_dir.exists():

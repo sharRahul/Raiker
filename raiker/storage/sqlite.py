@@ -2029,13 +2029,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute("DELETE FROM approved_memory_fts WHERE memory_id = ?", (memory_id,))
             connection.execute("DELETE FROM approved_memory WHERE memory_id = ?", (memory_id,))
 
-    def list_approved_memory(self, scope: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    def list_approved_memory(
+        self, scope: str | None = None, limit: int = 50, *, include_search_disabled: bool = False
+    ) -> list[dict[str, Any]]:
         now = utc_now()
         query = """SELECT * FROM approved_memory WHERE deleted_at IS NULL AND archived_at IS NULL
-        AND search_enabled = 1 AND (expires_at IS NULL OR expires_at > ?)
+        AND (expires_at IS NULL OR expires_at > ?)
         AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)
         AND superseded_at IS NULL"""
         params: list[Any] = [now, now, now]
+        if not include_search_disabled:
+            query += " AND search_enabled = 1"
         if scope is not None:
             query += " AND scope = ?"
             params.append(scope)

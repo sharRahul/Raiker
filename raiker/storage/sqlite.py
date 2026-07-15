@@ -68,6 +68,8 @@ from raiker.storage.migrations import (
     MEMORY_ARCHIVE_SQL,
     MEMORY_CONTROLS_MIGRATION_ID,
     MEMORY_CONTROLS_SQL,
+    MEMORY_PROJECTIONS_MIGRATION_ID,
+    MEMORY_PROJECTIONS_SQL,
     MEMORY_PURGE_MIGRATION_ID,
     MEMORY_PURGE_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
@@ -517,6 +519,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(EIDETIC_OBSERVATIONS_MIGRATION_ID, EIDETIC_OBSERVATIONS_SQL, connection)
             self._apply_migration(MEMORY_PURGE_MIGRATION_ID, MEMORY_PURGE_SQL, connection)
             self._apply_migration(GIST_MEMORY_MIGRATION_ID, GIST_MEMORY_SQL, connection)
+            self._apply_migration(MEMORY_PROJECTIONS_MIGRATION_ID, MEMORY_PROJECTIONS_SQL, connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
@@ -1689,6 +1692,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def create_memory_purge_record(self, purge_id: str, memory_id: str, requested_by: str, confirmed_at: str, disposition: dict[str, Any]) -> None:
         with self.connect() as connection:
             connection.execute("INSERT INTO memory_purge_records (purge_id, memory_id, requested_by, confirmed_at, disposition_json) VALUES (?, ?, ?, ?, ?)", (purge_id, memory_id, requested_by, confirmed_at, json.dumps(disposition, sort_keys=True)))
+
+    def deactivate_memory_projections(self, memory_id: str) -> None:
+        with self.connect() as connection:
+            connection.execute("UPDATE memory_projections SET active = 0 WHERE memory_id = ?", (memory_id,))
 
     def delete_approved_memory(self, memory_id: str) -> None:
         with self.connect() as connection:

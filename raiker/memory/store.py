@@ -281,6 +281,8 @@ def set_memory_archived(
     )
     if store is not None:
         store.set_approved_memory_archived(memory_id, archived_at=updated.archived_at, updated_at=updated.updated_at)
+        if archived:
+            store.deactivate_memory_projections(memory_id)
     return updated
 
 

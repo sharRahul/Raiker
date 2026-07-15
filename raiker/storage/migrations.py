@@ -1346,3 +1346,13 @@ CREATE TABLE IF NOT EXISTS gist_memories (
   summary TEXT NOT NULL, confidence REAL NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL
 );
 """
+
+MEMORY_PROJECTIONS_MIGRATION_ID = "RAIKER-2007-memory-projections"
+MEMORY_PROJECTIONS_SQL = """
+CREATE TABLE IF NOT EXISTS memory_projections (
+  memory_id TEXT NOT NULL, projection_type TEXT NOT NULL, projection_id TEXT NOT NULL,
+  source_version TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (memory_id, projection_type, projection_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_projections_active ON memory_projections(projection_type, projection_id) WHERE active = 1;
+"""

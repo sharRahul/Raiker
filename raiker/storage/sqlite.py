@@ -74,6 +74,8 @@ from raiker.storage.migrations import (
     MEMORY_ENTITY_GRAPH_SQL,
     MEMORY_FTS_MIGRATION_ID,
     MEMORY_FTS_SQL,
+    MEMORY_JOBS_MIGRATION_ID,
+    MEMORY_JOBS_SQL,
     MEMORY_PROJECTIONS_MIGRATION_ID,
     MEMORY_PROJECTIONS_SQL,
     MEMORY_PURGE_MIGRATION_ID,
@@ -547,6 +549,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MEMORY_BACKUP_CATALOG_MIGRATION_ID, MEMORY_BACKUP_CATALOG_SQL, connection
             )
+            self._apply_migration(MEMORY_JOBS_MIGRATION_ID, MEMORY_JOBS_SQL, connection)
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -2339,6 +2342,56 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "UPDATE backup_manifests SET restore_verified_at = ? WHERE manifest_id = ? AND erased_at IS NULL",
                 (utc_now(), manifest_id),
             )
+        return cursor.rowcount > 0
+
+    def enqueue_memory_job(self, job_type: str, dedup_key: str, max_attempts: int = 3) -> str:
+        from raiker.contracts.ids import new_id
+
+        if job_type not in {"reconcile", "integrity_scan"} or not dedup_key or max_attempts < 1:
+            raise ValueError("invalid_memory_job")
+        now = utc_now()
+        job_id = new_id("mjob_")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO memory_jobs VALUES (?, ?, ?, 'queued', 0, ?, NULL, NULL, ?, ?)
+                ON CONFLICT(job_type, dedup_key) DO NOTHING""",
+                (job_id, job_type, dedup_key, max_attempts, now, now),
+            )
+            row = connection.execute(
+                "SELECT job_id FROM memory_jobs WHERE job_type = ? AND dedup_key = ?", (job_type, dedup_key)
+            ).fetchone()
+        return str(row["job_id"])
+
+    def claim_memory_job(self, lease_until: str) -> dict[str, Any] | None:
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """SELECT * FROM memory_jobs WHERE status IN ('queued', 'retry')
+                OR (status = 'running' AND lease_until < ?) ORDER BY created_at LIMIT 1""", (now,)
+            ).fetchone()
+            if row is None:
+                return None
+            connection.execute(
+                "UPDATE memory_jobs SET status = 'running', attempts = attempts + 1, lease_until = ?, updated_at = ? WHERE job_id = ?",
+                (lease_until, now, row["job_id"]),
+            )
+            claimed = connection.execute("SELECT * FROM memory_jobs WHERE job_id = ?", (row["job_id"],)).fetchone()
+        return dict(claimed) if claimed else None
+
+    def finish_memory_job(self, job_id: str, error: str | None = None) -> bool:
+        now = utc_now()
+        with self.connect() as connection:
+            if error is None:
+                cursor = connection.execute(
+                    "UPDATE memory_jobs SET status = 'completed', lease_until = NULL, updated_at = ? WHERE job_id = ? AND status = 'running'", (now, job_id)
+                )
+            else:
+                cursor = connection.execute(
+                    """UPDATE memory_jobs SET status = CASE WHEN attempts >= max_attempts THEN 'dead_letter' ELSE 'retry' END,
+                    lease_until = NULL, last_error = ?, updated_at = ? WHERE job_id = ? AND status = 'running'""",
+                    (error[:500], now, job_id),
+                )
         return cursor.rowcount > 0
 
     # ── Phase 6: Channels & Relay ──

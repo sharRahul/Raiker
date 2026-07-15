@@ -317,10 +317,11 @@ all pass with documented evidence.
 
 ### Stage I — reliability and scale
 
-**In progress (integrity slice).** An owner-started read-only integrity report
-detects stale FTS/projection/graph state and missing Markdown artifacts. Repair
-jobs, queues, rate limits, monitoring, and load/failure exercises remain
-pending.
+**In progress (maintenance slice).** An owner-started read-only integrity report
+detects stale FTS/projection/graph state and missing Markdown artifacts. SQLite
+now provides idempotent maintenance jobs with leases, retry/dead-letter state,
+and bounded one-at-a-time owner execution for reconciliation and integrity
+scans. Rate limits, monitoring, and load/failure exercises remain pending.
 
 1. Move projection/reconciliation work to owner-enabled, idempotent jobs with
    leases, retries, dead-letter reporting, bounded concurrency, per-tenant rate

@@ -115,6 +115,9 @@ fail-closed by design.
   Stage H's backup catalog records retention, legal hold, restore verification,
   and erasure disposition. Encryption of memory content/indexes, tenant
   isolation, background jobs, and operational proof remain required.
+- The first maintenance-job primitive is now present: idempotent `reconcile`
+  and `integrity_scan` jobs have SQLite leases, retries, and dead-letter state,
+  but no daemon, rate limiting, telemetry, or load/chaos proof exists yet.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

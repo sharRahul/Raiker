@@ -30,6 +30,7 @@ _PREFIXES = {
     "mev_",
     "ent_",
     "rel_",
+    "mjob_",
     "mng_",
     "usr_",
     "rl_",

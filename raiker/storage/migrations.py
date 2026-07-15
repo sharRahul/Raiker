@@ -1419,3 +1419,15 @@ ALTER TABLE backup_manifests ADD COLUMN erasure_requested_at TEXT;
 ALTER TABLE backup_manifests ADD COLUMN erased_at TEXT;
 ALTER TABLE backup_manifests ADD COLUMN restore_verified_at TEXT;
 """
+
+MEMORY_JOBS_MIGRATION_ID = "RAIKER-2013-memory-jobs"
+MEMORY_JOBS_SQL = """
+CREATE TABLE IF NOT EXISTS memory_jobs (
+  job_id TEXT PRIMARY KEY, job_type TEXT NOT NULL, dedup_key TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('queued', 'running', 'retry', 'dead_letter', 'completed')),
+  attempts INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3,
+  lease_until TEXT, last_error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE(job_type, dedup_key)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_jobs_ready ON memory_jobs(status, lease_until, created_at);
+"""

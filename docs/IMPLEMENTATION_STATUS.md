@@ -172,6 +172,12 @@ fail-closed by design.
 > indexes, multi-tenant isolation, job workers, and operational benchmarks are
 > not yet complete.
 
+> **Implementation update (2026-07-15):** Stage I now has a bounded,
+> owner-started SQLite maintenance-job primitive for idempotent reconciliation
+> and integrity scans, including leases, retry attempts, and dead-letter state.
+> It deliberately has no autonomous daemon; rate limiting, monitoring, and
+> load/chaos evidence remain incomplete.
+
 > Current truth update (2026-07-15): reliable memory controls are complete for
 > the current backlog item 3 slice — a user-visible Memory view over the
 > EXISTING governed memory store. No second memory system is created.

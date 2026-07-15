@@ -1,5 +1,6 @@
 .venv
 poetry.lock
+*.pid
 .ruff_cache
 .raiker
 .pytest_cache

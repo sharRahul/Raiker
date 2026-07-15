@@ -243,8 +243,8 @@ FTS authoritative for governed retrieval. `RAIKER-2010` adds immutable
 correction/supersession links, temporal eligibility, human correction control,
 and persisted aggregate lexical evaluation runs. `memory-eval-v1` reports
 precision, Recall@k, MRR, nDCG, policy leaks, p50/p95 latency, token use, and
-local compute/storage cost. Versioned corpus fixtures and CI thresholds remain
-the next Stage F slice. `memory-eval-v1` now provides a deterministic
+local compute/storage cost. Broader corpus workloads and production thresholds
+remain pending. `memory-eval-v1` now provides a deterministic
 scoped, sensitive, archived, forgotten, corrected, and time-qualified corpus
 and CI enforces zero policy leaks plus exact
 precision/recall for that corpus; broader workload, latency, and cost budgets
@@ -306,8 +306,8 @@ use SQLCipher through `pysqlcipher3static` (the `pysqlcipher3` DB-API); the
 workspace app key derives the SQLCipher key and legacy plaintext databases are
 converted without retaining a plaintext copy. This distribution provides FTS4,
 not FTS5, so lexical ranking is deterministic recency order rather than BM25.
-Principal/workspace isolation and independent key-management review remain
-pending.
+Memory and backup lifecycle actions are metadata-audited. Principal/workspace
+isolation and independent key-management review remain pending.
 
 1. Enforce principal/workspace ownership in every memory row and projection;
    add tenant-isolation and confused-deputy tests.
@@ -328,7 +328,9 @@ all pass with documented evidence.
 ### Stage I — reliability and scale
 
 **In progress (maintenance slice).** An owner-started read-only integrity report
-detects stale FTS/projection/graph state and missing Markdown artifacts. SQLite
+detects stale FTS/projection/graph state, checksum mismatches, orphaned or
+missing Markdown artifacts, failed purge locations, and project path
+inconsistencies. SQLite
 now provides idempotent maintenance jobs with leases, retry/dead-letter state,
 bounded one-at-a-time owner execution, and per-workspace rate limits for
 reconciliation and integrity scans. Memory lifecycle audit rows cover archive,

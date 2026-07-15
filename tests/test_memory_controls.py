@@ -74,6 +74,10 @@ class TestMemoryList:
         assert m.trust_score == 0.8
         assert m.retention == "until_forget"
         assert m.approval_state == "approved"
+        assert m.source_event_id.startswith("evt_")
+        assert m.provenance["source_event_id"] == "evt_seed"
+        assert m.created_by == "test"
+        assert m.valid_from == m.created_at
         assert m.pinned is False
 
     def test_list_can_filter_by_scope(self, service: DashboardService, workspace: Path) -> None:

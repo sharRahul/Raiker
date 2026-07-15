@@ -130,6 +130,12 @@ class MemoryControlView:
     search_enabled: bool = True
     expires_at: str | None = None
     archived_at: str | None = None
+    source_event_id: str = ""
+    created_by: str = ""
+    valid_from: str | None = None
+    valid_until: str | None = None
+    supersedes_memory_id: str | None = None
+    remembered_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -150,6 +156,12 @@ class MemoryControlView:
             "search_enabled": self.search_enabled,
             "expires_at": self.expires_at,
             "archived_at": self.archived_at,
+            "source_event_id": self.source_event_id,
+            "created_by": self.created_by,
+            "valid_from": self.valid_from,
+            "valid_until": self.valid_until,
+            "supersedes_memory_id": self.supersedes_memory_id,
+            "remembered_reason": self.remembered_reason,
         }
 
 
@@ -753,6 +765,12 @@ class DashboardService:
                 search_enabled=e.search_enabled,
                 expires_at=e.expires_at,
                 archived_at=e.archived_at,
+                source_event_id=e.source_event_id,
+                created_by=e.created_by,
+                valid_from=e.valid_from,
+                valid_until=e.valid_until,
+                supersedes_memory_id=e.supersedes_memory_id,
+                remembered_reason=e.remembered_reason,
             )
             for e in entries
         ]

@@ -100,6 +100,37 @@ class TestAuthMint:
         assert not resp.json()["detail"]["ok"]
 
 
+class TestInstances:
+    def test_login_launcher_creates_an_isolated_same_server_instance(
+        self, bootstrapped_workspace: Path, client: TestClient
+    ) -> None:
+        response = client.post("/api/instances", json={"name": "alex"})
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["url"] == "/instances/alex/"
+        assert (bootstrapped_workspace / ".raiker" / "instances" / "alex").is_dir()
+        assert client.get("/instances/alex/api/health").status_code == 200
+        # A newly created instance has no inherited accounts; its own login is
+        # therefore the first place its owner establishes credentials.
+        assert client.post("/instances/alex/api/auth/session", json={"as_principal": None}).status_code == 403
+        child_login = client.post(
+            "/instances/alex/api/auth/register",
+            json={"username": "alex", "password": "correct horse battery staple"},
+        )
+        assert child_login.status_code == 200, child_login.text
+        child_headers = _auth_headers(str(child_login.json()["token"]))
+        created = client.post(
+            "/instances/alex/api/tasks",
+            headers=child_headers,
+            json={"title": "Only Alex can see this", "description": "Keep this task isolated."},
+        )
+        assert created.status_code == 201, created.text
+        root_headers = _auth_headers(_token(client))
+        assert all(task["title"] != "Only Alex can see this" for task in client.get("/api/tasks", headers=root_headers).json())
+        assert any(task["title"] == "Only Alex can see this" for task in client.get("/instances/alex/api/tasks", headers=child_headers).json())
+        assert client.post("/api/instances", json={"name": "alex"}).status_code == 409
+
+
 class TestAuthRequired:
     @pytest.mark.parametrize("route", PROTECTED_GET_ROUTES)
     def test_requires_bearer(self, client: TestClient, route: str) -> None:
@@ -206,6 +237,33 @@ class TestReads:
         # A queued schedule is visible, but its edge must not animate as though
         # execution has already started.
         assert tracks_edge["is_active"] is False
+
+    def test_brain_source_is_explicit_and_workspace_contained(
+        self, bootstrapped_workspace: Path, client: TestClient
+    ) -> None:
+        source = bootstrapped_workspace / "research"
+        source.mkdir()
+        (source / "notes.md").write_text("actual selected file", encoding="utf-8")
+        token = _token(client)
+
+        added = client.post(
+            "/api/brain/sources",
+            headers=_auth_headers(token),
+            json={"path": "research"},
+        )
+        assert added.status_code == 200, added.text
+        assert added.json() == {"ok": True, "path": "research"}
+        graph = client.get("/api/brain", headers=_auth_headers(token)).json()
+        assert any(node["node_id"] == "source:research" and node["node_type"] == "folder" for node in graph["nodes"])
+        assert any(node["node_id"] == "source:research/notes.md" and node["node_type"] == "file" for node in graph["nodes"])
+
+        rejected = client.post(
+            "/api/brain/sources",
+            headers=_auth_headers(token),
+            json={"path": "../outside"},
+        )
+        assert rejected.status_code == 422
+        assert rejected.json()["detail"]["reason_code"] == "brain_source_outside_workspace"
 
     def test_task_create_rejects_blank_title(self, client: TestClient) -> None:
         response = client.post(

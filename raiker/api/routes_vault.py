@@ -9,7 +9,6 @@ also accompany the change. Missing/invalid key => connectors fail closed.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -19,9 +18,7 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import VaultKeyRequest
 from raiker.auth.accounts import AccountService
 from raiker.auth.vault_key_file import (
-    VAULT_KEY_ENV,
     clear_vault_key,
-    load_vault_key_into_env,
     vault_status,
     write_vault_key,
 )
@@ -78,9 +75,6 @@ async def set_vault_key(body: VaultKeyRequest, request: Request) -> dict[str, An
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"ok": False, "reason_code": "connector_vault_key_invalid"},
         ) from exc
-    # Make the new key effective for this process (env unset case).
-    os.environ.pop(VAULT_KEY_ENV, None)
-    load_vault_key_into_env(ws)
     return {"state": vault_status(ws)}
 
 
@@ -97,5 +91,4 @@ async def delete_vault_key(
     ws = _ws(request)
     _enforce_vault_mfa_policy(ws, principal.principal_id, x_mfa_code)
     clear_vault_key(ws)
-    os.environ.pop(VAULT_KEY_ENV, None)
     return {"state": vault_status(ws)}

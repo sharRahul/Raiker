@@ -459,3 +459,13 @@ export interface BrainView {
   edges: BrainEdge[];
   illustrative_motion_notice: string;
 }
+
+export interface BrainSourceResult {
+  ok: boolean;
+  path: string;
+}
+
+export interface InstanceLaunchResult {
+  name: string;
+  url: string;
+}

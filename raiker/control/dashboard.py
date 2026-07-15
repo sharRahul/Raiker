@@ -568,6 +568,46 @@ class DashboardService:
         self.store = SQLiteStore(self.workspace_root)
         self.control = RuntimeControlService(self.workspace_root)
 
+    @property
+    def _brain_sources_path(self) -> Path:
+        return self.workspace_root / ".raiker" / "brain-sources.json"
+
+    def _brain_sources(self) -> list[str]:
+        try:
+            raw = json.loads(self._brain_sources_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return []
+        return [item for item in raw if isinstance(item, str) and item]
+
+    def _workspace_source(self, raw_path: str) -> tuple[str, Path]:
+        candidate = raw_path.strip()
+        if not candidate or len(candidate) > 512:
+            raise ValueError("invalid_brain_source_path")
+        root = self.workspace_root.resolve()
+        path = (root / candidate).resolve()
+        if path != root and root not in path.parents:
+            raise ValueError("brain_source_outside_workspace")
+        if not path.exists():
+            raise ValueError("brain_source_not_found")
+        return str(path.relative_to(root)), path
+
+    def add_brain_source(self, raw_path: str) -> dict[str, Any]:
+        relative_path, _path = self._workspace_source(raw_path)
+        sources = list(dict.fromkeys([*self._brain_sources(), relative_path]))
+        self._brain_sources_path.parent.mkdir(parents=True, exist_ok=True)
+        self._brain_sources_path.write_text(json.dumps(sources), encoding="utf-8")
+        return {"ok": True, "path": relative_path}
+
+    def remove_brain_source(self, raw_path: str) -> dict[str, Any]:
+        try:
+            relative_path, _path = self._workspace_source(raw_path)
+        except ValueError:
+            relative_path = raw_path.strip()
+        sources = [source for source in self._brain_sources() if source != relative_path]
+        self._brain_sources_path.parent.mkdir(parents=True, exist_ok=True)
+        self._brain_sources_path.write_text(json.dumps(sources), encoding="utf-8")
+        return {"ok": True, "path": relative_path}
+
     # ── Sessions / turns ────────────────────────────────────────────────
     def list_sessions(
         self, limit: int = 50, project_id: str | None = None, user_id: str | None = None
@@ -652,6 +692,27 @@ class DashboardService:
             node_id = f"backup:{backup['manifest_id']}"
             nodes.append(BrainNodeView(node_id, "backup", "Backup", "verified" if backup.get("restore_verified_at") else "catalogued"))
             edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "backs_up"))
+        root = self.workspace_root.resolve()
+        for source in self._brain_sources():
+            try:
+                relative_path, path = self._workspace_source(source)
+            except ValueError:
+                continue
+            source_id = f"source:{relative_path}"
+            source_type = "folder" if path.is_dir() else "file"
+            nodes.append(BrainNodeView(source_id, source_type, path.name or relative_path, "selected", relative_path))
+            edges.append(BrainEdgeView(f"principal:{principal_id}", source_id, "added"))
+            if path.is_dir():
+                try:
+                    children = sorted(path.iterdir(), key=lambda child: child.name.casefold())[:100]
+                except OSError:
+                    children = []
+                for child in children:
+                    child_path = str(child.resolve().relative_to(root))
+                    child_id = f"source:{child_path}"
+                    child_type = "folder" if child.is_dir() else "file"
+                    nodes.append(BrainNodeView(child_id, child_type, child.name, "available", child_path))
+                    edges.append(BrainEdgeView(source_id, child_id, "contains"))
         return BrainView(utc_now(), tuple(nodes), tuple(edges))
 
     def get_session(

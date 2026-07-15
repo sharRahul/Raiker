@@ -95,13 +95,13 @@ async def connector_store(
                 "installed": installed is not None,
                 "enabled": bool(installed and installed["enabled"]),
                 "auth_status": auth_status,
-                "vault_configured": ConnectorVault.configured(),
+                "vault_configured": ConnectorVault(store).configured(),
                 "activity_status": activity["status"] if activity else "idle",
                 "active_operation": activity["operation_id"] if activity else None,
                 "last_invoked_at": activity["started_at"] if activity else None,
             }
         )
-    return {"connectors": items, "count": len(items), "vault_configured": ConnectorVault.configured()}
+    return {"connectors": items, "count": len(items), "vault_configured": ConnectorVault(store).configured()}
 
 
 @router.post("/api/connector-store/{connector_id}/install")

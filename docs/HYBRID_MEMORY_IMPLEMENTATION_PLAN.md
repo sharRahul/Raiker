@@ -238,13 +238,16 @@ criterion; later stages do not weaken the completed safety rules.
 
 ### Deployment scope
 
-Raiker is a self-hosted, multi-user application for a single personal device
-or user-owned AI host: laptops, desktops, Macs, local AI devices, and optional
-home NAS hardware. Each local user has a separate principal and workspace; it
-is not a shared enterprise service or a hosted SaaS. Long-term backup is
-opt-in: users may keep it local or select a NAS, mounted drive, or supported
-cloud-storage provider. Raiker must encrypt and verify those backups, expose
-their retention/deletion disposition, and never silently upload a workspace.
+Raiker is a self-hosted, multi-instance application for a single personal
+device or user-owned AI host: laptops, desktops, Macs, local AI devices, and
+optional home NAS hardware. One server may host separate user instances, each
+with an independent workspace, SQLite state, vault key, connectors, models,
+files, folders, accounts, and administrator. An instance must never reveal its
+data to another instance; it is not a shared enterprise service or hosted SaaS.
+Long-term backup is opt-in: users may keep it local or select a NAS, mounted
+drive, or supported cloud-storage provider. Raiker must encrypt and verify
+those backups, expose their retention/deletion disposition, and never silently
+upload a workspace.
 
 ### Stage F — retrieval authority and measured quality
 

@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, Response
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
     AuthSessionRequest,
+    BrainSourceRequest,
     BulkDeleteSessionsRequest,
     CreateProjectRequest,
     MoveProjectRequest,
@@ -265,6 +266,31 @@ async def get_brain(
             user_id=principal.delegated_by_user_id,
         )
     )
+
+
+@router.post("/api/brain/sources")
+async def add_brain_source(
+    body: BrainSourceRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Add one explicit workspace-relative file or folder to the Brain graph."""
+    try:
+        return _service(request).add_brain_source(body.path)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": str(exc)},
+        ) from exc
+
+
+@router.delete("/api/brain/sources")
+async def remove_brain_source(
+    path: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _service(request).remove_brain_source(path)
 
 
 @router.get("/api/checkpoints")

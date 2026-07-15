@@ -4,6 +4,7 @@ import type {
   ApprovalView,
   AuthSession,
   BrainView,
+  BrainSourceResult,
   CapabilityDecisionMode,
   CapabilityGate,
   Checkpoint,
@@ -12,6 +13,7 @@ import type {
   Diagnostics,
   EventEntry,
   InterruptRequestBody,
+  InstanceLaunchResult,
   InterruptResult,
   MemoryControlView,
   MemorySettingsView,
@@ -63,7 +65,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (token !== null) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const resp = await fetch(path, { ...init, headers });
+  const resp = await fetch(instancePath(path), { ...init, headers });
   if (!resp.ok) {
     let reasonCode: string | null = null;
     try {
@@ -83,7 +85,7 @@ async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> 
   if (token !== null) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const resp = await fetch(path, { ...init, headers });
+  const resp = await fetch(instancePath(path), { ...init, headers });
   if (!resp.ok) {
     let reasonCode: string | null = null;
     try {
@@ -96,6 +98,12 @@ async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> 
     throw new ApiError(resp.status, reasonCode, `Request failed: ${resp.status} ${path}`);
   }
   return resp.blob();
+}
+
+function instancePath(path: string): string {
+  if (typeof window === "undefined") return path;
+  const match = window.location.pathname.match(/^(\/instances\/[^/]+)/);
+  return match ? `${match[1]}${path}` : path;
 }
 
 function withQuery(path: string, params: Record<string, string | number | undefined>): string {
@@ -132,6 +140,10 @@ export async function connect(): Promise<AuthSession> {
  */
 export function health(): Promise<{ status: string }> {
   return request<{ status: string }>("/api/health");
+}
+
+export function createInstance(name: string): Promise<InstanceLaunchResult> {
+  return postJson<InstanceLaunchResult>("/api/instances", { name });
 }
 
 export interface LoginResult {
@@ -305,6 +317,9 @@ export const api = {
   events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
     request<EventEntry[]>(withQuery("/api/events", params)),
   brain: () => request<BrainView>("/api/brain"),
+  addBrainSource: (path: string) => postJson<BrainSourceResult>("/api/brain/sources", { path }),
+  removeBrainSource: (path: string) =>
+    request<BrainSourceResult>(withQuery("/api/brain/sources", { path }), { method: "DELETE" }),
   checkpoints: (sessionId?: string, projectId?: string) =>
     request<Checkpoint[]>(
       withQuery("/api/checkpoints", { session_id: sessionId, project_id: projectId }),

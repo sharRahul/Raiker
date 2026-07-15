@@ -27,7 +27,7 @@ describe("BrainView", () => {
     await waitFor(() => expect(screen.getAllByText("Draft a plan").length).toBeGreaterThan(0));
     expect(screen.getByText(/visual activity only/i)).toBeInTheDocument();
     expect(screen.getAllByText("Researcher").length).toBeGreaterThan(0);
-    expect(screen.getByText(/idle · Draft a plan/i)).toBeInTheDocument();
-    expect(screen.getByText("Work in Action")).toBeInTheDocument();
+    expect(screen.getByText("Workspace sources")).toBeInTheDocument();
+    expect(screen.queryByText("Work in Action")).not.toBeInTheDocument();
   });
 });

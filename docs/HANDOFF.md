@@ -104,7 +104,7 @@ fail-closed by design.
 - Still pending for production memory: a representative consented benchmark
   and live quality/latency/cost thresholds; provider-backed runtime retrieval,
   entity extraction/review, and runtime hybrid integration; same-device
-  multi-user principal/workspace isolation; user-controlled NAS/mounted-drive/
+  cross-instance isolation and recovery drills; user-controlled NAS/mounted-drive/
   NAS backup first, with mounted-drive/cloud destinations optional; real encrypted
   backup and restore/erasure drills; monitoring, daemon/worker operation, load/soak/chaos
   evidence; and independent security, privacy, and pilot/benchmark evidence.

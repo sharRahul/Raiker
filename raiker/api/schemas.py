@@ -136,6 +136,22 @@ class UploadAttachmentRequest(BaseModel):
     data_base64: str
 
 
+class BrainSourceRequest(BaseModel):
+    """An explicit file or folder already placed inside this Raiker workspace."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+
+
+class InstanceCreateRequest(BaseModel):
+    """Name for a new, locally isolated Raiker instance."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+
+
 class CreateProjectRequest(BaseModel):
     # Create a named project (web-app task 5). The root subpath is derived
     # server-side from the name and contained inside the workspace — the client

@@ -26,3 +26,9 @@ def test_hybrid_retrieval_deduplicates_governed_lexical_vector_and_graph_hits(tm
     assert len(result) == 1
     assert result[0].memory_id == memory.memory_id
     assert result[0].sources == ("graph", "lexical", "vector")
+    assert result[0].source_event_id == memory.source_event_id
+    assert result[0].scope == memory.scope
+    assert result[0].sensitivity == memory.sensitivity
+    assert result[0].confidence == memory.confidence
+    assert result[0].retention == memory.retention
+    assert result[0].trust_label == "untrusted_memory_data"

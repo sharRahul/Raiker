@@ -14,6 +14,12 @@ class HybridMemoryResult:
     text: str
     score: float
     sources: tuple[str, ...]
+    source_event_id: str
+    scope: str
+    sensitivity: str
+    confidence: float
+    retention: str
+    trust_label: str = "untrusted_memory_data"
 
 
 def retrieve_hybrid_memory(
@@ -46,5 +52,17 @@ def retrieve_hybrid_memory(
     for memory_id, (score, sources) in candidates.items():
         memory_row = store.get_active_approved_memory(memory_id)
         if memory_row is not None:
-            results.append(HybridMemoryResult(memory_id, str(memory_row["text"]), score, tuple(sorted(sources))))
+            results.append(
+                HybridMemoryResult(
+                    memory_id,
+                    str(memory_row["text"]),
+                    score,
+                    tuple(sorted(sources)),
+                    str(memory_row["source_event_id"]),
+                    str(memory_row["scope"]),
+                    str(memory_row["sensitivity"]),
+                    float(memory_row["confidence"]),
+                    str(memory_row["retention"]),
+                )
+            )
     return sorted(results, key=lambda item: (-item.score, item.memory_id))[:limit]

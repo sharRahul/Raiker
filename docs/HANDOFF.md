@@ -103,13 +103,14 @@ fail-closed by design.
   migration also verifies conversion cleanup and encrypted-database access.
 - Still pending for production memory: a representative consented benchmark
   and live quality/latency/cost thresholds; provider-backed runtime retrieval,
-  entity extraction/review, and runtime hybrid integration; user-controlled
-  NAS/mounted-drive/cloud backup destinations and recovery; real encrypted
+  entity extraction/review, and runtime hybrid integration; same-device
+  multi-user principal/workspace isolation; user-controlled NAS/mounted-drive/
+  cloud backup destinations and recovery; real encrypted
   backup and restore/erasure drills; monitoring, daemon/worker operation, load/soak/chaos
   evidence; and independent security, privacy, and pilot/benchmark evidence.
 - The next memory program is staged in `HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`
   (Stages F–J): retrieval-authority/evaluation, gated semantic + entity
-  retrieval, local-first encryption/backup operations, reliability/scale, then
+  retrieval, self-hosted multi-user encryption/backup operations, reliability/scale, then
   independent benchmark evidence. Do not market the current implementation as
   “best”; that claim requires the Stage J evidence.
 - The roadmap explicitly covers the full production checklist: FTS/vector/graph

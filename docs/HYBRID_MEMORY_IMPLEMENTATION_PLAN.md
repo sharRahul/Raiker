@@ -238,13 +238,13 @@ criterion; later stages do not weaken the completed safety rules.
 
 ### Deployment scope
 
-Raiker is a local-first, single-user application for personal devices and
-user-owned AI hardware. It is intended to run on laptops, desktops, Macs,
-local AI devices, and optional home NAS hardware—not as a shared enterprise
-service. Long-term backup is opt-in: users may keep it local or select a NAS,
-mounted drive, or supported cloud-storage provider. Raiker must encrypt and
-verify those backups, expose their retention/deletion disposition, and never
-silently upload a workspace or require an account.
+Raiker is a self-hosted, multi-user application for a single personal device
+or user-owned AI host: laptops, desktops, Macs, local AI devices, and optional
+home NAS hardware. Each local user has a separate principal and workspace; it
+is not a shared enterprise service or a hosted SaaS. Long-term backup is
+opt-in: users may keep it local or select a NAS, mounted drive, or supported
+cloud-storage provider. Raiker must encrypt and verify those backups, expose
+their retention/deletion disposition, and never silently upload a workspace.
 
 ### Stage F — retrieval authority and measured quality
 
@@ -311,7 +311,7 @@ queue until an explicit approval creates the graph edge.
 **Exit:** capability-off and policy-denied paths are proven no-ops; enabled
 retrieval meets the Stage F recall/latency budgets without a visibility leak.
 
-### Stage H — local-first security, backup, and privacy operations
+### Stage H — self-hosted multi-user security, backup, and privacy operations
 
 **In progress (backup catalog slice).** Backup manifests now record encryption
 key identifiers, retention/legal-hold state, restore verification, erasure
@@ -321,17 +321,19 @@ workspace app key derives the SQLCipher key and legacy plaintext databases are
 converted without retaining a plaintext copy. This distribution provides FTS4,
 not FTS5, so lexical ranking is deterministic recency order rather than BM25.
 Memory and backup lifecycle actions are metadata-audited, and lifecycle-audit
-rows are append-only at the SQLite layer. Raiker targets one user-owned
-workspace per device, not shared enterprise tenancy. User-selected NAS, mounted
-drive, and cloud backup destinations remain pending.
+rows are append-only at the SQLite layer. Raiker supports multiple local users
+on one device through separate principals and workspaces, not enterprise
+multi-tenant hosting. User-selected NAS, mounted-drive, and cloud backup
+destinations remain pending.
 
-1. Keep each local workspace physically isolated, bind every memory operation
-   to its workspace root, and test that one workspace cannot read, write, or
-   restore another workspace's memory or backup catalog.
+1. Enforce principal and workspace ownership on every memory row, projection,
+   export, backup, and maintenance job. Test cross-user/workspace reads,
+   writes, retrieval, projection, export, backup, restore, and confused-deputy
+   attempts on the same host.
 2. Encrypt durable rows, artifacts, indexes, and backups at rest with a
-   local workspace key. Define user-controlled recovery, key rotation, and
-   revocation without requiring an account, enterprise KMS, or shared-user
-   key hierarchy.
+   per-workspace data key. Define local device-owner/user recovery, key
+   rotation, revocation, and access rules without requiring hosted enterprise
+   KMS or SaaS accounts.
 3. Add opt-in NAS, mounted-drive, and cloud-provider backup adapters. The
    catalog must record encrypted snapshots, destination, retention/hold
    deadlines, restore tests, erasure requests, deletion completion, and every
@@ -340,9 +342,9 @@ drive, and cloud backup destinations remain pending.
    import, archive, forget, purge, legal-hold changes, backup access, and admin
    access.
 
-**Exit:** local-device security review, restoration and migration-rollback
-drills, verified-erasure/pending-backup disposition drill, and workspace
-isolation suite all pass with documented evidence.
+**Exit:** self-hosted security review, restoration and migration-rollback
+drills, verified-erasure/pending-backup disposition drill, and same-device
+multi-user isolation suite all pass with documented evidence.
 
 ### Stage I — reliability and scale
 
@@ -426,18 +428,18 @@ for every step before changing the corresponding stage status.
    any inability to restore, erase, or report a pending backup as a release
    blocker.
 
-### 3. Local security and recovery review
+### 3. Self-hosted multi-user security and recovery review
 
 1. Have an independent reviewer inspect key creation, storage, rotation,
    revocation, recovery, logs, exports, backups, and SQLCipher connection
    initialization. Confirm keys and raw memory never appear in logs or error
    telemetry.
-2. Run the workspace-isolation suite. Test that separate local workspaces
-   cannot read, write, retrieve, project, export, back up, or restore each
-   other's data.
-3. Document user-controlled recovery, key rotation, incident response, and
+2. Run the same-device multi-user isolation suite. Test that different local
+   principals and workspaces cannot read, write, retrieve, project, export,
+   back up, or restore each other's data, including confused-deputy attempts.
+3. Document device-owner/user recovery, key rotation, local access rules, and
    NAS/mounted-drive/cloud backup setup. The current local app-key derivation
-   is not a substitute for documented backup-key recovery.
+   is not a substitute for documented per-workspace backup-key recovery.
 
 ### 4. Retrieval benchmark and pilot
 

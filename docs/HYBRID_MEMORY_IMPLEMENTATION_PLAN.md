@@ -296,8 +296,13 @@ retrieval meets the Stage F recall/latency budgets without a visibility leak.
 
 **In progress (backup catalog slice).** Backup manifests now record encryption
 key identifiers, retention/legal-hold state, restore verification, erasure
-requests, and completed erasure. Memory content/index encryption and
-principal/workspace isolation remain pending.
+requests, and completed erasure. SQLite, FTS, and vector/graph metadata now
+use SQLCipher through `pysqlcipher3static` (the `pysqlcipher3` DB-API); the
+workspace app key derives the SQLCipher key and legacy plaintext databases are
+converted without retaining a plaintext copy. This distribution provides FTS4,
+not FTS5, so lexical ranking is deterministic recency order rather than BM25.
+Principal/workspace isolation and independent key-management review remain
+pending.
 
 1. Enforce principal/workspace ownership in every memory row and projection;
    add tenant-isolation and confused-deputy tests.
@@ -320,8 +325,10 @@ all pass with documented evidence.
 **In progress (maintenance slice).** An owner-started read-only integrity report
 detects stale FTS/projection/graph state and missing Markdown artifacts. SQLite
 now provides idempotent maintenance jobs with leases, retry/dead-letter state,
-and bounded one-at-a-time owner execution for reconciliation and integrity
-scans. Rate limits, monitoring, and load/failure exercises remain pending.
+bounded one-at-a-time owner execution, and per-workspace rate limits for
+reconciliation and integrity scans. Memory lifecycle audit rows cover archive,
+restore, forget, purge, and correction. Monitoring and load/failure exercises
+remain pending.
 
 1. Move projection/reconciliation work to owner-enabled, idempotent jobs with
    leases, retries, dead-letter reporting, bounded concurrency, per-tenant rate

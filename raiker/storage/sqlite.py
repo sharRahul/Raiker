@@ -3,11 +3,13 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
-import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pysqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
+
+from raiker.auth.app_key import ensure_app_key
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import (
     AgentEvent,
@@ -66,6 +68,8 @@ from raiker.storage.migrations import (
     LOCK_SCREEN_SQL,
     MEMORY_ARCHIVE_MIGRATION_ID,
     MEMORY_ARCHIVE_SQL,
+    MEMORY_AUDIT_RATE_LIMIT_MIGRATION_ID,
+    MEMORY_AUDIT_RATE_LIMIT_SQL,
     MEMORY_BACKUP_CATALOG_MIGRATION_ID,
     MEMORY_BACKUP_CATALOG_SQL,
     MEMORY_CONTROLS_MIGRATION_ID,
@@ -82,6 +86,8 @@ from raiker.storage.migrations import (
     MEMORY_PURGE_SQL,
     MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
     MEMORY_RETRIEVAL_AUTHORITY_SQL,
+    MEMORY_SQLCIPHER_FTS_MIGRATION_ID,
+    MEMORY_SQLCIPHER_FTS_SQL,
     MEMORY_TEMPORAL_EVALUATION_MIGRATION_ID,
     MEMORY_TEMPORAL_EVALUATION_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
@@ -239,7 +245,9 @@ class SQLiteStore:
         self.bootstrap()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path, timeout=5.0)
+        connection = sqlite3.connect(str(self.db_path), timeout=5.0)
+        key_hex = hashlib.sha256(ensure_app_key(self.paths.workspace_root)).hexdigest()
+        connection.execute(f"PRAGMA key = \"x'{key_hex}'\"")
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA busy_timeout = 5000")
@@ -247,7 +255,8 @@ class SQLiteStore:
 
     def bootstrap(self) -> None:
         self.paths.ensure()
-        with sqlite3.connect(self.db_path) as connection:
+        self._migrate_plaintext_database()
+        with self.connect() as connection:
             connection.executescript(PHASE_1_SQL)
             connection.executescript("""
 CREATE TABLE IF NOT EXISTS model_session_state (
@@ -265,6 +274,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
                 (PHASE_1_MIGRATION_ID, utc_now()),
             )
+
             self._apply_migration(PHASE_2_MIGRATION_ID, PHASE_2_MIGRATION_SQL, connection)
             self._apply_migration(
                 MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
@@ -534,6 +544,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(MEMORY_PROJECTIONS_MIGRATION_ID, MEMORY_PROJECTIONS_SQL, connection)
             self._apply_migration(MEMORY_FTS_MIGRATION_ID, MEMORY_FTS_SQL, connection)
             self._apply_migration(
+                MEMORY_SQLCIPHER_FTS_MIGRATION_ID, MEMORY_SQLCIPHER_FTS_SQL, connection
+            )
+            self._apply_migration(
                 MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
                 MEMORY_RETRIEVAL_AUTHORITY_SQL,
                 connection,
@@ -550,6 +563,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 MEMORY_BACKUP_CATALOG_MIGRATION_ID, MEMORY_BACKUP_CATALOG_SQL, connection
             )
             self._apply_migration(MEMORY_JOBS_MIGRATION_ID, MEMORY_JOBS_SQL, connection)
+            self._apply_migration(
+                MEMORY_AUDIT_RATE_LIMIT_MIGRATION_ID, MEMORY_AUDIT_RATE_LIMIT_SQL, connection
+            )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -567,6 +583,25 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ):
                 with contextlib.suppress(sqlite3.OperationalError):
                     connection.execute(_alter_sql)
+
+    def _migrate_plaintext_database(self) -> None:
+        """Convert a legacy stdlib-SQLite file before SQLCipher opens it."""
+        if not self.db_path.exists() or not self.db_path.read_bytes()[:16].startswith(b"SQLite format 3"):
+            return
+        import sqlite3 as plaintext_sqlite
+
+        legacy_path = self.db_path.with_suffix(".plaintext-backup")
+        self.db_path.replace(legacy_path)
+        try:
+            with plaintext_sqlite.connect(legacy_path) as source, self.connect() as encrypted:
+                dump = "\n".join(source.iterdump()).replace("USING fts5(", "USING fts4(")
+                encrypted.executescript(dump)
+            legacy_path.unlink()
+        except Exception:
+            if self.db_path.exists():
+                self.db_path.unlink()
+            legacy_path.replace(self.db_path)
+            raise
 
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
         row = connection.execute(
@@ -1903,7 +1938,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
               AND superseded_at IS NULL""", (utc_now(), utc_now(), utc_now()))
 
     def search_approved_memory(self, query: str, scope: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
-        terms = [term for term in query.replace('"', " ").split() if term]
+        terms = [term for term in query.replace('"', " ").replace("-", " ").split() if len(term) >= 3]
         if not terms:
             return []
         sql = """SELECT m.* FROM approved_memory_fts f JOIN approved_memory m ON m.memory_id = f.memory_id
@@ -1912,11 +1947,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
           AND (m.valid_from IS NULL OR m.valid_from <= ?) AND (m.valid_until IS NULL OR m.valid_until > ?)
           AND m.superseded_at IS NULL"""
         now = utc_now()
-        params: list[Any] = [" AND ".join(f'"{term}"' for term in terms), now, now, now]
+        params: list[Any] = [" ".join(terms), now, now, now]
         if scope is not None:
             sql += " AND m.scope = ?"
             params.append(scope)
-        sql += " ORDER BY bm25(approved_memory_fts) LIMIT ?"
+        sql += " ORDER BY m.created_at DESC LIMIT ?"
         params.append(limit)
         with self.connect() as connection:
             rows = connection.execute(sql, params).fetchall()
@@ -2393,6 +2428,37 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     (error[:500], now, job_id),
                 )
         return cursor.rowcount > 0
+
+    def consume_memory_job_rate_limit(self, job_type: str, *, limit_per_minute: int) -> bool:
+        if limit_per_minute < 1:
+            raise ValueError("invalid_memory_job_rate_limit")
+        window = utc_now()[:16] + ":00Z"
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT count FROM memory_job_rate_windows WHERE job_type = ? AND window_started_at = ?", (job_type, window)
+            ).fetchone()
+            count = int(row["count"]) if row else 0
+            if count >= limit_per_minute:
+                return False
+            connection.execute(
+                """INSERT INTO memory_job_rate_windows VALUES (?, ?, 1)
+                ON CONFLICT(job_type, window_started_at) DO UPDATE SET count = count + 1""", (job_type, window)
+            )
+        return True
+
+    def record_memory_lifecycle_event(self, memory_id: str, action: str, actor_id: str, details: dict[str, Any] | None = None) -> str:
+        from raiker.contracts.ids import new_id
+
+        if action not in {"archive", "restore", "forget", "purge", "correct", "export", "import", "recall"}:
+            raise ValueError("invalid_memory_lifecycle_action")
+        audit_id = new_id("mla_")
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT INTO memory_lifecycle_audit VALUES (?, ?, ?, ?, ?, ?)",
+                (audit_id, memory_id, action, actor_id, json.dumps(details or {}, sort_keys=True), utc_now()),
+            )
+        return audit_id
 
     # ── Phase 6: Channels & Relay ──
 

@@ -149,6 +149,8 @@ class TestMemoryForget:
         assert service.list_memories() == []
         assert service.set_memory_archived(mid, False, OWNER).ok
         assert [m.memory_id for m in service.list_memories()] == [mid]
+        with service.store.connect() as connection:
+            assert connection.execute("SELECT COUNT(*) FROM memory_lifecycle_audit WHERE memory_id = ?", (mid,)).fetchone()[0] == 2
 
     def test_purge_requires_exact_confirmation(self, service: DashboardService, workspace: Path) -> None:
         mid = _seed_memory(service.store, workspace)

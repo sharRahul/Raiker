@@ -1359,12 +1359,19 @@ CREATE INDEX IF NOT EXISTS idx_memory_projections_active ON memory_projections(p
 
 MEMORY_FTS_MIGRATION_ID = "RAIKER-2008-memory-fts"
 MEMORY_FTS_SQL = """
-CREATE VIRTUAL TABLE IF NOT EXISTS approved_memory_fts USING fts5(
+CREATE VIRTUAL TABLE IF NOT EXISTS approved_memory_fts USING fts4(
   memory_id UNINDEXED, text, tags
 );
 INSERT INTO approved_memory_fts(memory_id, text, tags)
 SELECT memory_id, text, tags_json FROM approved_memory
 WHERE deleted_at IS NULL AND archived_at IS NULL;
+"""
+
+MEMORY_SQLCIPHER_FTS_MIGRATION_ID = "RAIKER-2015-sqlcipher-fts4-repair"
+MEMORY_SQLCIPHER_FTS_SQL = """
+CREATE VIRTUAL TABLE IF NOT EXISTS approved_memory_fts USING fts4(
+  memory_id UNINDEXED, text, tags
+);
 """
 
 MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID = "RAIKER-2009-memory-retrieval-authority"
@@ -1430,4 +1437,17 @@ CREATE TABLE IF NOT EXISTS memory_jobs (
   UNIQUE(job_type, dedup_key)
 );
 CREATE INDEX IF NOT EXISTS idx_memory_jobs_ready ON memory_jobs(status, lease_until, created_at);
+"""
+
+MEMORY_AUDIT_RATE_LIMIT_MIGRATION_ID = "RAIKER-2014-memory-audit-rate-limit"
+MEMORY_AUDIT_RATE_LIMIT_SQL = """
+CREATE TABLE IF NOT EXISTS memory_lifecycle_audit (
+  audit_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, action TEXT NOT NULL,
+  actor_id TEXT NOT NULL, details_json TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_memory_lifecycle_audit_memory ON memory_lifecycle_audit(memory_id, created_at);
+CREATE TABLE IF NOT EXISTS memory_job_rate_windows (
+  job_type TEXT NOT NULL, window_started_at TEXT NOT NULL, count INTEGER NOT NULL,
+  PRIMARY KEY(job_type, window_started_at)
+);
 """

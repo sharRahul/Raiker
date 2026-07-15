@@ -794,6 +794,7 @@ class DashboardService:
         )
         if not ok:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        self.store.record_memory_lifecycle_event(memory_id, "forget", principal.principal_id)
         return ControlResult(ok=True, data={"memory_id": memory_id})
 
     def set_memory_archived(self, memory_id: str, archived: bool, acting_principal_id: str | None) -> ControlResult:
@@ -803,6 +804,7 @@ class DashboardService:
         entry = set_memory_archived(memory_id, archived=archived, workspace_root=self.workspace_root, store=self.store)
         if entry is None:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        self.store.record_memory_lifecycle_event(memory_id, "archive" if archived else "restore", acting_principal_id or "")
         return ControlResult(ok=True, data={"memory_id": memory_id, "archived": archived})
 
     def preview_memory_purge(self, memory_id: str, acting_principal_id: str | None) -> ControlResult:
@@ -828,6 +830,7 @@ class DashboardService:
         self.store.delete_approved_memory(memory_id)
         disposition = {**preview.data, "projections": projections, "completed_storage_locations": ["markdown_export", "sqlite_approved_memory", "sqlite_fts", "projection_mappings"]}
         self.store.create_memory_purge_record(new_id("pur_"), memory_id, acting_principal_id or "", utc_now(), disposition)
+        self.store.record_memory_lifecycle_event(memory_id, "purge", acting_principal_id or "", disposition)
         return ControlResult(ok=True, data={"memory_id": memory_id, "purged": True, "backup_disposition": preview.data["backup_disposition"]})
 
     def edit_memory_controlled(self, memory_id: str, text: str, acting_principal_id: str | None) -> ControlResult:
@@ -853,6 +856,7 @@ class DashboardService:
         )
         if replacement is None:
             return ControlResult(ok=False, reason_code="invalid_memory_correction")
+        self.store.record_memory_lifecycle_event(memory_id, "correct", acting_principal_id or "", {"replacement_memory_id": replacement.memory_id, "reason": reason})
         return ControlResult(ok=True, data={"memory_id": replacement.memory_id, "supersedes_memory_id": memory_id})
 
     def set_memory_search_enabled(self, memory_id: str, search_enabled: bool, acting_principal_id: str | None) -> ControlResult:

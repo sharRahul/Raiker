@@ -22,3 +22,9 @@ def test_memory_job_dead_letters_after_attempt_budget(tmp_path: Path) -> None:
     assert store.finish_memory_job(job_id, "simulated failure")
     with store.connect() as connection:
         assert connection.execute("SELECT status FROM memory_jobs WHERE job_id = ?", (job_id,)).fetchone()["status"] == "dead_letter"
+
+
+def test_memory_job_rate_limit_is_enforced(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    assert store.consume_memory_job_rate_limit("reconcile", limit_per_minute=1)
+    assert not store.consume_memory_job_rate_limit("reconcile", limit_per_minute=1)

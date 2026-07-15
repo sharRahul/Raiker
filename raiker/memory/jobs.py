@@ -8,11 +8,16 @@ from raiker.memory.integrity import inspect_memory_integrity
 from raiker.storage.sqlite import SQLiteStore
 
 
-def run_one_memory_job(*, store: SQLiteStore, workspace_root: str | Path) -> dict[str, object] | None:
+def run_one_memory_job(
+    *, store: SQLiteStore, workspace_root: str | Path, limit_per_minute: int = 12
+) -> dict[str, object] | None:
     lease_until = (datetime.now(UTC) + timedelta(minutes=5)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     job = store.claim_memory_job(lease_until)
     if job is None:
         return None
+    if not store.consume_memory_job_rate_limit(str(job["job_type"]), limit_per_minute=limit_per_minute):
+        store.finish_memory_job(str(job["job_id"]), "rate_limited")
+        return {"job_id": str(job["job_id"]), "job_type": str(job["job_type"]), "rate_limited": True}
     try:
         result: dict[str, object]
         if job["job_type"] == "reconcile":

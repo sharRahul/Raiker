@@ -174,9 +174,18 @@ fail-closed by design.
 
 > **Implementation update (2026-07-15):** Stage I now has a bounded,
 > owner-started SQLite maintenance-job primitive for idempotent reconciliation
-> and integrity scans, including leases, retry attempts, and dead-letter state.
-> It deliberately has no autonomous daemon; rate limiting, monitoring, and
-> load/chaos evidence remain incomplete.
+> and integrity scans, including leases, retry attempts, dead-letter state,
+> per-workspace rate limits, and durable lifecycle audit rows. It deliberately
+> has no autonomous daemon; monitoring and load/chaos evidence remain
+> incomplete.
+
+> **Implementation update (2026-07-15):** `.raiker/raiker.db` now requires
+> SQLCipher through `pysqlcipher3static` (the `pysqlcipher3` DB-API). The
+> workspace-private app key derives the database key before any SQL runs,
+> encrypting SQLite tables, FTS4, vectors, and graph records together. A tested
+> one-time plaintext conversion removes its transient plaintext source on
+> success. The static SQLCipher build lacks FTS5, so the encrypted lexical index
+> uses FTS4 and deterministic recency ordering rather than BM25.
 
 > Current truth update (2026-07-15): reliable memory controls are complete for
 > the current backlog item 3 slice — a user-visible Memory view over the

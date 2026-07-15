@@ -113,11 +113,17 @@ fail-closed by design.
   evidence; hybrid retrieval deduplicates active lexical/vector/graph results;
   and an owner-started integrity report finds stale indexes/projections/edges.
   Stage H's backup catalog records retention, legal hold, restore verification,
-  and erasure disposition. Encryption of memory content/indexes, tenant
-  isolation, background jobs, and operational proof remain required.
+  and erasure disposition. SQLCipher now encrypts the SQLite database, FTS4,
+  vectors, and graph rows using a workspace-derived key; tenant isolation,
+  telemetry, and operational proof remain required.
 - The first maintenance-job primitive is now present: idempotent `reconcile`
   and `integrity_scan` jobs have SQLite leases, retries, and dead-letter state,
-  but no daemon, rate limiting, telemetry, or load/chaos proof exists yet.
+  per-workspace rate limits, and lifecycle audit rows, but no daemon, telemetry,
+  or load/chaos proof exists yet.
+- SQLCipher is provided by `pysqlcipher3static` (imported as `pysqlcipher3`).
+  The bundled build lacks FTS5, so Raiker uses encrypted FTS4 and deterministic
+  recency ordering. Legacy plaintext databases are converted once and the
+  transient plaintext source is removed after success.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

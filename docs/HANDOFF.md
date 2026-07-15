@@ -102,7 +102,7 @@ fail-closed by design.
   records with token and retrieved-storage regression budgets. SQLCipher
   migration also verifies conversion cleanup and encrypted-database access.
 - Still pending for production memory: a representative consented benchmark
-  and live quality/latency/cost thresholds; provider-backed vector projection,
+  and live quality/latency/cost thresholds; provider-backed runtime retrieval,
   entity extraction/review, and runtime hybrid integration; principal/workspace
   isolation and managed per-workspace key lifecycle; real encrypted backup and
   restore/erasure drills; monitoring, daemon/worker operation, load/soak/chaos

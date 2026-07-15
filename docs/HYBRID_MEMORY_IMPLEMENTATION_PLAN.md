@@ -250,15 +250,21 @@ the next Stage F slice.
    correction in one transaction.
 2. Add a versioned evaluation corpus with scoped, sensitive, archived,
    forgotten, corrected, and time-qualified cases.
-3. Measure Recall@k, MRR, nDCG, policy-leak count, and p95 latency per lexical,
-   vector, graph, and hybrid strategy. Persist only aggregate, non-sensitive
-   evaluation results.
-4. Add correction/supersession links so older facts are retained as evidence but
-   never preferred over an active correction.
+3. Measure Precision@k, Recall@k, MRR, nDCG, policy-leak count, p50/p95
+   latency, token use, and compute/storage cost per lexical, vector, graph,
+   and hybrid strategy. Persist only aggregate, non-sensitive evaluation
+   results.
+4. Add correction/supersession links and valid-time/effective-time fields so a
+   fact can be represented as `was_true`, `currently_true`, or `superseded`.
+   Older facts remain evidence but are never preferred over an active
+   correction.
+5. Expose human controls for what is remembered, why it was proposed/approved,
+   scope, sensitivity, retention/expiry, correction, archive, forget, and
+   purge; record the responsible human and evidence IDs for each decision.
 
-**Exit:** CI fails on a policy leak or an agreed retrieval-regression budget;
-every reported metric identifies corpus version, backend version, scope, and
-latency distribution.
+**Exit:** CI fails on a policy leak or an agreed quality/latency/cost regression
+budget; every reported metric identifies corpus version, backend version,
+scope, workload, and latency distribution.
 
 ### Stage G — gated semantic and entity retrieval
 
@@ -272,6 +278,9 @@ latency distribution.
    deterministic, observable weights.
 4. Keep raw content out of runtime events and show source IDs/trust labels in
    the assembled context.
+5. Route inferred facts through a human review queue. Sensitive, uncertain, or
+   conflicting inferences must never auto-promote; consolidation may merge only
+   when it preserves every source evidence ID, uncertainty, and prior version.
 
 **Exit:** capability-off and policy-denied paths are proven no-ops; enabled
 retrieval meets the Stage F recall/latency budgets without a visibility leak.
@@ -280,26 +289,32 @@ retrieval meets the Stage F recall/latency budgets without a visibility leak.
 
 1. Enforce principal/workspace ownership in every memory row and projection;
    add tenant-isolation and confused-deputy tests.
-2. Encrypt durable rows, artifacts, and backups at rest using owner-managed
-   keys; support key rotation and recovery drills.
+2. Encrypt durable rows, artifacts, indexes, and backups at rest with a
+   per-workspace data-encryption key wrapped by an owner/user-managed key;
+   define key rotation, revocation, recovery, and multi-user key-access rules.
 3. Replace the local backup notice with a backup catalog that records encrypted
-   snapshots, retention deadlines, restore tests, and deletion completion.
+   snapshots, retention/legal-hold deadlines, restore tests, erasure requests,
+   deletion completion, and every backup still pending expiry or erasure.
 4. Add immutable lifecycle audit records for recall, correction, export,
-   import, archive, forget, purge, and admin access.
+   import, archive, forget, purge, legal-hold changes, backup access, and admin
+   access.
 
-**Exit:** external security review, restoration drill, purge-disposition drill,
-and tenant-isolation suite all pass with documented evidence.
+**Exit:** external security review, restoration drill, migration rollback drill,
+verified-erasure/pending-backup disposition drill, and tenant-isolation suite
+all pass with documented evidence.
 
 ### Stage I — reliability and scale
 
 1. Move projection/reconciliation work to owner-enabled, idempotent jobs with
-   leases, retries, dead-letter reporting, bounded concurrency, and metrics.
+   leases, retries, dead-letter reporting, bounded concurrency, per-tenant rate
+   limits, and queue/worker/latency/error monitoring.
 2. Add integrity scanners for orphaned artifacts, stale FTS/vector/graph rows,
    checksum mismatches, path inconsistencies, and failed purge locations.
 3. Load-test realistic corpus sizes and concurrent users; set published p50/p95
    latency, availability, recovery-time, and recovery-point objectives.
-4. Run failure-injection tests for interrupted writes, index rebuilds, restore,
-   key rotation, and provider outages.
+4. Run load, soak, and chaos/failure-injection tests for interrupted writes,
+   queue duplication, index rebuilds, restore, migration rollback, key rotation,
+   backup corruption, and provider outages.
 
 **Exit:** documented SLOs are met under load and failure injection; operational
 dashboards and runbooks are exercised by people other than the implementer.

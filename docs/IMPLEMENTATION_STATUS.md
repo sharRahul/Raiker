@@ -143,6 +143,14 @@ fail-closed by design.
 > retrieval, tenancy/encryption, backup cataloging, job reliability, and an
 > independent benchmark remain future work; no market-leading claim is made.
 
+> **Roadmap completeness correction (2026-07-15):** Stages F–I explicitly
+> require precision/recall/latency/cost measurement; correction and temporal
+> supersession; human memory-decision controls and review queues; per-workspace
+> encryption keys; legal-hold and verified/pending-backup erasure evidence;
+> rate-limited idempotent jobs; recovery/migration rollback, integrity, load,
+> soak, and chaos testing. These are requirements, not claims of current
+> implementation.
+
 > **Implementation update (2026-07-15):** Stage F has started with
 > `RAIKER-2009-memory-retrieval-authority`: governed search reads SQLite's
 > active-only FTS source, while edits, search opt-outs, and expiry synchronize

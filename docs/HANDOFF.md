@@ -93,6 +93,12 @@ fail-closed by design.
   retrieval, tenancy/encryption/backup operations, reliability/scale, then
   independent benchmark evidence. Do not market the current implementation as
   “best”; that claim requires the Stage J evidence.
+- The roadmap explicitly covers the full production checklist: FTS/vector/graph
+  retrieval with filtering before ranking; precision/recall/latency/cost;
+  corrections and temporal/supersession states; per-workspace encrypted data
+  keys; legal holds and verified/pending backup erasure; rate-limited,
+  idempotent jobs; recovery/rollback/integrity/load/chaos evidence; and
+  human controls, review queues, and evidence-preserving consolidation.
 - Stage F has begun: `RAIKER-2009` makes SQLite + active-only FTS authoritative
   for governed memory retrieval and keeps corrections/search opt-outs/expiry
   synchronized. `raiker.memory.evaluation` provides the initial

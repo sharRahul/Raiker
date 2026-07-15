@@ -4,7 +4,13 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import ClientMetadata, PromptEnvelope, PromptOptions, PromptPayload, UserMetadata
+from raiker.contracts.models import (
+    ClientMetadata,
+    PromptEnvelope,
+    PromptOptions,
+    PromptPayload,
+    UserMetadata,
+)
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.storage.sqlite import SQLiteStore

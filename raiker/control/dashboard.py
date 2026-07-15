@@ -1516,7 +1516,7 @@ class DashboardService:
             raise ValueError(f"unknown_project:{project_id}")
         if parent_task_id is not None:
             parent = self.store.load_task(parent_task_id)
-            parent_session = parent and self.store.load_session(parent.session_id)
+            parent_session = self.store.load_session(parent.session_id) if parent is not None else None
             if parent is None or parent_session is None or (
                 user_id is not None
                 and parent_session.get("user_id") not in (None, user_id)

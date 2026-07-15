@@ -12,8 +12,8 @@ from raiker.api.schemas import (
     BrainSourceRequest,
     BulkDeleteSessionsRequest,
     CreateProjectRequest,
-    MoveProjectRequest,
     ModelConnectionRequest,
+    MoveProjectRequest,
     SaveProjectContextRequest,
     SelectProjectRequest,
     SetModelAdvisorRequest,
@@ -31,8 +31,8 @@ from raiker.models.connections import clear_model_connection, put_model_connecti
 from raiker.models.factory import ModelProviderFactory
 from raiker.models.policy_state import provider_runtime_policy_from_gates
 from raiker.models.registry import ModelProfileRegistry
-from raiker.storage.sqlite import SQLiteStore
 from raiker.runtime.authority.models import Principal
+from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
 
@@ -327,14 +327,14 @@ async def list_projects(
 async def create_project(
     body: CreateProjectRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Create a named project for the authenticated local human.
 
     The project root is derived server-side and always contained inside the
     workspace; a project grants no authority.
     """
-    session, _principal = _auth_data
+    session, _principal = auth_data
     result = _service(request).create_project(body.name, session.principal_id, parent_id=body.parent_id)
     if not result.ok:
         raise HTTPException(
@@ -348,13 +348,13 @@ async def create_project(
 async def select_project(
     body: SelectProjectRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Set (or clear) the active project for the authenticated local human.
 
     New sessions are stamped with the active project; selecting grants nothing.
     """
-    session, _principal = _auth_data
+    session, _principal = auth_data
     result = _service(request).select_project(body.project_id, session.principal_id)
     if not result.ok:
         raise HTTPException(
@@ -579,7 +579,7 @@ async def get_connections(
     Enabling a connector is done through the capability-gate + decision-mode
     control plane (gate-manager only), not here.
     """
-    session, _principal = _auth_data
+    session, _principal = auth_data
     return serialize_dto(_service(request).get_connections(session.principal_id))
 
 
@@ -608,14 +608,14 @@ async def list_provider_models(
 async def set_model_selection(
     body: SetModelSelectionRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Persist the operator's model selection (human gate-manager only).
 
     Placeholder profiles require a concrete model; provider policy is validated
     fail-closed before the selection is saved.
     """
-    session, _principal = _auth_data
+    session, _principal = auth_data
     result = await _service(request).set_model_selection(
         body.profile_id, body.model, session.principal_id
     )
@@ -665,7 +665,7 @@ async def set_model_connection(
 async def set_model_advisor(
     body: SetModelAdvisorRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Persist (or clear) the user-owned advisor model profile (gate-manager only).
 
@@ -673,7 +673,7 @@ async def set_model_advisor(
     advisor_model_runtime capability, its decision mode (default ask), and
     provider policy (hosted/private gate + egress allowlist + key) per call.
     """
-    session, _principal = _auth_data
+    session, _principal = auth_data
     result = _service(request).set_model_advisor(body.profile_id, session.principal_id)
     if not result.ok:
         raise HTTPException(
@@ -687,10 +687,10 @@ async def set_model_advisor(
 async def set_model_fallback(
     body: SetModelFallbackRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Set the user-owned ordered model fallback sequence (human gate-manager only)."""
-    session, _principal = _auth_data
+    session, _principal = auth_data
     result = _service(request).set_model_fallback_sequence(body.profile_ids, session.principal_id)
     if not result.ok:
         raise HTTPException(

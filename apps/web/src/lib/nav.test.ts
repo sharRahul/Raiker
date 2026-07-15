@@ -21,6 +21,8 @@ describe("nav model", () => {
       "search-chat",
       "memory",
       "tasks",
+      "brain",
+      "work",
       "approvals",
       "projects",
     ]);
@@ -43,6 +45,8 @@ describe("nav model", () => {
       "memory",
       "approvals",
       "tasks",
+      "brain",
+      "work",
       "sessions",
       "projects",
       "capabilities",

@@ -79,7 +79,7 @@ MEMORY_CONTROL = {
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 
@@ -192,7 +192,7 @@ class TestListContracts:
             workspace_root=workspace,
             store=SQLiteStore(workspace),
             governance=MemoryGovernance(
-                "evt_c", "", None, "test", 1.0, 1.0, "until_forget", "approved", "principal_rahul"
+                "evt_c", "", None, "test", 1.0, 1.0, "until_forget", "approved", "principal_owner"
             ),
         )
         h = _headers(_token(client))

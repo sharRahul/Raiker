@@ -35,7 +35,7 @@ def _enable_caps(store: SQLiteStore, svc: RuntimeControlService, caps: tuple[str
         with store.connect() as connection:
             connection.execute(
                 "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-                (cap, "principal_rahul", utc_now(), "e2e"),
+                (cap, "principal_owner", utc_now(), "e2e"),
             )
         svc.set_capability_state(cap, "enabled_runtime", None, "e2e")
 
@@ -46,14 +46,14 @@ def _force_enable_caps(store: SQLiteStore, caps: tuple[str, ...]) -> None:
         with store.connect() as connection:
             connection.execute(
                 "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-                (cap, "principal_rahul", now, "e2e"),
+                (cap, "principal_owner", now, "e2e"),
             )
         store.upsert_capability_gate_state({
             "capability": cap,
             "state": "enabled_runtime",
-            "requested_by": "principal_rahul",
+            "requested_by": "principal_owner",
             "requested_at": now,
-            "activated_by": "principal_rahul",
+            "activated_by": "principal_owner",
             "activated_at": now,
             "reason": "e2e",
             "created_at": now,
@@ -68,7 +68,7 @@ def _ws(tmp_path: Path) -> Path:
 
 
 def _setup(ws: Path) -> dict[str, Any]:
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "e2e")
     store = SQLiteStore(ws)
@@ -77,7 +77,7 @@ def _setup(ws: Path) -> dict[str, Any]:
         for cap in _TIER1_CAPS:
             connection.execute(
                 "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-                (cap, "principal_rahul", now, "e2e"),
+                (cap, "principal_owner", now, "e2e"),
             )
     for cap in _TIER1_CAPS:
         svc.set_capability_state(cap, "enabled_runtime", None, "e2e")
@@ -86,7 +86,7 @@ def _setup(ws: Path) -> dict[str, Any]:
         for cap in ("admin_mutation", "policy_mutation", "role_mutation"):
             connection.execute(
                 "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-                (cap, "principal_rahul", now, "e2e"),
+                (cap, "principal_owner", now, "e2e"),
             )
     registry = ExecutorRegistry()
     registry.register("approval_execution_relay", ApprovalExecutionRelay(ws, store))
@@ -102,8 +102,8 @@ def _setup(ws: Path) -> dict[str, Any]:
 
 
 def _make_human(store: SQLiteStore) -> Principal:
-    raw = store.get_principal("principal_rahul")
-    assert raw is not None, "bootstrap must have created principal_rahul"
+    raw = store.get_principal("principal_owner")
+    assert raw is not None, "bootstrap must have created principal_owner"
     return Principal(**raw)
 
 
@@ -124,7 +124,7 @@ def test_file_write_executor_happy(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="write_file",
         tool_or_service_name="write_file",
         arguments={"path": "hello.txt", "text": "Hello, World!"},
@@ -163,7 +163,7 @@ def test_approval_relay_executor_happy(tmp_path: Path) -> None:
             arguments={"path": "approved_hello.txt", "text": "Approved Content"},
             risk_level="low",
             requires_approval=True,
-            proposed_by="principal_rahul",
+            proposed_by="principal_owner",
         ),
         session_id="e2e", turn_id=None, status="approval_required",
     )
@@ -174,7 +174,7 @@ def test_approval_relay_executor_happy(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="approval_execution_relay",
         tool_or_service_name="approval_execution_relay",
         arguments={"approval_id": approval_id},
@@ -215,7 +215,7 @@ def test_executor_not_called_on_deny(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="write_file",
         tool_or_service_name="write_file",
         arguments={"path": "no_write.txt", "text": "should not appear"},
@@ -247,7 +247,7 @@ def test_disabled_gate_blocks_execution(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="write_file",
         tool_or_service_name="write_file",
         arguments={"path": "blocked.txt", "text": "should not appear"},
@@ -271,7 +271,7 @@ def test_missing_executor_fails_closed(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="write_file",
         tool_or_service_name="write_file",
         arguments={"path": "unavailable.txt", "text": "should not appear"},
@@ -298,7 +298,7 @@ def test_approval_relay_unknown_approval(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="approval_execution_relay",
         tool_or_service_name="approval_execution_relay",
         arguments={"approval_id": "nonexistent"},
@@ -328,7 +328,7 @@ def test_action_executed_event_present(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="write_file",
         tool_or_service_name="write_file",
         arguments={"path": "event_test.txt", "text": "event content"},
@@ -403,7 +403,7 @@ def test_memory_write_executor_happy(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="memory_write",
         tool_or_service_name="memory_write",
         arguments={
@@ -461,7 +461,7 @@ def test_memory_forget_executor(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="memory_forget",
         tool_or_service_name="memory_forget",
         arguments={"memory_id": entry.memory_id},
@@ -488,7 +488,7 @@ def test_memory_write_denied_no_text(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="memory_write",
         tool_or_service_name="memory_write",
         arguments={},
@@ -513,7 +513,7 @@ def test_memory_write_disabled_gate(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"),
-        principal_id="principal_rahul",
+        principal_id="principal_owner",
         action_type="memory_write",
         tool_or_service_name="memory_write",
         arguments={"text": "should not be written"},
@@ -536,7 +536,7 @@ def test_shell_executor_denied_no_command(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
     action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_rahul",
+        action_id=new_id("act_"), principal_id="principal_owner",
         action_type="shell", tool_or_service_name="shell",
         arguments={}, risk_level=RiskLevelValue.LOW,
     )
@@ -556,7 +556,7 @@ def test_shell_executor_blocked_not_allowed(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
     action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_rahul",
+        action_id=new_id("act_"), principal_id="principal_owner",
         action_type="shell", tool_or_service_name="shell",
         arguments={"command": ["rm", "-rf", "/"]}, risk_level=RiskLevelValue.LOW,
     )
@@ -576,7 +576,7 @@ def test_process_executor_denied_no_executable(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
     action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_rahul",
+        action_id=new_id("act_"), principal_id="principal_owner",
         action_type="process", tool_or_service_name="process",
         arguments={}, risk_level=RiskLevelValue.LOW,
     )
@@ -596,7 +596,7 @@ def test_web_fetch_denied_no_url(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
     action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_rahul",
+        action_id=new_id("act_"), principal_id="principal_owner",
         action_type="web_fetch", tool_or_service_name="web_fetch",
         arguments={}, risk_level=RiskLevelValue.LOW,
     )
@@ -616,7 +616,7 @@ def test_web_fetch_egress_denied(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
     action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_rahul",
+        action_id=new_id("act_"), principal_id="principal_owner",
         action_type="web_fetch", tool_or_service_name="web_fetch",
         arguments={"url": "http://malicious.example.com/data"},
         risk_level=RiskLevelValue.LOW,
@@ -637,7 +637,7 @@ def test_network_execution_egress_denied(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
     action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_rahul",
+        action_id=new_id("act_"), principal_id="principal_owner",
         action_type="network", tool_or_service_name="network",
         arguments={"url": "http://evil.com/hack"},
         risk_level=RiskLevelValue.LOW,
@@ -660,7 +660,7 @@ def test_tier2_disabled_gate_blocks_execution(tmp_path: Path) -> None:
     authority = RuntimeAuthority(store, writer, executor_registry=registry)
     principal = _make_human(store)
     action = GovernedAction(
-        action_id=new_id("act_"), principal_id="principal_rahul",
+        action_id=new_id("act_"), principal_id="principal_owner",
         action_type="shell", tool_or_service_name="shell",
         arguments={"command": ["echo", "test"]}, risk_level=RiskLevelValue.LOW,
     )

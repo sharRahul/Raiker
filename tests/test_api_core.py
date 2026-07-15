@@ -20,7 +20,7 @@ def temp_workspace(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def bootstrapped_workspace(temp_workspace: Path) -> Path:
-    bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+    bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
     return temp_workspace
 
 
@@ -32,7 +32,7 @@ def app(bootstrapped_workspace: Path) -> FastAPI:
 @pytest.fixture
 def owner_token(bootstrapped_workspace: Path) -> str:
     store = ApiSessionStore(bootstrapped_workspace)
-    raw, _ = store.create_session("principal_rahul")
+    raw, _ = store.create_session("principal_owner")
     return raw
 
 
@@ -100,7 +100,7 @@ class TestAiPrincipalDenied:
     def test_ai_principal_cannot_flip_gate_403(
         self, temp_workspace: Path, app: FastAPI,
     ) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
         _create_ai_principal(temp_workspace)
         store = ApiSessionStore(temp_workspace)
         raw, _ = store.create_session("principal_ai_assistant")

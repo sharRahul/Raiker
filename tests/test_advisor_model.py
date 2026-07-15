@@ -52,7 +52,7 @@ from raiker.tools.broker import ToolBroker
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "advisor"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 
@@ -63,14 +63,14 @@ def store(workspace: Path) -> SQLiteStore:
 
 def _enable_gate(workspace: Path, store: SQLiteStore) -> RuntimeControlService:
     ctrl = RuntimeControlService(workspace)
-    ctrl.activate_runtime_mode("local_single_user_runtime", "principal_rahul", "test")
+    ctrl.activate_runtime_mode("local_single_user_runtime", "principal_owner", "test")
     with store.connect() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref)"
             " VALUES (?, ?, ?, ?)",
             (
                 "advisor_model_runtime",
-                "principal_rahul",
+                "principal_owner",
                 utc_now(),
                 "docs/threat-models/advisor-model.md",
             ),
@@ -78,7 +78,7 @@ def _enable_gate(workspace: Path, store: SQLiteStore) -> RuntimeControlService:
     result = ctrl.set_capability_state(
         "advisor_model_runtime",
         "enabled_runtime",
-        "principal_rahul",
+        "principal_owner",
         "test",
         confirmation_token="CONFIRM",
     )
@@ -88,13 +88,13 @@ def _enable_gate(workspace: Path, store: SQLiteStore) -> RuntimeControlService:
 
 def _allow(ctrl: RuntimeControlService) -> None:
     result = ctrl.set_capability_decision_mode(
-        "advisor_model_runtime", "allow", "principal_rahul", "test"
+        "advisor_model_runtime", "allow", "principal_owner", "test"
     )
     assert result.ok, result.reason_code
 
 
 def _set_advisor(workspace: Path, profile_id: str = "anthropic-hosted") -> None:
-    result = DashboardService(workspace).set_model_advisor(profile_id, "principal_rahul")
+    result = DashboardService(workspace).set_model_advisor(profile_id, "principal_owner")
     assert result.ok, result.reason_code
 
 
@@ -113,7 +113,7 @@ class TestAdvisorServiceGovernance:
     def test_auto_withholds_offmachine_consult(self, workspace: Path, store: SQLiteStore) -> None:
         ctrl = _enable_gate(workspace, store)
         result = ctrl.set_capability_decision_mode(
-            "advisor_model_runtime", "auto", "principal_rahul", "test"
+            "advisor_model_runtime", "auto", "principal_owner", "test"
         )
         assert result.ok, result.reason_code
         outcome = AdvisorService(workspace, store).consult("q")
@@ -122,7 +122,7 @@ class TestAdvisorServiceGovernance:
     def test_deny_mode_blocks(self, workspace: Path, store: SQLiteStore) -> None:
         ctrl = _enable_gate(workspace, store)
         result = ctrl.set_capability_decision_mode(
-            "advisor_model_runtime", "deny", "principal_rahul", "test"
+            "advisor_model_runtime", "deny", "principal_owner", "test"
         )
         assert result.ok, result.reason_code
         outcome = AdvisorService(workspace, store).consult("q")
@@ -249,11 +249,11 @@ class TestAdvisorExecutor:
         self, workspace: Path, store: SQLiteStore
     ) -> None:
         ctrl = RuntimeControlService(workspace)
-        ctrl.activate_runtime_mode("local_single_user_runtime", "principal_rahul", "test")
+        ctrl.activate_runtime_mode("local_single_user_runtime", "principal_owner", "test")
         result = ctrl.set_capability_state(
             "advisor_model_runtime",
             "enabled_runtime",
-            "principal_rahul",
+            "principal_owner",
             "test",
             confirmation_token="CONFIRM",
         )
@@ -352,7 +352,7 @@ class TestModelAdvisorApi:
 
     @pytest.fixture
     def owner_token(self, workspace: Path) -> str:
-        raw, _ = ApiSessionStore(workspace).create_session("principal_rahul")
+        raw, _ = ApiSessionStore(workspace).create_session("principal_owner")
         return raw
 
     @staticmethod

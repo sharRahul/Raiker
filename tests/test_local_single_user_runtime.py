@@ -56,28 +56,28 @@ def _has_event(workspace_root: Path, event_type: str) -> bool:
 
 class TestOwnerBootstrap:
     def test_bootstrap_owner_succeeds_when_no_owner(self, temp_workspace: Path) -> None:
-        result = bootstrap_owner("rahul", "Rahul", "rahul@example.com", workspace_root=temp_workspace)
+        result = bootstrap_owner("owner", "Owner", "owner@example.com", workspace_root=temp_workspace)
         assert "Bootstrap denied" not in result
         assert "Owner bootstrap successful" in result
-        assert "rahul" in result
+        assert "owner" in result
         assert check_owner_bootstrapped(temp_workspace)
 
     def test_bootstrap_owner_denied_when_owner_exists(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
-        result = bootstrap_owner("rahul2", "Rahul Two", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
+        result = bootstrap_owner("rahul2", "Owner Two", workspace_root=temp_workspace)
         assert "Bootstrap denied: owner already exists." in result
 
     def test_bootstrap_creates_user_principal_roles(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", "rahul@example.com", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", "owner@example.com", workspace_root=temp_workspace)
         store = SQLiteStore(temp_workspace)
 
-        user = store.load_user("rahul")
+        user = store.load_user("owner")
         assert user is not None
-        assert user["display_name"] == "Rahul"
-        assert user["email"] == "rahul@example.com"
+        assert user["display_name"] == "Owner"
+        assert user["email"] == "owner@example.com"
         assert user["is_active"]
 
-        principal = store.get_principal("principal_rahul")
+        principal = store.get_principal("principal_owner")
         assert principal is not None
         assert principal["principal_type"] == "human"
         role_ids = principal["role_ids"]
@@ -89,13 +89,13 @@ class TestOwnerBootstrap:
             assert role is not None, f"Role {rid} not found"
 
     def test_bootstrap_emits_events(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
         assert _has_event(temp_workspace, "owner_bootstrap_requested")
         assert _has_event(temp_workspace, "owner_bootstrap_created")
 
     def test_bootstrap_denied_emits_event(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
-        result = bootstrap_owner("rahul2", "Rahul Two", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
+        result = bootstrap_owner("rahul2", "Owner Two", workspace_root=temp_workspace)
         assert "denied" in result
         assert _has_event(temp_workspace, "owner_bootstrap_denied")
 
@@ -113,18 +113,18 @@ class TestOwnerBootstrap:
 
 class TestPrincipalResolution:
     def test_resolve_explicit_owner(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
-        principal, err = resolve_local_principal(temp_workspace, explicit_principal_id="principal_rahul")
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
+        principal, err = resolve_local_principal(temp_workspace, explicit_principal_id="principal_owner")
         assert principal is not None
         assert err == ""
-        assert principal.principal_id == "principal_rahul"
+        assert principal.principal_id == "principal_owner"
 
     def test_resolve_default_owner_when_exactly_one(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
         principal, err = resolve_local_principal(temp_workspace)
         assert principal is not None
         assert err == ""
-        assert principal.principal_id == "principal_rahul"
+        assert principal.principal_id == "principal_owner"
 
     def test_deny_when_no_owner(self, temp_workspace: Path) -> None:
         principal, err = resolve_local_principal(temp_workspace)
@@ -132,16 +132,16 @@ class TestPrincipalResolution:
         assert "No owner principal" in err
 
     def test_deny_inactive_owner(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
         store = SQLiteStore(temp_workspace)
-        store.deactivate_principal("principal_rahul")
-        principal, err = resolve_local_principal(temp_workspace, "principal_rahul")
+        store.deactivate_principal("principal_owner")
+        principal, err = resolve_local_principal(temp_workspace, "principal_owner")
         assert principal is None
         assert "not active" in err
 
     def test_resolution_emits_events(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
-        resolve_local_principal(temp_workspace, "principal_rahul")
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
+        resolve_local_principal(temp_workspace, "principal_owner")
         assert _has_event(temp_workspace, "principal_resolved")
 
     def test_resolution_failed_emits_event(self, temp_workspace: Path) -> None:
@@ -154,7 +154,7 @@ class TestPrincipalResolution:
 
 class TestRuntimeGateAuthorization:
     def test_owner_can_activate_runtime_mode(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
         result = handle_runtime_mode_activate(
             "/runtime-mode activate local_single_user_runtime --reason test",
             workspace_root=temp_workspace,
@@ -163,7 +163,7 @@ class TestRuntimeGateAuthorization:
         assert "Acting principal" in result
 
     def test_runtime_gate_manager_can_activate_runtime_mode(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
         result = handle_runtime_mode_activate(
             "/runtime-mode activate local_single_user_runtime --reason test",
             workspace_root=temp_workspace,
@@ -171,7 +171,7 @@ class TestRuntimeGateAuthorization:
         assert "denied" not in result.lower()
 
     def test_owner_can_disable_runtime_mode(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
         handle_runtime_mode_activate(
             "/runtime-mode activate local_single_user_runtime --reason test",
             workspace_root=temp_workspace,
@@ -189,7 +189,7 @@ class TestRuntimeGateAuthorization:
 
 class TestCapabilityTransitions:
     def test_owner_can_enable_admin_mutation(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
         handle_runtime_mode_activate(
             "/runtime-mode activate local_single_user_runtime --reason test",
             workspace_root=temp_workspace,
@@ -202,7 +202,7 @@ class TestCapabilityTransitions:
         assert "Acting principal" in result
 
     def test_owner_can_enable_role_mutation(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
         handle_runtime_mode_activate(
             "/runtime-mode activate local_single_user_runtime --reason test",
             workspace_root=temp_workspace,
@@ -214,7 +214,7 @@ class TestCapabilityTransitions:
         assert "denied" not in result.lower()
 
     def test_owner_can_disable_admin_mutation(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
         handle_runtime_mode_activate(
             "/runtime-mode activate local_single_user_runtime --reason test",
             workspace_root=temp_workspace,
@@ -230,7 +230,7 @@ class TestCapabilityTransitions:
         assert "denied" not in result.lower()
 
     def test_dangerous_capabilities_cannot_be_enabled(self, temp_workspace: Path) -> None:
-        bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+        bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
         handle_runtime_mode_activate(
             "/runtime-mode activate local_single_user_runtime --reason test",
             workspace_root=temp_workspace,
@@ -257,7 +257,7 @@ class TestEndToEndLocalRuntime:
         ws = temp_workspace
 
         # 1. Bootstrap owner
-        result = bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+        result = bootstrap_owner("owner", "Owner", workspace_root=ws)
         assert "Owner bootstrap successful" in result
 
         # 2. Runtime mode status shows default
@@ -387,24 +387,24 @@ def test_whoami_without_owner(temp_workspace: Path) -> None:
 
 
 def test_whoami_with_owner(temp_workspace: Path) -> None:
-    bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+    bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
     result = handle_whoami(workspace_root=temp_workspace)
     assert "Acting principal" in result
-    assert "rahul" in result
+    assert "owner" in result
 
 
 def test_principals_list(temp_workspace: Path) -> None:
-    bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+    bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
     result = handle_principals(workspace_root=temp_workspace)
-    assert "principal_rahul" in result
+    assert "principal_owner" in result
 
 
 def test_principal_detail(temp_workspace: Path) -> None:
-    bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+    bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
     result = handle_principal_detail(
-        "/principal principal_rahul", workspace_root=temp_workspace,
+        "/principal principal_owner", workspace_root=temp_workspace,
     )
-    assert "principal_rahul" in result
+    assert "principal_owner" in result
     assert "human" in result
 
 
@@ -414,7 +414,7 @@ def test_get_bootstrap_status(temp_workspace: Path) -> None:
     assert status["acting_principal_available"] is False
     assert status["runtime_gate_manager_available"] is False
 
-    bootstrap_owner("rahul", "Rahul", workspace_root=temp_workspace)
+    bootstrap_owner("owner", "Owner", workspace_root=temp_workspace)
     status = get_bootstrap_status(temp_workspace)
     assert status["owner_bootstrapped"] is True
     assert status["acting_principal_available"] is True

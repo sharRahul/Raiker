@@ -134,14 +134,14 @@ def _ws(tmp_path: Path) -> Path:
 
 
 def _enable_install(ws: Path) -> None:
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     svc = RuntimeControlService(ws)
     svc.activate_runtime_mode("local_single_user_runtime", None, "test")
     store = SQLiteStore(ws)
     with store.connect() as connection:
         connection.execute(
             "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref) VALUES (?, ?, ?, ?)",
-            ("plugin_install", "principal_rahul", utc_now(), "docs/threat-models/plugins.md"),
+            ("plugin_install", "principal_owner", utc_now(), "docs/threat-models/plugins.md"),
         )
     result = svc.set_capability_state(
         "plugin_install", "enabled_runtime", None, "test", confirmation_token="confirm"
@@ -175,10 +175,10 @@ def test_install_fails_closed_on_unallowlisted_dependency(
         store, EventLogWriter(store),
         executor_registry=build_default_executor_registry(ws, store),
     )
-    raw = store.get_principal("principal_rahul")
+    raw = store.get_principal("principal_owner")
     assert raw is not None
     result = authority.route_action(
-        _install_action("principal_rahul", "manifest.json"), Principal(**raw)
+        _install_action("principal_owner", "manifest.json"), Principal(**raw)
     )
     assert result.error == "plugin_install_plan_not_approved:denied"
     assert store.list_plugin_install_records() == []
@@ -198,10 +198,10 @@ def test_install_succeeds_with_allowlisted_pinned_dependency(
         store, EventLogWriter(store),
         executor_registry=build_default_executor_registry(ws, store),
     )
-    raw = store.get_principal("principal_rahul")
+    raw = store.get_principal("principal_owner")
     assert raw is not None
     result = authority.route_action(
-        _install_action("principal_rahul", "manifest.json"), Principal(**raw)
+        _install_action("principal_owner", "manifest.json"), Principal(**raw)
     )
     assert result.decision == "allow"
     records = store.list_plugin_install_records(status="installed")

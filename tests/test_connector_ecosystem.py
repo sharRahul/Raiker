@@ -27,7 +27,7 @@ from raiker.storage.sqlite import SQLiteStore
 def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
-    bootstrap_owner("rahul", "Rahul", workspace_root=ws)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
     return ws
 
 
@@ -102,29 +102,29 @@ def test_vault_is_fail_closed_and_ciphertext_is_not_plaintext(
 ) -> None:
     store = SQLiteStore(workspace)
     vault = ConnectorVault(store)
-    vault.put("principal_rahul", "github", {"access_token": "top-secret"})
+    vault.put("principal_owner", "github", {"access_token": "top-secret"})
     with store.connect() as connection:
         encrypted = bytes(
             connection.execute("SELECT encrypted_payload FROM connector_credentials").fetchone()[0]
         )
     assert b"top-secret" not in encrypted
-    assert vault.get("principal_rahul", "github") == {"access_token": "top-secret"}
+    assert vault.get("principal_owner", "github") == {"access_token": "top-secret"}
     monkeypatch.delenv("RAIKER_CONNECTOR_VAULT_KEY")
     with pytest.raises(ValueError, match="connector_vault_key_unset"):
-        vault.get("principal_rahul", "github")
+        vault.get("principal_owner", "github")
 
 
 def test_invoker_rechecks_session_enablement_at_execution(workspace: Path) -> None:
     store = SQLiteStore(workspace)
     with pytest.raises(ValueError, match="connector_not_enabled"):
-        ConnectorInvoker(store)._require_enabled("principal_rahul", "github")
+        ConnectorInvoker(store)._require_enabled("principal_owner", "github")
     with store.connect() as connection:
         connection.execute(
             """INSERT INTO connector_installations
                (principal_id, connector_id, enabled, auth_status, installed_at, updated_at)
-               VALUES ('principal_rahul', 'github', 1, 'connected', 'now', 'now')"""
+               VALUES ('principal_owner', 'github', 1, 'connected', 'now', 'now')"""
         )
-    ConnectorInvoker(store)._require_enabled("principal_rahul", "github")
+    ConnectorInvoker(store)._require_enabled("principal_owner", "github")
 
 
 def test_manifest_compilation_is_bounded_and_under_200ms() -> None:
@@ -141,7 +141,7 @@ def test_enabled_connector_is_in_model_context_without_credentials(workspace: Pa
         connection.execute(
             """INSERT INTO connector_installations
                (principal_id, connector_id, enabled, auth_status, installed_at, updated_at)
-               VALUES ('principal_rahul', 'github', 1, 'connected', 'now', 'now')"""
+               VALUES ('principal_owner', 'github', 1, 'connected', 'now', 'now')"""
         )
     bundle = ContextGatherer().gather(
         workspace_root=workspace,

@@ -82,6 +82,18 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class PasswordRecoveryBeginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    username: str
+
+
+class PasswordRecoveryCompleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ticket: str
+    code: str
+    new_password: str
+
+
 class VaultKeyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     key: str

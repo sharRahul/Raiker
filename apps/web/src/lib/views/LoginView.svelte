@@ -17,13 +17,15 @@
     runtimeState?: RuntimeState;
   } = $props();
 
-  let mode = $state<"login" | "register">("login");
+  let mode = $state<"login" | "register" | "recovery" | "recovery-complete">("login");
   let step = $state<"credentials" | "mfa">("credentials");
   let username = $state("");
   let password = $state("");
   let confirmPassword = $state("");
   let mfaCode = $state("");
   let ticket = $state("");
+  let recoveryCode = $state("");
+  let bootstrapAllowed = $state(false);
   let error = $state<string | null>(null);
   let busy = $state(false);
   let showPassword = $state(false);
@@ -60,7 +62,16 @@
 
   onMount(() => {
     void probeRuntime();
+    void loadBootstrapStatus();
   });
+
+  async function loadBootstrapStatus() {
+    try {
+      bootstrapAllowed = (await auth.bootstrapStatus()).can_register;
+    } catch {
+      bootstrapAllowed = false;
+    }
+  }
 
   async function probeRuntime() {
     try {
@@ -98,6 +109,40 @@
     showPassword = false;
     await tick();
     document.getElementById("username")?.focus();
+  }
+
+  async function beginRecovery(event: Event) {
+    event.preventDefault();
+    error = null;
+    busy = true;
+    try {
+      ticket = (await auth.beginPasswordRecovery(username)).ticket;
+      mode = "recovery-complete";
+      await tick();
+      document.getElementById("recovery-code")?.focus();
+    } catch {
+      error = "Password recovery could not be started.";
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function completeRecovery(event: Event) {
+    event.preventDefault();
+    error = null;
+    busy = true;
+    try {
+      await auth.completePasswordRecovery(ticket, recoveryCode, password);
+      mode = "login";
+      password = "";
+      recoveryCode = "";
+      await tick();
+      document.getElementById("password")?.focus();
+    } catch {
+      error = "Password recovery failed.";
+    } finally {
+      busy = false;
+    }
   }
 
   async function submitCredentials(event: Event) {
@@ -215,6 +260,27 @@
           <button type="submit" class="btn btn-primary submit" disabled={busy || !instanceName.trim()}>{busy ? "Starting…" : "Create and open instance"}</button>
         </form>
         <button type="button" class="secondary" onclick={() => { instanceSetup = false; error = null; }} disabled={busy}>Return to login</button>
+      {:else if mode === "recovery"}
+        <h1 id="unlock-title">Recover password</h1>
+        <p class="intro">Enter your username to begin local recovery.</p>
+        <form onsubmit={beginRecovery}>
+          <label for="username">Username</label>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="user" size={17} /></span><input id="username" bind:value={username} autocomplete="username" required disabled={formDisabled} /></div>
+          {#if error}<p class="error" role="alert">{error}</p>{/if}
+          <button type="submit" class="btn btn-primary submit" disabled={formDisabled} aria-busy={busy}>{busy ? "Starting…" : "Begin recovery"}</button>
+        </form>
+        <button type="button" class="secondary" onclick={() => { mode = "login"; error = null; }} disabled={formDisabled}>Return to unlock</button>
+      {:else if mode === "recovery-complete"}
+        <h1 id="unlock-title">Verify recovery</h1>
+        <p class="intro">An existing authenticator code or one-time backup recovery code is required. Then choose a new password.</p>
+        <form onsubmit={completeRecovery}>
+          <label for="recovery-code">Recovery verification code</label>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span><input id="recovery-code" bind:value={recoveryCode} autocomplete="one-time-code" required disabled={formDisabled} /></div>
+          <label for="password">New password</label>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span><input id="password" type="password" bind:value={password} autocomplete="new-password" required disabled={formDisabled} /></div>
+          {#if error}<p class="error" role="alert">{error}</p>{/if}
+          <button type="submit" class="btn btn-primary submit" disabled={formDisabled} aria-busy={busy}>{busy ? "Updating…" : "Reset password"}</button>
+        </form>
       {:else if step === "credentials"}
         <h1 id="unlock-title">{isRegister ? "Create local account" : "Unlock Raiker"}</h1>
         <p class="intro">
@@ -284,14 +350,22 @@
 
         <div class="divider" aria-hidden="true"><span>or</span></div>
 
-        <button type="button" class="secondary" onclick={switchMode} disabled={formDisabled}>
-          <Icon name={isRegister ? "user" : "user-plus"} size={18} />
-          {isRegister ? "Return to unlock" : "Create local account"}
-        </button>
+        {#if bootstrapAllowed || isRegister}
+          <button type="button" class="secondary" onclick={switchMode} disabled={formDisabled}>
+            <Icon name={isRegister ? "user" : "user-plus"} size={18} />
+            {isRegister ? "Return to unlock" : "Create local account"}
+          </button>
+        {/if}
+
+        {#if !isRegister}
+          <button type="button" class="secondary" onclick={() => { mode = "recovery"; error = null; }} disabled={formDisabled}>
+            Forgot password?
+          </button>
+        {/if}
 
         <button type="button" class="secondary instance-button" onclick={() => { instanceSetup = true; error = null; }} disabled={formDisabled}>
           <Icon name="projects" size={18} />
-          Create separate instance
+          Create new user and separate instance
         </button>
 
         <div id="privacy-note" class="privacy">

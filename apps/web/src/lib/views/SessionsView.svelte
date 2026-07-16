@@ -64,6 +64,25 @@
     selected = next;
   }
 
+  // Select-all toggles every visible (filtered+ordered) session. If all are
+  // already selected it clears; otherwise it selects all.
+  function toggleSelectAll() {
+    if (ordered === null) return;
+    const allIds = ordered.map((s) => s.session_id);
+    const allSelected = allIds.every((id) => selected.has(id));
+    const next = new Set(selected);
+    if (allSelected) {
+      for (const id of allIds) next.delete(id);
+    } else {
+      for (const id of allIds) next.add(id);
+    }
+    selected = next;
+  }
+
+  const allVisibleSelected = $derived(
+    ordered !== null && ordered.length > 0 && ordered.every((s) => selected.has(s.session_id)),
+  );
+
   async function togglePin(s: SessionSummary) {
     actionError = null;
     try {
@@ -270,7 +289,7 @@
       <table class="table">
         <thead>
           <tr>
-            <th class="check-col"></th>
+            <th class="check-col"><input type="checkbox" checked={allVisibleSelected} onchange={toggleSelectAll} aria-label="Select all sessions" /></th>
             <th>Session</th>
             <th>Status</th>
             <th>Turns</th>

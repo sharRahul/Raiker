@@ -34,6 +34,44 @@
   // kept here so the segmented control updates without a full reload.
   let modeOverrides = $state<Record<string, DecisionMode>>({});
   let modeBusyCap = $state<string | null>(null);
+  let selectedCaps = $state<Set<string>>(new Set());
+  let bulkBusy = $state(false);
+
+  function toggleCapSelected(capability: string) {
+    const next = new Set(selectedCaps);
+    if (next.has(capability)) next.delete(capability);
+    else next.add(capability);
+    selectedCaps = next;
+  }
+  function toggleSelectAllInGroup(caps: string[]) {
+    const allSelected = caps.every((c) => selectedCaps.has(c));
+    const next = new Set(selectedCaps);
+    if (allSelected) { for (const c of caps) next.delete(c); }
+    else { for (const c of caps) next.add(c); }
+    selectedCaps = next;
+  }
+  function allSelectedInGroup(caps: string[]): boolean {
+    return caps.length > 0 && caps.every((c) => selectedCaps.has(c));
+  }
+  // Bulk-apply a tightening mode (ask/deny) to all selected capabilities.
+  async function bulkSetMode(mode: DecisionMode) {
+    if (bulkBusy || selectedCaps.size === 0) return;
+    bulkBusy = true;
+    notice = null;
+    try {
+      for (const cap of selectedCaps) {
+        await api.setCapabilityDecisionMode(cap, mode, "bulk-set via web UI");
+        modeOverrides = { ...modeOverrides, [cap]: mode };
+      }
+      notice = { kind: "ok", text: `${selectedCaps.size} capabilit${selectedCaps.size === 1 ? "y" : "ies"} set to "${DECISION_MODE_COPY[mode].label}".` };
+      selectedCaps = new Set();
+    } catch (e) {
+      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      notice = { kind: "error", text: explained ? `${explained.plain} ${explained.remediation ?? ""}` : "The bulk change was rejected." };
+    } finally {
+      bulkBusy = false;
+    }
+  }
 
   function modeFor(gate: CapabilityGate): DecisionMode | "unknown" {
     const override = modeOverrides[gate.capability];
@@ -64,13 +102,21 @@
   const filtered = $derived.by(() => {
     if (gates === null) return [];
     const q = search.trim().toLowerCase();
+    // Drop capabilities that are legacy contract gates or purely inherent —
+    // they have no real executor and their decision mode has no effect, so
+    // showing Ask/Allow/Auto/Deny for them is waste of space.
+    const actionable = gates.filter((g) => {
+      const label = capabilityLabel(g.capability);
+      if (label.toLowerCase().includes("legacy gate")) return false;
+      return true;
+    });
     const matches = q
-      ? gates.filter(
+      ? actionable.filter(
           (g) =>
             g.capability.toLowerCase().includes(q) ||
             capabilityLabel(g.capability).toLowerCase().includes(q),
         )
-      : gates;
+      : actionable;
     return groupByPhase(matches);
   });
 
@@ -204,6 +250,16 @@
   <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
 {/if}
 
+{#if selectedCaps.size > 0}
+  <div class="bulk-bar" role="toolbar" aria-label="Bulk capability actions">
+    <span class="bulk-count">{selectedCaps.size} selected</span>
+    <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selectedCaps = new Set())} disabled={bulkBusy}>Clear</button>
+    <span class="bulk-label">Set all to:</span>
+    <button type="button" class="btn btn-sm" onclick={() => void bulkSetMode("ask")} disabled={bulkBusy}>Ask</button>
+    <button type="button" class="btn btn-sm btn-danger" onclick={() => void bulkSetMode("deny")} disabled={bulkBusy}>Deny</button>
+  </div>
+{/if}
+
 <div class="toolbar">
   <div class="search">
     <Icon name="search" size={15} />
@@ -229,11 +285,29 @@
 {:else}
   {#each filtered as group (group.phase)}
     <div class="cap-list">
+      <div class="phase-head">
+        <label class="phase-select-all">
+          <input
+            type="checkbox"
+            checked={allSelectedInGroup(group.gates.map((g) => g.capability))}
+            onchange={() => toggleSelectAllInGroup(group.gates.map((g) => g.capability))}
+            aria-label={`Select all phase ${group.phase} capabilities`}
+          />
+          Phase {group.phase}
+        </label>
+      </div>
       {#each group.gates as gate (gate.capability)}
         {@const isOpen = expanded === gate.capability}
         {@const mode = modeFor(gate)}
         <div class="cap card" class:open={isOpen}>
           <div class="cap-row">
+            <input
+              type="checkbox"
+              class="cap-check"
+              checked={selectedCaps.has(gate.capability)}
+              onchange={() => toggleCapSelected(gate.capability)}
+              aria-label={`Select ${capabilityLabel(gate.capability)}`}
+            />
             <button
               type="button"
               class="cap-toggle"
@@ -365,6 +439,13 @@
     gap: var(--space-2);
     margin-bottom: var(--space-2);
   }
+  .phase-head { padding: 0 0.9rem 0.3rem; }
+  .phase-select-all { display:flex; align-items:center; gap:0.4rem; font-size:0.72rem; font-weight:650; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); cursor:pointer; }
+  .phase-select-all input { accent-color: var(--accent); }
+  .cap-check { accent-color: var(--accent); flex:0 0 auto; }
+  .bulk-bar { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; padding:0.55rem 0.9rem; border:1px solid var(--accent-border); border-radius:var(--r-md); background:var(--accent-soft); margin-bottom:var(--space-4); }
+  .bulk-count { font-weight:700; color:var(--accent); font-size:0.86rem; }
+  .bulk-label { color:var(--text-3); font-size:0.78rem; margin-left:0.3rem; }
   .cap {
     padding: 0;
     overflow: hidden;

@@ -13,12 +13,15 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
+from raiker.api.routes_instances import _require_loopback
 from raiker.api.schemas import (
     ChangePasswordRequest,
     ElevateRequest,
     LoginRequest,
     MfaCodeRequest,
     MfaVerifyRequest,
+    PasswordRecoveryBeginRequest,
+    PasswordRecoveryCompleteRequest,
     RegisterRequest,
 )
 from raiker.api.sessions import ApiSessionStore
@@ -46,6 +49,7 @@ def _result_body(result: Any) -> dict[str, Any]:
 
 @router.post("/api/auth/register")
 async def register(body: RegisterRequest, request: Request) -> dict[str, Any]:
+    _require_loopback(request)
     service = _service(request)
     try:
         service.register(body.username, body.password)
@@ -64,6 +68,33 @@ async def login(body: LoginRequest, request: Request) -> dict[str, Any]:
             status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
         ) from exc
     return _result_body(result)
+
+
+@router.get("/api/auth/bootstrap-status")
+async def bootstrap_status(request: Request) -> dict[str, bool]:
+    return {"can_register": not AccountService(_ws(request))._store.list_accounts()}  # noqa: SLF001
+
+
+@router.post("/api/auth/password-recovery/begin")
+async def begin_password_recovery(
+    body: PasswordRecoveryBeginRequest, request: Request
+) -> dict[str, Any]:
+    # Always acknowledge with the same shape. The opaque ticket is returned for
+    # both known and unknown users; only a real short-lived ticket can complete.
+    _require_loopback(request)
+    return {"ok": True, "ticket": _service(request).begin_password_recovery(body.username)}
+
+
+@router.post("/api/auth/password-recovery/complete")
+async def complete_password_recovery(
+    body: PasswordRecoveryCompleteRequest, request: Request
+) -> dict[str, bool]:
+    _require_loopback(request)
+    try:
+        _service(request).complete_password_recovery(body.ticket, body.code, body.new_password)
+    except AuthError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+    return {"ok": True}
 
 
 @router.post("/api/auth/mfa/verify")
@@ -88,7 +119,7 @@ async def mfa_enroll(request: Request) -> dict[str, Any]:
 async def mfa_activate(body: MfaCodeRequest, request: Request) -> dict[str, Any]:
     session, principal = AuthMiddleware(_ws(request)).authenticate(request)
     try:
-        _service(request).activate_mfa(principal.principal_id, body.code)
+        _service(request).activate_mfa(principal.principal_id, body.code, session.session_id)
     except AuthError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)

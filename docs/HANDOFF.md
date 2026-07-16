@@ -143,7 +143,7 @@ fail-closed by design.
   and `integrity_scan` jobs have SQLite leases, retries, and dead-letter state,
   per-workspace rate limits, and lifecycle audit rows, but no daemon, telemetry,
   or load/chaos proof exists yet.
-- SQLCipher is provided by `pysqlcipher3static` (imported as `pysqlcipher3`).
+- SQLCipher is provided by `sqlcipher3-wheels` (imported as `sqlcipher3`).
   The bundled build lacks FTS5, so Raiker uses encrypted FTS4 and deterministic
   recency ordering. Legacy plaintext databases are converted once and the
   transient plaintext source is removed after success.
@@ -430,3 +430,242 @@ and the relevant validation scripts. For web work run, from `apps/web`,
 `npm run check`, `npm run lint`, `npm test -- --run`, and `npm run build`.
 Record only the commands actually run and their results in the commit/PR; do
 not copy old green counts into this file.
+
+## Control Deck Pause Point — 2026-07-16
+
+The approved Control Deck work is tracked in:
+
+- `docs/specs/2026-07-16-raiker-control-deck-design.md`
+- `docs/plans/2026-07-16-raiker-control-deck-implementation.md`
+
+Do not discard the current dirty worktree. It includes intentional backend,
+web, test, dependency, and documentation changes and must be included in the
+eventual verified commit.
+
+### Product policy: one user per instance
+
+Raiker is **one user per instance**. Additional users get their own separate
+Raiker instance. Multi-account workspaces are not a supported state.
+
+The code permits what the policy forbids, so do not infer the policy from the
+code: `instance_account_guard` blocks only new *registration*, `login` has no
+guard check, and `_migrate_legacy_controls_to_original_owner` claims the guard
+for the oldest account without deactivating the others. A pre-existing active
+account can therefore still log in. There is no multi-account API surface and
+none should be built.
+
+Owner scoping is still live and load-bearing — a deactivated recovered-from
+owner, a CLI-bootstrapped owner, and non-human/delegated principals all coexist
+in one database. `tests/conftest.py::seed_account` seeds an extra
+credential-backed account directly into the tables (bypassing the guard claim)
+so isolation invariants can still be proven. That fixture is the sanctioned way
+to test owner isolation; a second web registration is not.
+
+### Plan Task 2 — implemented, reviewed, fixed, NOT yet accepted
+
+Task 2 implements the one-user-per-new-instance boundary, local recovery,
+per-principal controls, and owner-scoped data access:
+
+- Atomic initial-account and CLI-owner bootstrap transitions.
+- Atomic forced recovery with owner-scoped data/control transfer and old-session
+  revocation.
+- Atomic single-use MFA/recovery-ticket claiming and backup-code consumption.
+- Owner-scoped brain sources, prompt context, attachments, memory/vector
+  retrieval, projects, tasks, approvals, interrupts, model selection, and
+  capability controls.
+- Owner-isolated purge that removes target durable artifacts without deleting
+  another owner's records.
+
+**The two independent reviews ran on 2026-07-16. Both returned Fail**, with
+7 critical defects — each reproduced against a real workspace, not merely read.
+All 7 are now fixed:
+
+1. **CLI turns silently lost all context.** `gatherer.py` tested
+   `owner_principal_id` for truthiness rather than "is this a real account".
+   The CLI sends `UserMetadata`'s default `local_user`, which is truthy but is
+   not a principal, so project context, model profile, connector status, and
+   memory were dropped. Fixed with one shared predicate,
+   `SQLiteStore.account_scope()`, applied at the gather entry point.
+2. **`purge_account` did not purge.** `approved_memory_fts` and
+   `memory_projections` are keyed by `memory_id` only, so the owner-scoped
+   delete never matched them; plaintext also survived in `.raiker/memory/*.md`.
+   Both now deleted/unlinked.
+3. **Recovery orphaned the original-owner pointer.**
+   `_original_owner_from_connection` had no `is_active` filter, so it kept
+   resolving to the deactivated old owner and filed all later unattributed data
+   against a dead principal. The guard row is now the authority and every
+   fallback branch filters `is_active = 1`.
+
+   **This fix was initially only half done, and this file claimed otherwise.**
+   `_backfill_owned_context_data` — the function that actually *writes* the
+   attribution, and the one the pointer fix exists to protect — kept its own
+   inline copy of the resolution with no guard check and no `is_active` filter,
+   while its sibling `_backfill_owned_memory_metadata` correctly delegated. Both
+   independent re-reviews caught it; one reproduced it end-to-end through the
+   real `save_attachment` API. The duplicate query is deleted and
+   `test_context_data_backfill_files_unowned_rows_to_the_live_owner` fails
+   without the fix. Lesson: a fix landing on the read path is not the same as a
+   fix, and the accompanying test asserted the helper rather than the caller its
+   own docstring named as the reason the fix mattered.
+4. **CLI-bootstrapped owners could never be recovered.** `bootstrap_owner`
+   creates no credentials, but recovery required a credential-backed owner —
+   so the documented lost-access path always denied. The credential owner is
+   now nullable and the principal/guard/data transfer runs without it.
+5. **A non-idempotent migration was suppressed and marked applied.**
+   `_apply_migration` swallowed `OperationalError` then recorded success;
+   `OWNED_CONTEXT_DATA_SQL` is three `ADD COLUMN` statements and `executescript`
+   commits implicitly, so a crash mid-migration permanently denied
+   `vector_records` and `attachments` their `owner_principal_id` columns.
+   Suppression removed; `_skip_existing_add_columns` makes re-runs safe.
+6. **Connection leak blocked the plaintext-DB conversion on Windows.**
+   `with self.connect()` commits but does not close, and Windows refuses to
+   replace a file with an open handle. Closed explicitly at that one site.
+   NOTE: this one **pre-dated Task 2** — it fails at HEAD too. It is not a
+   Task 2 regression, contrary to the review that reported it.
+7. **22 test regressions** across 14 files, plus fixture reconciliation.
+
+Verified gates on the current worktree — full suite, run unpiped:
+
+```text
+python -m pytest -q                     # PYTEST_EXIT=0, 0 failed (was 23)
+python -m ruff check .                  # All checks passed!
+python -m mypy raiker apps tests        # Success: no issues found in 418 source files
+python -m compileall -q raiker tests    # exit 0
+```
+
+**Task 2's checkbox is still unchecked, deliberately.** Both reviews rated the
+underlying engineering sound — atomicity verified under 8-way concurrency
+(exactly one success every time), isolation tests confirmed to fail when the
+owner predicate is stripped — and both called this "re-review after fixes, not
+a redesign". But both verdicts were issued against the pre-fix code. **Re-run
+both reviews against the fixed tree before checking Task 2 off.** Review scope:
+atomic registration/recovery, MFA ticket replay, brain-source isolation,
+recovery data/control transfer, account purge, and all owner-scoped APIs.
+
+### Verification lessons — do not repeat these
+
+- **A focused suite is not an acceptance gate.** The previous handoff recorded
+  `pytest` on four files (101 passed) as evidence. Those four files did pass —
+  while 23 tests failed elsewhere. A gate that runs only the files you changed
+  cannot detect the regressions you caused elsewhere. Run the full suite.
+- **`pytest -q | tail` returns tail's exit code, not pytest's.** It reported
+  success over 23 failures in this session. Redirect to a file instead.
+- **Use `python -m pytest -o addopts="" -q > file 2>&1`.** `pyproject.toml:42`
+  already sets `addopts = "-q"`, so the obvious `pytest -q` is really `-qq`,
+  which suppresses the summary line entirely — the output file is dots and no
+  `N passed`. A "0 failed" claim read from that file's text is not evidence; only
+  the exit code carries it. Two independent reviewers flagged this.
+- **Synthetic fixtures are not real data.** `purge_account` passed every test and
+  both reviews, then failed on the first real workspace — three separate defects,
+  because no fixture had a conversation in it. Drive the real thing.
+- **A fix on the read path is not a fix.** The dead-owner hardening landed on the
+  resolver and not on the backfill that consumes it, and the test asserted the
+  resolver — so it passed while the bug stayed live on the write path.
+- **The previous handoff claimed `mypy` passed. It did not** — `mypy raiker
+  apps tests` had 6 errors, two of which were real runtime `TypeError`s from a
+  signature change whose callers were never updated.
+- **Every critical here shipped because no test covered the path** (CLI gather,
+  CLI recovery, crash-resume migration). A fix without a test that fails before
+  it is not done.
+- **Reviewer claims need independent verification.** One review asserted "all
+  23 failures pass on HEAD"; a baseline run disproved it (defect 6 above). The
+  findings that held up were the ones with reproduction transcripts attached.
+
+### Deferred security work
+
+Deliberately deferred to the credential/security task rather than silently
+treated as complete:
+
+- Encrypt or otherwise protect durable `.raiker/memory/*.md` content at rest;
+  SQLCipher protects the database but not standalone memory files. (Purge now
+  unlinks these files — that is not the same as encrypting them at rest.)
+- Complete entity-graph ownership hardening/migration beyond the owner predicate
+  on graph-neighborhood reads.
+- The general SQLite migration error/recovery policy. The specific
+  suppress-and-mark-applied defect is fixed (see 5 above); a broader review of
+  migration failure handling is still outstanding.
+
+Known remaining review findings, not yet actioned:
+
+- `begin_password_recovery` leaks account existence **by timing**, contradicting
+  its own docstring: measured 28.5 ms (existing username) vs 5.8 ms
+  (nonexistent), distributions non-overlapping, so one sample distinguishes. The
+  hit branch writes a session row; the miss branch returns
+  `secrets.token_hex(32)`. Response *shape* is identical; timing is not.
+- Owner-scope parameters default to `None`/`""`, so a forgotten argument fails
+  open. No live fail-open on the API surface today — but this is the mechanism
+  that let the backfill defect above become reachable.
+- Recovery duplicates role assignments (verified 2x per role; duplicates only,
+  no escalation).
+- `login` has a residual ~27 ms timing gap; the hashing equalization is correct,
+  the remainder is `_account_principal_is_active` opening a connection twice.
+
+**Corrected — do not carry these forward as findings:**
+
+- `_transfer_owner_scoped_data`'s docstring was previously recorded here as
+  false. It is **true**: a reviewer enumerated all swept tables and no audit or
+  event table carries an owner/principal/user column (they key on `session_id`),
+  so audit history is not rewritten. The real risk is future schema drift
+  silently opting a new audit table in.
+- `complete_password_recovery` had **no attempt lockout** — previously rated
+  Important here. Measured, it was Critical: 339 guesses/sec, the ticket
+  survived 300 failures, and `valid_window=1` keeps three TOTP codes live at
+  once, giving ~30% account takeover per 5-minute ticket against a freely
+  re-mintable ticket. **Now fixed** — recovery shares `login`'s
+  `LOCKOUT_THRESHOLD` counter, and the failure count is committed before the
+  raise so an attempt cannot roll back its own evidence.
+  `test_password_recovery_locks_out_after_repeated_wrong_codes` covers it.
+- `_check_mfa` consumed backup codes with no transaction, so a single-use code
+  granted **8 of 8 concurrent elevations** and a stale write could restore a
+  spent code for replay. Pre-existing, not a Task 2 regression — but Task 2
+  rewrote `verify_mfa` to consume transactionally and left the two sibling
+  callers (`/api/auth/elevate`, `routes_vault`) on the old path. **Now fixed** in
+  the shared function, which covers both callers.
+
+### `purge_account` — three defects found only by running it on real data
+
+Neither review caught these; both verified purge against synthetic fixtures with
+no conversation history. All three surfaced the first time it ran against a real
+workspace, and all three are fixed with tests that fail without the fix:
+
+- **Foreign-key ordering.** The sweep walks `sqlite_master`, which is
+  table-creation order — parent before child. `turns.session_id` references
+  `sessions`, so purge raised `FOREIGN KEY constraint failed` on any account that
+  ever held a conversation. Fixed with `PRAGMA defer_foreign_keys = ON` inside an
+  explicit `BEGIN IMMEDIATE`; the pragma is silently undone if set outside a
+  transaction.
+- **Silent no-op on a NULL delegation link.** Principals from older bootstraps
+  carry a NULL `delegated_by_user_id` and are linked to their user only by the
+  `principal_<user_id>` convention. Resolving from the column alone yielded NULL,
+  so every user-keyed and session-keyed delete matched nothing and purge returned
+  success having deleted nothing. Fixed by sharing one resolver,
+  `_principal_user_id_from_connection`.
+- **Rows orphaned by its own deletes.** The sweep can only match tables carrying
+  an owner/session/project column. Five FK edges have children that carry none —
+  `policy_decisions` and `approvals` -> `tool_actions`, `gist_memories` ->
+  `eidetic_observations`, and both `*_relationship*` tables -> `approved_memory` —
+  so they were left pointing at deleted parents and failed the deferred check at
+  COMMIT. `_delete_rows_orphaned_by_purge` lets SQLite name the orphans its own
+  deletes created rather than hardcoding a list that rots on schema drift.
+
+### Safe next-session sequence
+
+1. Read this handoff, the design spec, and the implementation plan. Inspect
+   `git status --short`; preserve all current changes.
+2. Finish Task 2 acceptance first: re-run both independent reviews against the
+   **fixed** tree, return any findings, then rerun the full suite and update
+   only Task 2's checkbox if both reviews pass. Do not mark Task 2 complete
+   from implementer tests alone.
+3. Execute Plan Task 3 next: add owner-scoped session rename/archive lifecycle
+   with tests before implementation. It is the next dependency for the shared
+   session menu and Sessions UI.
+4. Continue Tasks 4 and 5 before the corresponding UI work. Task 4 is governed
+   local stdio MCP only; Task 5 owns credential lifecycle, local scans, opt-in
+   HIBP range checks, monitoring, notifications, and the deferred durable-memory
+   security concerns above where applicable.
+5. Execute UI Tasks 6-10 in plan order. Preserve the current dark, compact
+   Control Deck visual system, use typed API contracts, and do not expose a UI
+   control without a supported backend operation.
+6. Run Plan Task 11's full Python/web/browser/static validators before any
+   commit. Only then inspect `git diff`, stage all intended changes, commit, and
+   push `origin/main` as requested.

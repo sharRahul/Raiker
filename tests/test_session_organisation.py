@@ -359,28 +359,22 @@ class TestSessionIsolation:
     def client(self, app: FastAPI) -> TestClient:
         return TestClient(app)
 
-    def test_account_cannot_delete_another_accounts_session(
-        self, client: TestClient, workspace: Path
+    def test_account_cannot_delete_another_accounts_session(  # type: ignore[no-untyped-def]
+        self, client: TestClient, workspace: Path, seed_account
     ) -> None:
-        # Bob registers and owns sess_bob.
-        bob_token = client.post(
-            "/api/auth/register", json={"username": "bob", "password": "right-pass-123"}
-        ).json()["token"]
-        bob_headers = {"Authorization": f"Bearer {bob_token}"}
+        # This workspace is already CLI-bootstrapped with an owner, so both
+        # accounts are seeded directly rather than registered. Session reads
+        # stay user-scoped regardless of how an account came to exist.
         store = SQLiteStore(workspace)
-        bob_account = store.get_account_by_username("bob")
-        assert bob_account is not None
-        bob_principal = store.get_principal(str(bob_account["principal_id"]))
+        bob_principal_id, bob_token = seed_account(workspace, "bob")
+        bob_headers = {"Authorization": f"Bearer {bob_token}"}
+        bob_principal = store.get_principal(bob_principal_id)
         assert bob_principal is not None
         bob_user_id = str(bob_principal["delegated_by_user_id"])
         store.create_session("sess_bob", str(workspace), user_id=bob_user_id)
 
-        # Alex registers as a separate account.
-        registered = client.post(
-            "/api/auth/register", json={"username": "alex", "password": "right-pass-123"}
-        )
-        assert registered.status_code == 200, registered.text
-        alex_headers = {"Authorization": f"Bearer {registered.json()['token']}"}
+        _, alex_token = seed_account(workspace, "alex")
+        alex_headers = {"Authorization": f"Bearer {alex_token}"}
 
         # Alex cannot see Bob's session at all (list isolation).
         listed = client.get("/api/sessions", headers=alex_headers).json()
@@ -400,28 +394,22 @@ class TestSessionIsolation:
             client.get("/api/sessions/sess_bob", headers=bob_headers).status_code == 200
         )
 
-    def test_account_cannot_retag_another_accounts_session(
-        self, client: TestClient, workspace: Path
+    def test_account_cannot_retag_another_accounts_session(  # type: ignore[no-untyped-def]
+        self, client: TestClient, workspace: Path, seed_account
     ) -> None:
-        # Bob registers and owns sess_bob.
-        bob_token = client.post(
-            "/api/auth/register", json={"username": "bob2", "password": "right-pass-123"}
-        ).json()["token"]
-        bob_headers = {"Authorization": f"Bearer {bob_token}"}
+        # Both accounts are seeded directly: this workspace is already
+        # CLI-bootstrapped with an owner, so registration refuses them. Session
+        # writes stay user-scoped regardless of how an account came to exist.
         store = SQLiteStore(workspace)
-        bob_account = store.get_account_by_username("bob2")
-        assert bob_account is not None
-        bob_principal = store.get_principal(str(bob_account["principal_id"]))
+        bob_principal_id, bob_token = seed_account(workspace, "bob2")
+        bob_headers = {"Authorization": f"Bearer {bob_token}"}
+        bob_principal = store.get_principal(bob_principal_id)
         assert bob_principal is not None
         bob_user_id = str(bob_principal["delegated_by_user_id"])
         store.create_session("sess_bob2", str(workspace), user_id=bob_user_id)
 
-        # Alex registers as a separate account.
-        registered = client.post(
-            "/api/auth/register", json={"username": "alex2", "password": "right-pass-123"}
-        )
-        assert registered.status_code == 200, registered.text
-        alex_headers = {"Authorization": f"Bearer {registered.json()['token']}"}
+        _, alex_token = seed_account(workspace, "alex2")
+        alex_headers = {"Authorization": f"Bearer {alex_token}"}
 
         # Alex cannot retag Bob's session — refused as unknown_session
         # because of user isolation (mirrors delete).

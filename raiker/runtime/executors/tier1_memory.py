@@ -64,6 +64,9 @@ class MemoryWriteExecutor:
             source=str(action.arguments.get("source", "agent")),
             store=self._store,
             governance=governance,
+            # A non-account principal (the terminal client) leaves this None so
+            # write_memory falls back to the instance's original owner.
+            owner_principal_id=self._store.account_scope(principal.principal_id),
         )
         return ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
@@ -98,10 +101,13 @@ class MemoryForgetExecutor:
             source_type=str(action.arguments.get("source_type", "executor")),
             deleted_by=str(action.arguments.get("deleted_by", action.principal_id)),
         )
+        store = SQLiteStore(self._workspace_root)
         found = forget_memory(
             memory_id,
             workspace_root=self._workspace_root,
+            store=store,
             governance=governance,
+            owner_principal_id=store.account_scope(principal.principal_id),
         )
         if not found:
             return ExecutionResult(

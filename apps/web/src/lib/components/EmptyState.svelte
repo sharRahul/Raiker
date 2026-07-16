@@ -6,12 +6,13 @@
     icon = "spark",
     title,
     body = null,
-  }: { icon?: IconName; title: string; body?: string | null } = $props();
+    serif = false,
+  }: { icon?: IconName; title: string; body?: string | null; serif?: boolean } = $props();
 </script>
 
 <div class="empty">
   <span class="empty-icon"><Icon name={icon} size={22} /></span>
-  <p class="empty-title">{title}</p>
+  <p class="empty-title" class:serif={serif}>{title}</p>
   {#if body}
     <p class="empty-body">{body}</p>
   {/if}
@@ -41,6 +42,12 @@
     font-weight: 650;
     color: var(--text-1);
     margin: 0;
+  }
+  .empty-title.serif {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    font-size: 1.35rem;
+    letter-spacing: -0.005em;
   }
   .empty-body {
     font-size: 0.85rem;

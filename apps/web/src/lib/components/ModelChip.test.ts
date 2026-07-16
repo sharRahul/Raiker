@@ -59,8 +59,8 @@ describe("ModelChip", () => {
     render(ModelChip, { models });
     const link = screen.getByRole("link", { name: /local · llama\.cpp/i });
     expect(link).toHaveAttribute("href", "#/models");
-    // The tooltip carries the profile, model, and endpoint class verbatim.
-    expect(link).toHaveAttribute("title", "local-gguf · qwen2.5-7b-instruct · local_process");
+    // The tooltip carries the provider name, model, and humanized endpoint kind.
+    expect(link).toHaveAttribute("title", "llama.cpp · qwen2.5-7b-instruct · Local");
   });
 
   it("shows a hosted chip with honest egress state", () => {

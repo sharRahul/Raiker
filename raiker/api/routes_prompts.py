@@ -133,7 +133,11 @@ async def submit_prompt(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    session, _principal = _auth_data
+    session, principal = _auth_data
+    if body.session_id:
+        existing = SQLiteStore(_ws(request)).load_session(body.session_id)
+        if existing is not None and existing.get("user_id") != principal.delegated_by_user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
     try:
         envelope = _build_envelope(body, session.principal_id)
     except ContractValidationError as exc:
@@ -162,7 +166,11 @@ async def stream_prompt(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> StreamingResponse:
-    session, _principal = _auth_data
+    session, principal = _auth_data
+    if body.session_id:
+        existing = SQLiteStore(_ws(request)).load_session(body.session_id)
+        if existing is not None and existing.get("user_id") != principal.delegated_by_user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
     try:
         envelope = _build_envelope(body, session.principal_id)
     except ContractValidationError as exc:
@@ -199,18 +207,24 @@ async def interrupts(
     writer = EventLogWriter(store)
     controller = InterruptController(store, writer)
     manager = TaskManager(store, writer)
+    user_id = store.principal_user_id(principal.principal_id)
+    session = store.load_session(body.session_id)
+    if session is None or session.get("user_id") != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"ok": False, "reason_code": "interrupt_target_not_found"})
 
     if body.all:
         targets = [
-            t for t in manager.list_tasks(session_id=body.session_id)
+            t for t in store.list_tasks(session_id=body.session_id, user_id=user_id)
             if t.status in _ACTIVE_TASK_STATES
         ]
     elif body.task_id:
         one = manager.get_task(body.task_id)
-        targets = [one] if one is not None else []
+        targets = [one] if one is not None and one.session_id == body.session_id and session.get("user_id") == user_id else []
     else:
         targets = []
 
+    if body.task_id and not targets:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"ok": False, "reason_code": "interrupt_target_not_found"})
     reason = body.reason or "user requested stop"
     applied: list[dict[str, str]] = []
     for task in targets:
@@ -224,9 +238,6 @@ async def interrupts(
         )
         # Governed safe-boundary interrupt: emits interrupt_received + safe_boundary_reached.
         result = controller.apply_at_safe_boundary(action)
-        if body.action_type == "cancel":
-            # Emit the task_cancelled audit event via the task manager.
-            manager.cancel_task(task.task_id, reason)
         applied.append({"task_id": task.task_id, "result": result})
 
     return {"applied": applied, "safe_boundary": True}

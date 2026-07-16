@@ -137,6 +137,9 @@ class RuntimeAuthority:
         )
         self.executor_registry = executor_registry or ExecutorRegistry()
 
+    def _uses_principal_controls(self, principal_id: str | None) -> bool:
+        return bool(principal_id and self.store.get_account(principal_id) is not None)
+
     def _event(
         self,
         event_type: str,
@@ -223,17 +226,25 @@ class RuntimeAuthority:
                 return "only_runtime_gate_manager_can_enable_gates"
         return None
 
-    def check_capability_gate(self, action_type: str, tool_or_service_name: str) -> str | None:
+    def check_capability_gate(
+        self, action_type: str, tool_or_service_name: str, principal_id: str | None = None
+    ) -> str | None:
         from raiker.phase_gates import CapabilityState, default_capability_gates
         cap_name = CAPABILITY_GATE_MAP.get(action_type) or CAPABILITY_GATE_MAP.get(tool_or_service_name)
         if cap_name is None:
             return None
-        persisted = self.store.get_capability_gate_state(cap_name)
+        persisted = (
+            self.store.get_principal_capability_gate_state(str(principal_id), cap_name)
+            if self._uses_principal_controls(principal_id)
+            else self.store.get_capability_gate_state(cap_name)
+        )
         if persisted is not None:
             state = persisted["state"]
             if state in (CapabilityState.DISABLED, CapabilityState.PLANNED):
                 return "disabled_by_capability_gate"
             return None
+        if self._uses_principal_controls(principal_id):
+            return "disabled_by_capability_gate"
         try:
             gates = default_capability_gates()
             gate = gates.get(cap_name)
@@ -245,27 +256,45 @@ class RuntimeAuthority:
         except Exception:
             return "unknown_capability_gate"
 
-    def get_persisted_capability_state(self, cap_name: str) -> dict[str, Any] | None:
-        return self.store.get_capability_gate_state(cap_name)
+    def get_persisted_capability_state(
+        self, cap_name: str, principal_id: str | None = None
+    ) -> dict[str, Any] | None:
+        return (
+            self.store.get_principal_capability_gate_state(str(principal_id), cap_name)
+            if self._uses_principal_controls(principal_id)
+            else self.store.get_capability_gate_state(cap_name)
+        )
 
-    def get_effective_capability_gate(self, cap_name: str) -> dict[str, Any]:
+    def get_effective_capability_gate(
+        self, cap_name: str, principal_id: str | None = None
+    ) -> dict[str, Any]:
         from raiker.phase_gates import CapabilityState, default_capability_gates
-        persisted = self.store.get_capability_gate_state(cap_name)
+        persisted = self.get_persisted_capability_state(cap_name, principal_id)
         if persisted is not None:
             return {"capability": cap_name, "state": persisted["state"], "source": "persisted"}
+        if self._uses_principal_controls(principal_id):
+            return {
+                "capability": cap_name,
+                "state": CapabilityState.DISABLED,
+                "source": "principal_fail_closed",
+            }
         gates = default_capability_gates()
         gate = gates.get(cap_name)
         if gate is None:
             return {"capability": cap_name, "state": CapabilityState.DISABLED, "source": "unknown"}
         return {"capability": cap_name, "state": gate.state.value, "source": "static_default"}
 
-    def _resolve_decision_mode(self, capability: str) -> DecisionMode:
-        persisted = self.store.get_capability_decision_mode(capability)
+    def _resolve_decision_mode(self, capability: str, principal_id: str | None = None) -> DecisionMode:
+        persisted = (
+            self.store.get_principal_capability_decision_mode(str(principal_id), capability)
+            if self._uses_principal_controls(principal_id)
+            else self.store.get_capability_decision_mode(capability)
+        )
         mode = parse_decision_mode(persisted) if persisted else None
         return mode or DEFAULT_DECISION_MODE
 
-    def get_capability_decision_mode(self, capability: str) -> str:
-        return self._resolve_decision_mode(capability).value
+    def get_capability_decision_mode(self, capability: str, principal_id: str | None = None) -> str:
+        return self._resolve_decision_mode(capability, principal_id).value
 
     def set_capability_decision_mode(
         self, capability: str, mode: str, principal: Principal, reason: str = "",
@@ -299,7 +328,7 @@ class RuntimeAuthority:
             })
             return f"decision_mode_requires_executor:{capability}"
         now = utc_now()
-        self.store.upsert_capability_decision_mode({
+        record = {
             "capability": capability,
             "decision_mode": parsed.value,
             "set_by": principal.principal_id,
@@ -308,14 +337,21 @@ class RuntimeAuthority:
             "event_id": "",
             "created_at": now,
             "updated_at": now,
-        })
+        }
+        if self._uses_principal_controls(principal.principal_id):
+            self.store.upsert_principal_capability_decision_mode(principal.principal_id, record)
+        else:
+            self.store.upsert_capability_decision_mode(record)
         self._event("capability_decision_mode_set", principal.principal_id, {
             "capability": capability, "decision_mode": parsed.value, "reason": reason,
         })
         return None
 
-    def get_runtime_mode(self) -> dict[str, Any]:
-        active = self.store.get_active_runtime_mode()
+    def get_runtime_mode(self, principal_id: str | None = None) -> dict[str, Any]:
+        active = (
+            self.store.get_principal_runtime_mode(str(principal_id))
+            if self._uses_principal_controls(principal_id) else self.store.get_active_runtime_mode()
+        )
         if active is not None:
             return active
         return {
@@ -340,7 +376,6 @@ class RuntimeAuthority:
                              "multi_user_local_runtime", "hosted_or_networked_runtime"):
             return f"unknown_runtime_mode:{mode_name}"
         now = utc_now()
-        self.store.disable_all_runtime_modes(principal.principal_id, f"activating {mode_name}")
         record = {
             "runtime_mode_id": new_id("rm_"),
             "mode_name": mode_name,
@@ -351,7 +386,11 @@ class RuntimeAuthority:
             "created_at": now,
             "updated_at": now,
         }
-        self.store.insert_runtime_mode_state(record)
+        if self._uses_principal_controls(principal.principal_id):
+            self.store.upsert_principal_runtime_mode(principal.principal_id, record)
+        else:
+            self.store.disable_all_runtime_modes(principal.principal_id, f"activating {mode_name}")
+            self.store.insert_runtime_mode_state(record)
         self._event("runtime_mode_activated", principal.principal_id, {
             "mode_name": mode_name, "runtime_mode_id": record["runtime_mode_id"], "reason": reason,
         })
@@ -365,7 +404,6 @@ class RuntimeAuthority:
             })
             return gate_check
         now = utc_now()
-        self.store.disable_all_runtime_modes(principal.principal_id, reason)
         record = {
             "runtime_mode_id": new_id("rm_"),
             "mode_name": "development_preview",
@@ -376,7 +414,11 @@ class RuntimeAuthority:
             "created_at": now,
             "updated_at": now,
         }
-        self.store.insert_runtime_mode_state(record)
+        if self._uses_principal_controls(principal.principal_id):
+            self.store.upsert_principal_runtime_mode(principal.principal_id, record)
+        else:
+            self.store.disable_all_runtime_modes(principal.principal_id, reason)
+            self.store.insert_runtime_mode_state(record)
         self._event("runtime_mode_disabled", principal.principal_id, {
             "mode_name": "development_preview", "reason": reason,
         })
@@ -435,7 +477,10 @@ class RuntimeAuthority:
             "created_at": now,
             "updated_at": now,
         }
-        self.store.upsert_capability_gate_state(record)
+        if self._uses_principal_controls(principal.principal_id):
+            self.store.upsert_principal_capability_gate_state(principal.principal_id, record)
+        else:
+            self.store.upsert_capability_gate_state(record)
         event_type = "capability_enabled" if target_state not in ("disabled", "planned") else "capability_disabled"
         self._event(event_type, principal.principal_id, {
             "capability": capability, "new_state": target_state, "reason": reason,
@@ -508,7 +553,9 @@ class RuntimeAuthority:
                 message=gate_check,
             )
 
-        cap_gate = self.check_capability_gate(action.action_type, action.tool_or_service_name)
+        cap_gate = self.check_capability_gate(
+            action.action_type, action.tool_or_service_name, principal.principal_id
+        )
         if cap_gate:
             return GovernedActionResult(
                 action_id=action.action_id,
@@ -549,7 +596,7 @@ class RuntimeAuthority:
         cap_for_mode = CAPABILITY_GATE_MAP.get(action.action_type) or CAPABILITY_GATE_MAP.get(
             action.tool_or_service_name
         )
-        mode = self._resolve_decision_mode(cap_for_mode) if cap_for_mode else None
+        mode = self._resolve_decision_mode(cap_for_mode, principal.principal_id) if cap_for_mode else None
         if mode == DecisionMode.DENY:
             return GovernedActionResult(
                 action_id=action.action_id,

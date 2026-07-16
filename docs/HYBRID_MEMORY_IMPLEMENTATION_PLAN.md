@@ -319,7 +319,7 @@ retrieval meets the Stage F recall/latency budgets without a visibility leak.
 **In progress (backup catalog slice).** Backup manifests now record encryption
 key identifiers, retention/legal-hold state, restore verification, erasure
 requests, and completed erasure. SQLite, FTS, and vector/graph metadata now
-use SQLCipher through `pysqlcipher3static` (the `pysqlcipher3` DB-API); the
+use SQLCipher through `sqlcipher3-wheels` (the `sqlcipher3` DB-API); the
 workspace app key derives the SQLCipher key and legacy plaintext databases are
 converted without retaining a plaintext copy. This distribution provides FTS4,
 not FTS5, so lexical ranking is deterministic recency order rather than BM25.

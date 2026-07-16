@@ -128,24 +128,29 @@ class ToolBroker:
                 str(args.get("query", "")),
                 scope=args.get("scope"),
                 max_results=int(args.get("max_results", 20)),
+                owner_principal_id=self.owner_scope,
             ),
             "memory_list": lambda args: memory_list(
                 self.workspace_root,
                 scope=args.get("scope"),
                 limit=int(args.get("limit", 50)),
+                owner_principal_id=self.owner_scope,
             ),
             "memory_get": lambda args: memory_get(
                 self.workspace_root,
                 str(args.get("memory_id", "")),
+                owner_principal_id=self.owner_scope,
             ),
             "vector_get": lambda args: vector_get(
                 self.workspace_root,
                 str(args.get("vector_id", "")),
+                owner_principal_id=self.owner_scope,
             ),
             "consult_advisor": lambda args: consult_advisor(
                 self.workspace_root,
                 str(args.get("question", "")),
                 store=self.store,
+                principal_id=self.principal_id,
             ),
             "github_read": lambda args: github_read(
                 self.workspace_root,
@@ -153,12 +158,14 @@ class ToolBroker:
                 str(args.get("repo", "")),
                 args.get("number", ""),
                 store=self.store,
+                principal_id=self.principal_id,
             ),
             "gmail_read": lambda args: gmail_read(
                 self.workspace_root,
                 str(args.get("resource", "")),
                 str(args.get("message_id", "")),
                 store=self.store,
+                principal_id=self.principal_id,
             ),
             "gcal_read": lambda args: gcal_read(
                 self.workspace_root,
@@ -166,12 +173,14 @@ class ToolBroker:
                 str(args.get("calendar_id", "")),
                 str(args.get("event_id", "")),
                 store=self.store,
+                principal_id=self.principal_id,
             ),
             "slack_read": lambda args: slack_read(
                 self.workspace_root,
                 str(args.get("resource", "")),
                 str(args.get("channel", "")),
                 store=self.store,
+                principal_id=self.principal_id,
             ),
             "connector_read": lambda args: connector_read(
                 self.workspace_root,
@@ -182,6 +191,19 @@ class ToolBroker:
                 store=self.store,
             ),
         }
+
+    @property
+    def owner_scope(self) -> str | None:
+        """The acting principal id, but only when it names a real account.
+
+        ``principal_id`` identifies *who acted* and is always recorded as-is for
+        attribution. It only narrows an owner-scoped **read** when it belongs to
+        an account: the default ``local_user`` is not a principal, so scoping a
+        read on it matches no rows and hides the caller's own data. Resolved per
+        call because an account can be created after the broker is built.
+        """
+        store = self.store or SQLiteStore(self.workspace_root)
+        return store.account_scope(self.principal_id)
 
     @staticmethod
     def _redact_value(value: Any) -> Any:
@@ -544,6 +566,7 @@ class ToolBroker:
                     session_id=session_id,
                     turn_id=turn_id,
                     client=client,
+                    owner_principal_id=self.owner_scope,
                 )
             elif action.tool_name == "memory_forget":
                 raw = self.memory_service.forget_from_action(
@@ -552,6 +575,7 @@ class ToolBroker:
                     session_id=session_id,
                     turn_id=turn_id,
                     client=client,
+                    owner_principal_id=self.owner_scope,
                 )
             else:
                 failed = ToolResult(

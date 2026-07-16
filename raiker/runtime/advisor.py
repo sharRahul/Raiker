@@ -58,15 +58,24 @@ class AdvisorService:
         workspace_root: str | Path,
         store: SQLiteStore,
         consult_fn: ConsultFn | None = None,
+        principal_id: str | None = None,
     ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
         self._store = store
         self._consult_fn = consult_fn
+        self._principal_id = principal_id
 
     # ── Governance checks ────────────────────────────────────────────────
     def _gate_enabled(self) -> bool:
         try:
-            record = self._store.get_capability_gate_state(_CAP)
+            scoped = bool(
+                self._principal_id and self._store.get_account(self._principal_id) is not None
+            )
+            if scoped:
+                assert self._principal_id is not None
+                record = self._store.get_principal_capability_gate_state(self._principal_id, _CAP)
+            else:
+                record = self._store.get_capability_gate_state(_CAP)
         except Exception:  # noqa: BLE001 — a broken read fails closed
             return False
         if not record:
@@ -74,11 +83,20 @@ class AdvisorService:
         return str(record.get("state", "")) in _ENABLED_GATE_STATES
 
     def _mode(self) -> DecisionMode:
-        persisted = self._store.get_capability_decision_mode(_CAP)
+        scoped = bool(self._principal_id and self._store.get_account(self._principal_id) is not None)
+        if scoped:
+            assert self._principal_id is not None
+            persisted = self._store.get_principal_capability_decision_mode(self._principal_id, _CAP)
+        else:
+            persisted = self._store.get_capability_decision_mode(_CAP)
         mode = parse_decision_mode(persisted) if persisted else None
         return mode or DEFAULT_DECISION_MODE
 
     def advisor_profile_id(self) -> str | None:
+        scoped = bool(self._principal_id and self._store.get_account(self._principal_id) is not None)
+        if scoped:
+            assert self._principal_id is not None
+            return self._store.load_principal_model_advisor(self._principal_id)
         return self._store.load_model_advisor(TERMINAL_MODEL_SESSION_ID)
 
     # ── Consult ──────────────────────────────────────────────────────────
@@ -138,7 +156,12 @@ class AdvisorService:
                 f"advisor_profile_not_allowed:{profile_id}",
                 "Advisor consult denied: test-harness profiles cannot advise.",
             )
-        state = self._store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        scoped = bool(self._principal_id and self._store.get_account(self._principal_id) is not None)
+        if scoped:
+            assert self._principal_id is not None
+            state = self._store.load_principal_model_state(self._principal_id)
+        else:
+            state = self._store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
         if state is not None and state.profile_id == profile.profile_id and state.model:
             profile = profile_with_model(profile, state.model)
         if not profile.model or "<" in profile.model:
@@ -183,7 +206,7 @@ class AdvisorService:
 
             router = ModelRouter(
                 ModelProfileRegistry.load(),
-                runtime_policy=provider_runtime_policy_from_gates(self._store),
+                runtime_policy=provider_runtime_policy_from_gates(self._store, self._principal_id),
             )
             messages = [ModelMessage(role="user", content=question)]
             # No tools are offered to the advisor: it answers, it does not act.

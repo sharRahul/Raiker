@@ -299,30 +299,30 @@ class TestProjectsApi:
         records = [json.loads(line) for line in response.text.splitlines()]
         assert [record["payload"]["message"] for record in records] == ["first", "second"]
 
-    def test_export_applies_visibility_to_bootstrap_and_named_accounts(
-        self, client: TestClient, workspace: Path
+    def test_export_applies_visibility_to_bootstrap_and_named_accounts(  # type: ignore[no-untyped-def]
+        self, client: TestClient, workspace: Path, seed_account
     ) -> None:
+        # Registration accepts one account per instance, so the extra accounts
+        # are seeded directly. Export visibility is still per-user: each account
+        # sees its own sessions plus the unowned legacy ones.
         owner_headers = self._headers(client)
         project_id = client.post(
             "/api/projects", json={"name": "Alpha"}, headers=owner_headers
         ).json()["project_id"]
-        registered = client.post(
-            "/api/auth/register", json={"username": "alex", "password": "right-pass-123"}
-        )
-        assert registered.status_code == 200, registered.text
-        alex_headers = {"Authorization": f"Bearer {registered.json()['token']}"}
-        maria_registered = client.post(
-            "/api/auth/register", json={"username": "maria", "password": "right-pass-123"}
-        )
-        assert maria_registered.status_code == 200, maria_registered.text
         store = SQLiteStore(workspace)
-        alex_principal = store.get_principal(registered.json()["principal_id"])
-        assert alex_principal is not None
+        alex_principal_id, alex_token = seed_account(workspace, "alex")
+        alex_headers = {"Authorization": f"Bearer {alex_token}"}
+        maria_principal_id, _ = seed_account(workspace, "maria")
+        alex_principal = store.get_principal(alex_principal_id)
+        maria_principal = store.get_principal(maria_principal_id)
+        assert alex_principal is not None and maria_principal is not None
         alex_user_id = str(alex_principal["delegated_by_user_id"])
-        maria_principal = store.get_principal(maria_registered.json()["principal_id"])
-        assert maria_principal is not None
         maria_user_id = str(maria_principal["delegated_by_user_id"])
+        # The active project is per-user, and it is what stamps a new session
+        # with its project.
         store.save_active_project(project_id)
+        store.save_active_project(project_id, alex_user_id)
+        store.save_active_project(project_id, maria_user_id)
         store.create_session("sess_alex", str(workspace), user_id=alex_user_id)
         store.create_session("sess_maria", str(workspace), user_id=maria_user_id)
         store.create_session("sess_legacy", str(workspace))
@@ -338,16 +338,19 @@ class TestProjectsApi:
                 )
             )
 
+        # The owner exports its own project: the visibility filter keeps the
+        # unowned legacy session and drops both other accounts' sessions.
         owner_response = client.post(f"/api/projects/{project_id}/export", headers=owner_headers)
         assert owner_response.status_code == 200, owner_response.text
         owner_exported = [json.loads(line)["session_id"] for line in owner_response.text.splitlines()]
         assert set(owner_exported) == {"sess_legacy"}
 
+        # A project belongs to one account, so another account cannot export it
+        # at all — not even the sessions it owns inside it.
         response = client.post(f"/api/projects/{project_id}/export", headers=alex_headers)
 
-        assert response.status_code == 200, response.text
-        exported = [json.loads(line)["session_id"] for line in response.text.splitlines()]
-        assert set(exported) == {"sess_alex", "sess_legacy"}
+        assert response.status_code == 404, response.text
+        assert response.json()["detail"]["reason_code"] == f"unknown_project:{project_id}"
 
     def test_export_of_empty_project_returns_empty_attachment(
         self, client: TestClient
@@ -422,21 +425,18 @@ class TestProjectsApi:
     def test_authenticated_human_can_confirm_project_deletion(
         self, client: TestClient, workspace: Path
     ) -> None:
+        # Deletion is owner-scoped, so the human who owns the project is the one
+        # who can confirm it. (This used to delete as a second registered
+        # account, which one-account-per-instance no longer allows — and which
+        # owner scoping would now refuse anyway.)
         owner_headers = self._headers(client)
         project_id = client.post(
             "/api/projects", json={"name": "Alpha"}, headers=owner_headers
         ).json()["project_id"]
-        registered = client.post(
-            "/api/auth/register", json={"username": "alex", "password": "right-pass-123"}
-        )
-        assert registered.status_code == 200, registered.text
 
         response = client.delete(
             f"/api/projects/{project_id}",
-            headers={
-                "Authorization": f"Bearer {registered.json()['token']}",
-                "X-Project-Delete-Confirm": project_id,
-            },
+            headers={**owner_headers, "X-Project-Delete-Confirm": project_id},
         )
 
         assert response.status_code == 200, response.text

@@ -12,6 +12,7 @@ def consult_advisor(
     question: str,
     *,
     store: SQLiteStore | None = None,
+    principal_id: str | None = None,
 ) -> dict[str, Any]:
     """Governed advisor consult, brokered as the ``consult_advisor`` tool.
 
@@ -29,5 +30,7 @@ def consult_advisor(
     from raiker.runtime.advisor import AdvisorService
     from raiker.storage.sqlite import SQLiteStore
 
-    service = AdvisorService(workspace_root, store or SQLiteStore(workspace_root))
+    service = AdvisorService(
+        workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
+    )
     return service.consult(question)

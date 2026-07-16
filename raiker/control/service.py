@@ -90,13 +90,18 @@ class RuntimeControlService:
     def _is_gate_manager(self, principal: Principal) -> bool:
         return self._authority._check_human_runtime_gate_manager(principal) is None  # noqa: SLF001
 
-    def _compute_allowed_transitions(self, capability: str) -> tuple[str, ...]:
+    def _compute_allowed_transitions(
+        self, capability: str, principal_id: str | None = None
+    ) -> tuple[str, ...]:
         req = get_activation_requirement(capability)
         allowed: list[str] = []
         for cs in CapabilityState:
             sv = cs.value
             if cs == CapabilityState.ENABLED_RUNTIME:
-                active_mode = self._store.get_active_runtime_mode()
+                active_mode = (
+                    self._store.get_principal_runtime_mode(principal_id)
+                    if principal_id else self._store.get_active_runtime_mode()
+                )
                 mode_name = (active_mode or {}).get("mode_name", "development_preview")
                 if mode_name not in _RUNTIME_ENABLEMENT_MODES:
                     continue
@@ -111,7 +116,9 @@ class RuntimeControlService:
         gates: dict[str, Any],
         principal: Principal | None,
     ) -> CapabilityGateView:
-        effective = self._authority.get_effective_capability_gate(capability)
+        effective = self._authority.get_effective_capability_gate(
+            capability, principal.principal_id if principal else None
+        )
         state: str = effective["state"]
         default_gate = gates.get(capability)
         default_state: str = default_gate.state.value if default_gate else "disabled"
@@ -143,11 +150,15 @@ class RuntimeControlService:
             default_state=default_state,
             source=effective.get("source", "unknown"),
             runtime_enabled=(state == CapabilityState.ENABLED_RUNTIME),
-            allowed_transitions=self._compute_allowed_transitions(capability),
+            allowed_transitions=self._compute_allowed_transitions(
+                capability, principal.principal_id if principal else None
+            ),
             can_current_principal_change=can_change,
             blocked_reason_code=blocked_reason,
             readiness=readiness,
-            decision_mode=self._authority.get_capability_decision_mode(capability),
+            decision_mode=self._authority.get_capability_decision_mode(
+                capability, principal.principal_id if principal else None
+            ),
         )
 
     # -- read methods -------------------------------------------------------
@@ -169,11 +180,13 @@ class RuntimeControlService:
             is_authorized_gate_manager=self._is_gate_manager(principal),
         ), None
 
-    def get_persisted_capability_state(self, capability: str) -> dict[str, Any] | None:
-        return self._store.get_capability_gate_state(capability)
+    def get_persisted_capability_state(
+        self, capability: str, acting_principal_id: str | None = None
+    ) -> dict[str, Any] | None:
+        return self._authority.get_persisted_capability_state(capability, acting_principal_id)
 
-    def get_runtime_mode(self) -> RuntimeModeView:
-        mode = self._authority.get_runtime_mode()
+    def get_runtime_mode(self, acting_principal_id: str | None = None) -> RuntimeModeView:
+        mode = self._authority.get_runtime_mode(acting_principal_id)
         return RuntimeModeView(
             mode_name=mode.get("mode_name", "development_preview"),
             status=mode.get("status", "inactive"),
@@ -209,7 +222,7 @@ class RuntimeControlService:
         self,
         acting_principal_id: str | None = None,
     ) -> RuntimeReadinessView:
-        mode_view = self.get_runtime_mode()
+        mode_view = self.get_runtime_mode(acting_principal_id)
         principal = self._resolve_or_none(acting_principal_id)
         gates = default_capability_gates()
         gate_views = tuple(
@@ -228,7 +241,7 @@ class RuntimeControlService:
 
         dangerous_caps_disabled = True
         for cap in _DANGEROUS_CAPS - REAL_EXECUTOR_CAPABILITIES:
-            g = self._authority.get_effective_capability_gate(cap)
+            g = self._authority.get_effective_capability_gate(cap, acting_principal_id)
             if g["state"] not in ("disabled", "planned"):
                 dangerous_caps_disabled = False
                 break
@@ -317,8 +330,10 @@ class RuntimeControlService:
             return ControlResult(ok=False, reason_code=denial)
         return ControlResult(ok=True, data={"capability": capability, "decision_mode": mode})
 
-    def get_capability_decision_mode(self, capability: str) -> ControlResult:
-        mode = self._authority.get_capability_decision_mode(capability)
+    def get_capability_decision_mode(
+        self, capability: str, acting_principal_id: str | None = None
+    ) -> ControlResult:
+        mode = self._authority.get_capability_decision_mode(capability, acting_principal_id)
         return ControlResult(ok=True, data={"capability": capability, "decision_mode": mode})
 
     def disable_capability(

@@ -66,7 +66,7 @@ class AgentGateway:
         self.model_router = ModelRouter(
             self.model_registry,
             self.writer,
-            runtime_policy=provider_runtime_policy_from_gates(self.store),
+            runtime_policy=provider_runtime_policy_from_gates(self.store, principal_id),
             connection_resolver=lambda profile_id: get_model_connection(
                 self.store, principal_id, profile_id
             ),
@@ -93,7 +93,11 @@ class AgentGateway:
         only place selection is bound to a turn, so the CLI and any future client share it.
         """
         native_default = self.model_router.default_provider()
-        state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        state = (
+            self.store.load_principal_model_state(self.tool_broker.principal_id)
+            if self.store.get_account(self.tool_broker.principal_id) is not None
+            else self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        )
         if state is None:
             return native_default
         try:
@@ -126,7 +130,11 @@ class AgentGateway:
         if bool(profile.raw.get("test_only", False)):
             return None
         effective_model = profile.model
-        state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        state = (
+            self.store.load_principal_model_state(self.tool_broker.principal_id)
+            if self.store.get_account(self.tool_broker.principal_id) is not None
+            else self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        )
         if state is not None and state.profile_id == profile.profile_id and state.model:
             effective_model = state.model
         if model:
@@ -153,7 +161,12 @@ class AgentGateway:
         the model router when each candidate is actually tried.
         """
         chain: list[tuple[str, str]] = []
-        for profile_id in self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID):
+        fallback_ids = (
+            self.store.load_principal_model_fallback_sequence(self.tool_broker.principal_id)
+            if self.store.get_account(self.tool_broker.principal_id) is not None
+            else self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
+        )
+        for profile_id in fallback_ids:
             resolved = self._resolve_profile_for_turn(profile_id)
             if resolved is not None and resolved not in chain:
                 chain.append(resolved)

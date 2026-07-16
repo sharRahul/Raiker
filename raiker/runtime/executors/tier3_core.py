@@ -56,7 +56,11 @@ class SemanticMemoryExecutor:
                 reason_code="missing_argument:query",
                 summary="Semantic memory query denied: no query provided.",
             )
-        results = search_memory(query, workspace_root=self._workspace_root, store=SQLiteStore(self._workspace_root))
+        store = SQLiteStore(self._workspace_root)
+        results = search_memory(
+            query, workspace_root=self._workspace_root, store=store,
+            owner_principal_id=store.account_scope(principal.principal_id),
+        )
         return ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
             summary=f"Semantic memory search returned {len(results)} results.",
@@ -88,17 +92,21 @@ class VectorEmbeddingExecutor:
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         op = action.arguments.get("action", "embed")
+        # Owner-scope only for a real account: a CLI-bootstrapped owner has no
+        # credential row, and scoping its reads on a non-account principal id
+        # hides its own records.
+        owner = self._store.account_scope(principal.principal_id)
         if op == "project_memory":
-            return self._project_memory(action)
+            return self._project_memory(action, owner)
         if op == "embed":
-            return self._embed(action)
+            return self._embed(action, owner)
         if op == "list":
-            return self._list(action)
+            return self._list(action, owner)
         if op == "search":
-            return self._search(action)
+            return self._search(action, owner)
         return self._failed(action.action_id, f"unknown_action:{op}")
 
-    def _embed(self, action: GovernedAction) -> ExecutionResult:
+    def _embed(self, action: GovernedAction, owner_principal_id: str | None) -> ExecutionResult:
         import json
 
         from raiker.contracts.ids import new_id, utc_now
@@ -129,6 +137,7 @@ class VectorEmbeddingExecutor:
             sensitivity=sensitivity,
             created_at=utc_now(),
             embedding=json.dumps(vector),
+            owner_principal_id=owner_principal_id or "",
         ))
         return ExecutionResult(
             ok=True,
@@ -144,13 +153,13 @@ class VectorEmbeddingExecutor:
             },
         )
 
-    def _project_memory(self, action: GovernedAction) -> ExecutionResult:
+    def _project_memory(self, action: GovernedAction, owner_principal_id: str | None) -> ExecutionResult:
         import json
 
         memory_id = action.arguments.get("memory_id")
         if not isinstance(memory_id, str) or not memory_id:
             return self._failed(action.action_id, "missing_argument:memory_id")
-        memory = self._store.get_active_approved_memory(memory_id)
+        memory = self._store.get_active_approved_memory(memory_id, owner_principal_id=owner_principal_id)
         if memory is None:
             return self._failed(action.action_id, "memory_not_active_or_not_found")
         from raiker.contracts.ids import new_id, utc_now
@@ -164,16 +173,20 @@ class VectorEmbeddingExecutor:
             content_preview=text[:_PREVIEW_LEN], embedding_model=LOCAL_EMBEDDING_MODEL,
             dimensions=384, scope=str(memory["scope"]), sensitivity=str(memory["sensitivity"]),
             created_at=utc_now(), embedding=json.dumps(embed_text(text, 384)),
+            owner_principal_id=owner_principal_id or "",
         ))
-        self._store.link_memory_projection(memory_id, "vector", vector_id, LOCAL_EMBEDDING_MODEL)
+        self._store.link_memory_projection(
+            memory_id, "vector", vector_id, LOCAL_EMBEDDING_MODEL,
+            owner_principal_id=owner_principal_id,
+        )
         return ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
             summary="Approved durable memory projected to a local vector; source text not emitted.",
             artifacts={"memory_id": memory_id, "vector_id": vector_id, "content_redacted": True},
         )
 
-    def _list(self, action: GovernedAction) -> ExecutionResult:
-        records = self._store.list_vector_records()
+    def _list(self, action: GovernedAction, owner_principal_id: str | None) -> ExecutionResult:
+        records = self._store.list_vector_records(owner_principal_id=owner_principal_id)
         return ExecutionResult(
             ok=True,
             capability=self.capability,
@@ -186,7 +199,7 @@ class VectorEmbeddingExecutor:
             },
         )
 
-    def _search(self, action: GovernedAction) -> ExecutionResult:
+    def _search(self, action: GovernedAction, owner_principal_id: str | None) -> ExecutionResult:
         import json
 
         from raiker.vector import LOCAL_EMBEDDING_MODEL, VectorIndex, embed_text
@@ -209,7 +222,9 @@ class VectorEmbeddingExecutor:
         # vectors were created with. Provider-model vectors are not searched here.
         query_vector = embed_text(query, dimensions)
         index = VectorIndex(dimensions)
-        for row in self._store.list_vector_embeddings(LOCAL_EMBEDDING_MODEL, scope=scope):
+        for row in self._store.list_vector_embeddings(
+            LOCAL_EMBEDDING_MODEL, scope=scope, owner_principal_id=owner_principal_id
+        ):
             raw = row.get("embedding")
             if not raw:
                 continue

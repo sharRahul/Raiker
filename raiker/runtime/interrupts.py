@@ -33,12 +33,15 @@ class InterruptController:
             )
         if action.action_type == "pause":
             self.store.update_task_status(action.task_id, "paused")
+            self._task_event(action, "task_paused")
             return "paused"
         if action.action_type == "cancel":
             self.store.cancel_task(action.task_id, action.reason)
+            self._task_event(action, "task_cancelled")
             return "cancelled"
         if action.action_type == "resume":
             self.store.update_task_status(action.task_id, "running")
+            self._task_event(action, "task_resumed")
             return "running"
         self.store.update_task_progress(action.task_id, action.steer_text or action.reason, 0)
         if self.writer:
@@ -52,3 +55,7 @@ class InterruptController:
                 )
             )
         return "steered"
+
+    def _task_event(self, action: InterruptAction, event_type: str) -> None:
+        if self.writer:
+            self.writer.append(make_event(session_id=action.session_id, turn_id=None, event_type=event_type, actor="runtime", payload={"task_id": action.task_id, "reason": action.reason}))

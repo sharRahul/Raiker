@@ -14,6 +14,7 @@ def github_read(
     number: Any,
     *,
     store: SQLiteStore | None = None,
+    principal_id: str | None = None,
 ) -> dict[str, Any]:
     """Governed GitHub issue/PR read, brokered as the ``github_read`` tool.
 
@@ -31,7 +32,9 @@ def github_read(
     from raiker.runtime.connectors import GithubConnectorService
     from raiker.storage.sqlite import SQLiteStore
 
-    service = GithubConnectorService(workspace_root, store or SQLiteStore(workspace_root))
+    service = GithubConnectorService(
+        workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
+    )
     return service.read(resource, repo, number)
 
 
@@ -41,6 +44,7 @@ def gmail_read(
     message_id: str,
     *,
     store: SQLiteStore | None = None,
+    principal_id: str | None = None,
 ) -> dict[str, Any]:
     """Governed Gmail message/thread read, brokered as the ``gmail_read`` tool.
 
@@ -55,7 +59,9 @@ def gmail_read(
     from raiker.runtime.connectors import GmailConnectorService
     from raiker.storage.sqlite import SQLiteStore
 
-    service = GmailConnectorService(workspace_root, store or SQLiteStore(workspace_root))
+    service = GmailConnectorService(
+        workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
+    )
     return service.read(resource, message_id)
 
 
@@ -66,6 +72,7 @@ def gcal_read(
     event_id: str = "",
     *,
     store: SQLiteStore | None = None,
+    principal_id: str | None = None,
 ) -> dict[str, Any]:
     """Governed Google Calendar event/calendar read, brokered as ``gcal_read``.
 
@@ -78,7 +85,9 @@ def gcal_read(
     from raiker.runtime.connectors import GcalConnectorService
     from raiker.storage.sqlite import SQLiteStore
 
-    service = GcalConnectorService(workspace_root, store or SQLiteStore(workspace_root))
+    service = GcalConnectorService(
+        workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
+    )
     return service.read(resource, calendar_id, event_id)
 
 
@@ -88,6 +97,7 @@ def slack_read(
     channel: str,
     *,
     store: SQLiteStore | None = None,
+    principal_id: str | None = None,
 ) -> dict[str, Any]:
     """Governed Slack channel info/history read, brokered as ``slack_read``.
 
@@ -100,7 +110,9 @@ def slack_read(
     from raiker.runtime.connectors import SlackConnectorService
     from raiker.storage.sqlite import SQLiteStore
 
-    service = SlackConnectorService(workspace_root, store or SQLiteStore(workspace_root))
+    service = SlackConnectorService(
+        workspace_root, store or SQLiteStore(workspace_root), principal_id=principal_id
+    )
     return service.read(resource, channel)
 
 

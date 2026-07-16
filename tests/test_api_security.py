@@ -9,7 +9,9 @@ from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
+from raiker.auth import passwords
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.contracts.ids import utc_now
 from raiker.storage.sqlite import SQLiteStore
 
 SK_OPENAI = "sk-proj-FakeTestKey00000000000000000000000000000000"
@@ -174,6 +176,27 @@ class TestTokenRevocation:
             headers={"Authorization": f"Bearer {raw}"},
         )
         assert resp.status_code == 401
+
+
+class TestInactivePrincipal:
+    @pytest.mark.parametrize("scope", ("mfa_pending", "control", "elevated"))
+    def test_inactive_credential_backed_principal_session_returns_401(
+        self, bootstrapped_ws: Path, client: TestClient, scope: str
+    ) -> None:
+        principal_id = "principal_owner"
+        encoded, algo = passwords.hash_password("inactive-pass")
+        SQLiteStore(bootstrapped_ws).upsert_account(
+            principal_id, "owner", encoded, algo, utc_now(), utc_now()
+        )
+        raw, _ = ApiSessionStore(bootstrapped_ws).create_session(principal_id, scope=scope)
+        SQLiteStore(bootstrapped_ws).deactivate_principal(principal_id)
+
+        response = client.get(
+            "/api/capability-gates", headers={"Authorization": f"Bearer {raw}"}
+        )
+
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Session principal not active"
 
 
 # ── 5. Cross-session leakage ─────────────────────────────────────────────────

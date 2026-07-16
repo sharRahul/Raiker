@@ -27,6 +27,35 @@
       .map(([key, ok]) => ({ key, ok: Boolean(ok) }));
   });
 
+  // Plain-English labels for backend identifiers.
+  function runtimeModeLabel(mode: string): string {
+    switch (mode) {
+      case "local_single_user_runtime": return "Local single-user";
+      case "production_ready_local_single_user_runtime": return "Local single-user (production-ready)";
+      default: return humanize(mode);
+    }
+  }
+  function endpointLabel(kind: string): string {
+    switch (kind) {
+      case "local_process":
+      case "local": return "Local";
+      case "private_network": return "Home-lab";
+      case "remote_hosted": return "Hosted";
+      default: return humanize(kind);
+    }
+  }
+  // Humanize readiness-check keys into readable labels.
+  function readinessLabel(key: string): string {
+    const map: Record<string, string> = {
+      vault_configured: "Vault configured",
+      egress_allowlist_configured: "Egress allowlist configured",
+      owner_token_configured: "Owner token configured",
+      model_profiles_configured: "Model profiles configured",
+      production_ready_local_single_user_runtime: "Production-ready (local)",
+    };
+    return map[key] ?? humanize(key);
+  }
+
   onMount(load);
 </script>
 
@@ -56,7 +85,7 @@
         />
       </p>
       <dl class="kv">
-        <div><dt>Mode</dt><dd>{humanize(diag.runtime_mode)}</dd></div>
+        <div><dt>Mode</dt><dd>{runtimeModeLabel(diag.runtime_mode)}</dd></div>
         {#each Object.entries(diag.counts) as [key, value] (key)}
           <div><dt>{humanize(key)}</dt><dd>{value}</dd></div>
         {/each}
@@ -83,7 +112,7 @@
         {#each readinessChecks as check (check.key)}
           <li class:ok={check.ok}>
             <Icon name={check.ok ? "check" : "x"} size={14} />
-            <span>{check.key.replaceAll("_", " ")}</span>
+            <span>{readinessLabel(check.key)}</span>
           </li>
         {/each}
       </ul>
@@ -100,7 +129,7 @@
           {#each diag.provider_health as p (p.profile_id)}
             <tr>
               <td class="mono">{p.profile_id}</td>
-              <td>{p.endpoint_kind}</td>
+              <td>{endpointLabel(p.endpoint_kind)}</td>
               <td>
                 <Badge variant={p.selected ? "active" : "idle"} label={p.status} />
               </td>

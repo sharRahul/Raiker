@@ -3,14 +3,15 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pysqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
+from sqlcipher3 import dbapi2 as sqlite3  # type: ignore[import-untyped]
 
 from raiker.auth.app_key import ensure_app_key
-from raiker.contracts.ids import utc_now
+from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import (
     AgentEvent,
     ApprovalRelayRecord,
@@ -50,6 +51,8 @@ from raiker.storage.migrations import (
     API_SESSIONS_SQL,
     ATTACHMENT_STORE_MIGRATION_ID,
     ATTACHMENT_STORE_SQL,
+    BRAIN_SOURCES_MIGRATION_ID,
+    BRAIN_SOURCES_SQL,
     CALENDAR_EVENTS_MIGRATION_ID,
     CALENDAR_EVENTS_SQL,
     CAPABILITY_DECISION_MODE_MIGRATION_ID,
@@ -64,6 +67,7 @@ from raiker.storage.migrations import (
     EMAIL_DRAFTS_SQL,
     GIST_MEMORY_MIGRATION_ID,
     GIST_MEMORY_SQL,
+    LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
     MEMORY_ARCHIVE_MIGRATION_ID,
@@ -104,6 +108,10 @@ from raiker.storage.migrations import (
     MODEL_FALLBACK_SEQUENCE_SQL,
     MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
     MODEL_SESSION_RESOLVED_MODEL_SQL,
+    OWNED_CONTEXT_DATA_MIGRATION_ID,
+    OWNED_CONTEXT_DATA_SQL,
+    OWNED_MEMORY_METADATA_MIGRATION_ID,
+    OWNED_MEMORY_METADATA_SQL,
     PHASE_1_MIGRATION_ID,
     PHASE_1_SQL,
     PHASE_2_MIGRATION_ID,
@@ -188,6 +196,8 @@ from raiker.storage.migrations import (
     PHASE_10_RUNTIME_AUTHORITY_SQL,
     PHASE_10_RUNTIME_MODE_STATE_MIGRATION_ID,
     PHASE_10_RUNTIME_MODE_STATE_SQL,
+    PRINCIPAL_CONTROL_SCOPE_MIGRATION_ID,
+    PRINCIPAL_CONTROL_SCOPE_SQL,
     PROJECT_CONTEXT_MIGRATION_ID,
     PROJECT_CONTEXT_SQL,
     PROJECT_MEMORY_INHERITANCE_MIGRATION_ID,
@@ -529,7 +539,25 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             # changes no gate, policy, or authority. Default 0 (unpinned).
             with contextlib.suppress(sqlite3.OperationalError):
                 connection.execute("ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
+            with contextlib.suppress(sqlite3.OperationalError):
+                connection.execute("ALTER TABLE projects ADD COLUMN owner_user_id TEXT REFERENCES users(user_id)")
             self._apply_migration(LOCK_SCREEN_MIGRATION_ID, LOCK_SCREEN_SQL, connection)
+            self._backfill_legacy_account_data_owner(connection)
+            self._apply_migration(
+                OWNED_CONTEXT_DATA_MIGRATION_ID, OWNED_CONTEXT_DATA_SQL, connection
+            )
+            self._backfill_owned_context_data(connection)
+            self._apply_migration(
+                OWNED_MEMORY_METADATA_MIGRATION_ID, OWNED_MEMORY_METADATA_SQL, connection
+            )
+            self._backfill_owned_memory_metadata(connection)
+            self._apply_migration(
+                PRINCIPAL_CONTROL_SCOPE_MIGRATION_ID, PRINCIPAL_CONTROL_SCOPE_SQL, connection
+            )
+            self._apply_migration(BRAIN_SOURCES_MIGRATION_ID, BRAIN_SOURCES_SQL, connection)
+            self._backfill_legacy_brain_sources(connection)
+            self._backfill_legacy_account_bootstrap_roles(connection)
+            self._migrate_legacy_controls_to_original_owner(connection)
             self._apply_migration(
                 MEMORY_CONTROLS_MIGRATION_ID, MEMORY_CONTROLS_SQL, connection
             )
@@ -626,18 +654,28 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         legacy_path = self.db_path.with_suffix(".plaintext-backup")
         self.db_path.replace(legacy_path)
         try:
-            with plaintext_sqlite.connect(legacy_path) as source, self.connect() as encrypted:
-                # SQLite dumps do not guarantee parent-before-child INSERT order.
-                # Import under the legacy database's existing integrity state, then
-                # restore enforcement for every normal Raiker connection.
-                encrypted.execute("PRAGMA foreign_keys = OFF")
-                # FTS virtual-table shadow rows are engine-specific. Rebuild this
-                # disposable projection from approved memory after importing.
-                dump = "\n".join(
-                    line for line in source.iterdump() if "approved_memory_fts" not in line
-                ).replace("USING fts5(", "USING fts4(")
-                encrypted.executescript(dump)
-                encrypted.execute("PRAGMA foreign_keys = ON")
+            # `with connection:` commits but does not close, and Windows refuses
+            # to unlink/replace a file that still has an open handle. Both
+            # connections are therefore closed explicitly before this function
+            # touches either file again.
+            source = plaintext_sqlite.connect(legacy_path)
+            encrypted = self.connect()
+            try:
+                with source, encrypted:
+                    # SQLite dumps do not guarantee parent-before-child INSERT order.
+                    # Import under the legacy database's existing integrity state, then
+                    # restore enforcement for every normal Raiker connection.
+                    encrypted.execute("PRAGMA foreign_keys = OFF")
+                    # FTS virtual-table shadow rows are engine-specific. Rebuild this
+                    # disposable projection from approved memory after importing.
+                    dump = "\n".join(
+                        line for line in source.iterdump() if "approved_memory_fts" not in line
+                    ).replace("USING fts5(", "USING fts4(")
+                    encrypted.executescript(dump)
+                    encrypted.execute("PRAGMA foreign_keys = ON")
+            finally:
+                source.close()
+                encrypted.close()
             legacy_path.unlink()
         except Exception:
             if self.db_path.exists():
@@ -645,18 +683,532 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             legacy_path.replace(self.db_path)
             raise
 
+    _ADD_COLUMN_RE = re.compile(
+        r"^\s*ALTER\s+TABLE\s+(?P<table>\w+)\s+ADD\s+COLUMN\s+(?P<column>\w+)\b",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _skip_existing_add_columns(cls, connection: sqlite3.Connection, sql: str) -> str:
+        """Drop ADD COLUMN statements whose column is already present.
+
+        SQLite has no ``ADD COLUMN IF NOT EXISTS``, so re-running a migration
+        that added columns raises "duplicate column name" on the first one and
+        strands every statement after it. Filtering those makes such a script
+        idempotent, which is what lets a partially-applied migration resume.
+        Splitting on ``;`` is lossless here because the parts are rejoined with
+        ``;`` and only whole leading ADD COLUMN statements are dropped.
+        """
+        kept: list[str] = []
+        for statement in sql.split(";"):
+            match = cls._ADD_COLUMN_RE.match(statement)
+            if match is not None:
+                columns = {
+                    str(row["name"])
+                    for row in connection.execute(f'PRAGMA table_info("{match["table"]}")').fetchall()
+                }
+                if match["column"] in columns:
+                    continue
+            kept.append(statement)
+        return ";".join(kept)
+
     def _apply_migration(self, migration_id: str, sql: str, connection: sqlite3.Connection) -> None:
         row = connection.execute(
             "SELECT applied_at FROM migrations WHERE migration_id = ?", (migration_id,)
         ).fetchone()
         if row is not None:
             return
-        with contextlib.suppress(sqlite3.OperationalError):
-            connection.executescript(sql)
+        # `executescript` commits implicitly, so a script cannot share a
+        # transaction with its own bookkeeping row: a crash between the two is
+        # always possible. Idempotency is what makes that safe — the re-run
+        # skips whatever already landed and completes the rest. Errors are
+        # deliberately not suppressed: a migration whose script did not apply
+        # must not be recorded as applied, or it never runs again.
+        connection.executescript(self._skip_existing_add_columns(connection, sql))
         connection.execute(
             "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
             (migration_id, utc_now()),
         )
+
+    def _backfill_legacy_account_bootstrap_roles(
+        self, connection: sqlite3.Connection
+    ) -> None:
+        connection.commit()
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            if connection.execute(
+                "SELECT 1 FROM migrations WHERE migration_id = ?",
+                (LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,),
+            ).fetchone() is not None:
+                connection.commit()
+                return
+
+            principals = connection.execute(
+                "SELECT p.principal_id, p.delegated_by_user_id, p.role_ids "
+                "FROM principals AS p "
+                "JOIN account_credentials AS ac ON ac.principal_id = p.principal_id "
+                "JOIN users AS u ON u.user_id = p.delegated_by_user_id "
+                "WHERE p.principal_type = 'human' AND p.is_active = 1 AND u.is_active = 1 "
+                "AND p.delegated_by_user_id IS NOT NULL AND p.delegated_by_user_id != ''"
+            ).fetchall()
+            required_role_ids = ("rl_admin", "rl_approver", "rl_rgm")
+            for principal in principals:
+                role_ids = json.loads(principal["role_ids"] or "[]")
+                missing_role_ids = [role_id for role_id in required_role_ids if role_id not in role_ids]
+                if missing_role_ids:
+                    connection.execute(
+                        "UPDATE principals SET role_ids = ? WHERE principal_id = ?",
+                        (json.dumps([*role_ids, *missing_role_ids], sort_keys=True), principal["principal_id"]),
+                    )
+                for role_id in required_role_ids:
+                    assignments = connection.execute(
+                        "SELECT assignment_id FROM user_role_assignments "
+                        "WHERE user_id = ? AND role_id = ? ORDER BY rowid",
+                        (principal["delegated_by_user_id"], role_id),
+                    ).fetchall()
+                    if assignments:
+                        connection.executemany(
+                            "DELETE FROM user_role_assignments WHERE assignment_id = ?",
+                            [(assignment["assignment_id"],) for assignment in assignments[1:]],
+                        )
+                        continue
+                    connection.execute(
+                        "INSERT INTO user_role_assignments "
+                        "(assignment_id, user_id, role_id, granted_at, granted_by) VALUES (?, ?, ?, ?, ?)",
+                        (
+                            f"ura_backfill_{principal['principal_id']}_{role_id}",
+                            principal["delegated_by_user_id"],
+                            role_id,
+                            utc_now(),
+                            "legacy_account_role_migration",
+                        ),
+                    )
+            connection.execute(
+                "INSERT INTO migrations (migration_id, applied_at) VALUES (?, ?)",
+                (LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID, utc_now()),
+            )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+
+    def _migrate_legacy_controls_to_original_owner(self, connection: sqlite3.Connection) -> None:
+        """Copy shared legacy controls once, exclusively to the oldest account."""
+        owner = connection.execute(
+            "SELECT principal_id FROM account_credentials ORDER BY created_at, principal_id LIMIT 1"
+        ).fetchone()
+        if owner is not None:
+            connection.execute(
+                "INSERT OR IGNORE INTO instance_account_guard (singleton, principal_id) VALUES (1, ?)",
+                (owner["principal_id"],),
+            )
+            self.initialize_principal_controls(str(owner["principal_id"]), connection=connection)
+
+    def _backfill_legacy_account_data_owner(self, connection: sqlite3.Connection) -> None:
+        principal_id = self._original_owner_from_connection(connection)
+        if principal_id is None:
+            return
+        principal = connection.execute(
+            "SELECT delegated_by_user_id FROM principals WHERE principal_id = ?", (principal_id,)
+        ).fetchone()
+        user_id = str(principal["delegated_by_user_id"] or principal_id.removeprefix("principal_")) if principal else ""
+        if not user_id or connection.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,)).fetchone() is None:
+            return
+        connection.execute("UPDATE sessions SET user_id = ? WHERE user_id IS NULL", (user_id,))
+        connection.execute("UPDATE projects SET owner_user_id = ? WHERE owner_user_id IS NULL", (user_id,))
+        legacy_active = connection.execute(
+            "SELECT project_id FROM active_project WHERE scope_id IN ('local_single_user', 'project_scope:legacy') "
+            "ORDER BY updated_at DESC LIMIT 1"
+        ).fetchone()
+        if legacy_active is not None and legacy_active["project_id"] is not None:
+            connection.execute(
+                "INSERT OR REPLACE INTO active_project (scope_id, project_id, updated_at) VALUES (?, ?, ?)",
+                (f"project_scope:{user_id}", legacy_active["project_id"], utc_now()),
+            )
+
+    @staticmethod
+    def _backfill_owned_context_data(connection: sqlite3.Connection) -> None:
+        """Assign pre-account prompt data to the original account, never a later one.
+
+        Resolution belongs to `_original_owner_from_connection`, which prefers
+        the guard row and skips deactivated principals. A local copy of that
+        query silently files new data against the owner a recovery replaced.
+        """
+        owner = SQLiteStore._original_owner_from_connection(connection)
+        if owner is None:
+            return
+        principal_id = owner
+        connection.execute(
+            "UPDATE approved_memory SET owner_principal_id = ? WHERE owner_principal_id IS NULL",
+            (principal_id,),
+        )
+        connection.execute(
+            "UPDATE vector_records SET owner_principal_id = ? WHERE owner_principal_id IS NULL",
+            (principal_id,),
+        )
+        connection.execute(
+            "UPDATE attachments SET owner_principal_id = ? WHERE owner_principal_id IS NULL",
+            (principal_id,),
+        )
+
+    @staticmethod
+    def _backfill_owned_memory_metadata(connection: sqlite3.Connection) -> None:
+        owner = SQLiteStore._original_owner_from_connection(connection)
+        if owner is not None:
+            connection.execute(
+                "UPDATE memory_candidates SET owner_principal_id = ? WHERE owner_principal_id IS NULL",
+                (owner,),
+            )
+
+    @staticmethod
+    def _original_owner_from_connection(connection: sqlite3.Connection) -> str | None:
+        """The live principal that owns this instance's unattributed data.
+
+        The guard row is the authority: it names the instance's sole account and
+        recovery repoints it, so it survives an owner replacement. The role scan
+        is the fallback for databases predating the guard, and only ever
+        considers *active* principals — recovery deactivates the old owner but
+        leaves its ``rl_owner`` role and its earlier ``created_at``, so an
+        unfiltered scan would keep resolving to the dead principal and file all
+        new data against it.
+        """
+        # The backfills call this during bootstrap, before the migration that
+        # creates the guard has run, so its absence is expected here.
+        guard_exists = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'instance_account_guard'"
+        ).fetchone() is not None
+        row = connection.execute(
+            "SELECT g.principal_id FROM instance_account_guard g "
+            "JOIN principals p ON p.principal_id = g.principal_id "
+            "WHERE g.singleton = 1 AND p.is_active = 1"
+        ).fetchone() if guard_exists else None
+        if row is None:
+            row = connection.execute(
+                "SELECT principal_id FROM principals WHERE role_ids LIKE '%rl_owner%' "
+                "AND is_active = 1 ORDER BY created_at, principal_id LIMIT 1"
+            ).fetchone()
+        if row is None:
+            row = connection.execute(
+                "SELECT c.principal_id FROM account_credentials c "
+                "JOIN principals p ON p.principal_id = c.principal_id "
+                "WHERE p.is_active = 1 ORDER BY c.created_at, c.principal_id LIMIT 1"
+            ).fetchone()
+        return str(row["principal_id"]) if row is not None else None
+
+    def assign_legacy_data_to_original_owner(self) -> None:
+        with self.connect() as connection:
+            self._backfill_legacy_account_data_owner(connection)
+            self._backfill_owned_context_data(connection)
+            self._backfill_owned_memory_metadata(connection)
+
+    def list_brain_sources(self, owner_principal_id: str) -> list[str]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT path FROM brain_sources WHERE owner_principal_id = ? ORDER BY created_at, path",
+                (owner_principal_id,),
+            ).fetchall()
+        return [str(row["path"]) for row in rows]
+
+    def add_brain_source(self, owner_principal_id: str, path: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO brain_sources (owner_principal_id, path, created_at) VALUES (?, ?, ?)",
+                (owner_principal_id, path, utc_now()),
+            )
+
+    def _backfill_legacy_brain_sources(self, connection: sqlite3.Connection) -> None:
+        """Migrate the former shared source list to the original account once."""
+        owner = self._original_owner_from_connection(connection)
+        legacy_path = self.paths.workspace_root / ".raiker" / "brain-sources.json"
+        if owner is None or not legacy_path.exists():
+            return
+        try:
+            raw = json.loads(legacy_path.read_text(encoding="utf-8"))
+            sources = [item for item in raw if isinstance(item, str) and item]
+        except (OSError, ValueError, TypeError):
+            return
+        connection.executemany(
+            "INSERT OR IGNORE INTO brain_sources (owner_principal_id, path, created_at) VALUES (?, ?, ?)",
+            [(owner, source, utc_now()) for source in sources],
+        )
+        with contextlib.suppress(OSError):
+            legacy_path.unlink()
+
+    def remove_brain_source(self, owner_principal_id: str, path: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM brain_sources WHERE owner_principal_id = ? AND path = ?",
+                (owner_principal_id, path),
+            )
+
+    def original_account_principal_id(self) -> str | None:
+        """Return the sole destination for unattributed legacy data, if one exists."""
+        with self.connect() as connection:
+            return self._original_owner_from_connection(connection)
+
+    @staticmethod
+    def _principal_user_id_from_connection(
+        connection: sqlite3.Connection, principal_id: str
+    ) -> str | None:
+        """Resolve a principal's user id on an existing connection.
+
+        A CLI-bootstrapped owner is created with no ``delegated_by_user_id``, so
+        the delegation column alone resolves to NULL and every user-keyed query
+        silently matches nothing. The ``principal_<user_id>`` naming convention
+        is the fallback, confirmed against ``users`` so an unrelated principal id
+        cannot conjure a user that does not exist.
+        """
+        row = connection.execute(
+            "SELECT delegated_by_user_id FROM principals WHERE principal_id = ?", (principal_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        delegated = row["delegated_by_user_id"]
+        if delegated:
+            return str(delegated)
+        inferred = principal_id.removeprefix("principal_")
+        exists = connection.execute(
+            "SELECT 1 FROM users WHERE user_id = ?", (inferred,)
+        ).fetchone()
+        return inferred if exists is not None else None
+
+    def principal_user_id(self, principal_id: str) -> str | None:
+        with self.connect() as connection:
+            return self._principal_user_id_from_connection(connection, principal_id)
+
+    def initialize_principal_controls(
+        self, principal_id: str, *, connection: sqlite3.Connection | None = None
+    ) -> None:
+        """Seed only the original account from legacy global controls.
+
+        Later accounts intentionally receive no rows: missing gate/model rows are
+        interpreted as disabled/unselected by scoped callers.
+        """
+        owns_connection = connection is None
+        if connection is None:
+            connection = self.connect()
+        try:
+            owner = connection.execute(
+                "SELECT principal_id FROM account_credentials ORDER BY created_at, principal_id LIMIT 1"
+            ).fetchone()
+            if owner is None:
+                owner = connection.execute(
+                    "SELECT principal_id FROM instance_account_guard WHERE singleton = 1"
+                ).fetchone()
+            if owner is None or str(owner["principal_id"]) != principal_id:
+                return
+            connection.execute(
+                """INSERT OR IGNORE INTO principal_model_control
+                SELECT ?, profile_id, model, reasoning_enabled, reasoning_effort, reasoning_mode,
+                       reasoning_budget_tokens, updated_at
+                FROM model_session_state WHERE session_id = 'terminal-local'""",
+                (principal_id,),
+            )
+            connection.execute(
+                """INSERT OR IGNORE INTO principal_model_fallback_sequence
+                SELECT ?, profile_ids_json, updated_at FROM model_fallback_sequence
+                WHERE session_id = 'terminal-local'""",
+                (principal_id,),
+            )
+            connection.execute(
+                """INSERT OR IGNORE INTO principal_model_advisor
+                SELECT ?, profile_id, updated_at FROM model_advisor WHERE session_id = 'terminal-local'""",
+                (principal_id,),
+            )
+            connection.execute(
+                """INSERT OR IGNORE INTO principal_runtime_mode_state
+                SELECT ?, mode_name, status, activated_by, activated_at, reason, updated_at
+                FROM runtime_mode_state WHERE status = 'active' ORDER BY created_at DESC LIMIT 1""",
+                (principal_id,),
+            )
+            connection.execute(
+                """INSERT OR IGNORE INTO principal_capability_gate_state
+                SELECT ?, capability, state, requested_by, requested_at, activated_by, activated_at,
+                       reason, readiness_snapshot_json, created_at, updated_at
+                FROM capability_gate_state""",
+                (principal_id,),
+            )
+            connection.execute(
+                """INSERT OR IGNORE INTO principal_capability_decision_mode
+                SELECT ?, capability, decision_mode, set_by, set_at, reason, created_at, updated_at
+                FROM capability_decision_mode""",
+                (principal_id,),
+            )
+        finally:
+            if owns_connection:
+                connection.commit()
+                connection.close()
+
+    def claim_initial_account(self, principal_id: str) -> bool:
+        """Atomically reserve this instance's sole local account."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "INSERT OR IGNORE INTO instance_account_guard (singleton, principal_id) VALUES (1, ?)",
+                (principal_id,),
+            )
+            return cursor.rowcount == 1
+
+    def create_initial_account_atomic(
+        self, *, user: User, principal_id: str, role_ids: tuple[str, ...], max_runtime_mode: str,
+        username: str | None = None, password_hash: str | None = None, hash_algo: str | None = None,
+        fail_after: str | None = None,
+    ) -> bool:
+        """Create the sole account and all identity state in one transaction."""
+        def checkpoint(phase: str) -> None:
+            if fail_after == phase:
+                raise RuntimeError(f"injected_failure:{phase}")
+
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                claimed = connection.execute(
+                    "INSERT OR IGNORE INTO instance_account_guard (singleton, principal_id) VALUES (1, ?)",
+                    (principal_id,),
+                )
+                if claimed.rowcount != 1:
+                    connection.rollback()
+                    return False
+                checkpoint("guard")
+                connection.execute(
+                    "INSERT INTO users (user_id, display_name, email, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (user.user_id, user.display_name, user.email, int(user.is_active), user.created_at, user.updated_at),
+                )
+                checkpoint("user")
+                connection.execute(
+                    """INSERT INTO principals (principal_id, principal_type, display_name, delegated_by_user_id,
+                    role_ids, domain_scopes, max_runtime_mode, created_at, is_active)
+                    VALUES (?, 'human', ?, ?, ?, '[]', ?, ?, 1)""",
+                    (principal_id, user.display_name, user.user_id, json.dumps(list(role_ids)), max_runtime_mode, user.created_at),
+                )
+                checkpoint("principal")
+                connection.executemany(
+                    "INSERT INTO user_role_assignments (assignment_id, user_id, role_id, granted_at, granted_by) VALUES (?, ?, ?, ?, ?)",
+                    [(new_id("ura_"), user.user_id, role_id, user.created_at, "lock_screen_registration") for role_id in role_ids],
+                )
+                if username is not None and password_hash is not None and hash_algo is not None:
+                    connection.execute(
+                        "INSERT INTO account_credentials (principal_id, username, password_hash, hash_algo, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (principal_id, username, password_hash, hash_algo, user.created_at, user.updated_at),
+                    )
+                checkpoint("credential")
+                self._backfill_legacy_account_data_owner(connection)
+                self._backfill_owned_context_data(connection)
+                self._backfill_owned_memory_metadata(connection)
+                self.initialize_principal_controls(principal_id, connection=connection)
+                checkpoint("migration")
+                connection.commit()
+                return True
+            except Exception:
+                connection.rollback()
+                raise
+
+    def recover_owner_atomic(
+        self, *, user: User, principal_id: str, role_ids: tuple[str, ...],
+        old_principal_ids: list[str], credential_owner_id: str | None, max_runtime_mode: str,
+        fail_after: str | None = None,
+    ) -> None:
+        """Transfer the sole credential and guard to a replacement owner atomically.
+
+        ``credential_owner_id`` is None when no owner has a credential row to
+        move — a CLI-bootstrapped owner never has one, and a fresh workspace has
+        no owner at all. The principal, guard, and data transfer still run; only
+        the credential move is skipped.
+        """
+        def checkpoint(phase: str) -> None:
+            if fail_after == phase:
+                raise RuntimeError(f"injected_failure:{phase}")
+
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                if (
+                    credential_owner_id is not None
+                    and connection.execute("SELECT 1 FROM account_credentials WHERE principal_id = ?", (credential_owner_id,)).fetchone() is None
+                ):
+                    raise ValueError("credential_owner_not_found")
+                connection.execute(
+                    "INSERT INTO users (user_id, display_name, email, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (user.user_id, user.display_name, user.email, int(user.is_active), user.created_at, user.updated_at),
+                )
+                checkpoint("user")
+                connection.execute(
+                    """INSERT INTO principals (principal_id, principal_type, display_name, delegated_by_user_id,
+                    role_ids, domain_scopes, max_runtime_mode, created_at, is_active)
+                    VALUES (?, 'human', ?, ?, ?, '[]', ?, ?, 1)""",
+                    (principal_id, user.display_name, user.user_id, json.dumps(list(role_ids)), max_runtime_mode, user.created_at),
+                )
+                connection.executemany(
+                    "INSERT INTO user_role_assignments (assignment_id, user_id, role_id, granted_at, granted_by) VALUES (?, ?, ?, ?, ?)",
+                    [(new_id("ura_"), user.user_id, role_id, user.created_at, "owner_recovery") for role_id in role_ids],
+                )
+                checkpoint("principal")
+                old_users = connection.execute(
+                    f"SELECT delegated_by_user_id FROM principals WHERE principal_id IN ({','.join('?' for _ in old_principal_ids)})",
+                    old_principal_ids,
+                ).fetchall() if old_principal_ids else []
+                self._transfer_owner_scoped_data(
+                    connection, old_principal_ids, [str(row["delegated_by_user_id"]) for row in old_users if row["delegated_by_user_id"]],
+                    principal_id, user.user_id,
+                )
+                if credential_owner_id is not None:
+                    connection.execute("UPDATE account_credentials SET principal_id = ? WHERE principal_id = ?", (principal_id, credential_owner_id))
+                # The guard names this instance's sole account either way, and
+                # is what the original-owner pointer resolves through.
+                connection.execute(
+                    "INSERT INTO instance_account_guard (singleton, principal_id) VALUES (1, ?) "
+                    "ON CONFLICT(singleton) DO UPDATE SET principal_id = excluded.principal_id",
+                    (principal_id,),
+                )
+                checkpoint("credential")
+                if old_principal_ids:
+                    marks = ",".join("?" for _ in old_principal_ids)
+                    connection.execute(f"UPDATE principals SET is_active = 0 WHERE principal_id IN ({marks})", old_principal_ids)
+                    connection.execute(f"UPDATE api_sessions SET revoked = 1 WHERE principal_id IN ({marks})", old_principal_ids)
+                self.initialize_principal_controls(principal_id, connection=connection)
+                checkpoint("finalize")
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+
+    @staticmethod
+    def _transfer_owner_scoped_data(
+        connection: sqlite3.Connection, old_principal_ids: list[str], old_user_ids: list[str],
+        principal_id: str, user_id: str,
+    ) -> None:
+        """Move owner-scoped rows without rewriting immutable audit/event history."""
+        excluded = {"account_credentials", "api_sessions", "instance_account_guard", "migrations", "principals", "users"}
+        tables = connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+        for row in tables:
+            table = str(row["name"])
+            if table.startswith("sqlite_") or table in excluded:
+                continue
+            columns = {str(column["name"]) for column in connection.execute(f'PRAGMA table_info("{table}")').fetchall()}
+            for column in ("owner_principal_id", "principal_id"):
+                if column in columns and old_principal_ids:
+                    marks = ",".join("?" for _ in old_principal_ids)
+                    connection.execute(
+                        f'UPDATE "{table}" SET "{column}" = ? WHERE "{column}" IN ({marks})',
+                        [principal_id, *old_principal_ids],
+                    )
+            for column in ("owner_user_id", "user_id"):
+                if column in columns and old_user_ids:
+                    marks = ",".join("?" for _ in old_user_ids)
+                    connection.execute(
+                        f'UPDATE "{table}" SET "{column}" = ? WHERE "{column}" IN ({marks})',
+                        [user_id, *old_user_ids],
+                    )
+
+    def rollback_initial_registration(self, principal_id: str, user_id: str) -> None:
+        with self.connect() as connection:
+            connection.execute("DELETE FROM user_role_assignments WHERE user_id = ?", (user_id,))
+            connection.execute("DELETE FROM account_credentials WHERE principal_id = ?", (principal_id,))
+            connection.execute("DELETE FROM principals WHERE principal_id = ?", (principal_id,))
+            connection.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+            connection.execute(
+                "DELETE FROM instance_account_guard WHERE singleton = 1 AND principal_id = ?",
+                (principal_id,),
+            )
 
     def _backfill_self_inclusive_project_paths(self, connection: sqlite3.Connection) -> None:
         """Derive paths from the authoritative adjacency list once per database."""
@@ -701,7 +1253,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         now = utc_now()
         # New sessions are stamped with the active project (if any) so project
         # scoping needs no caller changes — an organizing label, not authority.
-        project_id = self.get_active_project()
+        project_id = self.get_active_project(user_id)
         with self.connect() as connection:
             connection.execute(
                 """
@@ -714,9 +1266,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     # ── Projects (web-app task 5: named organizing scopes, governance-neutral) ──
 
-    ACTIVE_PROJECT_SCOPE = "local_single_user"
+    ACTIVE_PROJECT_SCOPE = "project_scope:"
 
-    def create_project(self, project_id: str, name: str, root_subpath: str, parent_id: str | None = None) -> None:
+    def create_project(self, project_id: str, name: str, root_subpath: str, parent_id: str | None = None, owner_user_id: str | None = None) -> None:
+        if owner_user_id is None:
+            original = self.original_account_principal_id()
+            owner_user_id = self.principal_user_id(original) if original else None
         with self.connect() as connection:
             if parent_id:
                 parent = connection.execute("SELECT path FROM projects WHERE project_id = ?", (parent_id,)).fetchone()
@@ -725,14 +1280,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             else:
                 path = f"/{project_id}/"
             connection.execute(
-                "INSERT INTO projects (project_id, name, root_subpath, created_at, parent_id, path, is_archived, archived_at) VALUES (?, ?, ?, ?, ?, ?, 0, NULL)",
-                (project_id, name, root_subpath, utc_now(), parent_id, path),
+                "INSERT INTO projects (project_id, name, root_subpath, created_at, parent_id, path, is_archived, archived_at, owner_user_id) VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?)",
+                (project_id, name, root_subpath, utc_now(), parent_id, path, owner_user_id),
             )
 
-    def load_project(self, project_id: str) -> dict[str, Any] | None:
+    def load_project(self, project_id: str, user_id: str | None = None) -> dict[str, Any] | None:
         with self.connect() as connection:
             row = connection.execute(
-                "SELECT * FROM projects WHERE project_id = ?", (project_id,)
+                "SELECT * FROM projects WHERE project_id = ?" + (" AND owner_user_id = ?" if user_id else ""),
+                (project_id, user_id) if user_id else (project_id,),
             ).fetchone()
         return dict(row) if row else None
 
@@ -743,7 +1299,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
-    def load_project_context(self, project_id: str) -> dict[str, Any]:
+    def load_project_context(self, project_id: str, *, user_id: str | None = None) -> dict[str, Any]:
+        if user_id is not None and self.load_project(project_id, user_id=user_id) is None:
+            return {"instructions": "", "attachment_ids": [], "memory_enabled": False, "memory_mode": "inherit"}
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT instructions, attachment_ids_json, memory_enabled, memory_mode FROM project_contexts WHERE project_id = ?",
@@ -770,10 +1328,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         attachment_ids: list[str],
         memory_enabled: bool | None = None,
         memory_mode: str | None = None,
+        owner_principal_id: str | None = None,
     ) -> None:
         mode = memory_mode or ("enabled" if memory_enabled else "disabled")
         if mode not in {"inherit", "enabled", "disabled"}:
             raise ValueError("invalid_memory_mode")
+        if owner_principal_id is not None and any(
+            self.load_attachment_metadata(attachment_id, owner_principal_id=owner_principal_id) is None
+            for attachment_id in attachment_ids
+        ):
+            raise ValueError("unknown_project_attachment")
         with self.connect() as connection:
             connection.execute(
                 """
@@ -789,28 +1353,44 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (project_id, instructions, json.dumps(attachment_ids), int(mode == "enabled"), mode, utc_now()),
             )
 
-    def list_projects(self) -> list[dict[str, Any]]:
+    def list_projects(self, user_id: str | None = None) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(
                 """
                 SELECT projects.*, COUNT(sessions.session_id) AS session_count
                 FROM projects
                 LEFT JOIN sessions ON sessions.project_id = projects.project_id
+                """ + (" WHERE projects.owner_user_id = ? " if user_id else "") + """
                 GROUP BY projects.project_id
                 ORDER BY projects.created_at DESC
-                """
+                """, (user_id,) if user_id else ()
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def get_active_project(self) -> str | None:
+    def get_active_project(self, user_id: str | None = None) -> str | None:
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT project_id FROM active_project WHERE scope_id = ?",
-                (self.ACTIVE_PROJECT_SCOPE,),
+                (f"{self.ACTIVE_PROJECT_SCOPE}{user_id or 'legacy'}",),
             ).fetchone()
-        return str(row["project_id"]) if row is not None and row["project_id"] else None
+            if row is None and user_id is None:
+                owner = self._original_owner_from_connection(connection)
+                if owner is not None:
+                    principal = connection.execute(
+                        "SELECT delegated_by_user_id FROM principals WHERE principal_id = ?", (owner,)
+                    ).fetchone()
+                    owner_user_id = str(principal["delegated_by_user_id"] or owner.removeprefix("principal_")) if principal else ""
+                    if owner_user_id:
+                        row = connection.execute(
+                            "SELECT project_id FROM active_project WHERE scope_id = ?",
+                            (f"{self.ACTIVE_PROJECT_SCOPE}{owner_user_id}",),
+                        ).fetchone()
+        project_id = str(row["project_id"]) if row is not None and row["project_id"] else None
+        if project_id is not None and user_id is not None and self.load_project(project_id, user_id) is None:
+            return None
+        return project_id
 
-    def save_active_project(self, project_id: str | None) -> None:
+    def save_active_project(self, project_id: str | None, user_id: str | None = None) -> None:
         with self.connect() as connection:
             connection.execute(
                 """
@@ -818,7 +1398,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 VALUES (?, ?, ?)
                 ON CONFLICT(scope_id) DO UPDATE SET project_id = excluded.project_id, updated_at = excluded.updated_at
                 """,
-                (self.ACTIVE_PROJECT_SCOPE, project_id, utc_now()),
+                (f"{self.ACTIVE_PROJECT_SCOPE}{user_id or 'legacy'}", project_id, utc_now()),
             )
 
     def load_session(self, session_id: str) -> dict[str, Any] | None:
@@ -890,13 +1470,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     # hard-delete. Path trigger auto-syncs on parent_id change. Partial index
     # on active tree for fast daily queries.
 
-    def list_project_tree(self, include_archived: bool = False) -> list[dict[str, Any]]:
+    def list_project_tree(self, include_archived: bool = False, user_id: str | None = None) -> list[dict[str, Any]]:
         """Return nested tree of projects (active by default)."""
-        where = "" if include_archived else "WHERE is_archived = 0"
+        conditions = [] if include_archived else ["is_archived = 0"]
+        params: list[Any] = []
+        if user_id is not None:
+            conditions.append("owner_user_id = ?")
+            params.append(user_id)
+        where = "WHERE " + " AND ".join(conditions) if conditions else ""
         with self.connect() as conn:
             rows = conn.execute(f"""
                 SELECT * FROM projects {where} ORDER BY path, created_at
-            """).fetchall()
+            """, params).fetchall()
         nodes = {row["project_id"]: {**dict(row), "children": []} for row in rows}
         roots = []
         for row in rows:
@@ -974,7 +1559,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             conn.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
         return True
 
-    def get_ancestor_contexts(self, project_id: str) -> list[dict[str, Any]]:
+    def get_ancestor_contexts(self, project_id: str, *, user_id: str | None = None) -> list[dict[str, Any]]:
         """Return context rows for all active ancestors of project_id, ordered root→leaf."""
         with self.connect() as conn:
             target = conn.execute("SELECT path FROM projects WHERE project_id = ?", (project_id,)).fetchone()
@@ -985,11 +1570,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 SELECT pc.* FROM project_contexts pc
                 JOIN projects p ON p.project_id = pc.project_id
                 WHERE ? LIKE p.path || '%' AND p.project_id != ? AND p.is_archived = 0
+                """ + (" AND p.owner_user_id = ?" if user_id is not None else "") + """
                 ORDER BY LENGTH(p.path) ASC
-            """, (path, project_id)).fetchall()
+            """, (path, project_id, *([user_id] if user_id is not None else []))).fetchall()
         return [dict(r) for r in rows]
 
-    def load_effective_project_context(self, project_id: str) -> dict[str, Any]:
+    def load_effective_project_context(self, project_id: str, *, user_id: str | None = None) -> dict[str, Any]:
         """Return the project's context merged with every active ancestor's.
 
         Instructions concatenate root→leaf so the nearest folder speaks last;
@@ -998,11 +1584,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         Archived ancestors contribute nothing. This is the single merge used by
         both the live context gatherer and the dashboard read path.
         """
-        own = self.load_project_context(project_id)
+        own = self.load_project_context(project_id, user_id=user_id)
         instructions: list[str] = []
         attachment_ids: list[str] = []
         memory_mode = "inherit"
-        for ancestor in self.get_ancestor_contexts(project_id):
+        for ancestor in self.get_ancestor_contexts(project_id, user_id=user_id):
             text = str(ancestor.get("instructions") or "").strip()
             if text:
                 instructions.append(text)
@@ -1058,6 +1644,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 and str(owner) != user_id
             ):
                 return False
+            if project_id is not None:
+                project = connection.execute(
+                    "SELECT owner_user_id FROM projects WHERE project_id = ?", (project_id,)
+                ).fetchone()
+                if project is None or project["owner_user_id"] != owner:
+                    return False
             connection.execute(
                 "UPDATE sessions SET project_id = ?, updated_at = ? WHERE session_id = ?",
                 (project_id, utc_now(), session_id),
@@ -1214,15 +1806,25 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return {str(row["memory_id"]) for row in rows}
 
-    def is_memory_incognito(self) -> bool:
+    def is_memory_incognito(self, owner_principal_id: str | None = None) -> bool:
+        scope_id = f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}" if owner_principal_id else self.MEMORY_SETTINGS_SCOPE
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT incognito FROM memory_settings WHERE scope_id = ?",
-                (self.MEMORY_SETTINGS_SCOPE,),
+                (scope_id,),
             ).fetchone()
+            if row is None and owner_principal_id is None:
+                original = self._original_owner_from_connection(connection)
+                if original is not None:
+                    row = connection.execute(
+                        "SELECT incognito FROM memory_settings WHERE scope_id = ?",
+                        (f"{self.MEMORY_SETTINGS_SCOPE}:{original}",),
+                    ).fetchone()
         return bool(row["incognito"]) if row is not None else False
 
-    def set_memory_incognito(self, incognito: bool) -> None:
+    def set_memory_incognito(self, incognito: bool, owner_principal_id: str | None = None) -> None:
+        if owner_principal_id is None:
+            owner_principal_id = self.original_account_principal_id()
         with self.connect() as connection:
             connection.execute(
                 """
@@ -1230,7 +1832,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 VALUES (?, ?, ?)
                 ON CONFLICT(scope_id) DO UPDATE SET incognito = excluded.incognito, updated_at = excluded.updated_at
                 """,
-                (self.MEMORY_SETTINGS_SCOPE, 1 if incognito else 0, utc_now()),
+                (f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}" if owner_principal_id else self.MEMORY_SETTINGS_SCOPE, 1 if incognito else 0, utc_now()),
             )
 
     def list_turns(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
@@ -1667,10 +2269,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             row = connection.execute(query, params).fetchone()
         return int(row["cnt"]) if row else 0
 
-    def count_pending_approvals(self) -> int:
+    def count_pending_approvals(self, session_id: str | None = None) -> int:
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT COUNT(*) AS cnt FROM approvals WHERE status = 'pending'"
+                + (" AND action_id IN (SELECT action_id FROM tool_actions WHERE session_id = ?)" if session_id else ""),
+                (session_id,) if session_id else (),
             ).fetchone()
         return int(row["cnt"]) if row else 0
 
@@ -1709,13 +2313,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
-    def list_approvals(self, status: str | None = None) -> list[dict[str, Any]]:
+    def list_approvals(self, status: str | None = None, *, user_id: str | None = None) -> list[dict[str, Any]]:
+        # The sessions join exists only to enforce the owner filter, so it is
+        # added only when filtering. An unconditional inner join would hide
+        # every approval whose action has no registered sessions row.
         query = """
             SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id, tool_actions.tool_name, tool_actions.arguments_json, tool_actions.risk_level
             FROM approvals
             JOIN tool_actions ON approvals.action_id = tool_actions.action_id
         """
         params: list[Any] = []
+        if user_id is not None:
+            query += " JOIN sessions ON tool_actions.session_id = sessions.session_id AND sessions.user_id = ?"
+            params.append(user_id)
         if status is not None:
             query += " WHERE approvals.status = ?"
             params.append(status)
@@ -1724,16 +2334,24 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
-    def load_approval(self, approval_id: str) -> dict[str, Any] | None:
+    def load_approval(self, approval_id: str, *, user_id: str | None = None) -> dict[str, Any] | None:
+        # The sessions join exists only to enforce the owner filter. Joining it
+        # unconditionally would hide every approval whose action has no
+        # registered sessions row (the terminal client records actions without
+        # one), so it is added only when a user is actually being filtered on.
         with self.connect() as connection:
             row = connection.execute(
                 """
                 SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id, tool_actions.tool_name, tool_actions.arguments_json, tool_actions.risk_level
                 FROM approvals
                 JOIN tool_actions ON approvals.action_id = tool_actions.action_id
+                """ + (
+                    " JOIN sessions ON tool_actions.session_id = sessions.session_id"
+                    " AND sessions.user_id = ?" if user_id is not None else ""
+                ) + """
                 WHERE approval_id = ?
                 """,
-                (approval_id,),
+                (approval_id,) if user_id is None else (user_id, approval_id),
             ).fetchone()
         return dict(row) if row else None
 
@@ -1749,13 +2367,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def update_task_status(self, task_id: str, status: str) -> None:
         self._update_task(task_id, status=status)
 
-    def insert_memory_candidate(self, candidate: Any) -> None:
+    def insert_memory_candidate(self, candidate: Any, *, owner_principal_id: str | None = None) -> None:
         with self.connect() as connection:
             connection.execute(
                 """
                 INSERT INTO memory_candidates
-                (candidate_id, source_event_id, memory_type, scope, text, sensitivity, confidence, decision, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (candidate_id, source_event_id, memory_type, scope, text, sensitivity, confidence, decision, created_at, owner_principal_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     candidate.candidate_id,
@@ -1767,15 +2385,20 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     candidate.confidence,
                     candidate.decision,
                     candidate.created_at,
+                    owner_principal_id,
                 ),
             )
 
-    def list_memory_candidates(self, decision: str | None = None) -> list[dict[str, Any]]:
+    def list_memory_candidates(self, decision: str | None = None, *, owner_principal_id: str | None = None) -> list[dict[str, Any]]:
         query = "SELECT * FROM memory_candidates"
         params: list[Any] = []
         if decision is not None:
             query += " WHERE decision = ?"
             params.append(decision)
+        if owner_principal_id is not None:
+            query += " AND" if params else " WHERE"
+            query += " owner_principal_id = ?"
+            params.append(owner_principal_id)
         query += " ORDER BY created_at DESC"
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
@@ -1786,8 +2409,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO approved_memory
-                (memory_id, text, scope, sensitivity, source_event_id, memory_type, created_at, tags_json, source, provenance_json, confidence, trust_score, retention, approval_state, created_by, updated_at, deleted_at, archived_at, search_enabled, expires_at, valid_from, valid_until, supersedes_memory_id, superseded_at, remembered_reason, content_checksum)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (memory_id, text, scope, sensitivity, source_event_id, memory_type, created_at, tags_json, source, provenance_json, confidence, trust_score, retention, approval_state, created_by, updated_at, deleted_at, archived_at, search_enabled, expires_at, valid_from, valid_until, supersedes_memory_id, superseded_at, remembered_reason, content_checksum, owner_principal_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     entry.memory_id,
@@ -1816,6 +2439,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     entry.superseded_at,
                     entry.remembered_reason,
                     hashlib.sha256(entry.text.encode()).hexdigest(),
+                    entry.owner_principal_id,
                 ),
             )
             self._sync_memory_fts(connection, entry.memory_id)
@@ -1827,7 +2451,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """UPDATE approved_memory SET text = ?, content_checksum = ?, sensitivity = ?, tags_json = ?, updated_at = ?,
                 search_enabled = ?, expires_at = ?, valid_from = ?, valid_until = ?,
                 supersedes_memory_id = ?, superseded_at = ?, remembered_reason = ?
-                WHERE memory_id = ? AND deleted_at IS NULL""",
+                WHERE memory_id = ? AND deleted_at IS NULL"""
+                + (" AND owner_principal_id = ?" if entry.owner_principal_id else ""),
                 (
                     entry.text,
                     hashlib.sha256(entry.text.encode()).hexdigest(),
@@ -1842,24 +2467,29 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     entry.superseded_at,
                     entry.remembered_reason,
                     entry.memory_id,
+                    *([entry.owner_principal_id] if entry.owner_principal_id else []),
                 ),
             )
             self._sync_memory_fts(connection, entry.memory_id)
             self._sync_memory_projection_eligibility(connection, entry.memory_id)
         return cursor.rowcount > 0
 
-    def supersede_approved_memory(self, memory_id: str, replacement_id: str, *, at: str) -> bool:
+    def supersede_approved_memory(
+        self, memory_id: str, replacement_id: str, *, at: str, owner_principal_id: str | None = None
+    ) -> bool:
         with self.connect() as connection:
             cursor = connection.execute(
                 """UPDATE approved_memory SET approval_state = 'superseded', valid_until = ?, superseded_at = ?,
-                updated_at = ? WHERE memory_id = ? AND deleted_at IS NULL AND superseded_at IS NULL""",
-                (at, at, at, memory_id),
+                updated_at = ? WHERE memory_id = ? AND deleted_at IS NULL AND superseded_at IS NULL"""
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (at, at, at, memory_id, *([owner_principal_id] if owner_principal_id else [])),
             )
             self._sync_memory_fts(connection, memory_id)
             self._sync_memory_projection_eligibility(connection, memory_id)
             connection.execute(
-                "UPDATE approved_memory SET supersedes_memory_id = ? WHERE memory_id = ?",
-                (memory_id, replacement_id),
+                "UPDATE approved_memory SET supersedes_memory_id = ? WHERE memory_id = ?"
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (memory_id, replacement_id, *([owner_principal_id] if owner_principal_id else [])),
             )
         return cursor.rowcount > 0
 
@@ -1946,7 +2576,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
         return cursor.rowcount > 0
 
-    def list_memory_entity_neighborhood(self, entity_id: str, scope: str | None = None) -> list[dict[str, Any]]:
+    def list_memory_entity_neighborhood(
+        self, entity_id: str, scope: str | None = None, *, owner_principal_id: str | None = None
+    ) -> list[dict[str, Any]]:
         now = utc_now()
         query = """SELECT r.*, s.display_name AS subject_name, o.display_name AS object_name
         FROM memory_entity_relationships r JOIN memory_entities s ON s.entity_id = r.subject_entity_id
@@ -1959,6 +2591,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
           AND (m.valid_from IS NULL OR m.valid_from <= ?)
           AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL"""
         params: list[Any] = [entity_id, entity_id, now, now, now]
+        if owner_principal_id:
+            query += " AND m.owner_principal_id = ?"
+            params.append(owner_principal_id)
         if scope:
             query += " AND m.scope = ?"
             params.append(scope)
@@ -1967,26 +2602,28 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return [dict(row) for row in rows]
 
     def mark_approved_memory_forgotten(
-        self, memory_id: str, *, deleted_at: str, updated_at: str
+        self, memory_id: str, *, deleted_at: str, updated_at: str,
+        owner_principal_id: str | None = None,
     ) -> bool:
         with self.connect() as connection:
             cursor = connection.execute(
                 """
                 UPDATE approved_memory
                 SET approval_state = ?, deleted_at = ?, updated_at = ?
-                WHERE memory_id = ? AND deleted_at IS NULL
-                """,
-                ("forgotten", deleted_at, updated_at, memory_id),
+                WHERE memory_id = ? AND deleted_at IS NULL"""
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                ("forgotten", deleted_at, updated_at, memory_id, *([owner_principal_id] if owner_principal_id else [])),
             )
             self._sync_memory_fts(connection, memory_id)
             self._sync_memory_projection_eligibility(connection, memory_id)
         return cursor.rowcount > 0
 
-    def set_approved_memory_archived(self, memory_id: str, *, archived_at: str | None, updated_at: str | None) -> bool:
+    def set_approved_memory_archived(self, memory_id: str, *, archived_at: str | None, updated_at: str | None, owner_principal_id: str | None = None) -> bool:
         with self.connect() as connection:
             cursor = connection.execute(
-                "UPDATE approved_memory SET archived_at = ?, updated_at = ? WHERE memory_id = ? AND deleted_at IS NULL",
-                (archived_at, updated_at, memory_id),
+                "UPDATE approved_memory SET archived_at = ?, updated_at = ? WHERE memory_id = ? AND deleted_at IS NULL"
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (archived_at, updated_at, memory_id, *([owner_principal_id] if owner_principal_id else [])),
             )
             self._sync_memory_fts(connection, memory_id)
             self._sync_memory_projection_eligibility(connection, memory_id)
@@ -2020,11 +2657,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             (int(enabled), now, now, now, memory_id),
         )
 
-    def link_memory_projection(self, memory_id: str, projection_type: str, projection_id: str, source_version: str) -> None:
+    def link_memory_projection(self, memory_id: str, projection_type: str, projection_id: str, source_version: str, *, owner_principal_id: str | None = None) -> None:
         if projection_type not in {"fts", "vector", "graph"}:
             raise ValueError("invalid_memory_projection_type")
         with self.connect() as connection:
-            row = connection.execute("SELECT 1 FROM approved_memory WHERE memory_id = ?", (memory_id,)).fetchone()
+            row = connection.execute(
+                "SELECT 1 FROM approved_memory WHERE memory_id = ?" + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (memory_id, *([owner_principal_id] if owner_principal_id else [])),
+            ).fetchone()
             if row is None:
                 raise ValueError("unknown_memory")
             connection.execute(
@@ -2038,7 +2678,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute("SELECT * FROM memory_projections WHERE memory_id = ? ORDER BY projection_type, projection_id", (memory_id,)).fetchall()
         return [dict(row) for row in rows]
 
-    def get_active_approved_memory(self, memory_id: str) -> dict[str, Any] | None:
+    def get_active_approved_memory(
+        self, memory_id: str, *, owner_principal_id: str | None = None
+    ) -> dict[str, Any] | None:
         now = utc_now()
         with self.connect() as connection:
             row = connection.execute(
@@ -2047,12 +2689,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 AND sensitivity NOT IN ('secret_like', 'credential_like')
                 AND (expires_at IS NULL OR expires_at > ?)
                 AND (valid_from IS NULL OR valid_from <= ?)
-                AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL""",
-                (memory_id, now, now, now),
+                AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL"""
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (memory_id, now, now, now, *([owner_principal_id] if owner_principal_id else [])),
             ).fetchone()
         return dict(row) if row else None
 
-    def reconcile_memory_projections(self) -> dict[str, int]:
+    def reconcile_memory_projections(self, *, owner_principal_id: str | None = None) -> dict[str, int]:
         with self.connect() as connection:
             now = utc_now()
             cursor = connection.execute(
@@ -2063,10 +2706,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     AND (m.expires_at IS NULL OR m.expires_at > ?)
                     AND (m.valid_from IS NULL OR m.valid_from <= ?)
                     AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL
-                ) THEN 1 ELSE 0 END""",
-                (now, now, now),
+                ) THEN 1 ELSE 0 END"""
+                + (" WHERE memory_id IN (SELECT memory_id FROM approved_memory WHERE owner_principal_id = ?)" if owner_principal_id else ""),
+                (now, now, now, *([owner_principal_id] if owner_principal_id else [])),
             )
-            self._rebuild_memory_fts(connection)
+            if owner_principal_id is None:
+                self._rebuild_memory_fts(connection)
         return {"projection_rows_reconciled": cursor.rowcount}
 
     @staticmethod
@@ -2101,7 +2746,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
               AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)
               AND superseded_at IS NULL""", (utc_now(), utc_now(), utc_now()))
 
-    def search_approved_memory(self, query: str, scope: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
+    def search_approved_memory(
+        self, query: str, scope: str | None = None, limit: int = 20,
+        *, owner_principal_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         terms = [term for term in query.replace('"', " ").replace("-", " ").split() if len(term) >= 3]
         if not terms:
             return []
@@ -2116,19 +2764,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if scope is not None:
             sql += " AND m.scope = ?"
             params.append(scope)
+        if owner_principal_id:
+            sql += " AND m.owner_principal_id = ?"
+            params.append(owner_principal_id)
         sql += " ORDER BY m.created_at DESC LIMIT ?"
         params.append(limit)
         with self.connect() as connection:
             rows = connection.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
 
-    def delete_approved_memory(self, memory_id: str) -> None:
+    def delete_approved_memory(self, memory_id: str, *, owner_principal_id: str | None = None) -> None:
         with self.connect() as connection:
             connection.execute("DELETE FROM approved_memory_fts WHERE memory_id = ?", (memory_id,))
-            connection.execute("DELETE FROM approved_memory WHERE memory_id = ?", (memory_id,))
+            connection.execute(
+                "DELETE FROM approved_memory WHERE memory_id = ?"
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (memory_id, *([owner_principal_id] if owner_principal_id else [])),
+            )
 
     def list_approved_memory(
-        self, scope: str | None = None, limit: int = 50, *, include_search_disabled: bool = False
+        self, scope: str | None = None, limit: int = 50, *, include_search_disabled: bool = False,
+        owner_principal_id: str | None = None,
     ) -> list[dict[str, Any]]:
         now = utc_now()
         query = """SELECT * FROM approved_memory WHERE deleted_at IS NULL AND archived_at IS NULL
@@ -2141,6 +2797,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if scope is not None:
             query += " AND scope = ?"
             params.append(scope)
+        if owner_principal_id:
+            query += " AND owner_principal_id = ?"
+            params.append(owner_principal_id)
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
         with self.connect() as connection:
@@ -2930,34 +3589,42 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO vector_records
-                (vector_id, content_hash, content_preview, embedding_model, dimensions, scope, sensitivity, embedding, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (vector_id, content_hash, content_preview, embedding_model, dimensions, scope, sensitivity, embedding, created_at, owner_principal_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (record.vector_id, record.content_hash, record.content_preview, record.embedding_model, record.dimensions, record.scope, record.sensitivity, record.embedding, record.created_at),
+                (record.vector_id, record.content_hash, record.content_preview, record.embedding_model, record.dimensions, record.scope, record.sensitivity, record.embedding, record.created_at, record.owner_principal_id),
             )
 
-    def list_vector_records(self, scope: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    def list_vector_records(self, scope: str | None = None, limit: int = 50, *, owner_principal_id: str | None = None) -> list[dict[str, Any]]:
         query = "SELECT * FROM vector_records"
         params: list[Any] = []
+        conditions: list[str] = []
         if scope:
-            query += " WHERE scope = ?"
+            conditions.append("scope = ?")
             params.append(scope)
+        if owner_principal_id:
+            conditions.append("owner_principal_id = ?")
+            params.append(owner_principal_id)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
-    def get_vector_record(self, vector_id: str) -> dict[str, Any] | None:
+    def get_vector_record(self, vector_id: str, *, owner_principal_id: str | None = None) -> dict[str, Any] | None:
         """Return one vector record by id (or ``None``). Includes the stored preview."""
         with self.connect() as connection:
             row = connection.execute(
-                "SELECT * FROM vector_records WHERE vector_id = ?", (vector_id,)
+                "SELECT * FROM vector_records WHERE vector_id = ?"
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (vector_id, *([owner_principal_id] if owner_principal_id else [])),
             ).fetchone()
         return dict(row) if row is not None else None
 
     def list_vector_embeddings(
-        self, embedding_model: str, scope: str | None = None
+        self, embedding_model: str, scope: str | None = None, *, owner_principal_id: str | None = None
     ) -> list[dict[str, Any]]:
         """Return ``(vector_id, embedding)`` rows for one embedding model.
 
@@ -2974,13 +3641,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if scope:
             query += " AND scope = ?"
             params.append(scope)
+        if owner_principal_id:
+            query += " AND owner_principal_id = ?"
+            params.append(owner_principal_id)
         query += " ORDER BY created_at"
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
     def list_active_memory_vector_embeddings(
-        self, embedding_model: str, scope: str | None = None
+        self, embedding_model: str, scope: str | None = None, *, owner_principal_id: str | None = None
     ) -> list[dict[str, Any]]:
         now = utc_now()
         query = """SELECT v.vector_id, v.embedding, p.memory_id FROM vector_records v
@@ -2997,6 +3667,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if scope:
             query += " AND m.scope = ?"
             params.append(scope)
+        if owner_principal_id:
+            query += " AND m.owner_principal_id = ? AND v.owner_principal_id = ?"
+            params.extend((owner_principal_id, owner_principal_id))
         query += " ORDER BY v.created_at"
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
@@ -3098,6 +3771,31 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             reasoning_budget_tokens=row["reasoning_budget_tokens"],
         )
 
+    def save_principal_model_state(self, principal_id: str, state: ModelSessionState) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO principal_model_control
+                (principal_id, profile_id, model, reasoning_enabled, reasoning_effort, reasoning_mode,
+                 reasoning_budget_tokens, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (principal_id, state.profile_id, state.model, int(state.reasoning_enabled),
+                 state.reasoning_effort, state.reasoning_mode, state.reasoning_budget_tokens, utc_now()),
+            )
+
+    def load_principal_model_state(self, principal_id: str) -> ModelSessionState | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM principal_model_control WHERE principal_id = ?", (principal_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        return ModelSessionState(
+            session_id=principal_id, profile_id=str(row["profile_id"]),
+            model=str(row["model"]) if row["model"] else None,
+            reasoning_enabled=bool(row["reasoning_enabled"]),
+            reasoning_effort=row["reasoning_effort"], reasoning_mode=row["reasoning_mode"],
+            reasoning_budget_tokens=row["reasoning_budget_tokens"],
+        )
+
     def save_model_fallback_sequence(self, session_id: str, profile_ids: list[str]) -> None:
         """Persist the ordered, user-owned model fallback sequence for ``session_id``.
 
@@ -3127,6 +3825,26 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             value = json.loads(row["profile_ids_json"])
         except (ValueError, TypeError):
             return []
+        return [str(item) for item in value] if isinstance(value, list) else []
+
+    def save_principal_model_fallback_sequence(self, principal_id: str, profile_ids: list[str]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO principal_model_fallback_sequence
+                (principal_id, profile_ids_json, updated_at) VALUES (?, ?, ?)""",
+                (principal_id, json.dumps(list(profile_ids)), utc_now()),
+            )
+
+    def load_principal_model_fallback_sequence(self, principal_id: str) -> list[str]:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT profile_ids_json FROM principal_model_fallback_sequence WHERE principal_id = ?",
+                (principal_id,),
+            ).fetchone()
+        try:
+            value = json.loads(row["profile_ids_json"]) if row else []
+        except (TypeError, ValueError):
+            value = []
         return [str(item) for item in value] if isinstance(value, list) else []
 
     def save_model_advisor(self, session_id: str, profile_id: str | None) -> None:
@@ -3159,6 +3877,23 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return str(row["profile_id"]) if row is not None else None
 
+    def save_principal_model_advisor(self, principal_id: str, profile_id: str | None) -> None:
+        with self.connect() as connection:
+            if not profile_id:
+                connection.execute("DELETE FROM principal_model_advisor WHERE principal_id = ?", (principal_id,))
+                return
+            connection.execute(
+                """INSERT OR REPLACE INTO principal_model_advisor (principal_id, profile_id, updated_at)
+                VALUES (?, ?, ?)""", (principal_id, profile_id, utc_now())
+            )
+
+    def load_principal_model_advisor(self, principal_id: str) -> str | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT profile_id FROM principal_model_advisor WHERE principal_id = ?", (principal_id,)
+            ).fetchone()
+        return str(row["profile_id"]) if row is not None else None
+
     # ── Uploaded attachments (web-app task 3): governed local attachment store ──
 
     def save_attachment(
@@ -3170,6 +3905,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         media_type: str,
         sha256: str,
         data: bytes,
+        owner_principal_id: str | None = None,
     ) -> None:
         """Persist validated attachment bytes. Validation is the caller's job
         (``raiker.runtime.attachments``) — this layer only stores what it is given."""
@@ -3177,17 +3913,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO attachments
-                (attachment_id, kind, filename, media_type, byte_size, sha256, data, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (attachment_id, kind, filename, media_type, byte_size, sha256, data, created_at, owner_principal_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (attachment_id, kind, filename, media_type, len(data), sha256, data, utc_now()),
+                (attachment_id, kind, filename, media_type, len(data), sha256, data, utc_now(), owner_principal_id),
             )
 
-    def load_attachment(self, attachment_id: str) -> dict[str, Any] | None:
+    def load_attachment(self, attachment_id: str, *, owner_principal_id: str | None = None) -> dict[str, Any] | None:
         """Return the stored attachment (metadata + raw bytes), or None if unknown."""
         with self.connect() as connection:
             row = connection.execute(
-                "SELECT * FROM attachments WHERE attachment_id = ?", (attachment_id,)
+                "SELECT * FROM attachments WHERE attachment_id = ?"
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (attachment_id, *([owner_principal_id] if owner_principal_id else [])),
             ).fetchone()
         if row is None:
             return None
@@ -3195,15 +3933,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         record["data"] = bytes(record["data"])
         return record
 
-    def load_attachment_metadata(self, attachment_id: str) -> dict[str, Any] | None:
+    def load_attachment_metadata(self, attachment_id: str, *, owner_principal_id: str | None = None) -> dict[str, Any] | None:
         """Return attachment metadata only — the bytes never ride this path."""
         with self.connect() as connection:
             row = connection.execute(
                 """
                 SELECT attachment_id, kind, filename, media_type, byte_size, sha256, created_at
                 FROM attachments WHERE attachment_id = ?
-                """,
-                (attachment_id,),
+                """ + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (attachment_id, *([owner_principal_id] if owner_principal_id else [])),
             ).fetchone()
         return dict(row) if row is not None else None
 
@@ -3273,6 +4011,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row is not None else None
 
+    def account_scope(self, principal_id: str | None) -> str | None:
+        """Return the principal id only when it names a real local account.
+
+        Reads are owner-scoped for accounts and unscoped otherwise. The terminal
+        client sends ``UserMetadata``'s default ``local_user``, which is truthy
+        but is not a principal — scoping on mere truthiness silently hides the
+        CLI's own project, connectors, memory, and model selection.
+        """
+        if not principal_id or self.get_account(principal_id) is None:
+            return None
+        return principal_id
+
     def set_account_failed(
         self, principal_id: str, failed_attempts: int, locked_until: str | None
     ) -> None:
@@ -3313,9 +4063,86 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "DELETE FROM account_credentials WHERE principal_id = ?", (principal_id,)
             )
 
+    @staticmethod
+    def _delete_rows_orphaned_by_purge(connection: sqlite3.Connection) -> None:
+        """Remove rows whose parent the purge sweep just deleted.
+
+        The sweep can only match tables carrying an owner/session/project column.
+        A child that references a swept parent but carries none of those columns
+        is unreachable by it and is left pointing at a deleted row, which fails
+        the deferred foreign-key check at COMMIT. Five such edges exist today
+        (`policy_decisions` and `approvals` -> `tool_actions`, `gist_memories` ->
+        `eidetic_observations`, and both `*_relationship*` tables ->
+        `approved_memory`), and hardcoding them would rot the next time a table
+        is added — so let SQLite name the orphans its own deletes created.
+
+        Callers must hold a transaction whose starting state had no violations,
+        or this removes pre-existing orphans too. `purge_account` is such a
+        caller: the workspaces it runs against are foreign-key-clean.
+        """
+        # Deleting an orphan can orphan its own child, so iterate to a fixed
+        # point. Bounded because each pass strictly shrinks the FK depth still
+        # to be resolved; the cap only stops a pathological cycle from spinning.
+        for _ in range(8):
+            violations = connection.execute("PRAGMA foreign_key_check").fetchall()
+            if not violations:
+                return
+            for violation in violations:
+                connection.execute(
+                    f'DELETE FROM "{violation[0]}" WHERE rowid = ?', (violation[1],)
+                )
+        raise RuntimeError("purge_orphan_cleanup_did_not_converge")
+
     def purge_account(self, principal_id: str) -> None:
         """Irreversibly remove an account and all its per-principal data."""
         with self.connect() as connection:
+            # The sweep below walks `sqlite_master`, which is table-creation
+            # order — parent before child. `sessions` is created before `turns`,
+            # and `turns.session_id` references it, so deleting the owner's
+            # sessions raises `FOREIGN KEY constraint failed` on any account that
+            # ever held a conversation. Defer enforcement to COMMIT instead of
+            # topologically sorting 87 tables: order stops mattering, and a purge
+            # that really would orphan a row still fails, just at commit.
+            #
+            # The pragma only holds for the transaction it is set in — SQLite
+            # resets it at each COMMIT/ROLLBACK, and setting it outside a
+            # transaction is silently undone when the first DELETE opens one.
+            # BEGIN first, so it applies to the sweep and cannot leak past it.
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("PRAGMA defer_foreign_keys = ON")
+            # Captured before the deletes below: approved_memory_fts and
+            # memory_projections are keyed only by memory_id (no owner column),
+            # so the owner-keyed sweep never matches them and the FTS row would
+            # keep the purged memory's full plaintext. The markdown exports are
+            # not rows at all and are unlinked after the transaction commits.
+            memory_ids = [
+                str(row["memory_id"])
+                for row in connection.execute(
+                    "SELECT memory_id FROM approved_memory WHERE owner_principal_id = ?",
+                    (principal_id,),
+                ).fetchall()
+            ]
+            user_id = self._principal_user_id_from_connection(connection, principal_id)
+            session_ids = [str(row["session_id"]) for row in connection.execute(
+                "SELECT session_id FROM sessions WHERE user_id = ?", (user_id,)
+            ).fetchall()] if user_id else []
+            project_ids = [str(row["project_id"]) for row in connection.execute(
+                "SELECT project_id FROM projects WHERE owner_user_id = ?", (user_id,)
+            ).fetchall()] if user_id else []
+            excluded = {"account_credentials", "api_sessions", "instance_account_guard", "migrations", "principals", "users"}
+            for table_row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall():
+                table = str(table_row["name"])
+                if table.startswith("sqlite_") or table in excluded:
+                    continue
+                columns = {str(column["name"]) for column in connection.execute(f'PRAGMA table_info("{table}")').fetchall()}
+                for column, values in (
+                    ("owner_principal_id", [principal_id]), ("principal_id", [principal_id]),
+                    ("owner_user_id", [user_id] if user_id else []), ("user_id", [user_id] if user_id else []),
+                    ("session_id", session_ids), ("project_id", project_ids),
+                ):
+                    if column in columns and values:
+                        marks = ",".join("?" for _ in values)
+                        connection.execute(f'DELETE FROM "{table}" WHERE "{column}" IN ({marks})', values)
             for sql in (
                 "DELETE FROM account_credentials WHERE principal_id = ?",
                 "DELETE FROM user_settings WHERE principal_id = ?",
@@ -3323,11 +4150,35 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "DELETE FROM connector_credentials WHERE principal_id = ?",
                 "DELETE FROM connector_installations WHERE principal_id = ?",
                 "DELETE FROM api_sessions WHERE principal_id = ?",
+                "DELETE FROM principal_model_control WHERE principal_id = ?",
+                "DELETE FROM principal_model_fallback_sequence WHERE principal_id = ?",
+                "DELETE FROM principal_model_advisor WHERE principal_id = ?",
+                "DELETE FROM principal_runtime_mode_state WHERE principal_id = ?",
+                "DELETE FROM principal_capability_gate_state WHERE principal_id = ?",
+                "DELETE FROM principal_capability_decision_mode WHERE principal_id = ?",
             ):
                 connection.execute(sql, (principal_id,))
+            connection.executemany(
+                "DELETE FROM approved_memory_fts WHERE memory_id = ?",
+                [(memory_id,) for memory_id in memory_ids],
+            )
+            connection.executemany(
+                "DELETE FROM memory_projections WHERE memory_id = ?",
+                [(memory_id,) for memory_id in memory_ids],
+            )
             connection.execute(
                 "UPDATE principals SET is_active = 0 WHERE principal_id = ?", (principal_id,)
             )
+            if user_id:
+                connection.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+            self._delete_rows_orphaned_by_purge(connection)
+            if connection.execute("SELECT 1 FROM account_credentials LIMIT 1").fetchone() is None:
+                connection.execute("DELETE FROM instance_account_guard WHERE singleton = 1")
+        # Durable markdown exports are plaintext on disk and outlive the rows.
+        memory_dir = self.paths.workspace_root / ".raiker" / "memory"
+        for memory_id in memory_ids:
+            with contextlib.suppress(OSError):
+                (memory_dir / f"{memory_id}.md").unlink(missing_ok=True)
 
     def list_accounts(self) -> list[dict[str, Any]]:
         with self.connect() as connection:
@@ -3488,6 +4339,23 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
+    def get_principal_runtime_mode(self, principal_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM principal_runtime_mode_state WHERE principal_id = ?", (principal_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def upsert_principal_runtime_mode(self, principal_id: str, record: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO principal_runtime_mode_state
+                (principal_id, mode_name, status, activated_by, activated_at, reason, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (principal_id, record["mode_name"], record["status"], record.get("activated_by"),
+                 record.get("activated_at"), record.get("reason"), record["updated_at"]),
+            )
+
     def insert_runtime_mode_state(self, record: dict[str, Any]) -> None:
         with self.connect() as connection:
             connection.execute(
@@ -3553,6 +4421,29 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
+    def get_principal_capability_gate_state(
+        self, principal_id: str, capability: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM principal_capability_gate_state WHERE principal_id = ? AND capability = ?",
+                (principal_id, capability),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def upsert_principal_capability_gate_state(self, principal_id: str, record: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO principal_capability_gate_state
+                (principal_id, capability, state, requested_by, requested_at, activated_by, activated_at,
+                 reason, readiness_snapshot_json, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (principal_id, record["capability"], record["state"], record.get("requested_by"),
+                 record.get("requested_at"), record.get("activated_by"), record.get("activated_at"),
+                 record.get("reason"), record.get("readiness_snapshot_json"), record["created_at"],
+                 record["updated_at"]),
+            )
+
     def list_capability_gate_states(self) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(
@@ -3608,6 +4499,26 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (capability,),
             ).fetchone()
         return str(row["decision_mode"]) if row else None
+
+    def get_principal_capability_decision_mode(self, principal_id: str, capability: str) -> str | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT decision_mode FROM principal_capability_decision_mode "
+                "WHERE principal_id = ? AND capability = ?", (principal_id, capability)
+            ).fetchone()
+        return str(row["decision_mode"]) if row else None
+
+    def upsert_principal_capability_decision_mode(
+        self, principal_id: str, record: dict[str, Any]
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO principal_capability_decision_mode
+                (principal_id, capability, decision_mode, set_by, set_at, reason, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (principal_id, record["capability"], record["decision_mode"], record.get("set_by"),
+                 record.get("set_at"), record.get("reason"), record["created_at"], record["updated_at"]),
+            )
 
     def list_capability_decision_modes(self) -> dict[str, str]:
         with self.connect() as connection:

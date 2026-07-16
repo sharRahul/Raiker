@@ -73,10 +73,10 @@ async def health() -> dict[str, str]:
 @router.get("/api/runtime-mode")
 async def get_runtime_mode(
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     service = _get_service(request)
-    return serialize_dto(service.get_runtime_mode())
+    return serialize_dto(service.get_runtime_mode(auth_data[0].principal_id))
 
 
 @router.post("/api/runtime-mode/activate")
@@ -172,10 +172,10 @@ async def disable_capability(
 async def get_capability_decision_mode(
     capability: str,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     service = _get_service(request)
-    result = service.get_capability_decision_mode(capability)
+    result = service.get_capability_decision_mode(capability, auth_data[0].principal_id)
     return {"ok": result.ok, **result.data}
 
 

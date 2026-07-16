@@ -45,7 +45,11 @@ async def list_approvals(
     status_filter: str = "pending",
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
-    return serialize_dto(_service(request).list_approvals(status=status_filter))
+    session, _principal = _auth_data
+    user_id = SQLiteStore(_ws(request)).principal_user_id(session.principal_id)
+    return serialize_dto(
+        _service(request).list_approvals(status=status_filter, user_id=user_id)
+    )
 
 
 @router.get("/api/approvals/{approval_id}")
@@ -54,7 +58,9 @@ async def get_approval(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    view = _service(request).get_approval(approval_id)
+    session, _principal = _auth_data
+    user_id = SQLiteStore(_ws(request)).principal_user_id(session.principal_id)
+    view = _service(request).get_approval(approval_id, user_id=user_id)
     if view is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown approval: {approval_id}"
@@ -72,6 +78,7 @@ async def resolve_approval(
     session, _principal = _auth_data
     store = SQLiteStore(_ws(request))
     inbox = ApprovalInbox(store, EventLogWriter(store))
+    user_id = store.principal_user_id(session.principal_id)
     with store.connect() as connection:
         pending_intent_row = connection.execute(
             "SELECT * FROM connector_write_intents WHERE approval_id=?", (approval_id,)
@@ -81,12 +88,20 @@ async def resolve_approval(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"ok": False, "reason_code": "connector_intent_principal_mismatch"},
         )
+    # A connector-store write is owned by the principal named on its intent
+    # (checked above), not by a chat session: those actions are recorded against
+    # the synthetic "connector_store" session id, which has no sessions row to
+    # scope by. Everything else is owned via its session's user.
+    owner_user_id = None if pending_intent_row is not None else user_id
+    if store.load_approval(approval_id, user_id=owner_user_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"ok": False, "reason_code": "approval_not_found"})
     try:
         resolution = inbox.resolve(
             approval_id,
             approve=body.approve,
             resolved_by=session.principal_id,
             reason=body.reason,
+            user_id=owner_user_id,
         )
     except ValueError as exc:
         code = str(exc)

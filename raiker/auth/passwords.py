@@ -28,16 +28,16 @@ _SCRYPT_R = 8
 _SCRYPT_P = 1
 _SCRYPT_DKLEN = 32
 
+# One encoded hash per configured algorithm lets every failed login execute the
+# same algorithm set as both legacy scrypt and current Argon2id accounts.
+_DUMMY_PASSWORD = secrets.token_urlsafe(32)
+_DUMMY_HASHES: dict[str, str] = {}
+
 
 def _scrypt_maxmem(n: int, r: int) -> int:
     # scrypt needs ~128 * N * r bytes; OpenSSL's default cap (32 MiB) is too low
     # for N=2**17. Grant the exact requirement plus a 1 MiB margin.
     return 128 * n * r + (1 << 20)
-# A pre-computed scrypt hash of a random string, used to spend comparable work
-# when an account does not exist (defeats username enumeration by timing).
-_DUMMY_SALT = secrets.token_bytes(16)
-
-
 def _scrypt_hash(password: str, salt: bytes) -> str:
     derived = hashlib.scrypt(
         password.encode("utf-8"),
@@ -92,9 +92,37 @@ def verify_password(password: str, encoded: str, algo: str) -> bool:
     return False
 
 
-def spend_dummy_verify(password: str) -> None:
-    """Run a hash to equalize timing for a nonexistent account."""
-    _scrypt_hash(password, _DUMMY_SALT)
+def verification_algorithm(encoded: str, algo: str) -> str | None:
+    """Return the configured algorithm path `verify_password` will execute."""
+    if algo == "argon2id" and ARGON2_AVAILABLE:
+        return "argon2id"
+    if algo == "scrypt" or encoded.startswith("scrypt$"):
+        return "scrypt"
+    return None
+
+
+def _configured_dummy_algorithms() -> tuple[str, ...]:
+    return ("scrypt", "argon2id") if ARGON2_AVAILABLE else ("scrypt",)
+
+
+def _generate_dummy_hash(algo: str) -> str:
+    if algo == "argon2id":
+        return _PH.hash(_DUMMY_PASSWORD)
+    return _scrypt_hash(_DUMMY_PASSWORD, secrets.token_bytes(16))
+
+
+def prepare_dummy_hashes() -> None:
+    """Precompute dummy hashes during service startup, never during login."""
+    for algo in _configured_dummy_algorithms():
+        if algo not in _DUMMY_HASHES:
+            _DUMMY_HASHES[algo] = _generate_dummy_hash(algo)
+
+
+def spend_dummy_verify(password: str, *, exclude_algo: str | None = None) -> None:
+    """Run each configured dummy verification except an already-verified algorithm."""
+    for algo in _configured_dummy_algorithms():
+        if algo != exclude_algo:
+            verify_password(password, _DUMMY_HASHES[algo], algo)
 
 
 def needs_rehash(encoded: str, algo: str) -> bool:

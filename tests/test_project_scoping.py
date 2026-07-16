@@ -155,7 +155,9 @@ class TestAncestorContextIsLive:
         store.save_project_context(
             "proj_leaf", instructions="Leaf rule.", attachment_ids=[], memory_enabled=False
         )
-        store.save_active_project("proj_leaf")
+        # The active project is per-user, so it is set for the same user the
+        # session belongs to — that is what stamps the session's project.
+        store.save_active_project("proj_leaf", "owner")
         store.create_session("sess_1", str(store.paths.workspace_root), user_id="owner")
 
         bundle = ContextGatherer().gather(
@@ -209,7 +211,7 @@ class TestProjectScopedSchedules:
         self, store: SQLiteStore, service: DashboardService
     ) -> None:
         _project(store, "proj_a", "Alpha")
-        store.save_active_project("proj_a")
+        store.save_active_project("proj_a", "owner")
 
         task = service.create_task(
             title="Weekly review",
@@ -371,28 +373,28 @@ class TestSessionIsolation:
     def client(self, workspace: Path) -> TestClient:
         return TestClient(create_app(workspace))
 
-    def test_account_cannot_move_another_accounts_session(
-        self, client: TestClient, workspace: Path
+    def test_account_cannot_move_another_accounts_session(  # type: ignore[no-untyped-def]
+        self, client: TestClient, workspace: Path, seed_account
     ) -> None:
+        # Both accounts are seeded directly: this workspace is already
+        # CLI-bootstrapped with an owner, so registration refuses them. A
+        # session still only moves for the account that owns it.
         store = SQLiteStore(workspace)
-        _project(store, "proj_a", "Alpha")
-        bob_token = client.post(
-            "/api/auth/register", json={"username": "bob", "password": "right-pass-123"}
-        ).json()["token"]
-        bob_account = store.get_account_by_username("bob")
-        assert bob_account is not None
-        bob_principal = store.get_principal(str(bob_account["principal_id"]))
+        bob_principal_id, bob_token = seed_account(workspace, "bob")
+        bob_principal = store.get_principal(bob_principal_id)
         assert bob_principal is not None
         store.create_session(
             "sess_bob", str(workspace), user_id=str(bob_principal["delegated_by_user_id"])
         )
         assert bob_token
 
-        alex = client.post(
-            "/api/auth/register", json={"username": "alex", "password": "right-pass-123"}
+        alex_principal_id, alex_token = seed_account(workspace, "alex")
+        alex_headers = {"Authorization": f"Bearer {alex_token}"}
+        # Alex owns the destination project, so the move is refused for the one
+        # reason under test: the session is Bob's.
+        store.create_project(
+            "proj_a", "Alpha", "alpha", owner_user_id=store.principal_user_id(alex_principal_id)
         )
-        assert alex.status_code == 200, alex.text
-        alex_headers = {"Authorization": f"Bearer {alex.json()['token']}"}
 
         resp = client.put(
             "/api/sessions/sess_bob/project", json={"project_id": "proj_a"}, headers=alex_headers

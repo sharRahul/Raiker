@@ -55,16 +55,21 @@ class AuthMiddleware:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token expired",
             )
-        if not self._scope_satisfies(session.scope, required_scope):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={"ok": False, "reason_code": "scope_insufficient"},
-            )
         principal = self._resolve_principal(session.principal_id)
         if principal is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Session principal not found",
+            )
+        if not principal.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session principal not active",
+            )
+        if not self._scope_satisfies(session.scope, required_scope):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"ok": False, "reason_code": "scope_insufficient"},
             )
         return session, principal
 

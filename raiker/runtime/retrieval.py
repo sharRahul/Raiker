@@ -62,13 +62,23 @@ class RetrievalAugmentor:
     payloads.
     """
 
-    def __init__(self, workspace_root: str | Path, store: SQLiteStore) -> None:
+    def __init__(
+        self, workspace_root: str | Path, store: SQLiteStore, principal_id: str | None = None
+    ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
         self._store = store
+        self._principal_id = principal_id
+
+    def _scoped(self) -> bool:
+        return bool(self._principal_id and self._store.get_account(self._principal_id) is not None)
 
     def _gate_enabled(self) -> bool:
         try:
-            record = self._store.get_capability_gate_state(_CAP)
+            if self._scoped():
+                assert self._principal_id is not None
+                record = self._store.get_principal_capability_gate_state(self._principal_id, _CAP)
+            else:
+                record = self._store.get_capability_gate_state(_CAP)
         except Exception:
             return False
         if not record:
@@ -76,7 +86,11 @@ class RetrievalAugmentor:
         return str(record.get("state", "")) in _ENABLED_GATE_STATES
 
     def _mode(self) -> DecisionMode:
-        persisted = self._store.get_capability_decision_mode(_CAP)
+        if self._scoped():
+            assert self._principal_id is not None
+            persisted = self._store.get_principal_capability_decision_mode(self._principal_id, _CAP)
+        else:
+            persisted = self._store.get_capability_decision_mode(_CAP)
         mode = parse_decision_mode(persisted) if persisted else None
         return mode or DEFAULT_DECISION_MODE
 
@@ -114,7 +128,10 @@ class RetrievalAugmentor:
             return []
         query_vector = embed_text(prompt_text, _DIMENSIONS)
         index = VectorIndex(_DIMENSIONS)
-        for row in self._store.list_active_memory_vector_embeddings(LOCAL_EMBEDDING_MODEL):
+        owner_principal_id = self._principal_id if self._scoped() else None
+        for row in self._store.list_active_memory_vector_embeddings(
+            LOCAL_EMBEDDING_MODEL, owner_principal_id=owner_principal_id
+        ):
             raw = row.get("embedding")
             if not raw:
                 continue
@@ -127,9 +144,13 @@ class RetrievalAugmentor:
         hits = index.search(query_vector, top_k=max(1, min(int(top_k), 100)))
         results: list[dict[str, Any]] = []
         for hit in hits:
-            record = self._store.get_vector_record(hit["vector_id"])
+            record = self._store.get_vector_record(
+                hit["vector_id"], owner_principal_id=owner_principal_id
+            )
             memory_id = str(hit.get("metadata", {}).get("memory_id", ""))
-            memory = self._store.get_active_approved_memory(memory_id)
+            memory = self._store.get_active_approved_memory(
+                memory_id, owner_principal_id=owner_principal_id
+            )
             if record is None or memory is None:
                 continue
             self._store.record_memory_lifecycle_event(

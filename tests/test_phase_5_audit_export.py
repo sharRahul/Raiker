@@ -263,11 +263,21 @@ def test_generate_export_project_filters_by_user_in_manifest_and_jsonl(
                 updated_at=now,
             )
         )
-    store.create_project(project_id, "Project", "project")
+    store.create_project(project_id, "Project", "project", owner_user_id=user_id)
+    # The active project is per-user and only resolves for the account that owns
+    # it; that is what stamps a new session with its project.
     store.save_active_project(project_id)
+    store.save_active_project(project_id, user_id)
     store.create_session("sess_visible", "/project", user_id=user_id)
     store.create_session("sess_hidden", "/project", user_id=other_user_id)
     store.create_session("sess_legacy", "/project")
+    # No supported path files another account's session under this project, so
+    # it is forced here: the point is that the export's *user filter* excludes
+    # it (defence in depth for legacy/recovered rows), not project scoping.
+    with store.connect() as connection:
+        connection.execute(
+            "UPDATE sessions SET project_id = ? WHERE session_id = 'sess_hidden'", (project_id,)
+        )
     for session_id in ("sess_visible", "sess_hidden", "sess_legacy"):
         _write_events(writer, count=1, session=session_id)
 

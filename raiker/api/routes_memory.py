@@ -124,9 +124,9 @@ async def cleanup_expired_observations(
 @router.get("/api/memory/settings")
 async def get_memory_settings(
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return serialize_dto(_service(request).get_memory_settings())
+    return serialize_dto(_service(request).get_memory_settings(auth_data[0].principal_id))
 
 
 @router.put("/api/memory/incognito")

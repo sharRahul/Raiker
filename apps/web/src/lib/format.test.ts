@@ -24,7 +24,14 @@ describe("format helpers", () => {
       { updated_at: "2026-07-06T08:00:00Z", id: "yesterday" },
       { updated_at: "2026-07-01T08:00:00Z", id: "older" },
     ], now);
-    expect(groups.map((group) => group.label)).toEqual(["Today", "Yesterday", "Wednesday, July 1, 2026"]);
+    // Older days are labelled in the viewer's own locale, so the expected text
+    // has to be derived the same way rather than hardcoded: "July 1, 2026" on a
+    // en-US runner is "1 July 2026" on a en-GB one, and only the grouping is
+    // under test here.
+    const older = new Date("2026-07-01T08:00:00Z").toLocaleDateString(undefined, {
+      weekday: "long", month: "long", day: "numeric", year: "numeric",
+    });
+    expect(groups.map((group) => group.label)).toEqual(["Today", "Yesterday", older]);
     expect(groups[0].items.map((item) => item.id)).toEqual(["today"]);
   });
 

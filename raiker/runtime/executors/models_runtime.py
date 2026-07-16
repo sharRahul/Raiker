@@ -158,7 +158,9 @@ class ModelProviderExecutor:
             memory_id = action.arguments.get("memory_id")
             if not isinstance(memory_id, str) or not memory_id:
                 return self._fail(action.action_id, "missing_argument:memory_id")
-            memory = self._store.get_active_approved_memory(memory_id)
+            memory = self._store.get_active_approved_memory(
+                memory_id, owner_principal_id=self._store.account_scope(principal.principal_id)
+            )
             if memory is None:
                 return self._fail(action.action_id, "memory_not_active_or_not_found")
             if str(memory["sensitivity"]) in {"secret_like", "credential_like"}:
@@ -190,7 +192,7 @@ class ModelProviderExecutor:
         if not model_egress_allowlist():
             return self._fail(action.action_id, "model_egress_denied:no_allowlist")
 
-        embedder = self._embedder or self._default_embedder()
+        embedder = self._embedder or self._default_embedder(principal.principal_id)
         try:
             response = embedder(provider, model, text)
         except SandboxError as exc:
@@ -222,9 +224,13 @@ class ModelProviderExecutor:
             sensitivity=sensitivity,
             created_at=utc_now(),
             embedding=_dump_vector(vector),
+            owner_principal_id=self._store.account_scope(principal.principal_id) or "",
         ))
         if memory_id is not None:
-            self._store.link_memory_projection(memory_id, "vector", vector_id, embedding_model)
+            self._store.link_memory_projection(
+                memory_id, "vector", vector_id, embedding_model,
+                owner_principal_id=self._store.account_scope(principal.principal_id),
+            )
         return ExecutionResult(
             ok=True,
             capability=self.capability,
@@ -241,7 +247,7 @@ class ModelProviderExecutor:
             },
         )
 
-    def _default_embedder(self) -> Embedder:
+    def _default_embedder(self, principal_id: str) -> Embedder:
         def embed(provider: str, model: str, text: str) -> EmbeddingResponse:
             import asyncio
 
@@ -250,7 +256,7 @@ class ModelProviderExecutor:
             from raiker.models.router import ModelRouter
 
             registry = ModelProfileRegistry.load(self._workspace_root)
-            policy = provider_runtime_policy_from_gates(self._store)
+            policy = provider_runtime_policy_from_gates(self._store, principal_id)
             router = ModelRouter(registry, runtime_policy=policy)
             return asyncio.run(router.aembed(provider, model, text))
 
@@ -328,7 +334,10 @@ class AdvisorModelRuntimeExecutor:
         if not isinstance(question, str) or not question.strip():
             return self._fail(action.action_id, "missing_argument:question")
 
-        service = AdvisorService(self._workspace_root, self._store, consult_fn=self._consult_fn)
+        service = AdvisorService(
+            self._workspace_root, self._store, consult_fn=self._consult_fn,
+            principal_id=principal.principal_id if principal is not None else None,
+        )
         outcome = service.consult(question, enforce_modes=False)
         if outcome.get("status") != "success":
             error = outcome.get("error", {})

@@ -38,10 +38,22 @@ def test_list_and_revoke_device_sessions(client: TestClient, tmp_path) -> None: 
     assert client.get("/api/sessions", headers=_h(other_tok)).status_code == 401
 
 
-def test_cannot_revoke_another_accounts_session(client: TestClient) -> None:
+def test_cannot_revoke_another_accounts_session(client: TestClient, tmp_path, seed_account) -> None:  # type: ignore[no-untyped-def]
+    # Registration accepts one account per instance, so bob is seeded directly.
+    # A second principal is still reachable here (CLI bootstrap, or the
+    # deactivated owner a recovery leaves behind), so `owns_session` still has
+    # to hold.
     tok_a = _register(client, "alice")
-    _register(client, "bob")
-    # alice cannot revoke a made-up / bob's session id
+    _, bob_token = seed_account(tmp_path, "bob")
+    bob_session = ApiSessionStore(tmp_path).get_by_token(bob_token)
+    assert bob_session is not None
+    # alice cannot revoke bob's real session ...
+    assert (
+        client.post(f"/api/auth/sessions/{bob_session.session_id}/revoke", headers=_h(tok_a)).status_code
+        == 404
+    )
+    assert client.get("/api/sessions", headers=_h(bob_token)).status_code == 200
+    # ... nor a made-up one
     assert client.post("/api/auth/sessions/api_ses_bogus/revoke", headers=_h(tok_a)).status_code == 404
 
 

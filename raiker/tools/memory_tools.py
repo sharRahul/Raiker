@@ -48,6 +48,7 @@ def memory_search(
     *,
     scope: str | None = None,
     max_results: int = 20,
+    owner_principal_id: str | None = None,
 ) -> dict[str, Any]:
     if not query.strip():
         return {"status": "failed", "error": {"type": "empty_query", "message": "Search query cannot be empty."}}
@@ -58,6 +59,7 @@ def memory_search(
         scope=scope,
         max_results=max_results,
         store=store,
+        owner_principal_id=owner_principal_id,
     )
     return {
         "status": "success",
@@ -101,8 +103,12 @@ def memory_list(
     *,
     scope: str | None = None,
     limit: int = 50,
+    owner_principal_id: str | None = None,
 ) -> dict[str, Any]:
-    results = list_memory(workspace_root=workspace_root, scope=scope, limit=limit)
+    results = list_memory(
+        workspace_root=workspace_root, scope=scope, limit=limit,
+        store=SQLiteStore(workspace_root), owner_principal_id=owner_principal_id,
+    )
     return {
         "status": "success",
         "count": len(results),
@@ -124,8 +130,10 @@ def memory_list(
 def memory_get(
     workspace_root: str | Path,
     memory_id: str,
+    *,
+    owner_principal_id: str | None = None,
 ) -> dict[str, Any]:
-    entry = get_memory(memory_id, workspace_root=workspace_root)
+    entry = get_memory(memory_id, workspace_root=workspace_root, owner_principal_id=owner_principal_id)
     if entry is None:
         return {"status": "failed", "error": {"type": "not_found", "message": f"Memory '{memory_id}' not found."}}
     return {

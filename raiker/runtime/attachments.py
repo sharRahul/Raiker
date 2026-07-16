@@ -115,7 +115,7 @@ def validate_image(media_type: str, data: bytes) -> None:
 
 
 def store_image(
-    store: SQLiteStore, *, filename: str, media_type: str, data: bytes
+    store: SQLiteStore, *, filename: str, media_type: str, data: bytes, owner_principal_id: str | None = None,
 ) -> StoredAttachment:
     """Validate and persist one uploaded image, returning metadata only."""
     validate_image(media_type, data)
@@ -129,6 +129,7 @@ def store_image(
         media_type=media_type,
         sha256=digest,
         data=data,
+        owner_principal_id=owner_principal_id,
     )
     return StoredAttachment(
         attachment_id=attachment_id,
@@ -140,13 +141,15 @@ def store_image(
     )
 
 
-def load_image(store: SQLiteStore, attachment_id: str) -> dict[str, Any] | None:
+def load_image(
+    store: SQLiteStore, attachment_id: str, *, owner_principal_id: str | None = None
+) -> dict[str, Any] | None:
     """Return the stored image record (metadata + bytes) or None.
 
     Re-validates on the way out so a record that somehow bypassed or predates
     validation still fails closed instead of reaching a provider.
     """
-    record = store.load_attachment(attachment_id)
+    record = store.load_attachment(attachment_id, owner_principal_id=owner_principal_id)
     if record is None or record.get("kind") != "image":
         return None
     try:
@@ -295,7 +298,7 @@ def extract_document_text(media_type: str, data: bytes) -> str:
 
 
 def store_document(
-    store: SQLiteStore, *, filename: str, media_type: str, data: bytes
+    store: SQLiteStore, *, filename: str, media_type: str, data: bytes, owner_principal_id: str | None = None,
 ) -> StoredAttachment:
     """Validate and persist one uploaded document, returning metadata only."""
     validate_document(media_type, data)
@@ -309,6 +312,7 @@ def store_document(
         media_type=media_type,
         sha256=digest,
         data=data,
+        owner_principal_id=owner_principal_id,
     )
     return StoredAttachment(
         attachment_id=attachment_id,
@@ -320,14 +324,16 @@ def store_document(
     )
 
 
-def load_document(store: SQLiteStore, attachment_id: str) -> dict[str, Any] | None:
+def load_document(
+    store: SQLiteStore, attachment_id: str, *, owner_principal_id: str | None = None
+) -> dict[str, Any] | None:
     """Return a stored document with its bounded extracted text, or None.
 
     Re-validates the bytes on the way out (fail closed if a record predates or
     bypassed validation) and attaches an ``extracted_text`` field so the caller
     never has to decode raw bytes itself.
     """
-    record = store.load_attachment(attachment_id)
+    record = store.load_attachment(attachment_id, owner_principal_id=owner_principal_id)
     if record is None or record.get("kind") != "document":
         return None
     media_type = str(record.get("media_type", ""))

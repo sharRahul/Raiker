@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.ids import utc_now
 from raiker.contracts.models import Role, User
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
@@ -55,7 +55,6 @@ def _ensure_bootstrap_roles(store: SQLiteStore) -> None:
                 role_id=role_id, name=name, description=description,
                 is_system_role=is_system, created_at=now,
             ))
-
 
 def _owner_exists(store: SQLiteStore) -> bool:
     principals = store.list_principals(active_only=False)
@@ -123,42 +122,9 @@ def bootstrap_owner(
 
     _ensure_bootstrap_roles(store)
     now = utc_now()
-
-    user = User(
-        user_id=user_id,
-        display_name=display_name,
-        email=email,
-        is_active=True,
-        created_at=now,
-        updated_at=now,
-    )
-    store.insert_user(user)
-
     principal_id = f"principal_{user_id}"
-    store.insert_principal(
-        principal_id=principal_id,
-        principal_type=PrincipalType.HUMAN.value,
-        display_name=display_name,
-        delegated_by_user_id=None,
-        role_ids=OWNER_BOOTSTRAP_ROLES,
-        domain_scopes=(),
-        max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_RUNTIME.value,
-        is_active=True,
-    )
-
-    for role_id in OWNER_BOOTSTRAP_ROLES:
-        from raiker.contracts.models import UserRoleAssignment
-        store.insert_user_role_assignment(UserRoleAssignment(
-            assignment_id=new_id("ura_"),
-            user_id=user_id,
-            role_id=role_id,
-            granted_at=now,
-            granted_by="system_bootstrap",
-        ))
-
-    _pre_ack_gov_caps(store, principal_id, now)
-
-    # Enable admin mutation gates for the owner so they can manage principals/roles
+    # Seed global bootstrap gates before scoped controls are copied into the
+    # initial owner. Missing scoped controls remain fail-closed.
     for cap in ("admin_mutation", "role_mutation", "policy_mutation"):
         store.upsert_capability_gate_state({
             "capability": cap,
@@ -172,6 +138,26 @@ def bootstrap_owner(
             "created_at": now,
             "updated_at": now,
         })
+    user = User(
+        user_id=user_id,
+        display_name=display_name,
+        email=email,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+    )
+    try:
+        if not store.create_initial_account_atomic(
+            user=user,
+            principal_id=principal_id,
+            role_ids=OWNER_BOOTSTRAP_ROLES,
+            max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_RUNTIME.value,
+        ):
+            return "Bootstrap denied: instance account already exists."
+    except Exception:
+        return "Bootstrap denied: initial owner identity could not be created."
+
+    _pre_ack_gov_caps(store, principal_id, now)
 
     writer.append(make_event(
         session_id="bootstrap",
@@ -220,6 +206,10 @@ def _handle_owner_recovery(
     recovery_reason: str,
 ) -> str:
     existing_owners = _get_active_owner_principals(store)
+    all_owners = [
+        principal for principal in store.list_principals(active_only=False)
+        if OWNER_ROLE_ID in principal.get("role_ids", ())
+    ]
 
     if existing_owners and not force_recover:
         writer.append(make_event(
@@ -247,13 +237,16 @@ def _handle_owner_recovery(
     _ensure_bootstrap_roles(store)
     now = utc_now()
 
-    old_owner_ids = []
-    if existing_owners and force_recover:
-        for p in existing_owners:
-            if confirm_deactivate_old:
-                store.deactivate_principal(p["principal_id"])
-                old_owner_ids.append(p["principal_id"])
-
+    old_owner_ids = [str(p["principal_id"]) for p in all_owners]
+    # A CLI-bootstrapped owner is created with no username or password, so it
+    # has no credential row to move. That is the documented lost-access path —
+    # requiring a credential-backed owner here would lock out precisely the
+    # owner recovery exists to replace. With no credential to transfer, the
+    # principal, guard, and data transfer still run on their own.
+    credential_owner = next(
+        (str(p["principal_id"]) for p in all_owners if store.get_account(str(p["principal_id"])) is not None),
+        None,
+    )
     user = User(
         user_id=user_id,
         display_name=display_name,
@@ -262,19 +255,15 @@ def _handle_owner_recovery(
         created_at=now,
         updated_at=now,
     )
-    store.insert_user(user)
-
     principal_id = f"principal_{user_id}"
-    store.insert_principal(
-        principal_id=principal_id,
-        principal_type=PrincipalType.HUMAN.value,
-        display_name=display_name,
-        delegated_by_user_id=None,
-        role_ids=OWNER_BOOTSTRAP_ROLES,
-        domain_scopes=(),
-        max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_RUNTIME.value,
-        is_active=True,
-    )
+    try:
+        store.recover_owner_atomic(
+            user=user, principal_id=principal_id, role_ids=OWNER_BOOTSTRAP_ROLES,
+            old_principal_ids=old_owner_ids, credential_owner_id=credential_owner,
+            max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_RUNTIME.value,
+        )
+    except (ValueError, OSError):
+        return "Recovery denied: credential transfer could not be completed safely."
     _pre_ack_gov_caps(store, principal_id, now)
 
     writer.append(make_event(

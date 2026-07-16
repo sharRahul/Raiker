@@ -180,7 +180,7 @@ fail-closed by design.
 > incomplete.
 
 > **Implementation update (2026-07-15):** `.raiker/raiker.db` now requires
-> SQLCipher through `pysqlcipher3static` (the `pysqlcipher3` DB-API). The
+> SQLCipher through `sqlcipher3-wheels` (the `sqlcipher3` DB-API). The
 > workspace-private app key derives the database key before any SQL runs,
 > encrypting SQLite tables, FTS4, vectors, and graph records together. A tested
 > one-time plaintext conversion removes its transient plaintext source on

@@ -31,8 +31,9 @@ class ApprovalInbox:
         approve: bool,
         resolved_by: str = "local_user",
         reason: str = "",
+        user_id: str | None = None,
     ) -> ApprovalResolution:
-        approval = self.store.load_approval(approval_id)
+        approval = self.store.load_approval(approval_id, user_id=user_id)
         if approval is None:
             raise ValueError("approval_not_found")
         if approval["status"] != "pending":

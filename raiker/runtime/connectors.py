@@ -53,6 +53,18 @@ _RESOURCE_PATHS = {"issue": "issues", "pull_request": "pulls"}
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
+def _scoped_record(store: SQLiteStore, principal_id: str | None, capability: str) -> dict[str, Any] | None:
+    if principal_id and store.get_account(principal_id) is not None:
+        return store.get_principal_capability_gate_state(principal_id, capability)
+    return store.get_capability_gate_state(capability)
+
+
+def _scoped_mode(store: SQLiteStore, principal_id: str | None, capability: str) -> str | None:
+    if principal_id and store.get_account(principal_id) is not None:
+        return store.get_principal_capability_decision_mode(principal_id, capability)
+    return store.get_capability_decision_mode(capability)
+
+
 class GithubConnectorService:
     """Governed, **default-ask** read and write operations for GitHub.
 
@@ -76,17 +88,19 @@ class GithubConnectorService:
         workspace_root: str | Path,
         store: SQLiteStore,
         fetch_fn: Any | None = None,
+        principal_id: str | None = None,
     ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
         self._store = store
         # Injectable so tests exercise the governed path without live network.
         # Signature: (url, headers) -> dict with body_text/status/truncated.
         self._fetch_fn = fetch_fn
+        self._principal_id = principal_id
 
     # ── Governance checks ────────────────────────────────────────────────
     def _gate_enabled(self) -> bool:
         try:
-            record = self._store.get_capability_gate_state(_CAP)
+            record = _scoped_record(self._store, self._principal_id, _CAP)
         except Exception:  # noqa: BLE001 — a broken read fails closed
             return False
         if not record:
@@ -94,7 +108,7 @@ class GithubConnectorService:
         return str(record.get("state", "")) in _ENABLED_GATE_STATES
 
     def _mode(self) -> DecisionMode:
-        persisted = self._store.get_capability_decision_mode(_CAP)
+        persisted = _scoped_mode(self._store, self._principal_id, _CAP)
         mode = parse_decision_mode(persisted) if persisted else None
         return mode or DEFAULT_DECISION_MODE
 
@@ -413,16 +427,18 @@ class GmailConnectorService:
         workspace_root: str | Path,
         store: SQLiteStore,
         fetch_fn: Any | None = None,
+        principal_id: str | None = None,
     ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
         self._store = store
         # Injectable so tests exercise the governed path without live network.
         self._fetch_fn = fetch_fn
+        self._principal_id = principal_id
 
     # ── Governance checks ────────────────────────────────────────────────
     def _gate_enabled(self) -> bool:
         try:
-            record = self._store.get_capability_gate_state(_GMAIL_CAP)
+            record = _scoped_record(self._store, self._principal_id, _GMAIL_CAP)
         except Exception:  # noqa: BLE001 — a broken read fails closed
             return False
         if not record:
@@ -430,7 +446,7 @@ class GmailConnectorService:
         return str(record.get("state", "")) in _ENABLED_GATE_STATES
 
     def _mode(self) -> DecisionMode:
-        persisted = self._store.get_capability_decision_mode(_GMAIL_CAP)
+        persisted = _scoped_mode(self._store, self._principal_id, _GMAIL_CAP)
         mode = parse_decision_mode(persisted) if persisted else None
         return mode or DEFAULT_DECISION_MODE
 
@@ -645,14 +661,16 @@ class GcalConnectorService:
         workspace_root: str | Path,
         store: SQLiteStore,
         fetch_fn: Any | None = None,
+        principal_id: str | None = None,
     ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
         self._store = store
         self._fetch_fn = fetch_fn
+        self._principal_id = principal_id
 
     def _gate_enabled(self) -> bool:
         try:
-            record = self._store.get_capability_gate_state(_GCAL_CAP)
+            record = _scoped_record(self._store, self._principal_id, _GCAL_CAP)
         except Exception:  # noqa: BLE001 — a broken read fails closed
             return False
         if not record:
@@ -660,7 +678,7 @@ class GcalConnectorService:
         return str(record.get("state", "")) in _ENABLED_GATE_STATES
 
     def _mode(self) -> DecisionMode:
-        persisted = self._store.get_capability_decision_mode(_GCAL_CAP)
+        persisted = _scoped_mode(self._store, self._principal_id, _GCAL_CAP)
         mode = parse_decision_mode(persisted) if persisted else None
         return mode or DEFAULT_DECISION_MODE
 
@@ -866,14 +884,16 @@ class SlackConnectorService:
         workspace_root: str | Path,
         store: SQLiteStore,
         fetch_fn: Any | None = None,
+        principal_id: str | None = None,
     ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
         self._store = store
         self._fetch_fn = fetch_fn
+        self._principal_id = principal_id
 
     def _gate_enabled(self) -> bool:
         try:
-            record = self._store.get_capability_gate_state(_SLACK_CAP)
+            record = _scoped_record(self._store, self._principal_id, _SLACK_CAP)
         except Exception:  # noqa: BLE001 — a broken read fails closed
             return False
         if not record:
@@ -881,7 +901,7 @@ class SlackConnectorService:
         return str(record.get("state", "")) in _ENABLED_GATE_STATES
 
     def _mode(self) -> DecisionMode:
-        persisted = self._store.get_capability_decision_mode(_SLACK_CAP)
+        persisted = _scoped_mode(self._store, self._principal_id, _SLACK_CAP)
         mode = parse_decision_mode(persisted) if persisted else None
         return mode or DEFAULT_DECISION_MODE
 

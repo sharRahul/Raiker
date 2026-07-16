@@ -3,7 +3,7 @@
   // whether it stays on this machine. Pure render of GET /api/models — no
   // client-side policy, links to the Models view for detail and changes.
   import type { ModelsView } from "../apiTypes";
-  import { providerName } from "../format";
+  import { humanize, providerName } from "../format";
 
   let { models }: { models: ModelsView | null } = $props();
 
@@ -17,6 +17,16 @@
   });
 
   const egressOpen = $derived(models?.model_egress_allowlist_configured ?? false);
+
+  function endpointLabel(kind: string): string {
+    switch (kind) {
+      case "local_process":
+      case "local": return "Local";
+      case "private_network": return "Home-lab";
+      case "remote_hosted": return "Hosted";
+      default: return humanize(kind);
+    }
+  }
 </script>
 
 {#if models !== null}
@@ -31,7 +41,7 @@
       class:chip-info={egressOpen}
       class:chip-warn={!egressOpen}
       href="#/models"
-      title={`${current.profile_id} · ${current.model} · ${current.endpoint_kind}`}
+      title={`${providerName(current.provider)} · ${current.model} · ${endpointLabel(current.endpoint_kind)}`}
     >
       <span class="glyph" aria-hidden="true">▲</span>
       Hosted · {providerName(current.provider)}
@@ -41,7 +51,7 @@
     <a
       class="chip chip-local"
       href="#/models"
-      title={`${current.profile_id} · ${current.model} · ${current.endpoint_kind}`}
+      title={`${providerName(current.provider)} · ${current.model} · ${endpointLabel(current.endpoint_kind)}`}
     >
       <span class="glyph" aria-hidden="true">●</span>
       Local · {providerName(current.provider)}

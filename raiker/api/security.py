@@ -143,3 +143,47 @@ class RateLimitMiddleware:
             return
         hits.append(now)
         await self.app(scope, receive, send)
+
+
+class StaticCacheMiddleware:
+    """Sets ``Cache-Control`` on the built SPA's static responses.
+
+    Without an explicit ``Cache-Control`` on ``index.html`` the browser
+    heuristically caches the HTML shell and keeps loading the *old* hashed JS
+    bundle after a rebuild — so UI changes never appear until a hard refresh.
+    The fix matches Vite's intended caching posture:
+
+    - HTML shell (``/``, ``/index.html``, any ``.html``): ``no-cache,
+      must-revalidate`` so the browser always revalidates and picks up the new
+      asset references after a rebuild.
+    - Hashed assets under ``/assets/`` (Vite content-hashed filenames):
+      ``public, max-age=31536000, immutable`` — safe to cache forever because
+      the filename changes on every build.
+    - Other static files (favicons, fonts, manifest): a short one-hour cache.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "") or "/"
+        if path == "/" or path.endswith("/index.html") or path.endswith(".html"):
+            cache = b"no-cache, must-revalidate"
+        elif path.startswith("/assets/"):
+            cache = b"public, max-age=31536000, immutable"
+        else:
+            cache = b"public, max-age=3600"
+
+        async def wrapped(message: Message) -> None:
+            if message["type"] == "http.response.start" and 200 <= message.get("status", 0) < 400:
+                headers = list(message.get("headers", []))
+                existing = {key.lower() for key, _ in headers}
+                if b"cache-control" not in existing:
+                    headers.append((b"cache-control", cache))
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, wrapped)

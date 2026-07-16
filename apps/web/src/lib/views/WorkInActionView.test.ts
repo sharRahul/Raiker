@@ -25,8 +25,8 @@ describe("WorkInActionView", () => {
     render(WorkInActionView);
 
     await waitFor(() => expect(screen.getByText("Researcher")).toBeInTheDocument());
-    expect(screen.getByText(/idle · Draft a plan/i)).toBeInTheDocument();
-    expect(screen.getByText(/running · 40% · Outline/i)).toBeInTheDocument();
+    expect(screen.getByText(/Idle · Draft a plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Working · 40% · Outline/i)).toBeInTheDocument();
     expect(screen.getByText(/waiting · 2026-07-16/i)).toBeInTheDocument();
     expect(screen.getByText(/visual-only/i)).toBeInTheDocument();
   });

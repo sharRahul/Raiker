@@ -134,8 +134,10 @@ describe("SessionsView organisation", () => {
     render(SessionsView);
 
     await waitFor(() => expect(screen.getByText("Pinned chat")).toBeInTheDocument());
-    // Select both sessions.
-    const checkboxes = screen.getAllByRole("checkbox");
+    // Select both sessions (skip the header select-all checkbox by targeting
+    // only the per-session checkboxes, which carry the session title in their
+    // aria-label).
+    const checkboxes = screen.getAllByRole("checkbox", { name: /Pinned chat|Second chat/i });
     for (const cb of checkboxes) await fireEvent.click(cb);
 
     // The bulk bar appears with the count and a delete button.

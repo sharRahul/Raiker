@@ -37,15 +37,16 @@ class HybridRetrievalWeights:
 def retrieve_hybrid_memory(
     *, store: SQLiteStore, query: str, scope: str | None = None, entity_id: str | None = None,
     limit: int = 10, weights: HybridRetrievalWeights | None = None,
+    owner_principal_id: str | None = None,
 ) -> list[HybridMemoryResult]:
     if not query.strip() or limit < 1:
         return []
     weights = weights or HybridRetrievalWeights()
     candidates: dict[str, tuple[float, set[str], dict[str, float]]] = {}
-    for row in store.search_approved_memory(query, scope=scope, limit=limit):
+    for row in store.search_approved_memory(query, scope=scope, limit=limit, owner_principal_id=owner_principal_id):
         candidates[str(row["memory_id"])] = (weights.lexical, {"lexical"}, {"lexical": weights.lexical})
     index = VectorIndex(384)
-    for row in store.list_active_memory_vector_embeddings(LOCAL_EMBEDDING_MODEL, scope=scope):
+    for row in store.list_active_memory_vector_embeddings(LOCAL_EMBEDDING_MODEL, scope=scope, owner_principal_id=owner_principal_id):
         try:
             vector = json.loads(str(row["embedding"]))
         except (TypeError, ValueError):
@@ -62,7 +63,9 @@ def retrieve_hybrid_memory(
             {**breakdown, "vector": contribution},
         )
     if entity_id:
-        for row in store.list_memory_entity_neighborhood(entity_id, scope=scope):
+        for row in store.list_memory_entity_neighborhood(
+            entity_id, scope=scope, owner_principal_id=owner_principal_id
+        ):
             memory_id = str(row["evidence_memory_id"])
             score, sources, breakdown = candidates.get(memory_id, (0.0, set(), {}))
             contribution = float(row["confidence"]) * weights.graph
@@ -73,7 +76,7 @@ def retrieve_hybrid_memory(
             )
     results: list[HybridMemoryResult] = []
     for memory_id, (score, sources, breakdown) in candidates.items():
-        memory_row = store.get_active_approved_memory(memory_id)
+        memory_row = store.get_active_approved_memory(memory_id, owner_principal_id=owner_principal_id)
         if memory_row is not None:
             results.append(
                 HybridMemoryResult(

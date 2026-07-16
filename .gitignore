@@ -16,7 +16,6 @@ __pycache__/
 *$py.class
 .claude
 project-map.md
-docs/specs
-docs/plans
 docs/superpowers
 .superpowers
+build/

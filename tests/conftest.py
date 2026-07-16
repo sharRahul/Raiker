@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import json
 import os
+import secrets
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
+
+from raiker.api.sessions import ApiSessionStore
+from raiker.auth import passwords
+from raiker.cli.principal_resolver import OWNER_BOOTSTRAP_ROLES, _ensure_bootstrap_roles
+from raiker.contracts.ids import new_id, utc_now
+from raiker.storage.sqlite import SQLiteStore
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -20,3 +30,60 @@ def _ensure_git_identity() -> None:
     os.environ.setdefault("GIT_AUTHOR_EMAIL", "raiker-test@example.com")
     os.environ.setdefault("GIT_COMMITTER_NAME", "Raiker Test")
     os.environ.setdefault("GIT_COMMITTER_EMAIL", "raiker-test@example.com")
+
+
+SeedAccount = Callable[..., tuple[str, str]]
+
+
+@pytest.fixture()
+def seed_account() -> SeedAccount:
+    """Create an extra credential-backed account directly in the database.
+
+    The product policy is one credential-backed human account per local
+    instance, so ``/api/auth/register`` refuses a second account and cannot be
+    used to build a cross-account fixture. Owner isolation is still live code —
+    a recovered-from owner, a CLI-bootstrapped owner, and delegated principals
+    all coexist in one database — so the isolation invariants still need a
+    second account to prove. Seed it the way the handoff sanctions: straight
+    into the tables ``create_initial_account_atomic`` would have written, minus
+    the ``instance_account_guard`` claim that enforces the one-account rule.
+
+    Returns the new ``(principal_id, control_session_token)``.
+    """
+
+    def _seed(
+        workspace: Path, username: str = "bob", password: str = "right-pass-123"
+    ) -> tuple[str, str]:
+        store = SQLiteStore(workspace)
+        _ensure_bootstrap_roles(store)
+        now = utc_now()
+        user_id = f"user_{secrets.token_hex(8)}"
+        principal_id = f"principal_{user_id}"
+        encoded, algo = passwords.hash_password(password)
+        with store.connect() as connection:
+            connection.execute(
+                "INSERT INTO users (user_id, display_name, email, is_active, created_at, updated_at) "
+                "VALUES (?, ?, NULL, 1, ?, ?)",
+                (user_id, username, now, now),
+            )
+            connection.execute(
+                """INSERT INTO principals (principal_id, principal_type, display_name,
+                delegated_by_user_id, role_ids, domain_scopes, max_runtime_mode, created_at, is_active)
+                VALUES (?, 'human', ?, ?, ?, '[]', 'multi_user_local_runtime', ?, 1)""",
+                (principal_id, username, user_id, json.dumps(list(OWNER_BOOTSTRAP_ROLES)), now),
+            )
+            connection.executemany(
+                "INSERT INTO user_role_assignments (assignment_id, user_id, role_id, granted_at, granted_by) "
+                "VALUES (?, ?, ?, ?, 'test_fixture')",
+                [(new_id("ura_"), user_id, role_id, now) for role_id in OWNER_BOOTSTRAP_ROLES],
+            )
+            connection.execute(
+                "INSERT INTO account_credentials (principal_id, username, password_hash, hash_algo, "
+                "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (principal_id, username, encoded, algo, now, now),
+            )
+        store.initialize_principal_controls(principal_id)
+        token, _ = ApiSessionStore(workspace).create_session(principal_id, scope="control")
+        return principal_id, token
+
+    return _seed

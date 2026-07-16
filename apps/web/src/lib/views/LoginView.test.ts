@@ -33,13 +33,13 @@ describe("LoginView", () => {
     // The greeting and the idle statement are never shown together.
     expect(screen.queryByText("Hello! I am Raiker.")).not.toBeInTheDocument();
     // No marketing copy, fabricated pre-auth status details, or unsupported
-    // auth affordances (the backend has no remember-me or password reset).
+    // auth affordances unsupported by the local backend.
     expect(screen.queryByText(/governed AI agent/i)).not.toBeInTheDocument();
     expect(
       screen.queryByText(/workspace locked|ready to unlock|checkpoint|scheduled run|task/i),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/remember me/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/forgot password/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Forgot password?" })).toBeInTheDocument();
     // The status bar carries only the health-probe-backed item.
     await waitFor(() => expect(screen.getByText("Runtime operational")).toBeInTheDocument());
   });
@@ -128,8 +128,9 @@ describe("LoginView", () => {
   });
 
   it("keeps registration visually distinct, greets, and validates confirmation", async () => {
-    stubFetch({ ...HEALTH_OK, "POST /api/auth/register": LOGIN_RESULT });
+    stubFetch({ ...HEALTH_OK, "GET /api/auth/bootstrap-status": { can_register: true }, "POST /api/auth/register": LOGIN_RESULT });
     render(LoginView, { props: { onAuthenticated } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Create local account" })).toBeInTheDocument());
     await fireEvent.click(screen.getByRole("button", { name: "Create local account" }));
     expect(screen.getByRole("heading", { name: "Create local account" })).toBeInTheDocument();
     expect(screen.getByText("Hello! I am Raiker.")).toBeInTheDocument();
@@ -149,10 +150,29 @@ describe("LoginView", () => {
     stubFetch({ ...HEALTH_OK, "POST /api/instances": { name: "alex", url: "/instances/alex/" } });
     const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
     render(LoginView, { props: { onAuthenticated } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create separate instance" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Create new user and separate instance" }));
     await fireEvent.input(screen.getByLabelText("Instance name"), { target: { value: "alex" } });
     await fireEvent.click(screen.getByRole("button", { name: "Create and open instance" }));
     await waitFor(() => expect(open).toHaveBeenCalledWith("/instances/alex/", "_blank", "noopener"));
+  });
+
+  it("runs the local password recovery flow with an accessible pending state", async () => {
+    stubFetch({
+      ...HEALTH_OK,
+      "POST /api/auth/password-recovery/begin": { ok: true, ticket: "recovery_1" },
+      "POST /api/auth/password-recovery/complete": { ok: true },
+    });
+    render(LoginView, { props: { onAuthenticated } });
+    await fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    await fireEvent.input(screen.getByLabelText("Username"), { target: { value: "owner" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Begin recovery" }));
+    const code = await screen.findByLabelText("Recovery verification code");
+    expect(screen.getByText(/existing authenticator code or one-time backup recovery code is required/i)).toBeInTheDocument();
+    expect(code).toHaveAttribute("autocomplete", "one-time-code");
+    await fireEvent.input(code, { target: { value: "123456" } });
+    await fireEvent.input(screen.getByLabelText("New password"), { target: { value: "new-password" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Reset password" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Unlock Raiker" })).toBeInTheDocument());
   });
 
   it("supports password visibility with an accessible toggle", async () => {

@@ -55,7 +55,7 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
 def upload_attachment(
     body: UploadAttachmentRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, object]:
     if len(body.data_base64) > _MAX_BASE64_CHARS:
         raise HTTPException(
@@ -86,7 +86,8 @@ def upload_attachment(
         )
     try:
         stored: StoredAttachment = storer(
-            store, filename=body.filename, media_type=body.media_type, data=data
+            store, filename=body.filename, media_type=body.media_type, data=data,
+            owner_principal_id=auth_data[0].principal_id,
         )
     except AttachmentValidationError as exc:
         raise HTTPException(

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import threading
+import webbrowser
 from pathlib import Path
 
 import uvicorn
@@ -54,6 +56,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Built web dashboard directory (default: apps/web/dist; env RAIKER_WEB_UI_DIR).",
     )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not auto-open the dashboard in the default browser (loopback only).",
+    )
     args = parser.parse_args(argv)
 
     public = not _is_loopback(args.host)
@@ -90,6 +97,15 @@ def main(argv: list[str] | None = None) -> int:
         rate_limit_per_minute=args.rate_limit_per_minute,
         hsts=public,
     )
+
+    # Auto-open the dashboard in the user's default browser for local loopback
+    # use. Skipped for --allow-public (the operator is on another machine) and
+    # when --no-browser is set (scripted/remote use, or the dev server proxies
+    # /api separately and the owner prefers to drive the URL themselves).
+    if not public and not args.no_browser and ui_dir is not None:
+        url = f"http://{args.host}:{args.port}/"
+        threading.Timer(1.2, lambda: webbrowser.open(url, new=1)).start()
+
     uvicorn.run(app, host=args.host, port=args.port)
     return 0
 

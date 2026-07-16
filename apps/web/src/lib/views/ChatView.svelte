@@ -437,6 +437,7 @@
         icon="chat"
         title={`What would you like to work on, ${userName}?`}
         body="Start with a question, a task, or a file. Every turn is governed, observable, and stays in this Raiker instance."
+        serif={true}
       />
     {/if}
 

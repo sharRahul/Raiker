@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -34,9 +36,12 @@ def test_settings_roundtrip(client: TestClient) -> None:
     assert got["settings"]["personalisation"]["theme"] == "dark"
 
 
-def test_settings_isolated_per_account(client: TestClient) -> None:
+def test_settings_isolated_per_account(client: TestClient, tmp_path: Path, seed_account) -> None:  # type: ignore[no-untyped-def]
+    # One credential-backed account registers per instance, so the second
+    # account is seeded directly. Settings stay per-principal because a legacy
+    # or recovered-from principal can still own rows in this database.
     tok_a = _token(client, "alice")
-    tok_b = _token(client, "bob")
+    _, tok_b = seed_account(tmp_path, "bob")
     client.put("/api/settings", json={"settings": {"secret": "alice-only"}}, headers=_h(tok_a))
     # bob sees his own (empty) settings, not alice's
     assert client.get("/api/settings", headers=_h(tok_b)).json()["settings"] == {}

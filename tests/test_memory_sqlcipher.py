@@ -1,3 +1,4 @@
+import contextlib
 import sqlite3
 from pathlib import Path
 
@@ -23,7 +24,10 @@ def test_memory_database_uses_sqlcipher_not_plain_sqlite(tmp_path: Path) -> None
 def test_plaintext_database_is_converted_without_leaving_plaintext_backup(tmp_path: Path) -> None:
     db_path = tmp_path / ".raiker" / "raiker.db"
     db_path.parent.mkdir()
-    with sqlite3.connect(db_path) as plaintext:
+    # `with sqlite3.connect(...)` commits but does not close, and the migration
+    # renames this file — which Windows refuses while a handle is open. Close it
+    # the way a real legacy client would have before Raiker starts.
+    with contextlib.closing(sqlite3.connect(db_path)) as plaintext, plaintext:
         plaintext.execute("CREATE TABLE legacy_note (value TEXT)")
         plaintext.execute("INSERT INTO legacy_note VALUES ('preserved')")
         plaintext.execute(

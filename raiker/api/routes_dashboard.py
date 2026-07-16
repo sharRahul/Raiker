@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import FileResponse, Response
 
 from raiker.api.auth import AuthMiddleware
+from raiker.api.routes_instances import _require_loopback
 from raiker.api.schemas import (
     AuthSessionRequest,
     BrainSourceRequest,
@@ -56,6 +57,7 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
 async def mint_session(body: AuthSessionRequest, request: Request) -> dict[str, Any]:
     from raiker.storage.sqlite import SQLiteStore
 
+    _require_loopback(request)
     ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
     if SQLiteStore(ws).list_accounts():
         raise HTTPException(
@@ -235,9 +237,9 @@ async def set_session_tags(
 async def get_turn(
     turn_id: str,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    view = _service(request).get_turn(turn_id)
+    view = _service(request).get_turn(turn_id, user_id=auth_data[1].delegated_by_user_id)
     if view is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown turn: {turn_id}")
     return serialize_dto(view)
@@ -250,11 +252,17 @@ async def list_events(
     turn_id: str | None = None,
     event_type: str | None = None,
     limit: int = 100,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
+    service = _service(request)
+    user_id = auth_data[1].delegated_by_user_id
+    if session_id is not None and service.get_session(session_id, user_id=user_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
+    if turn_id is not None and service.get_turn(turn_id, user_id=user_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown turn")
     return serialize_dto(
-        _service(request).list_events(
-            session_id=session_id, turn_id=turn_id, event_type=event_type, limit=limit
+        service.list_events(
+            session_id=session_id, turn_id=turn_id, event_type=event_type, limit=limit, user_id=user_id
         )
     )
 
@@ -278,11 +286,11 @@ async def get_brain(
 async def add_brain_source(
     body: BrainSourceRequest,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     """Add one explicit workspace-relative file or folder to the Brain graph."""
     try:
-        return _service(request).add_brain_source(body.path)
+        return _service(request).add_brain_source(body.path, owner_principal_id=auth_data[0].principal_id)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -294,9 +302,9 @@ async def add_brain_source(
 async def remove_brain_source(
     path: str,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return _service(request).remove_brain_source(path)
+    return _service(request).remove_brain_source(path, owner_principal_id=auth_data[0].principal_id)
 
 
 @router.get("/api/checkpoints")
@@ -305,11 +313,11 @@ async def list_checkpoints(
     session_id: str | None = None,
     limit: int = 50,
     project_id: str | None = None,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
     return serialize_dto(
         _service(request).list_checkpoints(
-            session_id=session_id, limit=limit, project_id=project_id
+            session_id=session_id, limit=limit, project_id=project_id, user_id=auth_data[1].delegated_by_user_id
         )
     )
 
@@ -318,9 +326,9 @@ async def list_checkpoints(
 @router.get("/api/projects")
 async def list_projects(
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    return serialize_dto(_service(request).list_projects())
+    return serialize_dto(_service(request).list_projects(auth_data[1].delegated_by_user_id))
 
 
 @router.post("/api/projects")
@@ -367,19 +375,19 @@ async def select_project(
 @router.get("/api/projects/tree")
 async def list_project_tree(
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict]:
     """Return the full project tree (active, non-archived only)."""
-    return _service(request).list_project_tree()
+    return _service(request).list_project_tree(auth_data[1].delegated_by_user_id)
 
 
 @router.get("/api/projects/{project_id}")
 async def get_project(
     project_id: str,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    view = _service(request).get_project(project_id)
+    view = _service(request).get_project(project_id, auth_data[1].delegated_by_user_id)
     if view is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown project: {project_id}"
@@ -494,9 +502,9 @@ async def archive_project(
 async def get_checkpoint(
     checkpoint_id: str,
     request: Request,
-    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    view = _service(request).get_checkpoint(checkpoint_id)
+    view = _service(request).get_checkpoint(checkpoint_id, auth_data[1].delegated_by_user_id)
     if view is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown checkpoint: {checkpoint_id}"
@@ -651,7 +659,7 @@ async def set_model_connection(
         return {"ok": True, "connection_configured": False}
     try:
         ModelProviderFactory(
-            policy=provider_runtime_policy_from_gates(store), connection=values
+            policy=provider_runtime_policy_from_gates(store, session.principal_id), connection=values
         ).create(profile, require_model=False)
         put_model_connection(store, session.principal_id, profile_id, values)
     except ValueError as exc:

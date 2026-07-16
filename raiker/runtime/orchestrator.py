@@ -63,7 +63,10 @@ class RuntimeOrchestrator:
         self.planner = SimplePlanner()
         self.context_gatherer = ContextGatherer()
         store = getattr(tool_broker, "store", None)
-        self.retrieval = RetrievalAugmentor(workspace_root, store) if store is not None else None
+        self.retrieval = (
+            RetrievalAugmentor(workspace_root, store, principal_id=tool_broker.principal_id)
+            if store is not None else None
+        )
         self.verifier = Verifier()
         self.tool_specs = default_tool_specs()
         self._sink: list[StreamEvent] | None = None
@@ -172,10 +175,15 @@ class RuntimeOrchestrator:
         except Exception:  # noqa: BLE001
             vision = False
         store = getattr(self.tool_broker, "store", None) or SQLiteStore(self.workspace_root)
+        # Only a real account scopes the lookup. The terminal client's default
+        # user id is not a principal, and an attachment it uploaded before any
+        # account existed has no owner — scoping on it would withhold the
+        # user's own image from their own turn.
+        owner_principal_id = store.account_scope(envelope.user.id)
         images: list[ModelImage] = []
         for entry in entries:
             attachment_id = str(entry.get("attachment_id", ""))
-            record = load_image(store, attachment_id) if attachment_id else None
+            record = load_image(store, attachment_id, owner_principal_id=owner_principal_id) if attachment_id else None
             if record is None:
                 self._event(
                     envelope,
@@ -463,6 +471,7 @@ class RuntimeOrchestrator:
             turn_id=envelope.turn_id,
             prompt_text=envelope.prompt.text,
             attachments=envelope.prompt.attachments,
+            owner_principal_id=envelope.user.id,
         )
         self._event(envelope, "context_gathered", bundle.event_payload())
 

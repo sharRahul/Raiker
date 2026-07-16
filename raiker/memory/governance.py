@@ -130,6 +130,7 @@ class GovernedMemoryService:
         session_id: str,
         turn_id: str | None,
         client: ClientMetadata | None,
+        owner_principal_id: str | None = None,
     ) -> dict[str, Any]:
         if decision.decision != "allow":
             return {
@@ -169,6 +170,7 @@ class GovernedMemoryService:
             source=str(action.arguments.get("source", "agent")),
             store=self.store,
             governance=governance,
+            owner_principal_id=owner_principal_id or action.proposed_by,
         )
         self._append_event(
             session_id=session_id,
@@ -206,6 +208,7 @@ class GovernedMemoryService:
         session_id: str,
         turn_id: str | None,
         client: ClientMetadata | None,
+        owner_principal_id: str | None = None,
     ) -> dict[str, Any]:
         if decision.decision != "allow":
             return {
@@ -224,7 +227,10 @@ class GovernedMemoryService:
                     "message": "memory_id is required.",
                 },
             }
-        existing = get_memory(memory_id, workspace_root=self.workspace_root)
+        existing = get_memory(
+            memory_id, workspace_root=self.workspace_root,
+            owner_principal_id=owner_principal_id or action.proposed_by,
+        )
         try:
             governance = self._build_forget_governance(
                 action, session_id=session_id, turn_id=turn_id
@@ -236,6 +242,7 @@ class GovernedMemoryService:
             workspace_root=self.workspace_root,
             store=self.store,
             governance=governance,
+            owner_principal_id=owner_principal_id or action.proposed_by,
         )
         if not found:
             return {

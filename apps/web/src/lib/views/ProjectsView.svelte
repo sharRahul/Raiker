@@ -37,6 +37,55 @@
   let archiving = $state<string | null>(null);
   let archiveError = $state<string | null>(null);
 
+  // Drag-and-drop: a recent chat from the sidebar can be dropped onto a
+  // project card to move that chat into the project. The session id travels in
+  // the drag dataTransfer under the private mime "text/raiker-session-id".
+  let dragOverId = $state<string | null>(null);
+  let dropError = $state<string | null>(null);
+
+  function onDragOver(event: DragEvent, projectId: string) {
+    if (event.dataTransfer === null) return;
+    // Accept chats being dragged in. Browsers won't let us read the payload
+    // on dragover, so we allow any drag that advertises our mime types.
+    if (event.dataTransfer.types.includes("text/raiker-session-id")) {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+      dragOverId = projectId;
+    }
+  }
+  function onDragLeave(projectId: string) {
+    if (dragOverId === projectId) dragOverId = null;
+  }
+  async function onDrop(event: DragEvent, projectId: string) {
+    event.preventDefault();
+    dragOverId = null;
+    const sessionId = event.dataTransfer?.getData("text/raiker-session-id") ?? null;
+    if (sessionId === null || sessionId === "") return;
+    dropError = null;
+    try {
+      await api.setSessionProject(sessionId, projectId);
+      window.dispatchEvent(new CustomEvent("raiker:chats-changed"));
+      await load();
+      onchanged?.();
+    } catch (e) {
+      dropError = e instanceof ApiError ? `Could not move chat into ${projectId}.` : "Could not move chat.";
+    }
+  }
+
+  // "New chat in this project": activate the project (new sessions are stamped
+  // with the active project), notify the shell so the topbar switcher follows,
+  // then open the composer. The project is an organizing scope — selecting it
+  // grants nothing; it only bounds the context the new chat receives.
+  async function newChatInProject(projectId: string) {
+    try {
+      await api.selectProject(projectId);
+      onchanged?.();
+      window.location.hash = "#/new-chat";
+    } catch (e) {
+      selectError = e instanceof ApiError ? `Could not start a new chat (${e.status}).` : "Could not start a new chat.";
+    }
+  }
+
   async function saveContext() {
     if (detail === null || savingContext) return;
     savingContext = true;
@@ -178,6 +227,8 @@
     A project is a named scope for an ongoing piece of work: its own folder inside the workspace,
     plus the sessions and checkpoints created while it is active. It is an organizing label, not an
     authority — selecting a project grants nothing, and its folder can never leave the workspace.
+    Drag a recent chat onto a project to move it in, or use “New chat” to start a conversation in
+    that project.
   </p>
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh projects">
     <Icon name="refresh" size={15} />
@@ -224,7 +275,14 @@
   <div class="layout">
     <div class="project-grid">
       {#each list.projects as p (p.project_id)}
-        <article class="card project" class:active={p.selected}>
+        <article
+          class="card project"
+          class:active={p.selected}
+          class:drag-over={dragOverId === p.project_id}
+          ondragover={(e) => onDragOver(e, p.project_id)}
+          ondragleave={() => onDragLeave(p.project_id)}
+          ondrop={(e) => void onDrop(e, p.project_id)}
+        >
           <div class="project-head">
             <h2 class="project-name">{p.name}</h2>
             {#if p.selected}
@@ -256,6 +314,9 @@
                 Set active
               </button>
             {/if}
+            <button type="button" class="btn btn-primary btn-sm" onclick={() => void newChatInProject(p.project_id)}>
+              New chat
+            </button>
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => void open(p.project_id)}>
               Details
             </button>
@@ -267,9 +328,16 @@
             </button>
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => void remove(p.project_id)}>Delete</button>
           </div>
+          {#if dragOverId === p.project_id}
+            <p class="drop-hint" role="status">Drop to move chat into “{p.name}”.</p>
+          {/if}
         </article>
       {/each}
     </div>
+
+    {#if dropError}
+      <p class="error" role="alert">{dropError}</p>
+    {/if}
 
     {#if archiveError}
       <p class="error" role="alert">{archiveError}</p>
@@ -410,6 +478,17 @@
   .project.active {
     border-color: var(--accent-border);
     box-shadow: 0 0 0 1px var(--accent-border), var(--shadow-1);
+  }
+  .project.drag-over {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent), var(--shadow-2);
+    background: var(--accent-soft);
+  }
+  .drop-hint {
+    margin: 0.5rem 0 0;
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 600;
   }
   .project-head {
     display: flex;

@@ -330,7 +330,7 @@ class TestConsultAdvisorTool:
         answer = "TOP-SECRET-ANSWER"
         monkeypatch.setattr(
             "raiker.tools.broker.consult_advisor",
-            lambda ws, q, store=None: {
+            lambda ws, q, store=None, principal_id=None: {
                 "status": "success",
                 "advisor_profile_id": "anthropic-hosted",
                 "provider": "anthropic",

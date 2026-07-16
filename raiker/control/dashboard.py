@@ -16,7 +16,7 @@ from raiker.control.dtos import ControlResult
 from raiker.control.service import RuntimeControlService
 from raiker.events.export import generate_export
 from raiker.events.writer import EventLogWriter
-from raiker.memory.store import list_memory
+from raiker.memory.store import get_memory, list_memory
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
 from raiker.models.exceptions import ModelProviderError, ProviderPolicyError, safe_error
 from raiker.models.factory import ModelProviderFactory
@@ -570,17 +570,6 @@ class DashboardService:
         self.store = SQLiteStore(self.workspace_root)
         self.control = RuntimeControlService(self.workspace_root)
 
-    @property
-    def _brain_sources_path(self) -> Path:
-        return self.workspace_root / ".raiker" / "brain-sources.json"
-
-    def _brain_sources(self) -> list[str]:
-        try:
-            raw = json.loads(self._brain_sources_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError, TypeError):
-            return []
-        return [item for item in raw if isinstance(item, str) and item]
-
     def _workspace_source(self, raw_path: str) -> tuple[str, Path]:
         candidate = raw_path.strip()
         if not candidate or len(candidate) > 512:
@@ -593,21 +582,17 @@ class DashboardService:
             raise ValueError("brain_source_not_found")
         return str(path.relative_to(root)), path
 
-    def add_brain_source(self, raw_path: str) -> dict[str, Any]:
+    def add_brain_source(self, raw_path: str, *, owner_principal_id: str) -> dict[str, Any]:
         relative_path, _path = self._workspace_source(raw_path)
-        sources = list(dict.fromkeys([*self._brain_sources(), relative_path]))
-        self._brain_sources_path.parent.mkdir(parents=True, exist_ok=True)
-        self._brain_sources_path.write_text(json.dumps(sources), encoding="utf-8")
+        self.store.add_brain_source(owner_principal_id, relative_path)
         return {"ok": True, "path": relative_path}
 
-    def remove_brain_source(self, raw_path: str) -> dict[str, Any]:
+    def remove_brain_source(self, raw_path: str, *, owner_principal_id: str) -> dict[str, Any]:
         try:
             relative_path, _path = self._workspace_source(raw_path)
         except ValueError:
             relative_path = raw_path.strip()
-        sources = [source for source in self._brain_sources() if source != relative_path]
-        self._brain_sources_path.parent.mkdir(parents=True, exist_ok=True)
-        self._brain_sources_path.write_text(json.dumps(sources), encoding="utf-8")
+        self.store.remove_brain_source(owner_principal_id, relative_path)
         return {"ok": True, "path": relative_path}
 
     # ── Sessions / turns ────────────────────────────────────────────────
@@ -640,11 +625,10 @@ class DashboardService:
             row for row in self.store.list_subagent_contracts()
             if str(row.get("parent_task_id", "")) in task_ids
         ]
-        memories = [
-            memory
-            for memory in list_memory(workspace_root=self.workspace_root, store=self.store, limit=100)
-            if memory.created_by == principal_id
-        ]
+        memories = list_memory(
+            workspace_root=self.workspace_root, store=self.store, limit=100,
+            owner_principal_id=principal_id,
+        )
         backups = [
             row for row in self.store.list_backup_manifests()
             if str(row.get("created_by", "")) == principal_id
@@ -695,7 +679,7 @@ class DashboardService:
             nodes.append(BrainNodeView(node_id, "backup", "Backup", "verified" if backup.get("restore_verified_at") else "catalogued"))
             edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "backs_up"))
         root = self.workspace_root.resolve()
-        for source in self._brain_sources():
+        for source in self.store.list_brain_sources(principal_id):
             try:
                 relative_path, path = self._workspace_source(source)
             except ValueError:
@@ -710,7 +694,7 @@ class DashboardService:
                 except OSError:
                     children = []
                 for child in children:
-                    child_path = str(child.resolve().relative_to(root))
+                    child_path = child.resolve().relative_to(root).as_posix()
                     child_id = f"source:{child_path}"
                     child_type = "folder" if child.is_dir() else "file"
                     nodes.append(BrainNodeView(child_id, child_type, child.name, "available", child_path))
@@ -734,9 +718,15 @@ class DashboardService:
     def search_sessions(self, query: str, user_id: str | None = None) -> list[SessionView]:
         return [self._session_view(row) for row in self.store.search_sessions(query.strip(), user_id)]
 
-    def get_turn(self, turn_id: str) -> TurnDetailView | None:
+    def get_turn(self, turn_id: str, user_id: str | None = None) -> TurnDetailView | None:
         row = self.store.load_turn(turn_id)
         if row is None:
+            return None
+        session = self.store.load_session(str(row["session_id"]))
+        if session is None:
+            return None
+        owner = session.get("user_id")
+        if user_id is not None and owner is not None and str(owner) != user_id:
             return None
         events = tuple(
             self._event_view(e) for e in self.store.list_event_index(turn_id=turn_id, limit=500)
@@ -819,11 +809,11 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        if project_id is not None and self.store.load_project(project_id) is None:
+        user_id = self.store.principal_user_id(principal.principal_id)
+        if project_id is not None and self.store.load_project(project_id, user_id=user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
         session = self.store.load_session(session_id)
         previous_project_id = str(session["project_id"]) if session and session.get("project_id") else None
-        user_id = principal.delegated_by_user_id
         if not self.store.set_session_project(session_id, project_id, user_id=user_id):
             return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
         from raiker.events.types import make_event
@@ -929,6 +919,7 @@ class DashboardService:
             limit=200,
             store=self.store,
             include_search_disabled=True,
+            owner_principal_id=acting_principal_id,
         )
         views = [
             MemoryControlView(
@@ -974,6 +965,8 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
+        if get_memory(memory_id, workspace_root=self.workspace_root, owner_principal_id=principal.principal_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
         self.store.set_memory_pinned(memory_id, pinned)
         return ControlResult(ok=True, data={"memory_id": memory_id, "pinned": pinned})
 
@@ -1005,6 +998,7 @@ class DashboardService:
             workspace_root=self.workspace_root,
             store=self.store,
             governance=governance,
+            owner_principal_id=principal.principal_id,
         )
         if not ok:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
@@ -1015,7 +1009,7 @@ class DashboardService:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
         from raiker.memory.store import set_memory_archived
-        entry = set_memory_archived(memory_id, archived=archived, workspace_root=self.workspace_root, store=self.store)
+        entry = set_memory_archived(memory_id, archived=archived, workspace_root=self.workspace_root, store=self.store, owner_principal_id=acting_principal_id)
         if entry is None:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
         self.store.record_memory_lifecycle_event(memory_id, "archive" if archived else "restore", acting_principal_id or "")
@@ -1025,7 +1019,7 @@ class DashboardService:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
         from raiker.memory.store import get_memory
-        memory = get_memory(memory_id, workspace_root=self.workspace_root, include_expired=True, include_archived=True)
+        memory = get_memory(memory_id, workspace_root=self.workspace_root, include_expired=True, include_archived=True, owner_principal_id=acting_principal_id)
         if memory is None:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
         return ControlResult(ok=True, data={"memory_id": memory_id, "artifacts": [str(self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md")], "backup_disposition": "retained backups are not immediately erased", "requires_confirmation": memory_id})
@@ -1041,7 +1035,7 @@ class DashboardService:
         path.unlink(missing_ok=True)
         projections = self.store.list_memory_projections(memory_id)
         self.store.deactivate_memory_projections(memory_id)
-        self.store.delete_approved_memory(memory_id)
+        self.store.delete_approved_memory(memory_id, owner_principal_id=acting_principal_id)
         disposition = {**preview.data, "projections": projections, "completed_storage_locations": ["markdown_export", "sqlite_approved_memory", "sqlite_fts", "projection_mappings"]}
         self.store.create_memory_purge_record(new_id("pur_"), memory_id, acting_principal_id or "", utc_now(), disposition)
         self.store.record_memory_lifecycle_event(memory_id, "purge", acting_principal_id or "", disposition)
@@ -1062,6 +1056,7 @@ class DashboardService:
         replacement = correct_memory(
             memory_id, text, workspace_root=self.workspace_root, store=self.store,
             remembered_reason=reason,
+            owner_principal_id=self.store.account_scope(acting_principal_id),
             governance=MemoryGovernance(
                 source_event_id=new_id("evt_"), source_session_id="", source_turn_id=None,
                 source_type="human_correction", confidence=1.0, trust_score=1.0,
@@ -1091,7 +1086,7 @@ class DashboardService:
     def export_memories(self, acting_principal_id: str | None) -> ControlResult:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        memories = [m.to_dict() for m in self.list_memories()]
+        memories = [m.to_dict() for m in self.list_memories(acting_principal_id=acting_principal_id)]
         self.store.record_memory_lifecycle_event(
             "workspace_memory_export", "export", acting_principal_id or "", {"memory_count": len(memories)}
         )
@@ -1114,6 +1109,7 @@ class DashboardService:
                     new_id("evt_"), "", None, "user_import", 1.0, 1.0,
                     str(item.get("retention", "until_forget")), "approved", acting_principal_id or "",
                 ),
+                owner_principal_id=acting_principal_id,
             )
             update_memory(
                 entry.memory_id,
@@ -1122,6 +1118,7 @@ class DashboardService:
                 expires_at=item.get("expires_at"),
                 update_expires_at="expires_at" in item,
                 store=self.store,
+                owner_principal_id=acting_principal_id,
             )
             self.store.record_memory_lifecycle_event(
                 entry.memory_id, "import", acting_principal_id or "", {"source": "user_import"}
@@ -1132,7 +1129,7 @@ class DashboardService:
         """Owner-started repair; never runs as an autonomous background worker."""
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        return ControlResult(ok=True, data=self.store.reconcile_memory_projections())
+        return ControlResult(ok=True, data=self.store.reconcile_memory_projections(owner_principal_id=acting_principal_id))
 
     def cleanup_expired_observations(
         self, observation_ids: set[str], now: str, acting_principal_id: str | None
@@ -1179,6 +1176,7 @@ class DashboardService:
             expires_at=expires_at,
             update_expires_at=update_expires_at,
             store=self.store,
+            owner_principal_id=acting_principal_id,
         )
         if updated is None:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
@@ -1191,8 +1189,8 @@ class DashboardService:
             },
         )
 
-    def get_memory_settings(self) -> MemorySettingsView:
-        return MemorySettingsView(incognito=self.store.is_memory_incognito())
+    def get_memory_settings(self, acting_principal_id: str | None = None) -> MemorySettingsView:
+        return MemorySettingsView(incognito=self.store.is_memory_incognito(acting_principal_id))
 
     def set_memory_incognito(
         self, incognito: bool, acting_principal_id: str | None
@@ -1208,7 +1206,7 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        self.store.set_memory_incognito(incognito)
+        self.store.set_memory_incognito(incognito, principal.principal_id)
         return ControlResult(ok=True, data={"incognito": incognito})
 
     # ── Events / checkpoints / tasks ────────────────────────────────────
@@ -1218,23 +1216,37 @@ class DashboardService:
         turn_id: str | None = None,
         event_type: str | None = None,
         limit: int = 100,
+        user_id: str | None = None,
     ) -> list[EventView]:
         rows = self.store.list_event_index(
             session_id=session_id, turn_id=turn_id, event_type=event_type, limit=limit
         )
-        return [self._event_view(r) for r in rows]
+        if user_id is None:
+            return [self._event_view(r) for r in rows]
+        visible_session_ids = {
+            str(session["session_id"])
+            for session in self.store.list_sessions(limit=10_000, user_id=user_id)
+        }
+        return [self._event_view(r) for r in rows if str(r.get("session_id")) in visible_session_ids]
 
     def list_checkpoints(
-        self, session_id: str | None = None, limit: int = 50, project_id: str | None = None
+        self, session_id: str | None = None, limit: int = 50, project_id: str | None = None, user_id: str | None = None
     ) -> list[CheckpointView]:
         return [
             self._checkpoint_view(r)
             for r in self.store.list_checkpoints(session_id, limit=limit, project_id=project_id)
+            if (session := self.store.load_session(str(r["session_id"]))) is not None
+            and (user_id is None or session.get("user_id") == user_id)
         ]
 
-    def get_checkpoint(self, checkpoint_id: str) -> CheckpointView | None:
+    def get_checkpoint(self, checkpoint_id: str, user_id: str | None = None) -> CheckpointView | None:
         row = self.store.load_checkpoint_by_id(checkpoint_id)
-        return self._checkpoint_view(row) if row is not None else None
+        if row is None:
+            return None
+        session = self.store.load_session(str(row["session_id"]))
+        if session is None or (user_id is not None and session.get("user_id") != user_id):
+            return None
+        return self._checkpoint_view(row)
 
     # ── Projects (web-app task 5) ────────────────────────────────────────
     # A project is a named organizing scope: a workspace-contained subpath plus
@@ -1244,20 +1256,20 @@ class DashboardService:
 
     _PROJECT_NAME_MAX = 100
 
-    def list_projects(self) -> ProjectsListView:
-        active = self.store.get_active_project()
+    def list_projects(self, user_id: str | None = None) -> ProjectsListView:
+        active = self.store.get_active_project(user_id)
         return ProjectsListView(
-            projects=tuple(self._project_view(row, active) for row in self.store.list_projects()),
+            projects=tuple(self._project_view(row, active) for row in self.store.list_projects(user_id)),
             active_project_id=active,
         )
 
-    def get_project(self, project_id: str) -> ProjectDetailView | None:
-        row = self.store.load_project(project_id)
+    def get_project(self, project_id: str, user_id: str | None = None) -> ProjectDetailView | None:
+        row = self.store.load_project(project_id, user_id)
         if row is None:
             return None
-        active = self.store.get_active_project()
+        active = self.store.get_active_project(user_id)
         sessions = tuple(
-            self._session_view(s) for s in self.store.list_sessions(limit=200, project_id=project_id)
+            self._session_view(s) for s in self.store.list_sessions(limit=200, project_id=project_id, user_id=user_id)
         )
         checkpoints = tuple(
             self._checkpoint_view(c) for c in self.store.list_checkpoints(project_id=project_id)
@@ -1278,7 +1290,7 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        if self.store.load_project(project_id) is None:
+        if self.store.load_project(project_id, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
         manifest = generate_export(
             self.store,
@@ -1310,18 +1322,18 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="invalid_project_name")
         if self.store.load_project_by_name(cleaned) is not None:
             return ControlResult(ok=False, reason_code="duplicate_project_name")
-        if parent_id is not None and self.store.load_project(parent_id) is None:
+        if parent_id is not None and self.store.load_project(parent_id, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_parent:{parent_id}")
         root_subpath = f"projects/{slug}"
         workspace = self.workspace_root.resolve()
         resolved = (workspace / root_subpath).resolve()
         if workspace != resolved and workspace not in resolved.parents:
             return ControlResult(ok=False, reason_code="project_root_escapes_workspace")
-        if any(p.get("root_subpath") == root_subpath for p in self.store.list_projects()):
+        if any(p.get("root_subpath") == root_subpath for p in self.store.list_projects(principal.delegated_by_user_id)):
             return ControlResult(ok=False, reason_code="duplicate_project_root")
         project_id = new_id("proj_")
         resolved.mkdir(parents=True, exist_ok=True)
-        self.store.create_project(project_id, cleaned, root_subpath, parent_id=parent_id)
+        self.store.create_project(project_id, cleaned, root_subpath, parent_id=parent_id, owner_user_id=principal.delegated_by_user_id)
         return ControlResult(
             ok=True,
             data={"project_id": project_id, "name": cleaned, "root_subpath": root_subpath, "parent_id": parent_id},
@@ -1340,11 +1352,11 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="not_authorized_human")
         cleaned = (project_id or "").strip()
         if not cleaned:
-            self.store.save_active_project(None)
+            self.store.save_active_project(None, principal.delegated_by_user_id)
             return ControlResult(ok=True, data={"active_project_id": None})
-        if self.store.load_project(cleaned) is None:
+        if self.store.load_project(cleaned, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{cleaned}")
-        self.store.save_active_project(cleaned)
+        self.store.save_active_project(cleaned, principal.delegated_by_user_id)
         return ControlResult(ok=True, data={"active_project_id": cleaned})
 
     def delete_project(self, project_id: str, acting_principal_id: str | None, confirm: bool = False) -> ControlResult:
@@ -1356,7 +1368,7 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="not_authorized_human")
         if not confirm:
             return ControlResult(ok=False, reason_code="project_delete_confirmation_required")
-        project = self.store.load_project(project_id)
+        project = self.store.load_project(project_id, principal.delegated_by_user_id)
         if project is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
         root = (self.workspace_root.resolve() / str(project["root_subpath"])).resolve()
@@ -1387,7 +1399,7 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        if self.store.load_project(project_id) is None:
+        if self.store.load_project(project_id, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
         cleaned = instructions.strip()
         if len(cleaned) > 4000:
@@ -1395,7 +1407,12 @@ class DashboardService:
         unique_ids = list(dict.fromkeys(item.strip() for item in attachment_ids if item.strip()))
         if len(unique_ids) > 20:
             return ControlResult(ok=False, reason_code="too_many_project_attachments")
-        if any(self.store.load_attachment_metadata(attachment_id) is None for attachment_id in unique_ids):
+        if any(
+            self.store.load_attachment_metadata(
+                attachment_id, owner_principal_id=principal.principal_id
+            ) is None
+            for attachment_id in unique_ids
+        ):
             return ControlResult(ok=False, reason_code="unknown_project_attachment")
         self.store.save_project_context(
             project_id,
@@ -1403,6 +1420,7 @@ class DashboardService:
             attachment_ids=unique_ids,
             memory_enabled=memory_enabled,
             memory_mode=memory_mode,
+            owner_principal_id=principal.principal_id,
         )
         context = self.store.load_project_context(project_id)
         return ControlResult(
@@ -1413,16 +1431,16 @@ class DashboardService:
     # Organizing scopes only — like all project operations, they grant nothing
     # and change no gate, policy, or authority.
 
-    def list_project_tree(self) -> list[dict]:
+    def list_project_tree(self, user_id: str | None = None) -> list[dict]:
         """Return the full project tree (active, non-archived only)."""
-        return self.store.list_project_tree()
+        return self.store.list_project_tree(user_id=user_id)
 
     def archive_project(self, project_id: str, acting_principal_id: str | None) -> ControlResult:
         """AI-autonomous soft-archive of a project subtree. No confirmation required."""
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
-        if self.store.load_project(project_id) is None:
+        if self.store.load_project(project_id, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
         self.store.archive_project(project_id)
         return ControlResult(ok=True, data={"project_id": project_id, "archived": True})
@@ -1434,9 +1452,9 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        if self.store.load_project(project_id) is None:
+        if self.store.load_project(project_id, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
-        if new_parent_id is not None and self.store.load_project(new_parent_id) is None:
+        if new_parent_id is not None and self.store.load_project(new_parent_id, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_parent:{new_parent_id}")
         ok = self.store.move_project(project_id, new_parent_id)
         if not ok:
@@ -1511,8 +1529,8 @@ class DashboardService:
         if scheduled_at is None:
             scheduled_at = utc_now()
         if project_id is None:
-            project_id = self.store.get_active_project()
-        elif self.store.load_project(project_id) is None:
+            project_id = self.store.get_active_project(user_id)
+        elif self.store.load_project(project_id, user_id) is None:
             raise ValueError(f"unknown_project:{project_id}")
         if parent_task_id is not None:
             parent = self.store.load_task(parent_task_id)
@@ -1543,11 +1561,18 @@ class DashboardService:
         return self._task_view(task)
 
     # ── Approvals (read-only views; resolution lives in ApprovalInbox) ───
-    def list_approvals(self, status: str = "pending") -> list[ApprovalView]:
-        return [self._approval_view(row) for row in self.store.list_approvals(status=status)]
+    def list_approvals(
+        self, status: str = "pending", *, user_id: str | None = None
+    ) -> list[ApprovalView]:
+        return [
+            self._approval_view(row)
+            for row in self.store.list_approvals(status=status, user_id=user_id)
+        ]
 
-    def get_approval(self, approval_id: str) -> ApprovalDetailView | None:
-        row = self.store.load_approval(approval_id)
+    def get_approval(
+        self, approval_id: str, *, user_id: str | None = None
+    ) -> ApprovalDetailView | None:
+        row = self.store.load_approval(approval_id, user_id=user_id)
         if row is None:
             return None
         return self._approval_detail(row)
@@ -1555,15 +1580,23 @@ class DashboardService:
     # ── Models / diagnostics ────────────────────────────────────────────
     def get_models(self, acting_principal_id: str | None = None) -> ModelsView:
         registry = ModelProfileRegistry.load()
-        state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        scoped_principal = (
+            acting_principal_id
+            if acting_principal_id and self.store.get_account(acting_principal_id) is not None
+            else None
+        )
+        state = (
+            self.store.load_principal_model_state(scoped_principal)
+            if scoped_principal else self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        )
         current = state.profile_id if state is not None else None
         # The persisted per-profile model override (e.g. an Ollama/OpenAI model
         # picked at selection time) is what the runtime actually binds, so the
         # selected profile card shows it instead of the profile's placeholder.
         override = state.model if state is not None and state.model else None
-        hosted_gate = self.control.get_capability_gate(HOSTED_MODEL_GATE)
-        private_gate = self.control.get_capability_gate(PRIVATE_NETWORK_MODEL_GATE)
-        advisor_gate = self.control.get_capability_gate("advisor_model_runtime")
+        hosted_gate = self.control.get_capability_gate(HOSTED_MODEL_GATE, acting_principal_id)
+        private_gate = self.control.get_capability_gate(PRIVATE_NETWORK_MODEL_GATE, acting_principal_id)
+        advisor_gate = self.control.get_capability_gate("advisor_model_runtime", acting_principal_id)
         from raiker.models.connections import get_model_connection
 
         profiles = tuple(
@@ -1603,10 +1636,14 @@ class DashboardService:
             ),
             remote_profile_count=sum(1 for p in profiles if p.off_machine),
             fallback_sequence=tuple(
-                self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
+                self.store.load_principal_model_fallback_sequence(scoped_principal)
+                if scoped_principal else self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
             ),
             current_model=self._current_model(registry, state),
-            advisor_profile_id=self.store.load_model_advisor(TERMINAL_MODEL_SESSION_ID),
+            advisor_profile_id=(
+                self.store.load_principal_model_advisor(scoped_principal)
+                if scoped_principal else self.store.load_model_advisor(TERMINAL_MODEL_SESSION_ID)
+            ),
             advisor_model_gate_state=advisor_gate.state if advisor_gate is not None else "unknown",
         )
 
@@ -1765,7 +1802,10 @@ class DashboardService:
                 return ControlResult(ok=False, reason_code=f"test_profile_not_allowed:{profile_id}")
             if profile_id not in cleaned:
                 cleaned.append(profile_id)
-        self.store.save_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID, cleaned)
+        if self.store.get_account(principal.principal_id) is not None:
+            self.store.save_principal_model_fallback_sequence(principal.principal_id, cleaned)
+        else:
+            self.store.save_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID, cleaned)
         return ControlResult(ok=True, data={"fallback_sequence": cleaned})
 
     def set_model_advisor(
@@ -1786,7 +1826,10 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
         cleaned = (profile_id or "").strip()
         if not cleaned:
-            self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, None)
+            if self.store.get_account(principal.principal_id) is not None:
+                self.store.save_principal_model_advisor(principal.principal_id, None)
+            else:
+                self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, None)
             return ControlResult(ok=True, data={"advisor_profile_id": None})
         registry = ModelProfileRegistry.load()
         try:
@@ -1795,13 +1838,20 @@ class DashboardService:
             return ControlResult(ok=False, reason_code=f"unknown_profile:{cleaned}")
         if bool(profile.raw.get("test_only", False)):
             return ControlResult(ok=False, reason_code=f"test_profile_not_allowed:{cleaned}")
-        state = self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        state = (
+            self.store.load_principal_model_state(principal.principal_id)
+            if self.store.get_account(principal.principal_id) is not None
+            else self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        )
         effective_model = profile.model
         if state is not None and state.profile_id == profile.profile_id and state.model:
             effective_model = state.model
         if not effective_model or "<" in effective_model:
             return ControlResult(ok=False, reason_code=f"model_required_for_profile:{cleaned}")
-        self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, profile.profile_id)
+        if self.store.get_account(principal.principal_id) is not None:
+            self.store.save_principal_model_advisor(principal.principal_id, profile.profile_id)
+        else:
+            self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, profile.profile_id)
         return ControlResult(ok=True, data={"advisor_profile_id": profile.profile_id})
 
     async def list_provider_models(
@@ -1827,7 +1877,7 @@ class DashboardService:
 
         router = ModelRouter(
             registry,
-            runtime_policy=provider_runtime_policy_from_gates(self.store),
+            runtime_policy=provider_runtime_policy_from_gates(self.store, acting_principal_id),
             connection_resolver=lambda current_profile_id: get_model_connection(
                 self.store, acting_principal_id or "", current_profile_id
             ) if acting_principal_id else None,
@@ -1902,7 +1952,7 @@ class DashboardService:
             from raiker.models.connections import get_model_connection
 
             validator = ModelProviderFactory(
-                policy=provider_runtime_policy_from_gates(self.store),
+                policy=provider_runtime_policy_from_gates(self.store, principal.principal_id),
                 connection=get_model_connection(self.store, principal.principal_id, profile.profile_id),
             ).create(effective)
         except Exception as exc:  # noqa: BLE001 — provider policy failures fail closed
@@ -1919,13 +1969,15 @@ class DashboardService:
         aclose = getattr(validator, "aclose", None)
         if aclose is not None:
             await aclose()
-        self.store.save_model_session_state(
-            ModelSessionState(
-                session_id=TERMINAL_MODEL_SESSION_ID,
+        state = ModelSessionState(
+                session_id=principal.principal_id if self.store.get_account(principal.principal_id) is not None else TERMINAL_MODEL_SESSION_ID,
                 profile_id=profile.profile_id,
                 model=(None if resolved_model == profile.model else resolved_model),
             )
-        )
+        if self.store.get_account(principal.principal_id) is not None:
+            self.store.save_principal_model_state(principal.principal_id, state)
+        else:
+            self.store.save_model_session_state(state)
         self._append_model_event(
             "model_profile_selected",
             {
@@ -1975,7 +2027,7 @@ class DashboardService:
             "checkpoints": self.store.count_checkpoints(),
             "tasks": self.store.count_tasks(),
         }
-        models = self.get_models()
+        models = self.get_models(acting_principal_id)
         provider_health = self._provider_health(models)
         missing_config = self._missing_config(readiness, models)
         return DiagnosticsView(

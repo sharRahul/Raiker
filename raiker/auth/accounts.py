@@ -13,6 +13,7 @@ return one generic error to prevent username enumeration.
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -21,24 +22,17 @@ from pathlib import Path
 from raiker.api.sessions import ApiSessionStore
 from raiker.auth import mfa, passwords
 from raiker.cli.principal_resolver import (
-    ADMIN_ROLE_ID,
-    APPROVER_ROLE_ID,
     OWNER_BOOTSTRAP_ROLES,
-    OWNER_ROLE_ID,
     _ensure_bootstrap_roles,
 )
-from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import User, UserRoleAssignment
+from raiker.contracts.ids import utc_now
+from raiker.contracts.models import User
 from raiker.storage.sqlite import SQLiteStore
-
-# Additional accounts (after the first/owner) get self-contained authority over
-# their own isolated data, but not owner/gate-manager, so a single gate manager
-# governs the device.
-_ADDITIONAL_ACCOUNT_ROLES = (ADMIN_ROLE_ID, APPROVER_ROLE_ID)
 
 LOCKOUT_THRESHOLD = 5
 LOCKOUT_SECONDS = 900  # 15 minutes
 MFA_TICKET_TTL = 300  # 5 minutes
+PASSWORD_RECOVERY_TICKET_TTL = 300  # 5 minutes
 SESSION_TTL = 86400 * 7  # sliding 7 days
 SESSION_ABSOLUTE_TTL = 86400 * 30  # hard 30-day cap
 ELEVATED_TTL = 300  # 5 minutes
@@ -68,6 +62,7 @@ def _parse(value: str) -> datetime:
 class AccountService:
     def __init__(self, workspace_root: str | Path) -> None:
         self._workspace_root = Path(workspace_root)
+        passwords.prepare_dummy_hashes()
         self._store = SQLiteStore(workspace_root)
         self._sessions = ApiSessionStore(workspace_root)
 
@@ -76,51 +71,19 @@ class AccountService:
         username = username.strip()
         if not username or not password:
             raise AuthError("Username and password are required")
-        if self._store.get_account_by_username(username) is not None:
-            raise AuthError("Username is already taken")
         _ensure_bootstrap_roles(self._store)
         now = utc_now()
         user_id = f"user_{secrets.token_hex(8)}"
         principal_id = f"principal_{user_id}"
-        roles = OWNER_BOOTSTRAP_ROLES if not self._owner_exists() else _ADDITIONAL_ACCOUNT_ROLES
-        self._store.insert_user(
-            User(
-                user_id=user_id,
-                display_name=username,
-                email=None,
-                is_active=True,
-                created_at=now,
-                updated_at=now,
-            )
-        )
-        self._store.insert_principal(
-            principal_id=principal_id,
-            principal_type="human",
-            display_name=username,
-            delegated_by_user_id=user_id,
-            role_ids=roles,
-            max_runtime_mode="multi_user_local_runtime",
-            is_active=True,
-        )
-        for role_id in roles:
-            self._store.insert_user_role_assignment(
-                UserRoleAssignment(
-                    assignment_id=new_id("ura_"),
-                    user_id=user_id,
-                    role_id=role_id,
-                    granted_at=now,
-                    granted_by="lock_screen_registration",
-                )
-            )
         encoded, algo = passwords.hash_password(password)
-        self._store.upsert_account(principal_id, username, encoded, algo, now, now)
+        created = self._store.create_initial_account_atomic(
+            user=User(user_id, username, None, True, now, now), principal_id=principal_id,
+            username=username, password_hash=encoded, hash_algo=algo,
+            role_ids=OWNER_BOOTSTRAP_ROLES, max_runtime_mode="multi_user_local_runtime",
+        )
+        if not created:
+            raise AuthError("Create new user and separate Raiker instance instead")
         return principal_id
-
-    def _owner_exists(self) -> bool:
-        for principal in self._store.list_principals(active_only=False):
-            if OWNER_ROLE_ID in principal.get("role_ids", ()):
-                return True
-        return False
 
     # ── Login state machine ─────────────────────────────────────────────────
     def login(self, username: str, password: str, device_label: str | None = None) -> LoginResult:
@@ -129,9 +92,24 @@ class AccountService:
             # Spend comparable work so a missing user is indistinguishable by timing.
             passwords.spend_dummy_verify(password)
             raise AuthError(GENERIC_AUTH_ERROR)
+        password_valid = passwords.verify_password(
+            password, account["password_hash"], account["hash_algo"]
+        )
+        verified_algo = passwords.verification_algorithm(
+            account["password_hash"], account["hash_algo"]
+        )
+        denied = (
+            not self._account_principal_is_active(account["principal_id"])
+            or self._is_locked(account)
+            or not password_valid
+        )
+        if denied:
+            passwords.spend_dummy_verify(password, exclude_algo=verified_algo)
+        if not self._account_principal_is_active(account["principal_id"]):
+            raise AuthError(GENERIC_AUTH_ERROR)
         if self._is_locked(account):
             raise AuthError(GENERIC_AUTH_ERROR)
-        if not passwords.verify_password(password, account["password_hash"], account["hash_algo"]):
+        if not password_valid:
             self._register_failure(account)
             raise AuthError(GENERIC_AUTH_ERROR)
         self._reset_failures(account["principal_id"])
@@ -148,17 +126,57 @@ class AccountService:
         return LoginResult(stage="session", principal_id=account["principal_id"], token=token)
 
     def verify_mfa(self, ticket_token: str, code: str) -> LoginResult:
-        ticket = self._sessions.get_by_token(ticket_token)
-        if ticket is None or ticket.revoked or ticket.is_expired() or ticket.scope != "mfa_pending":
-            raise AuthError("MFA verification failed")
-        account = self._store.get_account(ticket.principal_id)
-        if account is None or not account["mfa_enrolled"]:
-            raise AuthError("MFA verification failed")
-        if not self._check_mfa(account, code):
-            raise AuthError("MFA verification failed")
-        self._sessions.revoke_session(ticket.session_id)
-        token = self._issue_control_session(ticket.principal_id, None)
-        return LoginResult(stage="session", principal_id=ticket.principal_id, token=token)
+        # Claim the pending ticket and consume a backup code under one writer
+        # lock. A control session is minted only after that claim commits.
+        token_hash = hashlib.sha256(ticket_token.encode()).hexdigest()
+        try:
+            with self._store.connect() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                ticket = connection.execute(
+                    "SELECT * FROM api_sessions WHERE token_hash = ?", (token_hash,)
+                ).fetchone()
+                if (
+                    ticket is None or bool(ticket["revoked"])
+                    or str(ticket["scope"] or "") != "mfa_pending"
+                    or (ticket["expires_at"] and _parse(str(ticket["expires_at"])) <= _now())
+                    or (ticket["absolute_expires_at"] and _parse(str(ticket["absolute_expires_at"])) <= _now())
+                ):
+                    raise AuthError("MFA verification failed")
+                principal_id = str(ticket["principal_id"])
+                account = connection.execute(
+                    "SELECT * FROM account_credentials WHERE principal_id = ?", (principal_id,)
+                ).fetchone()
+                principal = connection.execute(
+                    "SELECT is_active FROM principals WHERE principal_id = ?", (principal_id,)
+                ).fetchone()
+                if account is None or principal is None or not bool(principal["is_active"]) or not bool(account["mfa_enrolled"]):
+                    raise AuthError("MFA verification failed")
+                verified = False
+                blob = account["mfa_secret_encrypted"]
+                if blob is not None:
+                    verified = mfa.verify_totp(mfa.decrypt_secret(self._workspace_root, blob), code)
+                if not verified and account["backup_codes_hashed"]:
+                    verified, updated = mfa.consume_backup_code(str(account["backup_codes_hashed"]), code)
+                    if verified:
+                        connection.execute(
+                            "UPDATE account_credentials SET backup_codes_hashed = ? WHERE principal_id = ?",
+                            (updated, principal_id),
+                        )
+                if not verified:
+                    raise AuthError("MFA verification failed")
+                claimed = connection.execute(
+                    "UPDATE api_sessions SET revoked = 1 WHERE session_id = ? AND revoked = 0",
+                    (str(ticket["session_id"]),),
+                )
+                if claimed.rowcount != 1:
+                    raise AuthError("MFA verification failed")
+                connection.commit()
+        except AuthError:
+            raise
+        except Exception as exc:
+            raise AuthError("MFA verification failed") from exc
+        token = self._issue_control_session(principal_id, None)
+        return LoginResult(stage="session", principal_id=principal_id, token=token)
 
     # ── Password & elevation ────────────────────────────────────────────────
     def change_password(
@@ -175,11 +193,102 @@ class AccountService:
         self._store.set_account_password(principal_id, encoded, algo, utc_now())
         self._sessions.revoke_others_for_principal(principal_id, keep_session_id)
 
+    def begin_password_recovery(self, username: str) -> str:
+        """Issue an opaque local recovery ticket without disclosing account existence."""
+        account = self._store.get_account_by_username(username.strip())
+        if account is None or not self._account_principal_is_active(account["principal_id"]):
+            # The caller receives an indistinguishable opaque value, but no
+            # server-side ticket exists to complete a reset for this username.
+            return secrets.token_hex(32)
+        token, _ = self._sessions.create_session(
+            account["principal_id"],
+            scope="password_recovery",
+            expires_in_seconds=PASSWORD_RECOVERY_TICKET_TTL,
+        )
+        return token
+
+    def complete_password_recovery(self, ticket_token: str, code: str, new_password: str) -> None:
+        if not new_password:
+            raise AuthError("Password recovery failed")
+        token_hash = hashlib.sha256(ticket_token.encode()).hexdigest()
+        # The ticket check, MFA/backup-code consume, password write, and session
+        # revocation share one write transaction. A completed ticket can never be
+        # replayed, even by concurrent requests.
+        with self._store.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            ticket = connection.execute(
+                "SELECT * FROM api_sessions WHERE token_hash = ?", (token_hash,)
+            ).fetchone()
+            if (
+                ticket is None
+                or bool(ticket["revoked"])
+                or str(ticket["scope"] or "") != "password_recovery"
+                or (ticket["expires_at"] and _parse(str(ticket["expires_at"])) <= _now())
+                or (ticket["absolute_expires_at"] and _parse(str(ticket["absolute_expires_at"])) <= _now())
+            ):
+                raise AuthError("Password recovery failed")
+            principal_id = str(ticket["principal_id"])
+            account = connection.execute(
+                "SELECT * FROM account_credentials WHERE principal_id = ?", (principal_id,)
+            ).fetchone()
+            principal = connection.execute(
+                "SELECT is_active FROM principals WHERE principal_id = ?", (principal_id,)
+            ).fetchone()
+            if account is None or principal is None or not bool(principal["is_active"]) or not bool(account["mfa_enrolled"]):
+                raise AuthError("Password recovery failed")
+            # This call resets the password, so its code gate needs the same
+            # lockout `login` has. Without it one ticket absorbs unlimited
+            # guesses against a 6-digit TOTP — and `valid_window=1` keeps three
+            # codes live at once — which is a takeover primitive, not a
+            # nuisance. The counter is shared with `login`, so a locked account
+            # is locked for both.
+            locked_until = account["locked_until"]
+            if locked_until and _parse(str(locked_until)) > _now():
+                raise AuthError("Password recovery failed")
+            blob = account["mfa_secret_encrypted"]
+            verified = False
+            if blob is not None:
+                verified = mfa.verify_totp(mfa.decrypt_secret(self._workspace_root, blob), code)
+            if not verified and account["backup_codes_hashed"]:
+                verified, updated = mfa.consume_backup_code(account["backup_codes_hashed"], code)
+                if verified:
+                    connection.execute(
+                        "UPDATE account_credentials SET backup_codes_hashed = ? WHERE principal_id = ?",
+                        (updated, principal_id),
+                    )
+            if not verified:
+                # The counter has to outlive the raise, and raising inside the
+                # transaction would roll it back — so commit it first. A failed
+                # attempt must cost the attacker something even though nothing
+                # else about this call is allowed to persist.
+                attempts = int(account["failed_attempts"] or 0) + 1
+                lock_at = (
+                    (_now() + timedelta(seconds=LOCKOUT_SECONDS)).isoformat(timespec="seconds")
+                    if attempts >= LOCKOUT_THRESHOLD
+                    else None
+                )
+                connection.execute(
+                    "UPDATE account_credentials SET failed_attempts = ?, locked_until = ? "
+                    "WHERE principal_id = ?",
+                    (attempts, lock_at, principal_id),
+                )
+                connection.execute("COMMIT")
+                raise AuthError("Password recovery failed")
+            encoded, algo = passwords.hash_password(new_password)
+            connection.execute(
+                "UPDATE account_credentials SET password_hash = ?, hash_algo = ?, updated_at = ?, "
+                "failed_attempts = 0, locked_until = NULL WHERE principal_id = ?",
+                (encoded, algo, utc_now(), principal_id),
+            )
+            connection.execute("UPDATE api_sessions SET revoked = 1 WHERE principal_id = ?", (principal_id,))
+
     def grant_elevated(
         self, principal_id: str, password: str | None = None, mfa_code: str | None = None
     ) -> str:
         account = self._store.get_account(principal_id)
         if account is None:
+            raise AuthError(GENERIC_AUTH_ERROR)
+        if not self._account_principal_is_active(principal_id):
             raise AuthError(GENERIC_AUTH_ERROR)
         password_ok = password is not None and passwords.verify_password(
             password, account["password_hash"], account["hash_algo"]
@@ -205,16 +314,24 @@ class AccountService:
         uri = mfa.provisioning_uri(secret, account["username"])
         return secret, uri, codes
 
-    def activate_mfa(self, principal_id: str, code: str) -> None:
-        account = self._store.get_account(principal_id)
-        if account is None or account["mfa_secret_encrypted"] is None:
-            raise AuthError("MFA enrollment not started")
-        secret = mfa.decrypt_secret(self._workspace_root, account["mfa_secret_encrypted"])
-        if not mfa.verify_totp(secret, code):
-            raise AuthError("Invalid verification code")
-        self._store.set_account_mfa(
-            principal_id, True, account["mfa_secret_encrypted"], account["backup_codes_hashed"]
-        )
+    def activate_mfa(self, principal_id: str, code: str, keep_session_id: str = "") -> None:
+        with self._store.connect() as connection:
+            account = connection.execute(
+                "SELECT * FROM account_credentials WHERE principal_id = ?", (principal_id,)
+            ).fetchone()
+            if account is None or account["mfa_secret_encrypted"] is None:
+                raise AuthError("MFA enrollment not started")
+            secret = mfa.decrypt_secret(self._workspace_root, account["mfa_secret_encrypted"])
+            if not mfa.verify_totp(secret, code):
+                raise AuthError("Invalid verification code")
+            connection.execute(
+                "UPDATE account_credentials SET mfa_enrolled = 1, updated_at = ? WHERE principal_id = ?",
+                (utc_now(), principal_id),
+            )
+            connection.execute(
+                "UPDATE api_sessions SET revoked = 1 WHERE principal_id = ? AND session_id != ?",
+                (principal_id, keep_session_id),
+            )
 
     def mfa_enrolled(self, principal_id: str) -> bool:
         account = self._store.get_account(principal_id)
@@ -227,10 +344,22 @@ class AccountService:
         return self._check_mfa(account, code)
 
     def disable_mfa(self, principal_id: str, keep_session_id: str = "") -> None:
-        self._store.set_account_mfa(principal_id, False, None, None)
-        self._sessions.revoke_others_for_principal(principal_id, keep_session_id)
+        with self._store.connect() as connection:
+            connection.execute(
+                "UPDATE account_credentials SET mfa_enrolled = 0, mfa_secret_encrypted = NULL, "
+                "backup_codes_hashed = NULL, updated_at = ? WHERE principal_id = ?",
+                (utc_now(), principal_id),
+            )
+            connection.execute(
+                "UPDATE api_sessions SET revoked = 1 WHERE principal_id = ? AND session_id != ?",
+                (principal_id, keep_session_id),
+            )
 
     # ── Internals ───────────────────────────────────────────────────────────
+    def _account_principal_is_active(self, principal_id: str) -> bool:
+        principal = self._store.get_principal(principal_id)
+        return bool(principal and principal["is_active"])
+
     def _issue_control_session(self, principal_id: str, device_label: str | None) -> str:
         token, _ = self._sessions.create_session(
             principal_id,
@@ -268,10 +397,34 @@ class AccountService:
             secret = mfa.decrypt_secret(self._workspace_root, blob)
             if mfa.verify_totp(secret, code):
                 return True
-        hashed = account.get("backup_codes_hashed")
-        if hashed:
-            ok, updated = mfa.consume_backup_code(hashed, code)
-            if ok:
-                self._store.set_account_mfa(account["principal_id"], True, blob, updated)
+        # A backup code is single-use, so the read, the consume, and the write
+        # have to be one atomic step. `account` is a snapshot taken before this
+        # call, so re-read the list under the writer lock: concurrent callers
+        # otherwise all consume from the same stale list, every racer is granted,
+        # and the last write restores a code another thread already spent.
+        # `verify_mfa` claims its ticket the same way; this is the shared path
+        # `grant_elevated` and `verify_mfa_code` reach.
+        principal_id = str(account["principal_id"])
+        with self._store.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT backup_codes_hashed FROM account_credentials WHERE principal_id = ?",
+                    (principal_id,),
+                ).fetchone()
+                hashed = row["backup_codes_hashed"] if row is not None else None
+                if not hashed:
+                    connection.execute("ROLLBACK")
+                    return False
+                ok, updated = mfa.consume_backup_code(str(hashed), code)
+                if not ok:
+                    connection.execute("ROLLBACK")
+                    return False
+                connection.execute(
+                    "UPDATE account_credentials SET backup_codes_hashed = ? WHERE principal_id = ?",
+                    (updated, principal_id),
+                )
                 return True
-        return False
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise

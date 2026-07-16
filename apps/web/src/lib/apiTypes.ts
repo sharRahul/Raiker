@@ -471,3 +471,11 @@ export interface InstanceLaunchResult {
   name: string;
   url: string;
 }
+
+/** Local-only password recovery acknowledgement. The opaque ticket is issued
+ * for known and unknown usernames alike; only a valid short-lived ticket plus
+ * TOTP/backup code can complete a reset. */
+export interface PasswordRecoveryBeginResult {
+  ok: boolean;
+  ticket: string;
+}

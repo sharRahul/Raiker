@@ -18,6 +18,7 @@ import type {
   MemoryControlView,
   MemorySettingsView,
   ModelsView,
+  PasswordRecoveryBeginResult,
   ProjectDetail,
   ProjectTreeNode,
   ProjectsList,
@@ -168,6 +169,15 @@ export const auth = {
     postJson<LoginResult>("/api/auth/login", { username, password }).then(adoptSession),
   verifyMfa: (ticket: string, code: string) =>
     postJson<LoginResult>("/api/auth/mfa/verify", { ticket, code }).then(adoptSession),
+  bootstrapStatus: () => request<{ can_register: boolean }>("/api/auth/bootstrap-status"),
+  beginPasswordRecovery: (username: string) =>
+    postJson<PasswordRecoveryBeginResult>("/api/auth/password-recovery/begin", { username }),
+  completePasswordRecovery: (ticket: string, code: string, newPassword: string) =>
+    postJson<{ ok: boolean }>("/api/auth/password-recovery/complete", {
+      ticket,
+      code,
+      new_password: newPassword,
+    }),
   logout: async () => {
     try {
       await postJson<{ ok: boolean }>("/api/auth/logout", {});

@@ -29,6 +29,7 @@ from raiker.api.security import (
     MaxBodySizeMiddleware,
     RateLimitMiddleware,
     SecurityHeadersMiddleware,
+    StaticCacheMiddleware,
 )
 from raiker.runtime.attachments import MAX_ATTACHMENT_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
@@ -247,10 +248,13 @@ def create_app(
     # dashboard launches with one command and the SPA's relative /api paths resolve directly.
     # Mounted LAST so the /api routes above keep precedence; skipped when no build is present
     # (API-only mode is unchanged). The SPA uses hash routing, so html=True at "/" is sufficient.
+    # StaticCacheMiddleware sets Cache-Control so a rebuilt index.html is always revalidated
+    # (the HTML shell must not be heuristically cached, or the browser keeps loading the old
+    # hashed JS bundle after a rebuild).
     if ui_dir is not None:
         ui_path = Path(ui_dir)
         if ui_path.is_dir() and (ui_path / "index.html").is_file():
-            app.mount("/", StaticFiles(directory=ui_path, html=True), name="web-ui")
+            app.mount("/", StaticCacheMiddleware(StaticFiles(directory=ui_path, html=True)), name="web-ui")
     for instance_name in _stored_instance_names(app.state.workspace_root):
         workspace = app.state.workspace_root / ".raiker" / "instances" / instance_name
         if workspace.is_dir():

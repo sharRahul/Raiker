@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 PHASE_1_MIGRATION_ID = "RAIKER-0201-phase1-bootstrap"
+LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID = "RAIKER-2021-legacy-account-bootstrap-roles"
+OWNED_CONTEXT_DATA_MIGRATION_ID = "RAIKER-2022-owned-context-data"
+OWNED_MEMORY_METADATA_MIGRATION_ID = "RAIKER-2023-owned-memory-metadata"
 
 PHASE_1_SQL = """
 PRAGMA journal_mode = WAL;
@@ -1492,4 +1495,96 @@ CREATE TABLE IF NOT EXISTS memory_job_rate_windows (
   job_type TEXT NOT NULL, window_started_at TEXT NOT NULL, count INTEGER NOT NULL,
   PRIMARY KEY(job_type, window_started_at)
 );
+"""
+
+# Owner isolation for durable prompt inputs.  The columns are additive so an
+# existing encrypted workspace can be upgraded in place; SQLiteStore assigns
+# old unattributed rows only to the original account during this migration.
+OWNED_CONTEXT_DATA_SQL = """
+ALTER TABLE approved_memory ADD COLUMN owner_principal_id TEXT;
+ALTER TABLE vector_records ADD COLUMN owner_principal_id TEXT;
+ALTER TABLE attachments ADD COLUMN owner_principal_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_approved_memory_owner ON approved_memory(owner_principal_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_vector_records_owner ON vector_records(owner_principal_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_attachments_owner ON attachments(owner_principal_id, created_at);
+"""
+
+OWNED_MEMORY_METADATA_SQL = """
+ALTER TABLE memory_candidates ADD COLUMN owner_principal_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_memory_candidates_owner ON memory_candidates(owner_principal_id, created_at);
+"""
+
+# Account-scoped control plane. Legacy tables remain readable for the terminal
+# client, but authenticated instance users read/write only these keyed rows.
+PRINCIPAL_CONTROL_SCOPE_MIGRATION_ID = "RAIKER-2022-principal-control-scope"
+PRINCIPAL_CONTROL_SCOPE_SQL = """
+CREATE TABLE IF NOT EXISTS principal_model_control (
+  principal_id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL,
+  model TEXT,
+  reasoning_enabled INTEGER NOT NULL DEFAULT 0,
+  reasoning_effort TEXT,
+  reasoning_mode TEXT,
+  reasoning_budget_tokens INTEGER,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS principal_model_fallback_sequence (
+  principal_id TEXT PRIMARY KEY,
+  profile_ids_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS principal_model_advisor (
+  principal_id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS principal_runtime_mode_state (
+  principal_id TEXT PRIMARY KEY,
+  mode_name TEXT NOT NULL,
+  status TEXT NOT NULL,
+  activated_by TEXT,
+  activated_at TEXT,
+  reason TEXT,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS principal_capability_gate_state (
+  principal_id TEXT NOT NULL,
+  capability TEXT NOT NULL,
+  state TEXT NOT NULL,
+  requested_by TEXT,
+  requested_at TEXT,
+  activated_by TEXT,
+  activated_at TEXT,
+  reason TEXT,
+  readiness_snapshot_json TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, capability)
+);
+CREATE TABLE IF NOT EXISTS principal_capability_decision_mode (
+  principal_id TEXT NOT NULL,
+  capability TEXT NOT NULL,
+  decision_mode TEXT NOT NULL,
+  set_by TEXT,
+  set_at TEXT,
+  reason TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, capability)
+);
+CREATE TABLE IF NOT EXISTS instance_account_guard (
+  singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+  principal_id TEXT NOT NULL
+);
+"""
+
+BRAIN_SOURCES_MIGRATION_ID = "RAIKER-2023-owner-brain-sources"
+BRAIN_SOURCES_SQL = """
+CREATE TABLE IF NOT EXISTS brain_sources (
+  owner_principal_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, path)
+);
+CREATE INDEX IF NOT EXISTS idx_brain_sources_owner ON brain_sources(owner_principal_id, created_at);
 """

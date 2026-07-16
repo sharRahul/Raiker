@@ -37,6 +37,7 @@ class MemoryEntry:
     supersedes_memory_id: str | None = None
     superseded_at: str | None = None
     remembered_reason: str | None = None
+    owner_principal_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -97,6 +98,7 @@ def _encode_frontmatter(entry: MemoryEntry) -> str:
         "supersedes_memory_id": entry.supersedes_memory_id,
         "superseded_at": entry.superseded_at,
         "remembered_reason": entry.remembered_reason,
+        "owner_principal_id": entry.owner_principal_id,
     }
     return json.dumps(meta, sort_keys=True)
 
@@ -123,12 +125,14 @@ def write_memory(
     source: str = "agent",
     store: SQLiteStore | None = None,
     governance: MemoryGovernance | None = None,
+    owner_principal_id: str | None = None,
 ) -> MemoryEntry:
     if governance is None:
         raise PermissionError("memory_write_requires_governed_path")
     mem_dir = _memory_dir(workspace_root)
     sensitivity = classify_memory_sensitivity(text)
     memory_id = new_id("mem_")
+    owner = owner_principal_id or (store.original_account_principal_id() if store is not None else None) or governance.created_by
     entry = MemoryEntry(
         memory_id=memory_id,
         text=text,
@@ -150,6 +154,7 @@ def write_memory(
         retention=governance.retention,
         approval_state=governance.approval_state,
         created_by=governance.created_by,
+        owner_principal_id=owner,
     )
     content = _encode_frontmatter(entry) + "\n" + text
     _entry_path(mem_dir, memory_id).write_text(content, encoding="utf-8")
@@ -165,9 +170,10 @@ def search_memory(
     scope: str | None = None,
     max_results: int = 20,
     store: SQLiteStore | None = None,
+    owner_principal_id: str | None = None,
 ) -> list[MemoryEntry]:
     if store is not None:
-        return [_entry_from_row(row) for row in store.search_approved_memory(query, scope=scope, limit=max_results)]
+        return [_entry_from_row(row) for row in store.search_approved_memory(query, scope=scope, limit=max_results, owner_principal_id=owner_principal_id)]
     query_lower = query.lower()
     results: list[MemoryEntry] = []
     mem_dir = _memory_dir(workspace_root)
@@ -209,10 +215,13 @@ def search_memory(
             valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
             supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
             remembered_reason=meta.get("remembered_reason"),
+            owner_principal_id=str(meta.get("owner_principal_id", "")),
         )
         if entry.deleted_at is not None or entry.archived_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
             continue
         if scope is not None and entry.scope != scope:
+            continue
+        if owner_principal_id and entry.owner_principal_id != owner_principal_id:
             continue
         if entry.search_enabled and (query_lower in body.lower() or query_lower in str(meta.get("tags", []))):
             results.append(entry)
@@ -225,6 +234,7 @@ def forget_memory(
     workspace_root: str | Path = ".",
     store: SQLiteStore | None = None,
     governance: MemoryForgetGovernance | None = None,
+    owner_principal_id: str | None = None,
 ) -> bool:
     if governance is None:
         raise PermissionError("memory_forget_requires_governed_path")
@@ -247,6 +257,8 @@ def forget_memory(
     except OSError:
         return False
     meta, _ = _decode_frontmatter(content)
+    if owner_principal_id and str(meta.get("owner_principal_id", "")) != owner_principal_id:
+        return False
     now = utc_now()
     tombstone = MemoryEntry(
         memory_id=str(meta.get("memory_id") or memory_id),
@@ -276,19 +288,21 @@ def forget_memory(
         created_by=str(meta.get("created_by", governance.deleted_by)),
         updated_at=now,
         deleted_at=now,
+        owner_principal_id=str(meta.get("owner_principal_id") or owner_principal_id or governance.deleted_by),
     )
     target.write_text(_encode_frontmatter(tombstone) + "\n", encoding="utf-8")
     if store is not None:
-        store.mark_approved_memory_forgotten(memory_id, deleted_at=now, updated_at=now)
+        store.mark_approved_memory_forgotten(memory_id, deleted_at=now, updated_at=now, owner_principal_id=owner_principal_id)
         store.deactivate_memory_projections(memory_id)
     return True
 
 
 def set_memory_archived(
-    memory_id: str, *, archived: bool, workspace_root: str | Path = ".", store: SQLiteStore | None = None
+    memory_id: str, *, archived: bool, workspace_root: str | Path = ".", store: SQLiteStore | None = None,
+    owner_principal_id: str | None = None,
 ) -> MemoryEntry | None:
     """Archive/restore a memory without changing its content or provenance."""
-    entry = get_memory(memory_id, workspace_root=workspace_root, include_expired=True, include_archived=True)
+    entry = get_memory(memory_id, workspace_root=workspace_root, include_expired=True, include_archived=True, owner_principal_id=owner_principal_id)
     if entry is None:
         return None
     updated = replace(entry, archived_at=utc_now() if archived else None, updated_at=utc_now())
@@ -296,7 +310,7 @@ def set_memory_archived(
         _encode_frontmatter(updated) + "\n" + updated.text, encoding="utf-8"
     )
     if store is not None:
-        store.set_approved_memory_archived(memory_id, archived_at=updated.archived_at, updated_at=updated.updated_at)
+        store.set_approved_memory_archived(memory_id, archived_at=updated.archived_at, updated_at=updated.updated_at, owner_principal_id=owner_principal_id)
         store.set_memory_projections_active(memory_id, not archived)
     return updated
 
@@ -308,12 +322,13 @@ def list_memory(
     limit: int = 50,
     store: SQLiteStore | None = None,
     include_search_disabled: bool = False,
+    owner_principal_id: str | None = None,
 ) -> list[MemoryEntry]:
     if store is not None:
         return [
             _entry_from_row(row)
             for row in store.list_approved_memory(
-                scope=scope, limit=limit, include_search_disabled=include_search_disabled
+                scope=scope, limit=limit, include_search_disabled=include_search_disabled, owner_principal_id=owner_principal_id
             )
         ]
     results: list[MemoryEntry] = []
@@ -355,10 +370,13 @@ def list_memory(
             valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
             supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
             remembered_reason=meta.get("remembered_reason"),
+            owner_principal_id=str(meta.get("owner_principal_id", "")),
         )
         if entry.deleted_at is not None or entry.archived_at is not None or (entry.expires_at is not None and entry.expires_at <= utc_now()):
             continue
         if scope is not None and entry.scope != scope:
+            continue
+        if owner_principal_id and entry.owner_principal_id != owner_principal_id:
             continue
         results.append(entry)
     return results
@@ -370,6 +388,7 @@ def get_memory(
     workspace_root: str | Path = ".",
     include_expired: bool = False,
     include_archived: bool = False,
+    owner_principal_id: str | None = None,
 ) -> MemoryEntry | None:
     mem_dir = _memory_dir(workspace_root)
     path = _entry_path(mem_dir, memory_id)
@@ -403,7 +422,10 @@ def get_memory(
             valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
             supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
             remembered_reason=meta.get("remembered_reason"),
+            owner_principal_id=str(meta.get("owner_principal_id", "")),
         )
+        if owner_principal_id and entry.owner_principal_id != owner_principal_id:
+            return None
         if entry.deleted_at is not None or (not include_archived and entry.archived_at is not None) or (
             not include_expired and entry.expires_at is not None and entry.expires_at <= utc_now()
         ):
@@ -440,7 +462,10 @@ def get_memory(
                 valid_from=meta.get("valid_from"), valid_until=meta.get("valid_until"),
                 supersedes_memory_id=meta.get("supersedes_memory_id"), superseded_at=meta.get("superseded_at"),
                 remembered_reason=meta.get("remembered_reason"),
+                owner_principal_id=str(meta.get("owner_principal_id", "")),
             )
+            if owner_principal_id and entry.owner_principal_id != owner_principal_id:
+                return None
             if entry.deleted_at is not None or (
                 not include_expired and entry.expires_at is not None and entry.expires_at <= utc_now()
             ):
@@ -454,8 +479,9 @@ def update_memory(
     search_enabled: bool | None = None, expires_at: str | None = None,
     update_expires_at: bool = False,
     store: SQLiteStore | None = None,
+    owner_principal_id: str | None = None,
 ) -> MemoryEntry | None:
-    entry = get_memory(memory_id, workspace_root=workspace_root, include_expired=True)
+    entry = get_memory(memory_id, workspace_root=workspace_root, include_expired=True, owner_principal_id=owner_principal_id)
     if entry is None:
         return None
     updated = replace(
@@ -477,22 +503,33 @@ def update_memory(
 def correct_memory(
     memory_id: str, text: str, *, workspace_root: str | Path = ".", store: SQLiteStore,
     governance: MemoryGovernance, remembered_reason: str,
+    owner_principal_id: str | None = None,
 ) -> MemoryEntry | None:
-    """Create a replacement fact, preserving the corrected record as evidence."""
-    original = get_memory(memory_id, workspace_root=workspace_root, include_expired=True, include_archived=True)
+    """Create a replacement fact, preserving the corrected record as evidence.
+
+    ``owner_principal_id`` scopes the correction to one account's memory, like
+    every other read here. It is deliberately not ``governance.created_by``:
+    that field attributes *who wrote* the record ("agent", "human") and is not
+    a principal id, so scoping on it would refuse corrections to the caller's
+    own memory.
+    """
+    original = get_memory(memory_id, workspace_root=workspace_root, include_expired=True, include_archived=True, owner_principal_id=owner_principal_id)
     if original is None or not text.strip() or not remembered_reason.strip():
         return None
     replacement = write_memory(
         text, workspace_root=workspace_root, scope=original.scope, source_event_id=governance.source_event_id,
         memory_type=original.memory_type, tags=original.tags, source="human_correction", store=store,
         governance=governance,
+        owner_principal_id=owner_principal_id,
     )
     replacement = replace(replacement, remembered_reason=remembered_reason.strip(), supersedes_memory_id=memory_id)
     _entry_path(_memory_dir(workspace_root), replacement.memory_id).write_text(
         _encode_frontmatter(replacement) + "\n" + replacement.text, encoding="utf-8"
     )
     store.update_approved_memory(replacement)
-    if not store.supersede_approved_memory(memory_id, replacement.memory_id, at=utc_now()):
+    if not store.supersede_approved_memory(
+        memory_id, replacement.memory_id, at=utc_now(), owner_principal_id=owner_principal_id
+    ):
         return None
     return replacement
 
@@ -511,6 +548,7 @@ def _entry_from_row(row: dict[str, Any]) -> MemoryEntry:
         valid_from=row["valid_from"], valid_until=row["valid_until"],
         supersedes_memory_id=row["supersedes_memory_id"], superseded_at=row["superseded_at"],
         remembered_reason=row["remembered_reason"],
+        owner_principal_id=str(row.get("owner_principal_id") or ""),
     )
 
 

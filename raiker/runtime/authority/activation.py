@@ -218,7 +218,11 @@ def evaluate_activation_requirement(
         return f"{ACTIVATION_BLOCKED_NEEDS_HUMAN_CONFIRMATION}:{capability}"
 
     if target_state == CapabilityState.ENABLED_RUNTIME.value:
-        active_mode = store.get_active_runtime_mode()
+        active_mode = (
+            store.get_principal_runtime_mode(principal.principal_id)
+            if store.get_account(principal.principal_id) is not None
+            else store.get_active_runtime_mode()
+        )
         mode_name = active_mode["mode_name"] if active_mode else "development_preview"
         if mode_name not in req.requires_runtime_mode:
             return f"{ACTIVATION_BLOCKED_RUNTIME_MODE_NOT_ACTIVE}:{capability} (needs {req.requires_runtime_mode})"

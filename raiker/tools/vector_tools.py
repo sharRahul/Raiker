@@ -6,7 +6,9 @@ from typing import Any
 from raiker.storage.sqlite import SQLiteStore
 
 
-def vector_get(workspace_root: str | Path, vector_id: str) -> dict[str, Any]:
+def vector_get(
+    workspace_root: str | Path, vector_id: str, *, owner_principal_id: str | None = None
+) -> dict[str, Any]:
     """Resolve a ``vector_id`` (e.g. from ``vector_embedding_runtime`` search
     results) to its stored record — the read half of the embed → store → search →
     retrieve loop.
@@ -20,7 +22,9 @@ def vector_get(workspace_root: str | Path, vector_id: str) -> dict[str, Any]:
     """
     if not isinstance(vector_id, str) or not vector_id.strip():
         return {"status": "failed", "error": {"type": "missing_argument", "message": "vector_id is required."}}
-    record = SQLiteStore(workspace_root).get_vector_record(vector_id)
+    record = SQLiteStore(workspace_root).get_vector_record(
+        vector_id, owner_principal_id=owner_principal_id
+    )
     if record is None:
         return {
             "status": "failed",

@@ -44,7 +44,8 @@ class GithubConnectorExecutor:
 
         operation = str(action.arguments.get("operation", "read")).strip()
         service = GithubConnectorService(
-            self._workspace_root, self._store, fetch_fn=self._fetch_fn
+            self._workspace_root, self._store, fetch_fn=self._fetch_fn,
+            principal_id=principal.principal_id if principal is not None else action.principal_id,
         )
         if operation == "create_comment":
             outcome = service.create_comment(
@@ -143,7 +144,8 @@ class GmailConnectorExecutor:
             return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
 
         service = GmailConnectorService(
-            self._workspace_root, self._store, fetch_fn=self._fetch_fn
+            self._workspace_root, self._store, fetch_fn=self._fetch_fn,
+            principal_id=principal.principal_id if principal is not None else action.principal_id,
         )
         outcome = service.read(
             str(action.arguments.get("resource", "")),
@@ -208,7 +210,10 @@ class GcalConnectorExecutor:
         if operation != "read":
             return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
 
-        service = GcalConnectorService(self._workspace_root, self._store, fetch_fn=self._fetch_fn)
+        service = GcalConnectorService(
+            self._workspace_root, self._store, fetch_fn=self._fetch_fn,
+            principal_id=principal.principal_id if principal is not None else action.principal_id,
+        )
         outcome = service.read(
             str(action.arguments.get("resource", "")),
             str(action.arguments.get("calendar_id", "")),
@@ -274,7 +279,10 @@ class SlackConnectorExecutor:
         if operation != "read":
             return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
 
-        service = SlackConnectorService(self._workspace_root, self._store, fetch_fn=self._fetch_fn)
+        service = SlackConnectorService(
+            self._workspace_root, self._store, fetch_fn=self._fetch_fn,
+            principal_id=principal.principal_id if principal is not None else action.principal_id,
+        )
         outcome = service.read(
             str(action.arguments.get("resource", "")),
             str(action.arguments.get("channel", "")),

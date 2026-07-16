@@ -108,6 +108,14 @@ class ApiSessionStore:
             )
             return cursor.rowcount
 
+    def revoke_all_for_principal(self, principal_id: str) -> int:
+        with self._store.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE api_sessions SET revoked = 1 WHERE principal_id = ? AND revoked = 0",
+                (principal_id,),
+            )
+            return cursor.rowcount
+
     def touch(self, session_id: str, when: str) -> None:
         with self._store.connect() as connection:
             connection.execute(

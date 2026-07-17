@@ -160,6 +160,18 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     for cap in ("scheduled_routines",):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Scheduler storage, owner consent, budget.")
+    # Governed local stdio MCP builder + connector (Control Deck task 4): both
+    # run on the local single-user machine. The builder writes a reviewed
+    # workspace-relative server template; the connector runs a bounded JSON-RPC
+    # stdio session against an owner-allowlisted local interpreter. No remote
+    # transport / OAuth. See docs/threat-models/mcp-builder.md and
+    # docs/threat-models/mcp-connector.md.
+    r["mcp_builder_runtime"] = _req(
+        "mcp_builder_runtime", "5", threat_ack=True, human_confirm=True,
+        notes="Local stdio MCP server template write; workspace-relative path, reviewed template only.")
+    r["mcp_connector_runtime"] = _req(
+        "mcp_connector_runtime", "5", threat_ack=True, human_confirm=True,
+        notes="Bounded local stdio MCP session; interpreter allowlist, workspace-relative args, redacted output.")
 
     # Tier 6
     for cap in ("email_runtime", "calendar_runtime", "reminder_runtime",

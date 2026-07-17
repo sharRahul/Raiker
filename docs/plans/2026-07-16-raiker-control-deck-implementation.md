@@ -255,7 +255,7 @@ Result 2026-07-17: `EXIT=0`, 44 passed. A live end-to-end drive (rename → arch
 
 **Does NOT cover:** Remote HTTP MCP transport, OAuth discovery, arbitrary shell commands, and execution of unreviewed MCP tools are excluded. Local stdio commands are owner-configured, workspace-scoped, allowlisted, and approval-governed.
 
-- [ ] **Step 1: Load `mcp-builder` and current official Python SDK documentation; write failing tests first** for disabled capability denial, command validation, owner isolation, safe server-template creation, and redacted audit metadata.
+- [x] **Step 1: Load `mcp-builder` and current official Python SDK documentation; write failing tests first** for disabled capability denial, command validation, owner isolation, safe server-template creation, and redacted audit metadata.
 
 ```python
 def test_mcp_connector_denies_unapproved_command(workspace: Path) -> None:
@@ -263,13 +263,23 @@ def test_mcp_connector_denies_unapproved_command(workspace: Path) -> None:
     assert outcome["error"]["type"] == "mcp_command_not_allowlisted"
 ```
 
-- [ ] **Step 2: Verify RED**
+> Landed as `tests/test_mcp_runtime.py` (22 tests). The MCP wire protocol is
+> implemented **directly over the documented JSON-RPC stdio format**, with no
+> third-party `mcp` SDK dependency, so the runtime stays hermetic/local-only and
+> `pyproject.toml` was intentionally left unchanged. The generated
+> `python-stdio-echo` template speaks the same wire format, making the
+> builder+connector testable end-to-end with no network. Executors return the
+> repo's `ExecutionResult` (not the illustrative `ExecutorResult.error`).
+
+- [x] **Step 2: Verify RED**
 
 Run: `python -m pytest tests/test_mcp_runtime.py -q`
 
 Expected: imports/endpoints are missing.
 
-- [ ] **Step 3: Add `mcp_builder_runtime` and `mcp_connector_runtime` as real capabilities** and map `mcp_server_create`, `mcp_connect`, `mcp_list_tools`, and `mcp_call_tool` through `CAPABILITY_GATE_MAP`.
+Result 2026-07-17: RED confirmed — `ModuleNotFoundError: raiker.runtime.executors.mcp`.
+
+- [x] **Step 3: Add `mcp_builder_runtime` and `mcp_connector_runtime` as real capabilities** and map `mcp_server_create`, `mcp_connect`, `mcp_list_tools`, and `mcp_call_tool` through `CAPABILITY_GATE_MAP`.
 
 Append these exact entries to the existing `REAL_EXECUTOR_CAPABILITIES` literal:
 
@@ -278,7 +288,14 @@ Append these exact entries to the existing `REAL_EXECUTOR_CAPABILITIES` literal:
     "mcp_connector_runtime",
 ```
 
-- [ ] **Step 4: Implement local MCP server creation and connection** using the documented MCP SDK, validated workspace-relative output paths, a fixed allowlisted executable registry, bounded stdio payloads/timeouts, and redacted event fields.
+> Done: both caps added to `REAL_EXECUTOR_CAPABILITIES`, `RUNTIME_DOMAIN_CAPABILITIES`,
+> the Tier-5 executed-caps group (full readiness → ship `ENABLED_RUNTIME`), the
+> `activation.py` requirement registry (threat_ack + human_confirm), the four
+> action types + two self-maps in `CAPABILITY_GATE_MAP`, and the four action
+> types in the policy `approval_required_actions`. New id prefix `mcp_`. Threat
+> models: `docs/threat-models/mcp-builder.md`, `docs/threat-models/mcp-connector.md`.
+
+- [x] **Step 4: Implement local MCP server creation and connection** using the documented MCP SDK, validated workspace-relative output paths, a fixed allowlisted executable registry, bounded stdio payloads/timeouts, and redacted event fields.
 
 ```python
 if not command or command[0] not in allowed_commands:
@@ -287,11 +304,25 @@ if any(Path(part).is_absolute() for part in command[1:]):
     return ExecutorResult.error("mcp_argument_path_not_workspace_relative")
 ```
 
-- [ ] **Step 5: Verify GREEN**
+> Landed in `raiker/runtime/executors/mcp.py`: `McpBuilderExecutor`
+> (`mcp_server_create`) writes a reviewed template to a workspace-relative path
+> (absolute/`..` escape rejected) and records an owner-scoped `mcp_servers` row;
+> `McpConnectorExecutor` (`mcp_connect`/`mcp_list_tools`/`mcp_call_tool`)
+> validates the interpreter allowlist + workspace-relative args, then runs a
+> bounded `subprocess.Popen`+`communicate` JSON-RPC stdio session (≤60 s, ≤200 KB)
+> and returns **redacted metadata only** (tool names/count; content length +
+> redaction flag — never raw content). Storage: migration
+> `RAIKER-1016-mcp-server-profiles` + owner-scoped CRUD. Owner-scoped read:
+> `GET /api/mcp/servers` (`McpServerView`); building/connecting stays a governed
+> runtime action, not a REST mutation.
+
+- [x] **Step 5: Verify GREEN**
 
 Run: `python -m pytest tests/test_mcp_runtime.py tests/test_executor_default_registry.py tests/test_connector_tool_policy.py -q`
 
 Expected: only authenticated owner-approved, capability-enabled local stdio MCP operations complete; all other paths fail closed.
+
+Result 2026-07-17: `EXIT=0`, 31 passed (the referenced trio). Static/regression gates on the same tree: `ruff` clean, `mypy` 421 files clean, all five repo validators PASS. A live end-to-end drive against a fresh temp workspace (build → connect → list tools → redacted tool call with a secret payload → fail-closed on unallowlisted command / absolute-path arg / disabled gate → owner-scoped `GET /api/mcp/servers` hiding another principal's server) all behaved correctly; the running web app was screenshotted for regression. Full-suite result recorded in HANDOFF.
 
 ### Task 5: Add Credential Lifecycle, Breach Detection, and Self-Monitoring
 

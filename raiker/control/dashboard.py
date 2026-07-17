@@ -69,6 +69,26 @@ class SessionView:
 
 
 @dataclass(frozen=True)
+class McpServerView:
+    """Owner-scoped view of one local stdio MCP server profile (Control Deck
+    task 4). ``command`` is the argv (interpreter + workspace-relative script);
+    it is never a secret or a remote endpoint. Read-only — building or
+    connecting a server is a governed runtime action, not a REST mutation."""
+
+    server_id: str
+    name: str
+    command: tuple[str, ...]
+    template: str | None
+    transport: str
+    status: str
+    created_at: str
+    last_connected_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class TurnView:
     turn_id: str
     session_id: str
@@ -876,6 +896,26 @@ class DashboardService:
         return ControlResult(
             ok=True, data={"session_id": session_id, "archived": archived}
         )
+
+    # ── Governed local MCP server profiles (Control Deck task 4) ─────────────
+    def list_mcp_servers(self, principal_id: str) -> list[McpServerView]:
+        """Owner-scoped, read-only list of the caller's local MCP server
+        profiles. Building or connecting a server is a governed runtime action
+        (through the authority/executor path), never a plain REST mutation, so
+        this surface is read-only by design."""
+        return [
+            McpServerView(
+                server_id=str(row["server_id"]),
+                name=str(row["name"]),
+                command=tuple(str(part) for part in row.get("command", [])),
+                template=row.get("template"),
+                transport=str(row.get("transport", "stdio")),
+                status=str(row.get("status", "created")),
+                created_at=str(row.get("created_at", "")),
+                last_connected_at=row.get("last_connected_at"),
+            )
+            for row in self.store.list_mcp_servers(principal_id)
+        ]
 
     def delete_session(
         self, session_id: str, acting_principal_id: str | None

@@ -66,6 +66,11 @@ class StaticPolicyConfig:
             # path executes the exact approved operation once.
             "connector_write",
             "scheduled_routines",
+            # Governed local stdio MCP builder + connector (Control Deck task 4).
+            # Governed inside the tool (capability gate + decision mode +
+            # interpreter allowlist + workspace-relative path); the executor
+            # runs only after the governed path clears.
+            "mcp_server_create", "mcp_connect", "mcp_list_tools", "mcp_call_tool",
             "subagents", "multi_agent_teams",
             "email_runtime", "calendar_runtime", "reminder_runtime",
             "finance_runtime", "investment_runtime", "medical_runtime",

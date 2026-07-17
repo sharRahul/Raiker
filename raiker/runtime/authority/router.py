@@ -79,6 +79,13 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "connector_gcal_runtime": "connector_gcal_runtime",
     "connector_slack_runtime": "connector_slack_runtime",
     "scheduled_routines": "scheduled_routines",
+    # Governed local stdio MCP builder + connector (Control Deck task 4).
+    "mcp_server_create": "mcp_builder_runtime",
+    "mcp_builder_runtime": "mcp_builder_runtime",
+    "mcp_connect": "mcp_connector_runtime",
+    "mcp_list_tools": "mcp_connector_runtime",
+    "mcp_call_tool": "mcp_connector_runtime",
+    "mcp_connector_runtime": "mcp_connector_runtime",
     "subagents": "subagents",
     "multi_agent_teams": "multi_agent_teams",
     "email_runtime": "email_runtime",

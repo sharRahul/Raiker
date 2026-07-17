@@ -101,6 +101,21 @@ async def list_sessions(
     )
 
 
+@router.get("/api/mcp/servers")
+async def list_mcp_servers(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    """List the authenticated principal's local MCP server profiles.
+
+    Owner-scoped by the acting principal (the creator) — an account never sees
+    another account's servers. Read-only: building or connecting a server is a
+    governed runtime action through the authority/executor path, not a REST
+    mutation, so no create/delete verbs are exposed here.
+    """
+    return serialize_dto(_service(request).list_mcp_servers(auth_data[0].principal_id))
+
+
 @router.get("/api/chat-search")
 async def search_chat_history(
     q: str,

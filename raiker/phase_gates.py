@@ -91,6 +91,8 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "semantic_memory_runtime",
     "vector_embedding_runtime",
     "scheduled_routines",
+    "mcp_builder_runtime",
+    "mcp_connector_runtime",
     "audit_export",
 }
 
@@ -182,7 +184,8 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
                              "private_network_model_runtime", "advisor_model_runtime",
                              "connector_github_runtime", "connector_gmail_runtime",
                              "connector_gcal_runtime", "connector_slack_runtime",
-                             "scheduled_routines")
+                             "scheduled_routines", "mcp_builder_runtime",
+                             "mcp_connector_runtime")
     _TIER6_EXECUTED_CAPS = ("email_runtime", "calendar_runtime", "reminder_runtime",
                              "finance_runtime", "investment_runtime", "medical_runtime",
                              "pregnancy_baby_runtime", "cctv_runtime", "home_security_runtime",

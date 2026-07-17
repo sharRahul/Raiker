@@ -58,6 +58,11 @@ class SessionView:
     # be moved in or out; the project grants nothing and only bounds the
     # context the chat receives.
     project_id: str | None = None
+    # Soft-archive state (Control Deck task 3). Archiving is a reversible
+    # organizing action — it moves a chat out of the default active list but
+    # never deletes transcripts, events, checkpoints, or permissions.
+    archived: bool = False
+    archived_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -597,11 +602,20 @@ class DashboardService:
 
     # ── Sessions / turns ────────────────────────────────────────────────
     def list_sessions(
-        self, limit: int = 50, project_id: str | None = None, user_id: str | None = None
+        self,
+        limit: int = 50,
+        project_id: str | None = None,
+        user_id: str | None = None,
+        include_archived: bool = False,
     ) -> list[SessionView]:
         return [
             self._session_view(row)
-            for row in self.store.list_sessions(limit=limit, project_id=project_id, user_id=user_id)
+            for row in self.store.list_sessions(
+                limit=limit,
+                project_id=project_id,
+                user_id=user_id,
+                include_archived=include_archived,
+            )
         ]
 
     def brain_view(self, *, principal_id: str, user_id: str | None) -> BrainView:
@@ -762,6 +776,105 @@ class DashboardService:
             return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
         return ControlResult(
             ok=True, data={"session_id": session_id, "pinned": pinned}
+        )
+
+    # ── Safe session rename / archive lifecycle (Control Deck task 3) ────────
+    # Renaming and archiving are organizing actions only — they grant nothing
+    # and change no gate, policy, or authority. Both are human-only and respect
+    # the same user/session visibility boundary as set_session_pinned: an
+    # account cannot rename or archive another account's session. Archiving is
+    # reversible and never deletes transcripts, events, checkpoints, or
+    # permissions; deletion remains a separate, confirmed, destructive path.
+
+    _TITLE_MAX_LEN = 200
+
+    def _normalize_title(self, title: str) -> tuple[str | None, str | None]:
+        """Return (normalized_title, reason_code). reason_code is None when the
+        title is acceptable. Trim, collapse internal whitespace (so control
+        characters and newlines cannot smuggle into a display label), reject
+        empty, and cap length."""
+        if not isinstance(title, str):
+            return None, "invalid_title:not_a_string"
+        normalized = re.sub(r"\s+", " ", title.strip())
+        if not normalized:
+            return None, "invalid_title:empty"
+        if len(normalized) > self._TITLE_MAX_LEN:
+            return None, f"invalid_title:too_long:{len(normalized)}"
+        return normalized, None
+
+    def rename_session(
+        self, session_id: str, title: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Rename one session (human-only).
+
+        The title is normalized (trim, collapse whitespace, length cap) and
+        rejected with ``invalid_title:*`` when empty or too long. Renaming is an
+        organizing label only — it grants nothing. Respects user/session
+        visibility: an account cannot rename another account's session.
+        """
+        normalized, reason = self._normalize_title(title)
+        if reason is not None or normalized is None:
+            return ControlResult(ok=False, reason_code=reason)
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        user_id = principal.delegated_by_user_id
+        session = self.store.load_session(session_id)
+        previous_title = str(session["title"]) if session and session.get("title") else None
+        if not self.store.rename_session(session_id, normalized, user_id=user_id):
+            return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
+        from raiker.events.types import make_event
+
+        EventLogWriter(self.store).append(
+            make_event(
+                session_id=session_id,
+                turn_id=None,
+                event_type="session_renamed",
+                actor="dashboard_service",
+                payload={
+                    "session_id": session_id,
+                    "from_title": previous_title,
+                    "to_title": normalized,
+                },
+            )
+        )
+        return ControlResult(
+            ok=True, data={"session_id": session_id, "title": normalized}
+        )
+
+    def set_session_archived(
+        self, session_id: str, archived: bool, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Archive or restore one session (human-only).
+
+        Archiving moves a chat out of the default active list and is fully
+        reversible; it never deletes transcripts, events, checkpoints, or
+        permissions. Respects user/session visibility: an account cannot
+        archive another account's session.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        user_id = principal.delegated_by_user_id
+        if not self.store.set_session_archived(session_id, archived, user_id=user_id):
+            return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
+        from raiker.events.types import make_event
+
+        EventLogWriter(self.store).append(
+            make_event(
+                session_id=session_id,
+                turn_id=None,
+                event_type="session_archived" if archived else "session_unarchived",
+                actor="dashboard_service",
+                payload={"session_id": session_id, "archived": archived},
+            )
+        )
+        return ControlResult(
+            ok=True, data={"session_id": session_id, "archived": archived}
         )
 
     def delete_session(
@@ -1223,9 +1336,13 @@ class DashboardService:
         )
         if user_id is None:
             return [self._event_view(r) for r in rows]
+        # Archiving a session never hides its events (archive is not delete), so
+        # the visibility set spans the owner's active and archived sessions.
         visible_session_ids = {
             str(session["session_id"])
-            for session in self.store.list_sessions(limit=10_000, user_id=user_id)
+            for session in self.store.list_sessions(
+                limit=10_000, user_id=user_id, include_archived=True
+            )
         }
         return [self._event_view(r) for r in rows if str(r.get("session_id")) in visible_session_ids]
 
@@ -2114,6 +2231,8 @@ class DashboardService:
             pinned=bool(row.get("pinned", 0)),
             tags=tuple(self.store.list_session_tags(session_id)),
             project_id=row.get("project_id"),
+            archived=bool(row.get("archived", 0)),
+            archived_at=row.get("archived_at"),
         )
 
     @staticmethod

@@ -1288,6 +1288,22 @@ CREATE TABLE IF NOT EXISTS session_tags (
 CREATE INDEX IF NOT EXISTS idx_session_tags_tag ON session_tags(tag);
 """
 
+# Safe session lifecycle (Control Deck task 3): a per-session soft-archive
+# state. Archiving is a reversible organizing action — it never deletes
+# transcripts, events, checkpoints, or permissions; it only moves a session out
+# of the default active list. `archived` defaults to 0 (active) so every
+# existing row stays visible; `archived_at` records when it was last archived.
+# The owner/archive/updated_at index serves the default active listing, which
+# filters by owner and archived state and orders by recency. Additive columns
+# only — grants nothing and changes no gate, policy, or authority.
+SESSION_ARCHIVE_MIGRATION_ID = "RAIKER-1015-session-archive-lifecycle"
+
+SESSION_ARCHIVE_SQL = """
+ALTER TABLE sessions ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN archived_at TEXT;
+CREATE INDEX IF NOT EXISTS idx_sessions_owner_archived_updated ON sessions(user_id, archived, updated_at DESC);
+"""
+
 # Nested projects/folders (conversation organisation remainder): arbitrary-depth
 # folder hierarchy via hybrid adjacency list + materialized path. Parent
 # reference uses ON DELETE SET NULL so children survive parent hard-delete.

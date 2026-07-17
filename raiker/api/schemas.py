@@ -234,6 +234,15 @@ class SetSessionProjectRequest(BaseModel):
     project_id: str | None = None
 
 
+class RenameSessionRequest(BaseModel):
+    # Rename one session. The title is an organizing label only — it grants
+    # nothing. The server normalizes (trim, collapse whitespace, length cap) and
+    # rejects invalid input. extra="forbid" rejects unknown fields.
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+
+
 class SetSessionTagsRequest(BaseModel):
     # Replace the tag set for one session. Tags are organizing labels only —
     # they grant nothing. The server normalizes (trim, lowercase, dedupe,

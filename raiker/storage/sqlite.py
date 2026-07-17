@@ -209,6 +209,8 @@ from raiker.storage.migrations import (
     PROJECTS_SQL,
     REMINDERS_MIGRATION_ID,
     REMINDERS_SQL,
+    SESSION_ARCHIVE_MIGRATION_ID,
+    SESSION_ARCHIVE_SQL,
     SESSION_TAGS_MIGRATION_ID,
     SESSION_TAGS_SQL,
     THREAT_MODEL_ACKS_MIGRATION_ID,
@@ -563,6 +565,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 SESSION_TAGS_MIGRATION_ID, SESSION_TAGS_SQL, connection
+            )
+            self._apply_migration(
+                SESSION_ARCHIVE_MIGRATION_ID, SESSION_ARCHIVE_SQL, connection
             )
             self._apply_migration(
                 PROJECTS_NESTING_MIGRATION_ID, PROJECTS_NESTING_SQL, connection
@@ -1409,11 +1414,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return dict(row) if row else None
 
     def list_sessions(
-        self, limit: int = 10, project_id: str | None = None, user_id: str | None = None
+        self,
+        limit: int = 10,
+        project_id: str | None = None,
+        user_id: str | None = None,
+        include_archived: bool = False,
     ) -> list[dict[str, Any]]:
         query = "SELECT * FROM sessions"
         params: list[Any] = []
         conditions: list[str] = []
+        if not include_archived:
+            # Default listing surfaces active sessions only; archived rows stay
+            # retrievable by an explicit ``include_archived`` request.
+            conditions.append("archived = 0")
         if project_id is not None:
             conditions.append("project_id = ?")
             params.append(project_id)
@@ -1624,6 +1637,51 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if row is None:
             return False, None
         return True, dict(row).get("user_id")
+
+    def _update_owned_session(
+        self, session_id: str, user_id: str | None, assignments: dict[str, Any]
+    ) -> bool:
+        """Apply column assignments to one session under the owner check shared
+        by every session mutator. Returns False when the session does not exist
+        or is owned by another account (legacy unowned sessions stay writable by
+        any authenticated account, mirroring set_session_pinned). ``updated_at``
+        is always refreshed. Column names come only from trusted call sites."""
+        if not assignments:
+            return False
+        with self.connect() as connection:
+            exists, owner = self._session_owner(connection, session_id)
+            if not exists:
+                return False
+            if user_id is not None and owner is not None and str(owner) != user_id:
+                return False
+            columns = ", ".join(f"{column} = ?" for column in assignments)
+            connection.execute(
+                f"UPDATE sessions SET {columns}, updated_at = ? WHERE session_id = ?",
+                (*assignments.values(), utc_now(), session_id),
+            )
+        return True
+
+    def rename_session(
+        self, session_id: str, title: str, user_id: str | None = None
+    ) -> bool:
+        """Set one session's title. The caller supplies the already-normalized
+        title. Returns False if the session does not exist or is owned by
+        another account (isolation mirrors set_session_pinned)."""
+        return self._update_owned_session(session_id, user_id, {"title": title})
+
+    def set_session_archived(
+        self, session_id: str, archived: bool, user_id: str | None = None
+    ) -> bool:
+        """Soft-archive (or restore) one session — a reversible organizing state
+        that never deletes transcripts, events, checkpoints, or permissions.
+        ``archived_at`` records the archive time and clears on restore. Returns
+        False if the session does not exist or is owned by another account
+        (isolation mirrors set_session_pinned)."""
+        return self._update_owned_session(
+            session_id,
+            user_id,
+            {"archived": int(archived), "archived_at": utc_now() if archived else None},
+        )
 
     def set_session_project(
         self, session_id: str, project_id: str | None, user_id: str | None = None

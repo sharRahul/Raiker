@@ -255,7 +255,7 @@ Result 2026-07-17: `EXIT=0`, 44 passed. A live end-to-end drive (rename → arch
 
 **Does NOT cover:** Remote HTTP MCP transport, OAuth discovery, arbitrary shell commands, and execution of unreviewed MCP tools are excluded. Local stdio commands are owner-configured, workspace-scoped, allowlisted, and approval-governed.
 
-- [ ] **Step 1: Load `mcp-builder` and current official Python SDK documentation; write failing tests first** for disabled capability denial, command validation, owner isolation, safe server-template creation, and redacted audit metadata.
+- [x] **Step 1: Load `mcp-builder` and current official Python SDK documentation; write failing tests first** for disabled capability denial, command validation, owner isolation, safe server-template creation, and redacted audit metadata.
 
 ```python
 def test_mcp_connector_denies_unapproved_command(workspace: Path) -> None:
@@ -263,13 +263,23 @@ def test_mcp_connector_denies_unapproved_command(workspace: Path) -> None:
     assert outcome["error"]["type"] == "mcp_command_not_allowlisted"
 ```
 
-- [ ] **Step 2: Verify RED**
+> Landed as `tests/test_mcp_runtime.py` (22 tests). The MCP wire protocol is
+> implemented **directly over the documented JSON-RPC stdio format**, with no
+> third-party `mcp` SDK dependency, so the runtime stays hermetic/local-only and
+> `pyproject.toml` was intentionally left unchanged. The generated
+> `python-stdio-echo` template speaks the same wire format, making the
+> builder+connector testable end-to-end with no network. Executors return the
+> repo's `ExecutionResult` (not the illustrative `ExecutorResult.error`).
+
+- [x] **Step 2: Verify RED**
 
 Run: `python -m pytest tests/test_mcp_runtime.py -q`
 
 Expected: imports/endpoints are missing.
 
-- [ ] **Step 3: Add `mcp_builder_runtime` and `mcp_connector_runtime` as real capabilities** and map `mcp_server_create`, `mcp_connect`, `mcp_list_tools`, and `mcp_call_tool` through `CAPABILITY_GATE_MAP`.
+Result 2026-07-17: RED confirmed — `ModuleNotFoundError: raiker.runtime.executors.mcp`.
+
+- [x] **Step 3: Add `mcp_builder_runtime` and `mcp_connector_runtime` as real capabilities** and map `mcp_server_create`, `mcp_connect`, `mcp_list_tools`, and `mcp_call_tool` through `CAPABILITY_GATE_MAP`.
 
 Append these exact entries to the existing `REAL_EXECUTOR_CAPABILITIES` literal:
 
@@ -278,7 +288,14 @@ Append these exact entries to the existing `REAL_EXECUTOR_CAPABILITIES` literal:
     "mcp_connector_runtime",
 ```
 
-- [ ] **Step 4: Implement local MCP server creation and connection** using the documented MCP SDK, validated workspace-relative output paths, a fixed allowlisted executable registry, bounded stdio payloads/timeouts, and redacted event fields.
+> Done: both caps added to `REAL_EXECUTOR_CAPABILITIES`, `RUNTIME_DOMAIN_CAPABILITIES`,
+> the Tier-5 executed-caps group (full readiness → ship `ENABLED_RUNTIME`), the
+> `activation.py` requirement registry (threat_ack + human_confirm), the four
+> action types + two self-maps in `CAPABILITY_GATE_MAP`, and the four action
+> types in the policy `approval_required_actions`. New id prefix `mcp_`. Threat
+> models: `docs/threat-models/mcp-builder.md`, `docs/threat-models/mcp-connector.md`.
+
+- [x] **Step 4: Implement local MCP server creation and connection** using the documented MCP SDK, validated workspace-relative output paths, a fixed allowlisted executable registry, bounded stdio payloads/timeouts, and redacted event fields.
 
 ```python
 if not command or command[0] not in allowed_commands:
@@ -287,11 +304,84 @@ if any(Path(part).is_absolute() for part in command[1:]):
     return ExecutorResult.error("mcp_argument_path_not_workspace_relative")
 ```
 
-- [ ] **Step 5: Verify GREEN**
+> Landed in `raiker/runtime/executors/mcp.py`: `McpBuilderExecutor`
+> (`mcp_server_create`) writes a reviewed template to a workspace-relative path
+> (absolute/`..` escape rejected) and records an owner-scoped `mcp_servers` row;
+> `McpConnectorExecutor` (`mcp_connect`/`mcp_list_tools`/`mcp_call_tool`)
+> validates the interpreter allowlist + workspace-relative args, then runs a
+> bounded `subprocess.Popen`+`communicate` JSON-RPC stdio session (≤60 s, ≤200 KB)
+> and returns **redacted metadata only** (tool names/count; content length +
+> redaction flag — never raw content). Storage: migration
+> `RAIKER-1016-mcp-server-profiles` + owner-scoped CRUD. Owner-scoped read:
+> `GET /api/mcp/servers` (`McpServerView`); building/connecting stays a governed
+> runtime action, not a REST mutation.
+
+- [x] **Step 5: Verify GREEN**
 
 Run: `python -m pytest tests/test_mcp_runtime.py tests/test_executor_default_registry.py tests/test_connector_tool_policy.py -q`
 
 Expected: only authenticated owner-approved, capability-enabled local stdio MCP operations complete; all other paths fail closed.
+
+Result 2026-07-17: `EXIT=0`, 31 passed (the referenced trio). Static/regression gates on the same tree: `ruff` clean, `mypy` 421 files clean, all five repo validators PASS. A live end-to-end drive against a fresh temp workspace (build → connect → list tools → redacted tool call with a secret payload → fail-closed on unallowlisted command / absolute-path arg / disabled gate → owner-scoped `GET /api/mcp/servers` hiding another principal's server) all behaved correctly; the running web app was screenshotted for regression. Full-suite result recorded in HANDOFF.
+
+### Task 4b: MCP Server Management Web Page (create / manage / delete)
+
+> **Plan amendment (2026-07-17), requested by the owner.** Task 4 delivered the
+> governed runtime + a read-only `GET /api/mcp/servers`. This task pulls the
+> dedicated MCP management surface forward from the Task 9 route rebuild into its
+> own page so the owner can create, inspect, test, rename, and delete local MCP
+> servers end-to-end from the web app.
+
+**Files:**
+- Modify: `raiker/storage/migrations.py` (tools/tool_count columns)
+- Modify: `raiker/storage/sqlite.py` (delete/rename/tools CRUD)
+- Modify: `raiker/runtime/executors/mcp.py` (persist discovered tools on connect)
+- Modify: `raiker/control/service.py` (governed create/connect + owner-scoped rename/delete)
+- Modify: `raiker/control/dashboard.py` (`McpServerView` carries tools/status)
+- Modify: `raiker/api/schemas.py`, `raiker/api/routes_dashboard.py` (write routes)
+- Create: `apps/web/src/lib/views/McpView.svelte`
+- Modify: `apps/web/src/lib/api.ts`, `apps/web/src/lib/apiTypes.ts`, `apps/web/src/lib/nav.ts`, `apps/web/src/App.svelte`
+- Modify: `tests/test_mcp_runtime.py`
+- Create: `apps/web/src/lib/views/McpView.test.ts`
+
+**Security flag:** `security`
+
+**Does NOT cover:** No side-door around governance. **Create** and **Test/Connect**
+run the real capability through `route_action` (capability gate + policy +
+decision mode + audit); when the gate is disabled the page surfaces the governed
+reason and points to Capabilities rather than bypassing it. **Rename** and
+**Delete** are owner-scoped, human-only metadata operations (delete also removes
+the generated template file inside the workspace). Editing a server's raw command
+and calling its tools from the page are out of scope for this slice — tool calls
+remain a governed runtime/agent action.
+
+- [x] **Step 1: Write failing API tests** for create (governed), connect/test
+  (persists discovered tools), rename, delete (removes profile + file), owner
+  isolation, and capability-gate denial. Landed as 9 new cases in
+  `tests/test_mcp_runtime.py` (+ `McpView.test.ts` for the page).
+- [x] **Step 2: Verify RED.**
+- [x] **Step 3: Backend.** Migration `RAIKER-1017-mcp-server-runtime-state` adds
+  `tools` / `tool_count`; storage gains `delete_mcp_server`, `rename_mcp_server`,
+  and tool persistence; `RuntimeControlService` gains governed `create_mcp_server`
+  / `connect_mcp_server` and owner-scoped `rename_mcp_server` / `delete_mcp_server`;
+  the connector executor persists discovered tools on connect; strict
+  request/response routes `POST /api/mcp/servers`, `POST /api/mcp/servers/{id}/connect`,
+  `PUT /api/mcp/servers/{id}`, `DELETE /api/mcp/servers/{id}`.
+- [x] **Step 4: Frontend.** `McpView.svelte` — create form (name + template),
+  server list with status pill, discovered tools, and command; test/rename/delete
+  actions; a capability-gate banner. Wired into `nav.ts` + `App.svelte`
+  (Steering → "MCP Servers").
+- [x] **Step 5: Verify GREEN.**
+
+Result 2026-07-17: `pytest` full suite **1918 passed** (exit 0); `ruff` clean;
+`mypy` 421 files clean; all five repo validators PASS. Web: `npm run check` 0
+errors, `npm run lint` clean, `npm test` 141 passed (McpView 4/4), `npm run build`
+exit 0. Live browser drive against a registered account (caps enabled): the page
+listed both servers with status + discovered tools, and clicking **Test** on the
+un-connected server flipped it to Connected with its `echo` / `workspace_ping`
+tools — screenshots captured. Create/connect run through the governed capability
+(a disabled gate surfaces `disabled_by_capability_gate` and points to
+Capabilities); rename/delete are owner-scoped and human-only.
 
 ### Task 5: Add Credential Lifecycle, Breach Detection, and Self-Monitoring
 

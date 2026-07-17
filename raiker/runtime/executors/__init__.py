@@ -17,6 +17,7 @@ from raiker.runtime.executors.connectors import (
     SlackConnectorExecutor,
 )
 from raiker.runtime.executors.containers import ContainerExecutionExecutor
+from raiker.runtime.executors.mcp import McpBuilderExecutor, McpConnectorExecutor
 from raiker.runtime.executors.models_runtime import (
     AdvisorModelRuntimeExecutor,
     HostedModelRuntimeExecutor,
@@ -81,6 +82,7 @@ __all__ = [
     "FinanceRuntimeExecutor", "InvestmentRuntimeExecutor", "MedicalRuntimeExecutor",
     "PregnancyBabyRuntimeExecutor", "CctvRuntimeExecutor", "HomeSecurityRuntimeExecutor",
     "HardwareOperatorRuntimeExecutor",
+    "McpBuilderExecutor", "McpConnectorExecutor",
 ]
 
 
@@ -129,6 +131,15 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "container_execution_cap",
     # Phase 4 — local on-demand scheduled routines (no daemon)
     "scheduled_routines",
+    # Control Deck task 4 — governed local stdio MCP builder + connector. The
+    # builder writes a reviewed dependency-free stdio server template to a
+    # workspace-relative path; the connector runs a bounded JSON-RPC stdio
+    # session (initialize / tools/list / tools/call) against an owner-configured
+    # local server whose interpreter is allowlisted and whose args are
+    # workspace-relative. Redacted, metadata-only events. Remote transport,
+    # OAuth discovery, and unreviewed-tool execution stay fail-closed.
+    "mcp_builder_runtime",
+    "mcp_connector_runtime",
     # Phase 4 slice 7 — hosted / private-network model runtime (owner egress
     # allowlist, metadata-only connectivity probe; chat path re-checks the
     # same allowlist in the provider factory)
@@ -209,6 +220,8 @@ def build_default_executor_registry(
     registry.register("channel_approval_relay", ChannelApprovalRelayExecutor(ws, store))
     registry.register("container_execution_cap", ContainerExecutionExecutor(ws))
     registry.register("scheduled_routines", ScheduledRoutinesExecutor(ws, store))
+    registry.register("mcp_builder_runtime", McpBuilderExecutor(ws, store))
+    registry.register("mcp_connector_runtime", McpConnectorExecutor(ws, store))
     registry.register("hosted_model_runtime", HostedModelRuntimeExecutor(ws))
     registry.register("private_network_model_runtime", PrivateNetworkModelRuntimeExecutor(ws))
     registry.register("advisor_model_runtime", AdvisorModelRuntimeExecutor(ws, store))

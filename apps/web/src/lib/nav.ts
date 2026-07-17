@@ -47,6 +47,12 @@ export const NAV_GROUPS: NavGroup[] = [
         hint: "Governed service connectors and their status",
       },
       {
+        id: "mcp",
+        label: "MCP Servers",
+        icon: "spark",
+        hint: "Build, test, and manage local MCP servers",
+      },
+      {
         id: "checkpoints",
         label: "Checkpoints",
         icon: "checkpoints",

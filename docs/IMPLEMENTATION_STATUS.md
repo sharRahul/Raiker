@@ -35,14 +35,53 @@ fail-closed by design.
 > `principal_capability_gate_state`, `principal_capability_decision_mode`,
 > `instance_account_guard`), owner-scoped context/memory/brain-source data, and
 > `SQLiteStore.account_scope()` as the single principal-scope predicate. Plan
-> Tasks 3–11 (session archive/rename lifecycle, governed local MCP builder/
-> connector, credential lifecycle + breach detection + self-monitoring, and the
-> web Control Deck rebuild) are **not started** — verified against the tree.
-> Python gates on this commit: `pytest` 1870 passed, `ruff` clean, `mypy` 418
-> files clean, and `validate_documentation_truthfulness`,
-> `validate_repo_truthfulness`, `validate_phase_status`,
-> `validate_runtime_enablement_readiness`, and `validate_local_single_user_runtime`
-> all pass.
+> **Task 3 (safe session rename + archive lifecycle) is now implemented and
+> committed** as `52d6c5e` ("Add safe session rename and archive lifecycle",
+> merged in PR #120): migration `RAIKER-1015-session-archive-lifecycle` adds
+> `sessions.archived` / `sessions.archived_at` plus the
+> `idx_sessions_owner_archived_updated` index via the idempotent
+> `_skip_existing_add_columns` path; `SQLiteStore._update_owned_session` is the
+> shared owner-check behind `rename_session` and `set_session_archived`;
+> `list_sessions` gained an `include_archived` flag (default active-only, the
+> event-visibility filter passes `include_archived=True` so archiving never hides
+> a session's events); `DashboardService.rename_session` normalizes titles (trim,
+> collapse whitespace, 200-char cap, 422 on invalid) and `set_session_archived`
+> toggles the reversible soft-archive state, both human-only and owner-scoped;
+> new event types `session_renamed` / `session_archived` / `session_unarchived`;
+> routes `PUT /api/sessions/{id}/rename|archive|unarchive` and an owner-scoped
+> `include_archived` query flag on `GET /api/sessions`. Archive never deletes
+> transcripts, events, checkpoints, or permissions; delete stays a separate
+> confirmed path. Covered by `tests/test_session_lifecycle.py` (14 tests) plus
+> `tests/test_api_dashboard.py`. Plan **Task 4 (governed local MCP builder +
+> connector) is now implemented on branch `claude/code-review-task-4-xp4s25`**:
+> `raiker/runtime/executors/mcp.py` adds `McpBuilderExecutor` (`mcp_server_create`,
+> writes a reviewed dependency-free stdio server template to a validated
+> workspace-relative path + owner-scoped `mcp_servers` row) and
+> `McpConnectorExecutor` (`mcp_connect` / `mcp_list_tools` / `mcp_call_tool`,
+> interpreter allowlist + workspace-relative args + a bounded JSON-RPC stdio
+> session returning redacted metadata only). The MCP wire protocol is spoken
+> directly with no third-party SDK (`pyproject.toml` unchanged). Wired through
+> `REAL_EXECUTOR_CAPABILITIES`, `phase_gates` (ship `ENABLED_RUNTIME`),
+> `activation.py`, `CAPABILITY_GATE_MAP`, the policy `approval_required_actions`,
+> migration `RAIKER-1016-mcp-server-profiles`, `McpServerView` + owner-scoped
+> `GET /api/mcp/servers`, id prefix `mcp_`, and threat models
+> `docs/threat-models/mcp-builder.md` / `mcp-connector.md`. Covered by
+> `tests/test_mcp_runtime.py` (31 tests). **Task 4b (owner-requested) adds the
+> MCP Servers management web page** — a dedicated `McpView.svelte` page that
+> creates, tests, renames, and deletes local MCP servers end-to-end, showing
+> status + discovered tools. Create/test run through the governed capability
+> (`route_action`; a disabled gate surfaces `disabled_by_capability_gate` and the
+> page points to Capabilities); rename/delete are owner-scoped human-only ops
+> (delete removes the generated file). Backend: migration
+> `RAIKER-1017-mcp-server-runtime-state`, storage delete/rename + tool
+> persistence, `RuntimeControlService.{create,connect,rename,delete}_mcp_server`,
+> and routes `POST /api/mcp/servers`, `POST /api/mcp/servers/{id}/connect`,
+> `PUT`/`DELETE /api/mcp/servers/{id}`; frontend `McpView.svelte` + `McpView.test.ts`.
+> Plan **Tasks 5–11** (credential lifecycle + breach detection + self-monitoring,
+> and the remaining web Control Deck rebuild) remain **not started** — verified
+> against the tree. Gates on the Task 4 + 4b tree: `pytest` 1918 passed, `ruff`
+> clean, `mypy` 421 files clean, all five repo validators pass; web
+> `check`/`lint`/`test` (141 passed)/`build` all green.
 
 > Current truth update (2026-07-13): The local-owner workstream now includes a
 > principal-scoped Inbox task-create route and Tasks UI. `priority`,

@@ -1304,6 +1304,43 @@ ALTER TABLE sessions ADD COLUMN archived_at TEXT;
 CREATE INDEX IF NOT EXISTS idx_sessions_owner_archived_updated ON sessions(user_id, archived, updated_at DESC);
 """
 
+# Governed local MCP builder + connector (Control Deck task 4): an owner-scoped
+# registry of local stdio MCP server profiles the owner has built or connected.
+# `command` is the JSON-encoded argv (interpreter + workspace-relative script);
+# it is owner-configured, allowlist-validated at execution time, and never a
+# remote endpoint. `principal_id` scopes every row to its creator so one owner
+# can never see or reach another owner's servers. No secrets or tool payloads
+# are stored here — only the profile metadata. Additive table only.
+MCP_SERVERS_MIGRATION_ID = "RAIKER-1016-mcp-server-profiles"
+
+MCP_SERVERS_SQL = """
+CREATE TABLE IF NOT EXISTS mcp_servers (
+  server_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  command TEXT NOT NULL,
+  template TEXT,
+  transport TEXT NOT NULL DEFAULT 'stdio',
+  status TEXT NOT NULL DEFAULT 'created',
+  created_at TEXT NOT NULL,
+  last_connected_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_owner ON mcp_servers(principal_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_servers_owner_name ON mcp_servers(principal_id, name);
+"""
+
+# MCP server runtime state (Control Deck task 4b): the last handshake's outcome
+# for a server profile — the JSON-encoded list of tool names the connector
+# discovered and their count. Recorded so the management page can show each
+# server's tools without re-spawning it on every page load. Tool names are not
+# secrets; no tool arguments or output are ever stored. Additive columns only.
+MCP_SERVER_RUNTIME_MIGRATION_ID = "RAIKER-1017-mcp-server-runtime-state"
+
+MCP_SERVER_RUNTIME_SQL = """
+ALTER TABLE mcp_servers ADD COLUMN tools TEXT;
+ALTER TABLE mcp_servers ADD COLUMN tool_count INTEGER NOT NULL DEFAULT 0;
+"""
+
 # Nested projects/folders (conversation organisation remainder): arbitrary-depth
 # folder hierarchy via hybrid adjacency list + materialized path. Parent
 # reference uses ON DELETE SET NULL so children survive parent hard-delete.

@@ -55,25 +55,94 @@ Control Deck commit.
   `principal_capability_gate_state` / `principal_capability_decision_mode` /
   `instance_account_guard` / `brain_sources` tables, and
   `SQLiteStore.account_scope()` as the single principal-scope predicate.
-- **Plan Tasks 3–11 are not started** (verified against the tree, not the plan
-  checkboxes): no session archive/rename migration or `set_session_archived`
-  storage, no `raiker/runtime/executors/mcp.py` / `mcp_builder_runtime`
-  capability, no `raiker/security/` package (credentials/monitoring), and none of
-  `tests/test_session_lifecycle.py`, `tests/test_mcp_runtime.py`,
-  `tests/test_credential_security.py`, `tests/test_runtime_monitoring.py` exist.
-  **Task 3 (safe session rename + archive lifecycle) is the next slice.**
+- **Plan Task 3 (safe session rename + archive lifecycle) is now implemented and
+  committed** as `52d6c5e` (merged in PR #120). Migration
+  `RAIKER-1015-session-archive-lifecycle` adds `sessions.archived` /
+  `sessions.archived_at` plus `idx_sessions_owner_archived_updated` via the
+  idempotent `_skip_existing_add_columns` path; `SQLiteStore._update_owned_session`
+  is the shared owner-check behind `rename_session` and `set_session_archived`;
+  `list_sessions` gained an `include_archived` flag (default active-only; the
+  event-visibility filter passes `include_archived=True` so archiving never hides
+  a session's events). `DashboardService.rename_session` normalizes titles (trim,
+  collapse whitespace, 200-char cap, 422 on invalid) and `set_session_archived`
+  toggles the reversible soft-archive state — both human-only and owner-scoped.
+  New event types `session_renamed` / `session_archived` / `session_unarchived`;
+  routes `PUT /api/sessions/{id}/rename|archive|unarchive` and an owner-scoped
+  `include_archived` query flag on `GET /api/sessions`. Archive never deletes
+  transcripts, events, checkpoints, or permissions. `tests/test_session_lifecycle.py`
+  (14 tests) covers it. A code review of the diff found no correctness defects;
+  one design note recorded below.
+- **Plan Task 4 (governed local MCP builder + connector) is now implemented on
+  this branch.** `raiker/runtime/executors/mcp.py` adds two real, fail-closed
+  executors: `McpBuilderExecutor` (`mcp_server_create`) writes a reviewed,
+  dependency-free stdio MCP server template to a validated workspace-relative
+  path (absolute/`..` rejected) and records an owner-scoped `mcp_servers` row;
+  `McpConnectorExecutor` (`mcp_connect` / `mcp_list_tools` / `mcp_call_tool`)
+  validates the interpreter allowlist (`python`/`python3`/`node`,
+  owner-extensible; shells never accepted) + workspace-relative args, then runs a
+  bounded `subprocess.Popen`+`communicate` JSON-RPC stdio session (≤60 s,
+  ≤200 KB) and returns **redacted metadata only** — tool names/count and content
+  length + redaction flag, never raw tool output. The MCP wire protocol is
+  spoken directly (no third-party `mcp` SDK, so the runtime stays hermetic;
+  `pyproject.toml` unchanged). Wiring: `mcp_builder_runtime` /
+  `mcp_connector_runtime` in `REAL_EXECUTOR_CAPABILITIES` +
+  `RUNTIME_DOMAIN_CAPABILITIES` + Tier-5 executed caps (ship `ENABLED_RUNTIME`),
+  `activation.py` requirements (threat_ack + human_confirm), `CAPABILITY_GATE_MAP`
+  (4 action types + 2 self-maps), policy `approval_required_actions` (4 action
+  types), new id prefix `mcp_`, migration `RAIKER-1016-mcp-server-profiles` +
+  owner-scoped storage CRUD, `McpServerView` + owner-scoped `GET /api/mcp/servers`
+  read (building/connecting stays a governed runtime action, not a REST
+  mutation), and threat models `docs/threat-models/mcp-builder.md` /
+  `mcp-connector.md`. Tests: `tests/test_mcp_runtime.py` (22). A live end-to-end
+  drive (build → connect → redacted tool call → three fail-closed paths →
+  owner-scoped API isolation) passed, and the running web app was screenshotted
+  (no regression).
+- **Task 4b (MCP server management web page) is now implemented on this branch**
+  (owner-requested amendment; pulled forward from the Task 9 route rebuild). A
+  dedicated **MCP Servers** page (Steering nav) creates, tests, renames, and
+  deletes local MCP servers end-to-end, showing each server's status, discovered
+  tools, and command. Governance split, no side-door: **create** and
+  **test/connect** run the real capability through `route_action` (gate + policy
+  + decision mode + audit; a disabled gate surfaces `disabled_by_capability_gate`
+  and the page points the owner at Capabilities); **rename** and **delete** are
+  owner-scoped, human-only metadata ops (delete also removes the generated
+  template file under `.raiker/mcp/servers/`). Backend: migration
+  `RAIKER-1017-mcp-server-runtime-state` (`tools` / `tool_count`), storage
+  `delete_mcp_server` / `rename_mcp_server` + tool persistence,
+  `RuntimeControlService.{create,connect,rename,delete}_mcp_server`, executor
+  persists discovered tools on connect, routes `POST /api/mcp/servers`,
+  `POST /api/mcp/servers/{id}/connect`, `PUT`/`DELETE /api/mcp/servers/{id}`.
+  Frontend: `McpView.svelte`, api client + `McpServer` type, `nav.ts` +
+  `App.svelte`. Tests: 9 new API cases in `tests/test_mcp_runtime.py` (31 total)
+  + `McpView.test.ts` (4). Full suite 1918 passed; web check/lint/test/build
+  green; live browser drive screenshotted (create → test → connected with tools).
+- **Plan Tasks 5–11 are not started** (verified against the tree): no
+  `raiker/security/` package (credentials/monitoring) and neither
+  `tests/test_credential_security.py` nor `tests/test_runtime_monitoring.py`
+  exists, and the web Control Deck rebuild (Tasks 6–10) has not begun.
+  **Task 5 (credential lifecycle + breach detection + self-monitoring) is the
+  next slice.**
+- **Task 3 review note (design, not a bug).** The new
+  `list_sessions(include_archived=False)` default excludes archived sessions from
+  every internal caller that does not opt in. The event-visibility path was
+  deliberately updated to `include_archived=True`, but `get_project`
+  (project-detail session list and `session_count`), `brain_view`, the workspace
+  stats count, and the CLI session list now show active-only. This is defensible
+  ("archived is out of the default active list") and no test regressed, but if a
+  project-scoped archived-session view is later wanted, those call sites need an
+  explicit `include_archived` pass-through — the mechanism already exists.
 - **Task 2 acceptance note.** The code is committed, but the recorded acceptance
   gate for Task 2 is a re-run of both independent reviews against the fixed tree
   (see the per-defect record below). The checkbox in the plan is marked done
   because the implementation and its self-tests landed; treat the dual re-review
   as the remaining formal sign-off, not as blocking work on Task 3.
 
-Python gates re-run on this commit (2026-07-17, deps installed fresh):
+Python gates re-run on the Task 4 + 4b tree (2026-07-17, deps installed fresh):
 
 ```text
-python -m pytest -o addopts="" -q     # exit 0, 1870 passed
+python -m pytest -o addopts="" -q     # exit 0, 1918 passed
 python -m ruff check .                # All checks passed!
-python -m mypy raiker apps tests      # Success: no issues found in 418 source files
+python -m mypy raiker apps tests      # Success: no issues found in 421 source files
 python scripts/validate_documentation_truthfulness.py     # PASSED
 python scripts/validate_repo_truthfulness.py              # PASSED
 python scripts/validate_phase_status.py                   # PASSED
@@ -81,8 +150,14 @@ python scripts/validate_runtime_enablement_readiness.py   # PASSED
 python scripts/validate_local_single_user_runtime.py      # PASSED
 ```
 
-Web gates (`apps/web`: `npm run check|lint|test|build`) were not re-run in this
-reconciliation pass; run them before any web-facing slice.
+Web gates (from `apps/web`) on the Task 4b tree:
+
+```text
+npm run check     # 0 errors, 0 warnings
+npm run lint      # clean
+npm test -- --run # 141 passed, 1 skipped (McpView 4/4)
+npm run build     # exit 0
+```
 
 ## Current product state — 2026-07-15
 
@@ -714,13 +789,13 @@ workspace, and all three are fixed with tests that fail without the fix:
 2. (Sign-off, non-blocking) Re-run both independent reviews against the committed
    Task 2 tree and record any findings. Do not treat green gates alone as
    acceptance — the gates were green when 7 criticals were still present.
-3. Execute Plan Task 3 next: add owner-scoped session rename/archive lifecycle
-   with tests before implementation. It is the next dependency for the shared
-   session menu and Sessions UI.
-4. Continue Tasks 4 and 5 before the corresponding UI work. Task 4 is governed
-   local stdio MCP only; Task 5 owns credential lifecycle, local scans, opt-in
-   HIBP range checks, monitoring, notifications, and the deferred durable-memory
-   security concerns above where applicable.
+3. Plan Tasks 3 and 4 are done (session rename/archive lifecycle committed as
+   `52d6c5e`; governed local stdio MCP builder + connector on this branch).
+   Execute Plan Task 5 next: credential lifecycle, local scans, opt-in HIBP range
+   checks, monitoring, notifications, and the deferred durable-memory security
+   concerns above where applicable — with tests before implementation.
+4. Then execute UI Tasks 6–10 (the web Control Deck rebuild), which include the
+   MCP builder/connector rows that sit on the Task 4 runtime.
 5. Execute UI Tasks 6-10 in plan order. Preserve the current dark, compact
    Control Deck visual system, use typed API contracts, and do not expose a UI
    control without a supported backend operation.

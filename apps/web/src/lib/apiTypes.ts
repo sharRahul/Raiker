@@ -32,6 +32,23 @@ export interface RuntimeReadiness {
   summary: Record<string, unknown>;
 }
 
+// GET /api/mcp/servers — one owner-scoped local stdio MCP server profile
+// (see raiker/control/dashboard.py::McpServerView). `command` is the argv
+// (interpreter + workspace-relative script), never a secret or remote endpoint.
+// `tools` are the names discovered by the last successful handshake.
+export interface McpServer {
+  server_id: string;
+  name: string;
+  command: string[];
+  template: string | null;
+  transport: string;
+  status: string;
+  created_at: string;
+  last_connected_at: string | null;
+  tools: string[];
+  tool_count: number;
+}
+
 // GET /api/capability-modes/{capability} — the per-capability decision mode
 // (ask | allow | auto | deny) governing AI-proposed actions for that capability.
 export interface CapabilityDecisionMode {

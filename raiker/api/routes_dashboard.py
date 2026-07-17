@@ -12,9 +12,11 @@ from raiker.api.schemas import (
     AuthSessionRequest,
     BrainSourceRequest,
     BulkDeleteSessionsRequest,
+    CreateMcpServerRequest,
     CreateProjectRequest,
     ModelConnectionRequest,
     MoveProjectRequest,
+    RenameMcpServerRequest,
     RenameSessionRequest,
     SaveProjectContextRequest,
     SelectProjectRequest,
@@ -98,6 +100,90 @@ async def list_sessions(
             user_id=user_id,
             include_archived=include_archived,
         )
+    )
+
+
+@router.get("/api/mcp/servers")
+async def list_mcp_servers(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    """List the authenticated principal's local MCP server profiles.
+
+    Owner-scoped by the acting principal (the creator) — an account never sees
+    another account's servers.
+    """
+    return serialize_dto(_service(request).list_mcp_servers(auth_data[0].principal_id))
+
+
+def _mcp_result(result: Any) -> dict[str, Any]:
+    """Map a ControlResult onto an HTTP response, translating the governed
+    reason into a status: 422 for invalid input, 403 for a disabled gate /
+    authorization / ownership failure."""
+    if result.ok:
+        return {"ok": True, **result.data}
+    reason = result.reason_code or ""
+    if reason.startswith("mcp_invalid_server_name") or reason.startswith("invalid"):
+        code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    else:
+        code = status.HTTP_403_FORBIDDEN
+    raise HTTPException(status_code=code, detail={"ok": False, "reason_code": result.reason_code})
+
+
+@router.post("/api/mcp/servers")
+async def create_mcp_server(
+    body: CreateMcpServerRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Build a local stdio MCP server from a reviewed template.
+
+    Runs through the governed ``mcp_builder_runtime`` capability — the gate,
+    policy, decision mode, and audit event all apply. A disabled gate returns
+    403 with ``disabled_by_capability_gate`` so the client can point the owner
+    at Capabilities rather than silently failing.
+    """
+    return _mcp_result(
+        _service(request).create_mcp_server(auth_data[0].principal_id, body.name, body.template)
+    )
+
+
+@router.post("/api/mcp/servers/{server_id}/connect")
+async def connect_mcp_server(
+    server_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Test-connect one stored server: run the governed stdio handshake and
+    persist the discovered tool names. Owner-scoped."""
+    return _mcp_result(
+        _service(request).connect_mcp_server(auth_data[0].principal_id, server_id)
+    )
+
+
+@router.put("/api/mcp/servers/{server_id}")
+async def rename_mcp_server(
+    server_id: str,
+    body: RenameMcpServerRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Rename one owner-scoped MCP server profile (human-only)."""
+    return _mcp_result(
+        _service(request).rename_mcp_server(auth_data[0].principal_id, server_id, body.name)
+    )
+
+
+@router.delete("/api/mcp/servers/{server_id}")
+async def delete_mcp_server(
+    server_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Delete one owner-scoped MCP server profile and its generated template
+    file (human-only)."""
+    return _mcp_result(
+        _service(request).delete_mcp_server(auth_data[0].principal_id, server_id)
     )
 
 

@@ -33,6 +33,57 @@ fail-closed by design.
   log, or commit them.
 - Add a typed event to `EVENT_TYPES` before emitting it.
 
+## Current state — 2026-07-17 (doc reconciliation)
+
+This section reconciles the handoff with the committed tree. Read it first; the
+older dated sections below remain accurate for their own slices but predate the
+Control Deck commit.
+
+- **The 2026-07-16 "dirty worktree" is now committed.** The Control Deck pause
+  point below told the next session to preserve an uncommitted worktree. That
+  work has since landed as commit `f97e6ce`
+  ("Isolate users by instance and scope control state per principal"). The
+  working tree is clean — do not go looking for uncommitted Control Deck changes.
+- **Plan Tasks 1 and 2 are implemented and committed.** Task 1 (legacy-account
+  role backfill + inactive-session fail-closed) and Task 2 (one-user-per-instance
+  boundary, local password recovery, per-principal control state, owner-scoped
+  data) are both on this branch. Task 1 added migration
+  `RAIKER-2021-legacy-account-bootstrap-roles`. Task 2 added
+  `RAIKER-2022-principal-control-scope`, `RAIKER-2022-owned-context-data`,
+  `RAIKER-2023-owned-memory-metadata`,
+  `RAIKER-2023-owner-brain-sources`, the `principal_model_control` /
+  `principal_capability_gate_state` / `principal_capability_decision_mode` /
+  `instance_account_guard` / `brain_sources` tables, and
+  `SQLiteStore.account_scope()` as the single principal-scope predicate.
+- **Plan Tasks 3–11 are not started** (verified against the tree, not the plan
+  checkboxes): no session archive/rename migration or `set_session_archived`
+  storage, no `raiker/runtime/executors/mcp.py` / `mcp_builder_runtime`
+  capability, no `raiker/security/` package (credentials/monitoring), and none of
+  `tests/test_session_lifecycle.py`, `tests/test_mcp_runtime.py`,
+  `tests/test_credential_security.py`, `tests/test_runtime_monitoring.py` exist.
+  **Task 3 (safe session rename + archive lifecycle) is the next slice.**
+- **Task 2 acceptance note.** The code is committed, but the recorded acceptance
+  gate for Task 2 is a re-run of both independent reviews against the fixed tree
+  (see the per-defect record below). The checkbox in the plan is marked done
+  because the implementation and its self-tests landed; treat the dual re-review
+  as the remaining formal sign-off, not as blocking work on Task 3.
+
+Python gates re-run on this commit (2026-07-17, deps installed fresh):
+
+```text
+python -m pytest -o addopts="" -q     # exit 0, 1870 passed
+python -m ruff check .                # All checks passed!
+python -m mypy raiker apps tests      # Success: no issues found in 418 source files
+python scripts/validate_documentation_truthfulness.py     # PASSED
+python scripts/validate_repo_truthfulness.py              # PASSED
+python scripts/validate_phase_status.py                   # PASSED
+python scripts/validate_runtime_enablement_readiness.py   # PASSED
+python scripts/validate_local_single_user_runtime.py      # PASSED
+```
+
+Web gates (`apps/web`: `npm run check|lint|test|build`) were not re-run in this
+reconciliation pass; run them before any web-facing slice.
+
 ## Current product state — 2026-07-15
 
 - The connector write reference (backlog item 5) has landed:
@@ -438,9 +489,11 @@ The approved Control Deck work is tracked in:
 - `docs/specs/2026-07-16-raiker-control-deck-design.md`
 - `docs/plans/2026-07-16-raiker-control-deck-implementation.md`
 
-Do not discard the current dirty worktree. It includes intentional backend,
-web, test, dependency, and documentation changes and must be included in the
-eventual verified commit.
+**Status (2026-07-17): this pause is resolved.** The worktree that this section
+warned against discarding has been committed as `f97e6ce`; the tree is clean.
+The instruction below is retained for history only — there is no longer a dirty
+worktree to preserve. See "Current state — 2026-07-17" above for what landed and
+what remains (Tasks 3–11).
 
 ### Product policy: one user per instance
 
@@ -650,12 +703,17 @@ workspace, and all three are fixed with tests that fail without the fix:
 
 ### Safe next-session sequence
 
+> Updated 2026-07-17: steps 1–2 below described a pre-commit state. The Control
+> Deck worktree is now committed (`f97e6ce`) and the tree is clean, so there are
+> no uncommitted changes to preserve. Task 2's code has landed; the dual
+> re-review is a formal sign-off that can run in parallel and does not block
+> Task 3. Start at step 3.
+
 1. Read this handoff, the design spec, and the implementation plan. Inspect
-   `git status --short`; preserve all current changes.
-2. Finish Task 2 acceptance first: re-run both independent reviews against the
-   **fixed** tree, return any findings, then rerun the full suite and update
-   only Task 2's checkbox if both reviews pass. Do not mark Task 2 complete
-   from implementer tests alone.
+   `git status --short` (expected: clean).
+2. (Sign-off, non-blocking) Re-run both independent reviews against the committed
+   Task 2 tree and record any findings. Do not treat green gates alone as
+   acceptance — the gates were green when 7 criticals were still present.
 3. Execute Plan Task 3 next: add owner-scoped session rename/archive lifecycle
    with tests before implementation. It is the next dependency for the shared
    session menu and Sessions UI.

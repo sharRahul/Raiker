@@ -534,5 +534,188 @@ def test_api_mcp_write_requires_auth(tmp_path: Path) -> None:
     assert client.post("/api/mcp/servers", json={"name": "x", "template": "python-stdio-echo"}).status_code == 401
 
 
+# ── Remote MCP (HTTP) transport — Phase A (monitored MCP connections) ─────────
+
+
+class _FakeMcpHttp:
+    """A fake HTTP transport that mimics a remote MCP server for one connection.
+
+    Records the headers it was sent (so a test can assert the token is passed
+    but never leaks elsewhere) and answers initialize / tools/list / tools/call.
+    """
+
+    def __init__(self, *, tools: list[str] | None = None, echo_text: str | None = None) -> None:
+        self.tools = tools if tools is not None else ["remote_echo", "remote_ping"]
+        self.echo_text = echo_text
+        self.seen_auth: list[str | None] = []
+
+    def __call__(self, url: str, payload: dict, *, headers: dict, timeout: float, max_bytes: int) -> dict:
+        self.seen_auth.append(headers.get("Authorization"))
+        method = payload.get("method")
+        rid = payload.get("id")
+        body: dict
+        if method == "initialize":
+            body = {"jsonrpc": "2.0", "id": rid, "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "fake-remote-mcp", "version": "1.0.0"},
+            }}
+        elif method == "notifications/initialized":
+            return {"status": 202, "body_text": "", "headers": {"mcp-session-id": "sess-xyz"}, "truncated": False}
+        elif method == "tools/list":
+            body = {"jsonrpc": "2.0", "id": rid, "result": {
+                "tools": [{"name": t} for t in self.tools]}}
+        elif method == "tools/call":
+            text = self.echo_text if self.echo_text is not None else "pong"
+            body = {"jsonrpc": "2.0", "id": rid, "result": {
+                "content": [{"type": "text", "text": text}], "isError": False}}
+        else:
+            body = {"jsonrpc": "2.0", "id": rid, "error": {"code": -32601, "message": "no"}}
+        return {"status": 200, "body_text": json.dumps(body), "headers": {"mcp-session-id": "sess-xyz"}, "truncated": False}
+
+
+def _remote_action(action_type: str, arguments: dict, *, principal_id: str = "principal_owner") -> GovernedAction:
+    return _action(action_type, {"transport": "http", **arguments}, principal_id=principal_id)
+
+
+def test_remote_connect_lists_tools_over_http(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    store = SQLiteStore(ws)
+    fake = _FakeMcpHttp(tools=["search", "fetch"])
+    executor = McpConnectorExecutor(ws, store, http_fn=fake)
+    result = executor.execute(
+        _remote_action("mcp_connect", {"endpoint_url": "https://mcp.example.com/rpc", "name": "remote"}),
+        _principal(),
+    )
+    assert result.ok is True, result.reason_code
+    assert result.artifacts["transport"] == "http"
+    assert result.artifacts["server_name"] == "fake-remote-mcp"
+    assert set(result.artifacts["tools"]) == {"search", "fetch"}
+
+
+def test_remote_token_is_sent_but_never_leaks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws = _ws(tmp_path)
+    store = SQLiteStore(ws)
+    secret_token = "REMOTE-TOKEN-SECRET-4417"
+    monkeypatch.setenv("RAIKER_TEST_MCP_TOKEN", secret_token)
+    fake = _FakeMcpHttp()
+    executor = McpConnectorExecutor(ws, store, http_fn=fake)
+    # Seed a remote profile so the connection is recorded (owner-scoped).
+    sid = new_id("mcp_")
+    store.create_mcp_server(
+        server_id=sid, principal_id="principal_owner", name="remote",
+        command=[], template=None, transport="http", status="created",
+        endpoint_url="https://mcp.example.com/rpc", auth_ref="RAIKER_TEST_MCP_TOKEN",
+    )
+    result = executor.execute(
+        _remote_action("mcp_connect", {
+            "endpoint_url": "https://mcp.example.com/rpc",
+            "auth_ref": "RAIKER_TEST_MCP_TOKEN", "name": "remote", "server_id": sid,
+        }),
+        _principal(),
+    )
+    assert result.ok is True, result.reason_code
+    # The bearer token WAS sent to the server...
+    assert any(h == f"Bearer {secret_token}" for h in fake.seen_auth)
+    # ...but never appears in the artifacts (→ audit event) or the stored row.
+    assert secret_token not in json.dumps(result.artifacts)
+    row = store.get_mcp_server(sid, "principal_owner")
+    assert row is not None
+    assert secret_token not in json.dumps(row)
+    assert row["auth_ref"] == "RAIKER_TEST_MCP_TOKEN"  # only the reference is stored
+
+
+def test_remote_call_tool_redacts_output(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    store = SQLiteStore(ws)
+    secret = "REMOTE-PAYLOAD-9931"
+    executor = McpConnectorExecutor(ws, store, http_fn=_FakeMcpHttp(echo_text=secret))
+    result = executor.execute(
+        _remote_action("mcp_call_tool", {
+            "endpoint_url": "https://mcp.example.com/rpc", "name": "remote",
+            "tool_name": "remote_echo", "tool_arguments": {"text": secret},
+        }),
+        _principal(),
+    )
+    assert result.ok is True, result.reason_code
+    assert result.artifacts["content_length"] == len(secret)
+    assert secret not in json.dumps(result.artifacts)
+
+
+def test_remote_invalid_endpoint_fails_closed(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    store = SQLiteStore(ws)
+    executor = McpConnectorExecutor(ws, store, http_fn=_FakeMcpHttp())
+    result = executor.execute(
+        _remote_action("mcp_connect", {"endpoint_url": "ftp://nope", "name": "remote"}),
+        _principal(),
+    )
+    assert result.ok is False
+    assert result.reason_code == "mcp_remote_invalid_endpoint"
+
+
+def test_remote_missing_token_fails_closed(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    store = SQLiteStore(ws)
+    executor = McpConnectorExecutor(ws, store, http_fn=_FakeMcpHttp())
+    result = executor.execute(
+        _remote_action("mcp_connect", {
+            "endpoint_url": "https://mcp.example.com/rpc",
+            "auth_ref": "RAIKER_DEFINITELY_UNSET_TOKEN_VAR", "name": "remote",
+        }),
+        _principal(),
+    )
+    assert result.ok is False
+    assert result.reason_code == "mcp_remote_token_missing"
+
+
+def test_remote_unreachable_fails_closed(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    store = SQLiteStore(ws)
+
+    def boom(url: str, payload: dict, **kw: Any) -> dict:
+        from raiker.runtime.executors.sandbox import SandboxError
+        raise SandboxError("mcp_remote_unreachable")
+
+    executor = McpConnectorExecutor(ws, store, http_fn=boom)
+    result = executor.execute(
+        _remote_action("mcp_connect", {"endpoint_url": "https://mcp.example.com/rpc", "name": "remote"}),
+        _principal(),
+    )
+    assert result.ok is False
+    assert result.reason_code == "mcp_remote_unreachable"
+
+
+def test_api_create_remote_connection_owner_scoped(tmp_path: Path) -> None:
+    ws, client = _mgmt_client(tmp_path, "remote_api")
+    resp = client.post("/api/mcp/servers/remote", json={
+        "name": "my remote", "endpoint_url": "https://mcp.example.com/rpc",
+        "auth_ref": "RAIKER_TEST_MCP_TOKEN",
+    })
+    assert resp.status_code == 200, resp.text
+    servers = client.get("/api/mcp/servers").json()
+    assert len(servers) == 1
+    row = servers[0]
+    assert row["transport"] == "http"
+    assert row["endpoint_url"] == "https://mcp.example.com/rpc"
+    # The API response scrubs token-like values defensively (the env-var *name*
+    # contains "token"), so the reference comes back present-but-redacted...
+    assert row["auth_ref"] in ("RAIKER_TEST_MCP_TOKEN", "***REDACTED***")
+    assert "Bearer" not in json.dumps(row)
+    # ...while the stored reference is exact and holds only the env-var name.
+    db_row = SQLiteStore(ws).get_mcp_server(row["server_id"], "principal_owner")
+    assert db_row is not None
+    assert db_row["auth_ref"] == "RAIKER_TEST_MCP_TOKEN"
+
+
+def test_api_create_remote_rejects_bad_url(tmp_path: Path) -> None:
+    _ws2, client = _mgmt_client(tmp_path, "remote_api_bad")
+    resp = client.post("/api/mcp/servers/remote", json={
+        "name": "bad", "endpoint_url": "not-a-url",
+    })
+    assert resp.status_code == 422
+    assert resp.json()["detail"]["reason_code"] == "mcp_remote_invalid_endpoint"
+
+
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-q"]))

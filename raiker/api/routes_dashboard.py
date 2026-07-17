@@ -14,6 +14,7 @@ from raiker.api.schemas import (
     BulkDeleteSessionsRequest,
     CreateMcpServerRequest,
     CreateProjectRequest,
+    CreateRemoteMcpServerRequest,
     ModelConnectionRequest,
     MoveProjectRequest,
     RenameMcpServerRequest,
@@ -123,7 +124,11 @@ def _mcp_result(result: Any) -> dict[str, Any]:
     if result.ok:
         return {"ok": True, **result.data}
     reason = result.reason_code or ""
-    if reason.startswith("mcp_invalid_server_name") or reason.startswith("invalid"):
+    if (
+        reason.startswith("mcp_invalid_server_name")
+        or reason.startswith("mcp_remote_invalid_endpoint")
+        or reason.startswith("invalid")
+    ):
         code = status.HTTP_422_UNPROCESSABLE_CONTENT
     else:
         code = status.HTTP_403_FORBIDDEN
@@ -145,6 +150,22 @@ async def create_mcp_server(
     """
     return _mcp_result(
         _service(request).create_mcp_server(auth_data[0].principal_id, body.name, body.template)
+    )
+
+
+@router.post("/api/mcp/servers/remote")
+async def create_remote_mcp_server(
+    body: CreateRemoteMcpServerRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Add a remote (HTTP) MCP connection (owner-added, monitored — not
+    allowlist-blocked). The owner token is never stored; ``auth_ref`` names the
+    env var that holds it. Test-connect (governed) makes the actual reach."""
+    return _mcp_result(
+        _service(request).create_remote_mcp_server(
+            auth_data[0].principal_id, body.name, body.endpoint_url, body.auth_ref
+        )
     )
 
 

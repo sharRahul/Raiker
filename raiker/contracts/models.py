@@ -97,6 +97,10 @@ EVENT_TYPES = {
     # restored. Reversible; never deletes transcripts, events, or permissions.
     "session_archived",
     "session_unarchived",
+    # An owner added or removed an MCP connection profile (local or remote). The
+    # payload is redacted metadata only (name, transport, host) — never a token.
+    "mcp_connection_added",
+    "mcp_connection_removed",
     "task_created",
     "task_started",
     "task_progress",

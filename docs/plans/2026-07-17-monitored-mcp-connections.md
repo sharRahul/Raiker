@@ -91,21 +91,33 @@ New `EVENT_TYPES`: `mcp_connection_added`, `mcp_connection_removed`,
 
 **Security flag:** `security`
 
-- [ ] **A1. Failing tests first** for: connecting a remote MCP server by URL +
-  owner token completes an `initialize` + `tools/list` over HTTP; a bad/unreachable
-  URL fails closed with a redacted reason; the token never appears in any event,
-  artifact, or stored row; owner isolation on the profile.
-- [ ] **A2. Verify RED.**
-- [ ] **A3. Implement** an HTTP JSON-RPC session in `McpConnectorExecutor`
-  (bounded body/timeouts, redacted metadata only) selected when
-  `transport == "http"`. The endpoint host is **recorded** (for monitoring), and
-  the request is made through the governed HTTP helper; the owner-added URL is
-  the authorization. Store `endpoint_url` + `auth_ref`; token lives in the owner
-  credential store, injected at call time, never persisted in `mcp_servers`.
-- [ ] **A4. Routes/service:** extend create/connect so a connection can be
-  `stdio` (template) or `http` (url + token). Emit `mcp_connection_added`.
-- [ ] **A5. Verify GREEN** + threat model doc `docs/threat-models/mcp-remote.md`
-  (records what is monitored, the kill/pause contract, redaction guarantees).
+- [x] **A1. Failing tests first** — 8 cases in `tests/test_mcp_runtime.py`
+  (remote connect + tools/list over HTTP via an injectable transport; token sent
+  as bearer but never in artifacts/events/rows; invalid-URL / missing-token /
+  unreachable fail closed; redacted tool output; API create-remote + owner
+  isolation + bad-URL 422).
+- [x] **A2. Verify RED.**
+- [x] **A3. Implement** — an HTTP JSON-RPC session in `McpConnectorExecutor`
+  selected when `transport == "http"`, via `sandbox.post_json_rpc` (bounded
+  body/timeout, returns headers so `Mcp-Session-Id` carries; injectable `http_fn`
+  for tests). Migration `RAIKER-1018-mcp-remote-endpoint` adds `endpoint_url` +
+  `auth_ref`; `update_mcp_server_runtime` refreshes only runtime fields so a
+  re-test never wipes the endpoint. The token is read from the env var named by
+  `auth_ref` at call time — only the reference is stored, never the token.
+- [x] **A4. Routes/service** — `RuntimeControlService.create_remote_mcp_server`
+  (human-only, owner-scoped, emits `mcp_connection_added`); `connect_mcp_server`
+  is transport-aware; `POST /api/mcp/servers/remote`; `McpServerView` carries
+  `endpoint_url`/`auth_ref`.
+- [x] **A5. Verify GREEN** + `docs/threat-models/mcp-remote.md`.
+
+Result 2026-07-17: `EXIT=0`, 39 MCP tests pass (8 new). Full suite **1926 passed**;
+`ruff` clean; `mypy` 421 files clean; all five repo validators PASS. A **live
+end-to-end drive over real HTTP** (a local stdlib MCP server on `127.0.0.1` +
+Raiker's default transport) connected, listed tools, called a tool with a secret
+(redacted — only the length surfaced), confirmed the bearer token reached the
+server but never entered any stored row, and failed closed on missing-token and
+invalid-endpoint. **Phases B–D (monitoring, notify/kill/auto-pause, Connections
+UI) are next.**
 
 ## Phase B — Monitoring & anomaly detection
 

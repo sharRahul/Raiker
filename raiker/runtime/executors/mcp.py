@@ -21,16 +21,19 @@ builder + connector are testable end-to-end without any network.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.runtime.executors.base import ExecutionResult
-from raiker.runtime.executors.sandbox import SandboxError
+from raiker.runtime.executors.sandbox import SandboxError, post_json_rpc
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -275,31 +278,45 @@ class McpBuilderExecutor:
 # ── Connector ────────────────────────────────────────────────────────────────
 
 
+HttpFn = Callable[..., dict[str, Any]]
+
+
+def _default_http_fn(
+    url: str, payload: dict[str, Any], *, headers: dict[str, str], timeout: float, max_bytes: int
+) -> dict[str, Any]:
+    return post_json_rpc(url, payload, headers=headers, timeout=timeout, max_bytes=max_bytes)
+
+
 class McpConnectorExecutor:
-    """Real executor for ``mcp_connector_runtime`` — a bounded local stdio call.
+    """Real executor for ``mcp_connector_runtime`` — a bounded MCP session.
 
     Reached only through ``route_action`` (gate + decision mode + approval
-    already applied). It validates the command against the interpreter
-    allowlist and the workspace-relative argument rule, then runs a bounded
-    JSON-RPC stdio session (initialize → tools/list or tools/call). Tool output
-    is returned as redacted metadata only — the raw content never enters the
-    artifacts (and therefore never the audit event).
+    already applied). Two transports:
+
+    - ``stdio`` (default): validates the command against the interpreter
+      allowlist and the workspace-relative argument rule, then runs a bounded
+      local JSON-RPC stdio session.
+    - ``http``: connects to an owner-added remote MCP endpoint (URL + optional
+      owner token) and runs a bounded JSON-RPC-over-HTTP session. The owner
+      adding the URL is the authorization — the connection is *monitored*, not
+      allowlist-blocked (see the Security Philosophy).
+
+    Either way, tool output is returned as redacted metadata only — the raw
+    content, and any owner token, never enter the artifacts or the audit event.
     """
 
     capability = "mcp_connector_runtime"
 
-    def __init__(self, workspace_root: str | Path, store: SQLiteStore) -> None:
+    def __init__(
+        self, workspace_root: str | Path, store: SQLiteStore, *, http_fn: HttpFn | None = None
+    ) -> None:
         self._ws = Path(workspace_root).resolve()
         self._store = store
+        # Injectable so the remote path is testable without a live network.
+        self._http_fn: HttpFn = http_fn or _default_http_fn
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         principal_id = principal.principal_id if principal is not None else action.principal_id
-        command = [str(part) for part in action.arguments.get("command", [])]
-
-        reason = self._validate_command(command)
-        if reason is not None:
-            return self._fail(action.action_id, reason)
-
         try:
             requested = float(action.arguments.get("timeout", MCP_SESSION_TIMEOUT))
         except (TypeError, ValueError):
@@ -307,6 +324,8 @@ class McpConnectorExecutor:
         timeout = min(max(requested, 1.0), _MAX_TIMEOUT)
         operation = action.action_type
 
+        # Build the JSON-RPC request set for this operation.
+        tool_name: str | None = None
         if operation == "mcp_call_tool":
             tool_name = str(action.arguments.get("tool_name", "")).strip()
             if not tool_name:
@@ -314,10 +333,140 @@ class McpConnectorExecutor:
             tool_arguments = action.arguments.get("tool_arguments") or {}
             if not isinstance(tool_arguments, dict):
                 return self._fail(action.action_id, "mcp_tool_arguments_invalid")
-            return self._call_tool(action, principal_id, command, tool_name, tool_arguments, timeout)
+            requests = [
+                _initialize_rpc(),
+                _notification("notifications/initialized"),
+                _rpc(3, "tools/call", {"name": tool_name, "arguments": tool_arguments}),
+            ]
+        else:  # mcp_connect / mcp_list_tools both initialize + enumerate tools.
+            requests = [
+                _initialize_rpc(),
+                _notification("notifications/initialized"),
+                _rpc(2, "tools/list", {}),
+            ]
 
-        # mcp_connect and mcp_list_tools both initialize + enumerate tools.
-        return self._connect_or_list(action, principal_id, command, timeout)
+        transport = str(action.arguments.get("transport", "stdio")).strip() or "stdio"
+        if transport == "http":
+            return self._execute_http(action, principal_id, operation, tool_name, requests, timeout)
+        return self._execute_stdio(action, principal_id, operation, tool_name, requests, timeout)
+
+    # ── transport dispatch ──
+    def _execute_stdio(
+        self,
+        action: GovernedAction,
+        principal_id: str,
+        operation: str,
+        tool_name: str | None,
+        requests: list[dict[str, Any]],
+        timeout: float,
+    ) -> ExecutionResult:
+        command = [str(part) for part in action.arguments.get("command", [])]
+        reason = self._validate_command(command)
+        if reason is not None:
+            return self._fail(action.action_id, reason)
+        try:
+            responses = self._run_session(command, requests, timeout)
+        except SandboxError as exc:
+            return self._fail(action.action_id, str(exc))
+        return self._finish(
+            action, principal_id, responses, operation, tool_name,
+            transport="stdio", command=command, endpoint_url=None,
+        )
+
+    def _execute_http(
+        self,
+        action: GovernedAction,
+        principal_id: str,
+        operation: str,
+        tool_name: str | None,
+        requests: list[dict[str, Any]],
+        timeout: float,
+    ) -> ExecutionResult:
+        endpoint_url = str(action.arguments.get("endpoint_url", "")).strip()
+        if urlparse(endpoint_url).scheme not in ("http", "https") or not urlparse(endpoint_url).netloc:
+            return self._fail(action.action_id, "mcp_remote_invalid_endpoint")
+        token, token_error = self._resolve_remote_token(
+            str(action.arguments.get("auth_ref", "")).strip() or None
+        )
+        if token_error is not None:
+            return self._fail(action.action_id, token_error)
+        try:
+            responses = self._run_http_session(endpoint_url, token, requests, timeout)
+        except SandboxError as exc:
+            return self._fail(action.action_id, str(exc))
+        return self._finish(
+            action, principal_id, responses, operation, tool_name,
+            transport="http", command=[], endpoint_url=endpoint_url,
+        )
+
+    @staticmethod
+    def _resolve_remote_token(auth_ref: str | None) -> tuple[str | None, str | None]:
+        """Resolve the owner token for a remote endpoint from the env var named
+        by ``auth_ref``. ``None`` auth_ref means an open server (no token). A
+        named-but-absent env var fails closed (missing prerequisite)."""
+        if not auth_ref:
+            return None, None
+        token = os.environ.get(auth_ref)
+        if not token:
+            return None, "mcp_remote_token_missing"
+        return token, None
+
+    # ── result interpretation (shared by both transports) ──
+    def _finish(
+        self,
+        action: GovernedAction,
+        principal_id: str,
+        responses: dict[Any, dict[str, Any]],
+        operation: str,
+        tool_name: str | None,
+        *,
+        transport: str,
+        command: list[str],
+        endpoint_url: str | None,
+    ) -> ExecutionResult:
+        if operation == "mcp_call_tool":
+            reason, blocks, length = _extract_call(responses)
+            if reason is not None:
+                return self._fail(action.action_id, reason)
+            self._record_connection(
+                action, principal_id, transport=transport,
+                command=command, endpoint_url=endpoint_url,
+            )
+            return ExecutionResult(
+                ok=True,
+                capability=self.capability,
+                action_id=action.action_id,
+                summary=f"MCP tool '{tool_name}' returned {length} char(s); content withheld.",
+                artifacts={
+                    "tool_name": tool_name,
+                    "content_blocks": blocks,
+                    "content_length": length,
+                    "content_redacted": True,
+                },
+            )
+        reason, tool_names, init_result = _extract_tools(responses)
+        if reason is not None:
+            return self._fail(action.action_id, reason)
+        server_info = init_result.get("serverInfo") or {}
+        self._record_connection(
+            action, principal_id, transport=transport,
+            command=command, endpoint_url=endpoint_url, tools=tool_names,
+        )
+        label = "remote HTTP" if transport == "http" else "stdio"
+        return ExecutionResult(
+            ok=True,
+            capability=self.capability,
+            action_id=action.action_id,
+            summary=f"MCP {label} session listed {len(tool_names)} tool(s); payloads withheld.",
+            artifacts={
+                "server_name": str(server_info.get("name", "")),
+                "protocol_version": str(init_result.get("protocolVersion", "")),
+                "transport": transport,
+                "tool_count": len(tool_names),
+                "tools": tool_names,
+                "content_redacted": True,
+            },
+        )
 
     # ── validation ──
     def _validate_command(self, command: list[str]) -> str | None:
@@ -330,105 +479,35 @@ class McpConnectorExecutor:
                 return "mcp_argument_path_not_workspace_relative"
         return None
 
-    # ── operations ──
-    def _connect_or_list(
-        self,
-        action: GovernedAction,
-        principal_id: str,
-        command: list[str],
-        timeout: float,
-    ) -> ExecutionResult:
-        requests = [
-            _rpc(1, "initialize", {
-                "protocolVersion": MCP_PROTOCOL_VERSION,
-                "capabilities": {},
-                "clientInfo": {"name": "raiker", "version": "1.0.0"},
-            }),
-            _notification("notifications/initialized"),
-            _rpc(2, "tools/list", {}),
-        ]
-        try:
-            responses = self._run_session(command, requests, timeout)
-        except SandboxError as exc:
-            return self._fail(action.action_id, str(exc))
-
-        init = responses.get(1)
-        if init is None or "result" not in init:
-            return self._fail(action.action_id, "mcp_initialize_failed")
-        tools_resp = responses.get(2)
-        if tools_resp is None or "result" not in tools_resp:
-            return self._fail(action.action_id, "mcp_list_tools_failed")
-        tools = tools_resp["result"].get("tools") or []
-        tool_names = [str(t.get("name", "")) for t in tools if isinstance(t, dict)]
-        server_info = init["result"].get("serverInfo") or {}
-
-        self._record_connection(action, principal_id, command, tools=tool_names)
-        return ExecutionResult(
-            ok=True,
-            capability=self.capability,
-            action_id=action.action_id,
-            summary=f"MCP stdio session listed {len(tool_names)} tool(s); payloads withheld.",
-            artifacts={
-                "server_name": str(server_info.get("name", "")),
-                "protocol_version": str(init["result"].get("protocolVersion", "")),
-                "tool_count": len(tool_names),
-                "tools": tool_names,
-                "content_redacted": True,
-            },
-        )
-
-    def _call_tool(
-        self,
-        action: GovernedAction,
-        principal_id: str,
-        command: list[str],
-        tool_name: str,
-        tool_arguments: dict[str, Any],
-        timeout: float,
-    ) -> ExecutionResult:
-        requests = [
-            _rpc(1, "initialize", {
-                "protocolVersion": MCP_PROTOCOL_VERSION,
-                "capabilities": {},
-                "clientInfo": {"name": "raiker", "version": "1.0.0"},
-            }),
-            _notification("notifications/initialized"),
-            _rpc(3, "tools/call", {"name": tool_name, "arguments": tool_arguments}),
-        ]
-        try:
-            responses = self._run_session(command, requests, timeout)
-        except SandboxError as exc:
-            return self._fail(action.action_id, str(exc))
-
-        init = responses.get(1)
-        if init is None or "result" not in init:
-            return self._fail(action.action_id, "mcp_initialize_failed")
-        call = responses.get(3)
-        if call is None:
-            return self._fail(action.action_id, "mcp_tool_call_no_response")
-        if "error" in call:
-            # Redact the server's message; keep only that it was a tool error.
-            return self._fail(action.action_id, "mcp_tool_error")
-        result = call.get("result") or {}
-        if result.get("isError"):
-            return self._fail(action.action_id, "mcp_tool_reported_error")
-        content = result.get("content") or []
-        content_length = sum(
-            len(str(block.get("text", ""))) for block in content if isinstance(block, dict)
-        )
-        self._record_connection(action, principal_id, command)
-        return ExecutionResult(
-            ok=True,
-            capability=self.capability,
-            action_id=action.action_id,
-            summary=f"MCP tool '{tool_name}' returned {content_length} char(s); content withheld.",
-            artifacts={
-                "tool_name": tool_name,
-                "content_blocks": len(content),
-                "content_length": content_length,
-                "content_redacted": True,
-            },
-        )
+    # ── remote HTTP session ──
+    def _run_http_session(
+        self, endpoint_url: str, token: str | None, requests: list[dict[str, Any]], timeout: float
+    ) -> dict[Any, dict[str, Any]]:
+        """Run a bounded JSON-RPC-over-HTTP session against an owner-added MCP
+        endpoint. The owner token (if any) is sent as a bearer header and never
+        stored or returned. An ``Mcp-Session-Id`` from the initialize response
+        is carried to later requests. Raises :class:`SandboxError` with a
+        redacted reason on any transport failure."""
+        responses: dict[Any, dict[str, Any]] = {}
+        session_id: str | None = None
+        for req in requests:
+            headers: dict[str, str] = {}
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+            if session_id:
+                headers["Mcp-Session-Id"] = session_id
+            result = self._http_fn(
+                endpoint_url, req, headers=headers, timeout=timeout, max_bytes=MCP_MAX_OUTPUT_BYTES,
+            )
+            if result.get("truncated"):
+                raise SandboxError("mcp_response_too_large")
+            sid = result.get("headers", {}).get("mcp-session-id")
+            if sid:
+                session_id = str(sid)
+            for message in _parse_jsonrpc_body(str(result.get("body_text", ""))):
+                if isinstance(message, dict) and "id" in message:
+                    responses[message["id"]] = message
+        return responses
 
     # ── stdio session ──
     def _run_session(
@@ -481,41 +560,52 @@ class McpConnectorExecutor:
         self,
         action: GovernedAction,
         principal_id: str,
+        *,
+        transport: str,
         command: list[str],
+        endpoint_url: str | None,
         tools: list[str] | None = None,
     ) -> None:
-        """Persist/refresh an owner-scoped 'connected' profile for the command,
-        including the tool names the handshake discovered (names only).
+        """Persist/refresh an owner-scoped 'connected' profile, including the tool
+        names the handshake discovered (names only).
 
         Best-effort bookkeeping only — a storage hiccup must never turn a
         successful governed read into a failure, so this swallows write errors.
-        Prefers an existing profile addressed by ``server_id`` (so a re-test of a
-        page-listed server updates that row) and otherwise falls back to the
-        server name.
+        An existing profile (addressed by ``server_id`` or name) has only its
+        *runtime* fields refreshed, so a re-test never wipes a stored endpoint or
+        auth reference. A missing profile (the stdio ad-hoc direct-executor path)
+        is created.
         """
         server_id_arg = str(action.arguments.get("server_id", "")).strip()
-        existing = None
-        if server_id_arg:
-            existing = self._store.get_mcp_server(server_id_arg, principal_id)
+        existing = (
+            self._store.get_mcp_server(server_id_arg, principal_id) if server_id_arg else None
+        )
         name = _normalize_server_name(str(action.arguments.get("name", "")))
         if existing is None and name is not None:
             existing = self._store.get_mcp_server_by_name(principal_id, name)
-        resolved_name = (
-            str(existing["name"]) if existing else (name or _normalize_server_name(Path(command[-1]).stem) or "mcp-server")
-        )
         try:
-            server_id = str(existing["server_id"]) if existing else new_id("mcp_")
-            template = existing.get("template") if existing else None
+            if existing is not None:
+                self._store.update_mcp_server_runtime(
+                    str(existing["server_id"]), principal_id,
+                    status="connected", tools=tools or [], last_connected_at=utc_now(),
+                )
+                return
+            fallback = (
+                name
+                or (_normalize_server_name(Path(command[-1]).stem) if command else None)
+                or "mcp-server"
+            )
             self._store.create_mcp_server(
-                server_id=server_id,
+                server_id=new_id("mcp_"),
                 principal_id=principal_id,
-                name=resolved_name,
+                name=fallback,
                 command=command,
-                template=template,
-                transport="stdio",
+                template=None,
+                transport=transport,
                 status="connected",
                 last_connected_at=utc_now(),
-                tools=tools if tools is not None else [],
+                tools=tools or [],
+                endpoint_url=endpoint_url,
             )
         except Exception:  # noqa: BLE001 - bookkeeping must not fail the read
             return
@@ -537,3 +627,80 @@ def _rpc(request_id: int, method: str, params: dict[str, Any]) -> dict[str, Any]
 
 def _notification(method: str) -> dict[str, Any]:
     return {"jsonrpc": "2.0", "method": method}
+
+
+def _initialize_rpc() -> dict[str, Any]:
+    return _rpc(1, "initialize", {
+        "protocolVersion": MCP_PROTOCOL_VERSION,
+        "capabilities": {},
+        "clientInfo": {"name": "raiker", "version": "1.0.0"},
+    })
+
+
+def _extract_tools(
+    responses: dict[Any, dict[str, Any]],
+) -> tuple[str | None, list[str], dict[str, Any]]:
+    """Interpret an initialize + tools/list exchange. Returns
+    (error_reason_or_None, tool_names, initialize_result)."""
+    init = responses.get(1)
+    if init is None or "result" not in init:
+        return "mcp_initialize_failed", [], {}
+    tools_resp = responses.get(2)
+    if tools_resp is None or "result" not in tools_resp:
+        return "mcp_list_tools_failed", [], {}
+    tools = tools_resp["result"].get("tools") or []
+    names = [str(t.get("name", "")) for t in tools if isinstance(t, dict)]
+    return None, names, init["result"]
+
+
+def _extract_call(responses: dict[Any, dict[str, Any]]) -> tuple[str | None, int, int]:
+    """Interpret an initialize + tools/call exchange. Returns
+    (error_reason_or_None, content_block_count, content_length). The tool's raw
+    content never leaves this function — only its size."""
+    init = responses.get(1)
+    if init is None or "result" not in init:
+        return "mcp_initialize_failed", 0, 0
+    call = responses.get(3)
+    if call is None:
+        return "mcp_tool_call_no_response", 0, 0
+    if "error" in call:
+        return "mcp_tool_error", 0, 0
+    result = call.get("result") or {}
+    if result.get("isError"):
+        return "mcp_tool_reported_error", 0, 0
+    content = result.get("content") or []
+    length = sum(len(str(b.get("text", ""))) for b in content if isinstance(b, dict))
+    return None, len(content), length
+
+
+def _parse_jsonrpc_body(body: str) -> list[dict[str, Any]]:
+    """Parse a JSON-RPC HTTP response body into messages, tolerating a single
+    object, a JSON array, SSE ``data:`` framing, or newline-delimited JSON."""
+    body = body.strip()
+    if not body:
+        return []
+    stripped = body.lstrip()
+    if stripped.startswith(("event:", "data:", ":")):
+        out: list[dict[str, Any]] = []
+        for line in body.splitlines():
+            line = line.strip()
+            if line.startswith("data:"):
+                with contextlib.suppress(ValueError):
+                    out.append(json.loads(line[5:].strip()))
+        return out
+    try:
+        parsed = json.loads(body)
+    except ValueError:
+        parsed = None
+    if isinstance(parsed, dict):
+        return [parsed]
+    if isinstance(parsed, list):
+        return [m for m in parsed if isinstance(m, dict)]
+    out = []
+    for line in body.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        with contextlib.suppress(ValueError):
+            out.append(json.loads(line))
+    return out

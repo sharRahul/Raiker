@@ -130,6 +130,26 @@ Control Deck commit.
   `App.svelte`. Tests: 9 new API cases in `tests/test_mcp_runtime.py` (31 total)
   + `McpView.test.ts` (4). Full suite 1918 passed; web check/lint/test/build
   green; live browser drive screenshotted (create → test → connected with tools).
+- **Monitored MCP connections — Phase A (remote HTTP transport) is implemented
+  on this branch.** Following the Security Philosophy (allow + monitor, not
+  block), `McpConnectorExecutor` gained an `http` transport: `mcp_connect` /
+  `mcp_list_tools` / `mcp_call_tool` run a bounded JSON-RPC-over-HTTP session
+  against an owner-added `endpoint_url` via `sandbox.post_json_rpc` (bounded
+  body/timeout, returns headers for `Mcp-Session-Id`; injectable `http_fn`). The
+  owner token is read from the env var named by `auth_ref` at call time — only
+  the reference is stored, never the token; artifacts/events stay redacted.
+  Migration `RAIKER-1018-mcp-remote-endpoint` (`endpoint_url`, `auth_ref`);
+  `update_mcp_server_runtime` refreshes only runtime fields (no endpoint wipe);
+  `RuntimeControlService.create_remote_mcp_server` (human-only, emits
+  `mcp_connection_added`) + transport-aware `connect_mcp_server`; route
+  `POST /api/mcp/servers/remote`; `McpServerView` carries `endpoint_url`/`auth_ref`.
+  Tests: 8 new in `tests/test_mcp_runtime.py` (39 total). Full suite 1926 passed;
+  ruff/mypy clean; five validators pass; a live real-HTTP drive (local MCP server
+  on 127.0.0.1) verified connect/list/redacted-call/token-never-stored/fail-closed.
+  Threat model `docs/threat-models/mcp-remote.md`. **Phases B–D (per-session
+  monitoring + anomaly findings, notify + kill switch + revocable auto-pause, and
+  the Connections "Connect via MCP" UI) are the next slices** — see
+  `docs/plans/2026-07-17-monitored-mcp-connections.md`.
 - **Plan Tasks 5–11 are not started** (verified against the tree): no
   `raiker/security/` package (credentials/monitoring) and neither
   `tests/test_credential_security.py` nor `tests/test_runtime_monitoring.py`

@@ -261,6 +261,17 @@ class RenameMcpServerRequest(BaseModel):
     name: str
 
 
+class CreateRemoteMcpServerRequest(BaseModel):
+    # Add a remote (HTTP) MCP connection (monitored MCP connections, Phase A).
+    # `endpoint_url` is the owner-added server URL; `auth_ref` optionally names
+    # the env var holding the owner token (never the token itself).
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    endpoint_url: str
+    auth_ref: str | None = None
+
+
 class SetSessionTagsRequest(BaseModel):
     # Replace the tag set for one session. Tags are organizing labels only —
     # they grant nothing. The server normalizes (trim, lowercase, dedupe,

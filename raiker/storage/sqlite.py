@@ -3921,11 +3921,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def load_attachment(self, attachment_id: str, *, owner_principal_id: str | None = None) -> dict[str, Any] | None:
         """Return the stored attachment (metadata + raw bytes), or None if unknown."""
+        # ``None`` means "no owner scoping requested"; an empty string is a
+        # caller bug that must fail closed (match nothing), never drop the
+        # predicate and expose every owner's bytes.
+        scoped = owner_principal_id is not None
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT * FROM attachments WHERE attachment_id = ?"
-                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
-                (attachment_id, *([owner_principal_id] if owner_principal_id else [])),
+                + (" AND owner_principal_id = ?" if scoped else ""),
+                (attachment_id, *([owner_principal_id] if scoped else [])),
             ).fetchone()
         if row is None:
             return None
@@ -3935,13 +3939,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def load_attachment_metadata(self, attachment_id: str, *, owner_principal_id: str | None = None) -> dict[str, Any] | None:
         """Return attachment metadata only — the bytes never ride this path."""
+        # ``None`` disables owner scoping; an empty string fails closed rather
+        # than dropping the predicate (see ``load_attachment``).
+        scoped = owner_principal_id is not None
         with self.connect() as connection:
             row = connection.execute(
                 """
                 SELECT attachment_id, kind, filename, media_type, byte_size, sha256, created_at
                 FROM attachments WHERE attachment_id = ?
-                """ + (" AND owner_principal_id = ?" if owner_principal_id else ""),
-                (attachment_id, *([owner_principal_id] if owner_principal_id else [])),
+                """ + (" AND owner_principal_id = ?" if scoped else ""),
+                (attachment_id, *([owner_principal_id] if scoped else [])),
             ).fetchone()
         return dict(row) if row is not None else None
 

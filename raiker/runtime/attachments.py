@@ -73,6 +73,12 @@ MAX_PDF_PAGES = 100
 # cap in this layer; the gatherer additionally caps to its own per-item budget.
 MAX_DOCUMENT_TEXT_CHARS = 200_000
 
+# Hard cap on the *decompressed* size of a .docx's ``word/document.xml``. A
+# ``.docx`` is a zip; the byte cap governs the compressed upload, but a small
+# archive can inflate to gigabytes (a zip bomb). The extractor reads the entry
+# through this bound and rejects anything larger instead of buffering it whole.
+MAX_DOCX_XML_BYTES = 50_000_000
+
 # Largest attachment of any kind, used to size the upload route's body cap.
 MAX_ATTACHMENT_BYTES = max(MAX_IMAGE_BYTES, MAX_DOCUMENT_BYTES)
 
@@ -195,11 +201,15 @@ def _validate_pdf(data: bytes) -> None:
         raise AttachmentValidationError("pdf_no_pages")
 
 
-def _validate_docx(data: bytes) -> None:
-    """Fail closed unless ``data`` is a real Word (.docx) OOXML package."""
-    # A .docx is a ZIP (PK\x03\x04) whose payload contains word/document.xml.
-    if not data.startswith(b"PK\x03\x04"):
-        raise AttachmentValidationError("content_does_not_match_media_type")
+def _read_docx_document_xml(data: bytes) -> bytes:
+    """Return ``word/document.xml`` bytes, failing closed on a bomb or DTD.
+
+    Reads the entry through ``MAX_DOCX_XML_BYTES`` so a zip bomb cannot buffer
+    an unbounded blob, and rejects any XML carrying a ``<!DOCTYPE`` (the only
+    way to define the internal entities behind a billion-laughs expansion). A
+    genuine ``.docx`` ``document.xml`` has no DOCTYPE, so this never rejects a
+    real file. Callers must have confirmed the ``PK\\x03\\x04`` magic first.
+    """
     import io
     import zipfile
 
@@ -207,8 +217,25 @@ def _validate_docx(data: bytes) -> None:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             if "word/document.xml" not in archive.namelist():
                 raise AttachmentValidationError("content_does_not_match_media_type")
+            with archive.open("word/document.xml") as entry:
+                xml_bytes = entry.read(MAX_DOCX_XML_BYTES + 1)
     except zipfile.BadZipFile as exc:
         raise AttachmentValidationError("content_does_not_match_media_type") from exc
+    if len(xml_bytes) > MAX_DOCX_XML_BYTES:
+        raise AttachmentValidationError("docx_too_large")
+    # XML mandates uppercase ``DOCTYPE``; an exact byte scan is cheap over the
+    # bounded buffer and blocks internal-entity (billion-laughs) expansion.
+    if b"<!DOCTYPE" in xml_bytes:
+        raise AttachmentValidationError("content_does_not_match_media_type")
+    return xml_bytes
+
+
+def _validate_docx(data: bytes) -> None:
+    """Fail closed unless ``data`` is a real Word (.docx) OOXML package."""
+    # A .docx is a ZIP (PK\x03\x04) whose payload contains word/document.xml.
+    if not data.startswith(b"PK\x03\x04"):
+        raise AttachmentValidationError("content_does_not_match_media_type")
+    _read_docx_document_xml(data)  # bounded read + DTD rejection (fails closed)
 
 
 def validate_document(media_type: str, data: bytes) -> None:
@@ -264,13 +291,10 @@ def _extract_pdf_text(data: bytes) -> str:
 
 def _extract_docx_text(data: bytes) -> str:
     """Bounded local text extraction from a validated .docx (stdlib only)."""
-    import io
     import xml.etree.ElementTree as ET
-    import zipfile
 
     ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-    with zipfile.ZipFile(io.BytesIO(data)) as archive:
-        xml_bytes = archive.read("word/document.xml")
+    xml_bytes = _read_docx_document_xml(data)  # bounded + DTD-free (fails closed)
     root = ET.fromstring(xml_bytes)
     # Join paragraph text: each <w:p> becomes a line, <w:t> runs its text.
     lines: list[str] = []

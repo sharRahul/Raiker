@@ -3,12 +3,22 @@ from __future__ import annotations
 import hashlib
 import secrets
 from dataclasses import dataclass
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from raiker.contracts.ids import utc_now
 from raiker.storage.sqlite import SQLiteStore
+
+
+def _parse_ts(value: str) -> datetime:
+    """Parse an ISO-8601 UTC timestamp regardless of ``Z`` vs ``+00:00`` suffix.
+
+    ``utc_now()`` emits ``...Z`` while ``create_session`` persists ``...+00:00``;
+    a lexical string compare of the two disagrees at an identical second (``Z`` >
+    ``+``), so expiry checks must compare parsed datetimes, not strings.
+    """
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 @dataclass(frozen=True)
@@ -23,12 +33,12 @@ class ApiSession:
     absolute_expires_at: str | None = None
 
     def is_expired(self, now: str | None = None) -> bool:
-        check = now or utc_now()
-        if self.absolute_expires_at is not None and check > self.absolute_expires_at:
+        check = _parse_ts(now or utc_now())
+        if self.absolute_expires_at is not None and check > _parse_ts(self.absolute_expires_at):
             return True
         if self.expires_at is None:
             return False
-        return check > self.expires_at
+        return check > _parse_ts(self.expires_at)
 
 
 def _hash_token(token: str) -> str:

@@ -121,6 +121,7 @@ class RateLimitMiddleware:
         self._max = max_requests
         self._window = window_seconds
         self._hits: dict[str, deque[float]] = defaultdict(deque)
+        self._last_sweep = time.monotonic()
 
     def _client_key(self, scope: Scope) -> str:
         client = scope.get("client")
@@ -128,11 +129,24 @@ class RateLimitMiddleware:
             return str(client[0])
         return "unknown"
 
+    def _sweep(self, now: float) -> None:
+        # Drop per-IP deques that have fully aged out. Without this, one entry
+        # per distinct source IP accumulates forever — an unbounded memory leak
+        # (and slow DoS) on an exposed bind where an attacker rotates IPs. The
+        # sweep runs at most once per window, so it stays O(n) and infrequent.
+        cutoff = now - self._window
+        stale = [key for key, hits in self._hits.items() if not hits or hits[-1] < cutoff]
+        for key in stale:
+            del self._hits[key]
+        self._last_sweep = now
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http" or not scope.get("path", "").startswith("/api"):
             await self.app(scope, receive, send)
             return
         now = time.monotonic()
+        if now - self._last_sweep >= self._window:
+            self._sweep(now)
         key = self._client_key(scope)
         hits = self._hits[key]
         cutoff = now - self._window

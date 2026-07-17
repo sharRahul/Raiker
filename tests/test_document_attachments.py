@@ -153,6 +153,35 @@ class TestDocumentValidation:
         with pytest.raises(AttachmentValidationError, match="content_does_not_match_media_type"):
             validate_document(DOCX_MEDIA_TYPE, buf.getvalue())
 
+    def test_docx_with_doctype_fails_closed(self) -> None:
+        # A DOCTYPE is the only way to define the internal entities behind a
+        # billion-laughs expansion; a real .docx never carries one.
+        doc_xml = (
+            b'<?xml version="1.0"?>'
+            b'<!DOCTYPE w:document [<!ENTITY a "boom">]>'
+            b'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            b"<w:body><w:p><w:r><w:t>&a;</w:t></w:r></w:p></w:body></w:document>"
+        )
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as archive:
+            archive.writestr("word/document.xml", doc_xml)
+        with pytest.raises(AttachmentValidationError, match="content_does_not_match_media_type"):
+            validate_document(DOCX_MEDIA_TYPE, buf.getvalue())
+
+    def test_docx_zip_bomb_fails_closed(self) -> None:
+        # A small archive whose document.xml inflates past the decompressed cap
+        # must be rejected instead of buffered whole (memory-exhaustion DoS).
+        from raiker.runtime.attachments import MAX_DOCX_XML_BYTES
+
+        bomb = b"<w:document>" + b" " * (MAX_DOCX_XML_BYTES + 1) + b"</w:document>"
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("word/document.xml", bomb)
+        payload = buf.getvalue()
+        assert len(payload) <= MAX_DOCUMENT_BYTES  # compresses tiny; would inflate hugely
+        with pytest.raises(AttachmentValidationError, match="docx_too_large"):
+            validate_document(DOCX_MEDIA_TYPE, payload)
+
 
 # ── extraction bounds ───────────────────────────────────────────────────────
 

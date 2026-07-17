@@ -192,7 +192,7 @@ python -m compileall -q raiker tests    # exit 0
 
 **Does NOT cover:** Archive does not delete transcripts, events, checkpoints, or permissions; delete remains separately confirmed and destructive.
 
-- [ ] **Step 1: Write failing API tests** for owner-scoped rename, archive, unarchive, list filtering, and cross-account refusal.
+- [x] **Step 1: Write failing API tests** for owner-scoped rename, archive, unarchive, list filtering, and cross-account refusal.
 
 ```python
 response = client.put("/api/sessions/sess_a/archive", headers=_auth(owner_token))
@@ -200,13 +200,15 @@ assert response.json() == {"ok": True, "session_id": "sess_a", "archived": True}
 assert "sess_a" not in [item["session_id"] for item in client.get("/api/sessions", headers=_auth(owner_token)).json()]
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `python -m pytest tests/test_session_lifecycle.py -q`
 
 Expected: 404 because archive/rename endpoints and storage state do not exist.
 
-- [ ] **Step 3: Add an idempotent migration and owner-checked operations**.
+Result 2026-07-17: RED confirmed — 13 of 14 tests failed (missing endpoints/columns/`rename_session`). The one green test (`test_archive_does_not_delete_turns`) only asserts the transcript is preserved, which holds trivially while archive is a no-op.
+
+- [x] **Step 3: Add an idempotent migration and owner-checked operations**.
 
 ```sql
 ALTER TABLE sessions ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
@@ -219,13 +221,19 @@ def set_session_archived(self, session_id: str, archived: bool, user_id: str) ->
     return self._update_owned_session(session_id, user_id, {"archived": int(archived), "archived_at": utc_now() if archived else None})
 ```
 
-- [ ] **Step 4: Add strict request/response routes and audit events** for rename/archive; list endpoints default to active sessions and accept `include_archived` only for the owner.
+Landed as migration `RAIKER-1015-session-archive-lifecycle` (applied via the idempotent `_apply_migration`/`_skip_existing_add_columns` path, so a partial or repeated run resumes cleanly), plus `SQLiteStore._update_owned_session`, `rename_session`, `set_session_archived`, and an `include_archived` flag on `list_sessions` (default active-only, matching the `list_project_tree` convention). The event-visibility filter passes `include_archived=True` so archiving never hides a session's events.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 4: Add strict request/response routes and audit events** for rename/archive; list endpoints default to active sessions and accept `include_archived` only for the owner.
+
+`PUT /api/sessions/{id}/rename` (strict `RenameSessionRequest`, `extra="forbid"`, server-side title normalization → 422 on invalid), `PUT /api/sessions/{id}/archive`, and `PUT /api/sessions/{id}/unarchive`. Mutations are human-only and owner-scoped; audit events `session_renamed`, `session_archived`, and `session_unarchived` are appended and added to the `EVENT_TYPES` registry. `GET /api/sessions` gains an owner-scoped `include_archived` query flag.
+
+- [x] **Step 5: Verify GREEN**
 
 Run: `python -m pytest tests/test_session_lifecycle.py tests/test_api_dashboard.py -q`
 
 Expected: active and archived records remain isolated per account; archive is reversible.
+
+Result 2026-07-17: `EXIT=0`, 44 passed. A live end-to-end drive (rename → archive → active/`include_archived` listings → unarchive, migration idempotency over repeated opens, 422 on empty/overlong/extra-field input, audit events, 403 on unknown/foreign sessions) all passed. Static/regression gates on the same tree: `ruff` clean, `mypy` 419 files clean, `compileall` exit 0.
 
 ### Task 4: Implement Governed Local MCP Builder and Connector
 

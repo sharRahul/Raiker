@@ -91,6 +91,12 @@ EVENT_TYPES = {
     # A chat moved into or out of an organizing project. The move grants
     # nothing; it changes only the bounded context the chat receives.
     "session_project_changed",
+    # A chat's organizing title changed. Renaming grants nothing.
+    "session_renamed",
+    # A chat was soft-archived (moved out of the default active list) or
+    # restored. Reversible; never deletes transcripts, events, or permissions.
+    "session_archived",
+    "session_unarchived",
     "task_created",
     "task_started",
     "task_progress",

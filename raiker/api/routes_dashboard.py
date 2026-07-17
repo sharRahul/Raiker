@@ -15,6 +15,7 @@ from raiker.api.schemas import (
     CreateProjectRequest,
     ModelConnectionRequest,
     MoveProjectRequest,
+    RenameSessionRequest,
     SaveProjectContextRequest,
     SelectProjectRequest,
     SetModelAdvisorRequest,
@@ -80,11 +81,23 @@ async def list_sessions(
     request: Request,
     limit: int = 50,
     project_id: str | None = None,
+    include_archived: bool = False,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
+    """List the authenticated account's sessions.
+
+    Defaults to active sessions only; ``include_archived=true`` also returns the
+    caller's archived sessions. Listing is always owner-scoped — the flag never
+    widens visibility beyond the caller's own sessions.
+    """
     user_id = auth_data[1].delegated_by_user_id
     return serialize_dto(
-        _service(request).list_sessions(limit=limit, project_id=project_id, user_id=user_id)
+        _service(request).list_sessions(
+            limit=limit,
+            project_id=project_id,
+            user_id=user_id,
+            include_archived=include_archived,
+        )
     )
 
 
@@ -124,6 +137,81 @@ async def set_session_pinned(
     """
     result = _service(request).set_session_pinned(
         session_id, body.pinned, auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/sessions/{session_id}/rename")
+async def rename_session(
+    session_id: str,
+    body: RenameSessionRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Rename one session for the authenticated local human.
+
+    The title is an organizing label only — it grants nothing. The server
+    normalizes the title (trim, collapse whitespace, length cap) and rejects
+    invalid input with 422. Human-only; an account cannot rename another
+    account's session.
+    """
+    result = _service(request).rename_session(
+        session_id, body.title, auth_data[0].principal_id
+    )
+    if not result.ok:
+        reason = result.reason_code or ""
+        if reason.startswith("invalid_title"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"ok": False, "reason_code": result.reason_code},
+            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/sessions/{session_id}/archive")
+async def archive_session(
+    session_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Soft-archive one session (human-only).
+
+    Archiving moves a chat out of the default active list and is fully
+    reversible via unarchive; it never deletes transcripts, events, checkpoints,
+    or permissions. An account cannot archive another account's session.
+    """
+    result = _service(request).set_session_archived(
+        session_id, True, auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/sessions/{session_id}/unarchive")
+async def unarchive_session(
+    session_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Restore one archived session to the active list (human-only).
+
+    An account cannot unarchive another account's session.
+    """
+    result = _service(request).set_session_archived(
+        session_id, False, auth_data[0].principal_id
     )
     if not result.ok:
         raise HTTPException(

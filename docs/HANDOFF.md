@@ -47,9 +47,10 @@ Control Deck commit.
 - **Plan Tasks 1 and 2 are implemented and committed.** Task 1 (legacy-account
   role backfill + inactive-session fail-closed) and Task 2 (one-user-per-instance
   boundary, local password recovery, per-principal control state, owner-scoped
-  data) are both on this branch. Task 2 added migrations
-  `RAIKER-2021-legacy-account-bootstrap-roles`, `RAIKER-2022-principal-control-scope`
-  / `RAIKER-2022-owned-context-data`, `RAIKER-2023-owned-memory-metadata`,
+  data) are both on this branch. Task 1 added migration
+  `RAIKER-2021-legacy-account-bootstrap-roles`. Task 2 added
+  `RAIKER-2022-principal-control-scope`, `RAIKER-2022-owned-context-data`,
+  `RAIKER-2023-owned-memory-metadata`,
   `RAIKER-2023-owner-brain-sources`, the `principal_model_control` /
   `principal_capability_gate_state` / `principal_capability_decision_mode` /
   `instance_account_guard` / `brain_sources` tables, and

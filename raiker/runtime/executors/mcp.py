@@ -362,7 +362,7 @@ class McpConnectorExecutor:
         tool_names = [str(t.get("name", "")) for t in tools if isinstance(t, dict)]
         server_info = init["result"].get("serverInfo") or {}
 
-        self._record_connection(action, principal_id, command)
+        self._record_connection(action, principal_id, command, tools=tool_names)
         return ExecutionResult(
             ok=True,
             capability=self.capability,
@@ -478,30 +478,44 @@ class McpConnectorExecutor:
         return responses
 
     def _record_connection(
-        self, action: GovernedAction, principal_id: str, command: list[str]
+        self,
+        action: GovernedAction,
+        principal_id: str,
+        command: list[str],
+        tools: list[str] | None = None,
     ) -> None:
-        """Persist/refresh an owner-scoped 'connected' profile for the command.
+        """Persist/refresh an owner-scoped 'connected' profile for the command,
+        including the tool names the handshake discovered (names only).
 
         Best-effort bookkeeping only — a storage hiccup must never turn a
         successful governed read into a failure, so this swallows write errors.
+        Prefers an existing profile addressed by ``server_id`` (so a re-test of a
+        page-listed server updates that row) and otherwise falls back to the
+        server name.
         """
-        name = _normalize_server_name(str(action.arguments.get("name", ""))) or Path(
-            command[-1]
-        ).stem
-        name = _normalize_server_name(name) or "mcp-server"
-        try:
+        server_id_arg = str(action.arguments.get("server_id", "")).strip()
+        existing = None
+        if server_id_arg:
+            existing = self._store.get_mcp_server(server_id_arg, principal_id)
+        name = _normalize_server_name(str(action.arguments.get("name", "")))
+        if existing is None and name is not None:
             existing = self._store.get_mcp_server_by_name(principal_id, name)
+        resolved_name = (
+            str(existing["name"]) if existing else (name or _normalize_server_name(Path(command[-1]).stem) or "mcp-server")
+        )
+        try:
             server_id = str(existing["server_id"]) if existing else new_id("mcp_")
             template = existing.get("template") if existing else None
             self._store.create_mcp_server(
                 server_id=server_id,
                 principal_id=principal_id,
-                name=name,
+                name=resolved_name,
                 command=command,
                 template=template,
                 transport="stdio",
                 status="connected",
                 last_connected_at=utc_now(),
+                tools=tools if tools is not None else [],
             )
         except Exception:  # noqa: BLE001 - bookkeeping must not fail the read
             return

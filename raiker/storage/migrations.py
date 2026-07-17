@@ -1329,6 +1329,18 @@ CREATE INDEX IF NOT EXISTS idx_mcp_servers_owner ON mcp_servers(principal_id, cr
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mcp_servers_owner_name ON mcp_servers(principal_id, name);
 """
 
+# MCP server runtime state (Control Deck task 4b): the last handshake's outcome
+# for a server profile — the JSON-encoded list of tool names the connector
+# discovered and their count. Recorded so the management page can show each
+# server's tools without re-spawning it on every page load. Tool names are not
+# secrets; no tool arguments or output are ever stored. Additive columns only.
+MCP_SERVER_RUNTIME_MIGRATION_ID = "RAIKER-1017-mcp-server-runtime-state"
+
+MCP_SERVER_RUNTIME_SQL = """
+ALTER TABLE mcp_servers ADD COLUMN tools TEXT;
+ALTER TABLE mcp_servers ADD COLUMN tool_count INTEGER NOT NULL DEFAULT 0;
+"""
+
 # Nested projects/folders (conversation organisation remainder): arbitrary-depth
 # folder hierarchy via hybrid adjacency list + materialized path. Parent
 # reference uses ON DELETE SET NULL so children survive parent hard-delete.

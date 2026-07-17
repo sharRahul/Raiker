@@ -243,6 +243,24 @@ class RenameSessionRequest(BaseModel):
     title: str
 
 
+class CreateMcpServerRequest(BaseModel):
+    # Build a local stdio MCP server from a reviewed template (Control Deck
+    # task 4b). Both fields are validated/normalized server-side; the actual
+    # write runs through the governed mcp_builder_runtime capability.
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    template: str
+
+
+class RenameMcpServerRequest(BaseModel):
+    # Rename one owner-scoped MCP server profile. The server normalizes the name
+    # and rejects a clash with the caller's other servers.
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+
+
 class SetSessionTagsRequest(BaseModel):
     # Replace the tag set for one session. Tags are organizing labels only —
     # they grant nothing. The server normalizes (trim, lowercase, dedupe,

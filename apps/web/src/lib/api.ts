@@ -15,6 +15,7 @@ import type {
   InterruptRequestBody,
   InstanceLaunchResult,
   InterruptResult,
+  McpServer,
   MemoryControlView,
   MemorySettingsView,
   ModelsView,
@@ -254,6 +255,32 @@ export const api = {
   // never exposes a credential value). Enabling one is done via the capability
   // gate + decision-mode control plane, not here.
   connections: () => request<ConnectionsView>("/api/connections"),
+  // ── Local MCP servers (Control Deck task 4b) ────────────────────────────
+  // Owner-scoped. Create and test-connect run through the governed capability
+  // (a disabled gate returns 403 disabled_by_capability_gate); rename and
+  // delete are human-only owner-scoped operations.
+  mcpServers: () => request<McpServer[]>("/api/mcp/servers"),
+  createMcpServer: (name: string, template: string) =>
+    postJson<{ ok: boolean; server_id: string | null; name: string | null }>(
+      "/api/mcp/servers",
+      { name, template },
+    ),
+  connectMcpServer: (serverId: string) =>
+    postJson<{ ok: boolean; status: string; tools: string[] }>(
+      `/api/mcp/servers/${encodeURIComponent(serverId)}/connect`,
+      {},
+    ),
+  renameMcpServer: (serverId: string, name: string) =>
+    request<{ ok: boolean; name: string }>(`/api/mcp/servers/${encodeURIComponent(serverId)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
+  deleteMcpServer: (serverId: string) =>
+    request<{ ok: boolean; server_id: string }>(
+      `/api/mcp/servers/${encodeURIComponent(serverId)}`,
+      { method: "DELETE" },
+    ),
   connectorStore: () => request<ConnectorStoreView>("/api/connector-store"),
   installConnector: (connectorId: string) =>
     postJson<{ ok: boolean; installed: boolean }>(

@@ -9,6 +9,7 @@ from raiker.cli.principal_resolver import (
     check_runtime_gate_manager_available,
     resolve_local_principal,
 )
+from raiker.contracts.ids import new_id
 from raiker.control.dtos import (
     CapabilityGateView,
     ControlPrincipalRef,
@@ -19,8 +20,8 @@ from raiker.control.dtos import (
 from raiker.events.writer import EventLogWriter
 from raiker.phase_gates import ALL_CAPABILITIES, CapabilityState, default_capability_gates
 from raiker.runtime.authority.activation import get_activation_requirement, has_executor
-from raiker.runtime.authority.models import Principal, PrincipalType
-from raiker.runtime.authority.router import RuntimeAuthority
+from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
+from raiker.runtime.authority.router import GovernedAction, GovernedActionResult, RuntimeAuthority
 from raiker.storage.sqlite import SQLiteStore
 
 _RUNTIME_ENABLEMENT_MODES = frozenset({
@@ -349,3 +350,150 @@ class RuntimeControlService:
         if denial is not None:
             return ControlResult(ok=False, reason_code=denial)
         return ControlResult(ok=True, data={"capability": capability})
+
+    # ── Governed local MCP server management (Control Deck task 4b) ──────────
+    # Create and Test/Connect run the real capability through route_action, so
+    # the capability gate, policy, decision mode, and audit trail all apply — no
+    # side-door. Rename and Delete are owner-scoped, human-only metadata
+    # operations on the caller's own profile (Delete also removes the generated
+    # template file). Every method is owner-scoped by the acting principal.
+
+    def _mcp_action_result(self, result: GovernedActionResult) -> ControlResult:
+        """Map a governed-action outcome onto a ControlResult, preserving the
+        governed reason (a disabled gate, a policy denial, or an executor
+        failure) so the caller can surface it verbatim."""
+        if result.decision == "disabled_by_capability_gate":
+            return ControlResult(ok=False, reason_code="disabled_by_capability_gate")
+        if result.decision != "allow":
+            return ControlResult(ok=False, reason_code=result.message or result.decision)
+        if result.message != "executed":
+            return ControlResult(ok=False, reason_code=result.error or result.message or "mcp_not_executed")
+        return ControlResult(ok=True)
+
+    def _route_mcp(
+        self, principal: Principal, action_type: str, arguments: dict[str, Any]
+    ) -> GovernedActionResult:
+        action = GovernedAction(
+            action_id=new_id("act_"),
+            principal_id=principal.principal_id,
+            action_type=action_type,
+            tool_or_service_name=action_type,
+            arguments=arguments,
+            risk_level=RiskLevelValue.MEDIUM,
+        )
+        return self._authority.route_action(action, principal)
+
+    def create_mcp_server(
+        self, acting_principal_id: str | None, name: str, template: str
+    ) -> ControlResult:
+        """Governed build of a local stdio MCP server from a reviewed template."""
+        from raiker.runtime.executors.mcp import _normalize_server_name
+
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        result = self._route_mcp(
+            principal, "mcp_server_create", {"name": name, "template": template}
+        )
+        mapped = self._mcp_action_result(result)
+        if not mapped.ok:
+            return mapped
+        normalized = _normalize_server_name(name)
+        row = (
+            self._store.get_mcp_server_by_name(principal.principal_id, normalized)
+            if normalized
+            else None
+        )
+        return ControlResult(
+            ok=True, data={"server_id": row["server_id"] if row else None, "name": normalized}
+        )
+
+    def connect_mcp_server(
+        self, acting_principal_id: str | None, server_id: str
+    ) -> ControlResult:
+        """Governed test-connect of a stored server: run the stdio handshake and
+        persist the discovered tool names + status. Owner-scoped."""
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        server = self._store.get_mcp_server(server_id, principal.principal_id)
+        if server is None:
+            return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
+        result = self._route_mcp(
+            principal,
+            "mcp_connect",
+            {"command": server["command"], "name": server["name"], "server_id": server_id},
+        )
+        mapped = self._mcp_action_result(result)
+        if not mapped.ok:
+            return mapped
+        updated = self._store.get_mcp_server(server_id, principal.principal_id) or {}
+        return ControlResult(
+            ok=True,
+            data={
+                "server_id": server_id,
+                "status": updated.get("status", "connected"),
+                "tools": list(updated.get("tools", [])),
+            },
+        )
+
+    def rename_mcp_server(
+        self, acting_principal_id: str | None, server_id: str, name: str
+    ) -> ControlResult:
+        """Owner-scoped, human-only rename of one server profile."""
+        from raiker.runtime.executors.mcp import _normalize_server_name
+
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        normalized = _normalize_server_name(name)
+        if normalized is None:
+            return ControlResult(ok=False, reason_code="mcp_invalid_server_name")
+        if self._store.get_mcp_server(server_id, principal.principal_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
+        if not self._store.rename_mcp_server(server_id, principal.principal_id, normalized):
+            return ControlResult(ok=False, reason_code="mcp_name_taken")
+        return ControlResult(ok=True, data={"server_id": server_id, "name": normalized})
+
+    def delete_mcp_server(
+        self, acting_principal_id: str | None, server_id: str
+    ) -> ControlResult:
+        """Owner-scoped, human-only delete of one server profile. Also removes
+        the generated template file when it lives inside the workspace MCP
+        directory (best-effort — a leftover file never blocks the delete)."""
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        server = self._store.get_mcp_server(server_id, principal.principal_id)
+        if server is None:
+            return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
+        if not self._store.delete_mcp_server(server_id, principal.principal_id):
+            return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
+        self._remove_generated_mcp_file(server)
+        return ControlResult(ok=True, data={"server_id": server_id})
+
+    def _remove_generated_mcp_file(self, server: dict[str, Any]) -> None:
+        from raiker.runtime.executors.mcp import _MCP_SERVERS_DIR, _safe_workspace_relative
+
+        command = server.get("command") or []
+        if len(command) < 2:
+            return
+        ws = Path(self._workspace_root).resolve()
+        resolved = _safe_workspace_relative(ws, str(command[1]))
+        if resolved is None:
+            return
+        try:
+            rel = resolved.relative_to(ws).as_posix()
+        except ValueError:
+            return
+        # Only ever unlink a file we generated under the managed servers dir.
+        if not rel.startswith(f"{_MCP_SERVERS_DIR}/"):
+            return
+        try:
+            resolved.unlink(missing_ok=True)
+        except OSError:
+            return

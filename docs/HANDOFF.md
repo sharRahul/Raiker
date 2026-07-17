@@ -97,6 +97,25 @@ Control Deck commit.
   drive (build → connect → redacted tool call → three fail-closed paths →
   owner-scoped API isolation) passed, and the running web app was screenshotted
   (no regression).
+- **Task 4b (MCP server management web page) is now implemented on this branch**
+  (owner-requested amendment; pulled forward from the Task 9 route rebuild). A
+  dedicated **MCP Servers** page (Steering nav) creates, tests, renames, and
+  deletes local MCP servers end-to-end, showing each server's status, discovered
+  tools, and command. Governance split, no side-door: **create** and
+  **test/connect** run the real capability through `route_action` (gate + policy
+  + decision mode + audit; a disabled gate surfaces `disabled_by_capability_gate`
+  and the page points the owner at Capabilities); **rename** and **delete** are
+  owner-scoped, human-only metadata ops (delete also removes the generated
+  template file under `.raiker/mcp/servers/`). Backend: migration
+  `RAIKER-1017-mcp-server-runtime-state` (`tools` / `tool_count`), storage
+  `delete_mcp_server` / `rename_mcp_server` + tool persistence,
+  `RuntimeControlService.{create,connect,rename,delete}_mcp_server`, executor
+  persists discovered tools on connect, routes `POST /api/mcp/servers`,
+  `POST /api/mcp/servers/{id}/connect`, `PUT`/`DELETE /api/mcp/servers/{id}`.
+  Frontend: `McpView.svelte`, api client + `McpServer` type, `nav.ts` +
+  `App.svelte`. Tests: 9 new API cases in `tests/test_mcp_runtime.py` (31 total)
+  + `McpView.test.ts` (4). Full suite 1918 passed; web check/lint/test/build
+  green; live browser drive screenshotted (create → test → connected with tools).
 - **Plan Tasks 5–11 are not started** (verified against the tree): no
   `raiker/security/` package (credentials/monitoring) and neither
   `tests/test_credential_security.py` nor `tests/test_runtime_monitoring.py`
@@ -118,10 +137,10 @@ Control Deck commit.
   because the implementation and its self-tests landed; treat the dual re-review
   as the remaining formal sign-off, not as blocking work on Task 3.
 
-Python gates re-run on the Task 4 tree (2026-07-17, deps installed fresh):
+Python gates re-run on the Task 4 + 4b tree (2026-07-17, deps installed fresh):
 
 ```text
-python -m pytest -o addopts="" -q     # exit 0, 1909 passed
+python -m pytest -o addopts="" -q     # exit 0, 1918 passed
 python -m ruff check .                # All checks passed!
 python -m mypy raiker apps tests      # Success: no issues found in 421 source files
 python scripts/validate_documentation_truthfulness.py     # PASSED
@@ -131,10 +150,14 @@ python scripts/validate_runtime_enablement_readiness.py   # PASSED
 python scripts/validate_local_single_user_runtime.py      # PASSED
 ```
 
-The web bundle was built (`npm run build`, exit 0) and the app was started and
-screenshotted for regression during the Task 4 live test; the web unit/lint/type
-gates (`npm run check|lint|test`) were not re-run in this backend slice — run
-them before any web-facing slice (Tasks 6–10).
+Web gates (from `apps/web`) on the Task 4b tree:
+
+```text
+npm run check     # 0 errors, 0 warnings
+npm run lint      # clean
+npm test -- --run # 141 passed, 1 skipped (McpView 4/4)
+npm run build     # exit 0
+```
 
 ## Current product state — 2026-07-15
 

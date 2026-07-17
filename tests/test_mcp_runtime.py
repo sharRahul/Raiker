@@ -417,5 +417,122 @@ def test_api_mcp_servers_requires_auth(tmp_path: Path) -> None:
     assert client.get("/api/mcp/servers").status_code == 401
 
 
+# ── End-to-end management API (Control Deck task 4b) ─────────────────────────
+
+
+def _mgmt_client(tmp_path: Path, sub: str = "mgmt") -> Any:
+    from fastapi.testclient import TestClient
+
+    from raiker.api.app import create_app
+
+    ws = tmp_path / sub
+    ws.mkdir()
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
+    client = TestClient(create_app(ws))
+    token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    return ws, client
+
+
+def test_api_create_then_list_mcp_server(tmp_path: Path) -> None:
+    ws, client = _mgmt_client(tmp_path)
+    resp = client.post("/api/mcp/servers", json={"name": "Echo Server", "template": "python-stdio-echo"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["ok"] is True
+    servers = client.get("/api/mcp/servers").json()
+    assert len(servers) == 1
+    assert servers[0]["template"] == "python-stdio-echo"
+    # The generated file exists on disk under the managed dir.
+    assert (ws / ".raiker/mcp/servers" / f"{servers[0]['name']}.py").exists()
+
+
+def test_api_create_rejects_unknown_template(tmp_path: Path) -> None:
+    _ws, client = _mgmt_client(tmp_path, "mgmt_tmpl")
+    resp = client.post("/api/mcp/servers", json={"name": "x", "template": "danger"})
+    assert resp.status_code == 403
+    assert resp.json()["detail"]["reason_code"].startswith("mcp_unknown_template")
+
+
+def test_api_connect_persists_discovered_tools(tmp_path: Path) -> None:
+    _ws, client = _mgmt_client(tmp_path, "mgmt_conn")
+    client.post("/api/mcp/servers", json={"name": "echo", "template": "python-stdio-echo"})
+    server_id = client.get("/api/mcp/servers").json()[0]["server_id"]
+    resp = client.post(f"/api/mcp/servers/{server_id}/connect")
+    assert resp.status_code == 200, resp.text
+    assert "echo" in resp.json()["tools"]
+    listed = client.get("/api/mcp/servers").json()[0]
+    assert listed["status"] == "connected"
+    assert listed["tool_count"] >= 1
+    assert "echo" in listed["tools"]
+
+
+def test_api_rename_mcp_server(tmp_path: Path) -> None:
+    _ws, client = _mgmt_client(tmp_path, "mgmt_rename")
+    client.post("/api/mcp/servers", json={"name": "echo", "template": "python-stdio-echo"})
+    server_id = client.get("/api/mcp/servers").json()[0]["server_id"]
+    resp = client.put(f"/api/mcp/servers/{server_id}", json={"name": "renamed-echo"})
+    assert resp.status_code == 200, resp.text
+    assert client.get("/api/mcp/servers").json()[0]["name"] == "renamed-echo"
+
+
+def test_api_rename_rejects_empty_name(tmp_path: Path) -> None:
+    _ws, client = _mgmt_client(tmp_path, "mgmt_rename_bad")
+    client.post("/api/mcp/servers", json={"name": "echo", "template": "python-stdio-echo"})
+    server_id = client.get("/api/mcp/servers").json()[0]["server_id"]
+    resp = client.put(f"/api/mcp/servers/{server_id}", json={"name": "   "})
+    assert resp.status_code == 422
+    assert resp.json()["detail"]["reason_code"] == "mcp_invalid_server_name"
+
+
+def test_api_delete_removes_profile_and_file(tmp_path: Path) -> None:
+    ws, client = _mgmt_client(tmp_path, "mgmt_delete")
+    client.post("/api/mcp/servers", json={"name": "echo", "template": "python-stdio-echo"})
+    server = client.get("/api/mcp/servers").json()[0]
+    server_file = ws / ".raiker/mcp/servers" / f"{server['name']}.py"
+    assert server_file.exists()
+    resp = client.delete(f"/api/mcp/servers/{server['server_id']}")
+    assert resp.status_code == 200, resp.text
+    assert client.get("/api/mcp/servers").json() == []
+    assert not server_file.exists()
+
+
+def test_api_delete_foreign_server_is_owner_scoped(tmp_path: Path) -> None:
+    ws, client = _mgmt_client(tmp_path, "mgmt_iso")
+    store = SQLiteStore(ws)
+    sid = new_id("mcp_")
+    store.create_mcp_server(
+        server_id=sid,
+        principal_id="principal_other",
+        name="theirs",
+        command=["python", ".raiker/mcp/servers/theirs.py"],
+        template="python-stdio-echo",
+        status="created",
+    )
+    resp = client.delete(f"/api/mcp/servers/{sid}")
+    assert resp.status_code == 403
+    # The other principal's row is untouched.
+    assert store.get_mcp_server(sid, "principal_other") is not None
+
+
+def test_api_create_denied_when_capability_gate_disabled(tmp_path: Path) -> None:
+    ws, client = _mgmt_client(tmp_path, "mgmt_gate")
+    RuntimeControlService(ws).set_capability_state("mcp_builder_runtime", "disabled", None, "test")
+    resp = client.post("/api/mcp/servers", json={"name": "echo", "template": "python-stdio-echo"})
+    assert resp.status_code == 403
+    assert resp.json()["detail"]["reason_code"] == "disabled_by_capability_gate"
+
+
+def test_api_mcp_write_requires_auth(tmp_path: Path) -> None:
+    from fastapi.testclient import TestClient
+
+    from raiker.api.app import create_app
+
+    ws = tmp_path / "mgmt_noauth"
+    ws.mkdir()
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
+    client = TestClient(create_app(ws))
+    assert client.post("/api/mcp/servers", json={"name": "x", "template": "python-stdio-echo"}).status_code == 401
+
+
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-q"]))

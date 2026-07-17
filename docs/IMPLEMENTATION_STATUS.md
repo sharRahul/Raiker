@@ -66,13 +66,22 @@ fail-closed by design.
 > migration `RAIKER-1016-mcp-server-profiles`, `McpServerView` + owner-scoped
 > `GET /api/mcp/servers`, id prefix `mcp_`, and threat models
 > `docs/threat-models/mcp-builder.md` / `mcp-connector.md`. Covered by
-> `tests/test_mcp_runtime.py` (22 tests). Plan **Tasks 5–11** (credential
-> lifecycle + breach detection + self-monitoring, and the web Control Deck
-> rebuild) remain **not started** — verified against the tree. Python gates on
-> the Task 4 tree: `pytest` 1909 passed, `ruff` clean, `mypy` 421 files
-> clean, and `validate_documentation_truthfulness`, `validate_repo_truthfulness`,
-> `validate_phase_status`, `validate_runtime_enablement_readiness`, and
-> `validate_local_single_user_runtime` all pass.
+> `tests/test_mcp_runtime.py` (31 tests). **Task 4b (owner-requested) adds the
+> MCP Servers management web page** — a dedicated `McpView.svelte` page that
+> creates, tests, renames, and deletes local MCP servers end-to-end, showing
+> status + discovered tools. Create/test run through the governed capability
+> (`route_action`; a disabled gate surfaces `disabled_by_capability_gate` and the
+> page points to Capabilities); rename/delete are owner-scoped human-only ops
+> (delete removes the generated file). Backend: migration
+> `RAIKER-1017-mcp-server-runtime-state`, storage delete/rename + tool
+> persistence, `RuntimeControlService.{create,connect,rename,delete}_mcp_server`,
+> and routes `POST /api/mcp/servers`, `POST /api/mcp/servers/{id}/connect`,
+> `PUT`/`DELETE /api/mcp/servers/{id}`; frontend `McpView.svelte` + `McpView.test.ts`.
+> Plan **Tasks 5–11** (credential lifecycle + breach detection + self-monitoring,
+> and the remaining web Control Deck rebuild) remain **not started** — verified
+> against the tree. Gates on the Task 4 + 4b tree: `pytest` 1918 passed, `ruff`
+> clean, `mypy` 421 files clean, all five repo validators pass; web
+> `check`/`lint`/`test` (141 passed)/`build` all green.
 
 > Current truth update (2026-07-13): The local-owner workstream now includes a
 > principal-scoped Inbox task-create route and Tasks UI. `priority`,

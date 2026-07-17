@@ -83,6 +83,10 @@ class McpServerView:
     status: str
     created_at: str
     last_connected_at: str | None = None
+    # Tool names discovered by the last successful handshake (names only —
+    # never arguments or output).
+    tools: tuple[str, ...] = ()
+    tool_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -913,9 +917,36 @@ class DashboardService:
                 status=str(row.get("status", "created")),
                 created_at=str(row.get("created_at", "")),
                 last_connected_at=row.get("last_connected_at"),
+                tools=tuple(str(t) for t in row.get("tools", [])),
+                tool_count=int(row.get("tool_count", 0) or 0),
             )
             for row in self.store.list_mcp_servers(principal_id)
         ]
+
+    def create_mcp_server(
+        self, acting_principal_id: str | None, name: str, template: str
+    ) -> ControlResult:
+        """Governed build of a local stdio MCP server (delegates to the
+        control service so the capability gate / policy / audit path applies)."""
+        return self.control.create_mcp_server(acting_principal_id, name, template)
+
+    def connect_mcp_server(
+        self, acting_principal_id: str | None, server_id: str
+    ) -> ControlResult:
+        """Governed test-connect of a stored MCP server (delegates)."""
+        return self.control.connect_mcp_server(acting_principal_id, server_id)
+
+    def rename_mcp_server(
+        self, acting_principal_id: str | None, server_id: str, name: str
+    ) -> ControlResult:
+        """Owner-scoped, human-only rename of one MCP server profile."""
+        return self.control.rename_mcp_server(acting_principal_id, server_id, name)
+
+    def delete_mcp_server(
+        self, acting_principal_id: str | None, server_id: str
+    ) -> ControlResult:
+        """Owner-scoped, human-only delete of one MCP server profile."""
+        return self.control.delete_mcp_server(acting_principal_id, server_id)
 
     def delete_session(
         self, session_id: str, acting_principal_id: str | None

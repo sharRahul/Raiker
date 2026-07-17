@@ -70,6 +70,8 @@ from raiker.storage.migrations import (
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
+    MCP_SERVER_RUNTIME_MIGRATION_ID,
+    MCP_SERVER_RUNTIME_SQL,
     MCP_SERVERS_MIGRATION_ID,
     MCP_SERVERS_SQL,
     MEMORY_ARCHIVE_MIGRATION_ID,
@@ -635,6 +637,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection,
             )
             self._apply_migration(MCP_SERVERS_MIGRATION_ID, MCP_SERVERS_SQL, connection)
+            self._apply_migration(
+                MCP_SERVER_RUNTIME_MIGRATION_ID, MCP_SERVER_RUNTIME_SQL, connection
+            )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -1472,11 +1477,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     @staticmethod
     def _mcp_row(row: sqlite3.Row) -> dict[str, Any]:
         data = dict(row)
-        raw = data.get("command")
-        try:
-            data["command"] = json.loads(raw) if isinstance(raw, str) else []
-        except (TypeError, ValueError):
-            data["command"] = []
+        for key in ("command", "tools"):
+            raw = data.get(key)
+            try:
+                data[key] = json.loads(raw) if isinstance(raw, str) else []
+            except (TypeError, ValueError):
+                data[key] = []
         return data
 
     def create_mcp_server(
@@ -1490,19 +1496,23 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         transport: str = "stdio",
         status: str = "created",
         last_connected_at: str | None = None,
+        tools: list[str] | None = None,
     ) -> str:
         """Upsert one owner-scoped MCP server profile.
 
         Keyed by ``server_id`` (INSERT OR REPLACE), and additionally unique per
         ``(principal_id, name)`` so re-building the same-named server for the
         same owner refreshes the single profile instead of accumulating rows.
+        ``tools`` is the JSON-encoded list of tool names from the last successful
+        handshake (names only — never arguments or output).
         """
+        tool_list = list(tools) if tools is not None else None
         with self.connect() as connection:
             connection.execute(
                 """INSERT OR REPLACE INTO mcp_servers
                    (server_id, principal_id, name, command, template, transport,
-                    status, created_at, last_connected_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    status, created_at, last_connected_at, tools, tool_count)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     server_id,
                     principal_id,
@@ -1513,9 +1523,38 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     status,
                     utc_now(),
                     last_connected_at,
+                    json.dumps(tool_list) if tool_list is not None else None,
+                    len(tool_list) if tool_list is not None else 0,
                 ),
             )
         return server_id
+
+    def rename_mcp_server(self, server_id: str, principal_id: str, name: str) -> bool:
+        """Owner-scoped rename of one MCP server profile. Returns False if the
+        row is missing / owned by another principal, or if the new name is
+        already taken by another of the caller's servers (unique per owner)."""
+        with self.connect() as connection:
+            clash = connection.execute(
+                "SELECT 1 FROM mcp_servers WHERE principal_id = ? AND name = ? AND server_id != ?",
+                (principal_id, name, server_id),
+            ).fetchone()
+            if clash is not None:
+                return False
+            cursor = connection.execute(
+                "UPDATE mcp_servers SET name = ? WHERE server_id = ? AND principal_id = ?",
+                (name, server_id, principal_id),
+            )
+            return cursor.rowcount > 0
+
+    def delete_mcp_server(self, server_id: str, principal_id: str) -> bool:
+        """Owner-scoped delete of one MCP server profile. Returns False if the
+        row is missing or owned by another principal (isolation)."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM mcp_servers WHERE server_id = ? AND principal_id = ?",
+                (server_id, principal_id),
+            )
+            return cursor.rowcount > 0
 
     def list_mcp_servers(self, principal_id: str) -> list[dict[str, Any]]:
         with self.connect() as connection:

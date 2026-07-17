@@ -150,6 +150,32 @@ def test_mfa_gate(tmp_path) -> None:  # type: ignore[no-untyped-def]
     assert verified.token
 
 
+def test_mfa_login_locks_out_after_repeated_wrong_codes(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """The mfa_pending code gate shares login's lockout counter.
+
+    Without it a live ticket (mintable with just the password) absorbs unlimited
+    guesses against a 6-digit TOTP — a second-factor-bypass primitive, the exact
+    gap `complete_password_recovery` was hardened against.
+    """
+    svc = _svc(tmp_path)
+    principal_id = svc.register("alice", "right-pass")
+    secret, _uri, _codes = svc.begin_enroll_mfa(principal_id)
+    svc.activate_mfa(principal_id, pyotp.TOTP(secret).now())
+
+    ticket = svc.login("alice", "right-pass").ticket
+    assert ticket is not None
+    for _ in range(LOCKOUT_THRESHOLD):
+        with pytest.raises(AuthError):
+            svc.verify_mfa(ticket, "000000")
+
+    # Locked: even the correct code on a fresh ticket is refused now.
+    with pytest.raises(AuthError):
+        svc.verify_mfa(ticket, pyotp.TOTP(secret).now())
+    account = SQLiteStore(tmp_path).get_account(principal_id)
+    assert account is not None
+    assert account["locked_until"] is not None
+
+
 def test_mfa_ticket_is_claimed_once_under_concurrent_verification(tmp_path) -> None:  # type: ignore[no-untyped-def]
     svc = _svc(tmp_path)
     principal_id = svc.register("alice", "right-pass")

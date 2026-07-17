@@ -151,19 +151,52 @@ class AccountService:
                 ).fetchone()
                 if account is None or principal is None or not bool(principal["is_active"]) or not bool(account["mfa_enrolled"]):
                     raise AuthError("MFA verification failed")
+                # A live mfa_pending ticket must not absorb unlimited TOTP
+                # guesses, so this code gate shares login's lockout counter — a
+                # locked account is locked here too (matches login's is_locked).
+                locked_until = account["locked_until"]
+                if locked_until and _parse(str(locked_until)) > _now():
+                    raise AuthError("MFA verification failed")
                 verified = False
+                updated_backup: str | None = None
                 blob = account["mfa_secret_encrypted"]
                 if blob is not None:
                     verified = mfa.verify_totp(mfa.decrypt_secret(self._workspace_root, blob), code)
                 if not verified and account["backup_codes_hashed"]:
                     verified, updated = mfa.consume_backup_code(str(account["backup_codes_hashed"]), code)
                     if verified:
-                        connection.execute(
-                            "UPDATE account_credentials SET backup_codes_hashed = ? WHERE principal_id = ?",
-                            (updated, principal_id),
-                        )
+                        updated_backup = updated
                 if not verified:
+                    # Charge the shared counter and lock at the threshold, then
+                    # commit so the cost survives the raise (the rollback the
+                    # with-block would otherwise apply must not erase it).
+                    attempts = int(account["failed_attempts"] or 0) + 1
+                    lock_at = (
+                        (_now() + timedelta(seconds=LOCKOUT_SECONDS)).isoformat(timespec="seconds")
+                        if attempts >= LOCKOUT_THRESHOLD
+                        else None
+                    )
+                    connection.execute(
+                        "UPDATE account_credentials SET failed_attempts = ?, locked_until = ? "
+                        "WHERE principal_id = ?",
+                        (attempts, lock_at, principal_id),
+                    )
+                    connection.commit()
                     raise AuthError("MFA verification failed")
+                # Success clears the counter; a spent backup code is consumed in
+                # the same write.
+                if updated_backup is not None:
+                    connection.execute(
+                        "UPDATE account_credentials SET backup_codes_hashed = ?, "
+                        "failed_attempts = 0, locked_until = NULL WHERE principal_id = ?",
+                        (updated_backup, principal_id),
+                    )
+                else:
+                    connection.execute(
+                        "UPDATE account_credentials SET failed_attempts = 0, "
+                        "locked_until = NULL WHERE principal_id = ?",
+                        (principal_id,),
+                    )
                 claimed = connection.execute(
                     "UPDATE api_sessions SET revoked = 1 WHERE session_id = ? AND revoked = 0",
                     (str(ticket["session_id"]),),
@@ -293,7 +326,15 @@ class AccountService:
         password_ok = password is not None and passwords.verify_password(
             password, account["password_hash"], account["hash_algo"]
         )
-        mfa_ok = mfa_code is not None and account["mfa_enrolled"] and self._check_mfa(account, mfa_code)
+        # Only reach `_check_mfa` when the password did not already satisfy the
+        # gate — it now charges the lockout counter on a wrong code, so a valid
+        # password paired with a stray/wrong code must not spuriously lock out.
+        mfa_ok = (
+            not password_ok
+            and mfa_code is not None
+            and bool(account["mfa_enrolled"])
+            and self._check_mfa(account, mfa_code)
+        )
         if not (password_ok or mfa_ok):
             raise AuthError(GENERIC_AUTH_ERROR)
         token, _ = self._sessions.create_session(
@@ -392,39 +433,75 @@ class AccountService:
             self._store.set_account_password(account["principal_id"], encoded, algo, utc_now())
 
     def _check_mfa(self, account: dict, code: str) -> bool:
-        blob = account.get("mfa_secret_encrypted")
-        if blob is not None:
-            secret = mfa.decrypt_secret(self._workspace_root, blob)
-            if mfa.verify_totp(secret, code):
-                return True
-        # A backup code is single-use, so the read, the consume, and the write
-        # have to be one atomic step. `account` is a snapshot taken before this
-        # call, so re-read the list under the writer lock: concurrent callers
-        # otherwise all consume from the same stale list, every racer is granted,
-        # and the last write restores a code another thread already spent.
-        # `verify_mfa` claims its ticket the same way; this is the shared path
-        # `grant_elevated` and `verify_mfa_code` reach.
+        # Verifying a second factor resets a password, elevates, or completes
+        # login, so it needs the same lockout `login` enforces — otherwise a
+        # ticket/session absorbs unlimited guesses against a 6-digit TOTP (with
+        # valid_window=1 keeping three codes live), which is an account-takeover
+        # primitive, not a nuisance. Everything runs under one writer lock so the
+        # counter, the TOTP check, and the single-use backup-code consume are
+        # atomic: `account` is a stale snapshot, so concurrent callers must not
+        # all consume from it (each would be granted and the last write would
+        # restore a spent code). This is the shared path `grant_elevated` and
+        # `verify_mfa_code` reach; `verify_mfa` claims its ticket the same way.
         principal_id = str(account["principal_id"])
         with self._store.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = connection.execute(
-                    "SELECT backup_codes_hashed FROM account_credentials WHERE principal_id = ?",
+                    "SELECT failed_attempts, locked_until, mfa_secret_encrypted, "
+                    "backup_codes_hashed FROM account_credentials WHERE principal_id = ?",
                     (principal_id,),
                 ).fetchone()
-                hashed = row["backup_codes_hashed"] if row is not None else None
-                if not hashed:
+                if row is None:
                     connection.execute("ROLLBACK")
                     return False
-                ok, updated = mfa.consume_backup_code(str(hashed), code)
-                if not ok:
+                locked_until = row["locked_until"]
+                if locked_until and _parse(str(locked_until)) > _now():
                     connection.execute("ROLLBACK")
                     return False
-                connection.execute(
-                    "UPDATE account_credentials SET backup_codes_hashed = ? WHERE principal_id = ?",
-                    (updated, principal_id),
+                verified = False
+                updated_backup: str | None = None
+                blob = row["mfa_secret_encrypted"]
+                if blob is not None and mfa.verify_totp(
+                    mfa.decrypt_secret(self._workspace_root, blob), code
+                ):
+                    verified = True
+                if not verified and row["backup_codes_hashed"]:
+                    ok, updated = mfa.consume_backup_code(str(row["backup_codes_hashed"]), code)
+                    if ok:
+                        verified = True
+                        updated_backup = updated
+                if verified:
+                    if updated_backup is not None:
+                        connection.execute(
+                            "UPDATE account_credentials SET backup_codes_hashed = ?, "
+                            "failed_attempts = 0, locked_until = NULL WHERE principal_id = ?",
+                            (updated_backup, principal_id),
+                        )
+                    else:
+                        connection.execute(
+                            "UPDATE account_credentials SET failed_attempts = 0, "
+                            "locked_until = NULL WHERE principal_id = ?",
+                            (principal_id,),
+                        )
+                    connection.commit()
+                    return True
+                # Wrong code: charge the shared counter and lock at the
+                # threshold, exactly as `login` and `complete_password_recovery`
+                # do, then commit so the cost outlives this failed call.
+                attempts = int(row["failed_attempts"] or 0) + 1
+                lock_at = (
+                    (_now() + timedelta(seconds=LOCKOUT_SECONDS)).isoformat(timespec="seconds")
+                    if attempts >= LOCKOUT_THRESHOLD
+                    else None
                 )
-                return True
+                connection.execute(
+                    "UPDATE account_credentials SET failed_attempts = ?, locked_until = ? "
+                    "WHERE principal_id = ?",
+                    (attempts, lock_at, principal_id),
+                )
+                connection.commit()
+                return False
             except Exception:
                 connection.execute("ROLLBACK")
                 raise

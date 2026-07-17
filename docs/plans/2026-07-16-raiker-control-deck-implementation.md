@@ -169,6 +169,14 @@ python -m compileall -q raiker tests    # exit 0
 
 > **Acceptance history.** Two independent reviews (spec + quality) ran against the first implementation and **both returned Fail** — 7 criticals, each reproduced against a real workspace: CLI turns silently losing all context; `purge_account` leaving plaintext in `approved_memory_fts` and on disk; recovery orphaning the original-owner pointer to a deactivated principal; CLI-bootstrapped owners being unrecoverable; a non-idempotent migration suppressed and marked applied (permanently wedging owner isolation); a pre-existing connection leak; and 22 test regressions. All are fixed — see `docs/HANDOFF.md` for the per-defect record. Both reviews rated the underlying engineering sound (atomicity verified under 8-way concurrency; isolation tests confirmed to fail when the owner predicate is stripped) and called this "re-review after fixes, not a redesign". The re-reviews against the fixed tree are the acceptance gate; do not treat green gates alone as acceptance — the gates were green when the 7 criticals were still present.
 
+> **Status (2026-07-17): Task 2 committed as `f97e6ce`.** Tasks 1 and 2 are
+> implemented and on the branch (migrations, per-principal control tables,
+> `SQLiteStore.account_scope()`, password recovery, owner-scoped data). Python
+> gates re-verified green on that commit: `pytest` 1870 passed, `ruff` clean,
+> `mypy` 418 files clean, and all five repo validators pass. **Tasks 3–11 below
+> are not started** — verified against the tree, not the checkboxes. Task 3 is
+> the next slice.
+
 ### Task 3: Add Safe Session Rename and Archive Lifecycle
 
 **Files:**

@@ -25,6 +25,25 @@ bypass governance. Every action must remain policy-aware, observable,
 auditable, approval-driven where required, human-governed, user-controlled, and
 fail-closed by design.
 
+> Current truth update (2026-07-17): the Control Deck work that `docs/HANDOFF.md`
+> previously described as an uncommitted worktree is now committed as `f97e6ce`
+> ("Isolate users by instance and scope control state per principal"). Plan
+> `docs/plans/2026-07-16-raiker-control-deck-implementation.md` Tasks 1 and 2 are
+> implemented and on the branch: legacy-account role backfill, the
+> one-user-per-instance boundary, local TOTP/recovery-code password recovery,
+> per-principal control tables (`principal_model_control`,
+> `principal_capability_gate_state`, `principal_capability_decision_mode`,
+> `instance_account_guard`), owner-scoped context/memory/brain-source data, and
+> `SQLiteStore.account_scope()` as the single principal-scope predicate. Plan
+> Tasks 3–11 (session archive/rename lifecycle, governed local MCP builder/
+> connector, credential lifecycle + breach detection + self-monitoring, and the
+> web Control Deck rebuild) are **not started** — verified against the tree.
+> Python gates on this commit: `pytest` 1870 passed, `ruff` clean, `mypy` 418
+> files clean, and `validate_documentation_truthfulness`,
+> `validate_repo_truthfulness`, `validate_phase_status`,
+> `validate_runtime_enablement_readiness`, and `validate_local_single_user_runtime`
+> all pass.
+
 > Current truth update (2026-07-13): The local-owner workstream now includes a
 > principal-scoped Inbox task-create route and Tasks UI. `priority`,
 > `scheduled_at`, `recurrence`, and `reminder_at` persist on tasks; scheduling is

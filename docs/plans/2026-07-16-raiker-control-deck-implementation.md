@@ -12,7 +12,14 @@
 - Active local accounts are administrators of their own isolated control plane. This will NOT permit one account to alter another account's model, capability, fallback, or decision-mode state.
 - Current provider API keys have no configured provider-admin lifecycle API and therefore use verified manual replacement, not automatic provider-side issuance/revocation.
 - HIBP checks are opt-in and require the existing egress policy to allow the public HIBP range endpoint; they will NOT run in offline or policy-denied mode.
-- MCP supports local stdio servers in this slice; it will NOT silently connect to arbitrary remote MCP endpoints.
+- MCP supports local stdio servers in this slice. **Superseded (2026-07-17):** the
+  original "will NOT connect to remote MCP endpoints" stance was a conservative
+  default, not a requirement, and is replaced by the monitored-connections
+  posture — remote MCP endpoints are **allowed when owner-added and monitored**
+  (recorded, anomaly-checked, findings + notifications, instant stop + revocable
+  auto-pause), never silent or unmonitored. See
+  `docs/plans/2026-07-17-monitored-mcp-connections.md` and
+  `docs/SECURITY_AND_POLICY.md` → "Security Philosophy".
 
 ---
 

@@ -23,10 +23,24 @@ bypass governance. Every action must remain policy-aware, observable,
 auditable, approval-driven where required, human-governed, user-controlled, and
 fail-closed by design.
 
+## Security posture (read before adding any restriction)
+
+Raiker is **owner-authoritative and monitored, not prevention-by-restriction.**
+Security is not restricting the user; it is a frictionless system that lets the
+owner operate securely without having their access taken away. Do **not** put a
+hard block in front of the owner's legitimate choices (e.g. connecting a remote
+MCP server) by default — **allow, monitor, surface anomalies as findings +
+notifications, and give the owner an instant stop plus an automatic revocable
+pause for the irreversible/high-severity cases.** Reserve hard prevention for a
+last resort and justify it against this posture. Full statement:
+`docs/SECURITY_AND_POLICY.md` → "Security Philosophy". The rules below still hold
+and are compatible with it:
+
 ## Non-negotiable runtime rules
 
 - Fail closed: a missing gate, policy, credential, allowlist, executor, or
-  approval denies the action.
+  approval denies the action. (This is honesty — no fabricated success — not a
+  wall in front of the owner.)
 - Route every model and tool action through the existing governance, policy,
   approval, and typed-event paths. Do not add a side-door.
 - Keep credentials in owner-controlled storage/environment only. Never render,

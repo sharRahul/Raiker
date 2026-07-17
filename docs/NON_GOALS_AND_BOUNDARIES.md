@@ -25,6 +25,15 @@ Raiker is not:
 13. a general malware-analysis or offensive automation platform;
 14. a system where interface richness decides authority.
 
+> **Read the operative word.** Several non-goals above forbid *silent*,
+> *ungoverned*, or *unrestricted* behaviour ("silently sends local data",
+> "unrestricted browser automation", "ungoverned shell runner"). The boundary is
+> **silent / ungoverned**, not **remote** or **capable**. An owner may connect
+> owner-chosen, **monitored, governed** remote services (e.g. a remote MCP
+> server) — that is *not* a non-goal. What stays out of scope is doing so
+> *silently* or *without monitoring, findings, and an owner stop*. See
+> `docs/SECURITY_AND_POLICY.md` → "Security Philosophy".
+
 ---
 
 ## Architecture Boundaries

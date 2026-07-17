@@ -4,9 +4,16 @@
   import { api, ApiError } from "../api";
   import type { CapabilityGate, McpServer } from "../apiTypes";
 
-  // Reviewed server templates the builder can generate. Kept in sync with the
-  // backend `available_mcp_templates()` (currently a single safe echo template).
-  const TEMPLATES = [{ id: "python-stdio-echo", label: "Python stdio · echo (safe demo)" }];
+  // Reviewed server templates the builder can generate. `id` is the backend
+  // template key; `label` is the plain-English name shown to the user. Kept in
+  // sync with the backend `available_mcp_templates()` (currently one safe
+  // starter server that just echoes text back).
+  const TEMPLATES = [{ id: "python-stdio-echo", label: "Sample echo server (safe starter)" }];
+
+  function templateLabel(id: string | null): string {
+    if (!id) return "None";
+    return TEMPLATES.find((t) => t.id === id)?.label ?? id;
+  }
 
   let servers = $state<McpServer[] | null>(null);
   let gates = $state<CapabilityGate[]>([]);
@@ -131,7 +138,7 @@
 <div class="header">
   <div>
     <h2>MCP Servers</h2>
-    <p>Build, test, and manage governed local stdio MCP servers for this workspace.</p>
+    <p>Build, test, and manage governed local MCP servers for this workspace.</p>
   </div>
   <button class="icon" aria-label="Refresh servers" onclick={load}><Icon name="refresh" size={17} /></button>
 </div>
@@ -152,7 +159,7 @@
 <form class="create" onsubmit={create}>
   <div class="field">
     <label class="field-label" for="mcp-name">Server name</label>
-    <input id="mcp-name" class="input" bind:value={newName} placeholder="my-tools" autocomplete="off" />
+    <input id="mcp-name" class="input" bind:value={newName} placeholder="e.g. My notes helper" autocomplete="off" />
   </div>
   <div class="field">
     <label class="field-label" for="mcp-template">Template</label>
@@ -203,7 +210,7 @@
         </div>
         <dl class="meta">
           <div><dt>Command</dt><dd><code>{s.command.join(" ")}</code></dd></div>
-          <div><dt>Template</dt><dd>{s.template ?? "—"}</dd></div>
+          <div><dt>Template</dt><dd>{templateLabel(s.template)}</dd></div>
           <div><dt>Last connected</dt><dd>{s.last_connected_at ?? "Never"}</dd></div>
         </dl>
         <div class="tools">

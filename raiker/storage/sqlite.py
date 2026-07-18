@@ -70,6 +70,8 @@ from raiker.storage.migrations import (
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
+    MCP_MONITORING_MIGRATION_ID,
+    MCP_MONITORING_SQL,
     MCP_REMOTE_ENDPOINT_MIGRATION_ID,
     MCP_REMOTE_ENDPOINT_SQL,
     MCP_SERVER_RUNTIME_MIGRATION_ID,
@@ -645,6 +647,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MCP_REMOTE_ENDPOINT_MIGRATION_ID, MCP_REMOTE_ENDPOINT_SQL, connection
             )
+            self._apply_migration(MCP_MONITORING_MIGRATION_ID, MCP_MONITORING_SQL, connection)
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -1640,6 +1643,161 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (status, last_connected_at, server_id, principal_id),
             )
             return cursor.rowcount > 0
+
+    # ── MCP monitoring: redacted per-session log + shared findings ───────────
+
+    @staticmethod
+    def _mcp_session_log_row(row: sqlite3.Row) -> dict[str, Any]:
+        data = dict(row)
+        raw = data.get("hosts_json")
+        try:
+            data["hosts"] = json.loads(raw) if isinstance(raw, str) else []
+        except (TypeError, ValueError):
+            data["hosts"] = []
+        return data
+
+    def insert_mcp_session_log(
+        self,
+        *,
+        server_id: str | None,
+        principal_id: str,
+        transport: str,
+        operation: str,
+        hosts: list[str],
+        tool_calls: int,
+        bytes_in: int,
+        bytes_out: int,
+        error_count: int,
+        outcome: str,
+        started_at: str,
+        ended_at: str | None = None,
+    ) -> str:
+        """Append one redacted per-session monitoring row for a connection.
+
+        Stores only metadata — the tool-call count, the hosts contacted (netloc
+        only), byte counts, error count, and outcome. No payload, token, or host
+        secret is ever written here. Owner-scoped by ``principal_id``.
+        """
+        session_row_id = new_id("mses_")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO mcp_session_log
+                   (session_row_id, server_id, principal_id, transport, operation,
+                    hosts_json, tool_calls, bytes_in, bytes_out, error_count,
+                    outcome, started_at, ended_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    session_row_id,
+                    server_id,
+                    principal_id,
+                    transport,
+                    operation,
+                    json.dumps(list(hosts)),
+                    int(tool_calls),
+                    int(bytes_in),
+                    int(bytes_out),
+                    int(error_count),
+                    outcome,
+                    started_at,
+                    ended_at,
+                ),
+            )
+        return session_row_id
+
+    def list_mcp_session_logs(
+        self, server_id: str | None, principal_id: str, *, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """Owner-scoped, most-recent-first session rows for one connection. A
+        different owner (or a null server_id) resolves nothing, so a baseline can
+        never be read across owners."""
+        if not server_id:
+            return []
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM mcp_session_log
+                   WHERE principal_id = ? AND server_id = ?
+                   ORDER BY started_at DESC, rowid DESC LIMIT ?""",
+                (principal_id, server_id, int(limit)),
+            ).fetchall()
+        return [self._mcp_session_log_row(row) for row in rows]
+
+    @staticmethod
+    def _security_finding_row(row: sqlite3.Row) -> dict[str, Any]:
+        data = dict(row)
+        raw = data.get("redacted_detail_json")
+        try:
+            data["redacted_detail"] = json.loads(raw) if isinstance(raw, str) else {}
+        except (TypeError, ValueError):
+            data["redacted_detail"] = {}
+        return data
+
+    def insert_security_finding(
+        self,
+        *,
+        principal_id: str,
+        source: str,
+        severity: str,
+        code: str,
+        summary: str,
+        redacted_detail: dict[str, Any] | None = None,
+        subject_id: str | None = None,
+        state: str = "open",
+    ) -> str:
+        """Persist one redacted finding. ``redacted_detail`` must already contain
+        redacted metadata only (labels/counts/hostnames) — never a raw value.
+        Owner-scoped by ``principal_id``; shared substrate across monitors."""
+        finding_id = new_id("find_")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO security_findings
+                   (finding_id, principal_id, source, severity, code, summary,
+                    redacted_detail_json, subject_id, state, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    finding_id,
+                    principal_id,
+                    source,
+                    severity,
+                    code,
+                    summary,
+                    json.dumps(dict(redacted_detail or {})),
+                    subject_id,
+                    state,
+                    utc_now(),
+                ),
+            )
+        return finding_id
+
+    def list_security_findings(
+        self,
+        principal_id: str,
+        *,
+        source: str | None = None,
+        subject_id: str | None = None,
+        state: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Owner-scoped findings, newest first, optionally filtered by source,
+        subject, or state. A different owner resolves nothing (isolation)."""
+        conditions = ["principal_id = ?"]
+        params: list[Any] = [principal_id]
+        if source is not None:
+            conditions.append("source = ?")
+            params.append(source)
+        if subject_id is not None:
+            conditions.append("subject_id = ?")
+            params.append(subject_id)
+        if state is not None:
+            conditions.append("state = ?")
+            params.append(state)
+        params.append(int(limit))
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM security_findings WHERE {' AND '.join(conditions)} "
+                "ORDER BY created_at DESC, rowid DESC LIMIT ?",
+                params,
+            ).fetchall()
+        return [self._security_finding_row(row) for row in rows]
 
     def delete_project(self, project_id: str) -> bool:
         with self.connect() as connection:

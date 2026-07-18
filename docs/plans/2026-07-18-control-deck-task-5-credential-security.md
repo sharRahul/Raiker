@@ -99,7 +99,7 @@ def test_hibp_request_uses_only_sha1_prefix(http_fn) -> None:
 - [x] Build the web app and use a disposable workspace to register/login, trigger a redacted local finding and health failure, inspect remediation, perform the opt-in breach request, and capture screenshots. Native Python Playwright was unavailable; the installed Node Playwright runtime drove system Chrome instead.
 - [x] Run all Python tests in two alphabetical file batches with `-p no:cacheprovider`, then `ruff`, `mypy`, `compileall`, all five validators, web check/lint/test/build, and `git diff --check`.
 - [x] Update the authoritative Task 5 result and future bounded-detector roadmap in the tracked plan, status, handoff, user guides, and threat model; record every command result and the browser-runtime limitation honestly.
-- [ ] Commit the Task 5 implementation plus the already-tested Windows interpreter fix, push `main`, and verify the pushed commit's GitHub workflows are green.
+- [x] Commit the Task 5 implementation plus the already-tested Windows interpreter fix, push `main`, and verify the pushed commit's GitHub workflows are green. The initial CI run caught missing type annotations in a new test; follow-up `e92882c` fixed them, and its CI (Python 3.11/3.12) plus Phase Status Validation completed successfully.
 
 ## Plan Self-Review
 

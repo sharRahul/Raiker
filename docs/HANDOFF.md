@@ -92,7 +92,9 @@ Control Deck commit.
   an opt-in breach request; screenshots are in `C:\Temp\raiker-task5-live`.
   The active Python environments lack Playwright, so that browser drive used the
   installed Node Playwright runtime with system Chrome after that limitation was
-  verified.
+  verified. GitHub CI initially caught missing annotations in the new monitoring
+  test; follow-up commit `e92882c` fixes that and its CI Python 3.11/3.12 matrix
+  plus Phase Status Validation are green.
 
 - **The 2026-07-16 "dirty worktree" is now committed.** The Control Deck pause
   point below told the next session to preserve an uncommitted worktree. That

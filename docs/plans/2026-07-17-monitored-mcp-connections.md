@@ -1,6 +1,9 @@
 # Monitored MCP Connections — Design & Implementation Plan
 
-> **Status:** design, approved 2026-07-17. Supersedes the "no remote MCP
+> **Status:** design approved 2026-07-17. **Phases A, B, C implemented**
+> (remote transport, per-session monitoring + anomaly findings, and
+> notify + kill switch + revocable auto-pause); **Phase D (Connections UI +
+> live monitor) is the remaining slice.** Supersedes the "no remote MCP
 > endpoints" stance in `docs/plans/2026-07-16-raiker-control-deck-implementation.md`.
 > Grounded in `docs/SECURITY_AND_POLICY.md` → "Security Philosophy".
 

@@ -25,6 +25,37 @@ bypass governance. Every action must remain policy-aware, observable,
 auditable, approval-driven where required, human-governed, user-controlled, and
 fail-closed by design.
 
+> Current truth update (2026-07-18): the **monitored MCP connections** plan
+> (`docs/plans/2026-07-17-monitored-mcp-connections.md`) is implemented through
+> **Phase C**. Phase A added the remote (HTTP) transport to `McpConnectorExecutor`
+> (owner-added `endpoint_url` + env-referenced `auth_ref`; token never stored;
+> migration `RAIKER-1018-mcp-remote-endpoint`). Phase B added
+> `raiker/security/mcp_monitor.py` (`McpSessionMonitor` + redacted
+> `McpSessionTelemetry`), migration `RAIKER-1019-mcp-monitoring` (the redacted
+> `mcp_session_log` + shared `security_findings` tables), and five deterministic
+> anomaly rules each raising a redacted finding + `mcp_anomaly_detected` event
+> (committed `ec05ae4`, PR #123). Phase C added the containment layer
+> (`McpContainment`): every finding raises a `notifications` row, a high-severity
+> finding trips a revocable auto-pause circuit breaker, and the connector gained a
+> containment gate that fails a `paused`/`killed` session closed
+> (`mcp_connection_paused` / `mcp_connection_killed`). Migration
+> `RAIKER-1020-mcp-containment-notifications` adds `mcp_servers.monitor_state` /
+> `paused_reason` / `paused_at` and the shared `notifications` table; new events
+> `mcp_connection_paused` / `mcp_connection_resumed` / `mcp_connection_killed`;
+> control-service `pause_mcp_server` / `kill_mcp_server` / `resume_mcp_server`
+> (human-only, owner-scoped); routes `POST /api/mcp/servers/{id}/pause|resume|kill`,
+> `GET /api/mcp/servers/{id}/findings`, `GET /api/notifications`,
+> `POST /api/notifications/{id}/read`. Kill and pause are both revocable via
+> resume. No raw payload/token/host secret ever reaches a session-log row,
+> finding, event, or notification. Covered by `tests/test_mcp_runtime.py`,
+> `tests/test_mcp_monitor.py`, and `tests/test_mcp_containment.py` (20 new). Gates:
+> `pytest` 1960 passed, `ruff` clean, `mypy` 425 files clean, `compileall` clean,
+> all five repo validators pass. Threat models
+> `docs/threat-models/mcp-remote.md` (transport) and
+> `docs/threat-models/mcp-monitoring.md` (monitoring + containment). **Phase D
+> (Connections UI + live monitor) is the remaining slice.** The shared
+> `security_findings` + `notifications` substrate is reused by Control Deck Task 5.
+
 > Current truth update (2026-07-17): the Control Deck work that `docs/HANDOFF.md`
 > previously described as an uncommitted worktree is now committed as `f97e6ce`
 > ("Isolate users by instance and scope control state per principal"). Plan

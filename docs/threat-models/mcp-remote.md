@@ -26,8 +26,10 @@ authorization. The transport does **not** require a pre-configured egress
 allowlist and does not pre-emptively block the owner's chosen host. Safety comes
 from **visibility + containment**, delivered across the monitored-MCP phases:
 Phase A records the connection (`mcp_connection_added`, redacted to host only);
-Phase B watches each session; Phase C adds findings + notifications + an instant
-stop and a revocable auto-pause. This document covers Phase A; B/C land next.
+Phase B watches each session (redacted per-session telemetry + anomaly findings);
+Phase C adds findings + notifications + an instant kill switch and a revocable
+auto-pause circuit breaker. This document covers Phase A's transport; Phases B
+and C are **implemented** and covered by `docs/threat-models/mcp-monitoring.md`.
 
 ## Boundaries enforced (fail-closed)
 
@@ -53,7 +55,8 @@ stop and a revocable auto-pause. This document covers Phase A; B/C land next.
 - **Redirects** — the initial scheme/host is validated; cross-host redirect
   hardening is tightened in a later phase.
 - **Monitoring/containment** (anomaly detection, findings, notifications, kill
-  switch, auto-pause) land in Phases B–C per
-  `docs/plans/2026-07-17-monitored-mcp-connections.md`. Until then a remote
-  connection is recorded and owner-controllable (test/rename/delete) but not yet
-  anomaly-scored.
+  switch, auto-pause) are **implemented** in Phases B–C per
+  `docs/plans/2026-07-17-monitored-mcp-connections.md`; see
+  `docs/threat-models/mcp-monitoring.md`. A remote connection is recorded,
+  anomaly-scored per session, and owner-controllable (test/rename/delete/pause/
+  resume/kill).

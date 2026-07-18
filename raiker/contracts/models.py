@@ -106,6 +106,13 @@ EVENT_TYPES = {
     # rule tripped — a redacted finding was raised (never a payload or token).
     "mcp_session_completed",
     "mcp_anomaly_detected",
+    # Containment (Phase C). A connection was paused (revocable circuit breaker —
+    # auto on a high-severity anomaly, or the owner's one-call stop), resumed
+    # (back to active), or killed (instant kill switch). Redacted metadata only
+    # (server_id, source, redacted reason) — never a payload or token.
+    "mcp_connection_paused",
+    "mcp_connection_resumed",
+    "mcp_connection_killed",
     "task_created",
     "task_started",
     "task_progress",

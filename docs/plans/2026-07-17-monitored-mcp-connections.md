@@ -1,6 +1,9 @@
 # Monitored MCP Connections — Design & Implementation Plan
 
-> **Status:** design, approved 2026-07-17. Supersedes the "no remote MCP
+> **Status:** design approved 2026-07-17. **Phases A, B, C implemented**
+> (remote transport, per-session monitoring + anomaly findings, and
+> notify + kill switch + revocable auto-pause); **Phase D (Connections UI +
+> live monitor) is the remaining slice.** Supersedes the "no remote MCP
 > endpoints" stance in `docs/plans/2026-07-16-raiker-control-deck-implementation.md`.
 > Grounded in `docs/SECURITY_AND_POLICY.md` → "Security Philosophy".
 
@@ -171,20 +174,50 @@ Connections UI) are next.**
 `raiker/api/routes_dashboard.py`, `raiker/api/schemas.py`,
 `tests/test_mcp_containment.py`.
 
-- [ ] **C1. Failing tests** for: a **high-severity** finding auto-transitions the
+- [x] **C1. Failing tests** for: a **high-severity** finding auto-transitions the
   connection to `paused` (revocable) and blocks further sessions until the owner
   resumes; a **kill** sets `killed` and refuses all sessions; **resume** clears
   `paused`; every transition emits its event and a notification; an owner-present
   **stop** works from one call; pause/kill/resume are owner-scoped + human-only.
-- [ ] **C2. Verify RED.**
-- [ ] **C3. Implement** the containment gate in the connector path: before a
+- [x] **C2. Verify RED.**
+- [x] **C3. Implement** the containment gate in the connector path: before a
   session runs, check `monitor_state` (`killed`/`paused` → refuse with a clear,
   non-fabricated reason); on a high-severity anomaly, set `paused` +
   `paused_reason`, emit `mcp_connection_paused`, and raise a notification.
   Endpoints: `POST /api/mcp/servers/{id}/pause|resume|kill`. A notification is
   raised for every finding and every containment transition.
-- [ ] **C4. Verify GREEN.** Include an async scenario: an unattended session that
+- [x] **C4. Verify GREEN.** Include an async scenario: an unattended session that
   trips a high-severity rule is auto-paused and cannot continue until resumed.
+
+Result 2026-07-18: implemented the `McpContainment` helper in
+`raiker/security/mcp_monitor.py` (shared by the monitor's automatic circuit
+breaker and the owner's manual controls) and wired it into `McpSessionMonitor`:
+every finding now raises an owner-facing notification, and a **high-severity**
+finding (tool-set swap, error/auth-failure burst, or sensitive-shape coinciding
+with a new host) auto-pauses the connection — once, without churning an ongoing
+incident. Migration `RAIKER-1020-mcp-containment-notifications` adds the
+`monitor_state` / `paused_reason` / `paused_at` columns and the shared
+`notifications` table (also for Task 5), with storage accessors
+(`set_mcp_monitor_state`, `insert/list/mark` notifications). The connector
+executor gained a **containment gate**: a `paused`/`killed` connection fails
+closed before the session runs (`mcp_connection_paused` / `mcp_connection_killed`
+— honest missing-prerequisite refusal, not an owner-facing ban). New event types
+`mcp_connection_paused` / `mcp_connection_resumed` / `mcp_connection_killed`;
+control-service `pause_mcp_server` / `kill_mcp_server` / `resume_mcp_server`
+(human-only, owner-scoped); endpoints `POST /api/mcp/servers/{id}/pause|resume|kill`,
+`GET /api/mcp/servers/{id}/findings`, `GET /api/notifications`,
+`POST /api/notifications/{id}/read`. Kill and pause are both **revocable** —
+resume returns either to `active`. `tests/test_mcp_containment.py` adds 20 cases
+(RED first, then GREEN). Full suite **1960 passed**; `ruff` clean; `mypy` 425
+files clean; `compileall` clean; all five repo validators PASS. Two live drives:
+(1) through the **real governed runtime** (`RuntimeAuthority.route_action` → a
+real local stdio MCP server) — an unattended session tripped the high-severity
+rule, the connection auto-paused, the next governed session was refused, resume
+restored it, kill refused again, and the secret appeared in **no** finding,
+notification, or session-log row; (2) a **real browser** (screenshot) driving the
+running API server over authenticated HTTP through connect → pause → refuse →
+resume → kill → refuse and listing the three transition notifications. **Phase D
+(Connections UI + live monitor) is next.**
 
 ## Phase D — Connections page: "Connect via MCP" + live monitor
 

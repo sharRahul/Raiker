@@ -346,6 +346,12 @@ class McpConnectorExecutor:
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         principal_id = principal.principal_id if principal is not None else action.principal_id
         started_at = utc_now()
+        # Containment gate: a paused/killed connection refuses the session before
+        # it runs, with a clear, non-fabricated reason (missing-prerequisite
+        # honesty, not an owner-facing ban — the owner can resume it any time).
+        contained = self._containment_reason(action, principal_id)
+        if contained is not None:
+            return self._fail(action.action_id, contained)
         try:
             requested = float(action.arguments.get("timeout", MCP_SESSION_TIMEOUT))
         except (TypeError, ValueError):
@@ -584,6 +590,26 @@ class McpConnectorExecutor:
             started_at=ctx.started_at,
             ended_at=utc_now(),
         )
+
+    def _containment_reason(self, action: GovernedAction, principal_id: str) -> str | None:
+        """Resolve the connection this session belongs to and refuse it if the
+        owner (or the auto-pause circuit breaker) has contained it. Returns a
+        redacted reason code (``mcp_connection_paused`` / ``mcp_connection_killed``)
+        or ``None`` when the connection is active or unknown (an ad-hoc session
+        with no stored profile has nothing to contain)."""
+        command = [str(part) for part in action.arguments.get("command", [])]
+        server_id = self._resolve_server_id(action, principal_id, command)
+        if not server_id:
+            return None
+        server = self._store.get_mcp_server(server_id, principal_id)
+        if server is None:
+            return None
+        state = str(server.get("monitor_state") or "active")
+        if state == "killed":
+            return "mcp_connection_killed"
+        if state == "paused":
+            return "mcp_connection_paused"
+        return None
 
     def _resolve_server_id(
         self, action: GovernedAction, principal_id: str, command: list[str]

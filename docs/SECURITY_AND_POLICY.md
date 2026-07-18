@@ -56,6 +56,23 @@ last resort and must be justified against this philosophy — not adopted as the
 default. (This is why, for example, remote MCP endpoints are **allowed and
 monitored**, not forbidden; see the monitored-MCP design plan.)
 
+**Implementation status (monitored MCP connections).** This philosophy is
+realised end-to-end for MCP connections (local + remote):
+`raiker/security/mcp_monitor.py` watches every governed session with redacted
+per-session telemetry and five deterministic anomaly rules (each raising a
+redacted `security_findings` row + `mcp_anomaly_detected` event); `McpContainment`
+raises an owner `notifications` row for every finding, trips a **revocable
+auto-pause circuit breaker** on a high-severity finding, and backs the owner's
+**instant kill switch** + **one-call stop** + **resume** (`monitor_state` =
+`active`/`paused`/`killed`, human-only, owner-scoped). The connector executor
+refuses a `paused`/`killed` session before it runs — an honest
+missing-prerequisite refusal that the owner can always revoke, never a wall. No
+raw payload, token, or host secret ever reaches a log row, finding, event, or
+notification. The `security_findings` + `notifications` tables are the shared
+substrate Control Deck self-monitoring (Task 5) reuses. See
+`docs/plans/2026-07-17-monitored-mcp-connections.md` and
+`docs/threat-models/mcp-monitoring.md`.
+
 ---
 
 ## Core Security Principle

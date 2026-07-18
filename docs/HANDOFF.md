@@ -146,16 +146,48 @@ Control Deck commit.
   Tests: 8 new in `tests/test_mcp_runtime.py` (39 total). Full suite 1926 passed;
   ruff/mypy clean; five validators pass; a live real-HTTP drive (local MCP server
   on 127.0.0.1) verified connect/list/redacted-call/token-never-stored/fail-closed.
-  Threat model `docs/threat-models/mcp-remote.md`. **Phases B–D (per-session
-  monitoring + anomaly findings, notify + kill switch + revocable auto-pause, and
-  the Connections "Connect via MCP" UI) are the next slices** — see
-  `docs/plans/2026-07-17-monitored-mcp-connections.md`.
-- **Plan Tasks 5–11 are not started** (verified against the tree): no
-  `raiker/security/` package (credentials/monitoring) and neither
+  Threat model `docs/threat-models/mcp-remote.md`.
+- **Monitored MCP connections — Phase B (per-session monitoring + anomaly
+  detection) is implemented** (commit `ec05ae4`, merged PR #123). New
+  `raiker/security/mcp_monitor.py` (`McpSessionMonitor` + redacted
+  `McpSessionTelemetry` + `shape_sensitivity`); migration
+  `RAIKER-1019-mcp-monitoring` adds the redacted `mcp_session_log` and the shared
+  `security_findings` tables; the executor emits per-session telemetry (stdio +
+  HTTP, on success and failure). Five deterministic rules (new-host, volume-spike,
+  tool-set-swap, sensitive-shape, error-burst) each raise a redacted finding +
+  `mcp_anomaly_detected` event; no raw payload/token/host secret is ever stored.
+  Tests: `tests/test_mcp_monitor.py` (14).
+- **Monitored MCP connections — Phase C (notify + instant kill switch + revocable
+  auto-pause) is implemented on this branch** (commit `4b2848d`, draft PR #124).
+  Findings become owner action: every finding raises a `notifications` row, and a
+  **high-severity** finding trips a revocable auto-pause circuit breaker. New
+  `McpContainment` helper (shared by the monitor's automatic breaker and the
+  owner's manual controls) writes `mcp_servers.monitor_state`
+  (`active`/`paused`/`killed`) + redacted `paused_reason`/`paused_at`, emits
+  `mcp_connection_paused`/`resumed`/`killed`, and raises a notification per
+  transition. The connector executor gained a **containment gate** — a
+  paused/killed connection fails closed before the session runs
+  (`mcp_connection_paused` / `mcp_connection_killed`, honest missing-prerequisite,
+  not a ban). Migration `RAIKER-1020-mcp-containment-notifications` (the three
+  `mcp_servers` columns + the shared `notifications` table); id prefix `ntf_`;
+  control-service `pause_mcp_server`/`kill_mcp_server`/`resume_mcp_server`
+  (human-only, owner-scoped); routes `POST /api/mcp/servers/{id}/pause|resume|kill`,
+  `GET /api/mcp/servers/{id}/findings`, `GET /api/notifications`,
+  `POST /api/notifications/{id}/read`. Kill and pause are both revocable via
+  resume. Tests: `tests/test_mcp_containment.py` (20). Full suite 1960 passed;
+  ruff clean; mypy 425 files clean; five validators pass; two live drives (real
+  governed runtime + a real-browser authenticated HTTP drive with a screenshot).
+  Threat model `docs/threat-models/mcp-monitoring.md`. **Phase D (Connections
+  "Connect via MCP" UI + live monitor panel with browser screenshots) is the
+  remaining slice** — see `docs/plans/2026-07-17-monitored-mcp-connections.md`.
+- **Plan Tasks 5–11 are not started** (verified against the tree): the
+  `raiker/security/` package now holds `mcp_monitor.py` (monitored-MCP Phases B–C)
+  but **not** the credential-lifecycle/breach-detection modules, and neither
   `tests/test_credential_security.py` nor `tests/test_runtime_monitoring.py`
-  exists, and the web Control Deck rebuild (Tasks 6–10) has not begun.
+  exists; the web Control Deck rebuild (Tasks 6–10) has not begun. Task 5 will
+  **reuse the shared `security_findings` + `notifications` substrate** built here.
   **Task 5 (credential lifecycle + breach detection + self-monitoring) is the
-  next slice.**
+  next Control Deck slice.**
 - **Task 3 review note (design, not a bug).** The new
   `list_sessions(include_archived=False)` default excludes archived sessions from
   every internal caller that does not opt in. The event-visibility path was

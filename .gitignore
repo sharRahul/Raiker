@@ -20,3 +20,5 @@ docs/superpowers
 .superpowers
 build/
 *.lock
+output/
+.playwright-mcp/

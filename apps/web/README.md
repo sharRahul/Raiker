@@ -19,6 +19,13 @@ RuntimeAuthority, and append-only audit log as the terminal client.
   `deferred`, `fails closed`); unknown backend codes and capabilities are surfaced raw, never
   hidden; the UI adds no authority of its own.
 
+## Shared shell
+
+`ResponsivePage` wraps authenticated route content while preserving the existing
+sidebar, topbar, skip link, and main landmark. On narrow screens the sidebar
+becomes a labelled icon rail; route-body migrations are deliberately staged in
+later Control Deck tasks.
+
 ## Surfaces
 
 | Page | What it covers |
@@ -56,3 +63,9 @@ isolated here and does not affect the Python package or its `ruff`/`mypy`/`pytes
 
 The typed API client lives in `src/lib/api.ts` / `src/lib/apiTypes.ts`; the backend contract test
 `tests/test_api_contract_schemas.py` guards the response keys the client reads.
+
+Shared presentational primitives live in `src/lib/components/`: `PageState`,
+`ResponsivePage`, `SessionMenu`, and `ToolControlBoard`. They only render server
+truth and route callbacks to their consumers. `SessionMenu` shares only
+loopback-origin hash links; its route integration is deferred to the Sessions
+migration task.

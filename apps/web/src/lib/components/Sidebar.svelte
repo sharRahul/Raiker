@@ -121,6 +121,7 @@
               class="nav-link"
               class:active={current === item.id}
               aria-current={current === item.id ? "page" : undefined}
+              aria-label={item.label}
               title={item.hint}
             >
               <Icon name={item.icon} size={17} />
@@ -212,11 +213,11 @@
     line-height: 1.15;
   }
   .brand-name {
-    font-family: var(--font-serif);
-    font-weight: 600;
-    font-size: 1.02rem;
-    letter-spacing: 0.02em;
-    text-transform: none;
+    font-family: var(--font-sans);
+    font-weight: 800;
+    font-size: 0.78rem;
+    letter-spacing: 0.45em;
+    text-transform: uppercase;
     color: var(--text-1);
   }
   .brand-sub {
@@ -350,5 +351,12 @@
     border: 0;
     cursor: default;
     appearance: none;
+  }
+  @media (max-width: 720px) {
+    .sidebar { width: 4rem; padding: var(--space-3) var(--space-2); }
+    .brand { justify-content: center; padding: 0.25rem; }
+    .brand-text, .group-label, .recent, .local-note { display: none; }
+    .nav-link { justify-content: center; padding: 0.55rem; }
+    .nav-link span { display: none; }
   }
 </style>

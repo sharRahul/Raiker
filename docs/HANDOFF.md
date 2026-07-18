@@ -53,6 +53,25 @@ This section reconciles the handoff with the committed tree. Read it first; the
 older dated sections below remain accurate for their own slices but predate the
 Control Deck commit.
 
+- **Control Deck Task 6 — shared web primitives and shell migration is
+  implemented locally.** Reused `Sidebar`/`NotificationCenter` remain the sole
+  shared instances; notification copy is source-neutral and the Sidebar uses
+  the approved Manrope uppercase wordmark. `PageState`, `ResponsivePage`,
+  `SessionMenu`, `ToolControlBoard`, and the loopback-only share predicate are
+  presentational/callback-only; no Svelte code decides authority. `App.svelte`
+  now wraps only the active route in `ResponsivePage`, preserving bootstrap,
+  auth, routing, projects, skip link, and main landmark. At 390px the shell
+  uses a labelled icon rail and compact padding. A live screenshot first found
+  the full sidebar crushing mobile content; that defect was fixed and the final
+  desktop/mobile authenticated screenshots live in
+  `.tmp/task6-live-20260718/`. SessionMenu is deliberately unconsumed until
+  Task 8, so its six actions and generic notification state are component-tested
+  rather than claimed as a live route flow. The Python Playwright package and
+  downloaded Node browser were unavailable; the authenticated drive used Node
+  Playwright with installed system Chrome. Full web (151 passed, one existing
+  skip), two uncached Python batches, ruff, mypy (429 files), compileall, and
+  all five validators passed. Final push/CI remains pending.
+
 - **Monitored MCP connections — Phase D (Connections UI + live monitor) is
   implemented in the current worktree.** Every Connections catalogue card now
   has a governed **Connect via MCP** flow for a local starter or a remote HTTP
@@ -224,7 +243,7 @@ Control Deck commit.
   "Connect via MCP" UI + live monitor panel with browser screenshots) is now
   implemented in the current worktree** — see
   `docs/plans/2026-07-17-monitored-mcp-connections.md`.
-- **Plan Tasks 5–11 are not started** (verified against the tree): the
+- **Plan Tasks 7–11 are not started** (verified against the tree): the
   `raiker/security/` package now also holds the Task 5 `credentials.py` and
   `monitoring.py` modules, with `tests/test_credential_security.py` and
   `tests/test_runtime_monitoring.py`; the web Control Deck rebuild (Tasks 6–10)

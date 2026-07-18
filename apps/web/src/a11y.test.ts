@@ -40,6 +40,15 @@ describe("accessibility landmarks", () => {
     });
   });
 
+  it("wraps the authenticated route in the responsive page shell", async () => {
+    stubFetch(BOOTSTRAP_ROUTES);
+    render(App);
+    await signIn();
+    await waitFor(() => {
+      expect(screen.getByTestId("responsive-page")).toBeInTheDocument();
+    });
+  });
+
   it("announces connection state via a status/alert region on failure", async () => {
     vi.stubGlobal(
       "fetch",

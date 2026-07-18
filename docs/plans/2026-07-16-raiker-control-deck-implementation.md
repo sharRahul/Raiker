@@ -453,14 +453,14 @@ or exhaustive system-security detection.
 
 **Files:**
 - Modify: `apps/web/src/lib/api.ts`
-- Modify: `apps/web/src/lib/apiTypes.ts`
-- Modify: `apps/web/src/app.css`
 - Modify: `apps/web/src/lib/components/Sidebar.svelte`
-- Create: `apps/web/src/lib/components/NotificationCenter.svelte`
+- Modify: `apps/web/src/lib/components/Topbar.svelte`
+- Modify: `apps/web/src/lib/components/NotificationCenter.svelte`
 - Create: `apps/web/src/lib/components/PageState.svelte`
 - Create: `apps/web/src/lib/components/SessionMenu.svelte`
 - Create: `apps/web/src/lib/components/ToolControlBoard.svelte`
 - Create: `apps/web/src/lib/components/ResponsivePage.svelte`
+- Create: `apps/web/src/lib/loopback.ts`
 - Modify: `apps/web/src/App.svelte`
 - Create: `apps/web/src/lib/components/SessionMenu.test.ts`
 
@@ -468,7 +468,7 @@ or exhaustive system-security detection.
 
 **Does NOT cover:** Components never decide authorization; they render server truth and show server remediation.
 
-- [ ] **Step 1: Write failing component tests** for all six session menu actions, loopback-only share copy, notification state, and hiding decision controls for non-executable tools.
+- [x] **Step 1: Write failing component tests** for all six session menu actions, loopback-only share copy, notification state, and hiding decision controls for non-executable tools.
 
 ```ts
 it("does not render decision controls for a deferred capability", async () => {
@@ -477,13 +477,13 @@ it("does not render decision controls for a deferred capability", async () => {
 });
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `npm --prefix apps/web run test -- --run SessionMenu.test.ts`
 
 Expected: shared components/imports are missing.
 
-- [ ] **Step 3: Add typed endpoint methods and DTOs**, then implement shared tokens and components. Use the login wordmark's Manrope uppercase tracking in `Sidebar`.
+- [x] **Step 3: Add typed endpoint methods and DTOs**, then implement shared tokens and components. Use the login wordmark's Manrope uppercase tracking in `Sidebar`.
 
 ```css
 .brand-name {
@@ -494,11 +494,23 @@ Expected: shared components/imports are missing.
 }
 ```
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run: `npm --prefix apps/web run check; npm --prefix apps/web run test -- --run SessionMenu.test.ts`
 
 Expected: shared shell compiles, menu actions are keyboard reachable, and unavailable controls are absent.
+
+**Result (2026-07-18):** `api.renameSession` and `api.archiveSession` cover the
+already-supported owner-scoped lifecycle routes; their simple response shapes do
+not need a duplicate `apiTypes.ts` DTO. `PageState`, `ResponsivePage`,
+`SessionMenu`, and `ToolControlBoard` are presentational/callback-only. The
+existing notification center is source-neutral, and the existing sidebar uses
+the approved Manrope uppercase wordmark. `App.svelte` now uses the responsive
+shell without rebuilding route bodies; Tasks 7-9 remain the consumers/migration
+work. At 390px the shell uses an icon rail with labelled links and compact
+topbar/content padding. Focused red/green tests, full web gates, two uncached
+Python batches, static checks, and repository validators passed; the final
+commit/push and exact-tip CI check are tracked in the Task 6 detail plan.
 
 ### Task 7: Rebuild Conversation, Search, Memory, Projects, Tasks, Approvals, Brain, and Work Routes
 

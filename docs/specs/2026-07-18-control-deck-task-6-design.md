@@ -48,3 +48,13 @@ Component tests cover all six menu actions, loopback-only share, notification
 read filtering, and omitted controls. The web check/lint/test/build gates, an
 authenticated browser drive, full Python gate, repository validators, and CI
 remain required before release.
+
+## Implementation record — 2026-07-18
+
+The shared shell migration is complete: `App.svelte` uses `ResponsivePage`
+without changing individual route bodies. At the verified 390px viewport the
+sidebar becomes an accessible icon rail; the original full-width mobile sidebar
+was found in the browser drive and repaired before release. `SessionMenu` stays
+an authority-neutral primitive until Task 8 integrates it into Sessions; its
+callbacks, loopback-only sharing predicate, and unavailable-control omission
+are verified in component tests rather than represented by a temporary route.

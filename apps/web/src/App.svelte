@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import Sidebar from "./lib/components/Sidebar.svelte";
   import Topbar from "./lib/components/Topbar.svelte";
+  import ResponsivePage from "./lib/components/ResponsivePage.svelte";
   import { DEFAULT_ROUTE, navItem, routeFromHash } from "./lib/nav";
   import { api } from "./lib/api";
   import type { ProjectsList } from "./lib/apiTypes";
@@ -103,41 +104,43 @@
       onProjectSelect={selectProject}
     />
     <main id="main" class="content" tabindex="-1">
-      {#if current === "new-chat"}
-        <ChatView sessionId={continuedSessionId} />
-      {:else if current === "search-chat"}
-        <SearchChatView />
-      {:else if current === "memory"}
-        <MemoryView />
-      {:else if current === "approvals"}
-        <ApprovalsView />
-      {:else if current === "tasks"}
-        <TasksView projectId={activeProjectId} />
-      {:else if current === "brain"}
-        <BrainView />
-      {:else if current === "work"}
-        <WorkInActionView />
-      {:else if current === "sessions"}
-        <SessionsView projectId={activeProjectId} />
-      {:else if current === "projects"}
-        <ProjectsView onchanged={refreshProjects} />
-      {:else if current === "capabilities"}
-        <CapabilitiesView {principal} />
-      {:else if current === "models"}
-        <ModelsView />
-      {:else if current === "connections"}
-        <ConnectionsView />
-      {:else if current === "mcp"}
-        <McpView />
-      {:else if current === "checkpoints"}
-        <CheckpointsView projectId={activeProjectId} />
-      {:else if current === "activity"}
-        <ActivityView />
-      {:else if current === "diagnostics"}
-        <DiagnosticsView />
-      {:else}
-        <SettingsView {principal} />
-      {/if}
+      <ResponsivePage lead={activeItem.hint}>
+        {#if current === "new-chat"}
+          <ChatView sessionId={continuedSessionId} />
+        {:else if current === "search-chat"}
+          <SearchChatView />
+        {:else if current === "memory"}
+          <MemoryView />
+        {:else if current === "approvals"}
+          <ApprovalsView />
+        {:else if current === "tasks"}
+          <TasksView projectId={activeProjectId} />
+        {:else if current === "brain"}
+          <BrainView />
+        {:else if current === "work"}
+          <WorkInActionView />
+        {:else if current === "sessions"}
+          <SessionsView projectId={activeProjectId} />
+        {:else if current === "projects"}
+          <ProjectsView onchanged={refreshProjects} />
+        {:else if current === "capabilities"}
+          <CapabilitiesView {principal} />
+        {:else if current === "models"}
+          <ModelsView />
+        {:else if current === "connections"}
+          <ConnectionsView />
+        {:else if current === "mcp"}
+          <McpView />
+        {:else if current === "checkpoints"}
+          <CheckpointsView projectId={activeProjectId} />
+        {:else if current === "activity"}
+          <ActivityView />
+        {:else if current === "diagnostics"}
+          <DiagnosticsView />
+        {:else}
+          <SettingsView {principal} />
+        {/if}
+      </ResponsivePage>
     </main>
   </div>
 </div>
@@ -163,5 +166,8 @@
   .content:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: -2px;
+  }
+  @media (max-width: 720px) {
+    .content { padding: var(--space-4) var(--space-3); }
   }
 </style>

@@ -519,6 +519,15 @@ export const api = {
       { method: "PUT" },
     ),
   session: (id: string) => request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
+  renameSession: (id: string, title: string) =>
+    request<{ ok: boolean; session_id: string; title: string }>(
+      `/api/sessions/${encodeURIComponent(id)}/rename`,
+      { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) },
+    ),
+  archiveSession: (id: string) =>
+    request<{ ok: boolean; session_id: string; archived: boolean }>(
+      `/api/sessions/${encodeURIComponent(id)}/archive`, { method: "PUT" },
+    ),
   // Pin (or unpin) a session. Organizing label only — grants nothing.
   setSessionPinned: (id: string, pinned: boolean) =>
     request<{ ok: boolean; session_id: string; pinned: boolean }>(

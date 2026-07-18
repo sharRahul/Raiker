@@ -6,7 +6,7 @@
 </script>
 
 {#if unread.length}
-  <section class="notifications" aria-label="MCP notifications">
+  <section class="notifications" aria-label="Notifications">
     {#each unread.slice(0, 3) as notification (notification.notification_id)}
       <div class="notice notice-warn" role="status"><strong>{notification.title}</strong><span>{notification.body}</span></div>
     {/each}

@@ -5,6 +5,21 @@
 
 # Implementation Status
 
+> Current truth update (2026-07-18): Control Deck **Task 6 shared web
+> primitives and shell migration** is implemented locally. Existing Sidebar and
+> NotificationCenter instances are reused; notification copy is source-neutral;
+> the sidebar uses its Manrope uppercase wordmark treatment; and App wraps the
+> active route in `ResponsivePage` without changing auth, bootstrap, hash
+> routing, project selection, skip link, or main landmark. New `PageState`,
+> `SessionMenu`, `ToolControlBoard`, and loopback share predicate are
+> presentational/callback-only, so Svelte adds no authority. Mobile 390px uses a
+> labelled icon rail and compact shell spacing, verified in a disposable
+> authenticated browser drive after a first screenshot exposed and fixed the
+> full-width-sidebar defect. Individual route-body migration remains Tasks 7-9;
+> `SessionMenu` has focused tests until Task 8 consumes it. Local gates are
+> green: 151 web tests (one existing skip), two uncached Python batches, ruff,
+> mypy (429 files), compileall, and all five validators. Final push/CI is pending.
+
 ## Goal
 
 Make Raiker a secure AI product that combines an AI assistant, a governed AI
@@ -131,7 +146,7 @@ fail-closed by design.
 > persistence, `RuntimeControlService.{create,connect,rename,delete}_mcp_server`,
 > and routes `POST /api/mcp/servers`, `POST /api/mcp/servers/{id}/connect`,
 > `PUT`/`DELETE /api/mcp/servers/{id}`; frontend `McpView.svelte` + `McpView.test.ts`.
-> Plan **Tasks 6–11** (the remaining web Control Deck rebuild) remain **not started** — verified
+> Plan **Tasks 7–11** (the remaining web Control Deck rebuild) remain **not started** — verified
 > against the tree. Gates on the Task 4 + 4b tree: `pytest` 1918 passed, `ruff`
 > clean, `mypy` 421 files clean, all five repo validators pass; web
 > `check`/`lint`/`test` (141 passed)/`build` all green.

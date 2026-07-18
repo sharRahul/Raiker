@@ -29,7 +29,7 @@
 - `api.archiveSession(id) -> Promise<{ ok: boolean; session_id: string; archived: boolean }>`
 - `SessionMenu` consumes `{ sessionId, title, projectOptions, onRename, onMove, onPin, onArchive, onDelete }`.
 
-- [ ] Write a failing component test that opens the menu, invokes rename/move/pin/archive/delete callbacks, and asserts copied share text starts with `window.location.origin + "/#"`.
+- [x] Write a failing component test that opens the menu, invokes rename/move/pin/archive/delete callbacks, and asserts copied share text starts with `window.location.origin + "/#"`.
 
 ```ts
 it("keeps share local and forwards the six session actions", async () => {
@@ -40,9 +40,9 @@ it("keeps share local and forwards the six session actions", async () => {
 });
 ```
 
-- [ ] Run `npm.cmd run test -- SessionMenu.test.ts` from `apps/web`; confirm RED because `SessionMenu` and the two typed methods do not exist.
-- [ ] Add the two minimal methods to the existing `api` object. Do not add DTOs already represented by the backend response shape.
-- [ ] Run the focused test again; it must remain RED until Task 2 adds the component.
+- [x] Run `npm.cmd run test -- SessionMenu.test.ts` from `apps/web`; confirm RED because `SessionMenu` and the two typed methods do not exist.
+- [x] Add the two minimal methods to the existing `api` object. Do not add DTOs already represented by the backend response shape.
+- [x] Run the focused test again; it must remain RED until Task 2 adds the component.
 
 ### Task 2: Add focused shared primitives
 
@@ -60,7 +60,7 @@ it("keeps share local and forwards the six session actions", async () => {
 - `ResponsivePage({ lead? })` provides named `title`, `actions`, and default slots.
 - `ToolControlBoard({ gates, onDecision })` consumes `CapabilityGate[]`, renders only `!isDeferred(gate) && gate.can_current_principal_change`, and reports `(capability, mode)` through `onDecision`.
 
-- [ ] Write failing tests for generic unread notifications and omission of a `blocked_reason_code: "activation_blocked:no_executor"` gate.
+- [x] Write failing tests for generic unread notifications and omission of a `blocked_reason_code: "activation_blocked:no_executor"` gate.
 
 ```ts
 it("omits a gate without an executor", () => {
@@ -69,10 +69,10 @@ it("omits a gate without an executor", () => {
 });
 ```
 
-- [ ] Run `npm.cmd run test -- SessionMenu.test.ts`; confirm RED for the missing primitives.
-- [ ] Implement only presentational components and callback plumbing. Reuse `isDeferred`, `DECISION_MODES`, `DECISION_MODE_COPY`, `Icon`, and existing CSS tokens. Rename `MCP notifications` to source-neutral `Notifications`; unread filtering remains unchanged.
-- [ ] Apply the approved Manrope uppercase wordmark treatment to the existing sidebar `.brand-name` rule.
-- [ ] Run `npm.cmd run test -- SessionMenu.test.ts`; confirm GREEN.
+- [x] Run `npm.cmd run test -- SessionMenu.test.ts`; confirm RED for the missing primitives.
+- [x] Implement only presentational components and callback plumbing. Reuse `isDeferred`, `DECISION_MODES`, `DECISION_MODE_COPY`, `Icon`, and existing CSS tokens. Rename `MCP notifications` to source-neutral `Notifications`; unread filtering remains unchanged.
+- [x] Apply the approved Manrope uppercase wordmark treatment to the existing sidebar `.brand-name` rule.
+- [x] Run `npm.cmd run test -- SessionMenu.test.ts`; confirm GREEN.
 
 ### Task 3: Migrate the shared shell and document the result
 
@@ -87,11 +87,11 @@ it("omits a gate without an executor", () => {
 **Interfaces:**
 - `App` keeps its existing hash route selection, authentication/bootstrap, project selection, sidebar, topbar, skip link, and main landmark while placing the active view inside `ResponsivePage`.
 
-- [ ] Write a failing app test asserting the authenticated shell contains `ResponsivePage`'s lead wrapper and preserves the main landmark/skip link.
-- [ ] Run `npm.cmd run test -- a11y.test.ts`; confirm RED because the shell does not yet use the primitive.
-- [ ] Wrap the existing active-view conditional in `ResponsivePage`; add only responsive content padding/width CSS needed by the shared shell.
-- [ ] Update Task 6 checkboxes and handoff/status/readme truth, including the explicit boundary that route-body migration is deferred to Tasks 7-9.
-- [ ] Run `npm.cmd run check`, `npm.cmd run lint`, `npm.cmd run test`, and `npm.cmd run build` from `apps/web`; confirm GREEN.
+- [x] Write a failing app test asserting the authenticated shell contains `ResponsivePage`'s lead wrapper and preserves the main landmark/skip link.
+- [x] Run `npm.cmd run test -- a11y.test.ts`; confirm RED because the shell does not yet use the primitive.
+- [x] Wrap the existing active-view conditional in `ResponsivePage`; add only responsive content padding/width CSS needed by the shared shell.
+- [x] Update Task 6 checkboxes and handoff/status/readme truth, including the explicit boundary that route-body migration is deferred to Tasks 7-9.
+- [x] Run `npm.cmd run check`, `npm.cmd run lint`, `npm.cmd run test`, and `npm.cmd run build` from `apps/web`; confirm GREEN.
 
 ### Task 4: Final evidence and release
 
@@ -99,10 +99,33 @@ it("omits a gate without an executor", () => {
 - Modify: `docs/plans/2026-07-18-control-deck-task-6-shared-primitives.md`
 - Modify: `docs/HANDOFF.md`
 
-- [ ] Run the full Python suite in two alphabetical batches with `-p no:cacheprovider`; run ruff, mypy over `raiker apps tests`, compileall, all five validators, and `git diff --check`.
-- [ ] Run an authenticated disposable-workspace browser drive: open the responsive shell, inspect the generic notification state, use every SessionMenu action against controlled test data, and capture screenshots.
-- [ ] Record results and any tool/runtime limitation honestly in this plan and handoff; do not claim universal responsiveness beyond the verified viewport.
+- [x] Run the full Python suite in two alphabetical batches with `-p no:cacheprovider`; run ruff, mypy over `raiker apps tests`, compileall, all five validators, and `git diff --check`.
+- [x] Run an authenticated disposable-workspace browser drive: open the responsive shell, inspect the generic notification state, use every SessionMenu action against controlled test data, and capture screenshots.
+- [x] Record results and any tool/runtime limitation honestly in this plan and handoff; do not claim universal responsiveness beyond the verified viewport.
 - [ ] Commit Task 6 on `main`, push `origin/main`, and wait for the exact pushed commit's CI and applicable Web UI workflow to be green.
+
+## Evidence — 2026-07-18
+
+- Component TDD: missing `SessionMenu`/`PageState` imports and missing
+  `ResponsivePage` shell both produced the expected RED tests before their
+  implementations; the focused suite now has 9 passing tests.
+- Full web: 29 files, 151 passed, 1 pre-existing skipped; lint clean;
+  `svelte-check` 0 errors/0 warnings; production build passed.
+- Full Python: two alphabetical, uncached batches passed (one existing skip in
+  each); `ruff` clean; `mypy` clean across 429 source files; `compileall` and
+  all five repository validators passed.
+- Browser: a disposable `raiker-web` workspace authenticated successfully at
+  desktop 1440x960 and mobile 390x844. The first mobile screenshot exposed the
+  full-width sidebar crushing content; it was fixed with the accessible icon
+  rail and retested. Final screenshots are
+  `.tmp/task6-live-20260718/task6-shell-desktop-final.png` and
+  `.tmp/task6-live-20260718/task6-shell-mobile-final.png`.
+- Browser limitation: the Python environment has no Playwright package and the
+  Node Playwright browser download is absent. The live drive therefore used the
+  installed Node Playwright runtime with system Chrome, after both limitations
+  were checked. `SessionMenu` intentionally has no route consumer until Task 8,
+  so its six actions and generic notification state have focused component
+  coverage, not a fabricated live route flow.
 
 ## Plan Self-Review
 

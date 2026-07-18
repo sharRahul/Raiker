@@ -2,6 +2,7 @@
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import type { MemoryControlView, MemorySettingsView } from "../apiTypes";
   import { relativeTime } from "../format";
@@ -222,9 +223,9 @@
 {#if actionError}<p class="error" role="alert">{actionError}</p>{/if}
 
 {#if loadError}
-  <p class="error" role="alert">Unavailable: {loadError}</p>
+  <PageState state="error" title="Couldn't load memories" detail={loadError} />
 {:else if memories === null}
-  <p class="loading">Loading...</p>
+  <PageState state="loading" title="Loading memories…" />
 {:else if memories.length === 0}
   <div class="card">
     <EmptyState icon="activity" title="No approved memories yet" body="The agent stores durable lessons here as you work. Nothing is shared without your approval." />
@@ -316,6 +317,11 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-4);
+  }
+  @media (max-width: 720px) {
+    .head-row {
+      flex-direction: column;
+    }
   }
   .incognito-row {
     display: flex;
@@ -465,8 +471,5 @@
   }
   .error {
     color: var(--danger);
-  }
-  .loading {
-    color: var(--text-2);
   }
 </style>

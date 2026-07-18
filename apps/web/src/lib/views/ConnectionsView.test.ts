@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ConnectionsView from "./ConnectionsView.svelte";
-import { stubFetch } from "../test-helpers";
+import { stubFetch, stubFetchPending } from "../test-helpers";
 import type { StoreConnector } from "../apiTypes";
 
 function connector(partial: Partial<StoreConnector> = {}): StoreConnector {
@@ -26,6 +26,13 @@ function connector(partial: Partial<StoreConnector> = {}): StoreConnector {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("ConnectionsView", () => {
+  it("shows a route-level loading state while the store is fetched", async () => {
+    stubFetchPending();
+    render(ConnectionsView);
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/loading connectors/i);
+  });
+
   it("renders the searchable categorized store", async () => {
     stubFetch({
       "GET /api/connector-store": {

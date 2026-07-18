@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ApprovalsView from "./ApprovalsView.svelte";
-import { stubFetch } from "../test-helpers";
+import { stubFetch, stubFetchPending } from "../test-helpers";
 
 const PENDING = {
   approval_id: "appr_1",
@@ -33,6 +33,21 @@ afterEach(() => {
 });
 
 describe("ApprovalsView", () => {
+  it("shows a route-level loading state while approvals are fetched", async () => {
+    stubFetchPending();
+    render(ApprovalsView);
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/loading approvals/i);
+  });
+
+  it("shows a route-level error state when approvals cannot load", async () => {
+    stubFetch({});
+    render(ApprovalsView);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn't load approvals/i);
+    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+  });
+
   it("lists pending approvals with their capability and risk", async () => {
     stubFetch({ "GET /api/approvals": [PENDING] });
     render(ApprovalsView);

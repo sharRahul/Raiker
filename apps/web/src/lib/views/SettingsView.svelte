@@ -1,30 +1,27 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
+  import { applyUiPrefs } from "../prefs.svelte";
   import General from "./settings/General.svelte";
   import Notification from "./settings/Notification.svelte";
   import Personalisation from "./settings/Personalisation.svelte";
-  import Voice from "./settings/Voice.svelte";
-  import DataControls from "./settings/DataControls.svelte";
   import Storage from "./settings/Storage.svelte";
   import SecurityLogin from "./settings/SecurityLogin.svelte";
-  import TrustedContact from "./settings/TrustedContact.svelte";
   import Account from "./settings/Account.svelte";
 
   let { principal = "—" }: { principal?: string } = $props();
 
-  // The 9-section settings taxonomy. Each section is self-contained; backed
-  // controls persist to /api/settings, unbacked ones render "not yet active".
+  // Only sections the runtime actually backs. Voice, trusted-contact
+  // recovery, data-export tooling, and cloud/cache controls have no backend
+  // consumer, so they are not presented as settings at all.
   const SECTIONS = [
-    { id: "general", label: "General", comp: General },
-    { id: "notification", label: "Notification", comp: Notification },
-    { id: "personalisation", label: "Personalisation", comp: Personalisation },
-    { id: "voice", label: "Voice", comp: Voice },
-    { id: "data", label: "Data Controls", comp: DataControls },
-    { id: "storage", label: "Storage", comp: Storage },
-    { id: "security", label: "Security & Login", comp: SecurityLogin },
-    { id: "trusted", label: "Trusted Contact", comp: TrustedContact },
-    { id: "account", label: "Account", comp: Account },
+    { id: "general", label: "General" },
+    { id: "notification", label: "Notification" },
+    { id: "personalisation", label: "Personalisation" },
+    { id: "storage", label: "Storage" },
+    { id: "security", label: "Security & Login" },
+    { id: "account", label: "Account" },
   ] as const;
 
   let active = $state<string>("general");
@@ -36,26 +33,47 @@
   });
   let loadError = $state<string | null>(null);
 
+  // One serialized save queue. Each write is optimistic in the UI, confirmed
+  // by the server, and rolled back to the last server snapshot on failure so
+  // a failed write is never silently kept.
+  let serverSettings: Record<string, unknown> = {};
+  let saveState = $state<"idle" | "saving" | "saved" | "error">("idle");
+  let saveDetail = $state<string | null>(null);
+  let queue: Promise<void> = Promise.resolve();
+
   async function load() {
     loadError = null;
     try {
       const s = await api.settings();
       settings = s.settings;
+      serverSettings = { ...s.settings };
       status = s.status;
     } catch (e) {
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
     }
   }
 
-  // Merge a patch into the settings blob and persist the whole blob.
-  async function save(patch: Record<string, unknown>) {
-    const next = { ...settings, ...patch };
-    settings = next;
+  function save(patch: Record<string, unknown>) {
+    settings = { ...settings, ...patch };
+    queue = queue.then(() => push());
+  }
+
+  async function push() {
+    const snapshot = { ...settings };
+    saveState = "saving";
     try {
-      await api.putSettings(next);
-    } catch {
-      // Re-read truth if the server rejected the write; never fabricate success.
-      await load();
+      await api.putSettings(snapshot);
+      serverSettings = snapshot;
+      saveState = "saved";
+      saveDetail = null;
+      applyUiPrefs(snapshot);
+    } catch (e) {
+      settings = { ...serverSettings };
+      saveState = "error";
+      saveDetail =
+        e instanceof ApiError
+          ? `Couldn't save (${e.status}). Your change was rolled back.`
+          : "Couldn't save. Your change was rolled back.";
     }
   }
 
@@ -68,8 +86,18 @@
 </p>
 
 {#if loadError}
-  <p class="notice notice-danger" role="alert">Settings unavailable: {loadError}</p>
+  <PageState state="error" title="Couldn't load settings" detail={loadError} />
 {/if}
+
+<div class="save-status" aria-live="polite">
+  {#if saveState === "saving"}
+    <p class="notice" role="status">Saving…</p>
+  {:else if saveState === "saved"}
+    <p class="notice notice-ok" role="status">All changes saved.</p>
+  {:else if saveState === "error"}
+    <p class="notice notice-danger" role="alert">{saveDetail}</p>
+  {/if}
+</div>
 
 <div class="settings-layout">
   <nav class="section-rail" aria-label="Settings sections">
@@ -93,16 +121,10 @@
       <Notification {settings} {save} />
     {:else if active === "personalisation"}
       <Personalisation {settings} {save} />
-    {:else if active === "voice"}
-      <Voice />
-    {:else if active === "data"}
-      <DataControls {settings} {save} />
     {:else if active === "storage"}
-      <Storage {settings} {save} />
+      <Storage />
     {:else if active === "security"}
       <SecurityLogin />
-    {:else if active === "trusted"}
-      <TrustedContact {settings} {save} />
     {:else}
       <Account {settings} {save} {status} />
     {/if}
@@ -110,6 +132,13 @@
 </div>
 
 <style>
+  .save-status {
+    min-height: 0;
+    margin-bottom: var(--space-3);
+  }
+  .save-status .notice {
+    margin: 0;
+  }
   .settings-layout {
     display: grid;
     grid-template-columns: 14rem 1fr;
@@ -127,16 +156,18 @@
     text-align: left;
     padding: var(--space-2) var(--space-3);
     border: none;
-    border-radius: var(--radius-2);
+    border-radius: var(--r-sm);
     background: none;
     color: var(--text-1);
+    font: inherit;
     cursor: pointer;
   }
   .rail-item:hover {
-    background: var(--bg-2);
+    background: var(--sunken);
   }
   .rail-item.active {
-    background: var(--bg-2);
+    background: var(--accent-soft);
+    color: var(--accent);
     font-weight: 600;
   }
   .section-body {

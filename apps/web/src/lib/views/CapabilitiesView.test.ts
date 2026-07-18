@@ -15,10 +15,36 @@ const GATES = [
     decision_mode: "ask",
   }),
   makeGate({
+    capability: "web_fetch",
+    phase: 3,
+    state: "enabled_runtime",
+    can_current_principal_change: true,
+    allowed_transitions: ["disabled"],
+    decision_mode: "ask",
+  }),
+  // Deferred: no executor exists, so no row and no selector may render.
+  makeGate({
     capability: "finance_runtime",
     phase: 3,
     state: "disabled",
     blocked_reason_code: "activation_blocked:no_executor",
+    decision_mode: "ask",
+  }),
+  // Inherent read-only contract surface: not a tool the agent wields.
+  makeGate({
+    capability: "web_ui",
+    phase: 3,
+    state: "enabled_read_only",
+    decision_mode: "ask",
+  }),
+  // Live-runtime shape of a fail-closed domain: no blocked_reason_code, but
+  // the backend offers no enabled target — still not a tool.
+  makeGate({
+    capability: "medical_runtime",
+    phase: 4,
+    state: "disabled",
+    blocked_reason_code: null,
+    allowed_transitions: ["disabled", "planned"],
     decision_mode: "ask",
   }),
 ];
@@ -28,16 +54,28 @@ afterEach(() => {
 });
 
 describe("CapabilitiesView", () => {
-  it("shows friendly labels and inline decision modes, with no implementation-status badges", async () => {
+  it("groups executable tools by domain and omits non-executors entirely", async () => {
     stubFetch({ "GET /api/capability-gates": GATES });
     render(CapabilitiesView, { principal: "prin_owner" });
     await waitFor(() => {
-      expect(screen.getAllByRole("group", { name: /decision mode/i })).toHaveLength(2);
+      expect(screen.getByText("Shell commands")).toBeInTheDocument();
     });
-    expect(screen.getByText("Shell commands")).toBeInTheDocument();
-    expect(screen.getByText("Finance")).toBeInTheDocument();
 
-    // Every capability exposes the Ask/Allow/Auto/Deny control inline, defaulting to Ask.
+    // Domain headings replace backend phase numbers.
+    expect(screen.getByText("Local execution")).toBeInTheDocument();
+    expect(screen.getByText("Network")).toBeInTheDocument();
+    expect(screen.queryByText(/^Phase \d/)).not.toBeInTheDocument();
+
+    // A capability with no executor is a future, not a tool: no row, no selector.
+    expect(screen.queryByText("Finance")).not.toBeInTheDocument();
+    // Same for a fail-closed domain that reports no reason code but offers no
+    // enable path (the live runtime's shape for sensitive domains).
+    expect(screen.queryByText("Medical")).not.toBeInTheDocument();
+    // Inherent read-only contract surfaces are omitted too.
+    expect(screen.queryByText("Web dashboard")).not.toBeInTheDocument();
+
+    // Only the two real tools expose the Ask/Allow/Auto/Deny control.
+    expect(screen.getAllByRole("group", { name: /decision mode/i })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Ask", pressed: true })).toHaveLength(2);
 
     // The implementation-status badges (Implemented / Deferred / Disabled) are gone.
@@ -100,9 +138,9 @@ describe("CapabilitiesView", () => {
       expect(screen.getByText("Shell commands")).toBeInTheDocument();
     });
     await fireEvent.input(screen.getByLabelText(/search capabilities/i), {
-      target: { value: "finance" },
+      target: { value: "web fetch" },
     });
     expect(screen.queryByText("Shell commands")).not.toBeInTheDocument();
-    expect(screen.getByText("Finance")).toBeInTheDocument();
+    expect(screen.getByText("Web fetch")).toBeInTheDocument();
   });
 });

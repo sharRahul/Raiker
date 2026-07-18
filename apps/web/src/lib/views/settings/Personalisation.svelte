@@ -18,7 +18,7 @@
   }
 
   const spacing = $derived((settings["personalisation.spacing"] as string) ?? "comfortable");
-  const font = $derived((settings["personalisation.font"] as string) ?? "system");
+  const font = $derived((settings["personalisation.font"] as string) ?? "sans");
 </script>
 
 <h2>Personalisation</h2>
@@ -55,12 +55,12 @@
   <label>
     Font
     <select value={font} onchange={(e) => save({ "personalisation.font": e.currentTarget.value })}>
+      <option value="sans">Manrope (default)</option>
       <option value="system">System</option>
-      <option value="sans">Sans</option>
       <option value="mono">Monospace</option>
     </select>
   </label>
-  <p class="sub">Spacing and font are saved to your account preferences.</p>
+  <p class="sub">Spacing and font apply to the whole app once the save is confirmed.</p>
 </section>
 
 <style>

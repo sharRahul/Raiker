@@ -3,6 +3,7 @@
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import type { ModelProfile, ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
@@ -361,9 +362,9 @@
 </div>
 
 {#if loadError}
-  <p class="error" role="alert">Unavailable: {loadError}</p>
+  <PageState state="error" title="Couldn't load models" detail={loadError} />
 {:else if models === null}
-  <p class="loading">Loading…</p>
+  <PageState state="loading" title="Loading models…" />
 {:else}
   {#if models.profiles.length === 0}
     <div class="card">
@@ -811,7 +812,6 @@
   .gates dd { margin:0.1rem 0 0; }
   .sub { color:var(--text-3); font-size:0.8rem; margin:0; }
   .error { color:var(--danger); }
-  .loading { color:var(--text-2); }
   @media (max-width: 44rem) {
     .head-row, .setup-overview, .section-heading { align-items:flex-start; flex-direction:column; }
     .setup-meter { text-align:left; width:100%; }

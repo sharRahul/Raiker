@@ -5,7 +5,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelProfile, ModelsView as ModelsData } from "../apiTypes";
-import { stubFetch } from "../test-helpers";
+import { stubFetch, stubFetchPending } from "../test-helpers";
 import ModelsView from "./ModelsView.svelte";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -48,6 +48,23 @@ function models(partial: Partial<ModelsData>): ModelsData {
     ...partial,
   };
 }
+
+describe("ModelsView state grammar", () => {
+  it("shows a route-level loading state while model truth is fetched", async () => {
+    stubFetchPending();
+    render(ModelsView);
+    const statuses = await screen.findAllByRole("status");
+    expect(statuses.some((el) => /loading models/i.test(el.textContent ?? ""))).toBe(true);
+  });
+
+  it("shows a route-level error state when model truth cannot load", async () => {
+    stubFetch({});
+    render(ModelsView);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn't load models/i);
+    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+  });
+});
 
 describe("ModelsView fallback sequence", () => {
   it("renders the persisted sequence in order", async () => {

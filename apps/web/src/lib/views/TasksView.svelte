@@ -2,6 +2,7 @@
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import type { TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
@@ -86,7 +87,7 @@
 </script>
 
 <section class="tasks">
-  <header><div><p class="eyebrow">Work orchestration</p><h2>Tasks and routines</h2><p>Create a task, nest it under another task, schedule a routine, or start a persistent background researcher. Every run remains governed and can be stopped at a safe boundary.</p></div><button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size={15} /> Refresh</button></header>
+  <header><p class="page-lead">Create a task, nest it under another task, schedule a routine, or start a persistent background researcher. Every run remains governed and can be stopped at a safe boundary.</p><button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size={15} /> Refresh</button></header>
 
   <form class="card composer" onsubmit={(event) => { event.preventDefault(); void createTask(); }}>
     <div class="composer-heading"><div><h3>Plan work</h3><p>A routine is a recurring task; a child task becomes a subtask or subroutine. A background agent runs asynchronously until its work is complete or you stop it.</p></div><div class="cadence" role="group" aria-label="When to run"><button type="button" class:chosen={cadence === "now"} onclick={() => cadence = "now"}>Task</button><button type="button" class:chosen={cadence === "once"} onclick={() => cadence = "once"}>Schedule once</button><button type="button" class:chosen={cadence === "daily"} onclick={() => cadence = "daily"}>Daily routine</button><button type="button" class:chosen={cadence === "background"} onclick={() => cadence = "background"}>Background agent</button></div></div>
@@ -97,8 +98,8 @@
   </form>
 
   {#if notice}<p class="notice" role="status">{notice}</p>{/if}
-  {#if loadError}<p class="error" role="alert">{loadError}</p>
-  {:else if tasks === null}<p class="muted">Loading work…</p>
+  {#if loadError}<PageState state="error" title="Couldn't load tasks" detail={loadError} />
+  {:else if tasks === null}<PageState state="loading" title="Loading tasks…" />
   {:else}
     <div class="summary"><span><strong>{active.length}</strong> open</span><span><strong>{scheduled.length}</strong> scheduled</span><span><strong>{history.length}</strong> finished</span></div>
     {#if rows.length === 0}<div class="card"><EmptyState icon="tasks" title="No work queued" body="Create a task for immediate work, or schedule a routine for later." /></div>
@@ -108,5 +109,5 @@
 </section>
 
 <style>
-  .tasks{max-width:64rem}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h2,h3,h4{margin:0}.eyebrow{color:var(--accent);font-size:.72rem;font-weight:750;letter-spacing:.08em;margin:0 0 .25rem;text-transform:uppercase}.tasks header p,.composer p,.task p{color:var(--text-2);font-size:.85rem;margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3)}.composer label{color:var(--text-2);display:grid;font-size:.8rem;gap:.35rem}.cadence{display:flex;flex-wrap:wrap;gap:.4rem}.cadence button{background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-pill);color:var(--text-2);font:inherit;padding:.38rem .65rem}.cadence button.chosen{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:var(--accent);color:var(--text-1)}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:.85rem}.summary strong{color:var(--text-1);font-size:1.1rem}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:.96rem}.step{color:var(--accent)!important}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:.76rem;margin-top:.8rem}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:.8rem}.notice{color:var(--success);margin:var(--space-3) 0}.error{color:var(--danger)}.muted{color:var(--text-2)}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
+  .tasks{max-width:64rem}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.tasks header .page-lead{margin:0;max-width:60ch}.composer p,.task p{color:var(--text-2);font-size:.85rem;margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3)}.composer label{color:var(--text-2);display:grid;font-size:.8rem;gap:.35rem}.cadence{display:flex;flex-wrap:wrap;gap:.4rem}.cadence button{background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-pill);color:var(--text-2);font:inherit;padding:.38rem .65rem}.cadence button.chosen{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:var(--accent);color:var(--text-1)}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:.85rem}.summary strong{color:var(--text-1);font-size:1.1rem}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:.96rem}.step{color:var(--accent)!important}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:.76rem;margin-top:.8rem}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:.8rem}.notice{color:var(--success);margin:var(--space-3) 0}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
 </style>

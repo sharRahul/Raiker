@@ -529,10 +529,10 @@ commit/push and exact-tip CI check are tracked in the Task 6 detail plan.
 
 **Does NOT cover:** Route presentation changes do not alter approval execution semantics, task scheduling semantics, or memory policy.
 
-- [ ] **Step 1: Add failing route tests** for route-level loading/error/empty states and preserved actions.
-- [ ] **Step 2: Verify RED** with `npm --prefix apps/web run test -- --run <affected test files>`.
-- [ ] **Step 3: Rebuild each route with `ResponsivePage`, `PageState`, and compact tool-focused hierarchy**. Preserve each existing typed API call and semantic status label; do not add client-side authority.
-- [ ] **Step 4: Verify GREEN** with `npm --prefix apps/web run check; npm --prefix apps/web run test`.
+- [x] **Step 1: Add failing route tests** for route-level loading/error/empty states and preserved actions.
+- [x] **Step 2: Verify RED** with `npm --prefix apps/web run test -- --run <affected test files>`.
+- [x] **Step 3: Rebuild each route with `ResponsivePage`, `PageState`, and compact tool-focused hierarchy**. Preserve each existing typed API call and semantic status label; do not add client-side authority.
+- [x] **Step 4: Verify GREEN** with `npm --prefix apps/web run check; npm --prefix apps/web run test`.
 
 ### Task 8: Rebuild Sessions and Checkpoints
 
@@ -546,22 +546,22 @@ commit/push and exact-tip CI check are tracked in the Task 6 detail plan.
 
 **Does NOT cover:** Checkpoint restore remains metadata-only until a governed restore executor exists.
 
-- [ ] **Step 1: Write failing tests** for select-all via keyboard, filtered-selection cleanup, rename/archive/unarchive, session resume link, and checkpoint filter/metadata labels.
+- [x] **Step 1: Write failing tests** for select-all via keyboard, filtered-selection cleanup, rename/archive/unarchive, session resume link, and checkpoint filter/metadata labels.
 
 ```ts
 await fireEvent.click(screen.getByRole("checkbox", { name: "Select all sessions" }));
 expect(screen.getByText(/2 selected/i)).toBeInTheDocument();
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `npm --prefix apps/web run test -- --run SessionsView.test.ts CheckpointsView.test.ts`
 
 Expected: new lifecycle controls and checkpoint test file are absent.
 
-- [ ] **Step 3: Rebuild Sessions** around a responsive conversation table/detail rail; use `SessionMenu` for share/rename/move/pin/archive/delete; clear hidden selections when scope/filter changes.
-- [ ] **Step 4: Rebuild Checkpoints** as a recorder timeline with explicit session/turn/task context and the text `Snapshot metadata only` instead of an implied restore action.
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 3: Rebuild Sessions** around a responsive conversation table/detail rail; use `SessionMenu` for share/rename/move/pin/archive/delete; clear hidden selections when scope/filter changes.
+- [x] **Step 4: Rebuild Checkpoints** as a recorder timeline with explicit session/turn/task context and the text `Snapshot metadata only` instead of an implied restore action.
+- [x] **Step 5: Verify GREEN**
 
 Run: `npm --prefix apps/web run check; npm --prefix apps/web run test -- --run SessionsView.test.ts CheckpointsView.test.ts`
 
@@ -585,18 +585,18 @@ Expected: select-all works from pointer and keyboard; archived sessions are not 
 
 **Does NOT cover:** Settings fields that have no active backend consumer are removed or marked unavailable; the UI does not simulate unsupported provider login/rotation.
 
-- [ ] **Step 1: Write failing tests** for the repaired Ollama selection, tool-domain grouping, no selector for non-executors, MCP builder/connector rows, serialized settings save/error feedback, credential status, breach alerts, and health recovery alerts.
-- [ ] **Step 2: Verify RED**
+- [x] **Step 1: Write failing tests** for the repaired Ollama selection, tool-domain grouping, no selector for non-executors, MCP builder/connector rows, serialized settings save/error feedback, credential status, breach alerts, and health recovery alerts.
+- [x] **Step 2: Verify RED**
 
 Run: `npm --prefix apps/web run test -- --run CapabilitiesView.test.ts ModelsView.test.ts SettingsView.test.ts`
 
 Expected: new tool grouping, security cards, and test files are absent.
 
-- [ ] **Step 3: Rebuild Models and Connections** with provider truth, explicit repair guidance, lifecycle status, and manual credential replacement.
-- [ ] **Step 4: Rebuild Capabilities using `ToolControlBoard`**. Group executable tools by domain: Workspace, Local execution, Network, Models, Connectors, MCP, and Automation. Omit inherent/read-only/deferred capabilities entirely.
-- [ ] **Step 5: Rebuild Settings as supported preferences and security posture**. Implement a single queued `save()` that awaits confirmation, rolls back to the last server snapshot on failure, and exposes a page-level save/error status. Wire theme, spacing, font, and startup route into the shell; wire in-app/desktop notification preference into `NotificationCenter`; wire history/retention and attachment threshold into the request/storage paths only after backend support exists; keep the working vault, MFA, password, and device-session operations. Sensitive Settings mutations require password elevation; request an MFA code only if the account enrolled MFA and the specific sensitive control requires it. Never require MFA for models, capability choices, or routine use. Remove voice, emergency access, cloud/cache, export, and other unsupported interactive controls rather than presenting them as settings. Place credential lifecycle, breach scans, and self-monitoring controls in Security.
-- [ ] **Step 6: Rebuild Activity and Diagnostics** as the audit/operational evidence views, including redacted health and security transitions.
-- [ ] **Step 7: Verify GREEN**
+- [x] **Step 3: Rebuild Models and Connections** with provider truth, explicit repair guidance, lifecycle status, and manual credential replacement.
+- [x] **Step 4: Rebuild Capabilities using `ToolControlBoard`**. Group executable tools by domain: Workspace, Local execution, Network, Models, Connectors, MCP, and Automation. Omit inherent/read-only/deferred capabilities entirely.
+- [x] **Step 5: Rebuild Settings as supported preferences and security posture**. Implement a single queued `save()` that awaits confirmation, rolls back to the last server snapshot on failure, and exposes a page-level save/error status. Wire theme, spacing, font, and startup route into the shell; wire in-app/desktop notification preference into `NotificationCenter`; wire history/retention and attachment threshold into the request/storage paths only after backend support exists; keep the working vault, MFA, password, and device-session operations. Sensitive Settings mutations require password elevation; request an MFA code only if the account enrolled MFA and the specific sensitive control requires it. Never require MFA for models, capability choices, or routine use. Remove voice, emergency access, cloud/cache, export, and other unsupported interactive controls rather than presenting them as settings. Place credential lifecycle, breach scans, and self-monitoring controls in Security.
+- [x] **Step 6: Rebuild Activity and Diagnostics** as the audit/operational evidence views, including redacted health and security transitions.
+- [x] **Step 7: Verify GREEN**
 
 Run: `npm --prefix apps/web run check; npm --prefix apps/web run test`
 
@@ -616,10 +616,10 @@ Expected: all controls reflect server data; selectors appear only for real tools
 
 **Does NOT cover:** Authentication protocol and MFA verification remain server-owned; the redesign does not change password or session security semantics.
 
-- [ ] **Step 1: Write failing tests** for keyboard navigation, the login-aligned RAIKER mark, notification access, and mobile navigation without horizontal overflow.
-- [ ] **Step 2: Verify RED** with `npm --prefix apps/web run test -- --run LoginView.test.ts`.
-- [ ] **Step 3: Apply the shared Control Deck shell** across light/dark themes, 375/768/1024/1440 breakpoints, focus management, touch targets, and reduced-motion behavior.
-- [ ] **Step 4: Verify GREEN** with `npm --prefix apps/web run check; npm --prefix apps/web run test`.
+- [x] **Step 1: Write failing tests** for keyboard navigation, the login-aligned RAIKER mark, notification access, and mobile navigation without horizontal overflow.
+- [x] **Step 2: Verify RED** with `npm --prefix apps/web run test -- --run LoginView.test.ts`.
+- [x] **Step 3: Apply the shared Control Deck shell** across light/dark themes, 375/768/1024/1440 breakpoints, focus management, touch targets, and reduced-motion behavior.
+- [x] **Step 4: Verify GREEN** with `npm --prefix apps/web run check; npm --prefix apps/web run test`.
 
 ### Task 11: Browser Validation and Full Workflow Proof
 
@@ -630,21 +630,21 @@ Expected: all controls reflect server data; selectors appear only for real tools
 
 **Does NOT cover:** Browser tests do not prove a third-party provider's external management API because no such integration is configured.
 
-- [ ] **Step 1: Build and start a temporary-workspace server** after dependencies are installed.
+- [x] **Step 1: Build and start a temporary-workspace server** after dependencies are installed.
 
 ```powershell
 npm --prefix apps/web run build
 python -m apps.api.main --workspace C:\Users\1niki\AppData\Local\Temp\opencode\raiker-browser-audit --port 8766 --no-browser
 ```
 
-- [ ] **Step 2: Use the Playwright CLI wrapper** to register/login only against the temporary workspace, visit every route, exercise session menu and model selection, inspect MCP/security/notification states, and capture screenshots under `output/playwright/`.
+- [x] **Step 2: Use the Playwright CLI wrapper** to register/login only against the temporary workspace, visit every route, exercise session menu and model selection, inspect MCP/security/notification states, and capture screenshots under `output/playwright/`.
 
 ```powershell
 bash /mnt/c/Users/1niki/.codex/skills/playwright/scripts/playwright_cli.sh open http://127.0.0.1:8766
 bash /mnt/c/Users/1niki/.codex/skills/playwright/scripts/playwright_cli.sh snapshot
 ```
 
-- [ ] **Step 3: Run the full local gates**.
+- [x] **Step 3: Run the full local gates**.
 
 ```powershell
 python -m pytest --collect-only -q
@@ -663,7 +663,7 @@ npm --prefix apps/web run test
 npm --prefix apps/web run build
 ```
 
-- [ ] **Step 4: Stub scan and final diff review**.
+- [x] **Step 4: Stub scan and final diff review**.
 
 ```powershell
 rg -n "TODO|FIXME|placeholder|NotImplementedError|raise NotImplementedError" raiker apps tests --glob "*.py" --glob "*.ts" --glob "*.svelte"

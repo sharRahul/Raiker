@@ -36,7 +36,8 @@ export type IconName =
   | "user"
   | "user-plus"
   | "eye"
-  | "eye-off";
+  | "eye-off"
+  | "bell";
 
 // Each icon is one or more SVG path `d` strings (stroke, round caps).
 export const ICON_PATHS: Record<IconName, string[]> = {
@@ -98,6 +99,7 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   warning: ["M12 4 2.8 20h18.4L12 4Z", "M12 10v4.5", "M12 17.5v.5"],
   info: ["M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18Z", "M12 11v5", "M12 7.5v.5"],
   spark: ["M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"],
+  bell: ["M18 16H6c1.2-1.4 2-2.8 2-6a4 4 0 0 1 8 0c0 3.2.8 4.6 2 6Z", "M10.4 19a1.8 1.8 0 0 0 3.2 0"],
   user: ["M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z", "M4.5 20c1.6-3.2 4.3-5 7.5-5s5.9 1.8 7.5 5"],
   "user-plus": [
     "M10 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z",

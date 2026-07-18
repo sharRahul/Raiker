@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Icon from "../components/Icon.svelte";
+  import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import type { BrainNode, BrainView as BrainData } from "../apiTypes";
 
@@ -170,9 +171,9 @@
 </div>
 
 {#if loadError}
-  <p class="error" role="alert">{loadError}</p>
+  <PageState state="error" title="Couldn't load the brain graph" detail={loadError} />
 {:else if brain === null}
-  <p class="loading">Loading Raiker Brain…</p>
+  <PageState state="loading" title="Loading the brain graph…" />
 {:else}
   <section class="flow card" aria-label="Brain function">
     <div><h2>Brain Function</h2><p>Each count is a current record in this workspace.</p></div>

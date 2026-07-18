@@ -6,7 +6,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setToken } from "../api";
 import type { ProjectView } from "../apiTypes";
-import { stubFetch } from "../test-helpers";
+import { stubFetch, stubFetchPending } from "../test-helpers";
 import ProjectsView from "./ProjectsView.svelte";
 
 afterEach(() => {
@@ -33,6 +33,21 @@ function project(partial: Partial<ProjectView>): ProjectView {
 }
 
 describe("ProjectsView", () => {
+  it("shows a route-level loading state while projects are fetched", async () => {
+    stubFetchPending();
+    render(ProjectsView);
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/loading projects/i);
+  });
+
+  it("shows a route-level error state when projects cannot load", async () => {
+    stubFetch({});
+    render(ProjectsView);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn't load projects/i);
+    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+  });
+
   it("lists projects with their scope and marks the active one", async () => {
     stubFetch({
       "GET /api/projects": {

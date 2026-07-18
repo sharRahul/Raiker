@@ -4,7 +4,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import MemoryView from "./MemoryView.svelte";
-import { stubFetch } from "../test-helpers";
+import { stubFetch, stubFetchPending } from "../test-helpers";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -12,6 +12,21 @@ afterEach(() => {
 });
 
 describe("MemoryView", () => {
+  it("shows a route-level loading state while memories are fetched", async () => {
+    stubFetchPending();
+    render(MemoryView);
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/loading memories/i);
+  });
+
+  it("shows a route-level error state when memories cannot load", async () => {
+    stubFetch({});
+    render(MemoryView);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn't load memories/i);
+    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+  });
+
   it("lists memories with provenance and sensitivity", async () => {
     stubFetch({
       "GET /api/memory": [

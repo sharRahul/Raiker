@@ -44,6 +44,33 @@ describe("LoginView", () => {
     await waitFor(() => expect(screen.getByText("Runtime operational")).toBeInTheDocument());
   });
 
+  it("submits the unlock form from the keyboard", async () => {
+    const fetchMock = stubFetch({
+      ...HEALTH_OK,
+      "POST /api/auth/login": LOGIN_RESULT,
+      "POST /api/auth/session": {
+        token: "test-token",
+        session_id: "apisess_1",
+        principal_id: "prin_owner",
+        expires_at: null,
+      },
+    });
+    render(LoginView, { props: { onAuthenticated } });
+    await fillCredentials();
+
+    // Enter in the password field submits through the real <form>, so the
+    // whole flow is keyboard-operable without reaching for the button.
+    const form = screen.getByLabelText("Password").closest("form")!;
+    await fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/auth/login",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+  });
+
   it("shows no state message until the health probe resolves", () => {
     vi.stubGlobal(
       "fetch",

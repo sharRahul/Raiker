@@ -1,7 +1,7 @@
 // Conversation organisation: pin/bookmark + bulk delete in the Sessions view.
 // These are organizing actions only — they grant nothing. The view surfaces
 // pinned sessions first and lets the user select and delete one or many.
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SessionsView from "./SessionsView.svelte";
 import { stubFetch } from "../test-helpers";
@@ -18,6 +18,8 @@ const SESSIONS_ROUTE = {
       pinned: false,
       tags: ["alpha"],
       project_id: null,
+      archived: false,
+      archived_at: null,
     },
     {
       session_id: "sess_a",
@@ -29,6 +31,8 @@ const SESSIONS_ROUTE = {
       pinned: true,
       tags: [],
       project_id: null,
+      archived: false,
+      archived_at: null,
     },
   ],
   "GET /api/projects": {
@@ -77,10 +81,10 @@ describe("SessionsView organisation", () => {
     render(SessionsView);
 
     await waitFor(() => expect(screen.getByText("Pinned chat")).toBeInTheDocument());
-    // "Pin session" (exact) targets the unpinned row only; the pinned row's
-    // button is labelled "Unpin session".
-    const pinBtn = screen.getByRole("button", { name: /^pin session$/i });
-    await fireEvent.click(pinBtn);
+    // Pin lives in the row's session menu; the unpinned row offers "Pin".
+    const row = screen.getByText("Second chat").closest("tr")!;
+    await fireEvent.click(within(row as HTMLElement).getByRole("button", { name: /session actions/i }));
+    await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: /^pin$/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -106,11 +110,10 @@ describe("SessionsView organisation", () => {
     render(SessionsView);
 
     await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
-    // Target the delete button inside the "Second chat" row (sess_b), since
-    // pinned sessions sort first and would otherwise shift the index.
+    // Delete lives in the row's session menu.
     const row = screen.getByText("Second chat").closest("tr")!;
-    const delBtn = row.querySelector('button[aria-label="Delete session"]') as HTMLButtonElement;
-    await fireEvent.click(delBtn);
+    await fireEvent.click(within(row as HTMLElement).getByRole("button", { name: /session actions/i }));
+    await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: /delete/i }));
 
     // The DELETE call must carry the confirmation header. `request()` wraps
     // headers in a Headers object, so read it back through `.get`.
@@ -244,5 +247,140 @@ describe("SessionsView organisation", () => {
     // Only sess_b carries the "alpha" tag; sess_a is filtered out.
     await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
     expect(screen.queryByText("Pinned chat")).toBeNull();
+  });
+
+  it("selects every visible session from the select-all checkbox", async () => {
+    stubFetch(SESSIONS_ROUTE);
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Pinned chat")).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("checkbox", { name: "Select all sessions" }));
+    expect(screen.getByText(/2 selected/i)).toBeInTheDocument();
+  });
+
+  it("clears hidden selections when the tag filter changes", async () => {
+    stubFetch(SESSIONS_ROUTE);
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Pinned chat")).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("checkbox", { name: "Select all sessions" }));
+    expect(screen.getByText(/2 selected/i)).toBeInTheDocument();
+
+    // Filtering to "alpha" hides sess_a; its selection must not survive as an
+    // invisible member of a later bulk action.
+    await fireEvent.input(screen.getByLabelText("Filter sessions by tag"), {
+      target: { value: "alpha" },
+    });
+    await waitFor(() => expect(screen.getByText(/1 selected/i)).toBeInTheDocument());
+  });
+
+  it("renames a session from the session menu", async () => {
+    const fetchMock = stubFetch({
+      ...SESSIONS_ROUTE,
+      "PUT /api/sessions/sess_b/rename": { ok: true, session_id: "sess_b", title: "Renamed chat" },
+    });
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
+    const row = screen.getByText("Second chat").closest("tr")!;
+    await fireEvent.click(within(row as HTMLElement).getByRole("button", { name: /session actions/i }));
+    await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: /rename/i }));
+    await fireEvent.input(within(row as HTMLElement).getByLabelText("Session title"), {
+      target: { value: "Renamed chat" },
+    });
+    await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: "Save name" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(
+        (c) => String(c[0]) === "/api/sessions/sess_b/rename" && c[1]?.method === "PUT",
+      );
+      expect(call).toBeDefined();
+      expect(JSON.parse(String(call![1]!.body))).toEqual({ title: "Renamed chat" });
+    });
+  });
+
+  it("archives a session from the session menu and refreshes", async () => {
+    const fetchMock = stubFetch({
+      ...SESSIONS_ROUTE,
+      "PUT /api/sessions/sess_b/archive": { ok: true, session_id: "sess_b", archived: true },
+    });
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
+    const row = screen.getByText("Second chat").closest("tr")!;
+    await fireEvent.click(within(row as HTMLElement).getByRole("button", { name: /session actions/i }));
+    await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: /^archive$/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/sessions/sess_b/archive",
+        expect.objectContaining({ method: "PUT" }),
+      );
+    });
+  });
+
+  it("shows archived sessions on demand and unarchives from the menu", async () => {
+    const archivedRow = {
+      session_id: "sess_c",
+      title: "Archived chat",
+      status: "open",
+      created_at: "2026-07-08T00:00:00Z",
+      updated_at: "2026-07-08T00:01:00Z",
+      turn_count: 3,
+      pinned: false,
+      tags: [],
+      project_id: null,
+      archived: true,
+      archived_at: "2026-07-09T00:00:00Z",
+    };
+    const fetchMock = stubFetch({
+      ...SESSIONS_ROUTE,
+      "PUT /api/sessions/sess_c/unarchive": { ok: true, session_id: "sess_c", archived: false },
+    });
+    // The include_archived read returns the archived session too.
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (method === "GET" && url.startsWith("/api/sessions")) {
+        const list = url.includes("include_archived=true")
+          ? [...(SESSIONS_ROUTE["GET /api/sessions"] as unknown[]), archivedRow]
+          : SESSIONS_ROUTE["GET /api/sessions"];
+        return { ok: true, status: 200, json: async () => list } as Response;
+      }
+      if (method === "GET" && url.startsWith("/api/projects")) {
+        return { ok: true, status: 200, json: async () => SESSIONS_ROUTE["GET /api/projects"] } as Response;
+      }
+      if (method === "PUT" && url === "/api/sessions/sess_c/unarchive") {
+        return { ok: true, status: 200, json: async () => ({ ok: true, session_id: "sess_c", archived: false }) } as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({ detail: {} }) } as Response;
+    });
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
+    expect(screen.queryByText("Archived chat")).toBeNull();
+
+    await fireEvent.click(screen.getByLabelText("Show archived sessions"));
+    await waitFor(() => expect(screen.getByText("Archived chat")).toBeInTheDocument());
+
+    const row = screen.getByText("Archived chat").closest("tr")!;
+    await fireEvent.click(within(row as HTMLElement).getByRole("button", { name: /session actions/i }));
+    await fireEvent.click(within(row as HTMLElement).getByRole("menuitem", { name: /unarchive/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/sessions/sess_c/unarchive",
+        expect.objectContaining({ method: "PUT" }),
+      );
+    });
+  });
+
+  it("links each conversation back into the chat surface", async () => {
+    stubFetch(SESSIONS_ROUTE);
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
+    const link = screen.getByRole("link", { name: "Open Second chat in chat" });
+    expect(link).toHaveAttribute("href", "#/new-chat?session=sess_b");
   });
 });

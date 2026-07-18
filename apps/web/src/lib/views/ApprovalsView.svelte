@@ -3,6 +3,7 @@
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import type { ApprovalDetailView, ApprovalView } from "../apiTypes";
   import { approvalBadge } from "../statusMaps";
@@ -110,9 +111,9 @@
 </div>
 
 {#if loadError}
-  <p class="error" role="alert">Unavailable: {loadError}</p>
+  <PageState state="error" title="Couldn't load approvals" detail={loadError} />
 {:else if approvals === null}
-  <p class="loading">Loading…</p>
+  <PageState state="loading" title="Loading approvals…" />
 {:else if approvals.length === 0}
   <div class="card">
     <EmptyState
@@ -225,6 +226,11 @@
     justify-content: space-between;
     gap: var(--space-4);
   }
+  @media (max-width: 720px) {
+    .head-row {
+      flex-direction: column;
+    }
+  }
   .filters {
     display: inline-flex;
     gap: 2px;
@@ -317,8 +323,5 @@
   }
   .error {
     color: var(--danger);
-  }
-  .loading {
-    color: var(--text-2);
   }
 </style>

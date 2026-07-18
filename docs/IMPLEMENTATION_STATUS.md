@@ -5,21 +5,22 @@
 
 # Implementation Status
 
-> Current truth update (2026-07-18): Control Deck **Task 6 shared web
-> primitives and shell migration** is implemented locally. Existing Sidebar and
-> NotificationCenter instances are reused; notification copy is source-neutral;
-> the sidebar uses its Manrope uppercase wordmark treatment; and App wraps the
-> active route in `ResponsivePage` without changing auth, bootstrap, hash
-> routing, project selection, skip link, or main landmark. New `PageState`,
-> `SessionMenu`, `ToolControlBoard`, and loopback share predicate are
-> presentational/callback-only, so Svelte adds no authority. Mobile 390px uses a
-> labelled icon rail and compact shell spacing, verified in a disposable
-> authenticated browser drive after a first screenshot exposed and fixed the
-> full-width-sidebar defect. Individual route-body migration remains Tasks 7-9;
-> `SessionMenu` has focused tests until Task 8 consumes it. Local gates are
-> green: 151 web tests (one existing skip), two uncached Python batches, ruff,
-> mypy (429 files), compileall, and all five validators. Implementation commit
-> `66037db` passed CI (Python 3.11/3.12), Web UI, and Phase Status Validation.
+> Current truth update (2026-07-18): Control Deck **Tasks 6–10** are
+> implemented locally. Existing Sidebar and NotificationCenter instances are
+> reused; `PageState`, `SessionMenu`, `ToolControlBoard`, and the loopback share
+> predicate remain presentational/callback-only. Task 7 supplies compact,
+> truthful route states; Task 8 consumes SessionMenu and labels checkpoints
+> `Snapshot metadata only`; Task 9 groups real tools by domain and keeps only
+> backed Settings controls; Task 10 supplies the responsive, focus-managed shell
+> and notification access. A disposable authenticated browser pass selected the
+> local llama.cpp profile, inspected notification/security/MCP states, visited
+> every authenticated route, and found no console errors/warnings or horizontal
+> overflow at 375px. Artifacts are `output/playwright/task7-10-*.png`. The final
+> Fresh verification passed: Python 3.12 pytest 1969 passed / 2 skipped; Ruff,
+> mypy (429 files), compileall, all five validators, web lint/check/test/build,
+> and diff whitespace checks. One upstream FastAPI / Starlette `TestClient`
+> deprecation warning was emitted by the current dependency set. Commit, push,
+> and exact-tip CI confirmation remain pending.
 
 ## Goal
 
@@ -147,10 +148,10 @@ fail-closed by design.
 > persistence, `RuntimeControlService.{create,connect,rename,delete}_mcp_server`,
 > and routes `POST /api/mcp/servers`, `POST /api/mcp/servers/{id}/connect`,
 > `PUT`/`DELETE /api/mcp/servers/{id}`; frontend `McpView.svelte` + `McpView.test.ts`.
-> Plan **Tasks 7–11** (the remaining web Control Deck rebuild) remain **not started** — verified
-> against the tree. Gates on the Task 4 + 4b tree: `pytest` 1918 passed, `ruff`
-> clean, `mypy` 421 files clean, all five repo validators pass; web
-> `check`/`lint`/`test` (141 passed)/`build` all green.
+> Plan **Tasks 7–10** are implemented locally; Task 11 has completed its
+> disposable authenticated browser pass and final local gate; only commit, push,
+> and exact-tip CI confirmation remain. Earlier Task 4 + 4b gate counts remain
+> historical evidence only.
 
 > Current truth update (2026-07-13): The local-owner workstream now includes a
 > principal-scoped Inbox task-create route and Tasks UI. `priority`,

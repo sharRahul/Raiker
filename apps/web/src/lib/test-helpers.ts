@@ -4,6 +4,13 @@
 import { vi } from "vitest";
 import type { CapabilityGate, Diagnostics, RuntimeMode } from "./apiTypes";
 
+/** A fetch that never settles — for asserting route-level loading states. */
+export function stubFetchPending(): ReturnType<typeof vi.fn> {
+  const mock = vi.fn(() => new Promise<never>(() => {}));
+  vi.stubGlobal("fetch", mock);
+  return mock;
+}
+
 export function stubFetch(routes: Record<string, unknown>): ReturnType<typeof vi.fn> {
   const mock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;

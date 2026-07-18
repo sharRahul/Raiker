@@ -315,6 +315,10 @@ export interface SessionSummary {
   // The organizing project this chat sits in, or null. A chat can be moved in
   // or out; the project only bounds the context the chat receives.
   project_id: string | null;
+  // Soft-archive state. Archiving is reversible and never deletes transcripts,
+  // events, checkpoints, or permissions.
+  archived: boolean;
+  archived_at: string | null;
 }
 
 export interface TurnSummary {

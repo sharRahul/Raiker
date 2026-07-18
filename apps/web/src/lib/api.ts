@@ -300,6 +300,8 @@ export const api = {
   resumeMcpServer: (serverId: string) =>
     postJson<{ ok: boolean; monitor_state: string }>(`/api/mcp/servers/${encodeURIComponent(serverId)}/resume`, {}),
   notifications: () => request<Notification[]>("/api/notifications"),
+  markNotificationRead: (id: string) =>
+    postJson<{ ok: boolean }>(`/api/notifications/${encodeURIComponent(id)}/read`, {}),
   securityCredentials: () => request<CredentialLifecycle[]>("/api/security/credentials"),
   securityFindings: () => request<McpFinding[]>("/api/security/findings"),
   securityHealth: () => request<SecurityHealth[]>("/api/security/health"),
@@ -399,8 +401,13 @@ export const api = {
       withQuery("/api/checkpoints", { session_id: sessionId, project_id: projectId }),
     ),
   checkpoint: (id: string) => request<Checkpoint>(`/api/checkpoints/${encodeURIComponent(id)}`),
-  sessions: (projectId?: string) =>
-    request<SessionSummary[]>(withQuery("/api/sessions", { project_id: projectId })),
+  sessions: (projectId?: string, includeArchived = false) =>
+    request<SessionSummary[]>(
+      withQuery("/api/sessions", {
+        project_id: projectId,
+        include_archived: includeArchived ? "true" : undefined,
+      }),
+    ),
   searchChats: (q: string) => request<SessionSummary[]>(withQuery("/api/chat-search", { q })),
 
   // ── Reliable memory controls (backlog item 3) ────────────────────────
@@ -527,6 +534,10 @@ export const api = {
   archiveSession: (id: string) =>
     request<{ ok: boolean; session_id: string; archived: boolean }>(
       `/api/sessions/${encodeURIComponent(id)}/archive`, { method: "PUT" },
+    ),
+  unarchiveSession: (id: string) =>
+    request<{ ok: boolean; session_id: string; archived: boolean }>(
+      `/api/sessions/${encodeURIComponent(id)}/unarchive`, { method: "PUT" },
     ),
   // Pin (or unpin) a session. Organizing label only — grants nothing.
   setSessionPinned: (id: string, pinned: boolean) =>

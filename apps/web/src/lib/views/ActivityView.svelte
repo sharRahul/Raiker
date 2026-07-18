@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import type { EventEntry } from "../apiTypes";
   import { humanize, relativeTime, shortId } from "../format";
@@ -75,9 +76,9 @@
 </form>
 
 {#if loadError}
-  <p class="error" role="alert">Unavailable: {loadError}</p>
+  <PageState state="error" title="Couldn't load events" detail={loadError} />
 {:else if events === null}
-  <p class="loading">Loading…</p>
+  <PageState state="loading" title="Loading events…" />
 {:else if events.length === 0}
   <div class="card">
     <EmptyState icon="activity" title="No events match" body="Adjust the filters or run a turn first." />
@@ -122,6 +123,11 @@
     justify-content: space-between;
     gap: var(--space-4);
   }
+  @media (max-width: 720px) {
+    .head-row {
+      flex-direction: column;
+    }
+  }
   .filters {
     display: flex;
     align-items: flex-end;
@@ -163,11 +169,5 @@
     border-color: var(--warn-border);
     background: var(--warn-soft);
     color: var(--warn);
-  }
-  .error {
-    color: var(--danger);
-  }
-  .loading {
-    color: var(--text-2);
   }
 </style>

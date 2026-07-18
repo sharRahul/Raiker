@@ -5,6 +5,7 @@
   import ResponsivePage from "./lib/components/ResponsivePage.svelte";
   import { DEFAULT_ROUTE, navItem, routeFromHash } from "./lib/nav";
   import { api } from "./lib/api";
+  import { applyUiPrefs, startupRoute } from "./lib/prefs.svelte";
   import type { ProjectsList } from "./lib/apiTypes";
   import LoginView from "./lib/views/LoginView.svelte";
   import ChatView from "./lib/views/ChatView.svelte";
@@ -42,6 +43,9 @@
   onMount(() => {
     const handler = () => {
       current = routeFromHash(window.location.hash);
+      // Route changes move focus to the main landmark so keyboard and screen
+      //-reader users land on the new page content, not mid-shell.
+      document.getElementById("main")?.focus();
     };
     window.addEventListener("hashchange", handler);
     return () => window.removeEventListener("hashchange", handler);
@@ -63,6 +67,21 @@
       ]);
       projects = projectsList;
       authState = "ready";
+      // Preferences are presentation only, so a failed read never locks the
+      // workspace: spacing/font/notifications apply, and the saved startup
+      // route wins only when the URL doesn't already name a route.
+      try {
+        const s = await api.settings();
+        applyUiPrefs(s.settings);
+        const route = startupRoute(s.settings);
+        const hash = window.location.hash.replace(/^#\/?/, "");
+        if (route !== null && hash === "") {
+          window.location.hash = `#/${route}`;
+          current = route;
+        }
+      } catch {
+        // Defaults stay in effect.
+      }
     } catch {
       // Fail closed: the workspace stays unmounted behind the lock screen.
       authState = "verification_failed";
@@ -104,7 +123,9 @@
       onProjectSelect={selectProject}
     />
     <main id="main" class="content" tabindex="-1">
-      <ResponsivePage lead={activeItem.hint}>
+      <!-- The topbar already shows the route title + hint; the page itself
+           opens with its own lead so nothing is said twice. -->
+      <ResponsivePage>
         {#if current === "new-chat"}
           <ChatView sessionId={continuedSessionId} />
         {:else if current === "search-chat"}

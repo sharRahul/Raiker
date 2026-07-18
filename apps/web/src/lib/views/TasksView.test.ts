@@ -1,11 +1,26 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TasksView from "./TasksView.svelte";
-import { stubFetch } from "../test-helpers";
+import { stubFetch, stubFetchPending } from "../test-helpers";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("TasksView", () => {
+  it("shows a route-level loading state while tasks are fetched", async () => {
+    stubFetchPending();
+    render(TasksView);
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/loading tasks/i);
+  });
+
+  it("shows a route-level error state when the task list cannot load", async () => {
+    stubFetch({});
+    render(TasksView);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn't load tasks/i);
+    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+  });
+
   it("creates a daily routine with its saved schedule", async () => {
     const fetchMock = stubFetch({
       "GET /api/tasks": [],

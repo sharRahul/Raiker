@@ -13,7 +13,12 @@ export function isDisabled(gate: CapabilityGate): boolean {
 /** A capability with no real executor is deferred (future), not merely gated. */
 export function isDeferred(gate: CapabilityGate): boolean {
   const reason = gate.blocked_reason_code ?? "";
-  return reason.includes("no_executor") || reason.includes("no_requirement_entry");
+  if (reason.includes("no_executor") || reason.includes("no_requirement_entry")) return true;
+  // The backend strips every enabled target from allowed_transitions when the
+  // capability has no executor in this runtime, so a disabled gate that offers
+  // no enable path is a future, not a tool (fail-closed sensitive domains,
+  // remote/cloud execution, and similar).
+  return isDisabled(gate) && enableableTargets(gate).length === 0;
 }
 
 // The meaningful "enable" target states a capability control may offer.
@@ -76,6 +81,99 @@ export function groupByPhase(gates: CapabilityGate[]): { phase: number; gates: C
       phase,
       gates: [...list].sort((a, b) => a.capability.localeCompare(b.capability)),
     }));
+}
+
+// ── Tool domains ─────────────────────────────────────────────────────────────
+// The Capabilities page groups executable tools by what they touch, not by
+// backend phase. Inherent contract surfaces (the UI reading itself) and
+// deferred capabilities (no executor) are not tools and are omitted entirely.
+
+const INHERENT_CAPABILITIES = new Set(["web_ui", "dashboard", "desktop_ui"]);
+
+/** A contract/read-only surface the user never wields as a tool. */
+export function isInherent(gate: CapabilityGate): boolean {
+  if (INHERENT_CAPABILITIES.has(gate.capability)) return true;
+  return capabilityLabel(gate.capability).toLowerCase().includes("legacy gate");
+}
+
+export const CAPABILITY_DOMAIN_ORDER = [
+  "Workspace",
+  "Local execution",
+  "Network",
+  "Models",
+  "Connectors",
+  "MCP",
+  "Automation",
+  "Other tools",
+] as const;
+
+const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
+  file_write_execution: "Workspace",
+  patch_apply_execution: "Workspace",
+  memory_write_execution: "Workspace",
+  memory_forget_execution: "Workspace",
+  semantic_memory_writes: "Workspace",
+  semantic_memory_review_queue: "Workspace",
+  graph_codemap_indexing: "Workspace",
+  graph_codemap_planning: "Workspace",
+  graph_indexing_runtime: "Workspace",
+  semantic_memory_runtime: "Workspace",
+  vector_embedding_runtime: "Workspace",
+  audit_export: "Workspace",
+  shell_execution: "Local execution",
+  process_execution: "Local execution",
+  container_execution_cap: "Local execution",
+  subagents: "Local execution",
+  multi_agent_teams: "Local execution",
+  network_execution: "Network",
+  web_fetch: "Network",
+  external_channel_runtime: "Network",
+  channel_approval_relay: "Network",
+  hosted_model_runtime: "Models",
+  private_network_model_runtime: "Models",
+  model_provider_runtime: "Models",
+  advisor_model_runtime: "Models",
+  plugin_sandbox_image_pull_cap: "Connectors",
+  plugin_install: "Connectors",
+  plugin_execution_cap: "Connectors",
+  plugin_revocation_cap: "Connectors",
+  plugin_runtime_cap: "Connectors",
+  plugin_sandboxed_runtime_cap: "Connectors",
+  email_runtime: "Connectors",
+  calendar_runtime: "Connectors",
+  reminder_runtime: "Connectors",
+  mcp_builder_runtime: "MCP",
+  mcp_connector_runtime: "MCP",
+  scheduled_routines: "Automation",
+  approval_execution_relay: "Automation",
+  admin_mutation: "Automation",
+  policy_mutation: "Automation",
+  role_mutation: "Automation",
+};
+
+/** Domain for one capability; unknown (future) capabilities are never hidden. */
+export function capabilityDomain(capability: string): string {
+  const mapped = DOMAIN_OF[capability];
+  if (mapped) return mapped;
+  if (/^connector_.+_runtime$/.test(capability)) return "Connectors";
+  return "Other tools";
+}
+
+/** Group executable tools by domain, in the fixed display order. */
+export function groupByDomain(gates: CapabilityGate[]): { domain: string; gates: CapabilityGate[] }[] {
+  const byDomain = new Map<string, CapabilityGate[]>();
+  for (const gate of gates) {
+    const domain = capabilityDomain(gate.capability);
+    const list = byDomain.get(domain) ?? [];
+    list.push(gate);
+    byDomain.set(domain, list);
+  }
+  return CAPABILITY_DOMAIN_ORDER.filter((domain) => byDomain.has(domain)).map((domain) => ({
+    domain,
+    gates: [...byDomain.get(domain)!].sort((a, b) =>
+      capabilityLabel(a.capability).localeCompare(capabilityLabel(b.capability)),
+    ),
+  }));
 }
 
 export interface CapabilityExplanation {
@@ -323,6 +421,24 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     label: "Vector embeddings",
     description: "Local embeddings + vector search; also gates retrieval-augmented turns (default-ask).",
   },
+  // MCP.
+  mcp_builder_runtime: {
+    label: "MCP builder",
+    description: "Create reviewed local MCP server templates inside the workspace.",
+  },
+  mcp_connector_runtime: {
+    label: "MCP connector",
+    description: "Connect to owner-added MCP servers over monitored, bounded sessions.",
+  },
+  // Models.
+  advisor_model_runtime: {
+    label: "Advisor model",
+    description: "Run the second-opinion advisor model alongside the selected model.",
+  },
+  plugin_sandbox_image_pull_cap: {
+    label: "Plugin sandbox image pull",
+    description: "Pull the container image used by the plugin sandbox.",
+  },
   // Automation / audit.
   scheduled_routines: {
     label: "Scheduled routines",
@@ -332,7 +448,13 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
 };
 
 export function capabilityLabel(capability: string): string {
-  return CAPABILITY_COPY[capability]?.label ?? humanize(capability);
+  const copy = CAPABILITY_COPY[capability];
+  if (copy) return copy.label;
+  // Per-connector runtime capabilities are registered dynamically
+  // (connector_github_runtime, …); label them by their service.
+  const connector = capability.match(/^connector_(.+)_runtime$/);
+  if (connector) return `${humanize(connector[1])} connector`;
+  return humanize(capability);
 }
 
 export function capabilityDescription(capability: string): string {

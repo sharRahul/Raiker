@@ -1,11 +1,18 @@
 <script lang="ts">
-  import NotYetActive from "./NotYetActive.svelte";
-
   let { settings, save }: { settings: Record<string, unknown>; save: (p: Record<string, unknown>) => void } =
     $props();
 
   const inApp = $derived(settings["notification.in_app"] !== false);
   const desktop = $derived(Boolean(settings["notification.desktop"]));
+
+  function toggleDesktop(enabled: boolean) {
+    // Desktop alerts need the browser permission; request it on enable so the
+    // preference never silently does nothing.
+    if (enabled && typeof Notification !== "undefined" && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
+    save({ "notification.desktop": enabled });
+  }
 </script>
 
 <h2>Notification</h2>
@@ -17,15 +24,10 @@
     In-app popups
   </label>
   <label class="toggle">
-    <input type="checkbox" checked={desktop} onchange={(e) => save({ "notification.desktop": e.currentTarget.checked })} />
+    <input type="checkbox" checked={desktop} onchange={(e) => toggleDesktop(e.currentTarget.checked)} />
     Desktop alerts
   </label>
-  <p class="sub">Saved to your account. In-app popups are honored by the dashboard.</p>
-</section>
-
-<section class="card">
-  <h3>Email notifications</h3>
-  <NotYetActive what="Email notification delivery (no mail transport is configured)" />
+  <p class="sub">Saved to your account and honored by the notification center.</p>
 </section>
 
 <style>

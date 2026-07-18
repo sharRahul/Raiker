@@ -244,6 +244,28 @@
   }
 }
 
+/* ── UI preferences (Settings → Personalisation) ──
+   Applied as data attributes on <html> by lib/prefs.svelte.ts. Presentation
+   only; the defaults (no attribute) are the comfortable Manrope layout. */
+:root[data-spacing="compact"] {
+  --space-3: 0.6rem;
+  --space-4: 0.8rem;
+  --space-5: 1.15rem;
+  --space-6: 1.5rem;
+}
+:root[data-spacing="spacious"] {
+  --space-3: 0.9rem;
+  --space-4: 1.25rem;
+  --space-5: 1.9rem;
+  --space-6: 2.6rem;
+}
+:root[data-font="system"] body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+:root[data-font="mono"] body {
+  font-family: var(--font-mono);
+}
+
 /* ── Base ── */
 *,
 *::before,
@@ -256,6 +278,9 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
+  /* The shell never scrolls sideways; wide content scrolls inside its own
+     card (tables/lists carry their own overflow-x: auto). */
+  overflow-x: clip;
 }
 
 body {
@@ -414,6 +439,16 @@ code,
 .btn-sm {
   font-size: 0.78rem;
   padding: 0.28rem 0.6rem;
+}
+
+/* Touch targets: on narrow (touch-first) screens every interactive control
+   meets a 40px minimum height without changing the desktop density. */
+@media (max-width: 720px) {
+  .btn,
+  .input,
+  .select {
+    min-height: 40px;
+  }
 }
 
 .input,

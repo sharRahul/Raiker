@@ -2,13 +2,18 @@
   import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import Icon from "../components/Icon.svelte";
+  import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
-  import type { Diagnostics } from "../apiTypes";
+  import type { Diagnostics, SecurityHealth } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
-  import { humanize } from "../format";
+  import { humanize, relativeTime } from "../format";
 
   let diag = $state<Diagnostics | null>(null);
   let loadError = $state<string | null>(null);
+  // Redacted self-monitoring transitions (Task 5). A failed read degrades to
+  // its own in-card message; it never hides the rest of the diagnostics.
+  let health = $state<SecurityHealth[] | null>(null);
+  let healthError = $state<string | null>(null);
 
   async function load() {
     loadError = null;
@@ -18,6 +23,19 @@
       diag = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
     }
+    healthError = null;
+    try {
+      health = await api.securityHealth();
+    } catch (e) {
+      health = null;
+      healthError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+    }
+  }
+
+  function healthBadge(state: string): "blocked" | "implemented" | "idle" {
+    if (state === "alerting") return "blocked";
+    if (state === "recovered") return "implemented";
+    return "idle";
   }
 
   const readinessChecks = $derived.by(() => {
@@ -71,11 +89,33 @@
 </div>
 
 {#if loadError}
-  <p class="error" role="alert">Unavailable: {loadError}</p>
+  <PageState state="error" title="Couldn't load diagnostics" detail={loadError} />
 {:else if diag === null}
-  <p class="loading">Loading…</p>
+  <PageState state="loading" title="Loading diagnostics…" />
 {:else}
   <div class="grid">
+    <section class="card" aria-labelledby="diag-monitor-h">
+      <h2 id="diag-monitor-h">Self-monitoring</h2>
+      <p class="sub">Redacted health transitions recorded by the runtime's own monitors.</p>
+      {#if healthError}
+        <p class="error" role="alert">{healthError}</p>
+      {:else if health === null}
+        <p class="sub">Loading…</p>
+      {:else if health.length === 0}
+        <p class="sub">No health transitions recorded.</p>
+      {:else}
+        <ul class="monitor">
+          {#each health as entry (`${entry.source}:${entry.subject_id}:${entry.code}`)}
+            <li>
+              <Badge variant={healthBadge(entry.state)} label={entry.state} />
+              <span class="monitor-code">{humanize(entry.code)}</span>
+              <span class="monitor-when" title={entry.updated_at}>{relativeTime(entry.updated_at)}</span>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+
     <section class="card" aria-labelledby="diag-status-h">
       <h2 id="diag-status-h">Runtime</h2>
       <p class="big-status">
@@ -161,6 +201,11 @@
     justify-content: space-between;
     gap: var(--space-4);
   }
+  @media (max-width: 720px) {
+    .head-row {
+      flex-direction: column;
+    }
+  }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
@@ -243,10 +288,30 @@
     color: var(--text-3);
     font-size: 0.8rem;
   }
+  .monitor {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+  }
+  .monitor li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+  }
+  .monitor-code {
+    color: var(--text-1);
+    flex: 1;
+  }
+  .monitor-when {
+    color: var(--text-3);
+    font-size: 0.74rem;
+    white-space: nowrap;
+  }
   .error {
     color: var(--danger);
-  }
-  .loading {
-    color: var(--text-2);
   }
 </style>

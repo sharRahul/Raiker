@@ -244,12 +244,20 @@ Control Deck commit.
   "Connect via MCP" UI + live monitor panel with browser screenshots) is now
   implemented in the current worktree** — see
   `docs/plans/2026-07-17-monitored-mcp-connections.md`.
-- **Plan Tasks 7–11 are not started** (verified against the tree): the
-  `raiker/security/` package now also holds the Task 5 `credentials.py` and
-  `monitoring.py` modules, with `tests/test_credential_security.py` and
-  `tests/test_runtime_monitoring.py`; the web Control Deck rebuild (Tasks 6–10)
-  has not begun. Task 5 reuses the shared `security_findings` + `notifications`
-  substrate built here.
+- **Control Deck Tasks 7–10 are implemented locally and await commit/push.**
+  The route bodies now use compact loading, error,
+  and empty states without changing typed API authority; Sessions consumes
+  `SessionMenu` for rename/archive/project/pin/delete operations and
+  Checkpoints is explicitly metadata-only. Models, Connections, Capabilities,
+  Settings, Activity, Diagnostics, login, and the responsive shell now share
+  the Control Deck tokens. The disposable authenticated browser pass selected
+  the local llama.cpp profile, opened the notification panel, visited all 17
+  routes, and confirmed no console errors/warnings or 375px horizontal
+  overflow. Screenshots are under `output/playwright/task7-10-*.png`. The fresh
+  Python 3.12 gate passed 1969 tests with two existing skips; Ruff, mypy (429
+  files), compileall, all five validators, web lint/check/test/build, and
+  `git diff --check` passed. The only emitted warning is an upstream FastAPI /
+  Starlette `TestClient` deprecation notice from the current dependency set.
 - **Task 3 review note (design, not a bug).** The new
   `list_sessions(include_archived=False)` default excludes archived sessions from
   every internal caller that does not opt in. The event-visibility path was

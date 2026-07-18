@@ -3,6 +3,7 @@
   import Icon from "../components/Icon.svelte";
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
+  import PageState from "../components/PageState.svelte";
   import { api, ApiError, streamPrompt } from "../api";
   import type { AgentResponse, ModelProfile, ProviderModelList, SessionDetail, StreamEvent } from "../apiTypes";
   import { groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
@@ -270,8 +271,10 @@
   // prompt, the agent's response message (turn.summary), and the turn status.
   // The live per-event timeline is not replayed; new turns stream as usual.
   let historyError = $state<string | null>(null);
+  let historyLoading = $state(false);
 
   async function loadHistory(id: string) {
+    historyLoading = true;
     try {
       const detail = await api.session(id);
       turns = detail.turns.map((t) => restoredTurn(t, id));
@@ -280,6 +283,8 @@
     } catch (e) {
       historyError =
         e instanceof ApiError ? `Could not load history (${e.status}).` : "Could not load history.";
+    } finally {
+      historyLoading = false;
     }
   }
 
@@ -432,7 +437,9 @@
     {#if historyError !== null}
       <p class="error-line" role="alert">{historyError}</p>
     {/if}
-    {#if turns.length === 0}
+    {#if historyLoading}
+      <PageState state="loading" title="Loading conversation…" />
+    {:else if turns.length === 0}
       <EmptyState
         icon="chat"
         title={`What would you like to work on, ${userName}?`}

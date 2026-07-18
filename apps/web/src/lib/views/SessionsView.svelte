@@ -2,6 +2,8 @@
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import PageState from "../components/PageState.svelte";
+  import SessionMenu from "../components/SessionMenu.svelte";
   import { api, ApiError } from "../api";
   import type { ProjectView, SessionDetail, SessionSummary, TurnDetail } from "../apiTypes";
   import { responseBadge } from "../statusMaps";
@@ -32,12 +34,16 @@
   let tagDraft = $state<Record<string, string>>({});
   let tagFilter = $state("");
 
+  // Archived sessions stay out of the default list; the toggle re-reads the
+  // owner-scoped list with include_archived. Archive is reversible and never
+  // deletes transcripts, events, checkpoints, or permissions.
+  let showArchived = $state(false);
+
   // Project context (backlog item 1): a chat can be moved into a project or out
   // of every project. The project is an organizing scope — the move grants
   // nothing; it only changes the bounded context (instructions, shared
   // attachments, opt-in project memory) the chat receives on its next turn.
   let projects = $state<ProjectView[]>([]);
-  let moving = $state<string | null>(null);
 
   // Pinned sessions first, then most-recently-updated. The sort is display-only
   // — the backend list order is unchanged. A non-empty tag filter further
@@ -83,6 +89,16 @@
     ordered !== null && ordered.length > 0 && ordered.every((s) => selected.has(s.session_id)),
   );
 
+  // A selection must never outlive its visibility: when the tag filter or the
+  // archived scope hides a session, it silently leaving via a later bulk
+  // delete would be a trap. Prune hidden ids whenever the visible set changes.
+  $effect(() => {
+    if (ordered === null) return;
+    const visible = new Set(ordered.map((s) => s.session_id));
+    const kept = [...selected].filter((id) => visible.has(id));
+    if (kept.length !== selected.size) selected = new Set(kept);
+  });
+
   async function togglePin(s: SessionSummary) {
     actionError = null;
     try {
@@ -91,6 +107,31 @@
     } catch (e) {
       actionError =
         e instanceof ApiError ? `Could not update pin (${e.status}).` : "Could not update pin.";
+    }
+  }
+
+  async function renameSession(s: SessionSummary, title: string) {
+    const next = title.trim();
+    if (next === "" || next === s.title) return;
+    actionError = null;
+    try {
+      await api.renameSession(s.session_id, next);
+      await load();
+    } catch (e) {
+      actionError =
+        e instanceof ApiError ? `Could not rename (${e.status}).` : "Could not rename.";
+    }
+  }
+
+  async function toggleArchived(s: SessionSummary) {
+    actionError = null;
+    try {
+      if (s.archived) await api.unarchiveSession(s.session_id);
+      else await api.archiveSession(s.session_id);
+      await load();
+    } catch (e) {
+      actionError =
+        e instanceof ApiError ? `Could not update archive state (${e.status}).` : "Could not update archive state.";
     }
   }
 
@@ -130,15 +171,12 @@
     const next = value === "" ? null : value;
     if (next === s.project_id) return;
     actionError = null;
-    moving = s.session_id;
     try {
       await api.setSessionProject(s.session_id, next);
       await load();
     } catch (e) {
       actionError =
         e instanceof ApiError ? `Could not move chat (${e.status}).` : "Could not move chat.";
-    } finally {
-      moving = null;
     }
   }
 
@@ -191,7 +229,7 @@
       } catch {
         projects = [];
       }
-      sessions = await api.sessions(projectId ?? undefined);
+      sessions = await api.sessions(projectId ?? undefined, showArchived);
       // Drop any selection that no longer exists after a refresh.
       const ids = new Set((sessions ?? []).map((s) => s.session_id));
       selected = new Set([...selected].filter((id) => ids.has(id)));
@@ -223,9 +261,10 @@
     }
   }
 
-  // Load on mount and again whenever the active project changes.
+  // Load on mount and again whenever the active project or archive scope changes.
   $effect(() => {
     void projectId;
+    void showArchived;
     void load();
   });
 </script>
@@ -244,6 +283,10 @@
         aria-label="Filter sessions by tag"
       />
     </label>
+    <label class="archived-toggle">
+      <input type="checkbox" bind:checked={showArchived} aria-label="Show archived sessions" />
+      Show archived
+    </label>
     <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh sessions">
       <Icon name="refresh" size={15} />
       Refresh
@@ -252,9 +295,9 @@
 </div>
 
 {#if loadError}
-  <p class="error" role="alert">Unavailable: {loadError}</p>
+  <PageState state="error" title="Couldn't load sessions" detail={loadError} />
 {:else if sessions === null}
-  <p class="loading">Loading…</p>
+  <PageState state="loading" title="Loading sessions…" />
 {:else if sessions.length === 0}
   <div class="card">
     <EmptyState icon="sessions" title="No sessions yet" body="Start a chat to create your first governed session." />
@@ -293,7 +336,6 @@
             <th>Session</th>
             <th>Status</th>
             <th>Turns</th>
-            <th>Project</th>
             <th>Tags</th>
             <th>Updated</th>
             <th></th>
@@ -317,25 +359,21 @@
                   {#if s.pinned}<span class="pin-mark" title="Pinned" aria-label="Pinned">★</span>{/if}
                   {s.title ?? shortId(s.session_id)}
                 </span>
-                <span class="mono sub">{shortId(s.session_id)}</span>
+                <span class="title-sub">
+                  <span class="mono sub">{shortId(s.session_id)}</span>
+                  <a
+                    class="open-link"
+                    href={`#/new-chat?session=${encodeURIComponent(s.session_id)}`}
+                    aria-label={`Open ${s.title ?? shortId(s.session_id)} in chat`}
+                    onclick={(e) => e.stopPropagation()}
+                  >Open</a>
+                </span>
               </td>
-              <td onclick={() => openSession(s.session_id)}><Badge variant={s.status === "active" ? "active" : "idle"} label={s.status} /></td>
+              <td onclick={() => openSession(s.session_id)}>
+                <Badge variant={s.status === "active" ? "active" : "idle"} label={s.status} />
+                {#if s.archived}<Badge variant="disabled" label="archived" />{/if}
+              </td>
               <td onclick={() => openSession(s.session_id)}>{s.turn_count}</td>
-              <td class="project-col" onclick={(e) => e.stopPropagation()}>
-                <select
-                  class="project-select"
-                  value={s.project_id ?? ""}
-                  disabled={moving === s.session_id}
-                  aria-label={`Project for ${s.title ?? shortId(s.session_id)}`}
-                  title="Move this chat into a project, or out of every project"
-                  onchange={(e) => void moveToProject(s, e.currentTarget.value)}
-                >
-                  <option value="">No project</option>
-                  {#each projects as p (p.project_id)}
-                    <option value={p.project_id}>{p.name}</option>
-                  {/each}
-                </select>
-              </td>
               <td class="tags-col" onclick={(e) => e.stopPropagation()}>
                 <span class="tag-chips">
                   {#each s.tags as t (t)}
@@ -376,23 +414,19 @@
                 </span>
               </td>
               <td onclick={() => openSession(s.session_id)} title={s.updated_at}>{relativeTime(s.updated_at)}</td>
-              <td class="row-actions">
-                <button
-                  type="button"
-                  class="icon-btn"
-                  class:pinned={s.pinned}
-                  onclick={() => void togglePin(s)}
-                  aria-label={s.pinned ? "Unpin session" : "Pin session"}
-                  title={s.pinned ? "Unpin" : "Pin to top"}
-                >★</button>
-                <button
-                  type="button"
-                  class="icon-btn danger"
-                  onclick={() => void deleteOne(s.session_id)}
-                  aria-label="Delete session"
-                  title="Delete conversation"
-                  disabled={deleting}
-                >🗑</button>
+              <td class="row-actions" onclick={(e) => e.stopPropagation()}>
+                <SessionMenu
+                  sessionId={s.session_id}
+                  title={s.title ?? shortId(s.session_id)}
+                  projects={projects.map((p) => ({ project_id: p.project_id, name: p.name }))}
+                  pinned={s.pinned}
+                  archived={s.archived}
+                  onRename={(title) => void renameSession(s, title)}
+                  onMove={(projectId) => void moveToProject(s, projectId)}
+                  onPin={() => void togglePin(s)}
+                  onArchive={() => void toggleArchived(s)}
+                  onDelete={() => void deleteOne(s.session_id)}
+                />
               </td>
             </tr>
           {/each}
@@ -463,6 +497,11 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-4);
+  }
+  @media (max-width: 720px) {
+    .head-row {
+      flex-direction: column;
+    }
   }
   .head-actions {
     display: flex;
@@ -536,22 +575,29 @@
   }
   .row-actions,
   .check-col,
-  .project-col,
   .tags-col {
     cursor: default;
   }
-  .project-select {
-    font: inherit;
-    font-size: 0.78rem;
-    padding: 0.15rem 0.3rem;
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    background: var(--bg);
-    color: var(--text-1);
-    max-width: 10rem;
+  .archived-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    color: var(--text-2);
+    cursor: pointer;
+    white-space: nowrap;
   }
-  .project-select:hover:not(:disabled) {
-    border-color: var(--accent-border);
+  .archived-toggle input {
+    accent-color: var(--accent);
+  }
+  .title-sub {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .open-link {
+    font-size: 0.76rem;
+    font-weight: 600;
   }
   .tags-col {
     max-width: 22rem;
@@ -624,30 +670,7 @@
     color: var(--accent);
     margin-right: 0.2rem;
   }
-  .icon-btn {
-    border: 1px solid transparent;
-    background: none;
-    color: var(--text-3);
-    cursor: pointer;
-    font-size: 0.95rem;
-    line-height: 1;
-    padding: 0.15rem 0.3rem;
-    border-radius: var(--r-sm);
-  }
-  .icon-btn:hover:not(:disabled) {
-    background: var(--neutral-soft);
-    color: var(--text-1);
-  }
-  .icon-btn.pinned {
-    color: var(--accent);
-  }
-  .icon-btn.danger:hover:not(:disabled) {
-    color: var(--danger);
-    background: var(--danger-soft);
-  }
   .row-actions {
-    display: flex;
-    gap: 0.15rem;
     white-space: nowrap;
   }
   .sub {
@@ -735,8 +758,5 @@
   }
   .error {
     color: var(--danger);
-  }
-  .loading {
-    color: var(--text-2);
   }
 </style>

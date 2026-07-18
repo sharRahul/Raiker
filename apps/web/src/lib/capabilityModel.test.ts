@@ -42,11 +42,21 @@ describe("capability state → badge mapping", () => {
     expect(gateBadge(g)).toBe("deferred");
   });
 
-  it("maps plain off/planned to disabled", () => {
-    expect(gateBadge(gate({ state: "disabled", blocked_reason_code: "disabled_by_capability_gate" }))).toBe("disabled");
-    expect(gateBadge(gate({ state: "planned" }))).toBe("disabled");
+  it("maps plain off/planned (with an enable path) to disabled", () => {
+    // A merely-gated capability always offers an enable target from the
+    // backend; only a gate with no enable path at all counts as deferred.
+    const offWithPath = { allowed_transitions: ["disabled", "enabled_policy_gated"] };
+    expect(
+      gateBadge(gate({ state: "disabled", blocked_reason_code: "disabled_by_capability_gate", ...offWithPath })),
+    ).toBe("disabled");
+    expect(gateBadge(gate({ state: "planned", ...offWithPath }))).toBe("disabled");
     expect(isDisabled(gate({ state: "planned" }))).toBe(true);
     expect(isDisabled(gate({ state: "enabled_runtime" }))).toBe(false);
+  });
+
+  it("treats a disabled gate with no enable path as deferred (live-runtime shape)", () => {
+    const g = gate({ state: "disabled", blocked_reason_code: null, allowed_transitions: ["disabled", "planned"] });
+    expect(isDeferred(g)).toBe(true);
   });
 });
 
@@ -64,7 +74,11 @@ describe("grouping and explanations", () => {
 
   it("explains a gated capability with readiness/needs", () => {
     const info = explainCapability(
-      gate({ blocked_reason_code: "disabled_by_capability_gate", readiness: { policy_ready: true, test_ready: false } }),
+      gate({
+        blocked_reason_code: "disabled_by_capability_gate",
+        allowed_transitions: ["disabled", "enabled_policy_gated"],
+        readiness: { policy_ready: true, test_ready: false },
+      }),
     );
     expect(info.kind).toBe("gated");
     expect(info.requirement.toLowerCase()).toContain("test");

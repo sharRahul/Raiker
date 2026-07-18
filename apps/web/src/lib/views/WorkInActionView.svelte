@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Icon from "../components/Icon.svelte";
+  import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import type { BrainNode, BrainView } from "../apiTypes";
 
@@ -81,9 +82,9 @@
 </div>
 
 {#if loadError}
-  <p class="error" role="alert">{loadError}</p>
+  <PageState state="error" title="Couldn't load live work" detail={loadError} />
 {:else if brain === null}
-  <p class="loading">Loading work in action…</p>
+  <PageState state="loading" title="Loading live work…" />
 {:else}
   <section class="card floor" aria-label="Agent workstations">
     <div class="floor-head"><h2>Workstations</h2><p>Each character is a recorded subagent. Their movement reflects stored status only.</p></div>
@@ -228,7 +229,6 @@
   .waitlist h3 { margin:0; font-size:0.84rem; } .waitlist p { margin:2px 0 0; color:var(--text-2); font-size:0.78rem; }
   .wait-mark { width:14px; height:14px; flex:0 0 auto; border-radius:50%; background:#c89528; animation:wait-pulse 2.2s ease-in-out infinite; }
   .empty { color:var(--text-2); font-size:0.85rem; }
-  .error { color:var(--danger); }
 
   @keyframes char-bob { 50% { transform:translateY(-2px); } }
   @keyframes char-work { 0%,100% { transform:translateY(0) rotate(-1deg); } 50% { transform:translateY(-4px) rotate(1deg); } }

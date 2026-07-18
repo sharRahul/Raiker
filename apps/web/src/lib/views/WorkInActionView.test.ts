@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WorkInActionView from "./WorkInActionView.svelte";
-import { stubFetch } from "../test-helpers";
+import { stubFetch, stubFetchPending } from "../test-helpers";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -9,6 +9,21 @@ afterEach(() => {
 });
 
 describe("WorkInActionView", () => {
+  it("shows a route-level loading state while live work is fetched", async () => {
+    stubFetchPending();
+    render(WorkInActionView);
+    const statuses = await screen.findAllByRole("status");
+    expect(statuses.some((el) => /loading live work/i.test(el.textContent ?? ""))).toBe(true);
+  });
+
+  it("shows a route-level error state when live work cannot load", async () => {
+    stubFetch({});
+    render(WorkInActionView);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn't load live work/i);
+    expect(alert).toHaveTextContent(/unavailable \(404\)/i);
+  });
+
   it("shows real subagent assignment, task progress, and waiting schedules", async () => {
     stubFetch({
       "GET /api/brain": {

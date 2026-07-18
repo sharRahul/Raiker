@@ -394,6 +394,13 @@ describe("ChatView streaming transcript", () => {
     expect(screen.queryByText(/working/i)).not.toBeInTheDocument();
   });
 
+  it("shows a route-level loading state while persisted history is fetched", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<never>(() => {})));
+    render(ChatView, { props: { sessionId: "sess_hist" } });
+    const statuses = await screen.findAllByRole("status");
+    expect(statuses.some((el) => /loading conversation/i.test(el.textContent ?? ""))).toBe(true);
+  });
+
   it("hydrates persisted turns when opened with a session id and continues that session", async () => {
     stubFetch({
       ...MODELS_ROUTE,

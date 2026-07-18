@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Icon from "../components/Icon.svelte";
+  import PageState from "../components/PageState.svelte";
   import StepUpDialog from "../components/StepUpDialog.svelte";
+  import ToolControlBoard from "../components/ToolControlBoard.svelte";
   import type { StepUpValues } from "../components/StepUpDialog.svelte";
   import { api, ApiError } from "../api";
   import type { CapabilityGate } from "../apiTypes";
@@ -11,10 +13,11 @@
     capabilityDescription,
     capabilityLabel,
     DECISION_MODE_COPY,
-    DECISION_MODES,
     enableableTargets,
-    groupByPhase,
+    groupByDomain,
     isDecisionMode,
+    isDeferred,
+    isInherent,
     requiresStepUpToken,
     type DecisionMode,
   } from "../capabilityModel";
@@ -102,14 +105,10 @@
   const filtered = $derived.by(() => {
     if (gates === null) return [];
     const q = search.trim().toLowerCase();
-    // Drop capabilities that are legacy contract gates or purely inherent —
-    // they have no real executor and their decision mode has no effect, so
-    // showing Ask/Allow/Auto/Deny for them is waste of space.
-    const actionable = gates.filter((g) => {
-      const label = capabilityLabel(g.capability);
-      if (label.toLowerCase().includes("legacy gate")) return false;
-      return true;
-    });
+    // Only real tools appear here. Deferred capabilities (no executor) and
+    // inherent contract surfaces are not tools: no row, no selector, no
+    // pretend control. They stay visible in Diagnostics as fail-closed.
+    const actionable = gates.filter((g) => !isDeferred(g) && !isInherent(g));
     const matches = q
       ? actionable.filter(
           (g) =>
@@ -117,7 +116,7 @@
             capabilityLabel(g.capability).toLowerCase().includes(q),
         )
       : actionable;
-    return groupByPhase(matches);
+    return groupByDomain(matches);
   });
 
   function toggleExpand(capability: string) {
@@ -279,11 +278,11 @@
 </div>
 
 {#if loadError}
-  <p class="error" role="alert">Unavailable: {loadError}</p>
+  <PageState state="error" title="Couldn't load capabilities" detail={loadError} />
 {:else if gates === null}
-  <p class="loading">Loading…</p>
+  <PageState state="loading" title="Loading capabilities…" />
 {:else}
-  {#each filtered as group (group.phase)}
+  {#each filtered as group (group.domain)}
     <div class="cap-list">
       <div class="phase-head">
         <label class="phase-select-all">
@@ -291,9 +290,9 @@
             type="checkbox"
             checked={allSelectedInGroup(group.gates.map((g) => g.capability))}
             onchange={() => toggleSelectAllInGroup(group.gates.map((g) => g.capability))}
-            aria-label={`Select all phase ${group.phase} capabilities`}
+            aria-label={`Select all ${group.domain} capabilities`}
           />
-          Phase {group.phase}
+          {group.domain}
         </label>
       </div>
       {#each group.gates as gate (gate.capability)}
@@ -322,25 +321,13 @@
               </span>
             </button>
 
-            <div
-              class="mode-seg"
-              role="group"
-              aria-label={`Decision mode for ${capabilityLabel(gate.capability)}`}
-            >
-              {#each DECISION_MODES as m (m)}
-                <button
-                  type="button"
-                  class="mode-btn"
-                  class:selected={mode === m}
-                  title={DECISION_MODE_COPY[m].hint}
-                  aria-pressed={mode === m}
-                  onclick={() => setMode(gate, m)}
-                  disabled={modeBusyCap === gate.capability}
-                >
-                  {DECISION_MODE_COPY[m].label}
-                </button>
-              {/each}
-            </div>
+            <ToolControlBoard
+              gates={[gate]}
+              showLabel={false}
+              modes={modeOverrides}
+              busyCapability={modeBusyCap}
+              onDecision={(_capability, m) => setMode(gate, m)}
+            />
           </div>
 
           {#if isOpen}
@@ -492,38 +479,6 @@
   .cap-label {
     font-weight: 600;
   }
-  .mode-seg {
-    display: inline-flex;
-    gap: 2px;
-    background: var(--sunken);
-    border: 1px solid var(--border);
-    border-radius: var(--r-pill);
-    padding: 3px;
-    flex-shrink: 0;
-  }
-  .mode-btn {
-    font: inherit;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--text-2);
-    background: transparent;
-    border: none;
-    border-radius: var(--r-pill);
-    padding: 0.2rem 0.7rem;
-    cursor: pointer;
-  }
-  .mode-btn:hover:not(:disabled):not(.selected) {
-    color: var(--text-1);
-  }
-  .mode-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  .mode-btn.selected {
-    background: var(--accent-soft);
-    color: var(--accent);
-    box-shadow: var(--shadow-1);
-  }
   .cap-detail {
     border-top: 1px solid var(--border);
     padding: var(--space-3) var(--space-4) var(--space-4);
@@ -548,12 +503,5 @@
   .muted {
     color: var(--text-3);
     font-size: 0.8rem;
-  }
-  .error {
-    color: var(--danger);
-  }
-  .loading {
-    color: var(--text-2);
-    font-size: 0.84rem;
   }
 </style>

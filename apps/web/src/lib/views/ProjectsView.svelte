@@ -3,6 +3,7 @@
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import PageState from "../components/PageState.svelte";
   import ProjectTreeNode from "../components/ProjectTreeNode.svelte";
   import { api, ApiError } from "../api";
   import type { ProjectDetail, ProjectsList, ProjectTreeNode as TreeNode } from "../apiTypes";
@@ -260,9 +261,9 @@
 </form>
 
 {#if loadError}
-  <p class="error" role="alert">Unavailable: {loadError}</p>
+  <PageState state="error" title="Couldn't load projects" detail={loadError} />
 {:else if list === null}
-  <p class="loading">Loading…</p>
+  <PageState state="loading" title="Loading projects…" />
 {:else if list.projects.length === 0}
   <div class="card">
     <EmptyState
@@ -455,6 +456,11 @@
     justify-content: space-between;
     gap: var(--space-4);
   }
+  @media (max-width: 720px) {
+    .head-row {
+      flex-direction: column;
+    }
+  }
   .create-row {
     display: flex;
     align-items: center;
@@ -571,8 +577,5 @@
   }
   .error {
     color: var(--danger);
-  }
-  .loading {
-    color: var(--text-2);
   }
 </style>

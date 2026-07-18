@@ -118,7 +118,7 @@ Run: `npm --prefix apps/web run test -- --run src/lib/components/Sidebar.test.ts
 Expected: PASS; all route links remain labelled, the active route remains
 identified, and More opens/closes through keyboard input.
 
-- [ ] **Step 5: Commit the isolated navigation change**
+- [x] **Step 5: Commit the isolated navigation change**
 
 ```powershell
 git add apps/web/src/lib/components/Sidebar.svelte apps/web/src/lib/components/Sidebar.test.ts
@@ -161,7 +161,7 @@ Run: `npm --prefix apps/web run check; npm --prefix apps/web run lint; npm --pre
 
 Expected: all commands exit 0 with no Svelte, TypeScript, lint, test, or production-build failures.
 
-- [ ] **Step 3: Commit shell rules**
+- [x] **Step 3: Commit shell rules**
 
 ```powershell
 git add apps/web/src/App.svelte apps/web/src/lib/components/Topbar.svelte apps/web/src/app.css
@@ -193,7 +193,7 @@ one authenticated page across 375px, 768px, and 1024px without reload, use
 Escape and the scrim, inspect browser console output, and save screenshots
 under the existing untracked `output/playwright/` evidence directory.
 
-- [ ] **Step 2: Run repository proof and review the diff**
+- [x] **Step 2: Run repository proof and review the diff**
 
 ```powershell
 python scripts/validate_phase_status.py
@@ -208,14 +208,14 @@ git status --short
 Expected: every validator and `git diff --check` exits 0; untracked existing
 Playwright artifacts remain unstaged.
 
-- [ ] **Step 3: Update only verified documentation and mark this plan**
+- [x] **Step 3: Update only verified documentation and mark this plan**
 
 Record the exact viewport evidence, commands, commit IDs, and workflow URLs in
 the existing control-deck plan, handoff, and implementation status. Mark only
 completed checkboxes in this plan; do not claim a GitHub workflow is green
 until its exact commit has finished successfully.
 
-- [ ] **Step 4: Push and verify exact-tip workflows**
+- [x] **Step 4: Push and verify exact-tip workflows**
 
 ```powershell
 git add -f docs/superpowers/plans/2026-07-18-adaptive-navigation.md
@@ -228,3 +228,9 @@ gh run list --commit HEAD --limit 10
 Expected: pushed commit has a green CI workflow, green Web UI workflow when a
 web-path change triggers it, and green phase-status validation. Investigate and
 fix any failed workflow before handoff.
+
+**Result (2026-07-18):** The adaptive navigation implementation was committed
+and pushed as `2e90eb2`. Its CI, Web UI, and Phase Status Validation workflows
+are green. The documentation commit following this completed plan records the
+same verified implementation evidence; screenshots remain intentionally
+untracked in `output/playwright/`.

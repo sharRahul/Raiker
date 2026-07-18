@@ -33,7 +33,11 @@
 > resized across 375/768/1024/1440px with no horizontal overflow or console
 > errors/warnings; Escape, scrim, and route-selection drawer closing all worked.
 > Screenshot evidence remains untracked under
-> `output/playwright/adaptive-navigation-*.png`.
+> `output/playwright/adaptive-navigation-*.png`. Implementation commit `2e90eb2`
+> is pushed to `main`; its [CI](https://github.com/sharRahul/Raiker/actions/runs/29661755519),
+> [Web UI](https://github.com/sharRahul/Raiker/actions/runs/29661755538), and
+> [Phase Status Validation](https://github.com/sharRahul/Raiker/actions/runs/29661755521)
+> workflows are green.
 
 ## Goal
 

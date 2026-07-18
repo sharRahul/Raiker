@@ -84,7 +84,11 @@ Control Deck commit.
   resized through 375/768/1024/1440px without reload: no horizontal overflow,
   correct adaptive controls, a working Diagnostics drawer route, and no browser
   console errors/warnings. Screenshots are untracked evidence at
-  `output/playwright/adaptive-navigation-*.png`.
+  `output/playwright/adaptive-navigation-*.png`. Implementation commit
+  `2e90eb2` is on `main`; its [CI](https://github.com/sharRahul/Raiker/actions/runs/29661755519),
+  [Web UI](https://github.com/sharRahul/Raiker/actions/runs/29661755538), and
+  [Phase Status Validation](https://github.com/sharRahul/Raiker/actions/runs/29661755521)
+  workflows are green.
 
 - **Monitored MCP connections — Phase D (Connections UI + live monitor) is
   implemented in the current worktree.** Every Connections catalogue card now

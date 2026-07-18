@@ -217,6 +217,61 @@ def post_url(
     return {"status": status_code, "sent_bytes": len(payload), "response_bytes": len(data[:max_bytes])}
 
 
+def post_json_rpc(
+    url: str,
+    payload: dict[str, object],
+    *,
+    headers: dict[str, str] | None = None,
+    max_bytes: int = 200_000,
+    timeout: float = 15.0,
+) -> dict:
+    """POST a JSON-RPC ``payload`` to an owner-added MCP endpoint.
+
+    Returns status, the bounded response body text, and the response headers
+    (lower-cased) — the latter so the caller can carry an ``Mcp-Session-Id``
+    across requests. Only the URL scheme is validated; the request goes to the
+    owner-supplied host because *the owner adding the URL is the authorization*
+    (monitored, not allowlist-blocked — see the Security Philosophy). Request
+    headers (e.g. an owner bearer token) are sent verbatim and are never
+    returned or logged by this function. An HTTP error still returns its body,
+    since an MCP server may deliver a JSON-RPC error with a non-2xx status.
+    """
+    import json as _json
+    import urllib.error
+    import urllib.request
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise SandboxError("mcp_remote_invalid_endpoint")
+    body = _json.dumps(payload).encode("utf-8")
+    merged = {"Content-Type": "application/json", "Accept": "application/json"}
+    merged.update(headers or {})
+    request = urllib.request.Request(  # noqa: S310 - scheme checked above
+        url, data=body, method="POST", headers=merged,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+            data = resp.read(max_bytes + 1)
+            status_code = resp.status if hasattr(resp, "status") else 200
+            resp_headers = {str(k).lower(): str(v) for k, v in resp.headers.items()}
+    except urllib.error.HTTPError as exc:
+        data = exc.read(max_bytes + 1) if hasattr(exc, "read") else b""
+        status_code = exc.code
+        resp_headers = {
+            str(k).lower(): str(v) for k, v in (exc.headers.items() if exc.headers else [])
+        }
+    except Exception:
+        raise SandboxError("mcp_remote_unreachable") from None
+    truncated = len(data) > max_bytes
+    return {
+        "status": status_code,
+        "body_text": data[:max_bytes].decode("utf-8", errors="replace"),
+        "headers": resp_headers,
+        "truncated": truncated,
+    }
+
+
 def post_json_url(
     url: str,
     payload: dict[str, object],

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from raiker.cli.principal_resolver import (
     check_acting_principal_available,
@@ -17,6 +18,7 @@ from raiker.control.dtos import (
     RuntimeModeView,
     RuntimeReadinessView,
 )
+from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.phase_gates import ALL_CAPABILITIES, CapabilityState, default_capability_gates
 from raiker.runtime.authority.activation import get_activation_requirement, has_executor
@@ -408,22 +410,86 @@ class RuntimeControlService:
             ok=True, data={"server_id": row["server_id"] if row else None, "name": normalized}
         )
 
+    def create_remote_mcp_server(
+        self, acting_principal_id: str | None, name: str, endpoint_url: str, auth_ref: str | None
+    ) -> ControlResult:
+        """Add an owner-scoped **remote** MCP connection (HTTP endpoint + optional
+        owner token reference). Owner-added and monitored, not allowlist-blocked;
+        the actual reach happens on test-connect (governed). Human-only. The
+        token itself is never stored — ``auth_ref`` names the env var that holds
+        it."""
+        from raiker.runtime.executors.mcp import _normalize_server_name
+
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        normalized = _normalize_server_name(name)
+        if normalized is None:
+            return ControlResult(ok=False, reason_code="mcp_invalid_server_name")
+        parsed = urlparse(endpoint_url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return ControlResult(ok=False, reason_code="mcp_remote_invalid_endpoint")
+        if self._store.get_mcp_server_by_name(principal.principal_id, normalized) is not None:
+            return ControlResult(ok=False, reason_code="mcp_name_taken")
+        server_id = new_id("mcp_")
+        self._store.create_mcp_server(
+            server_id=server_id,
+            principal_id=principal.principal_id,
+            name=normalized,
+            command=[],
+            template=None,
+            transport="http",
+            status="created",
+            endpoint_url=endpoint_url,
+            auth_ref=auth_ref or None,
+        )
+        self._writer.append(
+            make_event(
+                session_id="mcp",
+                turn_id=None,
+                event_type="mcp_connection_added",
+                actor="control_service",
+                # Redacted metadata only — host, never the full URL query or token.
+                payload={
+                    "server_id": server_id,
+                    "name": normalized,
+                    "transport": "http",
+                    "host": parsed.netloc,
+                },
+            )
+        )
+        return ControlResult(
+            ok=True, data={"server_id": server_id, "name": normalized, "transport": "http"}
+        )
+
     def connect_mcp_server(
         self, acting_principal_id: str | None, server_id: str
     ) -> ControlResult:
-        """Governed test-connect of a stored server: run the stdio handshake and
-        persist the discovered tool names + status. Owner-scoped."""
+        """Governed test-connect of a stored server: run the handshake (stdio or
+        remote HTTP) and persist the discovered tool names + status. Owner-scoped."""
         principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
         if principal is None:
             return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
         server = self._store.get_mcp_server(server_id, principal.principal_id)
         if server is None:
             return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
-        result = self._route_mcp(
-            principal,
-            "mcp_connect",
-            {"command": server["command"], "name": server["name"], "server_id": server_id},
-        )
+        if str(server.get("transport")) == "http":
+            connect_args: dict[str, Any] = {
+                "transport": "http",
+                "endpoint_url": server.get("endpoint_url") or "",
+                "auth_ref": server.get("auth_ref") or "",
+                "name": server["name"],
+                "server_id": server_id,
+            }
+        else:
+            connect_args = {
+                "command": server["command"],
+                "name": server["name"],
+                "server_id": server_id,
+            }
+        result = self._route_mcp(principal, "mcp_connect", connect_args)
         mapped = self._mcp_action_result(result)
         if not mapped.ok:
             return mapped

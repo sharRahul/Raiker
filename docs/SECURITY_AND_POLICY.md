@@ -11,6 +11,53 @@ This document defines Phase 1 security behaviour and phase-scheduled policy boun
 
 ---
 
+## Security Philosophy — monitored, owner-authoritative, frictionless
+
+> **Read this before adding any new restriction.** Raiker's security model is
+> built on **visibility and control, not on standing between the owner and the
+> systems they choose to use.** The local owner is the trust anchor. Security's
+> job is to make secure operation the frictionless default and to keep
+> everything the runtime does fully observable and instantly controllable — not
+> to restrict the owner's legitimate reach behind hard walls. Security is not
+> restricting the user; it is a frictionless system that lets the owner operate
+> securely without having their access taken away.
+
+Concretely, for capabilities the **owner** chooses to use:
+
+1. **Do not restrict the owner by default.** An owner may connect the tools,
+   models, and services they want — including remote MCP servers. The runtime
+   does not pre-emptively block those choices; it observes them. Prevention that
+   trains people to click "allow" on everything is not security.
+2. **Monitor everything.** Every governed action and every connection is
+   recorded in the append-only audit log, and live connections (e.g. MCP
+   sessions) are watched for unusual activity — new hosts, volume spikes,
+   sensitive-data patterns, unexpected tool behaviour.
+3. **Detect and surface, then let the owner act.** Anomalies become redacted
+   findings and notifications the owner can see, each with a one-click stop.
+4. **Contain what can't wait.** Detection is not prevention, so irreversible or
+   high-severity anomalies trigger an automatic, **revocable** pause (a circuit
+   breaker), and there is always an instant kill switch. Containment keeps the
+   monitoring actionable when the owner is away; it is not a restriction on the
+   owner's intent — it is what makes a frictionless-by-default posture safe.
+
+What this philosophy does **not** loosen:
+
+- **Fail-closed on missing prerequisites stays.** A missing credential,
+  executor, allowlist, policy, or approval still denies the action. That is
+  *honesty* — no fabricated success — not a wall placed in front of the owner.
+- **AI and non-owner principals stay governed.** The frictionless default is the
+  *owner's* authority. AI-proposed actions still pass the capability gate,
+  decision mode, approval, and audit path. The AI is never the trust anchor.
+
+**Design rule for all future plans and changes:** prefer monitoring +
+containment + owner control over hard prevention. A new "block it / ban it /
+allowlist-only by default" restriction on an **owner-chosen** capability is a
+last resort and must be justified against this philosophy — not adopted as the
+default. (This is why, for example, remote MCP endpoints are **allowed and
+monitored**, not forbidden; see the monitored-MCP design plan.)
+
+---
+
 ## Core Security Principle
 
 No agent-controlled action may execute unless it has passed through:

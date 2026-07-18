@@ -87,6 +87,11 @@ class McpServerView:
     # never arguments or output).
     tools: tuple[str, ...] = ()
     tool_count: int = 0
+    # Remote (http) connection details. `endpoint_url` is the owner-added URL;
+    # `auth_ref` names where the owner token lives (an env var name) — never the
+    # token itself. Both are null for a local stdio connection.
+    endpoint_url: str | None = None
+    auth_ref: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -919,6 +924,8 @@ class DashboardService:
                 last_connected_at=row.get("last_connected_at"),
                 tools=tuple(str(t) for t in row.get("tools", [])),
                 tool_count=int(row.get("tool_count", 0) or 0),
+                endpoint_url=row.get("endpoint_url"),
+                auth_ref=row.get("auth_ref"),
             )
             for row in self.store.list_mcp_servers(principal_id)
         ]
@@ -929,6 +936,14 @@ class DashboardService:
         """Governed build of a local stdio MCP server (delegates to the
         control service so the capability gate / policy / audit path applies)."""
         return self.control.create_mcp_server(acting_principal_id, name, template)
+
+    def create_remote_mcp_server(
+        self, acting_principal_id: str | None, name: str, endpoint_url: str, auth_ref: str | None
+    ) -> ControlResult:
+        """Add an owner-scoped remote (HTTP) MCP connection (delegates)."""
+        return self.control.create_remote_mcp_server(
+            acting_principal_id, name, endpoint_url, auth_ref
+        )
 
     def connect_mcp_server(
         self, acting_principal_id: str | None, server_id: str

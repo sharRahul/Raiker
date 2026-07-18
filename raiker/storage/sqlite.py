@@ -70,6 +70,8 @@ from raiker.storage.migrations import (
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
+    MCP_REMOTE_ENDPOINT_MIGRATION_ID,
+    MCP_REMOTE_ENDPOINT_SQL,
     MCP_SERVER_RUNTIME_MIGRATION_ID,
     MCP_SERVER_RUNTIME_SQL,
     MCP_SERVERS_MIGRATION_ID,
@@ -639,6 +641,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(MCP_SERVERS_MIGRATION_ID, MCP_SERVERS_SQL, connection)
             self._apply_migration(
                 MCP_SERVER_RUNTIME_MIGRATION_ID, MCP_SERVER_RUNTIME_SQL, connection
+            )
+            self._apply_migration(
+                MCP_REMOTE_ENDPOINT_MIGRATION_ID, MCP_REMOTE_ENDPOINT_SQL, connection
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -1497,6 +1502,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         status: str = "created",
         last_connected_at: str | None = None,
         tools: list[str] | None = None,
+        endpoint_url: str | None = None,
+        auth_ref: str | None = None,
     ) -> str:
         """Upsert one owner-scoped MCP server profile.
 
@@ -1504,15 +1511,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         ``(principal_id, name)`` so re-building the same-named server for the
         same owner refreshes the single profile instead of accumulating rows.
         ``tools`` is the JSON-encoded list of tool names from the last successful
-        handshake (names only — never arguments or output).
+        handshake (names only — never arguments or output). ``endpoint_url`` is
+        the remote HTTP URL for an ``http`` transport; ``auth_ref`` names where
+        the owner token lives (never the token itself).
         """
         tool_list = list(tools) if tools is not None else None
         with self.connect() as connection:
             connection.execute(
                 """INSERT OR REPLACE INTO mcp_servers
                    (server_id, principal_id, name, command, template, transport,
-                    status, created_at, last_connected_at, tools, tool_count)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    status, created_at, last_connected_at, tools, tool_count,
+                    endpoint_url, auth_ref)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     server_id,
                     principal_id,
@@ -1525,9 +1535,42 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     last_connected_at,
                     json.dumps(tool_list) if tool_list is not None else None,
                     len(tool_list) if tool_list is not None else 0,
+                    endpoint_url,
+                    auth_ref,
                 ),
             )
         return server_id
+
+    def update_mcp_server_runtime(
+        self,
+        server_id: str,
+        principal_id: str,
+        *,
+        status: str,
+        tools: list[str] | None = None,
+        last_connected_at: str | None = None,
+    ) -> bool:
+        """Owner-scoped update of only the *runtime* fields of a profile — status,
+        discovered tool names, and last-connected time — without touching its
+        identity/transport/endpoint columns (so a re-test never wipes a stored
+        remote endpoint or auth reference). Returns False if the row is missing
+        or owned by another principal."""
+        tool_list = list(tools) if tools is not None else None
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE mcp_servers
+                   SET status = ?, last_connected_at = ?, tools = ?, tool_count = ?
+                   WHERE server_id = ? AND principal_id = ?""",
+                (
+                    status,
+                    last_connected_at,
+                    json.dumps(tool_list) if tool_list is not None else None,
+                    len(tool_list) if tool_list is not None else 0,
+                    server_id,
+                    principal_id,
+                ),
+            )
+            return cursor.rowcount > 0
 
     def rename_mcp_server(self, server_id: str, principal_id: str, name: str) -> bool:
         """Owner-scoped rename of one MCP server profile. Returns False if the

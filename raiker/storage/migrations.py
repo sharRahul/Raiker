@@ -1341,6 +1341,19 @@ ALTER TABLE mcp_servers ADD COLUMN tools TEXT;
 ALTER TABLE mcp_servers ADD COLUMN tool_count INTEGER NOT NULL DEFAULT 0;
 """
 
+# Remote MCP endpoints (monitored MCP connections, Phase A): a connection can be
+# a local stdio server (command) or a remote HTTP MCP server. `endpoint_url` is
+# the owner-added remote URL (null for stdio); `auth_ref` names *where* the owner
+# token lives (an env var name), never the token itself — the token is read at
+# call time and never stored or logged. The owner adding a URL is the
+# authorization; the connection is monitored, not allowlist-blocked. Additive.
+MCP_REMOTE_ENDPOINT_MIGRATION_ID = "RAIKER-1018-mcp-remote-endpoint"
+
+MCP_REMOTE_ENDPOINT_SQL = """
+ALTER TABLE mcp_servers ADD COLUMN endpoint_url TEXT;
+ALTER TABLE mcp_servers ADD COLUMN auth_ref TEXT;
+"""
+
 # Nested projects/folders (conversation organisation remainder): arbitrary-depth
 # folder hierarchy via hybrid adjacency list + materialized path. Parent
 # reference uses ON DELETE SET NULL so children survive parent hard-delete.

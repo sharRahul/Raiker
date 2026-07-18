@@ -149,8 +149,8 @@ export function health(): Promise<{ status: string }> {
   return request<{ status: string }>("/api/health");
 }
 
-export function createInstance(name: string): Promise<InstanceLaunchResult> {
-  return postJson<InstanceLaunchResult>("/api/instances", { name });
+export function createInstance(name: string, username: string, password: string): Promise<InstanceLaunchResult> {
+  return postJson<InstanceLaunchResult>("/api/instances", { name, username, password });
 }
 
 export interface LoginResult {

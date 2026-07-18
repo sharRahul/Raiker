@@ -167,11 +167,13 @@ class BrainSourceRequest(BaseModel):
 
 
 class InstanceCreateRequest(BaseModel):
-    """Name for a new, locally isolated Raiker instance."""
+    """Name and optional first account for a locally isolated Raiker instance."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: str
+    username: str | None = None
+    password: str | None = None
 
 
 class CreateProjectRequest(BaseModel):

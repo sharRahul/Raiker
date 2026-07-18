@@ -38,6 +38,7 @@
   let runtimeReachable = $state<boolean | null>(null);
 
   const isRegister = $derived(mode === "register");
+  const isFirstRun = $derived(bootstrapAllowed && mode === "login" && !instanceSetup);
   const isVerifying = $derived(runtimeState === "verifying");
   const formDisabled = $derived(busy || isVerifying);
 
@@ -189,18 +190,21 @@
     }
   }
 
-  async function createSeparateInstance() {
-    if (!instanceName.trim()) return;
+  async function createUserInstance() {
+    if (!instanceName.trim() || password !== confirmPassword) {
+      error = password !== confirmPassword ? "Passwords do not match." : null;
+      return;
+    }
     busy = true;
     error = null;
     try {
-      const instance = await createInstance(instanceName.trim());
+      const instance = await createInstance(instanceName.trim(), username, password);
       const opened = window.open(instance.url, "_blank", "noopener");
       if (opened === null) window.location.assign(instance.url);
     } catch (e) {
       error = e instanceof ApiError && e.status === 409
         ? "That instance name is already in use on this device."
-        : "Could not create the separate local instance.";
+        : "Could not create the user account.";
     } finally {
       busy = false;
     }
@@ -251,13 +255,19 @@
       {/if}
 
       {#if instanceSetup}
-        <h1 id="unlock-title">Create separate instance</h1>
-        <p class="intro">This creates a separate Raiker instance on this server with its own workspace, database, vault, connectors, files, and login. It opens in a new tab.</p>
-        <form onsubmit={(event) => { event.preventDefault(); void createSeparateInstance(); }}>
+        <h1 id="unlock-title">Create a User Account</h1>
+        <p class="intro">Your account will have its own Raiker workspace and open in a new tab.</p>
+        <form onsubmit={(event) => { event.preventDefault(); void createUserInstance(); }}>
           <label for="instance-name">Instance name</label>
           <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="projects" size={17} /></span><input id="instance-name" bind:value={instanceName} placeholder="for example, alex" pattern={"[a-z0-9][a-z0-9-]{0,62}"} required disabled={busy} /></div>
+          <label for="username">Username</label>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="user" size={17} /></span><input id="username" bind:value={username} autocomplete="username" required disabled={busy} /></div>
+          <label for="password">Password</label>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span><input id="password" type="password" bind:value={password} autocomplete="new-password" required disabled={busy} /></div>
+          <label for="confirm-password">Confirm password</label>
+          <div class="field"><span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span><input id="confirm-password" type="password" bind:value={confirmPassword} autocomplete="new-password" required disabled={busy} /></div>
           {#if error}<p class="error" role="alert">{error}</p>{/if}
-          <button type="submit" class="btn btn-primary submit" disabled={busy || !instanceName.trim()}>{busy ? "Starting…" : "Create and open instance"}</button>
+          <button type="submit" class="btn btn-primary submit" disabled={busy || !instanceName.trim() || !username || !password || !confirmPassword}>{busy ? "Creating…" : "Create account and open Raiker"}</button>
         </form>
         <button type="button" class="secondary" onclick={() => { instanceSetup = false; error = null; }} disabled={busy}>Return to login</button>
       {:else if mode === "recovery"}
@@ -282,10 +292,12 @@
           <button type="submit" class="btn btn-primary submit" disabled={formDisabled} aria-busy={busy}>{busy ? "Updating…" : "Reset password"}</button>
         </form>
       {:else if step === "credentials"}
-        <h1 id="unlock-title">{isRegister ? "Create local account" : "Unlock Raiker"}</h1>
+        <h1 id="unlock-title">{isFirstRun ? "Welcome to Raiker" : isRegister ? "Create a User Account" : "Unlock Raiker"}</h1>
         <p class="intro">
-          {isRegister
-            ? "Set up a new local account on this device."
+          {isFirstRun
+            ? "Create a User Account to get started."
+            : isRegister
+            ? "Set up your Raiker account on this device."
             : "Authenticate to restore interactive control and open the governed workspace."}
         </p>
         <form onsubmit={submitCredentials} aria-describedby="privacy-note">
@@ -344,7 +356,7 @@
 
           {#if error}<p class="error" role="alert">{error}</p>{/if}
           <button type="submit" class="btn btn-primary submit" disabled={formDisabled} aria-busy={busy}>
-            {busy ? (isRegister ? "Creating…" : "Unlocking…") : isRegister ? "Create account" : "Unlock Raiker"}
+            {busy ? (isRegister ? "Creating…" : "Unlocking…") : isRegister ? "Create a User Account" : "Unlock Raiker"}
           </button>
         </form>
 
@@ -353,7 +365,7 @@
         {#if bootstrapAllowed || isRegister}
           <button type="button" class="secondary" onclick={switchMode} disabled={formDisabled}>
             <Icon name={isRegister ? "user" : "user-plus"} size={18} />
-            {isRegister ? "Return to unlock" : "Create local account"}
+            {isRegister ? "Return to unlock" : "Create a User Account"}
           </button>
         {/if}
 
@@ -363,10 +375,12 @@
           </button>
         {/if}
 
-        <button type="button" class="secondary instance-button" onclick={() => { instanceSetup = true; error = null; }} disabled={formDisabled}>
-          <Icon name="projects" size={18} />
-          Create new user and separate instance
-        </button>
+        {#if !bootstrapAllowed && !isRegister}
+          <button type="button" class="secondary instance-button" onclick={() => { instanceSetup = true; error = null; }} disabled={formDisabled}>
+            <Icon name="projects" size={18} />
+            Create a User Account
+          </button>
+        {/if}
 
         <div id="privacy-note" class="privacy">
           <span class="privacy-icon" aria-hidden="true"><Icon name="info" size={17} /></span>

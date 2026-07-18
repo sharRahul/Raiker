@@ -81,6 +81,14 @@ describe("LoginView", () => {
     expect(screen.queryByText("I cannot reach my runtime.")).not.toBeInTheDocument();
   });
 
+  it("welcomes a first-run user and calls account creation consistently", async () => {
+    stubFetch({ ...HEALTH_OK, "GET /api/auth/bootstrap-status": { can_register: true } });
+    render(LoginView, { props: { onAuthenticated } });
+    expect(await screen.findByRole("heading", { name: "Welcome to Raiker" })).toBeInTheDocument();
+    expect(screen.getByText("Create a User Account to get started.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create a User Account" })).toBeInTheDocument();
+  });
+
   it("reports an unreachable runtime from the real health probe", async () => {
     vi.stubGlobal(
       "fetch",
@@ -154,32 +162,34 @@ describe("LoginView", () => {
     await waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith("prin_owner"));
   });
 
-  it("keeps registration visually distinct, greets, and validates confirmation", async () => {
+  it("keeps account creation visually distinct, greets, and validates confirmation", async () => {
     stubFetch({ ...HEALTH_OK, "GET /api/auth/bootstrap-status": { can_register: true }, "POST /api/auth/register": LOGIN_RESULT });
     render(LoginView, { props: { onAuthenticated } });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Create local account" })).toBeInTheDocument());
-    await fireEvent.click(screen.getByRole("button", { name: "Create local account" }));
-    expect(screen.getByRole("heading", { name: "Create local account" })).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "Welcome to Raiker" });
+    await fireEvent.click(screen.getByRole("button", { name: "Create a User Account" }));
+    expect(await screen.findByRole("heading", { name: "Create a User Account" })).toBeInTheDocument();
     expect(screen.getByText("Hello! I am Raiker.")).toBeInTheDocument();
     expect(screen.getByText("Nice to meet you.")).toBeInTheDocument();
     expect(screen.queryByText("I am ready when you are.")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toHaveAttribute("autocomplete", "new-password");
     await fillCredentials("pw1");
     await fireEvent.input(screen.getByLabelText("Confirm password"), { target: { value: "pw2" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Create a User Account" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Passwords do not match.");
     await fireEvent.input(screen.getByLabelText("Confirm password"), { target: { value: "pw1" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Create a User Account" }));
     await waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith("prin_owner"));
   });
 
-  it("creates a separate same-server instance from the login screen", async () => {
+  it("creates an account in a separate same-server instance from the login screen", async () => {
     stubFetch({ ...HEALTH_OK, "POST /api/instances": { name: "alex", url: "/instances/alex/" } });
     const open = vi.spyOn(window, "open").mockReturnValue({} as Window);
     render(LoginView, { props: { onAuthenticated } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create new user and separate instance" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Create a User Account" }));
     await fireEvent.input(screen.getByLabelText("Instance name"), { target: { value: "alex" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create and open instance" }));
+    await fillCredentials();
+    await fireEvent.input(screen.getByLabelText("Confirm password"), { target: { value: "pw" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Create account and open Raiker" }));
     await waitFor(() => expect(open).toHaveBeenCalledWith("/instances/alex/", "_blank", "noopener"));
   });
 

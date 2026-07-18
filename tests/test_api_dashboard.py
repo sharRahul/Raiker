@@ -104,17 +104,20 @@ class TestInstances:
     def test_login_launcher_creates_an_isolated_same_server_instance(
         self, bootstrapped_workspace: Path, client: TestClient
     ) -> None:
-        response = client.post("/api/instances", json={"name": "alex"})
+        response = client.post(
+            "/api/instances",
+            json={"name": "alex", "username": "alex", "password": "correct horse battery staple"},
+        )
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["url"] == "/instances/alex/"
         assert (bootstrapped_workspace / ".raiker" / "instances" / "alex").is_dir()
         assert client.get("/instances/alex/api/health").status_code == 200
-        # A newly created instance has no inherited accounts; its own login is
-        # therefore the first place its owner establishes credentials.
+        # A password login is still required; the launcher session is never
+        # inherited by the new workspace.
         assert client.post("/instances/alex/api/auth/session", json={"as_principal": None}).status_code == 403
         child_login = client.post(
-            "/instances/alex/api/auth/register",
+            "/instances/alex/api/auth/login",
             json={"username": "alex", "password": "correct horse battery staple"},
         )
         assert child_login.status_code == 200, child_login.text

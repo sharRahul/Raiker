@@ -72,6 +72,10 @@ _PREFIXES = {
     "cwi_",
     "cinv_",
     "mcp_",
+    # Monitored MCP connections (Phase B): a redacted per-session monitoring row
+    # and a redacted security finding.
+    "mses_",
+    "find_",
 }
 
 

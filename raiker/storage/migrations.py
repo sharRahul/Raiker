@@ -1354,6 +1354,62 @@ ALTER TABLE mcp_servers ADD COLUMN endpoint_url TEXT;
 ALTER TABLE mcp_servers ADD COLUMN auth_ref TEXT;
 """
 
+# Per-session MCP monitoring + anomaly detection (monitored MCP connections,
+# Phase B) plus the shared redacted-findings substrate (also used by Control
+# Deck Task 5 self-monitoring). Two additive tables:
+#
+# `mcp_session_log` — one row per governed MCP session, redacted metadata only:
+#   the tool-call count, the hosts contacted (netloc only, never a full URL or
+#   query), byte counts, error count, and outcome. **No payloads, tokens, or
+#   host secrets are ever stored here** — the monitor classifies value *shapes*
+#   transiently and keeps only labels/counts. `principal_id` scopes every row to
+#   its owner. Rolling rows form each connection's baseline.
+#
+# `security_findings` — a redacted finding raised by a monitor (`source`, e.g.
+#   `mcp_monitor`). `redacted_detail_json` holds only redacted metadata (labels,
+#   counts, hostnames, added/removed tool names), never a raw value. `subject_id`
+#   is a generic reference to what the finding is about (the MCP `server_id` for
+#   `mcp_monitor` findings). `state` moves open → acknowledged → resolved. Shared
+#   with Task 5. Owner-scoped by `principal_id`.
+MCP_MONITORING_MIGRATION_ID = "RAIKER-1019-mcp-monitoring"
+
+MCP_MONITORING_SQL = """
+CREATE TABLE IF NOT EXISTS mcp_session_log (
+  session_row_id TEXT PRIMARY KEY,
+  server_id TEXT,
+  principal_id TEXT NOT NULL,
+  transport TEXT NOT NULL DEFAULT 'stdio',
+  operation TEXT NOT NULL,
+  hosts_json TEXT,
+  tool_calls INTEGER NOT NULL DEFAULT 0,
+  bytes_in INTEGER NOT NULL DEFAULT 0,
+  bytes_out INTEGER NOT NULL DEFAULT 0,
+  error_count INTEGER NOT NULL DEFAULT 0,
+  outcome TEXT NOT NULL DEFAULT 'ok',
+  started_at TEXT NOT NULL,
+  ended_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_session_log_conn
+  ON mcp_session_log(principal_id, server_id, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS security_findings (
+  finding_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  source TEXT NOT NULL,
+  severity TEXT NOT NULL,
+  code TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  redacted_detail_json TEXT,
+  subject_id TEXT,
+  state TEXT NOT NULL DEFAULT 'open',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_findings_owner
+  ON security_findings(principal_id, source, state, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_security_findings_subject
+  ON security_findings(principal_id, subject_id, created_at DESC);
+"""
+
 # Nested projects/folders (conversation organisation remainder): arbitrary-depth
 # folder hierarchy via hybrid adjacency list + materialized path. Parent
 # reference uses ON DELETE SET NULL so children survive parent hard-delete.

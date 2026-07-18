@@ -101,6 +101,11 @@ EVENT_TYPES = {
     # payload is redacted metadata only (name, transport, host) — never a token.
     "mcp_connection_added",
     "mcp_connection_removed",
+    # Per-session MCP monitoring (Phase B). A governed MCP session completed —
+    # redacted telemetry only (counts, hosts, byte totals, outcome). An anomaly
+    # rule tripped — a redacted finding was raised (never a payload or token).
+    "mcp_session_completed",
+    "mcp_anomaly_detected",
     "task_created",
     "task_started",
     "task_progress",

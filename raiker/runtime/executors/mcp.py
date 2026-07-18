@@ -27,6 +27,7 @@ import os
 import re
 import subprocess
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
@@ -34,6 +35,11 @@ from urllib.parse import urlparse
 from raiker.contracts.ids import new_id, utc_now
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import SandboxError, post_json_rpc
+from raiker.security.mcp_monitor import (
+    McpSessionMonitor,
+    McpSessionTelemetry,
+    shape_sensitivity,
+)
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -281,6 +287,20 @@ class McpBuilderExecutor:
 HttpFn = Callable[..., dict[str, Any]]
 
 
+@dataclass
+class _SessionCtx:
+    """Bundles the request context for one governed MCP session, so telemetry can
+    be assembled without threading many parameters through the transport paths."""
+
+    operation: str
+    tool_name: str | None
+    tool_arguments: dict[str, Any]
+    transport: str
+    command: list[str] = field(default_factory=list)
+    endpoint_url: str | None = None
+    started_at: str = ""
+
+
 def _default_http_fn(
     url: str, payload: dict[str, Any], *, headers: dict[str, str], timeout: float, max_bytes: int
 ) -> dict[str, Any]:
@@ -308,15 +328,24 @@ class McpConnectorExecutor:
     capability = "mcp_connector_runtime"
 
     def __init__(
-        self, workspace_root: str | Path, store: SQLiteStore, *, http_fn: HttpFn | None = None
+        self,
+        workspace_root: str | Path,
+        store: SQLiteStore,
+        *,
+        http_fn: HttpFn | None = None,
+        monitor: McpSessionMonitor | None = None,
     ) -> None:
         self._ws = Path(workspace_root).resolve()
         self._store = store
         # Injectable so the remote path is testable without a live network.
         self._http_fn: HttpFn = http_fn or _default_http_fn
+        # Every governed session hands redacted telemetry to the monitor, which
+        # records a session-log row and raises redacted findings on anomalies.
+        self._monitor = monitor or McpSessionMonitor(store)
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         principal_id = principal.principal_id if principal is not None else action.principal_id
+        started_at = utc_now()
         try:
             requested = float(action.arguments.get("timeout", MCP_SESSION_TIMEOUT))
         except (TypeError, ValueError):
@@ -326,13 +355,15 @@ class McpConnectorExecutor:
 
         # Build the JSON-RPC request set for this operation.
         tool_name: str | None = None
+        tool_arguments: dict[str, Any] = {}
         if operation == "mcp_call_tool":
             tool_name = str(action.arguments.get("tool_name", "")).strip()
             if not tool_name:
                 return self._fail(action.action_id, "mcp_tool_name_required")
-            tool_arguments = action.arguments.get("tool_arguments") or {}
-            if not isinstance(tool_arguments, dict):
+            raw_arguments = action.arguments.get("tool_arguments") or {}
+            if not isinstance(raw_arguments, dict):
                 return self._fail(action.action_id, "mcp_tool_arguments_invalid")
+            tool_arguments = raw_arguments
             requests = [
                 _initialize_rpc(),
                 _notification("notifications/initialized"),
@@ -346,58 +377,63 @@ class McpConnectorExecutor:
             ]
 
         transport = str(action.arguments.get("transport", "stdio")).strip() or "stdio"
+        ctx = _SessionCtx(
+            operation=operation,
+            tool_name=tool_name,
+            tool_arguments=tool_arguments,
+            transport=transport,
+            started_at=started_at,
+        )
         if transport == "http":
-            return self._execute_http(action, principal_id, operation, tool_name, requests, timeout)
-        return self._execute_stdio(action, principal_id, operation, tool_name, requests, timeout)
+            return self._execute_http(action, principal_id, ctx, requests, timeout)
+        return self._execute_stdio(action, principal_id, ctx, requests, timeout)
 
     # ── transport dispatch ──
     def _execute_stdio(
         self,
         action: GovernedAction,
         principal_id: str,
-        operation: str,
-        tool_name: str | None,
+        ctx: _SessionCtx,
         requests: list[dict[str, Any]],
         timeout: float,
     ) -> ExecutionResult:
         command = [str(part) for part in action.arguments.get("command", [])]
+        ctx.command = command
         reason = self._validate_command(command)
         if reason is not None:
             return self._fail(action.action_id, reason)
         try:
-            responses = self._run_session(command, requests, timeout)
+            responses, bytes_in, bytes_out = self._run_session(command, requests, timeout)
         except SandboxError as exc:
+            self._observe_failure(action, principal_id, ctx)
             return self._fail(action.action_id, str(exc))
-        return self._finish(
-            action, principal_id, responses, operation, tool_name,
-            transport="stdio", command=command, endpoint_url=None,
-        )
+        return self._finish(action, principal_id, ctx, responses, bytes_in, bytes_out)
 
     def _execute_http(
         self,
         action: GovernedAction,
         principal_id: str,
-        operation: str,
-        tool_name: str | None,
+        ctx: _SessionCtx,
         requests: list[dict[str, Any]],
         timeout: float,
     ) -> ExecutionResult:
         endpoint_url = str(action.arguments.get("endpoint_url", "")).strip()
         if urlparse(endpoint_url).scheme not in ("http", "https") or not urlparse(endpoint_url).netloc:
             return self._fail(action.action_id, "mcp_remote_invalid_endpoint")
+        ctx.endpoint_url = endpoint_url
         token, token_error = self._resolve_remote_token(
             str(action.arguments.get("auth_ref", "")).strip() or None
         )
         if token_error is not None:
             return self._fail(action.action_id, token_error)
         try:
-            responses = self._run_http_session(endpoint_url, token, requests, timeout)
+            responses, bytes_in, bytes_out = self._run_http_session(
+                endpoint_url, token, requests, timeout
+            )
         except SandboxError as exc:
+            self._observe_failure(action, principal_id, ctx)
             return self._fail(action.action_id, str(exc))
-        return self._finish(
-            action, principal_id, responses, operation, tool_name,
-            transport="http", command=[], endpoint_url=endpoint_url,
-        )
+        return self._finish(action, principal_id, ctx, responses, bytes_in, bytes_out)
 
     @staticmethod
     def _resolve_remote_token(auth_ref: str | None) -> tuple[str | None, str | None]:
@@ -416,29 +452,40 @@ class McpConnectorExecutor:
         self,
         action: GovernedAction,
         principal_id: str,
+        ctx: _SessionCtx,
         responses: dict[Any, dict[str, Any]],
-        operation: str,
-        tool_name: str | None,
-        *,
-        transport: str,
-        command: list[str],
-        endpoint_url: str | None,
+        bytes_in: int,
+        bytes_out: int,
     ) -> ExecutionResult:
-        if operation == "mcp_call_tool":
+        if ctx.operation == "mcp_call_tool":
             reason, blocks, length = _extract_call(responses)
             if reason is not None:
+                # A session that reached the server but errored still counts
+                # toward the error/refusal-burst rule.
+                self._observe_failure(action, principal_id, ctx, bytes_in, bytes_out)
                 return self._fail(action.action_id, reason)
+            # Classify the argument/result *shape* transiently — only the label
+            # crosses into the monitor; the raw value is dropped here.
+            arg_label = shape_sensitivity(_safe_json(ctx.tool_arguments))
+            result_label = shape_sensitivity(_call_result_text(responses))
+            self._observe(
+                self._build_telemetry(
+                    action, principal_id, ctx, outcome="ok",
+                    bytes_in=bytes_in, bytes_out=bytes_out,
+                    arg_label=arg_label, result_label=result_label,
+                )
+            )
             self._record_connection(
-                action, principal_id, transport=transport,
-                command=command, endpoint_url=endpoint_url,
+                action, principal_id, transport=ctx.transport,
+                command=ctx.command, endpoint_url=ctx.endpoint_url,
             )
             return ExecutionResult(
                 ok=True,
                 capability=self.capability,
                 action_id=action.action_id,
-                summary=f"MCP tool '{tool_name}' returned {length} char(s); content withheld.",
+                summary=f"MCP tool '{ctx.tool_name}' returned {length} char(s); content withheld.",
                 artifacts={
-                    "tool_name": tool_name,
+                    "tool_name": ctx.tool_name,
                     "content_blocks": blocks,
                     "content_length": length,
                     "content_redacted": True,
@@ -446,13 +493,20 @@ class McpConnectorExecutor:
             )
         reason, tool_names, init_result = _extract_tools(responses)
         if reason is not None:
+            self._observe_failure(action, principal_id, ctx, bytes_in, bytes_out)
             return self._fail(action.action_id, reason)
         server_info = init_result.get("serverInfo") or {}
-        self._record_connection(
-            action, principal_id, transport=transport,
-            command=command, endpoint_url=endpoint_url, tools=tool_names,
+        self._observe(
+            self._build_telemetry(
+                action, principal_id, ctx, outcome="ok",
+                bytes_in=bytes_in, bytes_out=bytes_out, tools=tuple(tool_names),
+            )
         )
-        label = "remote HTTP" if transport == "http" else "stdio"
+        self._record_connection(
+            action, principal_id, transport=ctx.transport,
+            command=ctx.command, endpoint_url=ctx.endpoint_url, tools=tool_names,
+        )
+        label = "remote HTTP" if ctx.transport == "http" else "stdio"
         return ExecutionResult(
             ok=True,
             capability=self.capability,
@@ -461,12 +515,97 @@ class McpConnectorExecutor:
             artifacts={
                 "server_name": str(server_info.get("name", "")),
                 "protocol_version": str(init_result.get("protocolVersion", "")),
-                "transport": transport,
+                "transport": ctx.transport,
                 "tool_count": len(tool_names),
                 "tools": tool_names,
                 "content_redacted": True,
             },
         )
+
+    # ── monitoring: hand redacted telemetry to the session monitor ──
+    def _observe(self, telemetry: McpSessionTelemetry) -> None:
+        """Best-effort: a monitoring hiccup must never turn a successful governed
+        session into a failure, so storage/event errors are swallowed. A raised
+        finding is still visible through the finding store + audit event."""
+        try:
+            self._monitor.observe(telemetry)
+        except Exception:  # noqa: BLE001 - monitoring must not fail the session
+            return
+
+    def _observe_failure(
+        self,
+        action: GovernedAction,
+        principal_id: str,
+        ctx: _SessionCtx,
+        bytes_in: int = 0,
+        bytes_out: int = 0,
+    ) -> None:
+        self._observe(
+            self._build_telemetry(
+                action, principal_id, ctx, outcome="error",
+                bytes_in=bytes_in, bytes_out=bytes_out, error_count=1,
+            )
+        )
+
+    def _build_telemetry(
+        self,
+        action: GovernedAction,
+        principal_id: str,
+        ctx: _SessionCtx,
+        *,
+        outcome: str,
+        bytes_in: int,
+        bytes_out: int,
+        tools: tuple[str, ...] = (),
+        arg_label: str | None = None,
+        result_label: str | None = None,
+        error_count: int = 0,
+    ) -> McpSessionTelemetry:
+        hosts: tuple[str, ...] = ()
+        if ctx.transport == "http" and ctx.endpoint_url:
+            # Redacted: the host (netloc) only — never the path, query, or token.
+            netloc = urlparse(ctx.endpoint_url).netloc
+            if netloc:
+                hosts = (netloc,)
+        return McpSessionTelemetry(
+            principal_id=principal_id,
+            server_id=self._resolve_server_id(action, principal_id, ctx.command),
+            transport=ctx.transport,
+            operation=ctx.operation,
+            hosts=hosts,
+            tool_calls=1 if ctx.operation == "mcp_call_tool" else 0,
+            tools=tools,
+            bytes_in=bytes_in,
+            bytes_out=bytes_out,
+            error_count=error_count,
+            outcome=outcome,
+            arg_sensitivity=arg_label,
+            result_sensitivity=result_label,
+            started_at=ctx.started_at,
+            ended_at=utc_now(),
+        )
+
+    def _resolve_server_id(
+        self, action: GovernedAction, principal_id: str, command: list[str]
+    ) -> str | None:
+        """Resolve the owner-scoped server_id this session belongs to, the same
+        way ``_record_connection`` does (server_id arg → name → command stem), so
+        the session log and any finding attach to the right connection."""
+        server_id_arg = str(action.arguments.get("server_id", "")).strip()
+        if server_id_arg and self._store.get_mcp_server(server_id_arg, principal_id) is not None:
+            return server_id_arg
+        name = _normalize_server_name(str(action.arguments.get("name", "")))
+        if name:
+            row = self._store.get_mcp_server_by_name(principal_id, name)
+            if row is not None:
+                return str(row["server_id"])
+        if command:
+            fallback = _normalize_server_name(Path(command[-1]).stem)
+            if fallback:
+                row = self._store.get_mcp_server_by_name(principal_id, fallback)
+                if row is not None:
+                    return str(row["server_id"])
+        return None
 
     # ── validation ──
     def _validate_command(self, command: list[str]) -> str | None:
@@ -482,15 +621,20 @@ class McpConnectorExecutor:
     # ── remote HTTP session ──
     def _run_http_session(
         self, endpoint_url: str, token: str | None, requests: list[dict[str, Any]], timeout: float
-    ) -> dict[Any, dict[str, Any]]:
+    ) -> tuple[dict[Any, dict[str, Any]], int, int]:
         """Run a bounded JSON-RPC-over-HTTP session against an owner-added MCP
         endpoint. The owner token (if any) is sent as a bearer header and never
         stored or returned. An ``Mcp-Session-Id`` from the initialize response
         is carried to later requests. Raises :class:`SandboxError` with a
-        redacted reason on any transport failure."""
+        redacted reason on any transport failure. Returns the id-keyed responses
+        plus the wire byte totals (in/out) for monitoring — sizes only, never
+        content."""
         responses: dict[Any, dict[str, Any]] = {}
         session_id: str | None = None
+        bytes_in = 0
+        bytes_out = 0
         for req in requests:
+            bytes_out += len(json.dumps(req).encode("utf-8"))
             headers: dict[str, str] = {}
             if token:
                 headers["Authorization"] = f"Bearer {token}"
@@ -501,25 +645,30 @@ class McpConnectorExecutor:
             )
             if result.get("truncated"):
                 raise SandboxError("mcp_response_too_large")
+            body_text = str(result.get("body_text", ""))
+            bytes_in += len(body_text.encode("utf-8"))
             sid = result.get("headers", {}).get("mcp-session-id")
             if sid:
                 session_id = str(sid)
-            for message in _parse_jsonrpc_body(str(result.get("body_text", ""))):
+            for message in _parse_jsonrpc_body(body_text):
                 if isinstance(message, dict) and "id" in message:
                     responses[message["id"]] = message
-        return responses
+        return responses, bytes_in, bytes_out
 
     # ── stdio session ──
     def _run_session(
         self, command: list[str], requests: list[dict[str, Any]], timeout: float
-    ) -> dict[Any, dict[str, Any]]:
+    ) -> tuple[dict[Any, dict[str, Any]], int, int]:
         """Run a bounded, non-interactive JSON-RPC stdio session.
 
         All requests are written up front; stdin is then closed so the local
         server drains, responds, and exits. Responses are matched back by id.
         Raises :class:`SandboxError` with a redacted reason code on any failure.
+        Returns the id-keyed responses plus the wire byte totals (in/out) for
+        monitoring — sizes only, never content.
         """
         payload = "".join(json.dumps(req) + "\n" for req in requests)
+        bytes_out = len(payload.encode("utf-8"))
         try:
             proc = subprocess.Popen(  # noqa: S603 - argv is allowlist-validated, no shell
                 command,
@@ -542,6 +691,7 @@ class McpConnectorExecutor:
 
         if len(stdout) > MCP_MAX_OUTPUT_BYTES:
             raise SandboxError("mcp_response_too_large")
+        bytes_in = len(stdout.encode("utf-8"))
 
         responses: dict[Any, dict[str, Any]] = {}
         for line in stdout.splitlines():
@@ -554,7 +704,7 @@ class McpConnectorExecutor:
                 continue
             if isinstance(message, dict) and "id" in message:
                 responses[message["id"]] = message
-        return responses
+        return responses, bytes_in, bytes_out
 
     def _record_connection(
         self,
@@ -671,6 +821,27 @@ def _extract_call(responses: dict[Any, dict[str, Any]]) -> tuple[str | None, int
     content = result.get("content") or []
     length = sum(len(str(b.get("text", ""))) for b in content if isinstance(b, dict))
     return None, len(content), length
+
+
+def _safe_json(value: Any) -> str:
+    """Serialise a value to text for *transient* shape classification only. The
+    result is fed to the sensitivity classifier and then discarded — it is never
+    stored, returned, or logged."""
+    try:
+        return json.dumps(value, default=str)
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _call_result_text(responses: dict[Any, dict[str, Any]]) -> str:
+    """Concatenate a tools/call result's text blocks for *transient* shape
+    classification only. Never stored or returned to the caller."""
+    call = responses.get(3)
+    if not isinstance(call, dict):
+        return ""
+    result = call.get("result") or {}
+    content = result.get("content") or []
+    return "".join(str(b.get("text", "")) for b in content if isinstance(b, dict))
 
 
 def _parse_jsonrpc_body(body: str) -> list[dict[str, Any]]:

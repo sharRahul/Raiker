@@ -125,12 +125,12 @@ UI) are next.**
 `raiker/runtime/executors/mcp.py` (emit per-session telemetry),
 `tests/test_mcp_monitor.py`.
 
-- [ ] **B1. Failing tests** for: each session writes a redacted `mcp_session_log`
+- [x] **B1. Failing tests** for: each session writes a redacted `mcp_session_log`
   row (tool-call count, hosts, byte counts, errors — never payloads); a baseline
   forms per connection; deviations raise an `mcp_anomaly_detected` event + a
   redacted `security_findings` row. Cover the anomaly rules below.
-- [ ] **B2. Verify RED.**
-- [ ] **B3. Implement** the monitor: after each governed MCP session the executor
+- [x] **B2. Verify RED.**
+- [x] **B3. Implement** the monitor: after each governed MCP session the executor
   hands redacted telemetry to `mcp_monitor`, which updates the per-connection
   baseline and evaluates rules:
   - **New host** contacted by a connection that never used it before.
@@ -142,8 +142,28 @@ UI) are next.**
     `classify_memory_sensitivity` on lengths/patterns (never store the value).
   - **Error/refusal burst** — repeated auth failures or errors.
   Each hit → redacted finding (severity by rule) + `mcp_anomaly_detected` event.
-- [ ] **B4. Verify GREEN.** Prove no raw payload/token/host-secret is ever stored
+- [x] **B4. Verify GREEN.** Prove no raw payload/token/host-secret is ever stored
   in a finding, event, or session-log row.
+
+Result 2026-07-18: implemented `raiker/security/mcp_monitor.py` (per-session
+`McpSessionMonitor` + redacted `McpSessionTelemetry` + `shape_sensitivity`),
+migration `RAIKER-1019-mcp-monitoring` adding the `mcp_session_log` and shared
+`security_findings` tables, storage accessors, the `mcp_session_completed` /
+`mcp_anomaly_detected` event types, and per-session telemetry emission from
+`McpConnectorExecutor` (both stdio + remote HTTP, on success and on session
+failure). The five anomaly rules (new-host, volume-spike, tool-set-swap,
+sensitive-shape, error-burst) each raise a redacted finding + audit event;
+tool-set-swap / error-burst are high-severity, sensitive-shape escalates to high
+when it coincides with a new host. `tests/test_mcp_monitor.py` adds 14 cases
+(RED first, then GREEN). Full suite passes; `ruff` clean; `mypy` 424 files clean;
+`compileall` clean; all five repo validators PASS. A **live drive through the
+real governed runtime** (`RuntimeAuthority.route_action` → a real local stdio MCP
+server) established a baseline, tripped the sensitive-shape rule on a
+credential-shaped tool argument, wrote two redacted `mcp_session_log` rows, one
+`security_findings` row, and two `mcp_session_completed` + one
+`mcp_anomaly_detected` audit events — and confirmed the secret value appears in
+**no** log row, finding, or event. **Phases C–D (containment/kill/auto-pause,
+Connections UI) are next.**
 
 ## Phase C — Notify, kill switch, auto-pause circuit breaker
 

@@ -188,7 +188,7 @@
     outline: 2px solid var(--focus-ring);
     outline-offset: -2px;
   }
-  @media (max-width: 720px) {
-    .content { padding: var(--space-4) var(--space-3); }
+  @media (max-width: 639px) {
+    .content { padding: var(--space-4) var(--space-3) calc(var(--space-5) + 4rem + env(safe-area-inset-bottom)); }
   }
 </style>

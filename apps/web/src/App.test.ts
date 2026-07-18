@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
 import { BOOTSTRAP_ROUTES, stubFetch } from "./lib/test-helpers";
@@ -22,10 +22,10 @@ describe("App shell", () => {
     render(App);
     await signIn();
     await waitFor(() => {
-      expect(screen.getByRole("navigation", { name: /primary/i })).toBeInTheDocument();
+      expect(screen.getByRole("navigation", { name: /all navigation/i })).toBeInTheDocument();
     });
     // Grouped nav with every governed surface reachable.
-    const nav = screen.getByRole("navigation", { name: /primary/i });
+    const nav = screen.getByRole("navigation", { name: /all navigation/i });
     expect(nav).toBeInTheDocument();
     for (const label of [
       "New Chat",
@@ -40,7 +40,7 @@ describe("App shell", () => {
       "Diagnostics",
       "Settings",
     ]) {
-      expect(screen.getByRole("link", { name: new RegExp(label, "i") })).toBeInTheDocument();
+      expect(within(nav).getByRole("link", { name: new RegExp(label, "i") })).toBeInTheDocument();
     }
     // The acting principal and mode are surfaced, honestly, from the API — the runtime
     // mode identifier is shown as a plain-English name, not the raw code.

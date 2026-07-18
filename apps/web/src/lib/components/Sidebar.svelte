@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from "./Icon.svelte";
   import Logo from "./Logo.svelte";
-  import { NAV_GROUPS } from "../nav";
+  import { NAV_GROUPS, navItem } from "../nav";
   import { api } from "../api";
   import type { ProjectView, SessionSummary } from "../apiTypes";
   import { relativeTime } from "../format";
@@ -17,6 +17,34 @@
   let moveOpen = $state(false);
   let busy = $state(false);
   let actionError = $state<string | null>(null);
+  const phoneNavItems = ["new-chat", "sessions", "tasks", "projects"].map(navItem);
+  let navigationOpen = $state(false);
+  let returnFocusTo: HTMLButtonElement | null = null;
+
+  function openNavigation(event: MouseEvent) {
+    returnFocusTo = event.currentTarget as HTMLButtonElement;
+    navigationOpen = true;
+  }
+
+  function closeNavigation(restoreFocus = true) {
+    navigationOpen = false;
+    if (restoreFocus) returnFocusTo?.focus();
+    returnFocusTo = null;
+  }
+
+  $effect(() => {
+    if (!navigationOpen) return;
+    const closeForEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeNavigation();
+    };
+    const closeForResize = () => closeNavigation(false);
+    window.addEventListener("keydown", closeForEscape);
+    window.addEventListener("resize", closeForResize);
+    return () => {
+      window.removeEventListener("keydown", closeForEscape);
+      window.removeEventListener("resize", closeForResize);
+    };
+  });
 
   async function loadRecent() {
     try {
@@ -101,7 +129,16 @@
   }
 </script>
 
-<nav class="sidebar" aria-label="Primary">
+<button type="button" class="tablet-toggle btn btn-ghost" aria-expanded={navigationOpen} aria-controls="all-navigation" onclick={openNavigation}>
+  Menu
+</button>
+
+{#if navigationOpen}
+  <button type="button" class="drawer-scrim" aria-label="Close navigation" onclick={() => closeNavigation()}></button>
+{/if}
+
+<nav id="all-navigation" class="sidebar" class:open={navigationOpen} aria-label="All navigation">
+  <button type="button" class="drawer-close btn btn-ghost" onclick={() => closeNavigation()}>Close</button>
   <a class="brand" href="#/chat">
     <Logo size={30} />
     <span class="brand-text">
@@ -123,6 +160,7 @@
               aria-current={current === item.id ? "page" : undefined}
               aria-label={item.label}
               title={item.hint}
+              onclick={() => closeNavigation(false)}
             >
               <Icon name={item.icon} size={17} />
               <span>{item.label}</span>
@@ -185,6 +223,25 @@
   </p>
 </nav>
 
+<nav class="phone-nav" aria-label="Primary">
+  {#each phoneNavItems as item (item.id)}
+    <a
+      class="phone-link"
+      class:active={current === item.id}
+      href={`#/${item.id}`}
+      aria-current={current === item.id ? "page" : undefined}
+      aria-label={item.label}
+    >
+      <Icon name={item.icon} size={18} />
+      <span>{item.label}</span>
+    </a>
+  {/each}
+  <button type="button" class="phone-more" aria-label="More navigation" aria-expanded={navigationOpen} aria-controls="all-navigation" onclick={openNavigation}>
+    <Icon name="chevron-right" size={18} />
+    <span>More</span>
+  </button>
+</nav>
+
 <style>
   .sidebar {
     width: var(--sidebar-w);
@@ -197,6 +254,7 @@
     background: var(--surface);
     overflow-y: auto;
   }
+  .tablet-toggle, .phone-nav, .drawer-scrim, .drawer-close { display: none; }
   .brand {
     display: flex;
     align-items: center;
@@ -352,11 +410,21 @@
     cursor: default;
     appearance: none;
   }
-  @media (max-width: 720px) {
-    .sidebar { width: 4rem; padding: var(--space-3) var(--space-2); }
-    .brand { justify-content: center; padding: 0.25rem; }
-    .brand-text, .group-label, .recent, .local-note { display: none; }
-    .nav-link { justify-content: center; padding: 0.55rem; }
-    .nav-link span { display: none; }
+  @media (max-width: 1023px) {
+    .tablet-toggle { display: inline-flex; position: fixed; top: 0.5rem; left: var(--space-3); z-index: 70; }
+    .drawer-scrim { display: block; position: fixed; inset: 0; z-index: 90; border: 0; background: var(--overlay); cursor: default; }
+    .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 100; width: min(19rem, 84vw); transform: translateX(-105%); transition: transform 160ms var(--ease); box-shadow: var(--shadow-2); }
+    .sidebar.open { transform: translateX(0); }
+    .drawer-close { display: inline-flex; align-self: flex-end; }
+  }
+  @media (max-width: 639px) {
+    .tablet-toggle { display: none; }
+    .phone-nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); position: fixed; inset: auto 0 0; z-index: 70; min-height: 4rem; padding-bottom: env(safe-area-inset-bottom); background: var(--surface); border-top: 1px solid var(--border); box-shadow: var(--shadow-1); }
+    .phone-link, .phone-more { display: grid; place-items: center; gap: 0.1rem; min-width: 0; padding: 0.4rem 0.2rem; color: var(--text-3); background: transparent; border: 0; font: inherit; font-size: 0.64rem; font-weight: 650; text-decoration: none; }
+    .phone-link.active, .phone-more[aria-expanded="true"] { color: var(--accent); }
+    .phone-link:hover, .phone-more:hover { background: var(--sunken); color: var(--text-1); text-decoration: none; }
+  }
+  @media (min-width: 1024px) {
+    .phone-nav, .tablet-toggle, .drawer-scrim, .drawer-close { display: none; }
   }
 </style>

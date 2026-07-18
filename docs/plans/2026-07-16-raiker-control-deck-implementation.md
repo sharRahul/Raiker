@@ -621,6 +621,24 @@ Expected: all controls reflect server data; selectors appear only for real tools
 - [x] **Step 3: Apply the shared Control Deck shell** across light/dark themes, 375/768/1024/1440 breakpoints, focus management, touch targets, and reduced-motion behavior.
 - [x] **Step 4: Verify GREEN** with `npm --prefix apps/web run check; npm --prefix apps/web run test`.
 
+**Responsive-navigation follow-up (2026-07-18):** The permanent phone icon
+rail is replaced by a five-item bottom bar (New Chat, Sessions, Tasks,
+Projects, More); More opens the existing full grouped navigation drawer. From
+640px through 1023px, a compact top-bar Menu trigger opens that drawer without
+reserving a rail; at 1024px and wider the full sidebar returns. The drawer
+closes through route selection, Escape, or its scrim and restores trigger
+focus for keyboard dismissal. `Sidebar.test.ts` was driven RED before the
+drawer existed, then GREEN; `App.test.ts` scopes its grouped-route assertion to
+the named drawer landmark because jsdom intentionally renders both responsive
+structures without CSS breakpoint layout. Local web verification: `svelte-check`
+0 errors/warnings, lint clean, 35 Vitest files / 196 passed / 1 skipped, and
+production build passed. A disposable local account was live-tested at
+375px, 768px, 1024px, and 1440px during one resize sequence: no horizontal
+overflow, phone bottom bar and More drawer, tablet trigger/scrim drawer,
+desktop full sidebar, Escape/scrim dismissal, and a drawer route selection all
+passed with no browser console errors or warnings. Screenshots are intentionally
+untracked under `output/playwright/adaptive-navigation-*.png`.
+
 ### Task 11: Browser Validation and Full Workflow Proof
 
 **Files:**

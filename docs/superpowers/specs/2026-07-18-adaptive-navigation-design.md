@@ -53,3 +53,11 @@ the existing grouped navigation; it is not duplicated in a new data model.
 - Run a disposable-workspace browser check at 375px, 768px, 1024px, and 1440px;
   resize a live session across the boundaries, use the menu/drawer, capture
   screenshots, and inspect browser errors.
+
+## Outcome
+
+Implemented on 2026-07-18 with the specified 640px and 1024px boundaries. The
+drawer regression test was observed failing before implementation and passes
+afterward. A disposable authenticated browser session resized across
+375/768/1024/1440px with no horizontal overflow or console errors; phone,
+tablet, and desktop navigation each matched this design.

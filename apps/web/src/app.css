@@ -443,7 +443,7 @@ code,
 
 /* Touch targets: on narrow (touch-first) screens every interactive control
    meets a 40px minimum height without changing the desktop density. */
-@media (max-width: 720px) {
+@media (max-width: 1023px) {
   .btn,
   .input,
   .select {

@@ -73,6 +73,19 @@ Control Deck commit.
   all five validators passed. Implementation commit `66037db` passed CI (Python
   3.11/3.12), Web UI, and Phase Status Validation.
 
+- **Adaptive navigation follow-up is implemented locally.** Phone widths below
+  640px use a five-item bottom bar with a More drawer instead of a permanent
+  icon rail. Tablet widths 640-1023px use a compact Menu trigger and the same
+  drawer; desktop widths 1024px and wider retain the full sidebar. The existing
+  grouped route list remains the sole navigation source. The drawer supports
+  route selection, Escape, scrim dismissal, and trigger-focus restoration.
+  `Sidebar.test.ts` was RED then GREEN; the full web gate is clean (35 files,
+  196 passed, 1 skipped; check/lint/build passed). A disposable live session
+  resized through 375/768/1024/1440px without reload: no horizontal overflow,
+  correct adaptive controls, a working Diagnostics drawer route, and no browser
+  console errors/warnings. Screenshots are untracked evidence at
+  `output/playwright/adaptive-navigation-*.png`.
+
 - **Monitored MCP connections — Phase D (Connections UI + live monitor) is
   implemented in the current worktree.** Every Connections catalogue card now
   has a governed **Connect via MCP** flow for a local starter or a remote HTTP

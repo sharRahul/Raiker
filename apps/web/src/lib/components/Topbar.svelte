@@ -126,4 +126,5 @@
   .panel li span{color:var(--text-2)}
   .panel li time{color:var(--text-3);font-size:.72rem}
   @media(max-width:900px){.page-hint{display:none}}@media(max-width:720px){.topbar{gap:var(--space-2);padding:0 var(--space-3)}.page-title{font-size:.9rem}.status{display:none}}
+  @media (min-width:640px) and (max-width:1023px){.topbar{padding-left:calc(var(--space-3) + 3rem)}}
 </style>

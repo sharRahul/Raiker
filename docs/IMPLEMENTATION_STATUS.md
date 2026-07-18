@@ -23,6 +23,18 @@
 > `37f681b` is pushed to `main`; its CI, Web UI, and Phase Status Validation
 > workflows are green.
 
+> Responsive-navigation follow-up (2026-07-18): the former permanent phone
+> icon rail is replaced by a bottom bar and More drawer below 640px; the same
+> grouped drawer is triggered from the top bar at 640-1023px; the full sidebar
+> remains at 1024px and wider. No router, API, dependency, or persisted
+> preference was added. `Sidebar.test.ts` was driven RED then GREEN, the full
+> web suite now passes 35 files / 196 tests (one existing skip), and
+> `svelte-check`, lint, and build are clean. A disposable live account was
+> resized across 375/768/1024/1440px with no horizontal overflow or console
+> errors/warnings; Escape, scrim, and route-selection drawer closing all worked.
+> Screenshot evidence remains untracked under
+> `output/playwright/adaptive-navigation-*.png`.
+
 ## Goal
 
 Make Raiker a secure AI product that combines an AI assistant, a governed AI

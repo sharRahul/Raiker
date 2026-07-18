@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from raiker.security.monitoring import SecurityMonitor
 from raiker.storage.sqlite import SQLiteStore
 
@@ -13,7 +15,9 @@ def _workspace(tmp_path: Path) -> Path:
     return workspace
 
 
-def test_local_scan_records_only_redacted_pattern_metadata(tmp_path: Path, monkeypatch) -> None:
+def test_local_scan_records_only_redacted_pattern_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = _workspace(tmp_path)
     (workspace / "settings.txt").write_text("api_key=sk-proj-ABCDEF1234567890", encoding="utf-8")
     monkeypatch.setenv("RAIKER_SECURITY_SCAN_PATHS", "settings.txt")
@@ -29,7 +33,9 @@ def test_local_scan_records_only_redacted_pattern_metadata(tmp_path: Path, monke
     assert len(store.list_notifications("principal_owner")) == 1
 
 
-def test_clean_rescan_resolves_a_prior_local_finding(tmp_path: Path, monkeypatch) -> None:
+def test_clean_rescan_resolves_a_prior_local_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = _workspace(tmp_path)
     path = workspace / "settings.txt"
     path.write_text("api_key=sk-proj-ABCDEF1234567890", encoding="utf-8")
@@ -47,16 +53,18 @@ def test_clean_rescan_resolves_a_prior_local_finding(tmp_path: Path, monkeypatch
     ]
 
 
-def test_breach_check_sends_only_sha1_prefix_and_offline_skip(tmp_path: Path, monkeypatch) -> None:
+def test_breach_check_sends_only_sha1_prefix_and_offline_skip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = _workspace(tmp_path)
     store = SQLiteStore(workspace)
     monkeypatch.setenv("RAIKER_SECURITY_BREACH_EGRESS_ALLOWLIST", "api.pwnedpasswords.com")
     urls: list[str] = []
-    monitor = SecurityMonitor(
-        store,
-        workspace,
-        http_get=lambda url: urls.append(url) or "61DDCC5E8A2DABEDE0F3B482CD9AEA9434D:2",
-    )
+    def http_get(url: str) -> str:
+        urls.append(url)
+        return "61DDCC5E8A2DABEDE0F3B482CD9AEA9434D:2"
+
+    monitor = SecurityMonitor(store, workspace, http_get=http_get)
 
     assert monitor.check_password_breach("principal_owner", "hello", enabled=False) is None
     assert urls == []

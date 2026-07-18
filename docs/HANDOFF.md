@@ -47,11 +47,29 @@ and are compatible with it:
   log, or commit them.
 - Add a typed event to `EVENT_TYPES` before emitting it.
 
-## Current state — 2026-07-17 (doc reconciliation)
+## Current state — 2026-07-18 (doc reconciliation)
 
 This section reconciles the handoff with the committed tree. Read it first; the
 older dated sections below remain accurate for their own slices but predate the
 Control Deck commit.
+
+- **Monitored MCP connections — Phase D (Connections UI + live monitor) is
+  implemented in the current worktree.** Every Connections catalogue card now
+  has a governed **Connect via MCP** flow for a local starter or a remote HTTP
+  endpoint. Remote auth retains only an owner-controlled token environment
+  variable reference. The MCP Servers page polls its owner-scoped telemetry
+  every ten seconds and shows connection state, redacted recent sessions, open
+  findings, notifications, and pause/resume actions. New read-only route:
+  `GET /api/mcp/servers/{server_id}/sessions`; it returns no payloads,
+  credentials, or principal identifier. Component and API contract tests were
+  driven RED then GREEN. A live authenticated browser drive created local and
+  mock-remote servers, tripped a tool-set anomaly into auto-pause plus finding /
+  notification, and resumed it; screenshots are retained with the task artifacts.
+  `ruff` (source roots), `mypy`, `compileall`, all five repository validators,
+  and web check/lint/test/build pass. The full Python suite reaches the unrelated
+  Phase 4 plugin-runtime tests, where three restricted-process checks fail with
+  `WinError 1312` (the Windows logon session/token is unavailable); do not weaken
+  that sandbox to mask the environment failure. The Phase D backend/API tests pass.
 
 - **The 2026-07-16 "dirty worktree" is now committed.** The Control Deck pause
   point below told the next session to preserve an uncommitted worktree. That
@@ -178,8 +196,9 @@ Control Deck commit.
   ruff clean; mypy 425 files clean; five validators pass; two live drives (real
   governed runtime + a real-browser authenticated HTTP drive with a screenshot).
   Threat model `docs/threat-models/mcp-monitoring.md`. **Phase D (Connections
-  "Connect via MCP" UI + live monitor panel with browser screenshots) is the
-  remaining slice** — see `docs/plans/2026-07-17-monitored-mcp-connections.md`.
+  "Connect via MCP" UI + live monitor panel with browser screenshots) is now
+  implemented in the current worktree** — see
+  `docs/plans/2026-07-17-monitored-mcp-connections.md`.
 - **Plan Tasks 5–11 are not started** (verified against the tree): the
   `raiker/security/` package now holds `mcp_monitor.py` (monitored-MCP Phases B–C)
   but **not** the credential-lifecycle/breach-detection modules, and neither

@@ -32,9 +32,9 @@ export interface RuntimeReadiness {
   summary: Record<string, unknown>;
 }
 
-// GET /api/mcp/servers — one owner-scoped local stdio MCP server profile
-// (see raiker/control/dashboard.py::McpServerView). `command` is the argv
-// (interpreter + workspace-relative script), never a secret or remote endpoint.
+// GET /api/mcp/servers — one owner-scoped local stdio or remote HTTP MCP profile
+// (see raiker/control/dashboard.py::McpServerView). `command` is argv for a
+// local server; remote credentials are represented only by `auth_ref`.
 // `tools` are the names discovered by the last successful handshake.
 export interface McpServer {
   server_id: string;
@@ -47,6 +47,49 @@ export interface McpServer {
   last_connected_at: string | null;
   tools: string[];
   tool_count: number;
+  endpoint_url: string | null;
+  auth_ref: string | null;
+  monitor_state: "active" | "paused" | "killed";
+  paused_reason: string | null;
+  paused_at: string | null;
+}
+
+export interface McpSession {
+  session_row_id: string;
+  server_id: string;
+  transport: string;
+  operation: string;
+  hosts: string[];
+  tool_calls: number;
+  bytes_in: number;
+  bytes_out: number;
+  error_count: number;
+  outcome: string;
+  started_at: string;
+  ended_at: string | null;
+}
+
+export interface McpFinding {
+  finding_id: string;
+  source: string;
+  severity: string;
+  code: string;
+  summary: string;
+  redacted_detail: Record<string, unknown>;
+  subject_id: string | null;
+  state: string;
+  created_at: string;
+}
+
+export interface Notification {
+  notification_id: string;
+  kind: string;
+  title: string;
+  body: string;
+  finding_id: string | null;
+  subject_id: string | null;
+  read: boolean;
+  created_at: string;
 }
 
 // GET /api/capability-modes/{capability} — the per-capability decision mode

@@ -16,6 +16,11 @@ function server(partial: Partial<McpServer> = {}): McpServer {
     last_connected_at: "2026-07-17T01:00:00Z",
     tools: ["echo", "workspace_ping"],
     tool_count: 2,
+    endpoint_url: null,
+    auth_ref: null,
+    monitor_state: "active",
+    paused_reason: null,
+    paused_at: null,
     ...partial,
   };
 }
@@ -25,6 +30,14 @@ const ENABLED_GATES = [
   makeGate({ capability: "mcp_connector_runtime", runtime_enabled: true }),
 ];
 
+function monitorRoutes() {
+  return {
+    "GET /api/mcp/servers/mcp_1/sessions": [],
+    "GET /api/mcp/servers/mcp_1/findings": [],
+    "GET /api/notifications": [],
+  };
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe("McpView", () => {
@@ -32,6 +45,7 @@ describe("McpView", () => {
     stubFetch({
       "GET /api/mcp/servers": [server()],
       "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
     });
     render(McpView);
     await waitFor(() => expect(screen.getByText("echo-server")).toBeInTheDocument());
@@ -76,6 +90,7 @@ describe("McpView", () => {
     const mock = stubFetch({
       "GET /api/mcp/servers": [server()],
       "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
       "DELETE /api/mcp/servers/mcp_1": { ok: true, server_id: "mcp_1" },
     });
     render(McpView);
@@ -87,5 +102,37 @@ describe("McpView", () => {
         expect.objectContaining({ method: "DELETE" }),
       ),
     );
+  });
+
+  it("shows live monitoring details, findings, notification, and stop/resume controls", async () => {
+    const mock = stubFetch({
+      "GET /api/mcp/servers": [server({ monitor_state: "paused", paused_reason: "New host with sensitive data" })],
+      "GET /api/capability-gates": ENABLED_GATES,
+      "GET /api/mcp/servers/mcp_1/sessions": [{
+        session_row_id: "mses_1", server_id: "mcp_1", transport: "http", operation: "tools/call",
+        hosts: ["mcp.example.test"], tool_calls: 3, bytes_in: 10, bytes_out: 20, error_count: 0,
+        outcome: "ok", started_at: "2026-07-18T10:00:00Z", ended_at: null,
+      }],
+      "GET /api/mcp/servers/mcp_1/findings": [{
+        finding_id: "find_1", source: "mcp_monitor", severity: "high", code: "new_host_sensitive",
+        summary: "New host with sensitive data", redacted_detail: {}, subject_id: "mcp_1", state: "open",
+        created_at: "2026-07-18T10:00:00Z",
+      }],
+      "GET /api/notifications": [{
+        notification_id: "note_1", kind: "mcp_anomaly", title: "MCP anomaly detected", body: "New host with sensitive data",
+        finding_id: "find_1", subject_id: "mcp_1", read: false, created_at: "2026-07-18T10:00:00Z",
+      }],
+      "POST /api/mcp/servers/mcp_1/resume": { ok: true, monitor_state: "active" },
+    });
+    render(McpView);
+    await waitFor(() => expect(screen.getByText("Paused: New host with sensitive data")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/3 tool calls/i)).toBeInTheDocument());
+    expect(screen.getByText("MCP anomaly detected")).toBeInTheDocument();
+    expect(screen.getByText("New host with sensitive data")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(mock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/mcp/servers/mcp_1/resume"),
+      expect.objectContaining({ method: "POST" }),
+    ));
   });
 });

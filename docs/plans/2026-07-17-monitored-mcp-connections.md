@@ -1,9 +1,9 @@
 # Monitored MCP Connections — Design & Implementation Plan
 
-> **Status:** design approved 2026-07-17. **Phases A, B, C implemented**
-> (remote transport, per-session monitoring + anomaly findings, and
-> notify + kill switch + revocable auto-pause); **Phase D (Connections UI +
-> live monitor) is the remaining slice.** Supersedes the "no remote MCP
+> **Status:** design approved 2026-07-17. **Phases A–D implemented**
+> (remote transport, per-session monitoring + anomaly findings, notify + kill
+> switch + revocable auto-pause, and the Connections UI + live monitor).
+> Supersedes the "no remote MCP
 > endpoints" stance in `docs/plans/2026-07-16-raiker-control-deck-implementation.md`.
 > Grounded in `docs/SECURITY_AND_POLICY.md` → "Security Philosophy".
 
@@ -226,18 +226,30 @@ resume → kill → refuse and listing the three transition notifications. **Pha
 `apps/web/src/lib/apiTypes.ts`, `apps/web/src/lib/components/NotificationCenter.svelte`
 (from Task 6), `*.test.ts`.
 
-- [ ] **D1. Failing component tests** for: every connector row offers **"Connect
+- [x] **D1. Failing component tests** for: every connector row offers **"Connect
   via MCP"** (local template or remote URL + token); a connection card shows
   status, recent tool calls, and any open findings; **Stop** and **Resume**
   controls; a paused/killed banner; a notification appears on anomaly.
-- [ ] **D2. Verify RED.**
-- [ ] **D3. Implement** the unified connect flow (reuse the MCP page's create/test
+- [x] **D2. Verify RED.**
+- [x] **D3. Implement** the unified connect flow (reuse the MCP page's create/test
   patterns), a live monitor panel per connection, and wire findings +
   notifications into the shared notification center. Plain-English copy
   throughout (owner preference).
-- [ ] **D4. Verify GREEN** + a live browser drive with screenshots (connect a
+- [x] **D4. Verify GREEN** + a live browser drive with screenshots (connect a
   local and a mock remote MCP server, trip an anomaly, see the notification,
   Stop and Resume).
+
+Result 2026-07-18: every Connections catalogue card now offers **Connect via
+MCP**, which creates either a governed local starter or an owner-supplied remote
+HTTP profile (only the token environment-variable name is retained). The MCP
+page polls every ten seconds and renders connection state, redacted recent
+sessions, open findings, notifications, and pause/resume actions. A minimal
+owner-scoped `GET /api/mcp/servers/{server_id}/sessions` contract exposes only
+redacted telemetry for that panel. Component and API contract tests were written
+RED first, then made GREEN. A real authenticated browser drive created a local
+and mock-remote connection, induced a tool-set anomaly that auto-paused the
+remote server and raised a finding/notification, then resumed it; screenshots
+are retained with the task artifacts.
 
 ---
 

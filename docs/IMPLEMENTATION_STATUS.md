@@ -27,7 +27,7 @@ fail-closed by design.
 
 > Current truth update (2026-07-18): the **monitored MCP connections** plan
 > (`docs/plans/2026-07-17-monitored-mcp-connections.md`) is implemented through
-> **Phase C**. Phase A added the remote (HTTP) transport to `McpConnectorExecutor`
+> **Phase D**. Phase A added the remote (HTTP) transport to `McpConnectorExecutor`
 > (owner-added `endpoint_url` + env-referenced `auth_ref`; token never stored;
 > migration `RAIKER-1018-mcp-remote-endpoint`). Phase B added
 > `raiker/security/mcp_monitor.py` (`McpSessionMonitor` + redacted
@@ -52,8 +52,14 @@ fail-closed by design.
 > `pytest` 1960 passed, `ruff` clean, `mypy` 425 files clean, `compileall` clean,
 > all five repo validators pass. Threat models
 > `docs/threat-models/mcp-remote.md` (transport) and
-> `docs/threat-models/mcp-monitoring.md` (monitoring + containment). **Phase D
-> (Connections UI + live monitor) is the remaining slice.** The shared
+> `docs/threat-models/mcp-monitoring.md` (monitoring + containment). Phase D adds
+> **Connect via MCP** to every Connections catalogue row (local starter or remote
+> endpoint plus token environment-variable reference), plus a ten-second live
+> monitor on MCP cards with redacted sessions, findings, notifications, and
+> pause/resume. Its read-only owner-scoped session contract is
+> `GET /api/mcp/servers/{server_id}/sessions`; it returns telemetry only, never
+> payloads or credentials. Component/API tests and an authenticated browser drive
+> (local + mock remote, anomaly → pause → notification → resume) passed. The shared
 > `security_findings` + `notifications` substrate is reused by Control Deck Task 5.
 
 > Current truth update (2026-07-17): the Control Deck work that `docs/HANDOFF.md`

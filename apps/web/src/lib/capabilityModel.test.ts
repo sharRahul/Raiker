@@ -99,6 +99,8 @@ describe("enableability for Security Settings", () => {
   it("flags Tier-2 caps as needing a step-up confirmation token", () => {
     expect(requiresStepUpToken("shell_execution")).toBe(true);
     expect(requiresStepUpToken("web_fetch")).toBe(true);
+    expect(requiresStepUpToken("mcp_builder_runtime")).toBe(true);
+    expect(requiresStepUpToken("mcp_connector_runtime")).toBe(true);
     expect(requiresStepUpToken("audit_export")).toBe(false);
   });
 });

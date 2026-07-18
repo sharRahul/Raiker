@@ -467,6 +467,46 @@ def test_api_findings_listing_is_owner_scoped(tmp_path: Path) -> None:
     assert any(f["code"] == "tool_set_changed" for f in findings)
 
 
+def test_api_session_logs_are_owner_scoped_and_redacted(tmp_path: Path) -> None:
+    ws, client = _mgmt_client(tmp_path, "cont_sessions")
+    store = SQLiteStore(ws)
+    sid = _seed_server(store, principal_id="principal_owner", name="remote")
+    store.insert_mcp_session_log(
+        server_id=sid,
+        principal_id="principal_owner",
+        transport="http",
+        operation="tools/call",
+        hosts=["mcp.example.test"],
+        tool_calls=2,
+        bytes_in=10,
+        bytes_out=20,
+        error_count=0,
+        outcome="ok",
+        started_at="2026-07-18T10:00:00Z",
+    )
+
+    sessions = client.get(f"/api/mcp/servers/{sid}/sessions")
+
+    assert sessions.status_code == 200, sessions.text
+    assert sessions.json() == [
+        {
+            "session_row_id": sessions.json()[0]["session_row_id"],
+            "server_id": sid,
+            "transport": "http",
+            "operation": "tools/call",
+            "hosts": ["mcp.example.test"],
+            "tool_calls": 2,
+            "bytes_in": 10,
+            "bytes_out": 20,
+            "error_count": 0,
+            "outcome": "ok",
+            "started_at": "2026-07-18T10:00:00Z",
+            "ended_at": None,
+        }
+    ]
+    assert "principal_id" not in sessions.json()[0]
+
+
 def test_api_containment_requires_auth(tmp_path: Path) -> None:
     from fastapi.testclient import TestClient
 

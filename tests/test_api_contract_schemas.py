@@ -73,6 +73,15 @@ MEMORY_CONTROL = {
     "source", "provenance", "confidence", "trust_score", "retention", "approval_state",
     "pinned", "search_enabled", "expires_at",
 }
+MCP_SERVER = {
+    "server_id", "name", "command", "template", "transport", "status", "created_at",
+    "last_connected_at", "tools", "tool_count", "endpoint_url", "auth_ref", "monitor_state",
+    "paused_reason", "paused_at",
+}
+MCP_SESSION = {
+    "session_row_id", "server_id", "transport", "operation", "hosts", "tool_calls", "bytes_in",
+    "bytes_out", "error_count", "outcome", "started_at", "ended_at",
+}
 
 
 @pytest.fixture
@@ -151,6 +160,38 @@ class TestObjectContracts:
 
 
 class TestListContracts:
+    def test_mcp_server_and_session_log(self, workspace: Path, client: TestClient) -> None:
+        store = SQLiteStore(workspace)
+        server_id = "mcp_contract"
+        store.create_mcp_server(
+            server_id=server_id,
+            principal_id="principal_owner",
+            name="contract",
+            command=["python", "server.py"],
+            template="python-stdio-echo",
+            status="connected",
+        )
+        store.insert_mcp_session_log(
+            server_id=server_id,
+            principal_id="principal_owner",
+            transport="stdio",
+            operation="tools/list",
+            hosts=[],
+            tool_calls=0,
+            bytes_in=0,
+            bytes_out=0,
+            error_count=0,
+            outcome="ok",
+            started_at="2026-07-18T10:00:00Z",
+        )
+        h = _headers(_token(client))
+        _assert_contract(MCP_SERVER, client.get("/api/mcp/servers", headers=h).json()[0], "McpServer")
+        _assert_contract(
+            MCP_SESSION,
+            client.get(f"/api/mcp/servers/{server_id}/sessions", headers=h).json()[0],
+            "McpSession",
+        )
+
     def test_sessions_events_checkpoints(self, client: TestClient) -> None:
         h = _headers(_token(client))
         # A governed turn seeds a session, events and a checkpoint.

@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Icon from "../components/Icon.svelte";
+  import NotificationCenter from "../components/NotificationCenter.svelte";
   import { api, ApiError } from "../api";
-  import type { CapabilityGate, McpServer } from "../apiTypes";
+  import type { CapabilityGate, McpFinding, McpServer, McpSession, Notification } from "../apiTypes";
 
   // Reviewed server templates the builder can generate. `id` is the backend
   // template key; `label` is the plain-English name shown to the user. Kept in
@@ -25,6 +26,9 @@
   let newTemplate = $state(TEMPLATES[0].id);
   let renamingId = $state<string | null>(null);
   let renameValue = $state("");
+  let sessions = $state<Record<string, McpSession[]>>({});
+  let findings = $state<Record<string, McpFinding[]>>({});
+  let notifications = $state<Notification[]>([]);
 
   const builderEnabled = $derived(
     gates.find((g) => g.capability === "mcp_builder_runtime")?.runtime_enabled ?? false,
@@ -48,6 +52,23 @@
       const [list, gateList] = await Promise.all([api.mcpServers(), api.capabilityGates()]);
       servers = list;
       gates = gateList;
+      if (list.length) {
+        const [details, notes] = await Promise.all([
+          Promise.all(list.map(async (server) => ({
+            serverId: server.server_id,
+            sessions: await api.mcpSessions(server.server_id),
+            findings: await api.mcpFindings(server.server_id),
+          }))),
+          api.notifications(),
+        ]);
+        sessions = Object.fromEntries(details.map((detail) => [detail.serverId, detail.sessions]));
+        findings = Object.fromEntries(details.map((detail) => [detail.serverId, detail.findings]));
+        notifications = notes;
+      } else {
+        sessions = {};
+        findings = {};
+        notifications = [];
+      }
     } catch (e) {
       error = reason(e);
     }
@@ -126,19 +147,42 @@
     }
   }
 
+  async function contain(server: McpServer) {
+    busy = server.server_id;
+    error = null;
+    notice = null;
+    try {
+      const result = server.monitor_state === "active"
+        ? await api.pauseMcpServer(server.server_id)
+        : await api.resumeMcpServer(server.server_id);
+      notice = `${server.name}: ${result.monitor_state === "active" ? "resumed" : "stopped"}.`;
+      await load();
+    } catch (e) {
+      error = `${server.name}: ${reason(e)}`;
+    } finally {
+      busy = null;
+    }
+  }
+
   function statusLabel(s: McpServer): string {
+    if (s.monitor_state === "paused") return "Paused";
+    if (s.monitor_state === "killed") return "Stopped";
     if (s.status === "connected") return "Connected";
     if (s.status === "error") return "Error";
     return "Created";
   }
 
-  onMount(load);
+  onMount(() => {
+    void load();
+    const timer = window.setInterval(load, 10_000);
+    return () => window.clearInterval(timer);
+  });
 </script>
 
 <div class="header">
   <div>
     <h2>MCP Servers</h2>
-    <p>Build, test, and manage governed local MCP servers for this workspace.</p>
+    <p>Build, connect, and monitor governed local or remote MCP servers for this workspace.</p>
   </div>
   <button class="icon" aria-label="Refresh servers" onclick={load}><Icon name="refresh" size={17} /></button>
 </div>
@@ -155,6 +199,7 @@
 
 {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
 {#if notice}<div class="notice notice-ok"><Icon name="check" size={15} /> {notice}</div>{/if}
+<NotificationCenter {notifications} />
 
 <form class="create" onsubmit={create}>
   <div class="field">
@@ -193,7 +238,7 @@
               <button class="btn btn-sm" onclick={() => (renamingId = null)}>Cancel</button>
             {:else}
               <span class="name">{s.name}</span>
-              <span class="status" class:connected={s.status === "connected"} class:danger={s.status === "error"}>
+              <span class="status" class:connected={s.status === "connected" && s.monitor_state === "active"} class:danger={s.status === "error" || s.monitor_state !== "active"}>
                 <i></i>{statusLabel(s)}
               </span>
             {/if}
@@ -203,14 +248,20 @@
               <button class="btn btn-sm" onclick={() => test(s)} disabled={busy === s.server_id || !connectorEnabled}>
                 {busy === s.server_id ? "Testing…" : "Test"}
               </button>
+              <button class="btn btn-sm" class:btn-danger={s.monitor_state === "active"} onclick={() => contain(s)} disabled={busy === s.server_id}>
+                {s.monitor_state === "active" ? "Stop" : "Resume"}
+              </button>
               <button class="btn btn-sm" onclick={() => startRename(s)} disabled={busy === s.server_id}>Rename</button>
               <button class="btn btn-sm btn-danger" onclick={() => remove(s)} disabled={busy === s.server_id}>Delete</button>
             </div>
           {/if}
         </div>
+        {#if s.monitor_state !== "active"}
+          <div class="notice notice-warn monitor-banner">{s.monitor_state === "killed" ? "Stopped" : "Paused"}: {s.paused_reason ?? "Owner control"}</div>
+        {/if}
         <dl class="meta">
-          <div><dt>Command</dt><dd><code>{s.command.join(" ")}</code></dd></div>
-          <div><dt>Template</dt><dd>{templateLabel(s.template)}</dd></div>
+          <div><dt>{s.transport === "http" ? "Endpoint" : "Command"}</dt><dd><code>{s.transport === "http" ? s.endpoint_url : s.command.join(" ")}</code></dd></div>
+          <div><dt>{s.transport === "http" ? "Token reference" : "Template"}</dt><dd>{s.transport === "http" ? s.auth_ref ?? "None" : templateLabel(s.template)}</dd></div>
           <div><dt>Last connected</dt><dd>{s.last_connected_at ?? "Never"}</dd></div>
         </dl>
         <div class="tools">
@@ -219,6 +270,20 @@
             {#each s.tools as tool (tool)}<span class="chip">{tool}</span>{/each}
           {:else}
             <span class="muted">Run Test to discover this server's tools.</span>
+          {/if}
+        </div>
+        <div class="monitor">
+          <span class="tools-label">Recent sessions</span>
+          {#if sessions[s.server_id]?.length}
+            {#each sessions[s.server_id] as session (session.session_row_id)}
+              <span class="chip">{session.operation} · {session.tool_calls} tool calls · {session.outcome}</span>
+            {/each}
+          {:else}<span class="muted">No monitored sessions yet.</span>{/if}
+          {#if findings[s.server_id]?.length}
+            <span class="tools-label">Open findings</span>
+            {#each findings[s.server_id].filter((finding) => finding.state === "open") as finding (finding.finding_id)}
+              <span class="finding">{finding.severity}: {finding.summary}</span>
+            {/each}
           {/if}
         </div>
       </li>
@@ -255,6 +320,9 @@
   .meta dd { margin: 0; font-size: 0.82rem; color: var(--text-2); }
   .meta code { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-1); background: var(--sunken); padding: 0.1rem 0.4rem; border-radius: 4px; }
   .tools { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+  .monitor { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+  .monitor-banner { margin: var(--space-3) 0 0; }
+  .finding { font-size: .75rem; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-border); }
   .tools-label { font-size: 0.72rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
   .chip { font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); }
   .muted { color: var(--text-3); font-size: 0.8rem; }

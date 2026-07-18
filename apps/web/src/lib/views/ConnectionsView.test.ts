@@ -67,6 +67,43 @@ describe("ConnectionsView", () => {
     expect(screen.getByText("Disabled")).toBeInTheDocument();
   });
 
+  it("offers a governed MCP connection flow for every connector", async () => {
+    stubFetch({
+      "GET /api/connector-store": {
+        connectors: [connector()], count: 1, vault_configured: true,
+      },
+      "POST /api/mcp/servers": { ok: true, server_id: "mcp_local", name: "GitHub MCP" },
+      "POST /api/mcp/servers/mcp_local/connect": { ok: true, status: "connected", tools: ["issues"] },
+    });
+    render(ConnectionsView);
+    await waitFor(() => expect(screen.getByText("GitHub")).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: "Connect GitHub via MCP" }));
+    expect(screen.getByRole("dialog", { name: "Connect GitHub via MCP" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Connect via MCP" }));
+    await waitFor(() => expect(screen.getByText(/connected.*1 tool/i)).toBeInTheDocument());
+  });
+
+  it("uses a URL and token environment variable for a remote MCP connection", async () => {
+    const mock = stubFetch({
+      "GET /api/connector-store": {
+        connectors: [connector()], count: 1, vault_configured: true,
+      },
+      "POST /api/mcp/servers/remote": { ok: true, server_id: "mcp_remote", name: "GitHub MCP" },
+      "POST /api/mcp/servers/mcp_remote/connect": { ok: true, status: "connected", tools: ["issues"] },
+    });
+    render(ConnectionsView);
+    await waitFor(() => expect(screen.getByText("GitHub")).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: "Connect GitHub via MCP" }));
+    await fireEvent.click(screen.getByLabelText("Remote MCP server"));
+    await fireEvent.input(screen.getByLabelText("MCP endpoint URL"), { target: { value: "https://mcp.example.test" } });
+    await fireEvent.input(screen.getByLabelText("Token environment variable"), { target: { value: "GITHUB_MCP_TOKEN" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Connect via MCP" }));
+    await waitFor(() => expect(mock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/mcp/servers/remote"),
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ name: "GitHub MCP", endpoint_url: "https://mcp.example.test", auth_ref: "GITHUB_MCP_TOKEN" }) }),
+    ));
+  });
+
   it("opens the encrypted authentication workflow without displaying a credential", async () => {
     stubFetch({
       "GET /api/connector-store": {

@@ -265,6 +265,18 @@ async def list_mcp_findings(
     )
 
 
+@router.get("/api/mcp/servers/{server_id}/sessions")
+async def list_mcp_sessions(
+    server_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    """Owner-scoped, redacted recent monitor sessions for one connection."""
+    return serialize_dto(
+        _service(request).list_mcp_sessions(auth_data[0].principal_id, server_id)
+    )
+
+
 @router.get("/api/notifications")
 async def list_notifications(
     request: Request,

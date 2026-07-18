@@ -50,7 +50,7 @@ export const NAV_GROUPS: NavGroup[] = [
         id: "mcp",
         label: "MCP Servers",
         icon: "spark",
-        hint: "Build, test, and manage local MCP servers",
+        hint: "Connect and monitor local or remote MCP servers",
       },
       {
         id: "checkpoints",

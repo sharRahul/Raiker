@@ -29,6 +29,8 @@ RuntimeAuthority, and append-only audit log as the terminal client.
 | Sessions | Session browser → turns → per-turn governed events |
 | Capabilities | All capability gates (per phase), friendly labels, gate enable/disable with step-up (reason, Tier-2 confirmation token, threat ack), per-capability decision modes (`ask`/`allow`/`auto`/`deny`) |
 | Models | Model profiles with provider + model selection (each provider's model catalogue fetched on demand, gate-manager only writes), advisor-model picker for local-model turns, hosted/private gate + egress allowlist posture (no keys, no allowlist values) |
+| Connections | Service catalogue with a governed **Connect via MCP** flow for a local starter or a remote HTTP endpoint; remote authentication stores only a token environment-variable reference |
+| MCP Servers | Owner-scoped local and remote MCP profiles, with discovered tools, redacted recent-session telemetry, open findings, notifications, and pause/resume controls |
 | Checkpoints | Rewind metadata per session (restore flags are metadata only) |
 | Audit log | The append-only event record with session/type filters |
 | Diagnostics | Readiness checks, configuration gaps, counts, config-derived provider status |

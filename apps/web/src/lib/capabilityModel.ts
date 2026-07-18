@@ -46,6 +46,8 @@ const TIER2_STEPUP_CAPS = new Set([
   "process_execution",
   "network_execution",
   "web_fetch",
+  "mcp_builder_runtime",
+  "mcp_connector_runtime",
 ]);
 
 export function requiresStepUpToken(capability: string): boolean {

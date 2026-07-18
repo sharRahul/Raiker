@@ -143,6 +143,27 @@ class NotificationView:
 
 
 @dataclass(frozen=True)
+class McpSessionView:
+    """Owner-scoped, redacted monitor row for one MCP connection session."""
+
+    session_row_id: str
+    server_id: str
+    transport: str
+    operation: str
+    hosts: tuple[str, ...]
+    tool_calls: int
+    bytes_in: int
+    bytes_out: int
+    error_count: int
+    outcome: str
+    started_at: str
+    ended_at: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class TurnView:
     turn_id: str
     session_id: str
@@ -1068,6 +1089,26 @@ class DashboardService:
                 created_at=str(row.get("created_at", "")),
             )
             for row in self.store.list_notifications(principal_id, unread_only=unread_only)
+        ]
+
+    def list_mcp_sessions(self, principal_id: str, server_id: str) -> list[McpSessionView]:
+        """Owner-scoped, redacted recent monitor sessions for one MCP connection."""
+        return [
+            McpSessionView(
+                session_row_id=str(row["session_row_id"]),
+                server_id=str(row["server_id"]),
+                transport=str(row["transport"]),
+                operation=str(row["operation"]),
+                hosts=tuple(str(host) for host in row.get("hosts", [])),
+                tool_calls=int(row["tool_calls"]),
+                bytes_in=int(row["bytes_in"]),
+                bytes_out=int(row["bytes_out"]),
+                error_count=int(row["error_count"]),
+                outcome=str(row["outcome"]),
+                started_at=str(row["started_at"]),
+                ended_at=row.get("ended_at"),
+            )
+            for row in self.store.list_mcp_session_logs(server_id, principal_id, limit=10)
         ]
 
     def mark_notification_read(

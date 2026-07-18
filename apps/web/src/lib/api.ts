@@ -16,6 +16,9 @@ import type {
   InstanceLaunchResult,
   InterruptResult,
   McpServer,
+  McpSession,
+  McpFinding,
+  Notification,
   MemoryControlView,
   MemorySettingsView,
   ModelsView,
@@ -281,6 +284,20 @@ export const api = {
       `/api/mcp/servers/${encodeURIComponent(serverId)}`,
       { method: "DELETE" },
     ),
+  createRemoteMcpServer: (name: string, endpoint_url: string, auth_ref: string | null) =>
+    postJson<{ ok: boolean; server_id: string | null; name: string | null }>(
+      "/api/mcp/servers/remote",
+      { name, endpoint_url, auth_ref },
+    ),
+  mcpSessions: (serverId: string) =>
+    request<McpSession[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`),
+  mcpFindings: (serverId: string) =>
+    request<McpFinding[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/findings`),
+  pauseMcpServer: (serverId: string) =>
+    postJson<{ ok: boolean; monitor_state: string }>(`/api/mcp/servers/${encodeURIComponent(serverId)}/pause`, {}),
+  resumeMcpServer: (serverId: string) =>
+    postJson<{ ok: boolean; monitor_state: string }>(`/api/mcp/servers/${encodeURIComponent(serverId)}/resume`, {}),
+  notifications: () => request<Notification[]>("/api/notifications"),
   connectorStore: () => request<ConnectorStoreView>("/api/connector-store"),
   installConnector: (connectorId: string) =>
     postJson<{ ok: boolean; installed: boolean }>(

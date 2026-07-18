@@ -671,7 +671,7 @@ git diff --check
 git status --short
 ```
 
-- [ ] **Step 5: Commit and push all verified changes** only after every command exits successfully.
+- [x] **Step 5: Commit and push all verified changes** only after every command exits successfully. Completed by `37f681b` (`Rebuild Raiker control deck routes`); exact-tip CI, Web UI, and Phase Status Validation are green.
 
 ```powershell
 git add -A

@@ -19,8 +19,9 @@
 > Fresh verification passed: Python 3.12 pytest 1969 passed / 2 skipped; Ruff,
 > mypy (429 files), compileall, all five validators, web lint/check/test/build,
 > and diff whitespace checks. One upstream FastAPI / Starlette `TestClient`
-> deprecation warning was emitted by the current dependency set. Commit, push,
-> and exact-tip CI confirmation remain pending.
+> deprecation warning was emitted by the current dependency set. Commit
+> `37f681b` is pushed to `main`; its CI, Web UI, and Phase Status Validation
+> workflows are green.
 
 ## Goal
 
@@ -148,10 +149,9 @@ fail-closed by design.
 > persistence, `RuntimeControlService.{create,connect,rename,delete}_mcp_server`,
 > and routes `POST /api/mcp/servers`, `POST /api/mcp/servers/{id}/connect`,
 > `PUT`/`DELETE /api/mcp/servers/{id}`; frontend `McpView.svelte` + `McpView.test.ts`.
-> Plan **Tasks 7–10** are implemented locally; Task 11 has completed its
-> disposable authenticated browser pass and final local gate; only commit, push,
-> and exact-tip CI confirmation remain. Earlier Task 4 + 4b gate counts remain
-> historical evidence only.
+> Plan **Tasks 7–11** are complete. Task 11's disposable authenticated browser
+> pass, final local gate, commit/push, and exact-tip CI are recorded above.
+> Earlier Task 4 + 4b gate counts remain historical evidence only.
 
 > Current truth update (2026-07-13): The local-owner workstream now includes a
 > principal-scoped Inbox task-create route and Tasks UI. `priority`,

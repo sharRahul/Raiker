@@ -258,6 +258,8 @@ Control Deck commit.
   files), compileall, all five validators, web lint/check/test/build, and
   `git diff --check` passed. The only emitted warning is an upstream FastAPI /
   Starlette `TestClient` deprecation notice from the current dependency set.
+  Commit `37f681b` is pushed to `main`; its CI (Python 3.11/3.12), Web UI, and
+  Phase Status Validation workflows are green.
 - **Task 3 review note (design, not a bug).** The new
   `list_sessions(include_archived=False)` default excludes archived sessions from
   every internal caller that does not opt in. The event-visibility path was

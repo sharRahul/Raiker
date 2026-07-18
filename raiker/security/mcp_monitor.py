@@ -39,6 +39,21 @@ if TYPE_CHECKING:
 MONITOR_SESSION_ID = "mcp"
 MONITOR_SOURCE = "mcp_monitor"
 
+# Connection monitoring / lifecycle states (Phase C). `active` runs normally;
+# `paused` is the revocable circuit breaker (auto on a high-severity anomaly, or
+# the owner's one-call stop); `killed` is the instant kill switch. Both `paused`
+# and `killed` are revocable by the owner (resume → `active`) — containment is
+# never an owner-facing ban, only what keeps a frictionless default safe.
+STATE_ACTIVE = "active"
+STATE_PAUSED = "paused"
+STATE_KILLED = "killed"
+
+# Notification kinds raised by this module (shared owner-facing substrate).
+NOTIFY_ANOMALY = "anomaly"
+NOTIFY_PAUSED = "connection_paused"
+NOTIFY_RESUMED = "connection_resumed"
+NOTIFY_KILLED = "connection_killed"
+
 # Anomaly thresholds. Deliberately conservative and deterministic so the rules
 # are explainable and testable — no fabricated "smart" scoring.
 VOLUME_SPIKE_FACTOR = 3.0
@@ -104,12 +119,18 @@ def shape_sensitivity(text: str) -> str | None:
     return None
 
 
-class McpSessionMonitor:
-    """Observes governed MCP sessions and raises redacted findings on anomalies.
+class McpContainment:
+    """Owner-authoritative containment for a monitored MCP connection.
 
-    Owner-scoped throughout: every read (baseline, known tools) and every write
-    (session log, finding) is keyed by ``principal_id`` so one owner's monitor
-    can never see or influence another owner's connection.
+    Shared by the monitor (the automatic, revocable circuit breaker that trips on
+    a high-severity anomaly) and the control service (the owner's instant kill
+    switch, one-call stop, and resume). Every transition writes the connection's
+    new ``monitor_state``, emits its audit event, and raises an owner-facing
+    notification — so the owner always sees, and can always revoke, containment.
+
+    Owner-scoped throughout: a transition addresses ``(server_id, principal_id)``
+    and returns ``False`` without side effects if the row is missing or owned by
+    another principal, so it can never touch another owner's connection.
     """
 
     def __init__(
@@ -122,6 +143,113 @@ class McpSessionMonitor:
         self._store = store
         self._writer = writer or EventLogWriter(store)
         self._clock = clock
+
+    def pause(
+        self, principal_id: str, server_id: str, *, reason: str | None = None, source: str = "owner"
+    ) -> bool:
+        """Trip the revocable circuit breaker: refuse further sessions until the
+        owner resumes. Used both by auto-pause (``source='mcp_monitor'``) and the
+        owner's one-call stop (``source='owner'``)."""
+        return self._transition(
+            principal_id, server_id, state=STATE_PAUSED,
+            event_type="mcp_connection_paused", kind=NOTIFY_PAUSED,
+            title="MCP connection paused",
+            body=reason or "This connection was paused and will not run until you resume it.",
+            reason=reason, source=source,
+        )
+
+    def kill(
+        self, principal_id: str, server_id: str, *, reason: str | None = None, source: str = "owner"
+    ) -> bool:
+        """The instant kill switch: refuse all sessions immediately. Revocable —
+        the owner can resume it back to active."""
+        return self._transition(
+            principal_id, server_id, state=STATE_KILLED,
+            event_type="mcp_connection_killed", kind=NOTIFY_KILLED,
+            title="MCP connection killed",
+            body=reason or "This connection was killed and will refuse every session until you resume it.",
+            reason=reason, source=source,
+        )
+
+    def resume(self, principal_id: str, server_id: str, *, source: str = "owner") -> bool:
+        """Revoke containment: clear any pause/kill back to active and reallow
+        sessions. Clears the redacted paused reason/time."""
+        return self._transition(
+            principal_id, server_id, state=STATE_ACTIVE,
+            event_type="mcp_connection_resumed", kind=NOTIFY_RESUMED,
+            title="MCP connection resumed",
+            body="This connection was resumed and can run again.",
+            reason=None, source=source, clear=True,
+        )
+
+    def _transition(
+        self,
+        principal_id: str,
+        server_id: str,
+        *,
+        state: str,
+        event_type: str,
+        kind: str,
+        title: str,
+        body: str,
+        reason: str | None,
+        source: str,
+        clear: bool = False,
+    ) -> bool:
+        now = self._clock()
+        ok = self._store.set_mcp_monitor_state(
+            server_id,
+            principal_id,
+            state,
+            paused_reason=None if clear else reason,
+            paused_at=None if clear else now,
+        )
+        if not ok:
+            return False
+        # Redacted audit event (server_id + source + redacted reason, never a
+        # payload) followed by an owner-facing notification for the transition.
+        self._writer.append(
+            make_event(
+                session_id=MONITOR_SESSION_ID,
+                turn_id=None,
+                event_type=event_type,
+                actor=source,
+                payload={"server_id": server_id, "source": source, "reason": reason},
+            )
+        )
+        self._store.insert_notification(
+            principal_id=principal_id,
+            kind=kind,
+            title=title,
+            body=body,
+            subject_id=server_id,
+        )
+        return True
+
+
+class McpSessionMonitor:
+    """Observes governed MCP sessions and raises redacted findings on anomalies.
+
+    Owner-scoped throughout: every read (baseline, known tools) and every write
+    (session log, finding) is keyed by ``principal_id`` so one owner's monitor
+    can never see or influence another owner's connection.
+
+    Phase C turns findings into action: each finding raises an owner-facing
+    notification, and a **high-severity** finding trips the revocable auto-pause
+    circuit breaker via :class:`McpContainment`.
+    """
+
+    def __init__(
+        self,
+        store: SQLiteStore,
+        *,
+        writer: EventLogWriter | None = None,
+        clock: Callable[[], str] = utc_now,
+    ) -> None:
+        self._store = store
+        self._writer = writer or EventLogWriter(store)
+        self._clock = clock
+        self._containment = McpContainment(store, writer=self._writer, clock=self._clock)
 
     def observe(self, telemetry: McpSessionTelemetry) -> list[SecurityFinding]:
         """Record a redacted session row, then evaluate the anomaly rules against
@@ -172,9 +300,42 @@ class McpSessionMonitor:
                 redacted_detail=finding.detail,
                 subject_id=telemetry.server_id,
             )
-            self._emit_anomaly(telemetry, replace(finding, finding_id=finding_id))
-            stored.append(replace(finding, finding_id=finding_id))
+            resolved = replace(finding, finding_id=finding_id)
+            self._emit_anomaly(telemetry, resolved)
+            # Every finding surfaces to the owner as a notification.
+            self._store.insert_notification(
+                principal_id=telemetry.principal_id,
+                kind=NOTIFY_ANOMALY,
+                title=f"Security anomaly on '{name}'",
+                body=finding.summary,
+                finding_id=finding_id,
+                subject_id=telemetry.server_id,
+            )
+            stored.append(resolved)
+        self._auto_pause_if_high_severity(telemetry, stored)
         return stored
+
+    def _auto_pause_if_high_severity(
+        self, telemetry: McpSessionTelemetry, stored: list[SecurityFinding]
+    ) -> None:
+        """Revocable circuit breaker: a high-severity finding pauses the
+        connection so an unattended session that trips a rule cannot continue
+        until the owner resumes. Transitions once — a connection already
+        contained (paused/killed) is left as-is, so one ongoing incident does not
+        churn the paused-at timestamp or re-emit the pause event."""
+        high = [f for f in stored if f.severity == "high"]
+        if not high or not telemetry.server_id:
+            return
+        current = self._store.get_mcp_server(telemetry.server_id, telemetry.principal_id)
+        if current is None or str(current.get("monitor_state") or STATE_ACTIVE) != STATE_ACTIVE:
+            return
+        codes = ", ".join(sorted({f.code for f in high}))
+        self._containment.pause(
+            telemetry.principal_id,
+            telemetry.server_id,
+            reason=f"Auto-paused: high-severity anomaly ({codes}). Resume when you have reviewed it.",
+            source=MONITOR_SOURCE,
+        )
 
     # ── rule evaluation ──
     def _evaluate(

@@ -12,6 +12,7 @@ from raiker.api.schemas import (
     AuthSessionRequest,
     BrainSourceRequest,
     BulkDeleteSessionsRequest,
+    ContainMcpServerRequest,
     CreateMcpServerRequest,
     CreateProjectRequest,
     CreateRemoteMcpServerRequest,
@@ -205,6 +206,87 @@ async def delete_mcp_server(
     file (human-only)."""
     return _mcp_result(
         _service(request).delete_mcp_server(auth_data[0].principal_id, server_id)
+    )
+
+
+# ── Containment: kill switch + revocable pause + findings/notifications ───────
+@router.post("/api/mcp/servers/{server_id}/pause")
+async def pause_mcp_server(
+    server_id: str,
+    request: Request,
+    body: ContainMcpServerRequest | None = None,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Owner's one-call stop: pause a monitored connection (revocable). Refuses
+    further sessions until resumed. Human-only, owner-scoped."""
+    reason = body.reason if body is not None else None
+    return _mcp_result(
+        _service(request).pause_mcp_server(auth_data[0].principal_id, server_id, reason)
+    )
+
+
+@router.post("/api/mcp/servers/{server_id}/resume")
+async def resume_mcp_server(
+    server_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Revoke containment: resume a paused/killed connection back to active.
+    Human-only, owner-scoped."""
+    return _mcp_result(
+        _service(request).resume_mcp_server(auth_data[0].principal_id, server_id)
+    )
+
+
+@router.post("/api/mcp/servers/{server_id}/kill")
+async def kill_mcp_server(
+    server_id: str,
+    request: Request,
+    body: ContainMcpServerRequest | None = None,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Instant kill switch: refuse all sessions for a connection (revocable via
+    resume). Human-only, owner-scoped."""
+    reason = body.reason if body is not None else None
+    return _mcp_result(
+        _service(request).kill_mcp_server(auth_data[0].principal_id, server_id, reason)
+    )
+
+
+@router.get("/api/mcp/servers/{server_id}/findings")
+async def list_mcp_findings(
+    server_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    """Owner-scoped redacted findings for one connection (newest first)."""
+    return serialize_dto(
+        _service(request).list_mcp_findings(auth_data[0].principal_id, server_id)
+    )
+
+
+@router.get("/api/notifications")
+async def list_notifications(
+    request: Request,
+    unread_only: bool = False,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    """Owner-scoped notifications (newest first). ``unread_only`` filters to the
+    unread ones."""
+    return serialize_dto(
+        _service(request).list_notifications(auth_data[0].principal_id, unread_only)
+    )
+
+
+@router.post("/api/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Owner-scoped mark-as-read for one notification."""
+    return _mcp_result(
+        _service(request).mark_notification_read(notification_id, auth_data[0].principal_id)
     )
 
 

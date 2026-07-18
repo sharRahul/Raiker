@@ -542,6 +542,65 @@ class RuntimeControlService:
         self._remove_generated_mcp_file(server)
         return ControlResult(ok=True, data={"server_id": server_id})
 
+    # ── Containment: instant kill switch + revocable pause (Phase C) ─────────
+    # Owner-scoped, human-only lifecycle control over a monitored connection.
+    # Pause is the one-call stop; kill is the instant kill switch; resume revokes
+    # either. Each transition writes the new state, emits its audit event, and
+    # raises an owner-facing notification via the shared McpContainment helper.
+
+    def _containment_transition(
+        self, acting_principal_id: str | None, server_id: str, verb: str, reason: str | None
+    ) -> ControlResult:
+        from raiker.security.mcp_monitor import McpContainment
+
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        server = self._store.get_mcp_server(server_id, principal.principal_id)
+        if server is None:
+            return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
+        containment = McpContainment(self._store, writer=self._writer)
+        if verb == "pause":
+            ok = containment.pause(
+                principal.principal_id, server_id,
+                reason=reason or "Paused by owner.", source="owner",
+            )
+            new_state = "paused"
+        elif verb == "kill":
+            ok = containment.kill(
+                principal.principal_id, server_id,
+                reason=reason or "Killed by owner.", source="owner",
+            )
+            new_state = "killed"
+        else:  # resume
+            ok = containment.resume(principal.principal_id, server_id, source="owner")
+            new_state = "active"
+        if not ok:
+            return ControlResult(ok=False, reason_code=f"unknown_mcp_server:{server_id}")
+        return ControlResult(
+            ok=True, data={"server_id": server_id, "monitor_state": new_state}
+        )
+
+    def pause_mcp_server(
+        self, acting_principal_id: str | None, server_id: str, reason: str | None = None
+    ) -> ControlResult:
+        """Owner-scoped, human-only one-call stop of a connection (revocable)."""
+        return self._containment_transition(acting_principal_id, server_id, "pause", reason)
+
+    def kill_mcp_server(
+        self, acting_principal_id: str | None, server_id: str, reason: str | None = None
+    ) -> ControlResult:
+        """Owner-scoped, human-only instant kill switch (revocable via resume)."""
+        return self._containment_transition(acting_principal_id, server_id, "kill", reason)
+
+    def resume_mcp_server(
+        self, acting_principal_id: str | None, server_id: str
+    ) -> ControlResult:
+        """Owner-scoped, human-only resume — revoke a pause/kill back to active."""
+        return self._containment_transition(acting_principal_id, server_id, "resume", None)
+
     def _remove_generated_mcp_file(self, server: dict[str, Any]) -> None:
         from raiker.runtime.executors.mcp import _MCP_SERVERS_DIR, _safe_workspace_relative
 

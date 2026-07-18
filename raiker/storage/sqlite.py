@@ -70,6 +70,8 @@ from raiker.storage.migrations import (
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
+    MCP_CONTAINMENT_MIGRATION_ID,
+    MCP_CONTAINMENT_SQL,
     MCP_MONITORING_MIGRATION_ID,
     MCP_MONITORING_SQL,
     MCP_REMOTE_ENDPOINT_MIGRATION_ID,
@@ -648,6 +650,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 MCP_REMOTE_ENDPOINT_MIGRATION_ID, MCP_REMOTE_ENDPOINT_SQL, connection
             )
             self._apply_migration(MCP_MONITORING_MIGRATION_ID, MCP_MONITORING_SQL, connection)
+            self._apply_migration(
+                MCP_CONTAINMENT_MIGRATION_ID, MCP_CONTAINMENT_SQL, connection
+            )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -1644,6 +1649,30 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             return cursor.rowcount > 0
 
+    def set_mcp_monitor_state(
+        self,
+        server_id: str,
+        principal_id: str,
+        monitor_state: str,
+        *,
+        paused_reason: str | None = None,
+        paused_at: str | None = None,
+    ) -> bool:
+        """Owner-scoped transition of a connection's monitoring/lifecycle state
+        (``active`` | ``paused`` | ``killed``). Returns False if the row is
+        missing or owned by another principal (isolation), so a containment
+        write can never touch another owner's connection. ``paused_reason`` /
+        ``paused_at`` are redacted metadata (a rule code + summary, a timestamp)
+        — never a payload."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE mcp_servers
+                   SET monitor_state = ?, paused_reason = ?, paused_at = ?
+                   WHERE server_id = ? AND principal_id = ?""",
+                (monitor_state, paused_reason, paused_at, server_id, principal_id),
+            )
+            return cursor.rowcount > 0
+
     # ── MCP monitoring: redacted per-session log + shared findings ───────────
 
     @staticmethod
@@ -1798,6 +1827,69 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 params,
             ).fetchall()
         return [self._security_finding_row(row) for row in rows]
+
+    # ── Owner-facing notifications (shared substrate) ────────────────────────
+
+    def insert_notification(
+        self,
+        *,
+        principal_id: str,
+        kind: str,
+        title: str,
+        body: str,
+        finding_id: str | None = None,
+        subject_id: str | None = None,
+    ) -> str:
+        """Persist one owner-facing notification. ``title`` / ``body`` are already
+        redacted human-readable copy (never a raw payload or token). Owner-scoped
+        by ``principal_id``; shared across sources (findings + containment)."""
+        notification_id = new_id("ntf_")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO notifications
+                   (notification_id, principal_id, kind, title, body, finding_id,
+                    subject_id, read, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)""",
+                (
+                    notification_id,
+                    principal_id,
+                    kind,
+                    title,
+                    body,
+                    finding_id,
+                    subject_id,
+                    utc_now(),
+                ),
+            )
+        return notification_id
+
+    def list_notifications(
+        self, principal_id: str, *, unread_only: bool = False, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """Owner-scoped notifications, newest first. ``unread_only`` filters to
+        the unread ones. A different owner resolves nothing (isolation)."""
+        conditions = ["principal_id = ?"]
+        params: list[Any] = [principal_id]
+        if unread_only:
+            conditions.append("read = 0")
+        params.append(int(limit))
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM notifications WHERE {' AND '.join(conditions)} "
+                "ORDER BY created_at DESC, rowid DESC LIMIT ?",
+                params,
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def mark_notification_read(self, notification_id: str, principal_id: str) -> bool:
+        """Owner-scoped mark-as-read. Returns False if the row is missing or owned
+        by another principal (isolation)."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE notifications SET read = 1 WHERE notification_id = ? AND principal_id = ?",
+                (notification_id, principal_id),
+            )
+            return cursor.rowcount > 0
 
     def delete_project(self, project_id: str) -> bool:
         with self.connect() as connection:

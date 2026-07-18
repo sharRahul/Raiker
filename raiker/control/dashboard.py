@@ -92,6 +92,51 @@ class McpServerView:
     # token itself. Both are null for a local stdio connection.
     endpoint_url: str | None = None
     auth_ref: str | None = None
+    # Containment state (Phase C): `active` | `paused` | `killed`. `paused` is the
+    # revocable circuit breaker (auto on a high-severity anomaly, or the owner's
+    # one-call stop); `killed` is the instant kill switch. `paused_reason` /
+    # `paused_at` are redacted metadata (a rule code + summary, a timestamp).
+    monitor_state: str = "active"
+    paused_reason: str | None = None
+    paused_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class SecurityFindingView:
+    """Owner-scoped view of one redacted security finding (monitored MCP
+    connections, Phase B/C). ``redacted_detail`` holds redacted metadata only
+    (labels, counts, hostnames, added/removed tool names) — never a raw value."""
+
+    finding_id: str
+    source: str
+    severity: str
+    code: str
+    summary: str
+    redacted_detail: dict[str, Any]
+    subject_id: str | None
+    state: str
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class NotificationView:
+    """Owner-scoped view of one notification (Phase C). Redacted human-readable
+    copy only; ``finding_id`` / ``subject_id`` link back to what raised it."""
+
+    notification_id: str
+    kind: str
+    title: str
+    body: str
+    finding_id: str | None
+    subject_id: str | None
+    read: bool
+    created_at: str
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -926,6 +971,9 @@ class DashboardService:
                 tool_count=int(row.get("tool_count", 0) or 0),
                 endpoint_url=row.get("endpoint_url"),
                 auth_ref=row.get("auth_ref"),
+                monitor_state=str(row.get("monitor_state") or "active"),
+                paused_reason=row.get("paused_reason"),
+                paused_at=row.get("paused_at"),
             )
             for row in self.store.list_mcp_servers(principal_id)
         ]
@@ -962,6 +1010,72 @@ class DashboardService:
     ) -> ControlResult:
         """Owner-scoped, human-only delete of one MCP server profile."""
         return self.control.delete_mcp_server(acting_principal_id, server_id)
+
+    # ── Containment + findings + notifications (Phase C) ─────────────────────
+    def pause_mcp_server(
+        self, acting_principal_id: str | None, server_id: str, reason: str | None = None
+    ) -> ControlResult:
+        """Owner-scoped, human-only one-call stop of a connection (delegates)."""
+        return self.control.pause_mcp_server(acting_principal_id, server_id, reason)
+
+    def resume_mcp_server(
+        self, acting_principal_id: str | None, server_id: str
+    ) -> ControlResult:
+        """Owner-scoped, human-only resume of a paused/killed connection."""
+        return self.control.resume_mcp_server(acting_principal_id, server_id)
+
+    def kill_mcp_server(
+        self, acting_principal_id: str | None, server_id: str, reason: str | None = None
+    ) -> ControlResult:
+        """Owner-scoped, human-only instant kill switch (delegates)."""
+        return self.control.kill_mcp_server(acting_principal_id, server_id, reason)
+
+    def list_mcp_findings(
+        self, principal_id: str, server_id: str | None = None
+    ) -> list[SecurityFindingView]:
+        """Owner-scoped redacted findings, newest first, optionally scoped to one
+        connection. Read-only view — never exposes a raw value."""
+        return [
+            SecurityFindingView(
+                finding_id=str(row["finding_id"]),
+                source=str(row.get("source", "")),
+                severity=str(row.get("severity", "")),
+                code=str(row.get("code", "")),
+                summary=str(row.get("summary", "")),
+                redacted_detail=dict(row.get("redacted_detail", {}) or {}),
+                subject_id=row.get("subject_id"),
+                state=str(row.get("state", "open")),
+                created_at=str(row.get("created_at", "")),
+            )
+            for row in self.store.list_security_findings(
+                principal_id, source="mcp_monitor", subject_id=server_id
+            )
+        ]
+
+    def list_notifications(
+        self, principal_id: str, unread_only: bool = False
+    ) -> list[NotificationView]:
+        """Owner-scoped notifications, newest first."""
+        return [
+            NotificationView(
+                notification_id=str(row["notification_id"]),
+                kind=str(row.get("kind", "")),
+                title=str(row.get("title", "")),
+                body=str(row.get("body", "")),
+                finding_id=row.get("finding_id"),
+                subject_id=row.get("subject_id"),
+                read=bool(row.get("read", 0)),
+                created_at=str(row.get("created_at", "")),
+            )
+            for row in self.store.list_notifications(principal_id, unread_only=unread_only)
+        ]
+
+    def mark_notification_read(
+        self, notification_id: str, principal_id: str
+    ) -> ControlResult:
+        """Owner-scoped mark-as-read for one notification."""
+        ok = self.store.mark_notification_read(notification_id, principal_id)
+        return ControlResult(ok=ok, reason_code=None if ok else "unknown_notification")
 
     def delete_session(
         self, session_id: str, acting_principal_id: str | None

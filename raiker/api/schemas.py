@@ -272,6 +272,15 @@ class CreateRemoteMcpServerRequest(BaseModel):
     auth_ref: str | None = None
 
 
+class ContainMcpServerRequest(BaseModel):
+    # Optional redacted reason for a pause/kill of a monitored MCP connection
+    # (Phase C). The reason is human-readable copy shown back to the owner — it
+    # must never carry a payload or token. extra="forbid" rejects unknown fields.
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str | None = None
+
+
 class SetSessionTagsRequest(BaseModel):
     # Replace the tag set for one session. Tags are organizing labels only —
     # they grant nothing. The server normalizes (trim, lowercase, dedupe,

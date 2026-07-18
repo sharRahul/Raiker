@@ -1410,6 +1410,45 @@ CREATE INDEX IF NOT EXISTS idx_security_findings_subject
   ON security_findings(principal_id, subject_id, created_at DESC);
 """
 
+# Notify + instant kill switch + revocable auto-pause circuit breaker
+# (monitored MCP connections, Phase C). Two additive parts:
+#
+# 1. `mcp_servers` gains a monitoring/lifecycle state so a connection can be
+#    contained without deleting it: `monitor_state` is `active` | `paused` |
+#    `killed`. `paused` is the revocable circuit breaker a high-severity anomaly
+#    trips (and the owner's one-call stop); `killed` is the instant kill switch.
+#    Both are revocable by the owner (resume → `active`). `paused_reason` /
+#    `paused_at` record why and when, redacted (a rule code + summary, never a
+#    payload). Containment is never an owner-facing ban — it keeps a
+#    frictionless-by-default posture safe when the owner is away.
+#
+# 2. `notifications` — the shared owner-facing notification substrate (also used
+#    by Control Deck Task 5). One row per notification: `kind`, `title`, `body`
+#    (all redacted, human-readable copy), an optional `finding_id` / `subject_id`
+#    link back to what raised it, and a `read` flag. Owner-scoped by
+#    `principal_id`. Every finding and every containment transition raises one.
+MCP_CONTAINMENT_MIGRATION_ID = "RAIKER-1020-mcp-containment-notifications"
+
+MCP_CONTAINMENT_SQL = """
+ALTER TABLE mcp_servers ADD COLUMN monitor_state TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE mcp_servers ADD COLUMN paused_reason TEXT;
+ALTER TABLE mcp_servers ADD COLUMN paused_at TEXT;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  notification_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  finding_id TEXT,
+  subject_id TEXT,
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_owner
+  ON notifications(principal_id, read, created_at DESC);
+"""
+
 # Nested projects/folders (conversation organisation remainder): arbitrary-depth
 # folder hierarchy via hybrid adjacency list + materialized path. Parent
 # reference uses ON DELETE SET NULL so children survive parent hard-delete.

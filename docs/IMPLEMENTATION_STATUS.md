@@ -18,7 +18,8 @@
 > full-width-sidebar defect. Individual route-body migration remains Tasks 7-9;
 > `SessionMenu` has focused tests until Task 8 consumes it. Local gates are
 > green: 151 web tests (one existing skip), two uncached Python batches, ruff,
-> mypy (429 files), compileall, and all five validators. Final push/CI is pending.
+> mypy (429 files), compileall, and all five validators. Implementation commit
+> `66037db` passed CI (Python 3.11/3.12), Web UI, and Phase Status Validation.
 
 ## Goal
 

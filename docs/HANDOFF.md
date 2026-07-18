@@ -70,7 +70,8 @@ Control Deck commit.
   downloaded Node browser were unavailable; the authenticated drive used Node
   Playwright with installed system Chrome. Full web (151 passed, one existing
   skip), two uncached Python batches, ruff, mypy (429 files), compileall, and
-  all five validators passed. Final push/CI remains pending.
+  all five validators passed. Implementation commit `66037db` passed CI (Python
+  3.11/3.12), Web UI, and Phase Status Validation.
 
 - **Monitored MCP connections — Phase D (Connections UI + live monitor) is
   implemented in the current worktree.** Every Connections catalogue card now

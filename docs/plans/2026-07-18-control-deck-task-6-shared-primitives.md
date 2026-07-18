@@ -102,7 +102,7 @@ it("omits a gate without an executor", () => {
 - [x] Run the full Python suite in two alphabetical batches with `-p no:cacheprovider`; run ruff, mypy over `raiker apps tests`, compileall, all five validators, and `git diff --check`.
 - [x] Run an authenticated disposable-workspace browser drive: open the responsive shell, inspect the generic notification state, use every SessionMenu action against controlled test data, and capture screenshots.
 - [x] Record results and any tool/runtime limitation honestly in this plan and handoff; do not claim universal responsiveness beyond the verified viewport.
-- [ ] Commit Task 6 on `main`, push `origin/main`, and wait for the exact pushed commit's CI and applicable Web UI workflow to be green.
+- [x] Commit Task 6 on `main`, push `origin/main`, and wait for the exact pushed commit's CI and applicable Web UI workflow to be green.
 
 ## Evidence — 2026-07-18
 
@@ -126,6 +126,9 @@ it("omits a gate without an executor", () => {
   were checked. `SessionMenu` intentionally has no route consumer until Task 8,
   so its six actions and generic notification state have focused component
   coverage, not a fabricated live route flow.
+- CI: implementation commit `66037db` passed CI (Python 3.11 and 3.12), Web UI,
+  and Phase Status Validation. GitHub reported only its non-failing Node 20
+  action-runtime deprecation notice while forcing those actions onto Node 24.
 
 ## Plan Self-Review
 

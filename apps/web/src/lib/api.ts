@@ -8,6 +8,7 @@ import type {
   CapabilityDecisionMode,
   CapabilityGate,
   Checkpoint,
+  CredentialLifecycle,
   ConnectionsView,
   ConnectorStoreView,
   Diagnostics,
@@ -31,6 +32,7 @@ import type {
   ResolveApprovalResult,
   RuntimeMode,
   RuntimeReadiness,
+  SecurityHealth,
   SessionDetail,
   SessionSummary,
   StreamEvent,
@@ -298,6 +300,15 @@ export const api = {
   resumeMcpServer: (serverId: string) =>
     postJson<{ ok: boolean; monitor_state: string }>(`/api/mcp/servers/${encodeURIComponent(serverId)}/resume`, {}),
   notifications: () => request<Notification[]>("/api/notifications"),
+  securityCredentials: () => request<CredentialLifecycle[]>("/api/security/credentials"),
+  securityFindings: () => request<McpFinding[]>("/api/security/findings"),
+  securityHealth: () => request<SecurityHealth[]>("/api/security/health"),
+  verifySecurityCredential: (provider: string) =>
+    postJson<CredentialLifecycle>(`/api/security/credentials/${encodeURIComponent(provider)}/verify`, {}),
+  scanSecurity: () => postJson<McpFinding[]>("/api/security/scan", {}),
+  checkSecurityHealth: () => postJson<SecurityHealth[]>("/api/security/health-check", {}),
+  checkPasswordBreach: (password: string, enabled: boolean) =>
+    postJson<McpFinding[]>("/api/security/breach-check", { password, enabled }),
   connectorStore: () => request<ConnectorStoreView>("/api/connector-store"),
   installConnector: (connectorId: string) =>
     postJson<{ ok: boolean; installed: boolean }>(

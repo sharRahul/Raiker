@@ -61,6 +61,8 @@ from raiker.storage.migrations import (
     CONNECTOR_ECOSYSTEM_SQL,
     CONNECTOR_INVOCATIONS_MIGRATION_ID,
     CONNECTOR_INVOCATIONS_SQL,
+    CREDENTIAL_SECURITY_MIGRATION_ID,
+    CREDENTIAL_SECURITY_SQL,
     EIDETIC_OBSERVATIONS_MIGRATION_ID,
     EIDETIC_OBSERVATIONS_SQL,
     EMAIL_DRAFTS_MIGRATION_ID,
@@ -652,6 +654,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(MCP_MONITORING_MIGRATION_ID, MCP_MONITORING_SQL, connection)
             self._apply_migration(
                 MCP_CONTAINMENT_MIGRATION_ID, MCP_CONTAINMENT_SQL, connection
+            )
+            self._apply_migration(
+                CREDENTIAL_SECURITY_MIGRATION_ID, CREDENTIAL_SECURITY_SQL, connection
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -1890,6 +1895,103 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (notification_id, principal_id),
             )
             return cursor.rowcount > 0
+
+    # â”€â”€ Credential lifecycle + security-monitor state (Control Deck Task 5) â”€â”€
+
+    def upsert_credential_lifecycle(
+        self,
+        principal_id: str,
+        provider: str,
+        *,
+        verified_at: str,
+        due_at: str,
+        status: str,
+    ) -> dict[str, Any]:
+        credential_id = new_id("cred_")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO credential_lifecycle
+                   (credential_id, principal_id, provider, rotated_at, verified_at, due_at, status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(principal_id, provider) DO UPDATE SET
+                     rotated_at=excluded.rotated_at, verified_at=excluded.verified_at,
+                     due_at=excluded.due_at, status=excluded.status""",
+                (credential_id, principal_id, provider, verified_at, verified_at, due_at, status),
+            )
+        row = self.get_credential_lifecycle(principal_id, provider)
+        assert row is not None
+        return row
+
+    def get_credential_lifecycle(self, principal_id: str, provider: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM credential_lifecycle WHERE principal_id = ? AND provider = ?",
+                (principal_id, provider),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_credential_lifecycle(self, principal_id: str) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM credential_lifecycle WHERE principal_id = ? ORDER BY provider",
+                (principal_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def has_connector_credential(self, principal_id: str, connector_id: str) -> bool:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT 1 FROM connector_credentials WHERE principal_id = ? AND connector_id = ?",
+                (principal_id, connector_id),
+            ).fetchone()
+        return row is not None
+
+    def get_security_monitor_state(
+        self, principal_id: str, source: str, subject_id: str, code: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM security_monitor_state
+                   WHERE principal_id = ? AND source = ? AND subject_id = ? AND code = ?""",
+                (principal_id, source, subject_id, code),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def set_security_monitor_state(
+        self,
+        principal_id: str,
+        source: str,
+        subject_id: str,
+        code: str,
+        *,
+        state: str,
+        finding_id: str | None,
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO security_monitor_state
+                   (principal_id, source, subject_id, code, state, finding_id, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(principal_id, source, subject_id, code) DO UPDATE SET
+                     state=excluded.state, finding_id=excluded.finding_id, updated_at=excluded.updated_at""",
+                (principal_id, source, subject_id, code, state, finding_id, utc_now()),
+            )
+
+    def set_security_finding_state(self, finding_id: str, principal_id: str, state: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE security_findings SET state = ? WHERE finding_id = ? AND principal_id = ?",
+                (state, finding_id, principal_id),
+            )
+        return cursor.rowcount > 0
+
+    def list_security_monitor_state(self, principal_id: str) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM security_monitor_state WHERE principal_id = ? ORDER BY updated_at DESC",
+                (principal_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def delete_project(self, project_id: str) -> bool:
         with self.connect() as connection:

@@ -30,6 +30,8 @@ from raiker.models.router import ModelRouter
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 from raiker.runtime.authority.models import PrincipalType
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
+from raiker.security.credentials import CredentialLifecycle, CredentialLifecycleView
+from raiker.security.monitoring import SecurityMonitor
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
 from raiker.tools.filesystem import FilesystemSafetyError, proposed_write_snapshot
@@ -1089,6 +1091,45 @@ class DashboardService:
                 created_at=str(row.get("created_at", "")),
             )
             for row in self.store.list_notifications(principal_id, unread_only=unread_only)
+        ]
+
+    def list_security_credentials(self, principal_id: str) -> list[CredentialLifecycleView]:
+        return CredentialLifecycle(self.store).list(principal_id)
+
+    def verify_security_credential(self, principal_id: str, provider: str) -> CredentialLifecycleView:
+        return CredentialLifecycle(self.store).verify_replacement(principal_id, provider)
+
+    def scan_security(self, principal_id: str) -> list[SecurityFindingView]:
+        SecurityMonitor(self.store, self.workspace_root).scan_configured_paths(principal_id)
+        return self.list_security_findings(principal_id)
+
+    def check_security_health(self, principal_id: str) -> list[dict[str, Any]]:
+        SecurityMonitor(self.store, self.workspace_root).check_vault_health(principal_id)
+        return self.list_security_health(principal_id)
+
+    def list_security_health(self, principal_id: str) -> list[dict[str, Any]]:
+        """Return the last recorded monitor state without performing a check."""
+        return self.store.list_security_monitor_state(principal_id)
+
+    def check_password_breach(
+        self, principal_id: str, password: str, *, enabled: bool
+    ) -> list[SecurityFindingView]:
+        SecurityMonitor(self.store, self.workspace_root).check_password_breach(
+            principal_id, password, enabled=enabled
+        )
+        return self.list_security_findings(principal_id)
+
+    def list_security_findings(self, principal_id: str) -> list[SecurityFindingView]:
+        return [
+            SecurityFindingView(
+                finding_id=str(row["finding_id"]), source=str(row.get("source", "")),
+                severity=str(row.get("severity", "")), code=str(row.get("code", "")),
+                summary=str(row.get("summary", "")),
+                redacted_detail=dict(row.get("redacted_detail", {}) or {}),
+                subject_id=row.get("subject_id"), state=str(row.get("state", "open")),
+                created_at=str(row.get("created_at", "")),
+            )
+            for row in self.store.list_security_findings(principal_id)
         ]
 
     def list_mcp_sessions(self, principal_id: str, server_id: str) -> list[McpSessionView]:

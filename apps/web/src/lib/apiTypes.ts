@@ -92,6 +92,22 @@ export interface Notification {
   created_at: string;
 }
 
+export interface CredentialLifecycle {
+  credential_id?: string;
+  provider: string;
+  verified_at?: string | null;
+  due_at: string;
+  status: "current" | "warning" | "overdue";
+}
+
+export interface SecurityHealth {
+  source: string;
+  subject_id: string;
+  code: string;
+  state: string;
+  updated_at: string;
+}
+
 // GET /api/capability-modes/{capability} — the per-capability decision mode
 // (ask | allow | auto | deny) governing AI-proposed actions for that capability.
 export interface CapabilityDecisionMode {

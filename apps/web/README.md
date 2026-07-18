@@ -34,7 +34,7 @@ RuntimeAuthority, and append-only audit log as the terminal client.
 | Checkpoints | Rewind metadata per session (restore flags are metadata only) |
 | Audit log | The append-only event record with session/type filters |
 | Diagnostics | Readiness checks, configuration gaps, counts, config-derived provider status |
-| Settings | Runtime mode activate/disable (step-up gated), appearance (light/dark/system), secrets & redaction posture |
+| Settings | Runtime mode activate/disable (step-up gated), appearance (light/dark/system), vault/MFA/session controls, and redacted credential lifecycle, bounded local scan, health, and opt-in breach posture |
 
 A top-bar **STOP** switch requests safe-boundary cancellation of all active tasks via the governed
 interrupt path.

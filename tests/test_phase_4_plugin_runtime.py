@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,11 @@ from raiker.events.writer import EventLogWriter
 from raiker.plugins.registry import record_plugin_install
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
 from raiker.runtime.authority.models import Principal, RiskLevelValue
-from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES, build_default_executor_registry
+from raiker.runtime.executors import (
+    REAL_EXECUTOR_CAPABILITIES,
+    PluginRuntimeExecutor,
+    build_default_executor_registry,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 _CAP = "plugin_runtime_cap"
@@ -218,6 +223,29 @@ def test_runtime_executes_installed_allowlisted_plugin(tmp_path: Path, monkeypat
     assert "SECRETOUTPUT" not in dumped
     assert payload["payload"]["artifacts"]["output_redacted"] is True
     assert payload["payload"]["artifacts"]["returncode"] == 0
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows interpreter selection")
+def test_runtime_defaults_to_direct_python_on_windows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ws = _ws(tmp_path)
+    _enable(ws)
+    monkeypatch.setenv(_ALLOWLIST_ENV, _PLUGIN)
+    store = SQLiteStore(ws)
+    _install(store)
+    _write_entry(ws, "entry.py", "print('ok')\n")
+    _, principal = _authority(ws)
+    commands: list[list[str]] = []
+
+    def runner(command: list[str], **_: object) -> dict[str, object]:
+        commands.append(command)
+        return {"returncode": 0, "stdout_bytes": 0, "stderr_bytes": 0, "truncated": False}
+
+    result = PluginRuntimeExecutor(ws, store, runner=runner).execute(
+        _run_action(principal.principal_id, plugin_id=_PLUGIN, entrypoint="entry.py"), principal
+    )
+
+    assert result.ok is True
+    assert commands == [["python", str(ws / "entry.py")]]
 
 
 def test_runtime_reports_nonzero_exit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

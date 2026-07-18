@@ -17,7 +17,7 @@ note rather than pretending to work.
 | **Voice** | — | Not yet active (no voice runtime) |
 | **Data Controls** | Keep chat & task history | History toggle yes; model-training & export not yet active |
 | **Storage** | Live local usage counts, attachment size threshold | Counts + threshold yes; cache clear & cloud metrics not yet active |
-| **Security & Login** | Vault Key (masked, status pill, elevated re-auth), MFA enroll, require-MFA-for-vault, password reset, active device sessions (revoke) | Yes |
+| **Security & Login** | Vault Key (masked, status pill, elevated re-auth), MFA enroll, credential lifecycle, bounded local scan/health, opt-in breach check, password reset, active device sessions (revoke) | Yes |
 | **Trusted Contact** | Add/remove recovery contacts | Contacts saved; emergency-access automation not yet active |
 | **Account** | Display name; **delete account** (elevated, irreversible) | Yes |
 
@@ -28,6 +28,12 @@ note rather than pretending to work.
   you enabled "require MFA for Vault operations").
 - **Password reset** — changing your password signs out all your other devices.
 - **Active device sessions** — see and revoke your other sessions; the current device is marked.
+
+### Credential security
+
+Credential status warns at 75 days and becomes overdue at 90. The local scan uses only
+configured workspace paths and renders redacted findings. A breach check requires explicit
+consent and allowed egress; it sends only a five-character SHA-1 prefix.
 
 ## Account deletion
 

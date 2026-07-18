@@ -30,12 +30,20 @@ describe("Security & Login settings", () => {
         settings: {},
         status: { vault: "missing", mfa_enrolled: false, username: "alice" },
       }),
+      "GET /api/security/credentials": () => [{ provider: "github", status: "warning", due_at: "2026-07-20T00:00:00Z" }],
+      "GET /api/security/findings": () => [{ code: "local_sensitive_pattern", severity: "high", summary: "Credential-like content detected." }],
+      "GET /api/security/health": () => [],
     });
     render(SecurityLogin);
     await waitFor(() => {
       expect(screen.getByText(/Missing \/ Fail-Closed Active/)).toBeInTheDocument();
     });
     expect(screen.getByText(/Not enrolled/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Credential security")).toBeInTheDocument();
+      expect(screen.getByText(/github.*warning/i)).toBeInTheDocument();
+      expect(screen.getByText(/Credential-like content detected/i)).toBeInTheDocument();
+    });
   });
 
   it("saves a vault key via elevated re-auth and flips the pill to valid", async () => {
@@ -56,5 +64,26 @@ describe("Security & Login settings", () => {
     await waitFor(() => {
       expect(screen.getByText(/Active \/ Valid/)).toBeInTheDocument();
     });
+  });
+
+  it("requires explicit consent before an opt-in breach check", async () => {
+    let requestBody: unknown;
+    stub({
+      "GET /api/settings": () => ({ settings: {}, status: { vault: "configured_valid", mfa_enrolled: true, username: "alice" } }),
+      "GET /api/security/credentials": () => [],
+      "GET /api/security/findings": () => [],
+      "GET /api/security/health": () => [],
+      "POST /api/security/breach-check": (init) => {
+        requestBody = JSON.parse(String(init?.body));
+        return [];
+      },
+    });
+    render(SecurityLogin);
+    const button = await screen.findByRole("button", { name: "Check breach corpus" });
+    await fireEvent.input(screen.getByLabelText("Password to check"), { target: { value: "example-password" } });
+    expect(button).toBeDisabled();
+    await fireEvent.click(screen.getByLabelText(/I opt in to a breach check/i));
+    await fireEvent.click(button);
+    await waitFor(() => expect(requestBody).toEqual({ password: "example-password", enabled: true }));
   });
 });

@@ -548,7 +548,7 @@ class PluginRuntimeExecutor:
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         plugin_id = action.arguments.get("plugin_id")
         entrypoint = action.arguments.get("entrypoint")
-        interpreter = action.arguments.get("interpreter", "python3")
+        interpreter = action.arguments.get("interpreter", "python" if os.name == "nt" else "python3")
         raw_args = action.arguments.get("args", [])
 
         if not isinstance(plugin_id, str) or not plugin_id.strip():

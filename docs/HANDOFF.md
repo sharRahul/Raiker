@@ -66,10 +66,33 @@ Control Deck commit.
   mock-remote servers, tripped a tool-set anomaly into auto-pause plus finding /
   notification, and resumed it; screenshots are retained with the task artifacts.
   `ruff` (source roots), `mypy`, `compileall`, all five repository validators,
-  and web check/lint/test/build pass. The full Python suite reaches the unrelated
-  Phase 4 plugin-runtime tests, where three restricted-process checks fail with
-  `WinError 1312` (the Windows logon session/token is unavailable); do not weaken
-  that sandbox to mask the environment failure. The Phase D backend/API tests pass.
+  web check/lint/test/build, and the full Python suite pass. The former Windows
+  `WinError 1312` came from the WindowsApps `python3` execution alias after a
+  long-lived test run; `PluginRuntimeExecutor` now defaults to direct `python`
+  on Windows, while retaining `python3` elsewhere. The Phase D backend/API tests pass.
+
+- **Control Deck Task 5 — credential lifecycle, breach detection, and
+  self-monitoring is implemented in the current worktree.** Migration
+  `RAIKER-1021-credential-security` adds owner-scoped lifecycle and monitor-state
+  rows. The Security & Login page exposes 75/90-day lifecycle status, verified
+  replacement only when encrypted connector credential metadata exists, redacted
+  configured-path scans, explicit vault-health checks, and a breach check that
+  requires both user consent and an owner allowlist for
+  `api.pwnedpasswords.com`. Task 5 uses the existing `security_findings` and
+  `notifications` substrate for deduplicated alert/recovery evidence. It stores
+  and renders no raw secret, password, full hash, local match, or breach-body
+  content. The later bounded-detector backlog is dependency/OS advisories,
+  auth/session anomalies, audit-policy violations, configuration drift, secret
+  exposure, runtime egress, and integrity checks; every addition must include a
+  redacted finding, deduplicated notification, remediation, and tests.
+  Focused lifecycle/monitor/API tests, the complete web gate (145 passed, one
+  existing skipped), both full Python batches (two existing skips total), ruff,
+  mypy, compileall, and all five validators pass. A disposable authenticated
+  browser drive recorded a redacted local finding plus vault-health failure and
+  an opt-in breach request; screenshots are in `C:\Temp\raiker-task5-live`.
+  The active Python environments lack Playwright, so that browser drive used the
+  installed Node Playwright runtime with system Chrome after that limitation was
+  verified.
 
 - **The 2026-07-16 "dirty worktree" is now committed.** The Control Deck pause
   point below told the next session to preserve an uncommitted worktree. That
@@ -200,13 +223,11 @@ Control Deck commit.
   implemented in the current worktree** — see
   `docs/plans/2026-07-17-monitored-mcp-connections.md`.
 - **Plan Tasks 5–11 are not started** (verified against the tree): the
-  `raiker/security/` package now holds `mcp_monitor.py` (monitored-MCP Phases B–C)
-  but **not** the credential-lifecycle/breach-detection modules, and neither
-  `tests/test_credential_security.py` nor `tests/test_runtime_monitoring.py`
-  exists; the web Control Deck rebuild (Tasks 6–10) has not begun. Task 5 will
-  **reuse the shared `security_findings` + `notifications` substrate** built here.
-  **Task 5 (credential lifecycle + breach detection + self-monitoring) is the
-  next Control Deck slice.**
+  `raiker/security/` package now also holds the Task 5 `credentials.py` and
+  `monitoring.py` modules, with `tests/test_credential_security.py` and
+  `tests/test_runtime_monitoring.py`; the web Control Deck rebuild (Tasks 6–10)
+  has not begun. Task 5 reuses the shared `security_findings` + `notifications`
+  substrate built here.
 - **Task 3 review note (design, not a bug).** The new
   `list_sessions(include_archived=False)` default excludes archived sessions from
   every internal caller that does not opt in. The event-visibility path was

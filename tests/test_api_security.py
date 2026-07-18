@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from raiker.api.sessions import ApiSessionStore
 from raiker.auth import passwords
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import utc_now
+from raiker.security.credentials import CredentialLifecycle
 from raiker.storage.sqlite import SQLiteStore
 
 SK_OPENAI = "sk-proj-FakeTestKey00000000000000000000000000000000"
@@ -160,6 +162,39 @@ class TestRedactionGuard:
         )
         assert resp.status_code == 200
         _assert_no_secrets_in_body(resp.json())
+
+
+class TestCredentialSecurityApi:
+    def test_owner_reads_lifecycle_and_scan_results_without_secret_values(
+        self, client: TestClient, owner_token: str, bootstrapped_ws: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        CredentialLifecycle(SQLiteStore(bootstrapped_ws)).record_verified("principal_owner", "github")
+        secret = "api_key=sk-proj-ABCDEF1234567890"
+        (bootstrapped_ws / "scan.txt").write_text(secret, encoding="utf-8")
+        monkeypatch.setenv("RAIKER_SECURITY_SCAN_PATHS", "scan.txt")
+        headers = {"Authorization": f"Bearer {owner_token}"}
+
+        lifecycle = client.get("/api/security/credentials", headers=headers)
+        scan = client.post("/api/security/scan", headers=headers)
+        findings = client.get("/api/security/findings", headers=headers)
+
+        assert lifecycle.status_code == scan.status_code == findings.status_code == 200
+        assert lifecycle.json()[0]["provider"] == "github"
+        dumped = json.dumps([scan.json(), findings.json()])
+        assert secret not in dumped
+        assert "local_sensitive_pattern" in dumped
+
+    def test_security_health_read_is_non_mutating_and_check_is_explicit(
+        self, client: TestClient, owner_token: str
+    ) -> None:
+        headers = {"Authorization": f"Bearer {owner_token}"}
+
+        read = client.get("/api/security/health", headers=headers)
+        checked = client.post("/api/security/health-check", headers=headers)
+
+        assert read.status_code == checked.status_code == 200
+        assert read.json() == []
+        assert checked.json()[0]["code"] == "health_vault_unhealthy"
 
 
 # ── 4. Token revocation ─────────────────────────────────────────────────────

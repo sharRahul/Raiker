@@ -281,6 +281,13 @@ class ContainMcpServerRequest(BaseModel):
     reason: str | None = None
 
 
+class BreachCheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    password: str
+    enabled: bool = False
+
+
 class SetSessionTagsRequest(BaseModel):
     # Replace the tag set for one session. Tags are organizing labels only —
     # they grant nothing. The server normalizes (trim, lowercase, dedupe,

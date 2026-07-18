@@ -45,6 +45,16 @@ OAuth tokens). Under **Settings → Security & Login**:
 If the key is missing or invalid, all connectors fail closed — no credential is retrieved and
 no outbound connector call is made.
 
+## Credential security
+
+The same **Security & Login** panel reports a connector credential warning at 75 days and
+overdue status at 90 days. **Verify replacement** only succeeds after encrypted connector
+credential metadata is present; it does not rotate a provider credential for you. The local
+scan reads only owner-configured workspace-relative paths and records a redacted finding. The
+optional breach check is off by default and needs explicit consent plus an owner allowlist for
+`api.pwnedpasswords.com`; it sends only the first five SHA-1 hash characters. Passwords, full
+hashes, matched content, and breach responses are never stored or shown.
+
 ## Sessions
 
 Session tokens are cryptographically random, stored only as hashes, and carry both a sliding

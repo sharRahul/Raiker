@@ -11,6 +11,7 @@ from raiker.api.routes_instances import _require_loopback
 from raiker.api.schemas import (
     AuthSessionRequest,
     BrainSourceRequest,
+    BreachCheckRequest,
     BulkDeleteSessionsRequest,
     ContainMcpServerRequest,
     CreateMcpServerRequest,
@@ -299,6 +300,62 @@ async def mark_notification_read(
     """Owner-scoped mark-as-read for one notification."""
     return _mcp_result(
         _service(request).mark_notification_read(notification_id, auth_data[0].principal_id)
+    )
+
+
+@router.get("/api/security/credentials")
+async def list_security_credentials(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> list[dict[str, Any]]:
+    return serialize_dto(_service(request).list_security_credentials(auth_data[0].principal_id))
+
+
+@router.post("/api/security/credentials/{provider}/verify")
+async def verify_security_credential(
+    provider: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    try:
+        return serialize_dto(_service(request).verify_security_credential(auth_data[0].principal_id, provider))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from None
+
+
+@router.get("/api/security/findings")
+async def list_security_findings(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> list[dict[str, Any]]:
+    return serialize_dto(_service(request).list_security_findings(auth_data[0].principal_id))
+
+
+@router.post("/api/security/scan")
+async def scan_security(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> list[dict[str, Any]]:
+    return serialize_dto(_service(request).scan_security(auth_data[0].principal_id))
+
+
+@router.get("/api/security/health")
+async def list_security_health(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> list[dict[str, Any]]:
+    return _service(request).list_security_health(auth_data[0].principal_id)
+
+
+@router.post("/api/security/health-check")
+async def check_security_health(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> list[dict[str, Any]]:
+    return _service(request).check_security_health(auth_data[0].principal_id)
+
+
+@router.post("/api/security/breach-check")
+async def check_password_breach(
+    body: BreachCheckRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    return serialize_dto(
+        _service(request).check_password_breach(auth_data[0].principal_id, body.password, enabled=body.enabled)
     )
 
 

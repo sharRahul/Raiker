@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api, auth, getToken, setToken, ApiError } from "../../api";
+  import type { CredentialLifecycle, McpFinding, SecurityHealth } from "../../apiTypes";
 
   // Security & Login settings section: Vault Key configuration (masked + reveal +
   // status pill + elevated re-auth to save) and MFA enrollment. Exercises the
@@ -28,6 +29,11 @@
   let sessions = $state<
     Array<{ session_id: string; created_at: string; last_seen_at: string | null; current: boolean; revoked: boolean }>
   >([]);
+  let credentials = $state<CredentialLifecycle[]>([]);
+  let findings = $state<McpFinding[]>([]);
+  let health = $state<SecurityHealth[]>([]);
+  let breachPassword = $state("");
+  let breachOptIn = $state(false);
 
   async function load() {
     try {
@@ -41,6 +47,37 @@
       notice = { kind: "error", text: "Could not load security settings." };
     }
     await loadSessions();
+    try {
+      [credentials, findings, health] = await Promise.all([
+        api.securityCredentials(), api.securityFindings(), api.securityHealth(),
+      ]);
+    } catch {
+      // Security posture stays unavailable rather than fabricating a healthy state.
+    }
+  }
+
+  async function scanSecurity() {
+    try { findings = await api.scanSecurity(); }
+    catch (e) { notice = { kind: "error", text: message(e, "Could not run the local security scan.") }; }
+  }
+
+  async function checkHealth() {
+    try { health = await api.checkSecurityHealth(); findings = await api.securityFindings(); }
+    catch (e) { notice = { kind: "error", text: message(e, "Could not run the health check.") }; }
+  }
+
+  async function verifyCredential(provider: string) {
+    try {
+      const updated = await api.verifySecurityCredential(provider);
+      credentials = credentials.map((row) => row.provider === provider ? updated : row);
+    } catch (e) { notice = { kind: "error", text: message(e, "Replacement is not verified.") }; }
+  }
+
+  async function checkBreach() {
+    try {
+      findings = await api.checkPasswordBreach(breachPassword, breachOptIn);
+      breachPassword = "";
+    } catch (e) { notice = { kind: "error", text: message(e, "Could not check the breach corpus.") }; }
   }
 
   async function loadSessions() {
@@ -241,6 +278,28 @@
       Require MFA for Vault operations
       {#if !mfaEnrolled}<span class="sub">(enroll in MFA to enable)</span>{/if}
     </label>
+  </div>
+
+  <div class="field">
+    <div class="field-head"><h3>Credential security</h3></div>
+    <p class="sub">Lifecycle status and findings are redacted. Local scans use only configured workspace paths.</p>
+    {#if credentials.length}
+      <ul>{#each credentials as credential}<li>{credential.provider} — {credential.status} <button class="link" onclick={() => verifyCredential(credential.provider)}>Verify replacement</button></li>{/each}</ul>
+    {:else}<p class="sub">No verified connector credentials yet.</p>{/if}
+    {#if findings.length}<ul>{#each findings as finding}<li>{finding.severity}: {finding.summary}</li>{/each}</ul>{/if}
+    {#if health.length}<p class="sub">Latest health state: {health[0].state}</p>{/if}
+    <div class="actions"><button class="btn btn-soft" onclick={scanSecurity}>Run local scan</button><button class="btn btn-soft" onclick={checkHealth}>Check runtime health</button></div>
+    <label>
+      Password to check
+      <input type="password" bind:value={breachPassword} autocomplete="off" />
+    </label>
+    <label class="toggle">
+      <input type="checkbox" bind:checked={breachOptIn} />
+      I opt in to a breach check; only the first five SHA-1 characters leave this device.
+    </label>
+    <button type="button" class="btn btn-soft" disabled={!breachPassword || !breachOptIn} onclick={checkBreach}>
+      Check breach corpus
+    </button>
   </div>
 
   <!-- Password reset -->

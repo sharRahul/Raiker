@@ -407,7 +407,7 @@ Capabilities); rename/delete are owner-scoped and human-only.
 
 **Does NOT cover:** Raw secret values are never stored in findings; HIBP is skipped without opt-in and permitted egress; provider-side rotation is not claimed for current providers.
 
-- [ ] **Step 1: Write failing tests** for 75/90-day status, verified manual replacement, redacted local finding, k-anonymous password range request, offline HIBP skip, deduplicated health alerts, and cleared recovery alerts.
+- [x] **Step 1: Write failing tests** for 75/90-day status, verified manual replacement, redacted local finding, k-anonymous password range request, offline HIBP skip, deduplicated health alerts, and cleared recovery alerts.
 
 ```python
 def test_hibp_only_sends_sha1_prefix(httpx_mock) -> None:
@@ -416,13 +416,13 @@ def test_hibp_only_sends_sha1_prefix(httpx_mock) -> None:
     assert len(httpx_mock.last_request.url.path.rsplit("/", 1)[-1]) == 5
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED** â€” captured before the Task 5 service and route implementation.
 
 Run: `python -m pytest tests/test_credential_security.py tests/test_runtime_monitoring.py -q`
 
 Expected: security services and authenticated endpoints do not exist.
 
-- [ ] **Step 3: Add additive, owner-scoped records** for credential lifecycle, redacted security findings, health observations, and notifications.
+- [x] **Step 3: Add additive, owner-scoped records** for credential lifecycle, redacted security findings, health observations, and notifications. Migration `RAIKER-1021-credential-security` adds owner-scoped lifecycle and monitor-transition tables alongside the shared findings/notifications substrate.
 
 ```sql
 CREATE TABLE IF NOT EXISTS credential_lifecycle (
@@ -431,15 +431,23 @@ CREATE TABLE IF NOT EXISTS credential_lifecycle (
 );
 ```
 
-- [ ] **Step 4: Implement security services**: mark 75-day warning/90-day overdue status, verify replacement before resetting rotation time, scan configured local paths without persisting secret values, use SHA-1 prefix/range comparison only after opt-in, and deduplicate state-transition alerts.
+- [x] **Step 4: Implement security services**: 75-day warning/90-day overdue status, verified replacement requiring encrypted credential metadata, configured workspace-relative local scans, opt-in SHA-1 prefix/range checks, and deduplicated alert/recovery transitions. The password, full hash, HIBP response, and local match never persist.
 
-- [ ] **Step 5: Add authenticated dashboard reads and explicit scan/check actions**; return remediation guidance and redacted identifiers only.
+- [x] **Step 5: Add authenticated dashboard reads and explicit scan/check actions**; the Security & Login card renders lifecycle, redacted findings, last health state, replacement verification, local scan, explicit health check, and an explicit breach opt-in. `GET /api/security/health` is read-only; `POST /api/security/health-check` performs the check.
 
-- [ ] **Step 6: Verify GREEN**
+- [x] **Step 6: Verify GREEN** â€” focused lifecycle/monitor/API tests and the Security & Login Vitest suite pass; final repository and browser evidence is recorded in `docs/HANDOFF.md`.
 
 Run: `python -m pytest tests/test_credential_security.py tests/test_runtime_monitoring.py tests/test_api_security.py -q`
 
 Expected: no raw credential is present in the database finding, event payload, API response, or HTTP request URL beyond a five-character password hash prefix.
+
+**Bounded next-security-detector roadmap (not implemented by Task 5):** Add one
+source-bounded detector at a time for dependency/OS advisories, auth/session
+anomalies, audit-policy violations, configuration drift, secret exposure,
+runtime egress, and integrity checks. Each detector must emit only a redacted
+finding, deduplicated notification, concrete remediation, and tests for alert,
+deduplication, recovery, owner isolation, and redaction. Do not claim universal
+or exhaustive system-security detection.
 
 ### Task 6: Extend Typed Web Contracts and Shared Control Deck Primitives
 

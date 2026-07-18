@@ -25,6 +25,23 @@ bypass governance. Every action must remain policy-aware, observable,
 auditable, approval-driven where required, human-governed, user-controlled, and
 fail-closed by design.
 
+> Current truth update (2026-07-18): Control Deck **Task 5 credential security**
+> is implemented in the current worktree. Migration
+> `RAIKER-1021-credential-security` stores only owner-scoped lifecycle metadata
+> and monitor transition state. `CredentialLifecycle` reports warning at 75 days
+> and overdue at 90, and verifies a replacement only when encrypted connector
+> credential metadata exists. `SecurityMonitor` records redacted configured-path
+> findings, opt-in/allowlisted k-anonymous HIBP range matches, and vault-health
+> failures/recoveries through shared `security_findings` and `notifications`.
+> The authenticated Security & Login surface exposes lifecycle, redacted findings,
+> explicit scan/health controls, and explicit breach consent. Raw passwords,
+> secrets, full hashes, local matches, and HIBP response bodies are never stored
+> or rendered. This is deliberately bounded, not a claim to find every security
+> issue; the planned follow-up sources are dependency/OS advisories, auth/session
+> anomalies, audit-policy violations, configuration drift, secret exposure,
+> runtime egress, and integrity checks, each with redaction, deduplication,
+> remediation, and tests.
+
 > Current truth update (2026-07-18): the **monitored MCP connections** plan
 > (`docs/plans/2026-07-17-monitored-mcp-connections.md`) is implemented through
 > **Phase D**. Phase A added the remote (HTTP) transport to `McpConnectorExecutor`
@@ -114,8 +131,7 @@ fail-closed by design.
 > persistence, `RuntimeControlService.{create,connect,rename,delete}_mcp_server`,
 > and routes `POST /api/mcp/servers`, `POST /api/mcp/servers/{id}/connect`,
 > `PUT`/`DELETE /api/mcp/servers/{id}`; frontend `McpView.svelte` + `McpView.test.ts`.
-> Plan **Tasks 5–11** (credential lifecycle + breach detection + self-monitoring,
-> and the remaining web Control Deck rebuild) remain **not started** — verified
+> Plan **Tasks 6–11** (the remaining web Control Deck rebuild) remain **not started** — verified
 > against the tree. Gates on the Task 4 + 4b tree: `pytest` 1918 passed, `ruff`
 > clean, `mypy` 421 files clean, all five repo validators pass; web
 > `check`/`lint`/`test` (141 passed)/`build` all green.

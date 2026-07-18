@@ -76,6 +76,7 @@ _PREFIXES = {
     # and a redacted security finding.
     "mses_",
     "find_",
+    "cred_",
     # Monitored MCP connections (Phase C): an owner-facing notification.
     "ntf_",
 }

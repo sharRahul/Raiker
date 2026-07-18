@@ -1449,6 +1449,37 @@ CREATE INDEX IF NOT EXISTS idx_notifications_owner
   ON notifications(principal_id, read, created_at DESC);
 """
 
+# Control Deck Task 5: owner-scoped credential lifecycle metadata and monitor
+# transition state. These rows deliberately contain labels, timestamps, and
+# finding ids only; encrypted credential material remains in connector_credentials.
+CREDENTIAL_SECURITY_MIGRATION_ID = "RAIKER-1021-credential-security"
+
+CREDENTIAL_SECURITY_SQL = """
+CREATE TABLE IF NOT EXISTS credential_lifecycle (
+  credential_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  rotated_at TEXT NOT NULL,
+  verified_at TEXT,
+  due_at TEXT NOT NULL,
+  status TEXT NOT NULL,
+  UNIQUE(principal_id, provider)
+);
+CREATE INDEX IF NOT EXISTS idx_credential_lifecycle_owner
+  ON credential_lifecycle(principal_id, status, due_at);
+
+CREATE TABLE IF NOT EXISTS security_monitor_state (
+  principal_id TEXT NOT NULL,
+  source TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  code TEXT NOT NULL,
+  state TEXT NOT NULL,
+  finding_id TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(principal_id, source, subject_id, code)
+);
+"""
+
 # Nested projects/folders (conversation organisation remainder): arbitrary-depth
 # folder hierarchy via hybrid adjacency list + materialized path. Parent
 # reference uses ON DELETE SET NULL so children survive parent hard-delete.

@@ -14,15 +14,17 @@
 
 | ID | Severity | Area | Status | One-liner |
 |----|----------|------|--------|-----------|
-| FIX-01 | Medium | Auth / first-run | Open | Primary button says "Unlock Raiker" before any account exists → "Authentication failed." |
+| FIX-01 | Medium | Auth / first-run | ✅ **Fixed** | Primary button says "Unlock Raiker" before any account exists → "Authentication failed." |
 | FIX-02 | High | Error clarity | ✅ **Fixed** | Provider connect error was over-redacted to `[REDACTED_SECRET]`. |
 | FIX-03 | High | Models / governance | ✅ **Fixed** | Hosted-model activation was impossible from the web dashboard (dead-end). |
-| FIX-04 | Low | MCP | Open | "Create server" button is clickable while the capability is disabled. |
-| FIX-05 | Medium | Docs vs runtime | Open | Fresh workspace shows **all** gates `disabled`, contradicting the README's "integrated gates default enabled_runtime". |
-| FIX-06 | Low | Tasks | Open | Queue open/scheduled/finished counts are confusing on a fresh workspace. |
-| FIX-07 | Medium | Security / vault | Open | Vault-key field requires a Fernet key but gives no format hint. |
+| FIX-04 | Low | MCP | ✅ **Fixed** | "Create server" button is clickable while the capability is disabled. |
+| FIX-05 | Medium | Docs vs runtime | ✅ **Fixed** | Fresh workspace shows **all** gates `disabled`, contradicting the README's "integrated gates default enabled_runtime". |
+| FIX-06 | Low | Tasks | ✅ **Fixed** | Queue open/scheduled/finished counts are confusing on a fresh workspace. |
+| FIX-07 | Medium | Security / vault | ✅ **Fixed** | Vault-key field requires a Fernet key but gives no format hint. |
 
-> **FIX-02 and FIX-03 are resolved in this branch.** Hosted providers
+> **All seven items are resolved in this branch.** FIX-02 and FIX-03 landed
+> earlier (below); FIX-01, FIX-04, FIX-05, FIX-06, and FIX-07 are addressed here.
+> Hosted providers
 > (Anthropic/OpenAI/Gemini) can now be enabled and used **entirely from the web
 > dashboard**, with the threat-model acknowledgement and confirmation token
 > collected in the governed step-up dialog — the security gate is preserved, not
@@ -33,6 +35,16 @@
 ---
 
 ### FIX-01 — First-run primary button says "Unlock Raiker" but no account exists yet
+
+> ✅ **Fixed in this branch.** `LoginView.svelte` now drives the primary CTA's
+> label, submit handler, confirm-password field, password autocomplete, and the
+> greeting from a combined `registerIntent = isRegister || isFirstRun`. On first
+> run the button reads **"Create a User Account"** and calls `auth.register`, so
+> the copy and the action no longer disagree. The redundant account-switch,
+> recovery, and secondary instance-creation controls (which have nothing to act on
+> before any account exists) are hidden on first run. Covered by
+> `LoginView.test.ts` ("registers the first account directly from the first-run
+> CTA and validates confirmation").
 
 - **Screenshot:** `screenshots/not-working/01-firstrun-cta-confusion.png`
 - **Where:** `apps/web/src/lib/views/LoginView.svelte`
@@ -140,6 +152,12 @@
 
 ### FIX-04 — MCP "Create server" button is clickable while the capability is disabled
 
+> ✅ **Fixed in this branch.** `McpView.svelte` now disables the **Create server**
+> button (plus the name input and template select) whenever `mcp_builder_runtime`
+> is off, and adds a `title` hint pointing to Capabilities — matching the other
+> gated controls. Failing closed is unchanged; the doomed 403 request is no longer
+> fireable from a live button.
+
 - **Screenshot:** `screenshots/not-working/05-mcp-capability-disabled.png`
 - **Where:** `apps/web/src/lib/views/McpView.svelte`
 - **Repro:** MCP Servers → type a server name → **Create server** (with the MCP
@@ -156,6 +174,19 @@
 ---
 
 ### FIX-05 — Fresh workspace shows all capability gates `disabled` vs README claim
+
+> ✅ **Fixed in this branch — reconciled as documentation + a UI affordance.** The
+> real cause is two deliberate design layers, now spelled out instead of implied:
+> (1) the web dashboard runs under **per-principal controls that fail closed** —
+> `RuntimeAuthority.get_effective_capability_gate` returns `disabled`
+> (`source: principal_fail_closed`) for any account principal until the owner turns
+> a gate on, so the `enabled_runtime` static default only describes the single-user
+> CLI posture; and (2) reaching `enabled_runtime` at all requires an active
+> runtime-enablement mode (`local_single_user_runtime`/`multi_user_local_runtime`),
+> not the default **Development preview**. `README.md`, `docs/RUNTIME_EXECUTORS_SPEC.md`,
+> and `docs/guide/core-concepts.md` now state both facts, and the **Capabilities**
+> view shows an inline note (when integrated gates read off) pointing the user to
+> **Settings → Runtime mode**.
 
 - **Where:** `README.md` (Project Status), `raiker/phase_gates.py`
   (`REAL_EXECUTOR_CAPABILITIES`), runtime-mode activation.
@@ -175,6 +206,16 @@
 
 ### FIX-06 — Task queue counts are confusing on a fresh workspace
 
+> ✅ **Fixed in this branch — product decision: chat turns are not user tasks.**
+> Every chat turn spawns an internal governance task (`title="Chat turn"`,
+> `parent_turn_id` set) via `AgentGateway.astream_prompt`. Those are internal
+> records, surfaced in Sessions/Audit — not user-planned work — so
+> `DashboardService.list_tasks` (the `/api/tasks` reader) now excludes tasks with a
+> `parent_turn_id`. The **open / scheduled / finished** counters and the **Parent
+> work** picker therefore reflect only user-created tasks. Interrupts still operate
+> on the raw store list, so a running chat turn can still be stopped. Covered by
+> `tests/test_phase_2_task_manager.py::TestDashboardTaskFiltering`.
+
 - **Screenshot:** `screenshots/working/07-tasks-created-all-types.png` (counts row)
 - **Where:** `apps/web/src/lib/views/TasksView.svelte` (`active` / `scheduled` /
   `history` derivations).
@@ -192,6 +233,17 @@
 ---
 
 ### FIX-07 — Vault key field requires a Fernet key but gives no format hint
+
+> ✅ **Fixed in this branch.** `SecurityLogin.svelte` now states the required
+> format inline ("a **Fernet key**: 32 random bytes, URL-safe base64, 44 chars"),
+> shows the copy-pasteable `Fernet.generate_key()` command, and adds a **Generate
+> key** button that mints a valid key client-side (Web Crypto `getRandomValues` →
+> URL-safe base64, mirroring `Fernet.generate_key()`) and reveals it for review.
+> The key still saves only through the existing governed, elevated-re-auth flow.
+> The invalid-key error was rewritten from the bare reason code to actionable
+> guidance ("a plain passphrase will not work"). The backend
+> `raiker/auth/vault_key_file.py` is unchanged — it correctly requires a real
+> Fernet key.
 
 - **Screenshot:** `screenshots/not-working/04-vault-key-invalid-no-hint.png`
 - **Where:** `apps/web/src/lib/views/settings/SecurityLogin.svelte`,

@@ -1895,11 +1895,18 @@ class DashboardService:
         user_id: str | None = None,
         project_id: str | None = None,
     ) -> list[TaskView]:
+        # The user-facing work queue lists only tasks the user created. Each chat
+        # turn also spawns an internal governance task (``parent_turn_id`` set);
+        # those are surfaced in Sessions/Audit, not here, so they no longer
+        # inflate the open/scheduled/finished counters or appear as selectable
+        # "Parent work" (FIX-06). Interrupts operate on the raw store list, so a
+        # running chat turn can still be stopped.
         return [
             self._task_view(t)
             for t in self.store.list_tasks(
                 session_id=session_id, status=status, user_id=user_id, project_id=project_id
             )
+            if not getattr(t, "parent_turn_id", None)
         ]
 
     def create_task(

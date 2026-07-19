@@ -39,6 +39,10 @@
 
   const isRegister = $derived(mode === "register");
   const isFirstRun = $derived(bootstrapAllowed && mode === "login" && !instanceSetup);
+  // First run has no account yet, so the primary CTA must create one, not log in.
+  // Label, submit handler, confirm-password field, and autocomplete all follow
+  // this combined intent so the copy and the action never disagree (FIX-01).
+  const registerIntent = $derived(isRegister || isFirstRun);
   const isVerifying = $derived(runtimeState === "verifying");
   const formDisabled = $derived(busy || isVerifying);
 
@@ -54,7 +58,7 @@
         sub: "Start the local Raiker server, then try again.",
       };
     }
-    if (isRegister) return { title: "Hello! I am Raiker.", sub: "Nice to meet you." };
+    if (registerIntent) return { title: "Hello! I am Raiker.", sub: "Nice to meet you." };
     if (runtimeReachable === true) {
       return { title: "I am ready when you are.", sub: "Unlock me to get started." };
     }
@@ -150,16 +154,15 @@
     event.preventDefault();
     error = null;
     // Client-side convenience only — the server remains authoritative.
-    if (mode === "register" && password !== confirmPassword) {
+    if (registerIntent && password !== confirmPassword) {
       error = "Passwords do not match.";
       return;
     }
     busy = true;
     try {
-      const result =
-        mode === "register"
-          ? await auth.register(username, password)
-          : await auth.login(username, password);
+      const result = registerIntent
+        ? await auth.register(username, password)
+        : await auth.login(username, password);
       if (result.stage === "mfa_required") {
         ticket = result.ticket ?? "";
         step = "mfa";
@@ -322,7 +325,7 @@
               type={showPassword ? "text" : "password"}
               bind:value={password}
               placeholder="Enter your password"
-              autocomplete={isRegister ? "new-password" : "current-password"}
+              autocomplete={registerIntent ? "new-password" : "current-password"}
               required
               disabled={formDisabled}
             />
@@ -338,7 +341,7 @@
             </button>
           </div>
 
-          {#if isRegister}
+          {#if registerIntent}
             <label for="confirm-password">Confirm password</label>
             <div class="field">
               <span class="field-icon" aria-hidden="true"><Icon name="lock" size={17} /></span>
@@ -356,30 +359,35 @@
 
           {#if error}<p class="error" role="alert">{error}</p>{/if}
           <button type="submit" class="btn btn-primary submit" disabled={formDisabled} aria-busy={busy}>
-            {busy ? (isRegister ? "Creating…" : "Unlocking…") : isRegister ? "Create a User Account" : "Unlock Raiker"}
+            {busy ? (registerIntent ? "Creating…" : "Unlocking…") : registerIntent ? "Create a User Account" : "Unlock Raiker"}
           </button>
         </form>
 
-        <div class="divider" aria-hidden="true"><span>or</span></div>
+        <!-- On first run there is no account yet, so account-switching, recovery,
+             and secondary instance-creation controls have nothing to act on and
+             are hidden — the primary CTA above already creates the account. -->
+        {#if !isFirstRun}
+          <div class="divider" aria-hidden="true"><span>or</span></div>
 
-        {#if bootstrapAllowed || isRegister}
-          <button type="button" class="secondary" onclick={switchMode} disabled={formDisabled}>
-            <Icon name={isRegister ? "user" : "user-plus"} size={18} />
-            {isRegister ? "Return to unlock" : "Create a User Account"}
-          </button>
-        {/if}
+          {#if bootstrapAllowed || isRegister}
+            <button type="button" class="secondary" onclick={switchMode} disabled={formDisabled}>
+              <Icon name={isRegister ? "user" : "user-plus"} size={18} />
+              {isRegister ? "Return to unlock" : "Create a User Account"}
+            </button>
+          {/if}
 
-        {#if !isRegister}
-          <button type="button" class="secondary" onclick={() => { mode = "recovery"; error = null; }} disabled={formDisabled}>
-            Forgot password?
-          </button>
-        {/if}
+          {#if !isRegister}
+            <button type="button" class="secondary" onclick={() => { mode = "recovery"; error = null; }} disabled={formDisabled}>
+              Forgot password?
+            </button>
+          {/if}
 
-        {#if !bootstrapAllowed && !isRegister}
-          <button type="button" class="secondary instance-button" onclick={() => { instanceSetup = true; error = null; }} disabled={formDisabled}>
-            <Icon name="projects" size={18} />
-            Create a User Account
-          </button>
+          {#if !bootstrapAllowed && !isRegister}
+            <button type="button" class="secondary instance-button" onclick={() => { instanceSetup = true; error = null; }} disabled={formDisabled}>
+              <Icon name="projects" size={18} />
+              Create a User Account
+            </button>
+          {/if}
         {/if}
 
         <div id="privacy-note" class="privacy">

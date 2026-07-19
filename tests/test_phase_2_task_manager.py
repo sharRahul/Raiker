@@ -60,6 +60,45 @@ class TestTaskManager:
     def test_list_tasks_empty(self, manager: TaskManager) -> None:
         assert manager.list_tasks() == []
 
+
+class TestDashboardTaskFiltering:
+    """FIX-06: the user-facing work queue lists only user-created tasks; the
+    internal per-turn governance tasks (``parent_turn_id`` set) are hidden so the
+    open/scheduled/finished counters and the Parent-work picker stay intuitive."""
+
+    def _create_session(self, store: SQLiteStore) -> str:
+        sid = new_id("sess_")
+        store.create_session(sid, str(store.paths.workspace_root))
+        return sid
+
+    def test_dashboard_hides_chat_turn_tasks(
+        self, manager: TaskManager, store: SQLiteStore
+    ) -> None:
+        from raiker.control.dashboard import DashboardService
+
+        sid = self._create_session(store)
+        user_task = manager.create_task(
+            session_id=sid, title="User task", objective="Explicitly created"
+        )
+        # A chat turn spawns an internal task stamped with its turn id.
+        turn_id = new_id("turn_")
+        store.insert_turn(sid, turn_id, "hello")
+        manager.create_task(
+            session_id=sid,
+            title="Chat turn",
+            objective="Governed chat turn",
+            parent_turn_id=turn_id,
+        )
+
+        # The raw store keeps both (interrupts must still be able to stop a turn).
+        assert len(store.list_tasks(session_id=sid)) == 2
+
+        # The dashboard view exposes only the user-created task.
+        service = DashboardService(store.paths.workspace_root)
+        views = service.list_tasks(session_id=sid)
+        assert [v.task_id for v in views] == [user_task.task_id]
+        assert all(v.title != "Chat turn" for v in views)
+
     def test_update_progress(self, manager: TaskManager, store: SQLiteStore) -> None:
         sid = self._create_session(store)
         task = manager.create_task(session_id=sid, title="Progress", objective="Check progress")

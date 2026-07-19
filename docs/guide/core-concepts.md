@@ -41,9 +41,13 @@ audited.
 
 Raiker's abilities are enumerated as ~53 **capabilities**, each with a **gate**.
 Integrated capabilities — exactly the capabilities in `REAL_EXECUTOR_CAPABILITIES`
-— default to `enabled_runtime`; capabilities without a real executor default to
-`disabled` and fail closed rather than fabricating success. Disabling an
-integrated gate is still owner/`runtime_gate_manager` controlled, persisted, and
+— default to `enabled_runtime` in the static/global (single-user CLI) posture;
+capabilities without a real executor default to `disabled` and fail closed rather
+than fabricating success. **In the web dashboard, gates are per-principal and
+fail closed:** each account owner sees every gate `disabled` until they turn it on,
+and only an active runtime-enablement mode (not Development preview) permits the
+`enabled_runtime` transition — which is why a fresh workspace shows everything off.
+Disabling an integrated gate is still owner/`runtime_gate_manager` controlled, persisted, and
 audited. An enabled gate is not unrestricted execution: every AI-proposed action
 still passes through the standing decision mode (default `ask`), PolicyEngine
 hard-denies, risk floors, and executor-level allowlists/threat acknowledgements.

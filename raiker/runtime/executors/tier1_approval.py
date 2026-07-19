@@ -45,6 +45,39 @@ class ApprovalExecutionRelay:
                 summary=f"Approval {approval_id} already resolved.",
             )
 
+        # TTL check first: an expired approval resolves to `expired` and never
+        # executes. `expires_at` is stored in the same canonical UTC ISO-8601
+        # format as `utc_now()`, so a lexicographic comparison is chronological.
+        now = utc_now()
+        expires_at = approval.get("expires_at")
+        if expires_at is not None and str(expires_at) and now > str(expires_at):
+            self._store.expire_approval(approval_id)
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code="approval_expired",
+                summary=f"Approval {approval_id} expired at {expires_at}; not executed.",
+            )
+
+        # TOCTOU defense: the immutable intent hash was captured at approval
+        # creation. Recompute it from the tool action as it stands now; if the
+        # arguments (or tool/risk) drifted since approval, refuse — the human
+        # approved a different action than the one about to run.
+        stored_hash = approval.get("action_payload_sha256")
+        if stored_hash is not None:
+            current_hash = self._store.tool_action_payload_sha256(
+                str(approval.get("tool_name", "")),
+                str(approval.get("arguments_json", "{}")),
+                str(approval.get("risk_level", "")),
+            )
+            if str(stored_hash) != current_hash:
+                return ExecutionResult(
+                    ok=False, capability=self.capability, action_id=action.action_id,
+                    reason_code="approval_payload_tampered",
+                    summary=(
+                        f"Approval {approval_id} arguments changed since approval; refused."
+                    ),
+                )
+
         arguments_json = str(approval.get("arguments_json", "{}"))
         try:
             tool_args: dict[str, Any] = json.loads(arguments_json)

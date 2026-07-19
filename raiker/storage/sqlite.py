@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -2570,7 +2571,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
 
     def insert_approval(
-        self, approval_id: str, action: ToolAction | str, status: str = "pending"
+        self,
+        approval_id: str,
+        action: ToolAction | str,
+        status: str = "pending",
+        *,
+        ttl_hours: float | None = 24.0,
     ) -> None:
         if isinstance(action, ToolAction):
             action_id = action.action_id
@@ -2589,15 +2595,42 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 str(row["arguments_json"]),
                 str(row["risk_level"]),
             )
+        # The approval carries an immutable intent snapshot: the SHA-256 of the
+        # proposed action's canonical payload (TOCTOU defense) plus a bounded
+        # lifetime. A pending approval that is never resolved expires — its
+        # resting state becomes "expired", so a stale grant can never execute.
+        created = datetime.now(UTC).replace(microsecond=0)
+        created_at = created.isoformat().replace("+00:00", "Z")
+        expires_at: str | None = None
+        if ttl_hours is not None and ttl_hours > 0:
+            expires_at = (
+                (created + timedelta(hours=ttl_hours)).isoformat().replace("+00:00", "Z")
+            )
         with self.connect() as connection:
             connection.execute(
                 """
                 INSERT INTO approvals
-                (approval_id, action_id, status, approval_scope, created_at, action_payload_sha256)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (approval_id, action_id, status, approval_scope, created_at, expires_at, action_payload_sha256)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (approval_id, action_id, status, "action", utc_now(), payload_hash),
+                (approval_id, action_id, status, "action", created_at, expires_at, payload_hash),
             )
+
+    def expire_approval(self, approval_id: str) -> bool:
+        """Resolve a still-pending approval to ``expired``.
+
+        Returns True when this call performed the transition. The
+        ``status = 'pending'`` guard makes it a no-op (returning False) once the
+        approval has already been approved, denied, or expired, so an expiry
+        sweep can never clobber a real human decision.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE approvals SET status = 'expired', resolved_at = ? "
+                "WHERE approval_id = ? AND status = 'pending'",
+                (utc_now(), approval_id),
+            )
+        return cursor.rowcount == 1
 
     def insert_checkpoint(self, checkpoint: Checkpoint, manifest_path: str) -> None:
         with self.connect() as connection:

@@ -212,7 +212,7 @@ npm --prefix apps/web run test        # vitest
 npm --prefix apps/web run build
 ```
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for submission and DCO terms and [`docs/LOCAL_VALIDATION_GATE.md`](docs/LOCAL_VALIDATION_GATE.md) for the full evidence checklist. Do not mark a capability `implemented_verified` without a named task, tests, and recorded validation, and never activate a disabled runtime gate through docs, tests, or code shortcuts. Open a GitHub issue for bugs, doc gaps, or scope conflicts, including the relevant phase, file path, and expected vs. actual behavior.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for submission terms and [`docs/LOCAL_VALIDATION_GATE.md`](docs/LOCAL_VALIDATION_GATE.md) for the full evidence checklist. Do not mark a capability `implemented_verified` without a named task, tests, and recorded validation, and never activate a disabled runtime gate through docs, tests, or code shortcuts. Open a GitHub issue for bugs, doc gaps, or scope conflicts, including the relevant phase, file path, and expected vs. actual behavior.
 
 ---
 

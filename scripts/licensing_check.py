@@ -106,7 +106,7 @@ def check_project_files(root: Path) -> list[str]:
     errors: list[str] = []
     if not (root / "LICENSE").read_text(encoding="utf-8").startswith("                                 Apache License\n"):
         errors.append("LICENSE is not the Apache License 2.0 text")
-    if not (root / "NOTICE").is_file() or not (root / "DCO").is_file() or not (root / "CONTRIBUTING.md").is_file():
+    if not (root / "NOTICE").is_file() or not (root / "CONTRIBUTING.md").is_file():
         errors.append("required root licensing files are missing")
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     if project.get("license") != "Apache-2.0":

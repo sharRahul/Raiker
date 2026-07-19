@@ -14,16 +14,18 @@ headers are not added to JSON, lockfiles, generated outputs, snapshots,
 fixtures, compiled assets, or third-party files. Do not remove third-party
 notices or add ownership claims without evidence.
 
-Contributions are submitted under Apache-2.0 and require the [DCO](../../DCO)
-sign-off described in [CONTRIBUTING.md](../../CONTRIBUTING.md). Raise licensing
-questions through a private security report or a repository issue that contains
-no sensitive information.
+Contributions are submitted under Apache-2.0 as described in
+[CONTRIBUTING.md](../../CONTRIBUTING.md); no sign-off trailer or Contributor
+License Agreement is required. Raise licensing questions through a private
+security report or a repository issue that contains no sensitive information.
 
 ## Dependencies and notices
 
 Dependencies retain their own licences. Generated files and SBOMs are not
 project copyright notices. Vendored or copied material must retain its licence
-and attribution; bundled fonts remain under the notices in
+and attribution; the bundled fonts remain under the SIL OFL 1.1 with the
+copyright notices and full licence text in
+`apps/web/src/assets/fonts/OFL.txt`, summarised in
 `apps/web/src/assets/fonts/LICENSE.md`.
 
 `LICENSE_POLICY.json` is the machine-readable dependency policy. Permissive

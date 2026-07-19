@@ -123,6 +123,11 @@ def check_headers(root: Path) -> list[str]:
     return [f"missing SPDX header: {path.relative_to(root)}" for path in paths if not path.read_text(encoding="utf-8").startswith("# SPDX-License-Identifier: Apache-2.0\n")]
 
 
+# Sentinel phrase for a stale MIT licence claim, assembled from fragments so
+# this checker — itself a tracked first-party file — does not match its own scan.
+_STALE_MIT_MARKER = "Released under the " + "MIT License"
+
+
 def check_stale_mit(root: Path) -> list[str]:
     tracked = subprocess.run(["git", "ls-files"], cwd=root, check=True, capture_output=True, text=True).stdout.splitlines()
     exclusions = {"docs/licensing/APACHE_2_RELICENSING_AUDIT.md"}
@@ -131,7 +136,7 @@ def check_stale_mit(root: Path) -> list[str]:
         if relative in exclusions or relative.endswith(".lock") or relative == "LICENSE":
             continue
         path = root / relative
-        if path.is_file() and b"\x00" not in path.read_bytes() and "Released under the MIT License" in path.read_text(encoding="utf-8", errors="ignore"):
+        if path.is_file() and b"\x00" not in path.read_bytes() and _STALE_MIT_MARKER in path.read_text(encoding="utf-8", errors="ignore"):
             errors.append(f"stale first-party MIT claim: {relative}")
     return errors
 

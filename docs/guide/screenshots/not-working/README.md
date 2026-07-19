@@ -3,6 +3,10 @@
 Real captures of the problems found during the end-to-end web-app test run. Each
 maps to an entry in [`../../TO_BE_FIXED.md`](../../TO_BE_FIXED.md).
 
+> **FIX-02 and FIX-03 (rows 2 and 3 below) are now resolved in this branch** —
+> these images are kept as "before" evidence. The working hosted-Anthropic flow
+> is captured in [`../working/`](../working/) (`26`–`29`).
+
 | File | Shows | Tracked as |
 |------|-------|-----------|
 | `01-firstrun-cta-confusion.png` | First-run panel: heading says "Create a User Account" but the primary button says "Unlock Raiker" | [FIX-01](../../TO_BE_FIXED.md#fix-01--first-run-primary-button-says-unlock-raiker-but-no-account-exists-yet) |

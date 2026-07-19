@@ -261,9 +261,14 @@ def has_executor(capability: str, registry: Any = None) -> bool:
     return registry is not None and registry.has(capability)
 
 
-def _has_threat_model_ack(capability: str, store: Any) -> bool:
+def has_threat_model_ack(capability: str, store: Any) -> bool:
+    """True when a threat-model acknowledgement is on record for *capability*."""
     with store.connect() as connection:
         row = connection.execute(
             "SELECT 1 FROM threat_model_acks WHERE capability = ?", (capability,)
         ).fetchone()
     return row is not None
+
+
+# Backwards-compatible private alias (kept for existing internal callers).
+_has_threat_model_ack = has_threat_model_ack

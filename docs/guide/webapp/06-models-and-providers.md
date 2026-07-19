@@ -45,31 +45,47 @@ back or written to the event log. (The dialog links you to the provider's key
 page — Raiker stores the key you paste; it does not perform a real OAuth
 redirect.)
 
-## ⚠️ Reality check: hosted models can't be fully enabled from the dashboard yet
+## Enabling a hosted provider (Anthropic / OpenAI / Gemini)
 
-Hosted inference is **implemented but fail-closed**, and in this release you
-**cannot complete its activation from the web app alone**. Two gates block a
-web-only user:
+Hosted inference is **fail-closed by default** — you must explicitly enable it,
+acknowledge its threat model, and confirm. All of this is now doable **entirely
+from the web dashboard**. The full path, once, from a fresh workspace:
 
-1. **Saving the key fails until the hosted gate is on.** With the
-   `hosted_model_runtime` capability disabled (the default), the connect dialog
-   returns a **403** — and the error text is mangled into
-   *"Could not connect (403: `[REDACTED_SECRET]`)"* instead of the real reason
-   (`provider_requires_explicit_policy_approval`).
-   See [FIX-02](../TO_BE_FIXED.md#fix-02--connect-error-is-over-redacted-to-redacted_secret).
+1. **Set a vault key** (Settings → Security & Login, see [page 9](09-security-vault-and-settings.md)) —
+   this encrypts the provider key you're about to store.
+2. **Enable the gate.** Go to **Capabilities → Hosted models → Turn on**. The
+   governed step-up dialog asks for:
+   - a **reason**,
+   - a **confirmation token** (type any value you use as your human "I'm doing
+     this on purpose" token), and
+   - the **threat-model acknowledgement** checkbox ("I have reviewed the threat
+     model … and accept the risk").
 
-2. **Turning the gate on hits a dead end.** In **Capabilities → Hosted models →
-   Turn on**, confirming reports *"Activation is blocked. Satisfy the activation
-   requirement first."* with no way to satisfy it — the runtime requires a
-   **threat-model acknowledgement** that the dashboard never collects or sends.
-   Recording that acknowledgement is currently a command-line/operator step.
-   See [FIX-03](../TO_BE_FIXED.md#fix-03--hosted-model-activation-is-impossible-from-the-web-dashboard).
+   ![Enabling Hosted models with ack + token](../screenshots/working/26-hosted-enable-with-ack-and-token.png)
 
-**Net effect:** to actually run a hosted model today you need the terminal
-client / operator flow to record the threat-model acknowledgement and enable
-`hosted_model_runtime`, after which the dashboard connect + select + chat path
-works. **Local models have no such gate and are the recommended path for a
-web-only user.**
+3. **Allow the mode** (optional but convenient): set **Hosted models** to
+   **Allow** so hosted turns don't pause for approval each time.
+4. **Connect your key.** Models → Anthropic → **Connect** → paste your key. It
+   now saves successfully.
+
+   ![Anthropic connected](../screenshots/working/27-anthropic-connected.png)
+
+5. **Pick a model.** **Choose model…** lists the provider's real models; select
+   one (e.g. `claude-haiku-4-5-…`) and **Use model**.
+
+   ![Anthropic model selected](../screenshots/working/28-anthropic-model-selected.png)
+
+6. **Chat.** Send a prompt — you get a real, governed hosted reply.
+
+   ![Live Anthropic reply in Chat](../screenshots/working/29-hosted-anthropic-live-reply.png)
+
+> 🔒 **The gate is preserved, not bypassed.** You still explicitly acknowledge
+> the threat model and supply a confirmation token; the acknowledgement is
+> recorded against your principal and written to the audit log. Raiker simply now
+> lets you do that *in the app* instead of only from the CLI.
+>
+> **Local models** (llama.cpp/Ollama/LM Studio) have no such gate and remain the
+> simplest path if you don't need a hosted provider.
 
 ## The fallback sequence
 
@@ -94,9 +110,10 @@ states, whether an egress allowlist is configured, and the off-machine profile
 count. It is **read-only** — allowlist values and API keys are never shown, and
 this is *not* where you flip the hosted gate.
 
-> ✅ **Verified:** local provider rows, the connect dialog, fallback editing, the
-> advisor selector, and the read-only posture card all render and operate.
-> ❌ **Not verified end-to-end from the web app:** a live hosted-model reply,
-> because activation is blocked as described above.
+> ✅ **Verified end-to-end from the web app:** enabling *Hosted models* (with
+> threat-ack + confirmation token), connecting the Anthropic key, selecting
+> `claude-haiku-4-5-…`, and receiving a **live governed reply** in Chat — plus
+> local provider rows, the fallback editor, advisor selector, and read-only
+> posture card.
 
 Next: [Capabilities & approvals →](07-capabilities-and-approvals.md)

@@ -68,6 +68,12 @@ class CapabilityGateView:
     # Included here so a UI can render the whole capability matrix in one read
     # instead of a per-capability fan-out.
     decision_mode: str = "ask"
+    # Activation preconditions the UI must collect to enable this capability, so
+    # the step-up dialog is driven by real backend requirements rather than a
+    # hardcoded client-side list.
+    requires_threat_model_ack: bool = False
+    requires_human_confirmation: bool = False
+    threat_model_ack_recorded: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -82,6 +88,9 @@ class CapabilityGateView:
             "blocked_reason_code": self.blocked_reason_code,
             "readiness": dict(self.readiness),
             "decision_mode": self.decision_mode,
+            "requires_threat_model_ack": self.requires_threat_model_ack,
+            "requires_human_confirmation": self.requires_human_confirmation,
+            "threat_model_ack_recorded": self.threat_model_ack_recorded,
         }
 
 

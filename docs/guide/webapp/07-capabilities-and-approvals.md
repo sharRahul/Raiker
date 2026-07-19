@@ -41,19 +41,26 @@ adds no authority of its own.
 Expand a row with the **›** chevron to reveal its description and a **Turn on** /
 **Turn off** button.
 
-- **Turn on** opens a step-up dialog asking for a **reason**. For **Tier-2**
-  capabilities (shell, process, network, web-fetch, and the MCP runtimes) it also
-  requires a **confirmation token** and a threat-model acknowledgement.
+- **Turn on** opens a step-up dialog asking for a **reason**. Higher-risk
+  capabilities also require a **confirmation token** and a **threat-model
+  acknowledgement** — the dialog shows exactly the fields that capability needs,
+  because the backend now reports each gate's real activation preconditions.
+  This covers **Hosted models** (Anthropic/OpenAI/Gemini), Home-lab models, the
+  MCP runtimes, and the Tier-2 execution capabilities (shell, process, network,
+  web-fetch).
+
+  ![Enabling Hosted models with ack + token](../screenshots/working/26-hosted-enable-with-ack-and-token.png)
+
 - Not every disabled capability can be turned on from here. Sensitive/deferred
   domains (finance, medical, remote/cloud execution, …) have **no executor** and
   stay off by design — they show no enable path.
 
-> ⚠️ **Known gap:** *Hosted models* and *Home-lab models* show a **Turn on**
-> button, but confirming it fails with *"Activation is blocked. Satisfy the
-> activation requirement first."* and offers no way to satisfy it. See
-> [FIX-03](../TO_BE_FIXED.md#fix-03--hosted-model-activation-is-impossible-from-the-web-dashboard).
-> On a fresh **Development preview** workspace, every gate reads `disabled`
-> initially — see [FIX-05](../TO_BE_FIXED.md#fix-05--fresh-workspace-shows-all-capability-gates-disabled-vs-readme-claim).
+> ✅ **Hosted models now enable cleanly from the dashboard** (this was previously
+> a dead end — see [FIX-03](../TO_BE_FIXED.md#fix-03--hosted-model-activation-is-impossible-from-the-web-dashboard)).
+> You acknowledge the threat model and supply a confirmation token in the dialog;
+> the acknowledgement is recorded against your principal and audited. On a fresh
+> **Development preview** workspace, gates read `disabled` until you enable them —
+> see [FIX-05](../TO_BE_FIXED.md#fix-05--fresh-workspace-shows-all-capability-gates-disabled-vs-readme-claim).
 
 ### Search & bulk
 

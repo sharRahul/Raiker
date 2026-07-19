@@ -31,3 +31,7 @@ documented (including Raiker correctly *failing closed* with honest errors).
 | `23-audit-log.png` | Append-only Audit log |
 | `24-work-in-action.png` | Work in Action (subagents/queues) |
 | `25-projects.png` | Projects (named scopes) |
+| `26-hosted-enable-with-ack-and-token.png` | Enabling *Hosted models* with the threat-ack + confirmation token (FIX-03 resolved) |
+| `27-anthropic-connected.png` | Anthropic key connected after enabling the gate |
+| `28-anthropic-model-selected.png` | `claude-haiku-4-5-…` selected as the active model |
+| `29-hosted-anthropic-live-reply.png` | A **live governed Anthropic reply** in Chat |

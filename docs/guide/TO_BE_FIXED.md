@@ -12,15 +12,23 @@
 
 ## Summary
 
-| ID | Severity | Area | One-liner |
-|----|----------|------|-----------|
-| FIX-01 | Medium | Auth / first-run | Primary button says "Unlock Raiker" before any account exists → "Authentication failed." |
-| FIX-02 | High | Error clarity | Provider connect error is over-redacted to `[REDACTED_SECRET]`. |
-| FIX-03 | High | Models / governance | Hosted-model activation is impossible from the web dashboard (dead-end). |
-| FIX-04 | Low | MCP | "Create server" button is clickable while the capability is disabled. |
-| FIX-05 | Medium | Docs vs runtime | Fresh workspace shows **all** gates `disabled`, contradicting the README's "integrated gates default enabled_runtime". |
-| FIX-06 | Low | Tasks | Queue open/scheduled/finished counts are confusing on a fresh workspace. |
-| FIX-07 | Medium | Security / vault | Vault-key field requires a Fernet key but gives no format hint. |
+| ID | Severity | Area | Status | One-liner |
+|----|----------|------|--------|-----------|
+| FIX-01 | Medium | Auth / first-run | Open | Primary button says "Unlock Raiker" before any account exists → "Authentication failed." |
+| FIX-02 | High | Error clarity | ✅ **Fixed** | Provider connect error was over-redacted to `[REDACTED_SECRET]`. |
+| FIX-03 | High | Models / governance | ✅ **Fixed** | Hosted-model activation was impossible from the web dashboard (dead-end). |
+| FIX-04 | Low | MCP | Open | "Create server" button is clickable while the capability is disabled. |
+| FIX-05 | Medium | Docs vs runtime | Open | Fresh workspace shows **all** gates `disabled`, contradicting the README's "integrated gates default enabled_runtime". |
+| FIX-06 | Low | Tasks | Open | Queue open/scheduled/finished counts are confusing on a fresh workspace. |
+| FIX-07 | Medium | Security / vault | Open | Vault-key field requires a Fernet key but gives no format hint. |
+
+> **FIX-02 and FIX-03 are resolved in this branch.** Hosted providers
+> (Anthropic/OpenAI/Gemini) can now be enabled and used **entirely from the web
+> dashboard**, with the threat-model acknowledgement and confirmation token
+> collected in the governed step-up dialog — the security gate is preserved, not
+> weakened. Verified end-to-end: enable *Hosted models* → connect the Anthropic
+> key → select `claude-haiku-4-5-…` → live reply in Chat
+> (`screenshots/working/26–29`).
 
 ---
 
@@ -46,7 +54,13 @@
 
 ### FIX-02 — Connect error is over-redacted to `[REDACTED_SECRET]`
 
-- **Screenshot:** `screenshots/not-working/02-model-connect-redacted-error.png`
+> ✅ **Fixed in this branch.** `raiker/context/redaction.py` now spares lowercase
+> `snake_case` reason codes from the high-entropy catch-all (via a callable
+> replacement that matches `[a-z]+(?:_[a-z]+)+`), while still redacting real
+> secrets (API keys, Fernet/base64 tokens always carry mixed case and/or digits).
+> Errors like `provider_requires_explicit_policy_approval` now render verbatim.
+
+- **Screenshot (before):** `screenshots/not-working/02-model-connect-redacted-error.png`
 - **Where:** `raiker/context/redaction.py:47`
 - **Repro:**
   1. Models → Anthropic → **Connect**, paste a key, **Connect**.
@@ -71,7 +85,28 @@
 
 ### FIX-03 — Hosted-model activation is impossible from the web dashboard
 
-- **Screenshot:** `screenshots/not-working/03-hosted-model-enable-deadend.png`
+> ✅ **Fixed in this branch — the security gate is preserved, not weakened.**
+> Changes:
+> - **New governed endpoint** `POST /api/capability-gates/{capability}/threat-ack`
+>   (owner/gate-manager only; only accepted for capabilities that actually
+>   require an ack) records the acknowledgement and an audit event
+>   (`threat_model_acknowledged`). Backed by `SQLiteStore.record_threat_model_ack`
+>   and `RuntimeControlService.record_threat_model_ack`.
+> - **Gate DTO now reports its real activation preconditions**
+>   (`requires_threat_model_ack`, `requires_human_confirmation`,
+>   `threat_model_ack_recorded`), so the frontend stops relying on a hardcoded
+>   Tier-2 list.
+> - **The step-up dialog** now shows the confirmation-token field *and* the
+>   threat-model acknowledgement for any gate that needs them (driven by the DTO
+>   flags), records the ack via the new endpoint, then runs the transition.
+>
+> Result: enabling *Hosted models* from the dashboard succeeds, and the full
+> Anthropic path (connect key → select model → chat) works end-to-end. The human
+> still explicitly acknowledges the threat model and supplies a confirmation
+> token — nothing is auto-granted. Verified live; see
+> `screenshots/working/26–29`.
+
+- **Screenshot (before):** `screenshots/not-working/03-hosted-model-enable-deadend.png`
 - **Where:** `apps/web/src/lib/views/CapabilitiesView.svelte`,
   `apps/web/src/lib/components/StepUpDialog.svelte`, `apps/web/src/lib/api.ts`
   (`setCapabilityState`), and the missing API route for threat-model acks.

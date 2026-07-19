@@ -640,6 +640,14 @@ export const api = {
       `/api/capability-gates/${encodeURIComponent(capability)}/disable`,
       { reason },
     ),
+  // Record a human threat-model acknowledgement (owner/gate-manager only). This
+  // is the in-app equivalent of the operator/CLI ack step and only satisfies the
+  // acknowledgement precondition — the capability transition still runs after it.
+  recordThreatModelAck: (capability: string, reason: string) =>
+    postJson<{ ok: boolean; capability: string; acknowledged: boolean }>(
+      `/api/capability-gates/${encodeURIComponent(capability)}/threat-ack`,
+      { reason },
+    ),
 
   // ── Per-capability decision modes (ask | allow | auto | deny) ──
   capabilityDecisionMode: (capability: string) =>

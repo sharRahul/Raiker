@@ -1,16 +1,31 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 
 REDACTED_SECRET = "[REDACTED_SECRET]"
 REDACTED_TOKEN = "[REDACTED_TOKEN]"
 REDACTED_EMAIL = "[REDACTED_EMAIL]"
 REDACTED_PRIVATE_KEY = "[REDACTED_PRIVATE_KEY]"
 
+# A lowercase snake_case identifier (two or more words joined by underscores).
+# Machine-readable reason codes / capability ids look like this and carry no
+# entropy, so the high-entropy fallback must not mistake them for secrets. Real
+# credentials (API keys, base64/hex tokens) always carry mixed case and/or
+# digits and never match this shape.
+_SNAKE_IDENTIFIER = re.compile(r"[a-z]+(?:_[a-z]+)+")
+
+
+def _redact_high_entropy(match: re.Match[str]) -> str:
+    token = match.group(0)
+    if _SNAKE_IDENTIFIER.fullmatch(token):
+        return token
+    return REDACTED_SECRET
+
 # Ordered (pattern, replacement) pairs. Private keys and known token shapes are matched
 # before the broad high-entropy fallback so they get specific placeholders. Each pattern is
 # deterministic and never raises on unusual input.
-_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+_PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], ...] = (
     (
         re.compile(
             r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----",
@@ -43,8 +58,10 @@ _PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(?:account|iban|bic|swift|routing)\s*[:=#]?\s*['\"]?[A-Z0-9]{8,}\b", re.IGNORECASE), "[REDACTED_ACCOUNT]"),
     # Medical identifiers (NHS/SSN-like patterns)
     (re.compile(r"\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b"), "[REDACTED_ID]"),
-    # High-entropy fallback for long opaque strings (kept last so specific shapes win).
-    (re.compile(r"\b[A-Za-z0-9+/_\-]{40,}\b"), REDACTED_SECRET),
+    # High-entropy fallback for long opaque strings (kept last so specific shapes
+    # win). A callable replacement spares lowercase snake_case reason codes /
+    # capability ids, which are long but carry no secret entropy.
+    (re.compile(r"\b[A-Za-z0-9+/_\-]{40,}\b"), _redact_high_entropy),
 )
 
 

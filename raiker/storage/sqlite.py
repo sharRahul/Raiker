@@ -4573,6 +4573,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
 
     # ── Local-account credentials & settings (lock screen) ──────────────────
+    def record_threat_model_ack(
+        self, capability: str, acked_by: str, acked_at: str, doc_ref: str = ""
+    ) -> None:
+        """Record (idempotently) that a human acknowledged a capability's threat model.
+
+        This is the persisted precondition for activating threat-ack-gated
+        capabilities (e.g. hosted model runtimes). Recording an acknowledgement
+        grants nothing on its own — it only satisfies one activation requirement;
+        the transition still runs through the full governed gate.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO threat_model_acks (capability, acked_by, acked_at, doc_ref)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(capability) DO UPDATE SET
+                     acked_by=excluded.acked_by,
+                     acked_at=excluded.acked_at,
+                     doc_ref=excluded.doc_ref""",
+                (capability, acked_by, acked_at, doc_ref),
+            )
+
     def upsert_account(
         self,
         principal_id: str,

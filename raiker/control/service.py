@@ -10,7 +10,7 @@ from raiker.cli.principal_resolver import (
     check_runtime_gate_manager_available,
     resolve_local_principal,
 )
-from raiker.contracts.ids import new_id
+from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import (
     CapabilityGateView,
     ControlPrincipalRef,
@@ -21,7 +21,11 @@ from raiker.control.dtos import (
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.phase_gates import ALL_CAPABILITIES, CapabilityState, default_capability_gates
-from raiker.runtime.authority.activation import get_activation_requirement, has_executor
+from raiker.runtime.authority.activation import (
+    get_activation_requirement,
+    has_executor,
+    has_threat_model_ack,
+)
 from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
 from raiker.runtime.authority.router import GovernedAction, GovernedActionResult, RuntimeAuthority
 from raiker.storage.sqlite import SQLiteStore
@@ -122,6 +126,7 @@ class RuntimeControlService:
         effective = self._authority.get_effective_capability_gate(
             capability, principal.principal_id if principal else None
         )
+        req = get_activation_requirement(capability)
         state: str = effective["state"]
         default_gate = gates.get(capability)
         default_state: str = default_gate.state.value if default_gate else "disabled"
@@ -162,6 +167,9 @@ class RuntimeControlService:
             decision_mode=self._authority.get_capability_decision_mode(
                 capability, principal.principal_id if principal else None
             ),
+            requires_threat_model_ack=(req.requires_threat_model_ack if req else False),
+            requires_human_confirmation=(req.requires_human_confirmation_to_enable if req else False),
+            threat_model_ack_recorded=has_threat_model_ack(capability, self._store),
         )
 
     # -- read methods -------------------------------------------------------
@@ -317,6 +325,43 @@ class RuntimeControlService:
         if denial is not None:
             return ControlResult(ok=False, reason_code=denial)
         return ControlResult(ok=True, data={"capability": capability, "target_state": target_state})
+
+    def record_threat_model_ack(
+        self,
+        capability: str,
+        acting_principal_id: str | None,
+        reason: str = "",
+    ) -> ControlResult:
+        """Record a human threat-model acknowledgement for *capability*.
+
+        This is the governed, in-app equivalent of the operator/CLI ack step. It
+        is owner/gate-manager-only and only accepted for capabilities that
+        actually require an acknowledgement. It records the acknowledgement and
+        an audit event — it does **not** enable the capability; the caller must
+        still run the normal capability transition afterwards.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="threat_ack_requires_human")
+        denial = self._authority._check_human_runtime_gate_manager(principal)  # noqa: SLF001
+        if denial is not None:
+            return ControlResult(ok=False, reason_code=denial)
+        if capability not in ALL_CAPABILITIES:
+            return ControlResult(ok=False, reason_code=f"unknown_capability:{capability}")
+        req = get_activation_requirement(capability)
+        if req is None or not req.requires_threat_model_ack:
+            return ControlResult(ok=False, reason_code=f"threat_ack_not_required:{capability}")
+        self._store.record_threat_model_ack(
+            capability, principal.principal_id, utc_now(), doc_ref=reason or "web_dashboard_ack"
+        )
+        self._authority._event(  # noqa: SLF001
+            "threat_model_acknowledged",
+            principal.principal_id,
+            {"capability": capability, "reason": reason},
+        )
+        return ControlResult(ok=True, data={"capability": capability, "acknowledged": True})
 
     def set_capability_decision_mode(
         self,

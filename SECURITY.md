@@ -27,6 +27,8 @@ Scope boundaries:
 
 ## 2. Security Principles
 
+The owner's normative security policy — the **User-Centric Zero Trust** framework, with its verbatim policy text, interpretation, precedence rule, and numbered requirements ZT-1 … ZT-12 — is [`docs/USER_CENTRIC_ZERO_TRUST_POLICY.md`](docs/USER_CENTRIC_ZERO_TRUST_POLICY.md). The principles below are the implementation-level expression of that policy for the current runtime; policy requirements whose mechanisms are not yet built are marked Planned there, trace to [`docs/plans/2026-07-19-execution-breadth-and-zero-trust-plan.md`](docs/plans/2026-07-19-execution-breadth-and-zero-trust-plan.md), and stay fail-closed until implemented.
+
 Raiker's current security principles are:
 
 1. **Local by default:** prefer local workspace state, local providers, and local audit evidence before hosted services; the API server and dashboard are loopback-only and single-user.

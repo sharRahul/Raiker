@@ -33,6 +33,9 @@ documents (executor spec, threat models, implementation ledger, …) stay at the
 
 - **[Implementation Status](IMPLEMENTATION_STATUS.md)** — the control ledger of
   what is built, verified, or intentionally deferred (source of truth).
+- **[User-Centric Zero Trust Policy](USER_CENTRIC_ZERO_TRUST_POLICY.md)** — the
+  owner's normative security policy and its numbered requirements (ZT-1 …
+  ZT-12), the traceability targets for governance code and tests.
 - **[Runtime Executors Spec](RUNTIME_EXECUTORS_SPEC.md)** — per-capability truth
   about what can execute today.
 - **[Handoff](HANDOFF.md)** — where the current build effort stands and what is

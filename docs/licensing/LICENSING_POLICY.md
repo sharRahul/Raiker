@@ -23,7 +23,9 @@ security report or a repository issue that contains no sensitive information.
 
 Dependencies retain their own licences. Generated files and SBOMs are not
 project copyright notices. Vendored or copied material must retain its licence
-and attribution; bundled fonts remain under the notices in
+and attribution; the bundled fonts remain under the SIL OFL 1.1 with the
+copyright notices and full licence text in
+`apps/web/src/assets/fonts/OFL.txt`, summarised in
 `apps/web/src/assets/fonts/LICENSE.md`.
 
 `LICENSE_POLICY.json` is the machine-readable dependency policy. Permissive

@@ -86,7 +86,7 @@
 
     {#if requireToken}
       <label class="field-label token-label" for="stepup-token">
-        Confirmation token (required for this Tier-2 change)
+        Confirmation token (required to enable this capability)
       </label>
       <input
         id="stepup-token"
@@ -97,7 +97,8 @@
         autocomplete="off"
       />
       <p class="hint">
-        Tier-2 capabilities (shell, network, web-fetch, process) require a human confirmation token.
+        Higher-risk capabilities (shell, network, web-fetch, process, hosted model
+        runtimes) require a human confirmation token to enable.
       </p>
     {/if}
 

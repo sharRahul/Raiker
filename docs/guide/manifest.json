@@ -3,6 +3,23 @@
   "description": "The Raiker user guide: install, concepts, usage, integrations, capabilities, implementation, and best practices.",
   "sections": [
     {
+      "slug": "webapp",
+      "title": "Web App Guide (End-to-End)",
+      "index": "webapp/README.md",
+      "pages": [
+        { "slug": "install-and-launch", "title": "Install & Launch", "file": "webapp/01-install-and-launch.md" },
+        { "slug": "account-and-login", "title": "Create Account & Unlock", "file": "webapp/02-account-and-login.md" },
+        { "slug": "dashboard-tour", "title": "Dashboard Tour", "file": "webapp/03-dashboard-tour.md" },
+        { "slug": "chat", "title": "Chat", "file": "webapp/04-chat.md" },
+        { "slug": "tasks", "title": "Tasks", "file": "webapp/05-tasks.md" },
+        { "slug": "models-and-providers", "title": "Models & Providers", "file": "webapp/06-models-and-providers.md" },
+        { "slug": "capabilities-and-approvals", "title": "Capabilities & Approvals", "file": "webapp/07-capabilities-and-approvals.md" },
+        { "slug": "connections-and-mcp", "title": "Connections & MCP", "file": "webapp/08-connections-and-mcp.md" },
+        { "slug": "security-vault-and-settings", "title": "Security, Vault & Settings", "file": "webapp/09-security-vault-and-settings.md" },
+        { "slug": "sessions-audit-diagnostics", "title": "Sessions, Audit & Diagnostics", "file": "webapp/10-sessions-audit-diagnostics.md" }
+      ]
+    },
+    {
       "slug": "getting-started",
       "title": "Getting Started",
       "index": "getting-started.md",

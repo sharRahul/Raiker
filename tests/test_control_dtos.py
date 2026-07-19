@@ -116,6 +116,9 @@ class TestCapabilityGateView:
             "blocked_reason_code": None,
             "readiness": {"policy_ready": True, "contract_ready": False},
             "decision_mode": "ask",
+            "requires_threat_model_ack": False,
+            "requires_human_confirmation": False,
+            "threat_model_ack_recorded": False,
         }
 
     def test_to_dict_no_secrets(self) -> None:
@@ -246,6 +249,9 @@ class TestRuntimeReadinessView:
                     "blocked_reason_code": None,
                     "readiness": {},
                     "decision_mode": "ask",
+                    "requires_threat_model_ack": False,
+                    "requires_human_confirmation": False,
+                    "threat_model_ack_recorded": False,
                 },
             ],
             "summary": {"owner_bootstrapped": True, "dangerous_caps_disabled": True},

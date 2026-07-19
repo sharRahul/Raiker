@@ -10,6 +10,7 @@ from raiker.api.schemas import (
     ActivateRuntimeModeRequest,
     DisableCapabilityRequest,
     DisableRuntimeModeRequest,
+    RecordThreatModelAckRequest,
     SetCapabilityDecisionModeRequest,
     SetCapabilityStateRequest,
     serialize_dto,
@@ -151,6 +152,27 @@ async def set_capability_state(
     if not result.ok:
         _deny(result.reason_code)
     return {"ok": True, "capability": capability, "target_state": body.target_state}
+
+
+@router.post("/api/capability-gates/{capability}/threat-ack")
+async def record_threat_model_ack(
+    capability: str,
+    body: RecordThreatModelAckRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Record a human threat-model acknowledgement for a capability.
+
+    This is the in-app, governed equivalent of the operator/CLI ack step that
+    activation of threat-ack-gated capabilities (e.g. hosted model runtimes)
+    requires. It records the acknowledgement only — it does not enable anything.
+    """
+    session, _principal = _auth_data
+    service = _get_service(request)
+    result = service.record_threat_model_ack(capability, session.principal_id, body.reason)
+    if not result.ok:
+        _deny(result.reason_code)
+    return {"ok": True, "capability": capability, "acknowledged": True}
 
 
 @router.post("/api/capability-gates/{capability}/disable")

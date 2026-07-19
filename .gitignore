@@ -23,3 +23,5 @@ build/
 output/
 /artifacts/
 .playwright-mcp/
+.raiker-testws/
+.raiker-e2e/

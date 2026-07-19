@@ -227,6 +227,7 @@ EVENT_TYPES = {
     "capability_disabled",
     "capability_transition_denied",
     "capability_decision_mode_set",
+    "threat_model_acknowledged",
     "runtime_readiness_checked",
     "owner_bootstrap_requested",
     "owner_bootstrap_created",

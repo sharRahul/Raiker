@@ -84,7 +84,14 @@
 
   // The pending mutation awaiting step-up confirmation.
   type Pending =
-    | { kind: "enable"; capability: string; target: string; requireToken: boolean }
+    | {
+        kind: "enable";
+        capability: string;
+        target: string;
+        requireToken: boolean;
+        requireThreatAck: boolean;
+        ackNeeded: boolean;
+      }
     | { kind: "disable_cap"; capability: string }
     | { kind: "set_mode"; capability: string; mode: DecisionMode };
   let pending = $state<Pending | null>(null);
@@ -156,11 +163,24 @@
   function startEnable(gate: CapabilityGate) {
     const targets = enableableTargets(gate);
     const target = targets.includes("enabled_runtime") ? "enabled_runtime" : targets[0];
+    // Drive the step-up requirements from the gate's real activation
+    // preconditions when the backend reports them, falling back to the static
+    // Tier-2 list for older payloads. A human confirmation token is required
+    // whenever the backend says so (or for the Tier-2 caps); the threat-model
+    // acknowledgement is required when the capability needs one and none is on
+    // record yet.
+    const requireToken =
+      gate.requires_human_confirmation ?? requiresStepUpToken(gate.capability);
+    const ackNeeded =
+      (gate.requires_threat_model_ack ?? requiresStepUpToken(gate.capability)) &&
+      !(gate.threat_model_ack_recorded ?? false);
     pending = {
       kind: "enable",
       capability: gate.capability,
       target,
-      requireToken: requiresStepUpToken(gate.capability),
+      requireToken,
+      requireThreatAck: ackNeeded,
+      ackNeeded,
     };
     dialogError = null;
   }
@@ -172,7 +192,7 @@
         return {
           title: `Enable ${capabilityLabel(pending.capability)}`,
           requireToken: pending.requireToken,
-          requireThreatAck: pending.requireToken,
+          requireThreatAck: pending.requireThreatAck,
         };
       case "disable_cap":
         return {
@@ -217,6 +237,12 @@
 
   async function runMutation(p: Pending, values: StepUpValues): Promise<void> {
     if (p.kind === "enable") {
+      // Record the threat-model acknowledgement first (governed, owner-only) so
+      // the activation check finds it satisfied. This only persists the ack; the
+      // transition below still runs through the full governed gate.
+      if (p.ackNeeded && values.threatAck) {
+        await api.recordThreatModelAck(p.capability, values.reason);
+      }
       await api.setCapabilityState(p.capability, {
         target_state: p.target,
         reason: values.reason,

@@ -15,6 +15,12 @@ export interface CapabilityGate {
   readiness: Record<string, boolean>;
   // Per-capability decision mode for AI-proposed actions (ask|allow|auto|deny).
   decision_mode: string;
+  // Activation preconditions the enable step-up dialog must collect, driven by
+  // the backend's real requirements (not a hardcoded client list). Optional so
+  // older payloads / test fixtures without them remain valid.
+  requires_threat_model_ack?: boolean;
+  requires_human_confirmation?: boolean;
+  threat_model_ack_recorded?: boolean;
 }
 
 export interface RuntimeMode {

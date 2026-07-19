@@ -29,6 +29,15 @@ class SetCapabilityStateRequest:
 
 
 @dataclass
+class RecordThreatModelAckRequest:
+    # Human acknowledgement that the capability's threat model was reviewed. The
+    # reason is stored as the acknowledgement's doc reference. Owner/gate-manager
+    # only; only accepted for capabilities that actually require an ack.
+    reason: str = ""
+    as_principal: str | None = None
+
+
+@dataclass
 class DisableCapabilityRequest:
     reason: str = ""
     as_principal: str | None = None

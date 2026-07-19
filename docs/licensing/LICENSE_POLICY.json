@@ -1,0 +1,42 @@
+{
+  "permitted": [
+    "Apache-2.0",
+    "MIT",
+    "MIT-0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "BlueOak-1.0.0",
+    "Python-2.0",
+    "Zlib",
+    "OFL-1.1"
+  ],
+  "review": [
+    "MPL-2.0",
+    "LGPL-2.1-only",
+    "LGPL-2.1-or-later",
+    "LGPL-3.0-only",
+    "LGPL-3.0-or-later"
+  ],
+  "prohibited": [
+    "GPL-2.0-only",
+    "GPL-2.0-or-later",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "AGPL-3.0-only",
+    "AGPL-3.0-or-later",
+    "PROPRIETARY"
+  ],
+  "exceptions": [
+    {
+      "component": "certifi",
+      "license": "MPL-2.0",
+      "reason": "Unmodified transitive CA bundle; MPL-2.0 is file-level and no certifi source is copied into Raiker."
+    },
+    {
+      "component": "pathspec",
+      "license": "MPL-2.0",
+      "reason": "Unmodified transitive development-only dependency of mypy; it is not included in Raiker distributions."
+    }
+  ]
+}

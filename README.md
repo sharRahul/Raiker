@@ -201,6 +201,7 @@ python -m mypy raiker apps tests
 python -m pytest
 python scripts/validate_phase_status.py
 python scripts/validate_repo_truthfulness.py
+python scripts/licensing_check.py --sbom artifacts/licensing/raiker.spdx.json
 raiker --help
 raiker --prompt "Hello Raiker"
 
@@ -211,10 +212,13 @@ npm --prefix apps/web run test        # vitest
 npm --prefix apps/web run build
 ```
 
-See [`docs/LOCAL_VALIDATION_GATE.md`](docs/LOCAL_VALIDATION_GATE.md) for the full evidence checklist (including the additional `validate_*` scripts and the single-command web launch smoke). Do not mark a capability `implemented_verified` without a named task, tests, and recorded validation, and never activate a disabled runtime gate through docs, tests, or code shortcuts. Open a GitHub issue for bugs, doc gaps, or scope conflicts, including the relevant phase, file path, and expected vs. actual behavior.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for submission and DCO terms and [`docs/LOCAL_VALIDATION_GATE.md`](docs/LOCAL_VALIDATION_GATE.md) for the full evidence checklist. Do not mark a capability `implemented_verified` without a named task, tests, and recorded validation, and never activate a disabled runtime gate through docs, tests, or code shortcuts. Open a GitHub issue for bugs, doc gaps, or scope conflicts, including the relevant phase, file path, and expected vs. actual behavior.
 
 ---
 
 ## License
 
-Released under the MIT License. See [`LICENSE`](LICENSE).
+Current Raiker versions are released under the [Apache License 2.0](LICENSE).
+See [NOTICE](NOTICE), [CONTRIBUTING.md](CONTRIBUTING.md), and the
+[licensing policy](docs/licensing/LICENSING_POLICY.md). Earlier MIT releases
+remain available under their original licence terms.

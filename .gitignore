@@ -21,4 +21,5 @@ docs/superpowers
 build/
 *.lock
 output/
+/artifacts/
 .playwright-mcp/

@@ -1,6 +1,7 @@
 {
   "name": "raiker-web",
   "private": true,
+  "license": "Apache-2.0",
   "version": "0.0.0",
   "type": "module",
   "description": "Raiker governed-agent web UI (M1 skeleton). Local-first view/controller over the governed runtime.",

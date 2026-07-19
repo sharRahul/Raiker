@@ -1,0 +1,2 @@
+prune apps/web/node_modules
+prune apps/web/dist

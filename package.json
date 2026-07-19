@@ -1,6 +1,7 @@
 {
   "name": "raiker-root",
   "private": true,
+  "license": "Apache-2.0",
   "version": "0.0.0",
   "description": "Raiker governed-agent runtime. Root package.json delegates web-app (apps/web) scripts so `npm run <script>` works from the repo root. The web app is the only JS project; this file has no dependencies of its own and does not affect the Python package or its ruff/mypy/pytest gate.",
   "scripts": {

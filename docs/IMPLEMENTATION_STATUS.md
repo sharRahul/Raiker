@@ -5,6 +5,11 @@
 
 # Implementation Status
 
+> Current truth update (2026-07-19): Raiker's project licence changed from MIT
+> to Apache-2.0. Earlier MIT releases retain their original terms. Python and
+> JavaScript metadata, contribution/DCO terms, SPDX policy, dependency-licence
+> checks, and SPDX JSON SBOM generation were added with the licensing change.
+
 > Current truth update (2026-07-18): Control Deck **Tasks 6–10** are
 > implemented locally. Existing Sidebar and NotificationCenter instances are
 > reused; `PageState`, `SessionMenu`, `ToolControlBoard`, and the loopback share

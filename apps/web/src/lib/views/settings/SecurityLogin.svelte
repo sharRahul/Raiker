@@ -13,6 +13,21 @@
   // Vault key editor
   let keyInput = $state("");
   let revealed = $state(false);
+
+  // A Fernet key is 32 random bytes, URL-safe base64 encoded (44 chars ending in
+  // "="). Generating one client-side (Web Crypto) mirrors
+  // `Fernet.generate_key()` so a user without the CLI can produce a valid key
+  // instead of guessing the format (FIX-07). The key never leaves the browser
+  // until the user chooses to save it through the governed, elevated flow below.
+  function generateVaultKey() {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    let binary = "";
+    for (const b of bytes) binary += String.fromCharCode(b);
+    keyInput = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_");
+    revealed = true;
+    notice = { kind: "ok", text: "Generated a valid Fernet key. Review it, then confirm your password and Save key." };
+  }
   let elevatePassword = $state("");
   let mfaForVault = $state("");
   let busy = $state(false);
@@ -129,7 +144,13 @@
       mfaForVault = "";
       notice = { kind: "ok", text: "Vault key saved." };
     } catch (e) {
-      notice = { kind: "error", text: message(e, "Could not save the vault key.") };
+      const invalid = e instanceof ApiError && e.reasonCode === "connector_vault_key_invalid";
+      notice = {
+        kind: "error",
+        text: invalid
+          ? "That is not a valid Fernet key. Use “Generate key” or a 44-character URL-safe base64 key — a plain passphrase will not work."
+          : message(e, "Could not save the vault key."),
+      };
     } finally {
       setToken(control);
       busy = false;
@@ -224,14 +245,24 @@
       Vault key
       <input
         type={revealed ? "text" : "password"}
-        placeholder="••••••••••••"
+        placeholder="44-character Fernet key (URL-safe base64)"
         bind:value={keyInput}
         autocomplete="off"
+        spellcheck="false"
+        aria-describedby="vault-key-format"
       />
     </label>
-    <button type="button" class="link" onclick={() => (revealed = !revealed)}>
-      {revealed ? "Hide" : "Reveal"}
-    </button>
+    <p id="vault-key-format" class="sub hint">
+      Must be a <strong>Fernet key</strong>: 32 random bytes, URL-safe base64 (44 characters, ends with
+      <code>=</code>). A passphrase will not work. Generate one below, or run:
+      <code class="cmd">python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"</code>
+    </p>
+    <div class="key-tools">
+      <button type="button" class="btn btn-soft btn-sm" onclick={generateVaultKey}>Generate key</button>
+      <button type="button" class="link" onclick={() => (revealed = !revealed)}>
+        {revealed ? "Hide" : "Reveal"}
+      </button>
+    </div>
     <label>
       Confirm password (elevated re-auth)
       <input type="password" bind:value={elevatePassword} autocomplete="current-password" />
@@ -417,5 +448,30 @@
   }
   .sub {
     color: var(--text-2);
+  }
+  .hint {
+    font-size: 0.82rem;
+    margin: var(--space-2) 0 0;
+    max-width: 34rem;
+  }
+  .hint code {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.78rem;
+    background: var(--bg-2);
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+  }
+  .hint code.cmd {
+    display: block;
+    margin-top: var(--space-2);
+    padding: var(--space-2);
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+  .key-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-2);
   }
 </style>

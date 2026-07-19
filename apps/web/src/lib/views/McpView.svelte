@@ -204,15 +204,17 @@
 <form class="create" onsubmit={create}>
   <div class="field">
     <label class="field-label" for="mcp-name">Server name</label>
-    <input id="mcp-name" class="input" bind:value={newName} placeholder="e.g. My notes helper" autocomplete="off" />
+    <input id="mcp-name" class="input" bind:value={newName} placeholder="e.g. My notes helper" autocomplete="off" disabled={!builderEnabled} />
   </div>
   <div class="field">
     <label class="field-label" for="mcp-template">Template</label>
-    <select id="mcp-template" class="select" bind:value={newTemplate}>
+    <select id="mcp-template" class="select" bind:value={newTemplate} disabled={!builderEnabled}>
       {#each TEMPLATES as t (t.id)}<option value={t.id}>{t.label}</option>{/each}
     </select>
   </div>
-  <button class="btn btn-primary" type="submit" disabled={busy === "create" || !newName.trim()}>
+  <!-- Creating a server needs the builder capability; keep the control disabled
+       while it is off rather than firing a request that can only 403 (FIX-04). -->
+  <button class="btn btn-primary" type="submit" disabled={busy === "create" || !newName.trim() || !builderEnabled} title={builderEnabled ? undefined : "Enable the MCP builder capability to create a server."}>
     {busy === "create" ? "Creating…" : "Create server"}
   </button>
 </form>

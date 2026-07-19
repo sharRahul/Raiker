@@ -109,6 +109,24 @@
     }
   }
 
+  // Integrated capabilities (a real executor) ship `enabled_runtime` as their
+  // static default, but the web dashboard applies per-principal controls that
+  // fail closed: each one starts off for your account until you turn it on, and
+  // reaching `enabled_runtime` also needs a runtime-enablement mode active (not
+  // Development preview). Surfacing that reconciles the README's "default
+  // enabled_runtime" wording with the all-off state a fresh workspace shows
+  // (FIX-05). We detect it as gates whose default is runtime-enabled but whose
+  // effective state is not.
+  const integratedButOff = $derived(
+    (gates ?? []).filter(
+      (g) =>
+        g.default_state === "enabled_runtime" &&
+        g.state !== "enabled_runtime" &&
+        !isDeferred(g) &&
+        !isInherent(g),
+    ).length,
+  );
+
   const filtered = $derived.by(() => {
     if (gates === null) return [];
     const q = search.trim().toLowerCase();
@@ -273,6 +291,18 @@
 
 {#if notice}
   <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+{/if}
+
+{#if integratedButOff > 0}
+  <div class="runtime-note" role="note">
+    <Icon name="info" size={16} />
+    <span>
+      Capabilities with a real executor ship enabled in the local single-user runtime, but the web
+      dashboard fails closed per account — they start <strong>off</strong> here until you turn them on.
+      Reaching “runtime” also needs a runtime-enablement mode active; activate one under
+      <a href="#/settings">Settings → Runtime mode</a> (Development preview keeps everything off).
+    </span>
+  </div>
 {/if}
 
 {#if selectedCaps.size > 0}
@@ -529,5 +559,21 @@
   .muted {
     color: var(--text-3);
     font-size: 0.8rem;
+  }
+  .runtime-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.6rem 0.9rem;
+    margin-bottom: var(--space-4);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--r-md);
+    background: var(--accent-soft);
+    color: var(--text-2);
+    font-size: 0.86rem;
+  }
+  .runtime-note a {
+    color: var(--accent);
+    font-weight: 600;
   }
 </style>

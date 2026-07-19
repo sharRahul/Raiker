@@ -17,11 +17,26 @@ executor/activation model added on top of `RuntimeAuthority`.
    principals can never flip a gate (enable or disable). An enabled gate does not by
    itself let an AI act — the decision mode (default `ask`), critical-risk human floor,
    PolicyEngine hard-denies, and executor-level env allowlists still apply.
+
+   > **Per-principal fail-closed (web dashboard).** The `enabled_runtime` default above
+   > is the *static/global* posture — it is what the single-user CLI runtime (a
+   > principal with no account row) sees. The web dashboard runs under **per-principal
+   > controls**: when the acting principal has an account, every gate reads as
+   > `disabled` (`source: principal_fail_closed`) until that owner explicitly turns it
+   > on for their own workspace. Nothing is auto-enabled per account. This is why a
+   > freshly built `raiker-web` workspace reports **all** gates `disabled` even for
+   > integrated capabilities — by design, not a regression. See
+   > `RuntimeAuthority.get_effective_capability_gate`.
 2. **Activation requirement** (`raiker/runtime/authority/activation.py`) — a gate can
    only transition to an enabled state when its `ActivationRequirement` is satisfied:
    acting principal is HUMAN, the required runtime mode is active, a **real executor is
    registered**, any required threat-model ack exists, and (for sensitive tiers) a
-   human confirmation token is supplied.
+   human confirmation token is supplied. The runtime-enablement modes are
+   `local_single_user_runtime` and `multi_user_local_runtime` (see
+   `_RUNTIME_ENABLEMENT_MODES`); the default **Development preview**
+   (`development_preview`) is *not* one, so while it is active the dashboard does not
+   even offer the `enabled_runtime` transition. Activate a runtime mode under
+   **Settings → Runtime mode** first.
 3. **Executor registry** (`raiker/runtime/executors/registry.py`) — maps a capability
    to an `Executor`. `RuntimeAuthority.route_action()` executes the registered executor
    **only** on an `allow` decision; otherwise it returns the gate/policy reason and runs

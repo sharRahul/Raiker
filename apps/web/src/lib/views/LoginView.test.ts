@@ -162,23 +162,30 @@ describe("LoginView", () => {
     await waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith("prin_owner"));
   });
 
-  it("keeps account creation visually distinct, greets, and validates confirmation", async () => {
-    stubFetch({ ...HEALTH_OK, "GET /api/auth/bootstrap-status": { can_register: true }, "POST /api/auth/register": LOGIN_RESULT });
+  it("registers the first account directly from the first-run CTA and validates confirmation", async () => {
+    // FIX-01: on first run the primary CTA must create the account, not attempt a
+    // login there is no account for. The greeting, the confirm-password field, and
+    // the register submit all follow the first-run intent — no mode switch needed.
+    const fetchMock = stubFetch({ ...HEALTH_OK, "GET /api/auth/bootstrap-status": { can_register: true }, "POST /api/auth/register": LOGIN_RESULT });
     render(LoginView, { props: { onAuthenticated } });
     await screen.findByRole("heading", { name: "Welcome to Raiker" });
-    await fireEvent.click(screen.getByRole("button", { name: "Create a User Account" }));
-    expect(await screen.findByRole("heading", { name: "Create a User Account" })).toBeInTheDocument();
-    expect(screen.getByText("Hello! I am Raiker.")).toBeInTheDocument();
+    // The account-creation greeting shows immediately on first run.
+    await waitFor(() => expect(screen.getByText("Hello! I am Raiker.")).toBeInTheDocument());
     expect(screen.getByText("Nice to meet you.")).toBeInTheDocument();
     expect(screen.queryByText("I am ready when you are.")).not.toBeInTheDocument();
+    // The primary CTA creates the account, so the password is a new one.
     expect(screen.getByLabelText("Password")).toHaveAttribute("autocomplete", "new-password");
+    const primary = screen.getByRole("button", { name: "Create a User Account" });
     await fillCredentials("pw1");
     await fireEvent.input(screen.getByLabelText("Confirm password"), { target: { value: "pw2" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create a User Account" }));
+    await fireEvent.click(primary);
     expect(screen.getByRole("alert")).toHaveTextContent("Passwords do not match.");
     await fireEvent.input(screen.getByLabelText("Confirm password"), { target: { value: "pw1" } });
     await fireEvent.click(screen.getByRole("button", { name: "Create a User Account" }));
     await waitFor(() => expect(onAuthenticated).toHaveBeenCalledWith("prin_owner"));
+    // The CTA registered rather than attempting a doomed login.
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/register", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/auth/login", expect.anything());
   });
 
   it("creates an account in a separate same-server instance from the login screen", async () => {

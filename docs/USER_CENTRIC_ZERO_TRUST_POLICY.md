@@ -49,6 +49,13 @@ fail-closed regardless of any requirement here.
   theirs to make.
 - **"User-centric"** means every trust decision belongs to the device owner:
   inspectable, reversible, and requiring no external administrator.
+- **"Security as an enabler, not a mechanism for restriction"** means the
+  system's answer to risk is *more verification, not less capability*: when an
+  action can be made safe to run — through verification, scoping, audit, and
+  reversibility — the system runs it, and escalation prefers step-up
+  verification over lock-out (ZT-6). Blocking is reserved for what cannot yet
+  be verified: no-executor domains and hard-denies stay fail-closed as the
+  floor for the unverifiable, never as a ceiling on the user.
 - **Precedence rule (owner decision, 2026-07-19):** where frictionless goals
   meet a critical-risk action or a fail-closed invariant, verification and
   visibility win. A critical action's resting state is deny; only a notified

@@ -22,8 +22,11 @@ The owner's security policy is: Zero Trust ("never trust, always verify"), appli
 | Frictionless by default | `DecisionMode.AUTO` already runs low-risk actions unprompted deterministically. **Planned:** scoped standing approvals ("allow this action shape for this session/project until *expiry*") so users answer a class of prompt once, not per action. |
 | No arbitrary administrative barriers | All grants are user-owned (owner/`runtime_gate_manager`), reversible, and inspectable in the dashboard; nothing requires an external administrator. |
 | Security at the point of interaction | Approval prompts carry redacted, metadata-only previews at the moment of the action; asynchronous delivery (dashboard notification / channel relay) replaces modal blocking. |
+| Human in control at the top of the risk ladder | **Planned (F6–F7):** critical-risk actions are classified in production code, always notify the owner, and resolve only by a live human's manual approve/reject. Their resting state is deny: silence, expiry, delegation, or any non-human resolution denies. |
 
 **Invariants that this plan does not relax (design decision, stated up front):** the critical-risk human-confirmation floor, PolicyEngine hard-denies (secret-like memory, workspace boundary), fail-closed no-executor capabilities, environment-only credentials + egress allowlists, and append-only hash-chained audit. "Frictionless" is implemented as *fewer, better-scoped, asynchronous* decisions — not as silent execution of high-risk actions. Where the policy's "invisible" language meets a critical-risk action, visibility wins.
+
+**Critical-risk rule (owner decision, 2026-07-19):** the critical floor is strengthened from today's flat deny into an explicit human-decision lifecycle. A critical action's **resting state is deny**; the only event that can change its outcome is a notified human manually approving it. No decision mode (`allow`/`auto`), standing grant, scheduled routine, subagent, or relay may ever resolve a critical approval — grants carry a risk ceiling strictly below critical by construction. Silence, TTL expiry, session revocation, or any non-human resolution attempt resolves to deny. This is deliberately *more* visible than the current router behavior (which denies AI-proposed critical actions without telling the owner): the human always sees the request, always decides it, and nothing executes until they do.
 
 **Assumptions:**
 - Assumes the local single-user / multi-account-per-machine deployment model — this plan does NOT cover hosted multi-tenant Raiker.
@@ -145,6 +148,18 @@ Cross-cutting; starts immediately and lands with each workstream above.
 - [ ] F3. **Scoped standing approvals engine:** one grant model shared by A/C/E — `(principal, action shape, scope pattern, risk ceiling, expires_at)`; grants can only *narrow* from a human-made decision, are always listed in Security Settings, and expire by default in 7 days. Replaces repeated identical prompts (the actual "frictionless" mechanism).
 - [ ] F4. **Step-up verification:** when a grant or `auto` decision would cover an action whose computed risk exceeds the grant's ceiling (posture degraded, new recipient, out-of-scope path), require fresh TOTP/re-auth instead of failing outright — verify harder, not block harder.
 - [ ] F5. **Truthfulness gates:** extend `scripts/validate_runtime_enablement_readiness.py` so every new gate above must have executor + tests + threat model before `allow`/`auto` becomes selectable (mechanically enforcing "documentation never runs ahead of code").
+- [ ] F6. **Production critical-risk classification.** Today `RiskLevelValue.CRITICAL` is assigned only in tests — the router floor (`raiker/runtime/authority/router.py`) has no production callers routing to it. Land a canonical, in-code classification table (new `raiker/runtime/authority/critical.py`, consumed by the router's risk resolution) so `critical` is a real production tier. Initial criteria — an action is critical when it matches any of:
+  - (a) enabling or relaxing Tier-2 execution (shell / process / network / web-fetch), including threat-model acknowledgments and confirmation-token issuance;
+  - (b) an external send or calendar invite to any recipient/attendee not on the account's allowlist (Workstream E);
+  - (c) a checkpoint restore that would overwrite changes made by a different principal since the checkpoint (Workstream B);
+  - (d) creating or broadening a standing approval grant (F3) — grants are born from a critical, human-decided action, which is what makes their later unprompted use legitimate;
+  - (e) any operation on vault/credential material or on an egress allowlist.
+  The table is data, not scattered conditionals; it ships with tests proving each criterion routes to the floor, and it may only be *extended* (never narrowed) without a threat-model note — enforced by the F5 validator.
+- [ ] F7. **Critical approval lifecycle: notify → manual human decision → default deny.** Replace the router's current silent flat-deny of AI-proposed critical actions with a parked `pending_critical` approval that always notifies the owner (D2: dashboard notification center, OS notification via the desktop shell, channel relay where enabled). Resolution rules, enforced in `RuntimeAuthority` and covered by tests:
+  - Only a live human principal may resolve it, and approval requires step-up verification (fresh TOTP/re-auth when MFA is stale) before the Workstream A relay executes it with execution-time re-verification and posture check.
+  - Manual reject, TTL expiry (default 24 h), revocation of the approving session, or any resolution attempt by a non-human principal resolves to **deny**.
+  - No decision mode, standing grant, scheduled routine, or subagent can resolve or pre-authorize a critical approval; the resting state of every critical action is deny, and absence of an explicit human approval always means deny.
+  - Every transition (`created → notified → resolved/expired`) is an audit event carrying the posture snapshot (F1), so "who was in control, when" is reconstructable from the log alone.
 
 ---
 
@@ -152,8 +167,8 @@ Cross-cutting; starts immediately and lands with each workstream above.
 
 | Milestone | Contents | Exit criteria |
 |---|---|---|
-| M1 | A1–A2, F1, F3 (grant model), D2 (notifications) | An approved non-file action executes end-to-end; grants visible/revocable; full suite + validators green |
-| M2 | A3–A4, B1–B2 | Tier-2 approve-and-run behind threat-ack; restore with pre-image undo proven by tests |
+| M1 | A1–A2, F1, F3 (grant model), F6 (critical classification), D2 (notifications) | An approved non-file action executes end-to-end; grants visible/revocable; every F6 criterion provably routes to the critical floor; full suite + validators green |
+| M2 | A3–A4, B1–B2, F7 (critical lifecycle) | Tier-2 approve-and-run behind threat-ack; restore with pre-image undo proven by tests; critical actions notify + resolve only by manual human decision, defaulting to deny |
 | M3 | C1–C3, B3–B4, F2 | Read-only subagents runnable under budget; background sweep shipping |
 | M4 | E1–E3, D1 | First real external email send + calendar push through draft→approve→send; rich TUI launchable |
 | M5 | D3, E4, C4, F4 | Desktop shell with keychain vault; step-up flows; teams enabled |

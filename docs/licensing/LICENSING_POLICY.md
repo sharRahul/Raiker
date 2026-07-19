@@ -14,10 +14,10 @@ headers are not added to JSON, lockfiles, generated outputs, snapshots,
 fixtures, compiled assets, or third-party files. Do not remove third-party
 notices or add ownership claims without evidence.
 
-Contributions are submitted under Apache-2.0 and require the [DCO](../../DCO)
-sign-off described in [CONTRIBUTING.md](../../CONTRIBUTING.md). Raise licensing
-questions through a private security report or a repository issue that contains
-no sensitive information.
+Contributions are submitted under Apache-2.0 as described in
+[CONTRIBUTING.md](../../CONTRIBUTING.md); no sign-off trailer or Contributor
+License Agreement is required. Raise licensing questions through a private
+security report or a repository issue that contains no sensitive information.
 
 ## Dependencies and notices
 

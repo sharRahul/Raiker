@@ -112,6 +112,32 @@ class TestTerminalCommands:
         )
         assert "Unknown checkpoint" in result
 
+    def test_handle_checkpoints_fork(self, store: SQLiteStore) -> None:
+        from raiker.checkpoints.service import CheckpointService
+
+        service = CheckpointService(store)
+        checkpoint, _ = service.write_turn_checkpoint(
+            session_id=new_id("sess_"),
+            turn_id=new_id("turn_"),
+            runtime_state="CLOSED",
+            summary="Branch me",
+            last_event_id=new_id("evt_"),
+        )
+        result = handle_checkpoints(
+            f"/checkpoints fork {checkpoint.checkpoint_id}",
+            workspace_root=str(store.paths.workspace_root),
+        )
+        assert "Forked checkpoint" in result
+        assert "new session" in result
+        # The fork materialized a real, distinct session.
+        assert len(store.list_sessions(limit=50)) >= 1
+
+    def test_handle_checkpoints_fork_unknown(self, tmp_path: Path) -> None:
+        result = handle_checkpoints(
+            "/checkpoints fork ckpt_missing", workspace_root=str(tmp_path)
+        )
+        assert "Unknown checkpoint" in result
+
     def test_slash_help(self, tmp_path: Path) -> None:
         result = handle_slash_command("/help", workspace_root=str(tmp_path))
         assert "/help" in result

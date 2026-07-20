@@ -1561,6 +1561,19 @@ CRITICAL_APPROVAL_LIFECYCLE_SQL = """
 ALTER TABLE approvals ADD COLUMN critical INTEGER NOT NULL DEFAULT 0;
 """
 
+# Subagent per-spawn budgets (Workstream C / C1): a subagent's enforced resource
+# envelope — step, tool-call, and (estimated) token caps — persists on its
+# contract so the bounded run is auditable after the fact. Wall-clock already
+# lived in `max_runtime_seconds`; these add the remaining three dimensions.
+# Legacy rows default to 0 (unset), never a permissive high cap.
+SUBAGENT_BUDGETS_MIGRATION_ID = "RAIKER-1303-subagent-budgets"
+
+SUBAGENT_BUDGETS_SQL = """
+ALTER TABLE subagent_contracts ADD COLUMN max_steps INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE subagent_contracts ADD COLUMN max_tool_calls INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE subagent_contracts ADD COLUMN max_tokens INTEGER NOT NULL DEFAULT 0;
+"""
+
 # Nested projects/folders (conversation organisation remainder): arbitrary-depth
 # folder hierarchy via hybrid adjacency list + materialized path. Parent
 # reference uses ON DELETE SET NULL so children survive parent hard-delete.

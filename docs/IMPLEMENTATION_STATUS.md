@@ -5,6 +5,40 @@
 
 # Implementation Status
 
+> Current truth update (2026-07-20): **Milestone 3 (partial) — C1 (subagent
+> budgets) and B3 (checkpoint fork)** of the execution-breadth & User-Centric
+> Zero Trust plan (`docs/plans/2026-07-19-execution-breadth-and-zero-trust-plan.md`)
+> landed. **C1 (Workstream C):** `raiker/agents/orchestration.py::SubagentBudget`
+> is a four-dimension per-spawn budget record — max steps, max tool calls,
+> wall-clock, and estimated tokens. Its `effective()` clamps caller-supplied
+> values *down* to the process-wide hard caps
+> (`MAX_SUBAGENT_STEPS`/`MAX_SUBAGENT_TOOL_CALLS`/`MAX_SUBAGENT_TOKENS`) and never
+> up, so a spec can only shrink the envelope. `SubagentRunner.run` enforces all
+> four dimensions and fails the subagent *closed* on any breach
+> (`subagent_step_budget_exceeded`, `subagent_tool_call_budget_exceeded` —
+> checked before each dispatch, `subagent_time_budget_exceeded`,
+> `subagent_token_budget_exceeded` — a deterministic ~4-char/token estimate via
+> `estimate_step_tokens`, since the read-only runner makes no model calls),
+> never silently truncating. The budget persists on the subagent contract
+> (`SubagentContract.max_steps/max_tool_calls/max_tokens`, migration
+> `RAIKER-1303-subagent-budgets`) and rides the metadata-only outcome artifacts,
+> so a bounded run stays auditable after the fact. **B3 (Workstream B):**
+> `CheckpointService.plan_fork` is now a metadata-only preview
+> (`can_execute: True`, `requires_approval: False` — a fork mutates no workspace
+> files, so it is not an approval-required governed mutation), and
+> `CheckpointService.execute_fork` materializes a fresh session
+> (`store.create_session`) seeded from the checkpoint's state summary + memory
+> candidates (`_fork_seed`, read best-effort from the manifest — a missing or
+> corrupt manifest degrades to an empty seed rather than failing). A
+> metadata-only fork manifest under `.raiker/checkpoints/forks/<session_id>.json`
+> records the lineage + seed (`load_fork_seed` reads it back); no workspace file
+> is written or overwritten. CLI `/checkpoints fork <id>` runs the fork directly
+> and reports the new session. Neither slice adds a new capability gate or
+> relaxes an invariant. New migration: `RAIKER-1303-subagent-budgets`. Tests:
+> `tests/test_subagent_activation.py`, `tests/test_checkpoints.py`,
+> `tests/test_phase_2_terminal_commands.py`. M3 remains open (C2–C3, B4, F2 still
+> pending).
+
 > Current truth update (2026-07-20): **Milestone 2 — F7 (critical approval
 > lifecycle, ZT-7)** of the execution-breadth & User-Centric Zero Trust plan
 > (`docs/plans/2026-07-19-execution-breadth-and-zero-trust-plan.md`) is complete,

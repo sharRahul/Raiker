@@ -77,7 +77,7 @@ def test_terminal_slash_approval_commands(tmp_path: Path) -> None:
     assert "Usage:" in handle_slash_command("/approve", workspace_root=tmp_path)
 
 
-def test_checkpoint_restore_is_executable_governed_plan_fork_still_plan_only(
+def test_checkpoint_restore_and_fork_are_executable_governed_plans(
     tmp_path: Path,
 ) -> None:
     store = SQLiteStore(tmp_path)
@@ -85,13 +85,15 @@ def test_checkpoint_restore_is_executable_governed_plan_fork_still_plan_only(
     checkpoint, _ = service.write_turn_checkpoint(
         session_id="sess", turn_id="turn", runtime_state="CLOSED", summary="s", last_event_id="evt"
     )
-    # B2: restore is now an executable, approval-required governed action (the
-    # dry-run plan is metadata-only). Fork (B3) remains plan-only for now.
+    # B2: restore is an executable, approval-required governed action (the
+    # dry-run plan is metadata-only). B3: fork is now executable too, but — since
+    # it mutates no workspace files — it is not an approval-required mutation.
     restore_plan = service.plan_restore(checkpoint.checkpoint_id)
     assert restore_plan["can_execute"] is True
     assert restore_plan["requires_approval"] is True
-    assert service.plan_fork(checkpoint.checkpoint_id)["can_execute"] is False
-    assert service.plan_fork(checkpoint.checkpoint_id)["requires_approval"] is True
+    fork_plan = service.plan_fork(checkpoint.checkpoint_id)
+    assert fork_plan["can_execute"] is True
+    assert fork_plan["requires_approval"] is False
 
 
 def test_stat_diff_and_write_proposal_do_not_mutate_without_approval(tmp_path: Path) -> None:

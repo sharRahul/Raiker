@@ -32,7 +32,10 @@ network, and cannot widen the parent's authority.
 | Per-step governance | Every step goes through `ToolBroker`/`PolicyEngine`; a `deny`/`needs_approval` step stops the subagent (`subagent_step_blocked`). |
 | Depth bound | `depth < min(max_depth, MAX_SUBAGENT_DEPTH=3)`; else `subagent_depth_exceeded`. |
 | Step budget | `len(steps) ≤ min(max_steps, MAX_SUBAGENT_STEPS=25)`; else `subagent_step_budget_exceeded`. |
+| Tool-call budget (C1) | Checked before each dispatch against `min(max_tool_calls, MAX_SUBAGENT_TOOL_CALLS=25)`; else `subagent_tool_call_budget_exceeded` (fails closed before the over-budget call runs). |
+| Token budget (C1) | Running deterministic ~4-char/token estimate per step against `min(max_tokens, MAX_SUBAGENT_TOKENS=200000)`; else `subagent_token_budget_exceeded`. |
 | Time budget | Wall-clock guard per step; else `subagent_time_budget_exceeded`. |
+| Budget record (C1) | The four-dimension per-spawn budget (`SubagentBudget`) is clamped down to the hard caps (`effective()` — callers may only shrink) and persisted on the contract (`max_steps`/`max_tool_calls`/`max_tokens`), so a bounded run's enforced envelope is auditable after the fact. |
 | Team size | `≤ MAX_TEAM_MEMBERS=5`; else `team_member_budget_exceeded`. |
 | AI principals | Capability gate + `route_action` block non-human principals from running or enabling the gate. |
 | No fabricated success | Any breach returns `ok=False` with a reason code; never a fake "completed". |

@@ -77,10 +77,11 @@ since the checkpoint escalates to high risk, and — per F6(c) — a restore tha
 would overwrite a different principal's changes is a **critical** action routed
 to the human floor.
 
-### B3–B4 (planned)
+### B3 (done) · B4 (planned)
 
-`plan_fork` will seed a new session from a checkpoint's state summary with no
-file mutation. B4 adds the different-principal escalation described above.
+B3 landed: `execute_fork` seeds a new session from a checkpoint's state summary +
+memory candidates with no file mutation (see the **Fork (B3)** section below).
+B4 (planned) adds the different-principal escalation described above.
 
 ## Boundaries enforced (fail-closed)
 
@@ -118,3 +119,18 @@ file mutation. B4 adds the different-principal escalation described above.
 - **Out of scope (workstream non-goals).** Restoring state outside the workspace
   (global config, SQLite history), rewinding the append-only event log, and
   cross-machine restore are explicitly not covered.
+
+## Fork (B3)
+
+A **fork** (`CheckpointService.execute_fork`) branches *session* state — it
+materializes a new session seeded from a checkpoint's state summary + memory
+candidates — and, unlike restore, **mutates no workspace files**. Because there
+is no file mutation, a fork is *not* an approval-required governed mutation
+(`plan_fork` reports `can_execute: True`, `requires_approval: False`), and the
+CLI `/checkpoints fork <id>` runs it directly. The seed is read best-effort from
+the checkpoint manifest — a missing or corrupt manifest degrades to an empty
+seed rather than failing — and is recorded as a **metadata-only** fork manifest
+under `.raiker/checkpoints/forks/<session_id>.json` (lineage + summary + memory
+candidates; never workspace file content). A fork never overwrites, deletes, or
+reads back any workspace file, so it introduces no TOCTOU or cross-principal
+overwrite surface; its only effect is a new session row plus its seed manifest.

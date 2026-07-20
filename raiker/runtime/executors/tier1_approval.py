@@ -118,6 +118,18 @@ class ApprovalExecutionRelay:
                 summary=f"Approval {approval_id} already resolved.",
             )
 
+        # F7 — a critical approval executes only through the critical lifecycle
+        # (`RuntimeAuthority.resolve_critical_approval`), which drives this relay
+        # with a one-shot `CriticalConfirmation`. Without that confirmation the
+        # relay refuses to touch it, so an AI (or a stray direct relay call) can
+        # neither claim nor re-park a critical approval.
+        if approval.get("critical") and action.critical_confirmation is None:
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code="critical_approval_requires_lifecycle",
+                summary=f"Approval {approval_id} is critical; resolve it via the critical lifecycle.",
+            )
+
         # A1 — TTL check first: an expired approval resolves to `expired` and
         # never executes. `expires_at` is stored in the same canonical UTC
         # ISO-8601 format as `utc_now()`, so a lexicographic compare is
@@ -215,6 +227,11 @@ class ApprovalExecutionRelay:
             requires_approval=False,
             session_id=action.session_id,
             turn_id=action.turn_id,
+            # F7 — carry a live human's critical confirmation (issued only by
+            # `resolve_critical_approval`) onto the re-governed target, so a
+            # human-approved critical action clears the deny floor while still
+            # running under its own gate, policy review, and posture check.
+            critical_confirmation=action.critical_confirmation,
         )
         result = self._get_authority().route_action(target_action, principal)
         executed = result.decision == "allow" and result.error is None

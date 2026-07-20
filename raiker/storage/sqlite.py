@@ -66,6 +66,8 @@ from raiker.storage.migrations import (
     CONNECTOR_INVOCATIONS_SQL,
     CREDENTIAL_SECURITY_MIGRATION_ID,
     CREDENTIAL_SECURITY_SQL,
+    CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID,
+    CRITICAL_APPROVAL_LIFECYCLE_SQL,
     EIDETIC_OBSERVATIONS_MIGRATION_ID,
     EIDETIC_OBSERVATIONS_SQL,
     EMAIL_DRAFTS_MIGRATION_ID,
@@ -670,6 +672,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 STANDING_GRANTS_MIGRATION_ID, STANDING_GRANTS_SQL, connection
+            )
+            self._apply_migration(
+                CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID,
+                CRITICAL_APPROVAL_LIFECYCLE_SQL,
+                connection,
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -2589,6 +2596,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         status: str = "pending",
         *,
         ttl_hours: float | None = 24.0,
+        critical: bool = False,
     ) -> None:
         if isinstance(action, ToolAction):
             action_id = action.action_id
@@ -2622,10 +2630,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT INTO approvals
-                (approval_id, action_id, status, approval_scope, created_at, expires_at, action_payload_sha256)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (approval_id, action_id, status, approval_scope, created_at, expires_at, action_payload_sha256, critical)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (approval_id, action_id, status, "action", created_at, expires_at, payload_hash),
+                (
+                    approval_id,
+                    action_id,
+                    status,
+                    "critical" if critical else "action",
+                    created_at,
+                    expires_at,
+                    payload_hash,
+                    1 if critical else 0,
+                ),
             )
 
     def expire_approval(self, approval_id: str) -> bool:

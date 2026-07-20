@@ -180,7 +180,8 @@ def test_active_grant_satisfies_approval_and_executes(
 def test_grant_creation_is_classified_critical(
     authority: RuntimeAuthority, store: SQLiteStore
 ) -> None:
-    # An AI proposing to create a grant is denied at the critical floor.
+    # An AI proposing to create a grant hits the critical floor: F7 parks it for a
+    # human decision (resting state deny) rather than executing it.
     action = GovernedAction(
         action_id=new_id("act_"),
         principal_id="ai_worker",
@@ -190,8 +191,9 @@ def test_grant_creation_is_classified_critical(
         risk_level=RiskLevelValue.LOW,
     )
     result = authority.route_action(action, _ai())
-    assert result.decision == "deny"
-    assert result.message == "critical_action_requires_human_confirmation"
+    assert result.decision == "needs_human_confirmation"
+    assert result.message == "critical_action_parked_for_human"
+    assert result.approval_id is not None
 
 
 def test_grant_for_critical_action_type_refused(

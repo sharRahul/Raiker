@@ -36,6 +36,12 @@ class ApprovalInbox:
         approval = self.store.load_approval(approval_id, user_id=user_id)
         if approval is None:
             raise ValueError("approval_not_found")
+        # A critical approval (F7) has a stricter resting state (deny) and a
+        # human-only, step-up-gated resolution lifecycle in RuntimeAuthority. The
+        # ordinary metadata-only inbox must never touch it — routing it here would
+        # let it be "resolved" outside the critical floor.
+        if approval.get("critical"):
+            raise ValueError("critical_approval_requires_lifecycle")
         if approval["status"] != "pending":
             raise ValueError("approval_already_resolved")
         # An approval past its TTL resolves to `expired` and can never be acted

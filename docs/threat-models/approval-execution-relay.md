@@ -72,9 +72,13 @@ The immutable **approval intent** is captured at creation time by
   executes the exact `{tool_name, arguments, risk_level}` the human approved
   (hash-pinned), routed through that capability's own gate/mode/policy. Tier-2
   targets still require their gate to be enabled (which required the threat-ack),
-  and critical-risk targets hit the human-confirmation floor in `route_action`
-  and do not execute via the relay. Coverage across `apply_patch`, `memory_write`,
-  and Tier-2 `shell` in `test_relay_dispatches_*`.
+  and critical-risk targets hit the human-confirmation floor in `route_action`:
+  they execute via the relay only when accompanied by a one-shot
+  `CriticalConfirmation` issued by `resolve_critical_approval` (F7) — the relay
+  carries it onto the target but never mints one, so a critical action cannot be
+  relayed without a live human's step-up-verified decision. Coverage across
+  `apply_patch`, `memory_write`, and Tier-2 `shell` in `test_relay_dispatches_*`;
+  critical gating in `tests/test_critical_lifecycle.py`.
 - **T6 — Approving session revoked between approval and execution (A4).**
   Mitigated: the posture check denies with `posture_degraded:session_revoked`
   before any claim; the approval remains actionable from a live session. Covered
@@ -88,7 +92,9 @@ The immutable **approval intent** is captured at creation time by
 - Approving actions for capabilities with **no real executor** — they stay
   `activation_blocked:no_executor` and the relay reports `target_not_executed`.
 - Batch/blanket approval of heterogeneous actions (one approval, one action).
-- The full critical-risk approval lifecycle (notify → manual human decision) —
-  that is Workstream F6/F7; today a critical target simply does not execute via
-  the relay (human-confirmation floor).
+- The critical-risk approval lifecycle itself (notify → manual human decision →
+  deny/execute) lives in Workstream F7 —
+  `docs/threat-models/critical-approval-lifecycle.md`. The relay is only its
+  execution arm: it runs a critical target solely when carrying the one-shot
+  `CriticalConfirmation` that lifecycle issues.
 - Recursive or delegated relays (a relay may never execute another relay).

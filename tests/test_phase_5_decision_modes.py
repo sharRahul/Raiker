@@ -170,6 +170,9 @@ def test_always_allow_cannot_bypass_critical_floor(tmp_path: Path) -> None:
     result = authority.route_action(
         _write_action("p_ai", risk=RiskLevelValue.CRITICAL, name="crit.txt"), _ai_principal(ws)
     )
-    assert result.decision == "deny"
-    assert result.message == "critical_action_requires_human_confirmation"
+    # F7: the critical floor now parks the AI-proposed action for a human decision
+    # (resting state deny) instead of a silent flat-deny — `always_allow` still
+    # cannot execute it. What matters for this invariant is that nothing ran.
+    assert result.decision == "needs_human_confirmation"
+    assert result.message == "critical_action_parked_for_human"
     assert not (ws / "crit.txt").exists()

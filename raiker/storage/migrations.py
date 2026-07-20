@@ -1480,6 +1480,39 @@ CREATE TABLE IF NOT EXISTS security_monitor_state (
 );
 """
 
+# Workstream B / Slice B1 — checkpoint capture manifest. Each mutation executed
+# through the broker/relay records the *pre-image* of the file it is about to
+# overwrite (or the absence of a not-yet-existing file) as a content-addressed
+# blob under `.raiker/checkpoints/objects/`; this table is the metadata-only
+# manifest that maps a governed mutation to the blob hash of its pre-image, so a
+# later restore (B2) can put the file back byte-for-byte. Only metadata lives
+# here and in the event log — never file content. `capture_status` is one of
+# `captured` (pre-image blob stored), `absent` (file did not exist; restore =
+# delete), or `oversize` (file exceeded the size cap and could not be snapshot,
+# so it is not restorable — recorded honestly rather than silently dropped).
+CHECKPOINT_CAPTURE_MANIFEST_MIGRATION_ID = "RAIKER-1201-checkpoint-capture-manifest"
+
+CHECKPOINT_CAPTURE_MANIFEST_SQL = """
+CREATE TABLE IF NOT EXISTS checkpoint_capture_manifest (
+  manifest_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  turn_id TEXT,
+  action_id TEXT NOT NULL,
+  capability TEXT NOT NULL,
+  principal_id TEXT,
+  workspace_path TEXT NOT NULL,
+  pre_image_sha256 TEXT,
+  pre_image_size INTEGER NOT NULL DEFAULT 0,
+  existed_before INTEGER NOT NULL DEFAULT 0,
+  capture_status TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_checkpoint_capture_session
+  ON checkpoint_capture_manifest(session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_checkpoint_capture_action
+  ON checkpoint_capture_manifest(action_id);
+"""
+
 # Nested projects/folders (conversation organisation remainder): arbitrary-depth
 # folder hierarchy via hybrid adjacency list + materialized path. Parent
 # reference uses ON DELETE SET NULL so children survive parent hard-delete.

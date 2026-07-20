@@ -73,6 +73,14 @@ EVENT_TYPES = {
     "memory_record_forgotten",
     "response_created",
     "checkpoint_created",
+    # Checkpoint pre-image capture (Workstream B / B1). `checkpoint_captured`
+    # records that a workspace-file mutation's pre-image was snapshot into the
+    # content-addressed blob store before the mutation ran — metadata only
+    # (content-address, size, status), never file content. `checkpoint_capture_failed`
+    # records a best-effort capture that could not be persisted; it never blocks
+    # the underlying mutation.
+    "checkpoint_captured",
+    "checkpoint_capture_failed",
     "turn_closed",
     "error_recorded",
     "turn_state_changed",

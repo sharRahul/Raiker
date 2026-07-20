@@ -58,6 +58,8 @@ from raiker.storage.migrations import (
     CALENDAR_EVENTS_SQL,
     CAPABILITY_DECISION_MODE_MIGRATION_ID,
     CAPABILITY_DECISION_MODE_SQL,
+    CHECKPOINT_CAPTURE_MANIFEST_MIGRATION_ID,
+    CHECKPOINT_CAPTURE_MANIFEST_SQL,
     CONNECTOR_ECOSYSTEM_MIGRATION_ID,
     CONNECTOR_ECOSYSTEM_SQL,
     CONNECTOR_INVOCATIONS_MIGRATION_ID,
@@ -658,6 +660,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 CREDENTIAL_SECURITY_MIGRATION_ID, CREDENTIAL_SECURITY_SQL, connection
+            )
+            self._apply_migration(
+                CHECKPOINT_CAPTURE_MANIFEST_MIGRATION_ID,
+                CHECKPOINT_CAPTURE_MANIFEST_SQL,
+                connection,
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -2721,6 +2728,84 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     0,
                 ),
             )
+
+    def insert_checkpoint_capture_entry(
+        self,
+        *,
+        manifest_id: str,
+        session_id: str,
+        turn_id: str | None,
+        action_id: str,
+        capability: str,
+        principal_id: str | None,
+        workspace_path: str,
+        pre_image_sha256: str | None,
+        pre_image_size: int,
+        existed_before: bool,
+        capture_status: str,
+        created_at: str,
+    ) -> None:
+        """Record one metadata-only pre-image manifest entry (B1 capture).
+
+        No file content is stored here — only the content-address (sha256) of the
+        pre-image blob that lives under ``.raiker/checkpoints/objects/``.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO checkpoint_capture_manifest
+                (manifest_id, session_id, turn_id, action_id, capability, principal_id,
+                 workspace_path, pre_image_sha256, pre_image_size, existed_before,
+                 capture_status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    manifest_id,
+                    session_id,
+                    turn_id,
+                    action_id,
+                    capability,
+                    principal_id,
+                    workspace_path,
+                    pre_image_sha256,
+                    int(pre_image_size),
+                    1 if existed_before else 0,
+                    capture_status,
+                    created_at,
+                ),
+            )
+
+    def list_checkpoint_capture_entries(
+        self,
+        *,
+        session_id: str | None = None,
+        action_id: str | None = None,
+        limit: int = 200,
+    ) -> list[dict]:
+        clauses: list[str] = []
+        params: list[object] = []
+        if session_id is not None:
+            clauses.append("session_id = ?")
+            params.append(session_id)
+        if action_id is not None:
+            clauses.append("action_id = ?")
+            params.append(action_id)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT manifest_id, session_id, turn_id, action_id, capability, principal_id,
+                       workspace_path, pre_image_sha256, pre_image_size, existed_before,
+                       capture_status, created_at
+                FROM checkpoint_capture_manifest
+                {where}
+                ORDER BY created_at DESC, manifest_id DESC
+                LIMIT ?
+                """,
+                tuple(params),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def upsert_model_profiles(self, profiles: list[ModelProfile]) -> None:
         now = utc_now()

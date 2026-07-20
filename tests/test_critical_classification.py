@@ -6,9 +6,10 @@ Two layers of coverage:
   proving each of the five criteria (a)-(e) is recognised, and that near-misses
   are *not* elevated (so the floor is not over-broad);
 * router-integration tests proving every criterion routes to the critical floor
-  — an AI principal is denied (`critical_action_requires_human_confirmation`),
-  and a human is asked (`needs_human_confirmation`) — regardless of the action's
-  self-declared risk level or any permissive decision mode.
+  — an AI-proposed action is parked for a human decision (F7) and a human is
+  asked to confirm — regardless of the action's self-declared risk level or any
+  permissive decision mode. The full parked → resolve lifecycle lives in
+  ``tests/test_critical_lifecycle.py``.
 """
 
 from __future__ import annotations
@@ -167,12 +168,16 @@ _CRITICAL_ACTIONS = [
 
 
 @pytest.mark.parametrize(("action_type", "args"), _CRITICAL_ACTIONS)
-def test_ai_proposed_critical_action_is_denied(
+def test_ai_proposed_critical_action_is_parked_not_executed(
     authority: RuntimeAuthority, action_type: str, args: dict
 ) -> None:
+    # F7: an AI-proposed critical action is no longer silently flat-denied — it is
+    # parked as a critical approval (resting state deny) and the owner is notified.
+    # Nothing executes; only a live human may later resolve it.
     result = authority.route_action(_action(action_type, args=args), _ai())
-    assert result.decision == "deny"
-    assert result.message == "critical_action_requires_human_confirmation"
+    assert result.decision == "needs_human_confirmation"
+    assert result.message == "critical_action_parked_for_human"
+    assert result.approval_id is not None
 
 
 @pytest.mark.parametrize(("action_type", "args"), _CRITICAL_ACTIONS)
@@ -189,7 +194,10 @@ def test_human_critical_action_needs_confirmation(
         risk_level=RiskLevelValue.LOW,
     )
     result = authority.route_action(action, human)
+    # A human proposing a critical action directly still cannot execute it in-band:
+    # it is parked for an explicit, step-up-verified confirmation.
     assert result.decision == "needs_human_confirmation"
+    assert result.approval_id is not None
 
 
 def test_critical_classification_emits_audit_event(

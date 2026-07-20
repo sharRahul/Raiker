@@ -1550,6 +1550,17 @@ CREATE INDEX IF NOT EXISTS idx_standing_grants_owner
   ON standing_grants(granted_by, revoked, created_at DESC);
 """
 
+# Critical approval lifecycle (Workstream F / F7, ZT-7): a critical action is
+# parked as an approval whose resting state is deny. The `critical` flag marks
+# such rows so the metadata-only inbox/relay never treat them as ordinary
+# approvals — a critical approval is resolvable *only* by the human-decision
+# lifecycle in RuntimeAuthority, never by a decision mode, grant, or subagent.
+CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID = "RAIKER-1302-critical-approval-lifecycle"
+
+CRITICAL_APPROVAL_LIFECYCLE_SQL = """
+ALTER TABLE approvals ADD COLUMN critical INTEGER NOT NULL DEFAULT 0;
+"""
+
 # Nested projects/folders (conversation organisation remainder): arbitrary-depth
 # folder hierarchy via hybrid adjacency list + materialized path. Parent
 # reference uses ON DELETE SET NULL so children survive parent hard-delete.

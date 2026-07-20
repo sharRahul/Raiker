@@ -10,11 +10,13 @@ All copy is redacted, metadata-only (never a raw payload, token, or file content
 from raiker.notify.approval_notifier import (
     fire_os_notification,
     notify_approval_pending,
+    notify_critical_approval_pending,
     resolve_owner_principal_id,
 )
 
 __all__ = [
     "fire_os_notification",
     "notify_approval_pending",
+    "notify_critical_approval_pending",
     "resolve_owner_principal_id",
 ]

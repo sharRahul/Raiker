@@ -109,6 +109,25 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
 
 
 @dataclass(frozen=True)
+class CriticalConfirmation:
+    """A live human's manual confirmation of one parked critical action (F7).
+
+    Produced *only* by :meth:`RuntimeAuthority.resolve_critical_approval`, after
+    it has verified the resolver is human, the approving session is valid, step-up
+    was satisfied, and the intent is unchanged. It rides on the target action
+    through the Workstream A relay into :meth:`RuntimeAuthority.route_action`,
+    where it is the single signal that lets a critical action past the deny floor.
+    It is never constructed on the AI-proposed path, and the router re-validates
+    it against persisted state (human principal + a claimed critical approval), so
+    its mere presence cannot smuggle a critical action through.
+    """
+
+    approval_id: str
+    confirmed_by: str
+    step_up_verified: bool = False
+
+
+@dataclass(frozen=True)
 class GovernedAction:
     action_id: str
     principal_id: str
@@ -122,6 +141,7 @@ class GovernedAction:
     requires_risk_acceptance: bool = False
     session_id: str = ""
     turn_id: str | None = None
+    critical_confirmation: CriticalConfirmation | None = None
 
 
 @dataclass(frozen=True)
@@ -133,6 +153,7 @@ class GovernedActionResult:
     approved: bool = False
     message: str = ""
     error: str | None = None
+    approval_id: str | None = None
 
 
 class RuntimeAuthority:
@@ -704,6 +725,333 @@ class RuntimeAuthority:
                 return row
         return None
 
+    # ── critical approval lifecycle (Workstream F / F7, ZT-7) ─────────────────
+
+    def _critical_confirmation_valid(
+        self, action: GovernedAction, principal: Principal
+    ) -> bool:
+        """True only for a genuine, human-issued confirmation of a parked critical.
+
+        A confirmation lets a critical action past the deny floor, so this guard
+        is deliberately strict and re-checks *persisted* state (never trusting the
+        object's mere presence): the acting principal must be a human, must be the
+        principal named on the confirmation, and the referenced approval must be a
+        real critical approval that the relay has already claimed for execution
+        (``executing``). An AI can never satisfy the human-principal check, so no
+        decision mode, grant, or subagent can forge its way through here.
+        """
+        confirmation = action.critical_confirmation
+        if confirmation is None:
+            return False
+        if principal.principal_type != PrincipalType.HUMAN:
+            return False
+        if confirmation.confirmed_by != principal.principal_id:
+            return False
+        approval = self.store.load_approval(confirmation.approval_id)
+        if approval is None or not approval.get("critical"):
+            return False
+        return approval.get("status") == "executing"
+
+    def _park_critical_action(
+        self,
+        action: GovernedAction,
+        principal: Principal,
+        critical_match: Any,
+    ) -> GovernedActionResult:
+        """Park a critical action as an approval and notify the owner (F7).
+
+        Replaces the old silent flat-deny of AI-proposed critical actions: the
+        action's resting state is deny, but the owner is always told, and the
+        parked approval is the object a live human later resolves (approve with
+        step-up → execute; reject / expiry / non-human attempt → deny). Metadata
+        only; the arguments never enter the notification or the audit payloads.
+        """
+        from raiker.contracts.models import ToolAction
+
+        approval_id = new_id("appr_")
+        tool_action = ToolAction(
+            action_id=action.action_id,
+            tool_name=action.tool_or_service_name,
+            arguments=action.arguments,
+            risk_level=action.risk_level,
+            requires_approval=True,
+            proposed_by=principal.principal_id,
+        )
+        posture = self._capture_action_posture(principal, action)
+        criterion = critical_match.code if critical_match is not None else "declared_critical"
+        try:
+            self.store.insert_tool_action(
+                tool_action, action.session_id or "critical", action.turn_id, "critical_pending"
+            )
+            self.store.insert_approval(approval_id, tool_action, critical=True)
+        except Exception as exc:  # pragma: no cover - storage failure is fail-closed
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="deny",
+                message=f"critical_park_failed:{type(exc).__name__}",
+            )
+
+        self._event(
+            event_type="critical_approval_created",
+            actor="runtime_authority",
+            payload={
+                "approval_id": approval_id,
+                "action_id": action.action_id,
+                "action_type": action.action_type,
+                "criterion": criterion,
+                "proposed_by": principal.principal_id,
+                "posture": posture,
+            },
+            session_id=action.session_id,
+            turn_id=action.turn_id,
+        )
+
+        notification_id: str | None = None
+        try:
+            from raiker.notify import notify_critical_approval_pending
+
+            notification_id = notify_critical_approval_pending(
+                self.store,
+                acting_principal_id=principal.principal_id,
+                approval_id=approval_id,
+                tool_name=action.tool_or_service_name,
+                criterion=criterion,
+                risk_level=action.risk_level,
+            )
+        except Exception:  # pragma: no cover - delivery is best-effort
+            notification_id = None
+
+        self._event(
+            event_type="critical_approval_notified",
+            actor="runtime_authority",
+            payload={
+                "approval_id": approval_id,
+                "notification_id": notification_id,
+                "delivered": notification_id is not None,
+                "posture": posture,
+            },
+            session_id=action.session_id,
+            turn_id=action.turn_id,
+        )
+        return GovernedActionResult(
+            action_id=action.action_id,
+            decision="needs_human_confirmation",
+            message="critical_action_parked_for_human",
+            approval_id=approval_id,
+        )
+
+    def resolve_critical_approval(
+        self,
+        approval_id: str,
+        resolver: Principal,
+        *,
+        approve: bool,
+        step_up_verified: bool = False,
+        session_id: str = "",
+        reason: str = "",
+    ) -> GovernedActionResult:
+        """Resolve a parked critical approval by a live human's manual decision.
+
+        The only path that can move a critical action off its deny resting state.
+        Enforced here (F7): only a human may resolve; approving requires step-up
+        verification and a non-degraded posture; the immutable intent and TTL are
+        re-checked; and execution runs through the Workstream A relay with a
+        one-shot :class:`CriticalConfirmation` so the target is re-verified at
+        execution time. Any non-human attempt, manual reject, expiry, tamper, or
+        degraded posture resolves to deny (or, for step-up, parks it unchanged so
+        the human can verify harder and retry).
+        """
+        approval = self.store.load_approval(approval_id)
+        if approval is None:
+            return GovernedActionResult(
+                action_id=approval_id, decision="deny",
+                message="approval_not_found", approval_id=approval_id,
+            )
+        if not approval.get("critical"):
+            return GovernedActionResult(
+                action_id=approval_id, decision="deny",
+                message="not_a_critical_approval", approval_id=approval_id,
+            )
+        if approval.get("status") != "pending":
+            return GovernedActionResult(
+                action_id=approval_id, decision="deny",
+                message="approval_already_resolved", approval_id=approval_id,
+            )
+
+        # A non-human principal may never resolve a critical approval — the attempt
+        # itself resolves the (critical, pending) action to deny, its resting state.
+        # No decision mode, standing grant, scheduled routine, or subagent can
+        # reach past this point.
+        if resolver.principal_type != PrincipalType.HUMAN:
+            self.store.resolve_approval(
+                approval_id, status="denied", resolved_by=resolver.principal_id,
+                resolved_at=utc_now(),
+            )
+            self._event(
+                event_type="critical_approval_denied",
+                actor="runtime_authority",
+                payload={
+                    "approval_id": approval_id,
+                    "reason": "non_human_resolution",
+                    "resolver": resolver.principal_id,
+                },
+                session_id=session_id,
+            )
+            return GovernedActionResult(
+                action_id=approval_id,
+                decision="deny",
+                message="only_human_may_resolve_critical",
+                approval_id=approval_id,
+            )
+
+        # TTL — a past-expiry critical approval resolves to `expired` and never runs.
+        expires_at = approval.get("expires_at")
+        if expires_at is not None and str(expires_at) and utc_now() > str(expires_at):
+            self.store.expire_approval(approval_id)
+            self._event(
+                event_type="critical_approval_expired",
+                actor="runtime_authority",
+                payload={"approval_id": approval_id, "resolver": resolver.principal_id},
+                session_id=session_id,
+            )
+            return GovernedActionResult(
+                action_id=approval_id, decision="deny",
+                message="critical_approval_expired", approval_id=approval_id,
+            )
+
+        # TOCTOU — the human approves the exact intent captured at park time.
+        stored_hash = approval.get("action_payload_sha256")
+        if stored_hash is not None:
+            current_hash = self.store.tool_action_payload_sha256(
+                str(approval.get("tool_name", "")),
+                str(approval.get("arguments_json", "{}")),
+                str(approval.get("risk_level", "")),
+            )
+            if str(stored_hash) != current_hash:
+                self._event(
+                    event_type="critical_approval_denied",
+                    actor="runtime_authority",
+                    payload={"approval_id": approval_id, "reason": "payload_tampered"},
+                    session_id=session_id,
+                )
+                return GovernedActionResult(
+                    action_id=approval_id, decision="deny",
+                    message="critical_approval_payload_tampered", approval_id=approval_id,
+                )
+
+        # Posture — a revoked approving session denies before anything runs.
+        posture = self._capture_action_posture(
+            resolver, self._approval_as_action(approval, session_id)
+        )
+        from raiker.runtime.authority.posture import posture_degraded_reason
+
+        degraded = posture_degraded_reason(posture)
+        if degraded is not None:
+            self._event(
+                event_type="critical_approval_denied",
+                actor="runtime_authority",
+                payload={"approval_id": approval_id, "reason": degraded, "posture": posture},
+                session_id=session_id,
+            )
+            return GovernedActionResult(
+                action_id=approval_id, decision="deny",
+                message=degraded, approval_id=approval_id,
+            )
+
+        # Manual reject → deny.
+        if not approve:
+            self.store.resolve_approval(
+                approval_id, status="denied", resolved_by=resolver.principal_id,
+                resolved_at=utc_now(),
+            )
+            self._event(
+                event_type="critical_approval_resolved",
+                actor="runtime_authority",
+                payload={
+                    "approval_id": approval_id, "outcome": "rejected",
+                    "resolver": resolver.principal_id, "reason": reason, "posture": posture,
+                },
+                session_id=session_id,
+            )
+            return GovernedActionResult(
+                action_id=approval_id, decision="deny",
+                message="critical_action_rejected", approval_id=approval_id,
+            )
+
+        # Step-up — approving a critical action requires fresh verification. Until
+        # F4 lands MFA-freshness tracking, the conservative rule is: an MFA-enrolled
+        # human must present a step-up (fresh TOTP/re-auth); a human without MFA
+        # cannot (nothing to step up to). The approval stays pending so the human
+        # can verify harder and retry — "verify harder, not block harder".
+        if posture.get("mfa_enrolled") and not step_up_verified:
+            self._event(
+                event_type="critical_approval_step_up_required",
+                actor="runtime_authority",
+                payload={"approval_id": approval_id, "resolver": resolver.principal_id, "posture": posture},
+                session_id=session_id,
+            )
+            return GovernedActionResult(
+                action_id=approval_id, decision="needs_step_up",
+                message="critical_approval_step_up_required", approval_id=approval_id,
+            )
+
+        # Human-approved with step-up satisfied. Log the resolution, then execute
+        # through the Workstream A relay with a one-shot confirmation so the target
+        # is re-governed (gate + policy + posture) at execution time.
+        self._event(
+            event_type="critical_approval_resolved",
+            actor="runtime_authority",
+            payload={
+                "approval_id": approval_id, "outcome": "approved",
+                "resolver": resolver.principal_id, "step_up_verified": step_up_verified,
+                "reason": reason, "posture": posture,
+            },
+            session_id=session_id,
+        )
+        confirmation = CriticalConfirmation(
+            approval_id=approval_id,
+            confirmed_by=resolver.principal_id,
+            step_up_verified=step_up_verified,
+        )
+        from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
+
+        relay = ApprovalExecutionRelay(self.store.paths.workspace_root, self.store)
+        relay_action = GovernedAction(
+            action_id=new_id("act_"),
+            principal_id=resolver.principal_id,
+            action_type="approval_execution_relay",
+            tool_or_service_name="approval_execution_relay",
+            arguments={"approval_id": approval_id},
+            risk_level=RiskLevelValue.LOW,
+            session_id=session_id,
+            turn_id=approval.get("turn_id"),
+            critical_confirmation=confirmation,
+        )
+        result = relay.execute(relay_action, resolver)
+        if result.ok:
+            return GovernedActionResult(
+                action_id=approval_id, decision="allow",
+                message="critical_action_executed", approval_id=approval_id,
+            )
+        return GovernedActionResult(
+            action_id=approval_id, decision="deny",
+            message=f"critical_execution_failed:{result.reason_code}", approval_id=approval_id,
+        )
+
+    def _approval_as_action(
+        self, approval: dict[str, Any], session_id: str
+    ) -> GovernedAction:
+        """A minimal GovernedAction view of a stored approval, for posture capture."""
+        return GovernedAction(
+            action_id=str(approval.get("action_id", "")),
+            principal_id="",
+            action_type=str(approval.get("tool_name", "")),
+            tool_or_service_name=str(approval.get("tool_name", "")),
+            arguments={},
+            risk_level=str(approval.get("risk_level", RiskLevelValue.LOW)),
+            session_id=session_id,
+        )
+
     def route_action(self, action: GovernedAction, principal: Principal) -> GovernedActionResult:
         self._event(
             event_type="action_proposed",
@@ -797,17 +1145,21 @@ class RuntimeAuthority:
                     session_id=action.session_id,
                     turn_id=action.turn_id,
                 )
-            if principal.principal_type != PrincipalType.HUMAN:
-                return GovernedActionResult(
-                    action_id=action.action_id,
-                    decision="deny",
-                    message="critical_action_requires_human_confirmation",
-                )
-            return GovernedActionResult(
-                action_id=action.action_id,
-                decision="needs_human_confirmation",
-                message="critical_action_requires_human_confirmation",
-            )
+            # F7 (ZT-7) — critical approval lifecycle. A live human's manual
+            # confirmation (issued only by `resolve_critical_approval`, re-verified
+            # against persisted state) is the *only* thing that lets a critical
+            # action past the deny floor. Everything else — an AI principal, or a
+            # human without a valid confirmation — parks the action and defaults to
+            # deny until a human resolves it. No decision mode, standing grant,
+            # scheduled routine, or subagent can reach this branch with a valid
+            # confirmation, because confirmations require a human principal.
+            if self._critical_confirmation_valid(action, principal):
+                # Human-confirmed: fall through into normal governance below so the
+                # target still runs under its gate, policy review, and posture check
+                # at execution time (execution-time re-verification).
+                pass
+            else:
+                return self._park_critical_action(action, principal, critical_match)
 
         from raiker.contracts.models import ToolAction
 

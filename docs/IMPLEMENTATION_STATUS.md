@@ -5,6 +5,47 @@
 
 # Implementation Status
 
+> Current truth update (2026-07-20): **Milestone 2 — F7 (critical approval
+> lifecycle, ZT-7)** of the execution-breadth & User-Centric Zero Trust plan
+> (`docs/plans/2026-07-19-execution-breadth-and-zero-trust-plan.md`) is complete,
+> finishing M2 (A3–A4 and B1–B2 landed earlier). **F7 replaces the router's old
+> silent flat-deny of AI-proposed critical actions with an explicit, always-visible
+> human-decision lifecycle whose resting state is deny.** When
+> `RuntimeAuthority.route_action` classifies an action as critical (an F6-table
+> match or an explicitly `CRITICAL`-risk action) and no valid human confirmation
+> accompanies it, `_park_critical_action` records a `critical`-flagged approval
+> (immutable `action_payload_sha256` + 24 h TTL, reusing the A1 intent snapshot),
+> notifies the owner asynchronously (`notify_critical_approval_pending` → dashboard
+> notification center's distinct `critical_approval_pending` kind + optional OS
+> hook), emits `critical_approval_created`/`critical_approval_notified` (each with
+> an F1 posture snapshot), and returns `needs_human_confirmation` + the
+> `approval_id` — nothing executes. `RuntimeAuthority.resolve_critical_approval` is
+> the *only* transition off deny: it is human-only (a non-human attempt resolves
+> the approval `denied`), re-checks the TTL, the immutable intent (TOCTOU), and the
+> approving session (posture: a revoked session denies), and — to approve —
+> requires step-up verification (`step_up_verified`; an MFA-enrolled human must
+> present it, else the approval stays `pending` with `needs_step_up`; conservative
+> until F4 lands MFA-freshness). Manual reject, TTL expiry, tamper, or degraded
+> posture all resolve to **deny**. An approved, step-up-verified decision issues a
+> one-shot `CriticalConfirmation` and executes through the Workstream A relay, which
+> carries the confirmation onto the re-governed target so it clears the deny floor
+> exactly once while still running under the target's own capability gate,
+> PolicyEngine review, decision mode, B1 pre-image capture, and posture check at
+> execution time; `_critical_confirmation_valid` (human principal + a claimed
+> `executing` critical approval) rejects any forged or AI-supplied confirmation. No
+> decision mode, standing grant, scheduled routine, or subagent can resolve or
+> pre-authorize a critical approval. Migration
+> `RAIKER-1302-critical-approval-lifecycle` adds the `critical` approvals column.
+> New events: `critical_approval_created/notified/resolved/step_up_required/expired/denied`.
+> Tests: `tests/test_critical_lifecycle.py` (11 cases across park+notify, human
+> approve→execute, AI-cannot-resolve, reject, expiry, tamper, revoked session,
+> step-up, relay-without-confirmation, forged confirmation, double-resolution);
+> `test_critical_classification.py`, `test_phase_5_decision_modes.py`, and
+> `test_standing_grants.py` updated to the parked behavior. Threat model:
+> `docs/threat-models/critical-approval-lifecycle.md`; the relay threat model's T5
+> updated. No new capability gate, no relaxed invariant — the critical floor is
+> strengthened (more visible), not weakened.
+
 > Current truth update (2026-07-20): **Milestone 1** of the execution-breadth &
 > User-Centric Zero Trust plan
 > (`docs/plans/2026-07-19-execution-breadth-and-zero-trust-plan.md`) is complete.

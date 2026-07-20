@@ -32,6 +32,11 @@ OS_NOTIFY_ENV = "RAIKER_OS_NOTIFY_CMD"
 # Notification kind for the dashboard notification center.
 APPROVAL_PENDING_KIND = "approval_pending"
 
+# A parked critical action (Workstream F / F7). Its own kind so the dashboard can
+# surface it distinctly — critical approvals resolve *only* by a live human's
+# manual decision, so the owner should never miss one.
+CRITICAL_APPROVAL_PENDING_KIND = "critical_approval_pending"
+
 
 def resolve_owner_principal_id(
     store: SQLiteStore, acting_principal_id: str | None
@@ -105,5 +110,45 @@ def notify_approval_pending(
     )
     # Best-effort OS-level push. Isolated: a failure here never affects the row
     # above or the parked turn.
+    fire_os_notification(title, body)
+    return notification_id
+
+
+def notify_critical_approval_pending(
+    store: SQLiteStore,
+    *,
+    acting_principal_id: str | None,
+    approval_id: str,
+    tool_name: str,
+    criterion: str = "",
+    risk_level: str = "",
+) -> str | None:
+    """Notify the owner that a **critical** action is parked awaiting their decision.
+
+    A critical action's resting state is deny: it never executes until a live
+    human manually approves it (F7), so this notification is not merely a
+    convenience — it is the mechanism that puts the human in control. Same
+    delivery surfaces as :func:`notify_approval_pending` (dashboard row + optional
+    OS hook), a distinct kind, and copy that is metadata-only: the tool name,
+    risk, and the (redacted) criterion code — never the arguments. Returns the
+    notification id, or ``None`` when there is no owner account yet (bootstrap).
+    """
+    owner_principal_id = resolve_owner_principal_id(store, acting_principal_id)
+    if owner_principal_id is None:
+        return None
+    risk_suffix = f" ({risk_level} risk)" if risk_level else ""
+    reason_suffix = f" — {criterion}" if criterion else ""
+    title = "Critical action needs your approval"
+    body = (
+        f"Raiker parked a critical action '{tool_name}'{risk_suffix}{reason_suffix}. "
+        "It will not run until you approve it in person; otherwise it is denied."
+    )
+    notification_id = store.insert_notification(
+        principal_id=owner_principal_id,
+        kind=CRITICAL_APPROVAL_PENDING_KIND,
+        title=title,
+        body=body,
+        subject_id=approval_id,
+    )
     fire_os_notification(title, body)
     return notification_id

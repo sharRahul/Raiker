@@ -67,6 +67,18 @@ EVENT_TYPES = {
     # when the in-code classification table elevates a governed action to the
     # critical floor; metadata only (criterion code, ZT ref, declared risk).
     "critical_action_classified",
+    # Critical approval lifecycle (Workstream F / F7, ZT-7). A critical action's
+    # resting state is deny; these record the full "notify → manual human decision
+    # → deny/execute" path (each carrying a posture snapshot): `created`/`notified`
+    # when it is parked and the owner is told; `resolved` (approved or rejected);
+    # `step_up_required` when approving needs fresh verification; `expired` when
+    # the TTL lapses; `denied` for a non-human/degraded resolution attempt.
+    "critical_approval_created",
+    "critical_approval_notified",
+    "critical_approval_resolved",
+    "critical_approval_step_up_required",
+    "critical_approval_expired",
+    "critical_approval_denied",
     # Scoped standing approval grants (Workstream F / F3, ZT-5). Lifecycle events
     # for the grant engine — created/denied/revoked are the human decisions, and
     # `standing_grant_applied` records that an active grant satisfied an

@@ -56,6 +56,13 @@ EVENT_TYPES = {
     "approval_requested",
     "approval_received",
     "approval_denied",
+    # Approval execution relay (Workstream A). `approval_executed` records that a
+    # previously human-approved action was re-governed and run through its own
+    # capability's executor, carrying a metadata-only posture snapshot (A4).
+    # `approval_execution_denied` records a relay refusal (posture degraded, or
+    # the re-governed target was blocked/failed) with the same posture snapshot.
+    "approval_executed",
+    "approval_execution_denied",
     "tool_started",
     "tool_completed",
     "tool_failed",

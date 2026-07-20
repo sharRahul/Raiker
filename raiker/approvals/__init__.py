@@ -38,6 +38,12 @@ class ApprovalInbox:
             raise ValueError("approval_not_found")
         if approval["status"] != "pending":
             raise ValueError("approval_already_resolved")
+        # An approval past its TTL resolves to `expired` and can never be acted
+        # on — the resting state of an unresolved approval is deny, not grant.
+        expires_at = approval.get("expires_at")
+        if expires_at is not None and str(expires_at) and utc_now() > str(expires_at):
+            self.store.expire_approval(approval_id)
+            raise ValueError("approval_expired")
         current_hash = self.store.tool_action_payload_sha256(
             str(approval["tool_name"]),
             str(approval["arguments_json"]),

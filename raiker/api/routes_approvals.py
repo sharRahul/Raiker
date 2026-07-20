@@ -24,6 +24,7 @@ _RESOLVE_ERRORS = {
     "approval_not_found": status.HTTP_404_NOT_FOUND,
     "approval_already_resolved": status.HTTP_409_CONFLICT,
     "approval_payload_tampered": status.HTTP_409_CONFLICT,
+    "approval_expired": status.HTTP_409_CONFLICT,
 }
 
 

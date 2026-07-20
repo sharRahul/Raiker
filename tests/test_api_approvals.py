@@ -142,6 +142,25 @@ class TestApprovalsResolve:
         assert resp.status_code == 409
         assert resp.json()["detail"]["reason_code"] == "approval_payload_tampered"
 
+    def test_expired_approval_rejected(self, workspace: Path, client: TestClient) -> None:
+        _pending_approval(workspace)
+        # Force the approval past its TTL after it was recorded.
+        store = SQLiteStore(workspace)
+        with store.connect() as connection:
+            connection.execute(
+                "UPDATE approvals SET expires_at = ? WHERE approval_id = ?",
+                ("2000-01-01T00:00:00Z", "appr_1"),
+            )
+        token = _token(client)
+        resp = client.post(
+            "/api/approvals/appr_1/resolve",
+            json={"approve": True, "reason": "x"},
+            headers=_headers(token),
+        )
+        assert resp.status_code == 409
+        assert resp.json()["detail"]["reason_code"] == "approval_expired"
+        assert store.load_approval("appr_1")["status"] == "expired"  # type: ignore[index]
+
     def test_unknown_request_field_rejected(self, workspace: Path, client: TestClient) -> None:
         _pending_approval(workspace)
         token = _token(client)

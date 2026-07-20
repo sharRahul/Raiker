@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api, auth, getToken, setToken, ApiError } from "../../api";
-  import type { CredentialLifecycle, McpFinding, SecurityHealth } from "../../apiTypes";
+  import type { CredentialLifecycle, McpFinding, SecurityHealth, StandingGrant } from "../../apiTypes";
 
   // Security & Login settings section: Vault Key configuration (masked + reveal +
   // status pill + elevated re-auth to save) and MFA enrollment. Exercises the
@@ -50,6 +50,46 @@
   let breachPassword = $state("");
   let breachOptIn = $state(false);
 
+  // Scoped standing approval grants (ZT-5): user-owned, expiry-bound, revocable.
+  let grants = $state<StandingGrant[]>([]);
+  let grantActionType = $state("");
+  let grantRiskCeiling = $state("medium");
+  let grantScope = $state("*");
+
+  async function loadGrants() {
+    try {
+      grants = (await api.standingGrants()).grants;
+    } catch {
+      grants = [];
+    }
+  }
+
+  async function createGrant() {
+    notice = null;
+    try {
+      await api.createStandingGrant({
+        action_type: grantActionType.trim(),
+        risk_ceiling: grantRiskCeiling,
+        scope_pattern: grantScope.trim() || "*",
+      });
+      grantActionType = "";
+      grantScope = "*";
+      notice = { kind: "ok", text: "Standing grant created." };
+      await loadGrants();
+    } catch (e) {
+      notice = { kind: "error", text: message(e, "Could not create the grant.") };
+    }
+  }
+
+  async function revokeGrant(grantId: string) {
+    try {
+      await api.revokeStandingGrant(grantId);
+      await loadGrants();
+    } catch (e) {
+      notice = { kind: "error", text: message(e, "Could not revoke the grant.") };
+    }
+  }
+
   async function load() {
     try {
       const s = await api.settings();
@@ -62,6 +102,7 @@
       notice = { kind: "error", text: "Could not load security settings." };
     }
     await loadSessions();
+    await loadGrants();
     try {
       [credentials, findings, health] = await Promise.all([
         api.securityCredentials(), api.securityFindings(), api.securityHealth(),
@@ -375,6 +416,57 @@
       </ul>
     {/if}
   </div>
+
+  <!-- Scoped standing approval grants (ZT-5) -->
+  <div class="field">
+    <div class="field-head"><h3>Standing approval grants</h3></div>
+    <p class="sub">
+      Answer a class of approval once instead of every time. A grant lets Raiker run a
+      matching, sub-critical action shape without a fresh prompt until it expires (default
+      7 days). Grants can never cover critical actions, and you can revoke any grant here.
+    </p>
+    <div class="grant-form">
+      <input
+        placeholder="Action type (e.g. write_file)"
+        bind:value={grantActionType}
+        aria-label="Grant action type"
+      />
+      <input placeholder="Scope pattern (e.g. coding, *)" bind:value={grantScope} aria-label="Grant scope pattern" />
+      <select bind:value={grantRiskCeiling} aria-label="Grant risk ceiling">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+      </select>
+      <button type="button" class="btn btn-primary btn-sm" disabled={!grantActionType.trim()} onclick={createGrant}>
+        Create grant
+      </button>
+    </div>
+    {#if grants.length === 0}
+      <p class="sub">No standing grants.</p>
+    {:else}
+      <ul class="grants">
+        {#each grants as g (g.grant_id)}
+          <li>
+            <span class="grant-desc">
+              <strong>{g.action_type}</strong>
+              <span class="pill">≤ {g.risk_ceiling}</span>
+              <span class="grant-scope">scope: {g.scope_pattern}</span>
+              {#if g.revoked}
+                <span class="pill pill-danger">Revoked</span>
+              {:else}
+                <span class="sub">expires {g.expires_at.slice(0, 10)} · used {g.use_count}×</span>
+              {/if}
+            </span>
+            {#if !g.revoked}
+              <button type="button" class="btn btn-danger btn-sm" onclick={() => revokeGrant(g.grant_id)}>
+                Revoke
+              </button>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
 </section>
 
 <style>
@@ -407,6 +499,42 @@
     display: flex;
     gap: var(--space-2);
     margin-top: var(--space-3);
+  }
+  .grant-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 var(--space-3);
+    align-items: center;
+  }
+  .grant-form input,
+  .grant-form select {
+    padding: var(--space-2) var(--space-3);
+  }
+  ul.grants {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  ul.grants li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .grant-desc {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .grant-scope {
+    color: var(--text-2);
+    font-size: 0.82rem;
   }
   .pill {
     padding: 2px 10px;

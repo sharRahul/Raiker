@@ -35,6 +35,7 @@ import type {
   SecurityHealth,
   SessionDetail,
   SessionSummary,
+  StandingGrant,
   StreamEvent,
   TaskView,
   TurnDetail,
@@ -302,6 +303,23 @@ export const api = {
   notifications: () => request<Notification[]>("/api/notifications"),
   markNotificationRead: (id: string) =>
     postJson<{ ok: boolean }>(`/api/notifications/${encodeURIComponent(id)}/read`, {}),
+  standingGrants: (includeInactive = true) =>
+    request<{ ok: boolean; grants: StandingGrant[] }>(
+      `/api/standing-grants?include_inactive=${includeInactive ? "true" : "false"}`,
+    ),
+  createStandingGrant: (body: {
+    action_type: string;
+    risk_ceiling: string;
+    tool_name?: string;
+    scope_pattern?: string;
+    reason?: string;
+    ttl_days?: number;
+  }) => postJson<{ ok: boolean; grant: StandingGrant }>("/api/standing-grants", body),
+  revokeStandingGrant: (grantId: string) =>
+    postJson<{ ok: boolean; grant_id: string }>(
+      `/api/standing-grants/${encodeURIComponent(grantId)}/revoke`,
+      {},
+    ),
   securityCredentials: () => request<CredentialLifecycle[]>("/api/security/credentials"),
   securityFindings: () => request<McpFinding[]>("/api/security/findings"),
   securityHealth: () => request<SecurityHealth[]>("/api/security/health"),

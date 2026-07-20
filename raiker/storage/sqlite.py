@@ -228,6 +228,8 @@ from raiker.storage.migrations import (
     SESSION_ARCHIVE_SQL,
     SESSION_TAGS_MIGRATION_ID,
     SESSION_TAGS_SQL,
+    STANDING_GRANTS_MIGRATION_ID,
+    STANDING_GRANTS_SQL,
     THREAT_MODEL_ACKS_MIGRATION_ID,
     THREAT_MODEL_ACKS_SQL,
 )
@@ -665,6 +667,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 CHECKPOINT_CAPTURE_MANIFEST_MIGRATION_ID,
                 CHECKPOINT_CAPTURE_MANIFEST_SQL,
                 connection,
+            )
+            self._apply_migration(
+                STANDING_GRANTS_MIGRATION_ID, STANDING_GRANTS_SQL, connection
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -2687,6 +2692,114 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (approval_id,),
             )
         return cursor.rowcount == 1
+
+    # ── scoped standing approval grants (Workstream F / F3, ZT-5) ─────────────
+
+    def insert_standing_grant(self, record: dict[str, Any]) -> None:
+        """Persist a scoped standing grant. All fields are metadata only.
+
+        The caller (the grant engine) is responsible for the invariants — a
+        human ``granted_by``, a sub-critical ``risk_ceiling``, and a mandatory
+        ``expires_at``. This method only writes the row it is given.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO standing_grants
+                (grant_id, principal_id, granted_by, action_type, tool_name,
+                 scope_pattern, risk_ceiling, reason, created_at, expires_at,
+                 revoked, revoked_at, revoked_by, use_count, last_used_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, 0, NULL)
+                """,
+                (
+                    record["grant_id"],
+                    record["principal_id"],
+                    record["granted_by"],
+                    record["action_type"],
+                    record.get("tool_name", ""),
+                    record.get("scope_pattern", "*"),
+                    record["risk_ceiling"],
+                    record.get("reason", ""),
+                    record["created_at"],
+                    record["expires_at"],
+                ),
+            )
+
+    def load_standing_grant(self, grant_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM standing_grants WHERE grant_id = ?", (grant_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_standing_grants(
+        self, *, granted_by: str | None = None, include_inactive: bool = True
+    ) -> list[dict[str, Any]]:
+        """Grants for Security Settings, newest first.
+
+        ``granted_by`` scopes to a single owner (isolation). ``include_inactive``
+        controls whether revoked/expired grants are listed — the Security
+        Settings surface lists everything so the owner sees the full history.
+        """
+        conditions: list[str] = []
+        params: list[Any] = []
+        if granted_by is not None:
+            conditions.append("granted_by = ?")
+            params.append(granted_by)
+        if not include_inactive:
+            conditions.append("revoked = 0")
+            conditions.append("expires_at > ?")
+            params.append(utc_now())
+        where = f"WHERE {' AND '.join(conditions)} " if conditions else ""
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM standing_grants {where}ORDER BY created_at DESC, rowid DESC",
+                params,
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def find_active_standing_grants(
+        self, principal_id: str, action_type: str
+    ) -> list[dict[str, Any]]:
+        """Active (non-revoked, unexpired) grants for a principal + action type."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM standing_grants
+                WHERE principal_id = ? AND action_type = ?
+                  AND revoked = 0 AND expires_at > ?
+                ORDER BY created_at DESC
+                """,
+                (principal_id, action_type, utc_now()),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def revoke_standing_grant(
+        self, grant_id: str, *, revoked_by: str, granted_by: str | None = None
+    ) -> bool:
+        """Owner-scoped revoke. Returns False if missing, already revoked, or
+        owned by another principal (isolation)."""
+        conditions = ["grant_id = ?", "revoked = 0"]
+        params: list[Any] = [utc_now(), revoked_by, grant_id]
+        if granted_by is not None:
+            conditions.append("granted_by = ?")
+            params.append(granted_by)
+        with self.connect() as connection:
+            cursor = connection.execute(
+                f"UPDATE standing_grants SET revoked = 1, revoked_at = ?, revoked_by = ? "
+                f"WHERE {' AND '.join(conditions)}",
+                params,
+            )
+        return cursor.rowcount == 1
+
+    def record_standing_grant_use(self, grant_id: str) -> None:
+        """Increment a grant's use counter (every use is logged with the id)."""
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE standing_grants SET use_count = use_count + 1, last_used_at = ? "
+                "WHERE grant_id = ?",
+                (utc_now(), grant_id),
+            )
 
     def load_api_session(self, session_id: str) -> dict[str, Any] | None:
         """Best-effort lookup of an API session row by id (posture snapshots)."""

@@ -10,7 +10,9 @@ from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.authority import grants
 from raiker.runtime.authority.activation import evaluate_activation_requirement
+from raiker.runtime.authority.critical import classify_critical
 from raiker.runtime.authority.decision_modes import (
     DEFAULT_DECISION_MODE,
     PERMISSIVE_MODES,
@@ -209,6 +211,32 @@ class RuntimeAuthority:
                 session_id=action.session_id,
                 turn_id=action.turn_id,
             )
+
+    def _capture_action_posture(
+        self,
+        principal: Principal,
+        action: GovernedAction,
+        *,
+        mode: DecisionMode | None = None,
+        grant_applied: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Build the F1 (ZT-3) posture snapshot for a governed action.
+
+        Extends the base identity/session/auth-strength snapshot with the
+        *decision path* — which decision mode governed the action and which
+        standing grant (if any) authorized an unprompted run. Metadata-only and
+        never raises into the action path.
+        """
+        from raiker.runtime.authority.posture import capture_posture
+
+        try:
+            posture = capture_posture(self.store, principal, action.session_id or "")
+        except Exception:  # pragma: no cover - posture is best-effort metadata
+            posture = {"principal_id": principal.principal_id}
+        posture["decision_mode"] = mode.value if mode is not None else None
+        posture["grant_id"] = str(grant_applied["grant_id"]) if grant_applied else None
+        posture["action_type"] = action.action_type
+        return posture
 
     def _uses_principal_controls(self, principal_id: str | None) -> bool:
         return bool(principal_id and self.store.get_account(principal_id) is not None)
@@ -571,6 +599,111 @@ class RuntimeAuthority:
             "is_expired": principal.expires_at is not None and utc_now() > principal.expires_at,
         }
 
+    # ── scoped standing grants (Workstream F / F3, ZT-5) ──────────────────────
+
+    def create_standing_grant(
+        self,
+        *,
+        granted_by: Principal,
+        principal_id: str,
+        action_type: str,
+        risk_ceiling: str,
+        tool_name: str = "",
+        scope_pattern: str = "*",
+        reason: str = "",
+        ttl_days: float = grants.DEFAULT_GRANT_TTL_DAYS,
+    ) -> str | dict[str, Any]:
+        """Create a scoped standing grant (a critical, human-decided action).
+
+        Returns a reason-code string on refusal or the persisted grant row on
+        success. Only a human may create a grant, the ceiling must be strictly
+        sub-critical, and the grant is created for a *sub-critical* action shape:
+        if the requested action type itself classifies as critical (F6), it can
+        never be pre-authorized by a grant and creation is refused.
+        """
+        critical_match = classify_critical(action_type, tool_name, {})
+        if critical_match is not None:
+            self._event("standing_grant_denied", granted_by.principal_id, {
+                "action_type": action_type, "reason": "grant_target_is_critical",
+                "criterion": critical_match.code,
+            })
+            return "grant_target_is_critical"
+        try:
+            record = grants.build_grant_record(
+                principal_id=principal_id,
+                granted_by=granted_by,
+                action_type=action_type,
+                tool_name=tool_name,
+                scope_pattern=scope_pattern,
+                risk_ceiling=risk_ceiling,
+                reason=reason,
+                ttl_days=ttl_days,
+            )
+        except grants.GrantValidationError as exc:
+            self._event("standing_grant_denied", granted_by.principal_id, {
+                "action_type": action_type, "reason": str(exc),
+            })
+            return str(exc)
+        self.store.insert_standing_grant(record)
+        self._event("standing_grant_created", granted_by.principal_id, {
+            "grant_id": record["grant_id"],
+            "principal_id": principal_id,
+            "action_type": action_type,
+            "tool_name": tool_name,
+            "scope_pattern": scope_pattern,
+            "risk_ceiling": risk_ceiling,
+            "expires_at": record["expires_at"],
+            "reason": reason,
+        })
+        return record
+
+    def list_standing_grants(
+        self, granted_by: str | None = None, *, include_inactive: bool = True
+    ) -> list[dict[str, Any]]:
+        return self.store.list_standing_grants(
+            granted_by=granted_by, include_inactive=include_inactive
+        )
+
+    def revoke_standing_grant(
+        self, grant_id: str, revoker: Principal, granted_by: str | None = None
+    ) -> str | None:
+        """Human-only revoke. Returns None on success or a reason code."""
+        if revoker.principal_type != PrincipalType.HUMAN:
+            return "only_human_may_revoke_grant"
+        ok = self.store.revoke_standing_grant(
+            grant_id, revoked_by=revoker.principal_id, granted_by=granted_by
+        )
+        if not ok:
+            return "grant_not_found_or_already_revoked"
+        self._event("standing_grant_revoked", revoker.principal_id, {"grant_id": grant_id})
+        return None
+
+    def find_matching_standing_grant(
+        self, principal: Principal, action: GovernedAction, risk_level: str
+    ) -> dict[str, Any] | None:
+        """Return the active grant that covers this action shape, if any.
+
+        Consulted only for sub-critical AI-proposed actions that would otherwise
+        need approval (the router guarantees critical never reaches here). The
+        first covering grant wins; the caller logs its use.
+        """
+        if principal.principal_type == PrincipalType.HUMAN:
+            return None
+        if risk_level == RiskLevelValue.CRITICAL:
+            return None
+        for row in self.store.find_active_standing_grants(
+            principal.principal_id, action.action_type
+        ):
+            if grants.grant_covers(
+                row,
+                action_type=action.action_type,
+                tool_name=action.tool_or_service_name,
+                scope=action.domain_scope,
+                risk_level=risk_level,
+            ):
+                return row
+        return None
+
     def route_action(self, action: GovernedAction, principal: Principal) -> GovernedActionResult:
         self._event(
             event_type="action_proposed",
@@ -636,6 +769,46 @@ class RuntimeAuthority:
                 message=cap_gate,
             )
 
+        # F6 (ZT-7) — production critical-risk classification. The in-code table
+        # (raiker/runtime/authority/critical.py) is the single source of truth for
+        # what "critical" means in production. A critical action is routed to the
+        # human-confirmation floor here — before policy review and decision-mode
+        # resolution — so that critical dominates every other outcome: its resting
+        # state is deny, and only a live human may resolve it (no decision mode,
+        # standing grant, or subagent can). An action's declared risk is also
+        # honoured: an explicitly-CRITICAL action floors too.
+        critical_match = classify_critical(
+            action.action_type, action.tool_or_service_name, action.arguments
+        )
+        is_critical = critical_match is not None or action.risk_level == RiskLevelValue.CRITICAL
+        if is_critical:
+            if critical_match is not None:
+                self._event(
+                    event_type="critical_action_classified",
+                    actor="runtime_authority",
+                    payload={
+                        "action_id": action.action_id,
+                        "action_type": action.action_type,
+                        "criterion": critical_match.code,
+                        "zt_ref": critical_match.zt_ref,
+                        "detail": critical_match.detail,
+                        "declared_risk": action.risk_level,
+                    },
+                    session_id=action.session_id,
+                    turn_id=action.turn_id,
+                )
+            if principal.principal_type != PrincipalType.HUMAN:
+                return GovernedActionResult(
+                    action_id=action.action_id,
+                    decision="deny",
+                    message="critical_action_requires_human_confirmation",
+                )
+            return GovernedActionResult(
+                action_id=action.action_id,
+                decision="needs_human_confirmation",
+                message="critical_action_requires_human_confirmation",
+            )
+
         from raiker.contracts.models import ToolAction
 
         tool_action = ToolAction(
@@ -678,23 +851,8 @@ class RuntimeAuthority:
                 message="denied_by_decision_mode",
             )
 
-        # Critical-risk actions always require a human, regardless of decision
-        # mode — always_allow/auto can never let an AI take a critical action.
-        if action.risk_level == RiskLevelValue.CRITICAL:
-            if principal.principal_type != PrincipalType.HUMAN:
-                return GovernedActionResult(
-                    action_id=action.action_id,
-                    decision="deny",
-                    policy_decision=decision,
-                    message="critical_action_requires_human_confirmation",
-                )
-            return GovernedActionResult(
-                action_id=action.action_id,
-                decision="needs_human_confirmation",
-                policy_decision=decision,
-                message="critical_action_requires_human_confirmation",
-            )
-
+        # Critical is already floored above (before policy review), so every
+        # action from here on is sub-critical.
         raw_needs_approval = action.requires_approval or decision.decision == "needs_approval"
         if mode is None:
             effective_needs_approval = raw_needs_approval
@@ -706,6 +864,21 @@ class RuntimeAuthority:
             effective_needs_approval = auto_requires_approval(action.risk_level)
         else:  # ASK (default) forces approval for AI-proposed actions
             effective_needs_approval = True
+
+        # F3 (ZT-5) — scoped standing grant. Before parking an AI-proposed action
+        # for approval, check for an active, non-expired, human-created grant that
+        # covers this exact action shape at or above its (sub-critical) risk. A
+        # match satisfies the approval requirement without a fresh prompt — this
+        # is the "frictionless" mechanism. Critical actions can never reach here
+        # (floored above), and grant ceilings are sub-critical by construction.
+        grant_applied: dict[str, Any] | None = None
+        if effective_needs_approval and principal.principal_type != PrincipalType.HUMAN:
+            grant = self.find_matching_standing_grant(
+                principal, action, action.risk_level
+            )
+            if grant is not None:
+                grant_applied = grant
+                effective_needs_approval = False
 
         if effective_needs_approval and principal.principal_type != PrincipalType.HUMAN:
             return GovernedActionResult(
@@ -732,6 +905,33 @@ class RuntimeAuthority:
             if valid.get("one_time_or_reusable") == "one_time":
                 self.store.consume_risk_acceptance(valid["risk_acceptance_id"])
 
+        # F1 (ZT-3) — capture the per-action posture snapshot once, so every
+        # governed execution/failure event carries "who was in control, on what
+        # session, how strongly authenticated, and by what decision path" as
+        # metadata. The decision-mode / grant used is recorded alongside it.
+        posture = self._capture_action_posture(
+            principal, action, mode=mode, grant_applied=grant_applied
+        )
+
+        # F3 — a matching standing grant satisfied the approval requirement. Log
+        # its use (with the grant id) before executing, so the audit trail shows
+        # the grant that authorized this unprompted run.
+        if grant_applied is not None:
+            self.store.record_standing_grant_use(str(grant_applied["grant_id"]))
+            self._event(
+                event_type="standing_grant_applied",
+                actor="runtime_authority",
+                payload={
+                    "grant_id": grant_applied["grant_id"],
+                    "action_id": action.action_id,
+                    "action_type": action.action_type,
+                    "risk_level": action.risk_level,
+                    "posture": posture,
+                },
+                session_id=action.session_id,
+                turn_id=action.turn_id,
+            )
+
         capability = CAPABILITY_GATE_MAP.get(action.action_type, action.action_type)
         executor = self.executor_registry.get(capability)
         if executor is not None:
@@ -754,6 +954,7 @@ class RuntimeAuthority:
                     "reason_code": result.reason_code,
                     "summary": result.summary,
                     "artifacts": result.artifacts,
+                    "posture": posture,
                 },
                 session_id=action.session_id,
                 turn_id=action.turn_id,

@@ -50,6 +50,19 @@ class SetCapabilityDecisionModeRequest:
 
 
 @dataclass
+class CreateStandingGrantRequest:
+    # Scoped standing approval grant (F3). Creation is a critical, human-decided
+    # action; the authority enforces the human-only + sub-critical ceiling.
+    action_type: str
+    risk_ceiling: str
+    tool_name: str = ""
+    scope_pattern: str = "*"
+    reason: str = ""
+    ttl_days: float | None = None
+    as_principal: str | None = None
+
+
+@dataclass
 class AuthSessionRequest:
     # Optional explicit principal; defaults to the resolved local owner. Local-only, human-only.
     as_principal: str | None = None

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
     ActivateRuntimeModeRequest,
+    CreateStandingGrantRequest,
     DisableCapabilityRequest,
     DisableRuntimeModeRequest,
     RecordThreatModelAckRequest,
@@ -250,3 +251,61 @@ async def get_runtime_readiness(
     service = _get_service(request)
     readiness = service.get_runtime_readiness(principal.principal_id)
     return serialize_dto(readiness)
+
+
+# ── Scoped standing approval grants (Workstream F / F3, ZT-5) ────────────────
+
+
+@router.get("/api/standing-grants")
+async def list_standing_grants(
+    request: Request,
+    include_inactive: bool = True,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """List the owner's standing grants for Security Settings (newest first)."""
+    session, _principal = _auth_data
+    service = _get_service(request)
+    result = service.list_standing_grants(
+        session.principal_id, include_inactive=include_inactive
+    )
+    if not result.ok:
+        _deny(result.reason_code)
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/standing-grants")
+async def create_standing_grant(
+    body: CreateStandingGrantRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Create a scoped standing grant (a critical, human-decided action)."""
+    session, _principal = _auth_data
+    service = _get_service(request)
+    result = service.create_standing_grant(
+        session.principal_id,
+        action_type=body.action_type,
+        risk_ceiling=body.risk_ceiling,
+        tool_name=body.tool_name,
+        scope_pattern=body.scope_pattern,
+        reason=body.reason,
+        ttl_days=body.ttl_days,
+    )
+    if not result.ok:
+        _deny(result.reason_code)
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/standing-grants/{grant_id}/revoke")
+async def revoke_standing_grant(
+    grant_id: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Revoke a standing grant. Immediate — the resting state is deny."""
+    session, _principal = _auth_data
+    service = _get_service(request)
+    result = service.revoke_standing_grant(grant_id, session.principal_id)
+    if not result.ok:
+        _deny(result.reason_code)
+    return {"ok": True, "grant_id": grant_id}

@@ -5,6 +5,45 @@
 
 # Implementation Status
 
+> Current truth update (2026-07-20): **Milestone 1** of the execution-breadth &
+> User-Centric Zero Trust plan
+> (`docs/plans/2026-07-19-execution-breadth-and-zero-trust-plan.md`) is complete.
+> A1–A2 (the generalized approve→execute relay) landed earlier; this update adds
+> **F1, F3 (grant model), F6 (critical classification), and D2 (notifications)**.
+> **F6 (ZT-7):** `raiker/runtime/authority/critical.py::classify_critical` is a
+> data-driven, five-criterion table (Tier-2 relaxation; external send to a
+> non-allowlisted recipient; cross-principal restore; standing-grant creation;
+> vault/credential/egress operation), each with a stable code + `zt_ref`.
+> `RuntimeAuthority.route_action` consults it during risk resolution *before*
+> policy review and decision-mode resolution, so a critical action (or an
+> explicitly-CRITICAL one) routes to the human-confirmation floor and dominates
+> every other outcome (AI → deny, human → `needs_human_confirmation`), emitting
+> `critical_action_classified`. **F3 (ZT-5):** `raiker/runtime/authority/grants.py`
+> + migration `RAIKER-1301-standing-grants` add the scoped standing-grant engine
+> — human-created only, sub-critical ceiling by construction, mandatory 7-day
+> default expiry, scope-glob + risk-ceiling matching, revocable, listed in
+> Security Settings. An active matching grant satisfies an AI-proposed
+> sub-critical action's approval requirement without a fresh prompt (logging
+> `standing_grant_applied` with the grant id + posture); grant *creation* is F6
+> criterion (d) critical. Surfaced via `RuntimeControlService`,
+> `GET/POST /api/standing-grants` + `POST /api/standing-grants/{id}/revoke`, and a
+> Standing-Grants panel in the Security & Login settings view. **F1 (ZT-3):**
+> `capture_posture` now derives `auth_strength`, and `RuntimeAuthority`
+> attaches a metadata-only posture snapshot (identity, session age, MFA, interface,
+> decision-mode/grant used) to every `action_executed`/`action_failed` and
+> `standing_grant_applied` event. **D2:** `raiker/notify/approval_notifier.py`
+> delivers an owner-scoped `approval_pending` notification (dashboard center +
+> optional env-gated OS hook `RAIKER_OS_NOTIFY_CMD`) whenever the broker parks an
+> approval, so approvals never block a flow. New events: `critical_action_classified`,
+> `standing_grant_created/denied/revoked/applied`. Tests (+46 Python, +1 web):
+> `tests/test_critical_classification.py`, `tests/test_standing_grants.py`,
+> `tests/test_api_standing_grants.py`, `tests/test_posture_snapshot.py`,
+> `tests/test_approval_notifications.py`, `SecurityLogin.test.ts`. Local gate:
+> pytest 2058 passed / 1 skipped, ruff clean, mypy clean (444 files), compileall
+> clean, all five repo validators + licensing check pass, web check/lint/test
+> (35 files / 198 passed)/build clean. No new capability gate, no relaxed
+> invariant — the critical floor is strengthened, not weakened.
+
 > Current truth update (2026-07-19): Raiker's project licence changed from MIT
 > to Apache-2.0. Earlier MIT releases retain their original terms. Python and
 > JavaScript metadata, contribution terms, SPDX policy, dependency-licence

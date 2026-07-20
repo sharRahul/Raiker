@@ -45,6 +45,7 @@ def capture_posture(
     # principal_type may be a PrincipalType enum or a plain string (rows loaded
     # straight from SQLite are not coerced), so normalise to its string value.
     principal_type = getattr(principal.principal_type, "value", str(principal.principal_type))
+    mfa_enrolled = store.principal_mfa_enrolled(principal.principal_id)
     return {
         "principal_id": principal.principal_id,
         "principal_type": principal_type,
@@ -52,7 +53,11 @@ def capture_posture(
         # An API session implies a web/app interface; its absence is the local
         # terminal path, which has no revocable server-side session.
         "interface": "web_api" if session is not None else "local",
-        "mfa_enrolled": store.principal_mfa_enrolled(principal.principal_id),
+        "mfa_enrolled": mfa_enrolled,
+        # Auth strength is derived honestly from what is persisted: an
+        # MFA-enrolled account authenticates more strongly than a password-only
+        # one. This is the coarse signal F4's step-up rules key off later.
+        "auth_strength": "mfa" if mfa_enrolled else "password",
         "session_revoked": bool(session and session.get("revoked")),
         "session_age_seconds": _age_seconds(session.get("created_at")) if session else None,
         "captured_at": utc_now(),

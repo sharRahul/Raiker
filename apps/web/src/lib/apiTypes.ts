@@ -98,6 +98,22 @@ export interface Notification {
   created_at: string;
 }
 
+export interface StandingGrant {
+  grant_id: string;
+  principal_id: string;
+  granted_by: string;
+  action_type: string;
+  tool_name: string;
+  scope_pattern: string;
+  risk_ceiling: string;
+  reason: string;
+  created_at: string;
+  expires_at: string;
+  revoked: number;
+  use_count: number;
+  last_used_at: string | null;
+}
+
 export interface CredentialLifecycle {
   credential_id?: string;
   provider: string;

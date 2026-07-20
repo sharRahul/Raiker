@@ -329,9 +329,14 @@ def handle_events(*, workspace_root: str | Path = ".") -> str:
     return "\n".join(lines)
 
 
-def handle_checkpoints(*, workspace_root: str | Path = ".") -> str:
+def handle_checkpoints(command: str = "/checkpoints", *, workspace_root: str | Path = ".") -> str:
     store = SQLiteStore(workspace_root)
     service = CheckpointService(store)
+    parts = command.split()
+    if len(parts) >= 2 and parts[1] == "restore":
+        if len(parts) < 3:
+            return "Usage: /checkpoints restore <checkpoint_id>"
+        return _render_restore_plan(service, parts[2])
     checkpoints = service.list_checkpoints(limit=50)
     if not checkpoints:
         return "No checkpoints."
@@ -341,7 +346,47 @@ def handle_checkpoints(*, workspace_root: str | Path = ".") -> str:
         lines.append(
             f"- {cp['checkpoint_id']} session={cp['session_id']} turn={cp['turn_id']} type={cp['checkpoint_type']} created={cp['created_at']} summary={summary}"
         )
+    lines.append("Preview a restore with: /checkpoints restore <checkpoint_id>")
     return "\n".join(lines)
+
+
+def _render_restore_plan(service: CheckpointService, checkpoint_id: str) -> str:
+    """Metadata-only dry-run preview of a checkpoint restore (B2).
+
+    Restore is an approval-required governed mutation: this command only previews
+    the per-file diff. Actual execution runs through the governed
+    propose → approve → relay path, never directly from this preview.
+    """
+    try:
+        plan = service.plan_restore(checkpoint_id)
+    except ValueError:
+        return f"Unknown checkpoint: {checkpoint_id}"
+    files: list[dict[str, object]] = plan.get("files", [])  # type: ignore[assignment]
+    lines = [
+        f"Restore plan for {checkpoint_id} (dry-run, metadata only):",
+        (
+            f"  rewrite={plan['restore_content_count']} "
+            f"delete={plan['delete_count']} "
+            f"skip={plan['skip_count']} "
+            f"changed={plan['changed_count']}"
+        ),
+    ]
+    if not files:
+        lines.append("  No files changed since this checkpoint — nothing to restore.")
+    for entry in files:
+        marker = "*" if entry["changed"] else " "
+        lines.append(
+            f" {marker} {entry['op']:16} {entry['workspace_path']} "
+            f"(now={_short_sha(entry['current_sha256'])} → {_short_sha(entry['pre_image_sha256'])})"
+        )
+    lines.append("Restore is approval-required: propose it to run it through the governed queue.")
+    return "\n".join(lines)
+
+
+def _short_sha(value: object) -> str:
+    if not value:
+        return "∅"
+    return str(value)[:12]
 
 
 def handle_memory(*, workspace_root: str | Path = ".") -> str:
@@ -2715,7 +2760,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return "Exiting Raiker."
     if command == "/help":
         return (
-            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /approval-previews [--json] [--status <status>] [--limit <n>], /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-preview <preview_id> [--json], /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only] [--save-proposals], /proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] [--limit <number>], /proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>] [--approval-preview], /doctor, /channels, /launch --provider <provider> --model <model>, /quit\n"
+            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /checkpoints restore <checkpoint_id>, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /approval-previews [--json] [--status <status>] [--limit <n>], /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-preview <preview_id> [--json], /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only] [--save-proposals], /proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] [--limit <number>], /proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>] [--approval-preview], /doctor, /channels, /launch --provider <provider> --model <model>, /quit\n"
             "Status: Phase 3 Slice B approval planning preview is implemented. Phase 3 is complete for safe foundation/readiness slices A-P; integrated real executors are governed per action; no-executor capabilities remain disabled/fail-closed. Current launchable UI is the plain local terminal client only (RAIKER_TUI=plain, --prompt, or interactive stdin). Rich/native TUI and Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred work, not launchable apps. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
         )
     if command == "/providers":
@@ -2734,8 +2779,8 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return handle_tasks(workspace_root=workspace_root)
     if command == "/events":
         return handle_events(workspace_root=workspace_root)
-    if command == "/checkpoints":
-        return handle_checkpoints(workspace_root=workspace_root)
+    if command == "/checkpoints" or command.startswith("/checkpoints "):
+        return handle_checkpoints(command, workspace_root=workspace_root)
     if command == "/approvals":
         return handle_approvals(workspace_root=workspace_root)
     if command == "/memory":

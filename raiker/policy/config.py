@@ -52,6 +52,9 @@ class StaticPolicyConfig:
         default_factory=lambda: frozenset({
             "shell", "write_file", "edit_file", "apply_patch",
             "memory_write", "memory_forget",
+            # Checkpoint restore (Workstream B / B2) is itself a workspace
+            # mutation — approval-required, routed through its own governed gate.
+            "checkpoint_restore", "checkpoint_restore_execution",
             "process", "network", "web_fetch",
             "graph_indexing", "semantic_memory", "vector_embedding", "model_provider",
             "plugin_install", "plugin_execution_cap", "plugin_revocation_cap",

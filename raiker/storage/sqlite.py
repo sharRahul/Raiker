@@ -2780,6 +2780,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         *,
         session_id: str | None = None,
         action_id: str | None = None,
+        created_after: str | None = None,
         limit: int = 200,
     ) -> list[dict]:
         clauses: list[str] = []
@@ -2790,6 +2791,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if action_id is not None:
             clauses.append("action_id = ?")
             params.append(action_id)
+        if created_after is not None:
+            # Strictly-after the checkpoint's own timestamp: a checkpoint captures
+            # the state *at* its creation, so only mutations recorded after it are
+            # rewound (the checkpoint's own turn keeps its changes).
+            clauses.append("created_at > ?")
+            params.append(created_after)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         params.append(limit)
         with self.connect() as connection:

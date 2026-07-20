@@ -90,6 +90,18 @@ class CheckpointCaptureService:
         raw_path = str(arguments.get(arg, ""))
         if not raw_path:
             return None
+        return self.snapshot_path(raw_path, capability)
+
+    def snapshot_path(self, raw_path: str, capability: str) -> PreImage | None:
+        """Snapshot the current bytes of one workspace file (reusable primitive).
+
+        Used both by the broker capture hook and by the restore executor, which
+        captures its *own* pre-image before overwriting a file so a restore is
+        itself reversible. Returns ``None`` for an empty path or one that resolves
+        outside the workspace.
+        """
+        if not raw_path:
+            return None
         try:
             resolved = resolve_workspace_path(self.workspace_root, raw_path)
         except FilesystemSafetyError:
@@ -144,6 +156,20 @@ class CheckpointCaptureService:
 
     def blob_path(self, digest: str) -> Path:
         return self.objects_dir / digest[:2] / digest
+
+    def read_blob(self, digest: str) -> bytes | None:
+        """Return a stored pre-image's bytes, or ``None`` if the object is gone.
+
+        The content-address is re-verified on read: a blob whose bytes no longer
+        hash to their name is treated as missing (tamper-evident), never restored.
+        """
+        path = self.blob_path(digest)
+        if not path.exists():
+            return None
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != digest:
+            return None
+        return data
 
     def commit(
         self,

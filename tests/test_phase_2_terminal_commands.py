@@ -88,6 +88,30 @@ class TestTerminalCommands:
         result = handle_checkpoints(workspace_root=str(store.paths.workspace_root))
         assert "Test" in result
 
+    def test_handle_checkpoints_restore_preview(self, store: SQLiteStore) -> None:
+        from raiker.checkpoints.service import CheckpointService
+
+        service = CheckpointService(store)
+        checkpoint, _ = service.write_turn_checkpoint(
+            session_id=new_id("sess_"),
+            turn_id=new_id("turn_"),
+            runtime_state="CLOSED",
+            summary="Base",
+            last_event_id=new_id("evt_"),
+        )
+        result = handle_checkpoints(
+            f"/checkpoints restore {checkpoint.checkpoint_id}",
+            workspace_root=str(store.paths.workspace_root),
+        )
+        assert "Restore plan" in result
+        assert "approval-required" in result
+
+    def test_handle_checkpoints_restore_unknown(self, tmp_path: Path) -> None:
+        result = handle_checkpoints(
+            "/checkpoints restore ckpt_missing", workspace_root=str(tmp_path)
+        )
+        assert "Unknown checkpoint" in result
+
     def test_slash_help(self, tmp_path: Path) -> None:
         result = handle_slash_command("/help", workspace_root=str(tmp_path))
         assert "/help" in result

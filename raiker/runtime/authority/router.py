@@ -55,6 +55,8 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "apply_patch": "patch_apply_execution",
     "memory_write": "memory_write_execution",
     "memory_forget": "memory_forget_execution",
+    "checkpoint_restore": "checkpoint_restore_execution",
+    "checkpoint_restore_execution": "checkpoint_restore_execution",
     "shell": "shell_execution",
     "process": "process_execution",
     "network": "network_execution",

@@ -1,9 +1,9 @@
-# Threat Model — Approval Execution Relay (Workstream A, Slice A1)
+# Threat Model — Approval Execution Relay (Workstream A: A1–A4)
 
 > Status marker: real executor (`approval_execution_relay`), Tier 1, integrated
-> and governed per action. This slice (A1 — **immutable approval intent**)
-> hardens the relay's execution-time verification; executor dispatch beyond
-> `write_file` (A2/A3) and posture hooks (A4) are separate slices.
+> and governed per action. Covers A1 (immutable approval intent), A2 (executor
+> dispatch + single-execution), A3 (coverage beyond `write_file`), and A4
+> (zero-trust posture hooks).
 
 Per-capability threat model tracking the relay's execution-time defenses. The
 relay is `raiker/runtime/executors/tier1_approval.py::ApprovalExecutionRelay`.
@@ -14,13 +14,18 @@ relay is `raiker/runtime/executors/tier1_approval.py::ApprovalExecutionRelay`.
 an actual execution. It is reached only through
 `RuntimeAuthority.route_action()` — the single chokepoint — with an
 `approval_execution_relay` governed action whose only argument is an
-`approval_id`. The relay:
+`approval_id`. Given that id the relay, in order:
 
 1. loads the approval and its joined tool action from SQLite (never trusting
    caller-supplied arguments);
-2. verifies the approval is still `pending`, still within its TTL, and that the
-   action payload has not drifted since approval;
-3. resolves the approval to `approved` and performs the underlying write.
+2. verifies the approval is still `pending`, within its TTL, and that the action
+   payload has not drifted since approval (**A1**);
+3. captures a posture snapshot and denies if the approving session was revoked
+   (**A4**);
+4. atomically claims the approval `pending → executing` (**A2** single-execution);
+5. re-routes the approved action's `action_type` through `route_action` so the
+   target runs under its **own** capability gate, decision mode, and PolicyEngine
+   review *at execution time* (**A2/A3**), then resolves `executing → executed`.
 
 The immutable **approval intent** is captured at creation time by
 `SQLiteStore.insert_approval`: a `action_payload_sha256` over the canonical
@@ -31,42 +36,59 @@ The immutable **approval intent** is captured at creation time by
 
 | Control | Mechanism |
 |---|---|
-| Governed entry only | Executor runs only when `route_action()` returns `decision="allow"` — every gate/policy/risk check has already passed. |
-| Immutable arguments (TOCTOU) | At execution the relay recomputes `tool_action_payload_sha256` from the tool action *as it stands now* and compares it to the hash stored at approval time. Any drift → `approval_payload_tampered`, no write, approval left `pending`. |
-| Bounded lifetime | An approval past `expires_at` resolves to `expired` (via `expire_approval`, guarded on `status='pending'`) and never executes → `approval_expired`. Default TTL 24h. |
-| Single resolution | `resolve_approval` / `expire_approval` both carry `WHERE status='pending'`; a resolved approval cannot be re-resolved or re-run. |
-| Workspace confinement | Writes go through `resolve_workspace_path()`, which rejects paths outside the workspace root. |
-| Metadata-only results | `ExecutionResult` carries only `summary` and metadata `artifacts` (approval_id, path, size_bytes) — never raw file contents. |
+| Governed entry only | The relay runs only when the outer `route_action()` returns `decision="allow"` for `approval_execution_relay`. |
+| Immutable arguments (TOCTOU, A1) | At execution the relay recomputes `tool_action_payload_sha256` from the tool action *as it stands now* and compares it to the hash stored at approval time. Any drift → `approval_payload_tampered`, no execution, approval left `pending`. |
+| Bounded lifetime (A1) | An approval past `expires_at` resolves to `expired` (via `expire_approval`, guarded on `status='pending'`) and never executes → `approval_expired`. Default TTL 24h. |
+| Execution-time re-governance (A2/A3) | The approved action is re-routed through `RuntimeAuthority.route_action` as the approving human. The **target's** capability gate state, decision mode, PolicyEngine review, and (for Tier-2) the threat-ack-gated enablement all apply *again* at execution time — approval-time state is never trusted. |
+| Single execution (A2) | `claim_approval_for_execution` performs an atomic `pending → executing` UPDATE guarded on `status='pending'`; only one caller wins. Success → `finalize_approval_execution(executed)`; a target blocked before any executor ran → `release_approval_claim` back to `pending` (safe retry); a target that ran and failed → terminal `execution_failed` (never re-run). |
+| No relay-of-relay (A2) | A target whose capability is `approval_execution_relay` is refused (`relay_target_not_permitted`) — no recursion, no relay approving a relay. |
+| Posture / revoked session (A4) | `capture_posture` records principal, session, interface, MFA-enrolment; a revoked approving session denies with `posture_degraded:session_revoked` before any claim or execution. |
+| Metadata-only audit (A4) | `approval_executed` / `approval_execution_denied` events carry the posture snapshot and target metadata only — never arguments, file contents, or secrets. |
 
 ## Threats
 
-- **T1 — TOCTOU: arguments mutated between approval and execution.** A human
-  approves `write_file safe.txt`; the stored tool action is then altered to
-  `write_file evil.txt` before the relay runs. Mitigated: the relay recomputes
-  the payload hash and refuses on mismatch (`approval_payload_tampered`); the
-  approval stays `pending` and nothing is written. Covered by
+- **T1 — TOCTOU: arguments mutated between approval and execution (A1).** A human
+  approves `write_file safe.txt`; the stored tool action is then altered before
+  the relay runs. Mitigated: hash recomputation refuses on mismatch
+  (`approval_payload_tampered`); the approval stays `pending`. Covered by
   `tests/test_approval_relay_general.py::test_relay_refuses_tampered_payload`.
-- **T2 — Stale approval executed long after the fact.** An approval sits
-  unresolved indefinitely and is later replayed. Mitigated: a bounded TTL means
-  an unresolved approval's resting state becomes `expired`; the relay refuses it
-  (`approval_expired`) and marks it expired. Covered by
-  `test_relay_refuses_and_expires_stale_approval`. The metadata-only resolution
-  path (`ApprovalInbox.resolve`) enforces the same TTL, surfaced by the API as
-  HTTP 409 `approval_expired`
-  (`tests/test_api_approvals.py::test_expired_approval_rejected`).
-- **T3 — Double execution of one approval.** Mitigated: resolution transitions
-  guard on `status='pending'`; a second relay call sees a non-pending status and
-  returns `approval_already_resolved`. (A2 adds an explicit
-  `pending → executing → executed` transition for stronger single-execution
-  under concurrency.)
-- **T4 — File contents leaked into the audit log.** Mitigated: results are
-  metadata-only.
-- **T5 — Execution without a registered executor.** Mitigated by fail-closed
-  handling upstream in `route_action` (`execution_unavailable:no_executor`).
+- **T2 — Stale approval replayed (A1).** Mitigated: a bounded TTL means an
+  unresolved approval's resting state becomes `expired`; the relay refuses it
+  (`approval_expired`). The metadata-only `ApprovalInbox.resolve` path enforces
+  the same TTL, surfaced by the API as HTTP 409 `approval_expired`. Covered by
+  `test_relay_refuses_and_expires_stale_approval`,
+  `tests/test_api_approvals.py::test_expired_approval_rejected`.
+- **T3 — Double execution of one approval (A2).** An approval is relayed twice
+  (race or replay). Mitigated: the atomic `pending → executing` claim means the
+  loser sees a non-pending row and stops (`approval_already_resolved`); the
+  target executes at most once. Covered by `test_relay_executes_at_most_once`,
+  `test_relay_rejects_claimed_approval`.
+- **T4 — Approval-time gate/policy trusted at execution (A2/A3).** A capability
+  is enabled at approval time then disabled before execution (or a policy
+  changes). Mitigated: the target is re-governed at execution time; a disabled
+  target gate refuses (`target_not_executed:*`) and the claim is released to
+  `pending`. Covered by `test_relay_refuses_disabled_target_gate_and_releases`.
+- **T5 — Privilege via arbitrary target capability (A3).** The relay only ever
+  executes the exact `{tool_name, arguments, risk_level}` the human approved
+  (hash-pinned), routed through that capability's own gate/mode/policy. Tier-2
+  targets still require their gate to be enabled (which required the threat-ack),
+  and critical-risk targets hit the human-confirmation floor in `route_action`
+  and do not execute via the relay. Coverage across `apply_patch`, `memory_write`,
+  and Tier-2 `shell` in `test_relay_dispatches_*`.
+- **T6 — Approving session revoked between approval and execution (A4).**
+  Mitigated: the posture check denies with `posture_degraded:session_revoked`
+  before any claim; the approval remains actionable from a live session. Covered
+  by `test_relay_denies_revoked_session`.
+- **T7 — Sensitive data leaked into the audit log.** Mitigated: relay events and
+  results are metadata-only (approval id, target action id, capability, decision,
+  posture). Never arguments or content.
 
-## What A1 explicitly does not cover
+## What Workstream A does not cover
 
-- Executor dispatch for capabilities beyond the `write_file` shape (A2/A3).
-- Atomic single-execution nonce / `executing` state under concurrency (A2).
-- Posture snapshot + revoked-session denial on the relay (A4).
-- Batch/blanket approval of heterogeneous actions (out of scope for Workstream A).
+- Approving actions for capabilities with **no real executor** — they stay
+  `activation_blocked:no_executor` and the relay reports `target_not_executed`.
+- Batch/blanket approval of heterogeneous actions (one approval, one action).
+- The full critical-risk approval lifecycle (notify → manual human decision) —
+  that is Workstream F6/F7; today a critical target simply does not execute via
+  the relay (human-confirmation floor).
+- Recursive or delegated relays (a relay may never execute another relay).

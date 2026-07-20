@@ -2632,6 +2632,73 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
         return cursor.rowcount == 1
 
+    def claim_approval_for_execution(self, approval_id: str) -> bool:
+        """Atomically claim a pending approval for execution (pending → executing).
+
+        Returns True only for the single caller that wins the race. The
+        ``WHERE status = 'pending'`` guard on a single UPDATE is the
+        single-execution primitive: two concurrent relays cannot both claim the
+        same approval, so an approved action executes at most once.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE approvals SET status = 'executing' "
+                "WHERE approval_id = ? AND status = 'pending'",
+                (approval_id,),
+            )
+        return cursor.rowcount == 1
+
+    def finalize_approval_execution(
+        self, approval_id: str, *, status: str, resolved_by: str
+    ) -> bool:
+        """Resolve a claimed approval to a terminal outcome (executing → status).
+
+        ``status`` is the terminal state — ``executed`` on success or
+        ``execution_failed`` when the target executor ran but failed. The
+        ``executing`` guard means only a claimed approval can be finalized.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE approvals SET status = ?, approved_by = ?, resolved_at = ? "
+                "WHERE approval_id = ? AND status = 'executing'",
+                (status, resolved_by, utc_now(), approval_id),
+            )
+        return cursor.rowcount == 1
+
+    def release_approval_claim(self, approval_id: str) -> bool:
+        """Return a claimed approval to ``pending`` (executing → pending).
+
+        Used only when the re-governed action was blocked *before* any executor
+        ran (gate disabled, policy deny, no executor), so nothing was committed
+        and a later retry — after the owner fixes the gate — is safe. Clears the
+        claim's bookkeeping so the approval looks untouched.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE approvals SET status = 'pending', approved_by = NULL, resolved_at = NULL "
+                "WHERE approval_id = ? AND status = 'executing'",
+                (approval_id,),
+            )
+        return cursor.rowcount == 1
+
+    def load_api_session(self, session_id: str) -> dict[str, Any] | None:
+        """Best-effort lookup of an API session row by id (posture snapshots)."""
+        if not session_id:
+            return None
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM api_sessions WHERE session_id = ?", (session_id,)
+            ).fetchone()
+        return dict(row) if row else None
+
+    def principal_mfa_enrolled(self, principal_id: str) -> bool:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT mfa_enrolled FROM account_credentials WHERE principal_id = ?",
+                (principal_id,),
+            ).fetchone()
+        return bool(row["mfa_enrolled"]) if row else False
+
     def insert_checkpoint(self, checkpoint: Checkpoint, manifest_path: str) -> None:
         with self.connect() as connection:
             connection.execute(

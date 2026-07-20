@@ -63,6 +63,18 @@ EVENT_TYPES = {
     # the re-governed target was blocked/failed) with the same posture snapshot.
     "approval_executed",
     "approval_execution_denied",
+    # Production critical-risk classification (Workstream F / F6, ZT-7). Recorded
+    # when the in-code classification table elevates a governed action to the
+    # critical floor; metadata only (criterion code, ZT ref, declared risk).
+    "critical_action_classified",
+    # Scoped standing approval grants (Workstream F / F3, ZT-5). Lifecycle events
+    # for the grant engine — created/denied/revoked are the human decisions, and
+    # `standing_grant_applied` records that an active grant satisfied an
+    # AI-proposed action's approval requirement (with the grant id + posture).
+    "standing_grant_created",
+    "standing_grant_denied",
+    "standing_grant_revoked",
+    "standing_grant_applied",
     "tool_started",
     "tool_completed",
     "tool_failed",

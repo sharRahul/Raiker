@@ -1513,6 +1513,43 @@ CREATE INDEX IF NOT EXISTS idx_checkpoint_capture_action
   ON checkpoint_capture_manifest(action_id);
 """
 
+# Workstream F / Slice F3 (ZT-5) — scoped standing approvals engine. One grant
+# model shared by Workstreams A/C/E: `(principal, action shape, scope pattern,
+# risk ceiling, expires_at)`. A grant is created from a critical, human-decided
+# action (F6 criterion (d)); it lets a *later*, identical-shape, sub-critical
+# AI-proposed action run without a fresh prompt — the actual "frictionless"
+# mechanism. Grants are user-owned, scope-bound, expiry-bound (default 7 days),
+# revocable, always listed in Security Settings, and can only ever *narrow* from
+# the human decision that created them. `risk_ceiling` is strictly below critical
+# by construction, so no grant can ever pre-authorize a critical action. Every
+# use is logged with the grant id. Only metadata lives here — never a secret,
+# token, or payload.
+STANDING_GRANTS_MIGRATION_ID = "RAIKER-1301-standing-grants"
+
+STANDING_GRANTS_SQL = """
+CREATE TABLE IF NOT EXISTS standing_grants (
+  grant_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  granted_by TEXT NOT NULL,
+  action_type TEXT NOT NULL,
+  tool_name TEXT NOT NULL DEFAULT '',
+  scope_pattern TEXT NOT NULL DEFAULT '*',
+  risk_ceiling TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  revoked INTEGER NOT NULL DEFAULT 0,
+  revoked_at TEXT,
+  revoked_by TEXT,
+  use_count INTEGER NOT NULL DEFAULT 0,
+  last_used_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_standing_grants_principal
+  ON standing_grants(principal_id, revoked, expires_at);
+CREATE INDEX IF NOT EXISTS idx_standing_grants_owner
+  ON standing_grants(granted_by, revoked, created_at DESC);
+"""
+
 # Nested projects/folders (conversation organisation remainder): arbitrary-depth
 # folder hierarchy via hybrid adjacency list + materialized path. Parent
 # reference uses ON DELETE SET NULL so children survive parent hard-delete.

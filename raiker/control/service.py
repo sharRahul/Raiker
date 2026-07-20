@@ -398,6 +398,65 @@ class RuntimeControlService:
             return ControlResult(ok=False, reason_code=denial)
         return ControlResult(ok=True, data={"capability": capability})
 
+    # ── Scoped standing approval grants (Workstream F / F3, ZT-5) ───────────
+    # Grants are user-owned, scope-bound, expiry-bound, revocable, and listed in
+    # Security Settings. Creation is a critical, human-decided action; the
+    # authority enforces the human-only + sub-critical-ceiling invariants.
+
+    def create_standing_grant(
+        self,
+        acting_principal_id: str | None,
+        *,
+        action_type: str,
+        risk_ceiling: str,
+        tool_name: str = "",
+        scope_pattern: str = "*",
+        reason: str = "",
+        ttl_days: float | None = None,
+    ) -> ControlResult:
+        from raiker.runtime.authority import grants
+
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        outcome = self._authority.create_standing_grant(
+            granted_by=principal,
+            principal_id=principal.principal_id,
+            action_type=action_type,
+            risk_ceiling=risk_ceiling,
+            tool_name=tool_name,
+            scope_pattern=scope_pattern,
+            reason=reason,
+            ttl_days=ttl_days if ttl_days is not None else grants.DEFAULT_GRANT_TTL_DAYS,
+        )
+        if isinstance(outcome, str):
+            return ControlResult(ok=False, reason_code=outcome)
+        return ControlResult(ok=True, data={"grant": outcome})
+
+    def list_standing_grants(
+        self, acting_principal_id: str | None, *, include_inactive: bool = True
+    ) -> ControlResult:
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        grants_list = self._authority.list_standing_grants(
+            granted_by=principal.principal_id, include_inactive=include_inactive
+        )
+        return ControlResult(ok=True, data={"grants": grants_list})
+
+    def revoke_standing_grant(
+        self, grant_id: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        denial = self._authority.revoke_standing_grant(
+            grant_id, principal, granted_by=principal.principal_id
+        )
+        if denial is not None:
+            return ControlResult(ok=False, reason_code=denial)
+        return ControlResult(ok=True, data={"grant_id": grant_id})
+
     # ── Governed local MCP server management (Control Deck task 4b) ──────────
     # Create and Test/Connect run the real capability through route_action, so
     # the capability gate, policy, decision mode, and audit trail all apply — no

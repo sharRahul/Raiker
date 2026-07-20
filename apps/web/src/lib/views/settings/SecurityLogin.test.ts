@@ -66,6 +66,49 @@ describe("Security & Login settings", () => {
     });
   });
 
+  it("lists and revokes a standing approval grant", async () => {
+    let revoked = false;
+    stub({
+      "GET /api/settings": () => ({ settings: {}, status: { vault: "configured_valid", mfa_enrolled: true, username: "alice" } }),
+      "GET /api/security/credentials": () => [],
+      "GET /api/security/findings": () => [],
+      "GET /api/security/health": () => [],
+      "GET /api/standing-grants": () => ({
+        ok: true,
+        grants: revoked
+          ? []
+          : [
+              {
+                grant_id: "grn_1",
+                principal_id: "ai",
+                granted_by: "principal_owner",
+                action_type: "write_file",
+                tool_name: "",
+                scope_pattern: "coding",
+                risk_ceiling: "medium",
+                reason: "",
+                created_at: "2026-07-20T00:00:00Z",
+                expires_at: "2026-07-27T00:00:00Z",
+                revoked: 0,
+                use_count: 2,
+                last_used_at: null,
+              },
+            ],
+      }),
+      "POST /api/standing-grants/grn_1/revoke": () => {
+        revoked = true;
+        return { ok: true, grant_id: "grn_1" };
+      },
+    });
+    render(SecurityLogin);
+    await waitFor(() => {
+      expect(screen.getByText("Standing approval grants")).toBeInTheDocument();
+      expect(screen.getByText("write_file")).toBeInTheDocument();
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+    await waitFor(() => expect(screen.getByText("No standing grants.")).toBeInTheDocument());
+  });
+
   it("requires explicit consent before an opt-in breach check", async () => {
     let requestBody: unknown;
     stub({

@@ -486,6 +486,23 @@ class ToolBroker:
                 self.store.insert_tool_action(
                     sanitized_action, session_id, turn_id, "approval_required"
                 )
+                # D2 — async approval notification. Parking a turn for approval
+                # never blocks silently: the owner gets a dashboard notification
+                # (and an optional OS-level push) so they can approve from any
+                # surface. Best-effort and metadata-only; a delivery failure never
+                # affects the parked approval.
+                try:
+                    from raiker.notify import notify_approval_pending
+
+                    notify_approval_pending(
+                        self.store,
+                        acting_principal_id=self.principal_id,
+                        approval_id=approval_id,
+                        tool_name=action.tool_name,
+                        risk_level=action.risk_level,
+                    )
+                except Exception:
+                    pass
                 if action.tool_name == "connector_write":
                     connector_id = action.arguments.get("connector_id")
                     operation_id = action.arguments.get("operation_id")

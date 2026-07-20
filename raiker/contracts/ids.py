@@ -81,6 +81,8 @@ _PREFIXES = {
     "cred_",
     # Monitored MCP connections (Phase C): an owner-facing notification.
     "ntf_",
+    # Scoped standing approval grants (Workstream F / F3).
+    "grn_",
 }
 
 

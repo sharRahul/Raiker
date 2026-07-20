@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import PolicyDecision
@@ -29,6 +29,9 @@ from raiker.runtime.authority.models import (
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.storage.sqlite import SQLiteStore
 
+if TYPE_CHECKING:
+    from raiker.checkpoints.capture import CheckpointCaptureService
+
 NON_ALLOW_DECISIONS = frozenset({
     "deny",
     "needs_approval",
@@ -52,6 +55,8 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "apply_patch": "patch_apply_execution",
     "memory_write": "memory_write_execution",
     "memory_forget": "memory_forget_execution",
+    "checkpoint_restore": "checkpoint_restore_execution",
+    "checkpoint_restore_execution": "checkpoint_restore_execution",
     "shell": "shell_execution",
     "process": "process_execution",
     "network": "network_execution",
@@ -143,6 +148,67 @@ class RuntimeAuthority:
             store=store,
         )
         self.executor_registry = executor_registry or ExecutorRegistry()
+        self._capture_service: CheckpointCaptureService | None = None
+
+    @property
+    def capture_service(self) -> CheckpointCaptureService:
+        """Lazily-built pre-image capture service (Workstream B / B1).
+
+        Records the pre-image of every workspace-file mutation routed through
+        this authority into a content-addressed blob store, so mutations become
+        reversible. Built lazily to avoid an import cycle at module load and to
+        keep the constructor signature unchanged for existing callers.
+        """
+        if self._capture_service is None:
+            from raiker.checkpoints.capture import CheckpointCaptureService
+
+            self._capture_service = CheckpointCaptureService(self.store)
+        return self._capture_service
+
+    def _snapshot_pre_image(self, capability: str, arguments: dict[str, Any]) -> Any:
+        """Best-effort pre-mutation snapshot; never raises into the mutation path."""
+        try:
+            if not self.capture_service.eligible(capability):
+                return None
+            return self.capture_service.snapshot_pre_image(capability, arguments)
+        except Exception:
+            return None
+
+    def _commit_pre_image(
+        self, pre_image: Any, action: GovernedAction, principal: Principal
+    ) -> None:
+        """Persist the captured pre-image + emit a metadata-only capture event.
+
+        Isolated in try/except: a checkpoint-capture failure is recorded as a
+        metadata event but never propagates into the mutation result.
+        """
+        try:
+            meta = self.capture_service.commit(
+                pre_image,
+                session_id=action.session_id,
+                turn_id=action.turn_id,
+                action_id=action.action_id,
+                principal_id=principal.principal_id,
+            )
+            self._event(
+                event_type="checkpoint_captured",
+                actor="checkpoint_capture",
+                payload=meta,
+                session_id=action.session_id,
+                turn_id=action.turn_id,
+            )
+        except Exception as exc:  # pragma: no cover - defensive; capture is best-effort
+            self._event(
+                event_type="checkpoint_capture_failed",
+                actor="checkpoint_capture",
+                payload={
+                    "action_id": action.action_id,
+                    "capability": pre_image.capability if pre_image else None,
+                    "reason": type(exc).__name__,
+                },
+                session_id=action.session_id,
+                turn_id=action.turn_id,
+            )
 
     def _uses_principal_controls(self, principal_id: str | None) -> bool:
         return bool(principal_id and self.store.get_account(principal_id) is not None)
@@ -669,7 +735,14 @@ class RuntimeAuthority:
         capability = CAPABILITY_GATE_MAP.get(action.action_type, action.action_type)
         executor = self.executor_registry.get(capability)
         if executor is not None:
+            # B1 capture: snapshot the target file's pre-image *before* the
+            # executor overwrites it, so the mutation is reversible. Best-effort
+            # and fully isolated — a capture failure must never fail or block the
+            # real mutation.
+            pre_image = self._snapshot_pre_image(capability, action.arguments)
             result = executor.execute(action, principal)
+            if pre_image is not None and result.ok:
+                self._commit_pre_image(pre_image, action, principal)
             event_type = "action_executed" if result.ok else "action_failed"
             self._event(
                 event_type=event_type,

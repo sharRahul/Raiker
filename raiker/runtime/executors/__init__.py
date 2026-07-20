@@ -28,6 +28,7 @@ from raiker.runtime.executors.orchestration import MultiAgentTeamExecutor, Subag
 from raiker.runtime.executors.reminders import ReminderRuntimeExecutor
 from raiker.runtime.executors.scheduled import ScheduledRoutinesExecutor
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
+from raiker.runtime.executors.tier1_checkpoint import CheckpointRestoreExecutor
 from raiker.runtime.executors.tier1_files import FileWriteExecutor, PatchApplyExecutor
 from raiker.runtime.executors.tier1_memory import MemoryForgetExecutor, MemoryWriteExecutor
 from raiker.runtime.executors.tier2_shell import ProcessExecutor, ShellExecutor
@@ -66,7 +67,7 @@ from raiker.runtime.executors.tier6_local import (
 __all__ = [
     "Executor", "ExecutionResult", "ExecutorRegistry", "SandboxError", "not_implemented",
     "REAL_EXECUTOR_CAPABILITIES", "build_default_executor_registry",
-    "ApprovalExecutionRelay", "FileWriteExecutor", "PatchApplyExecutor",
+    "ApprovalExecutionRelay", "CheckpointRestoreExecutor", "FileWriteExecutor", "PatchApplyExecutor",
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "NetworkExecutor",
     "GraphIndexingExecutor", "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
@@ -107,6 +108,10 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "patch_apply_execution",
     "memory_write_execution",
     "memory_forget_execution",
+    # Workstream B — reversible checkpoint restore. Rewinds workspace files to a
+    # checkpoint using B1 pre-image blobs; writes its own pre-image first, so a
+    # restore is itself reversible. Approval-required governed mutation.
+    "checkpoint_restore_execution",
     # Tier 2 — sandboxed local execution / allowlisted egress
     "shell_execution",
     "process_execution",
@@ -204,6 +209,7 @@ def build_default_executor_registry(
     registry.register("approval_execution_relay", ApprovalExecutionRelay(ws, store))
     registry.register("file_write_execution", FileWriteExecutor(ws))
     registry.register("patch_apply_execution", PatchApplyExecutor(ws))
+    registry.register("checkpoint_restore_execution", CheckpointRestoreExecutor(ws, store))
     registry.register("memory_write_execution", MemoryWriteExecutor(ws, store))
     registry.register("memory_forget_execution", MemoryForgetExecutor(ws))
     registry.register("shell_execution", ShellExecutor(ws))

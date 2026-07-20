@@ -12,6 +12,8 @@ _PREFIXES = {
     "tool_",
     "pol_",
     "ckpt_",
+    # Checkpoint pre-image capture manifest entry (Workstream B / B1).
+    "ckcap_",
     "task_",
     "appr_",
     "memcand_",

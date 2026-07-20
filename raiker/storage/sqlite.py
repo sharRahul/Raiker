@@ -232,6 +232,8 @@ from raiker.storage.migrations import (
     SESSION_TAGS_SQL,
     STANDING_GRANTS_MIGRATION_ID,
     STANDING_GRANTS_SQL,
+    SUBAGENT_BUDGETS_MIGRATION_ID,
+    SUBAGENT_BUDGETS_SQL,
     THREAT_MODEL_ACKS_MIGRATION_ID,
     THREAT_MODEL_ACKS_SQL,
 )
@@ -677,6 +679,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID,
                 CRITICAL_APPROVAL_LIFECYCLE_SQL,
                 connection,
+            )
+            self._apply_migration(
+                SUBAGENT_BUDGETS_MIGRATION_ID, SUBAGENT_BUDGETS_SQL, connection
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -4351,10 +4356,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO subagent_contracts
-                (subagent_id, parent_task_id, name, mode, allowed_tools_json, max_depth, max_runtime_seconds, max_cost, created_by, created_at, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (subagent_id, parent_task_id, name, mode, allowed_tools_json, max_depth, max_runtime_seconds, max_cost, created_by, created_at, status, max_steps, max_tool_calls, max_tokens)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (contract.subagent_id, contract.parent_task_id, contract.name, contract.mode, contract.allowed_tools_json, contract.max_depth, contract.max_runtime_seconds, contract.max_cost, contract.created_by, contract.created_at, contract.status),
+                (contract.subagent_id, contract.parent_task_id, contract.name, contract.mode, contract.allowed_tools_json, contract.max_depth, contract.max_runtime_seconds, contract.max_cost, contract.created_by, contract.created_at, contract.status, contract.max_steps, contract.max_tool_calls, contract.max_tokens),
             )
 
     def list_subagent_contracts(self) -> list[dict[str, Any]]:

@@ -337,6 +337,10 @@ def handle_checkpoints(command: str = "/checkpoints", *, workspace_root: str | P
         if len(parts) < 3:
             return "Usage: /checkpoints restore <checkpoint_id>"
         return _render_restore_plan(service, parts[2])
+    if len(parts) >= 2 and parts[1] == "fork":
+        if len(parts) < 3:
+            return "Usage: /checkpoints fork <checkpoint_id>"
+        return _render_fork(service, parts[2])
     checkpoints = service.list_checkpoints(limit=50)
     if not checkpoints:
         return "No checkpoints."
@@ -347,7 +351,27 @@ def handle_checkpoints(command: str = "/checkpoints", *, workspace_root: str | P
             f"- {cp['checkpoint_id']} session={cp['session_id']} turn={cp['turn_id']} type={cp['checkpoint_type']} created={cp['created_at']} summary={summary}"
         )
     lines.append("Preview a restore with: /checkpoints restore <checkpoint_id>")
+    lines.append("Fork a checkpoint into a new session with: /checkpoints fork <checkpoint_id>")
     return "\n".join(lines)
+
+
+def _render_fork(service: CheckpointService, checkpoint_id: str) -> str:
+    """Materialize a new session forked from a checkpoint (B3).
+
+    Fork mutates no workspace files, so — unlike restore — it runs directly:
+    it branches session state (seeded from the checkpoint's summary + memory
+    candidates) into a fresh session and leaves the current workspace untouched.
+    """
+    try:
+        result = service.execute_fork(checkpoint_id)
+    except ValueError:
+        return f"Unknown checkpoint: {checkpoint_id}"
+    return (
+        f"Forked checkpoint {checkpoint_id} into new session {result['session_id']}.\n"
+        f"  seeded from: session={result['source_session_id']} "
+        f"summary={result['summary']!r} "
+        f"memory_candidates={result['memory_candidate_count']}"
+    )
 
 
 def _render_restore_plan(service: CheckpointService, checkpoint_id: str) -> str:

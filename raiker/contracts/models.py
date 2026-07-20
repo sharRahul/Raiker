@@ -1160,6 +1160,11 @@ class SubagentContract:
     created_by: str
     created_at: str
     status: str
+    # C1: per-spawn budget dimensions (0 = unset on legacy rows). Persisted so a
+    # subagent's enforced resource envelope is auditable after the run.
+    max_steps: int = 0
+    max_tool_calls: int = 0
+    max_tokens: int = 0
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:

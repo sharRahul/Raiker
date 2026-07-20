@@ -160,14 +160,119 @@ class CheckpointService:
     def capture_service(self) -> CheckpointCaptureService:
         return CheckpointCaptureService(self.store)
 
+    def _fork_seed(self, checkpoint: dict) -> dict[str, object]:
+        """Derive the seed a fork is materialized from (metadata-only).
+
+        The seed is the checkpoint's state *summary* plus its *memory
+        candidates* — never any workspace file content. ``summary`` lives on the
+        checkpoint row; ``runtime_state`` and ``memory_candidates`` live in the
+        manifest JSON, which is read best-effort (a missing/corrupt manifest
+        degrades to an empty seed rather than failing the fork).
+        """
+        runtime_state = ""
+        memory_candidates: list[dict[str, object]] = []
+        manifest_path = checkpoint.get("manifest_path")
+        if manifest_path:
+            try:
+                manifest = self.read(str(manifest_path))
+                runtime_state = manifest.runtime_state
+                memory_candidates = list(manifest.memory_candidates)
+            except (OSError, ValueError, TypeError):
+                pass
+        return {
+            "source_checkpoint_id": str(checkpoint["checkpoint_id"]),
+            "source_session_id": str(checkpoint["session_id"]),
+            "summary": str(checkpoint.get("summary", "")),
+            "runtime_state": runtime_state,
+            "memory_candidates": memory_candidates,
+        }
+
+    def _fork_manifest_path(self, session_id: str) -> Path:
+        return self.root / "forks" / f"{session_id}.json"
+
     def plan_fork(self, checkpoint_id: str) -> dict[str, object]:
+        """Metadata-only dry-run preview of a fork (B3).
+
+        A fork materializes a *new* session seeded from the checkpoint's state
+        summary and memory candidates; it mutates no workspace files, so — unlike
+        restore — it is not an approval-required governed mutation.
+        """
         checkpoint = self.get_checkpoint(checkpoint_id)
         if checkpoint is None:
             raise ValueError("checkpoint_not_found")
+        seed = self._fork_seed(checkpoint)
         return {
             "status": "fork_plan",
             "checkpoint_id": checkpoint_id,
-            "can_execute": False,
-            "requires_approval": True,
-            "reason": "Phase 2 plans fork only; execution is not active.",
+            "source_session_id": seed["source_session_id"],
+            "summary": seed["summary"],
+            "memory_candidate_count": len(seed["memory_candidates"]),  # type: ignore[arg-type]
+            "can_execute": True,
+            "requires_approval": False,
         }
+
+    def execute_fork(
+        self,
+        checkpoint_id: str,
+        *,
+        new_session_id: str | None = None,
+        title: str | None = None,
+        user_id: str | None = None,
+    ) -> dict[str, object]:
+        """Materialize a new session seeded from the checkpoint (B3).
+
+        Creates a fresh session and records a metadata-only fork manifest
+        capturing its lineage and seed (state summary + memory candidates). No
+        workspace file is written or overwritten — the fork only branches
+        conversation/session state, leaving the current workspace untouched.
+        """
+        checkpoint = self.get_checkpoint(checkpoint_id)
+        if checkpoint is None:
+            raise ValueError("checkpoint_not_found")
+        seed = self._fork_seed(checkpoint)
+
+        session_id = new_session_id or new_id("sess_")
+        summary = str(seed["summary"])
+        fork_title = title or (f"fork of {summary}".strip()[:120] if summary else "fork")
+        self.store.create_session(
+            session_id,
+            str(self.store.paths.workspace_root),
+            title=fork_title,
+            user_id=user_id,
+        )
+
+        manifest = {
+            "session_id": session_id,
+            "forked_from_checkpoint_id": checkpoint_id,
+            "source_session_id": seed["source_session_id"],
+            "summary": summary,
+            "runtime_state": seed["runtime_state"],
+            "memory_candidates": seed["memory_candidates"],
+            "created_at": utc_now(),
+        }
+        manifest_path = self._fork_manifest_path(session_id)
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+
+        return {
+            "status": "forked",
+            "checkpoint_id": checkpoint_id,
+            "source_session_id": seed["source_session_id"],
+            "session_id": session_id,
+            "title": fork_title,
+            "summary": summary,
+            "memory_candidate_count": len(seed["memory_candidates"]),  # type: ignore[arg-type]
+            "seed_manifest_path": str(manifest_path),
+        }
+
+    def load_fork_seed(self, session_id: str) -> dict[str, object] | None:
+        """Return the fork manifest for a forked session, or ``None``."""
+        path = self._fork_manifest_path(session_id)
+        if not path.exists():
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None

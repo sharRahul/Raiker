@@ -28,7 +28,22 @@ DELEGABLE_TOOLS: frozenset[str] = frozenset({
 # shrink these, never grow them.
 MAX_SUBAGENT_DEPTH = 3
 MAX_SUBAGENT_STEPS = 25
+MAX_SUBAGENT_TOOL_CALLS = 25
+MAX_SUBAGENT_TOKENS = 200_000
 MAX_TEAM_MEMBERS = 5
+
+# ~4 characters per token is the standard rough heuristic; the in-process
+# read-only runner makes no model calls, so this is a deterministic *estimate*
+# of the context a step would consume, not a live token meter. It exists so the
+# token budget is enforced today and already threaded through for model-driven
+# subagents (Workstream C3).
+_CHARS_PER_TOKEN = 4
+
+
+def estimate_step_tokens(tool_name: str, arguments: dict[str, Any]) -> int:
+    """Deterministic token estimate for one subagent step (minimum 1)."""
+    payload = json.dumps(arguments, sort_keys=True, default=str)
+    return (len(tool_name) + len(payload)) // _CHARS_PER_TOKEN + 1
 
 
 class SubagentSpecError(ValueError):
@@ -42,6 +57,34 @@ class SubagentStep:
 
 
 @dataclass(frozen=True)
+class SubagentBudget:
+    """Per-spawn resource budget (C1).
+
+    Four independent dimensions — steps, tool calls, wall-clock, and (estimated)
+    tokens — each bounded and each enforced by :class:`SubagentRunner`. A breach
+    of *any* dimension fails the subagent closed; nothing is silently truncated.
+    Caller-supplied values may only *shrink* the process-wide hard caps, never
+    grow them (:meth:`effective`).
+    """
+
+    max_steps: int
+    max_tool_calls: int
+    max_runtime_seconds: int
+    max_tokens: int
+
+    def effective(self) -> SubagentBudget:
+        """Clamp the caller's budget down to the hard caps (never up)."""
+        return SubagentBudget(
+            max_steps=min(self.max_steps, MAX_SUBAGENT_STEPS),
+            max_tool_calls=min(self.max_tool_calls, MAX_SUBAGENT_TOOL_CALLS),
+            # Wall-clock has no process-wide ceiling today; the caller's value is
+            # the bound. Kept non-negative to stay fail-closed on a bad spec.
+            max_runtime_seconds=max(self.max_runtime_seconds, 0),
+            max_tokens=min(self.max_tokens, MAX_SUBAGENT_TOKENS),
+        )
+
+
+@dataclass(frozen=True)
 class SubagentSpec:
     parent_task_id: str
     name: str
@@ -52,6 +95,16 @@ class SubagentSpec:
     max_runtime_seconds: int
     allowed_tools: frozenset[str]
     steps: tuple[SubagentStep, ...]
+    max_tool_calls: int = MAX_SUBAGENT_TOOL_CALLS
+    max_tokens: int = MAX_SUBAGENT_TOKENS
+
+    def budget(self) -> SubagentBudget:
+        return SubagentBudget(
+            max_steps=self.max_steps,
+            max_tool_calls=self.max_tool_calls,
+            max_runtime_seconds=self.max_runtime_seconds,
+            max_tokens=self.max_tokens,
+        )
 
 
 @dataclass(frozen=True)
@@ -81,6 +134,8 @@ def parse_subagent_spec(args: dict[str, Any]) -> SubagentSpec:
         max_depth = int(args.get("max_depth", MAX_SUBAGENT_DEPTH))
         max_steps = int(args.get("max_steps", MAX_SUBAGENT_STEPS))
         max_runtime_seconds = int(args.get("max_runtime_seconds", 30))
+        max_tool_calls = int(args.get("max_tool_calls", MAX_SUBAGENT_TOOL_CALLS))
+        max_tokens = int(args.get("max_tokens", MAX_SUBAGENT_TOKENS))
     except (TypeError, ValueError) as exc:
         raise SubagentSpecError(f"invalid:numeric_budget:{exc}") from None
     raw_allowed = args.get("allowed_tools")
@@ -114,6 +169,8 @@ def parse_subagent_spec(args: dict[str, Any]) -> SubagentSpec:
         max_runtime_seconds=max_runtime_seconds,
         allowed_tools=allowed_tools,
         steps=tuple(steps),
+        max_tool_calls=max_tool_calls,
+        max_tokens=max_tokens,
     )
 
 
@@ -149,7 +206,8 @@ class SubagentRunner:
         subagent_id = new_id("sba_")
         now = utc_now()
         eff_depth = min(spec.max_depth, MAX_SUBAGENT_DEPTH)
-        eff_steps = min(spec.max_steps, MAX_SUBAGENT_STEPS)
+        budget = spec.budget().effective()
+        eff_steps = budget.max_steps
         effective_allowed = spec.allowed_tools & DELEGABLE_TOOLS
 
         contract = SubagentContract(
@@ -159,11 +217,16 @@ class SubagentRunner:
             mode="bounded_delegated_readonly",
             allowed_tools_json=json.dumps(sorted(effective_allowed)),
             max_depth=eff_depth,
-            max_runtime_seconds=spec.max_runtime_seconds,
+            max_runtime_seconds=budget.max_runtime_seconds,
             max_cost=0.0,
             created_by=principal_id,
             created_at=now,
             status="running",
+            # C1: the per-spawn budget record persists alongside the contract so a
+            # subagent's resource envelope is auditable after the fact.
+            max_steps=budget.max_steps,
+            max_tool_calls=budget.max_tool_calls,
+            max_tokens=budget.max_tokens,
         )
         self._store.insert_subagent_contract(contract)
 
@@ -184,6 +247,12 @@ class SubagentRunner:
                     "steps_executed": executed,
                     "tools_used": sorted(set(tools_used)),
                     "status": status,
+                    "budget": {
+                        "max_steps": budget.max_steps,
+                        "max_tool_calls": budget.max_tool_calls,
+                        "max_runtime_seconds": budget.max_runtime_seconds,
+                        "max_tokens": budget.max_tokens,
+                    },
                 },
             )
 
@@ -200,10 +269,19 @@ class SubagentRunner:
 
         start = time.monotonic()
         executed = 0
-        for step in spec.steps:
-            if time.monotonic() - start > spec.max_runtime_seconds:
+        tokens = 0
+        for calls_made, step in enumerate(spec.steps):
+            if time.monotonic() - start > budget.max_runtime_seconds:
                 return finish("failed", False, "subagent_time_budget_exceeded",
-                              f"Subagent exceeded its {spec.max_runtime_seconds}s budget.", executed)
+                              f"Subagent exceeded its {budget.max_runtime_seconds}s budget.", executed)
+            # C1: the tool-call budget is checked *before* dispatching the next
+            # step (``calls_made`` is the number already dispatched), so a subagent
+            # fails closed rather than making a call it has no budget for. (One step
+            # is one tool call in this bounded runner, but the budget is a distinct,
+            # independently-tunable dimension.)
+            if calls_made >= budget.max_tool_calls:
+                return finish("failed", False, "subagent_tool_call_budget_exceeded",
+                              f"Subagent reached its tool-call budget of {budget.max_tool_calls}.", executed)
             action = ToolAction(
                 action_id=new_id("act_"),
                 tool_name=step.tool_name,
@@ -223,6 +301,12 @@ class SubagentRunner:
                 return finish("failed", False,
                               f"subagent_step_failed:{step.tool_name}",
                               "A subagent step failed safely; the subagent stopped.", executed)
+            # C1: accrue the (estimated) token cost and fail closed if the step
+            # pushed the subagent over its token budget.
+            tokens += estimate_step_tokens(step.tool_name, step.arguments)
+            if tokens > budget.max_tokens:
+                return finish("failed", False, "subagent_token_budget_exceeded",
+                              f"Subagent reached its token budget of {budget.max_tokens}.", executed + 1)
             executed += 1
         return finish("completed", True, None,
                       f"Subagent '{spec.name}' completed {executed} read-only step(s).", executed)

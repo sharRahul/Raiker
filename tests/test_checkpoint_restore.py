@@ -300,7 +300,7 @@ from raiker.checkpoints.service import (  # noqa: E402
     CheckpointService,
 )
 from raiker.contracts.models import Checkpoint  # noqa: E402
-from raiker.runtime.authority.models import PrincipalType, RuntimeMode  # noqa: E402
+from raiker.runtime.authority.models import RuntimeMode  # noqa: E402
 from raiker.runtime.executors.tier1_checkpoint import CheckpointRestoreExecutor  # noqa: E402
 
 

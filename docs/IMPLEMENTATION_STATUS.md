@@ -5,6 +5,16 @@
 
 # Implementation Status
 
+> Current truth update (2026-07-21): **Milestone 3 complete** — C2 persists a
+> distinct bounded subagent AI principal and parks any mutation in the parent
+> approval queue; C3 emits low-risk read-only `subagent_plan` steps; B4 derives
+> cross-principal restore risk from capture ownership and routes it to the
+> critical human-confirmation floor; F2 adds the scheduled, silent-on-green
+> integrity sweep (`raiker/security/integrity_sweep.py`) for event chains, API
+> session validity, owner control drift, and egress-allowlist drift. Tests:
+> `tests/test_subagent_activation.py`, `tests/test_milestone_3.py`,
+> `tests/test_checkpoint_restore.py`, `tests/test_integrity_sweep.py`.
+
 > Current truth update (2026-07-20): **Milestone 3 (partial) — C1 (subagent
 > budgets) and B3 (checkpoint fork)** of the execution-breadth & User-Centric
 > Zero Trust plan (`docs/plans/2026-07-19-execution-breadth-and-zero-trust-plan.md`)

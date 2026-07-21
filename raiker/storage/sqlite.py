@@ -5377,6 +5377,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
+    def list_principal_capability_gate_states(self, principal_id: str) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM principal_capability_gate_state WHERE principal_id = ? ORDER BY capability",
+                (principal_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def upsert_principal_capability_gate_state(self, principal_id: str, record: dict[str, Any]) -> None:
         with self.connect() as connection:
             connection.execute(
@@ -5453,6 +5461,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "WHERE principal_id = ? AND capability = ?", (principal_id, capability)
             ).fetchone()
         return str(row["decision_mode"]) if row else None
+
+    def list_principal_capability_decision_modes(self, principal_id: str) -> dict[str, str]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT capability, decision_mode FROM principal_capability_decision_mode WHERE principal_id = ?",
+                (principal_id,),
+            ).fetchall()
+        return {str(row["capability"]): str(row["decision_mode"]) for row in rows}
 
     def upsert_principal_capability_decision_mode(
         self, principal_id: str, record: dict[str, Any]

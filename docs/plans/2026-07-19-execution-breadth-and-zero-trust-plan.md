@@ -165,6 +165,15 @@ Cross-cutting; starts immediately and lands with each workstream above.
 
 ---
 
+## Milestone 3 completion update (2026-07-21)
+
+M3 is complete: C2 records a separate bounded AI principal and parks mutations
+for parent approval; C3 emits low-risk read-only `subagent_plan` steps; B4
+derives cross-principal restore escalation from capture manifests; F2 adds the
+silent-on-green scheduled integrity sweep. Evidence is in
+`tests/test_subagent_activation.py`, `tests/test_milestone_3.py`,
+`tests/test_checkpoint_restore.py`, and `tests/test_integrity_sweep.py`.
+
 ## Sequencing & milestones
 
 | Milestone | Contents | Exit criteria |

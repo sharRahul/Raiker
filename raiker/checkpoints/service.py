@@ -77,7 +77,9 @@ class CheckpointService:
         data = resolved.read_bytes()
         return (True, hashlib.sha256(data).hexdigest(), len(data))
 
-    def compute_restore_plan(self, checkpoint_id: str) -> dict[str, object]:
+    def compute_restore_plan(
+        self, checkpoint_id: str, *, restoring_principal_id: str | None = None
+    ) -> dict[str, object]:
         """Compute a metadata-only per-file restore plan for a checkpoint.
 
         Restoring *to* a checkpoint rewinds every workspace file mutated after it
@@ -100,6 +102,7 @@ class CheckpointService:
             earliest_by_path[str(entry["workspace_path"])] = entry
 
         files: list[dict[str, object]] = []
+        touches_other_principal = False
         for path in sorted(earliest_by_path):
             entry = earliest_by_path[path]
             status = str(entry["capture_status"])
@@ -126,6 +129,11 @@ class CheckpointService:
                 changed = current_sha != target_sha
             else:
                 changed = False
+            changed_by_other_principal = bool(
+                changed and restoring_principal_id
+                and str(entry["principal_id"]) != restoring_principal_id
+            )
+            touches_other_principal = touches_other_principal or changed_by_other_principal
             files.append(
                 {
                     "workspace_path": path,
@@ -135,6 +143,7 @@ class CheckpointService:
                     "current_sha256": current_sha,
                     "current_size": current_size,
                     "changed": changed,
+                    "changed_by_other_principal": changed_by_other_principal,
                 }
             )
         return {
@@ -151,6 +160,7 @@ class CheckpointService:
             "delete_count": sum(1 for f in files if f["op"] == RESTORE_OP_DELETE),
             "skip_count": sum(1 for f in files if f["op"] == RESTORE_OP_SKIP_OVERSIZE),
             "changed_count": sum(1 for f in files if f["changed"]),
+            "touches_other_principal": touches_other_principal,
         }
 
     def plan_restore(self, checkpoint_id: str) -> dict[str, object]:

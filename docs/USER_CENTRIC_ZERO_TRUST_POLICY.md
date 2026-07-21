@@ -82,6 +82,13 @@ reference these IDs. "Existing" cites the mechanism already in the codebase;
 | ZT-11 | All trust decisions (gates, modes, grants, allowlists, runtime modes) belong to the device owner or their designated `runtime_gate_manager`, are reversible, and require no external administrator. AI principals can never make them. | Owner bootstrap; human-only authority actions | Existing |
 | ZT-12 | Interfaces are zero-authority clients: every surface (terminal, web dashboard, and any future TUI/desktop/IDE surface) MUST route through the same governed gateway and MUST NOT add authority of its own. | `AgentGateway`; loopback-only API | Existing; applies to Workstream D surfaces |
 
+## ZT-4 implementation update (2026-07-21)
+
+F2 is implemented by `raiker/security/integrity_sweep.py` through the existing
+scheduled-routines executor. It is silent when its event-chain, session,
+owner-control baseline, and egress-allowlist checks are green, and produces an
+owner-scoped metadata-only dashboard notification only on a deviation.
+
 ## 4. Translation discipline
 
 - New tests that enforce a requirement SHOULD reference its ID (e.g.

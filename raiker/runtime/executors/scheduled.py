@@ -68,10 +68,11 @@ class ScheduledRoutinesExecutor:
             return self._fail(action, "missing_argument:payload")
         routine_id = new_id("rtn_")
         # Validate the payload is a bounded read-only subagent spec (fail closed otherwise).
-        try:
-            parse_subagent_spec({"parent_task_id": routine_id, **payload})
-        except SubagentSpecError as exc:
-            return self._fail(action, f"invalid_payload:{exc}")
+        if payload.get("routine_type") != "integrity_sweep":
+            try:
+                parse_subagent_spec({"parent_task_id": routine_id, **payload})
+            except SubagentSpecError as exc:
+                return self._fail(action, f"invalid_payload:{exc}")
         now = utc_now()
         self._store.insert_scheduled_routine({
             "routine_id": routine_id,
@@ -136,6 +137,17 @@ class ScheduledRoutinesExecutor:
             payload = json.loads(routine["payload_json"])
         except (json.JSONDecodeError, TypeError):
             return False, "invalid_payload_json"
+        if payload.get("routine_type") == "integrity_sweep":
+            from raiker.security.integrity_sweep import IntegritySweep
+
+            outcome = IntegritySweep(self._store).run(str(routine["created_by"]))
+            now = utc_now()
+            self._store.update_scheduled_routine_run(
+                routine["routine_id"],
+                last_run=now,
+                next_run=_plus_seconds(now, int(routine["interval_seconds"])),
+            )
+            return True, None if not outcome["deviations"] else "integrity_deviations_found"
         from dataclasses import replace
         # Reuse the governed subagent executor for the bounded read-only steps.
         sub_action = replace(

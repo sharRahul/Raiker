@@ -126,8 +126,8 @@ def test_run_due_fails_closed_on_mutating_routine(tmp_path: Path) -> None:
         principal,
     )
     run = authority.route_action(_action(principal.principal_id, operation="run_due"), principal)
-    # The tick executed, but the routine's subagent fails closed on the mutating tool.
-    assert run.error is not None and run.error.startswith("subagent_tool_not_allowed")
+    # C2: the tick never mutates; it parks the write for parent approval.
+    assert run.error == "subagent_mutation_proposed"
     assert not (ws / "x").exists()
 
 

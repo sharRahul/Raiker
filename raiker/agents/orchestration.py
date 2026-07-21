@@ -24,6 +24,12 @@ DELEGABLE_TOOLS: frozenset[str] = frozenset({
     "vector_get",
 })
 
+# A subagent may only *propose* these mutations. The broker parks them in the
+# parent's approval queue; the subagent neither executes nor resolves them.
+MUTATION_PROPOSAL_TOOLS: frozenset[str] = frozenset({
+    "write_file", "edit_file", "apply_patch", "memory_write", "memory_forget",
+})
+
 # Hard caps independent of any caller-supplied budget. Caller budgets may only
 # shrink these, never grow them.
 MAX_SUBAGENT_DEPTH = 3
@@ -228,6 +234,18 @@ class SubagentRunner:
             max_tool_calls=budget.max_tool_calls,
             max_tokens=budget.max_tokens,
         )
+        parent = self._store.get_principal(principal_id)
+        self._store.insert_principal(
+            subagent_id,
+            "ai_agent",
+            spec.name,
+            delegated_by_user_id=(
+                str(parent["delegated_by_user_id"])
+                if parent and parent.get("delegated_by_user_id") else None
+            ),
+            session_id=session_id or None,
+            max_runtime_mode="development_preview",
+        )
         self._store.insert_subagent_contract(contract)
 
         tools_used: list[str] = []
@@ -262,7 +280,10 @@ class SubagentRunner:
         if len(spec.steps) > eff_steps:
             return finish("failed", False, "subagent_step_budget_exceeded",
                           f"{len(spec.steps)} steps exceeds the budget of {eff_steps}.", 0)
-        disallowed = [step.tool_name for step in spec.steps if step.tool_name not in effective_allowed]
+        disallowed = [
+            step.tool_name for step in spec.steps
+            if step.tool_name not in effective_allowed and step.tool_name not in MUTATION_PROPOSAL_TOOLS
+        ]
         if disallowed:
             return finish("failed", False, f"subagent_tool_not_allowed:{disallowed[0]}",
                           "A subagent step used a tool outside its read-only allowlist.", 0)
@@ -287,11 +308,16 @@ class SubagentRunner:
                 tool_name=step.tool_name,
                 arguments=step.arguments,
                 risk_level="low",
-                requires_approval=False,
-                proposed_by=principal_id,
+                requires_approval=step.tool_name in MUTATION_PROPOSAL_TOOLS,
+                proposed_by=subagent_id,
             )
             result, decision = self._broker.execute(action, session_id=session_id, turn_id=turn_id)
             tools_used.append(step.tool_name)
+            if step.tool_name in MUTATION_PROPOSAL_TOOLS and result.status == "approval_required":
+                return finish(
+                    "cancelled", False, "subagent_mutation_proposed",
+                    "A subagent mutation was parked for the parent to approve.", executed,
+                )
             if decision.decision != "allow":
                 return finish("failed", False,
                               f"subagent_step_blocked:{step.tool_name}:{decision.decision}",

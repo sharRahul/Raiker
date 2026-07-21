@@ -16,19 +16,29 @@ class PlanResult:
 class SimplePlanner:
     def create_or_skip(self, classification: Classification) -> PlanResult:
         if classification.requires_plan:
+            steps: list[dict[str, object]] = [
+                {
+                    "step_id": "step_1",
+                    "description": "Create policy-reviewed action proposal.",
+                    "risk_level": classification.risk_level,
+                }
+            ]
+            if classification.intent == "research_request":
+                steps = [
+                    {
+                        "step_id": "subagent_plan",
+                        "action_type": "subagent_plan",
+                        "description": "Run a bounded read-only research subagent.",
+                        "risk_level": "low",
+                    }
+                ]
             return PlanResult(
                 required=True,
                 event_type="plan_created",
                 payload={
                     "plan_id": new_id("task_"),
                     "summary": "Review policy, request approval where required, and avoid hidden execution.",
-                    "steps": [
-                        {
-                            "step_id": "step_1",
-                            "description": "Create policy-reviewed action proposal.",
-                            "risk_level": classification.risk_level,
-                        }
-                    ],
+                    "steps": steps,
                     "requires_approval": classification.intent
                     in {"local_action_request", "code_change_request"},
                 },

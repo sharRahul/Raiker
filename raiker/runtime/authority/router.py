@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id, utc_now
@@ -1125,6 +1125,28 @@ class RuntimeAuthority:
         # state is deny, and only a live human may resolve it (no decision mode,
         # standing grant, or subagent can). An action's declared risk is also
         # honoured: an explicitly-CRITICAL action floors too.
+        if action.action_type in {"checkpoint_restore", "checkpoint_restore_execution"}:
+            checkpoint_id = str(action.arguments.get("checkpoint_id", ""))
+            if checkpoint_id:
+                try:
+                    from raiker.checkpoints.service import CheckpointService
+
+                    restore_plan = CheckpointService(self.store).compute_restore_plan(
+                        checkpoint_id, restoring_principal_id=principal.principal_id
+                    )
+                    action = replace(
+                        action,
+                        arguments={
+                            **action.arguments,
+                            "touches_other_principal": bool(
+                                restore_plan["touches_other_principal"]
+                            ),
+                        },
+                        risk_level=RiskLevelValue.MEDIUM,
+                    )
+                except (OSError, ValueError):
+                    action = replace(action, risk_level=RiskLevelValue.MEDIUM)
+
         critical_match = classify_critical(
             action.action_type, action.tool_or_service_name, action.arguments
         )

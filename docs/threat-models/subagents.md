@@ -28,7 +28,8 @@ network, and cannot widen the parent's authority.
 
 | Control | Mechanism |
 |---|---|
-| Read-only only | Steps restricted to `DELEGABLE_TOOLS` (read/inspection tools); any other tool fails closed with `subagent_tool_not_allowed`. |
+| Delegated identity and subset (C2) | Each run persists a distinct `ai_agent` principal and records its explicit read-only subset in the contract; the subset is intersected with `DELEGABLE_TOOLS`, so it cannot exceed the parent envelope. |
+| Mutation proposals (C2) | A write/memory mutation from a subagent is parked in the parent-owned approval queue. The subagent never executes, approves, or relays it. |
 | Per-step governance | Every step goes through `ToolBroker`/`PolicyEngine`; a `deny`/`needs_approval` step stops the subagent (`subagent_step_blocked`). |
 | Depth bound | `depth < min(max_depth, MAX_SUBAGENT_DEPTH=3)`; else `subagent_depth_exceeded`. |
 | Step budget | `len(steps) ≤ min(max_steps, MAX_SUBAGENT_STEPS=25)`; else `subagent_step_budget_exceeded`. |

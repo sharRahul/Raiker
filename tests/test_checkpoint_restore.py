@@ -25,7 +25,7 @@ from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
-from raiker.runtime.authority.models import Principal, RiskLevelValue
+from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
 from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
 from raiker.runtime.executors import build_default_executor_registry
 from raiker.storage.sqlite import SQLiteStore
@@ -140,7 +140,7 @@ def test_capture_via_apply_patch(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     store = SQLiteStore(ws)
     store.create_session("sess_a", "ws")
-    (ws / "poem.txt").write_text("roses\n", encoding="utf-8")
+    (ws / "poem.txt").write_bytes(b"roses\n")
     authority = _authority(ws, store)
 
     authority.route_action(
@@ -441,8 +441,9 @@ def test_ai_proposed_restore_needs_approval(tmp_path: Path) -> None:
     )
     result = authority.route_action(action, ai)
 
-    # A restore is a mutation: an AI can only propose it. Nothing is rewound.
-    assert result.decision == "needs_approval"
+    # B4: an AI restoring another principal's captured changes crosses the
+    # critical human-confirmation floor. Nothing is rewound.
+    assert result.decision == "needs_human_confirmation"
     assert (ws / "a.txt").read_text(encoding="utf-8") == "v2"
     assert (ws / "b.txt").exists()
 
@@ -567,3 +568,30 @@ def test_restore_skips_when_pre_image_blob_missing(tmp_path: Path) -> None:
     assert result.ok is True
     assert result.artifacts["skipped"] == 1
     assert (ws / "gone.txt").read_text(encoding="utf-8") == "live"
+
+
+def test_restore_of_another_principals_change_is_critical(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    store = SQLiteStore(ws)
+    store.create_session("sess_a", "ws")
+    authority = _seed_mutations(ws, store)
+    checkpoint_id = _checkpoint_at(store, created_at="2000-01-01T00:00:00Z")
+    other = Principal(
+        principal_id="principal_other",
+        principal_type=PrincipalType.HUMAN,
+        display_name="Other",
+        is_active=True,
+    )
+    action = GovernedAction(
+        action_id=new_id("act_"),
+        principal_id=other.principal_id,
+        action_type="checkpoint_restore",
+        tool_or_service_name="checkpoint_restore",
+        arguments={"checkpoint_id": checkpoint_id},
+        risk_level=RiskLevelValue.LOW,
+        session_id="sess_a",
+    )
+
+    result = authority.route_action(action, other)
+
+    assert result.decision == "needs_human_confirmation"

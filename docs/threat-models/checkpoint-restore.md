@@ -83,6 +83,15 @@ B3 landed: `execute_fork` seeds a new session from a checkpoint's state summary 
 memory candidates with no file mutation (see the **Fork (B3)** section below).
 B4 (planned) adds the different-principal escalation described above.
 
+## B4 zero-trust escalation (live)
+
+Every restore is reclassified as medium risk from its checkpoint manifest before
+decision-mode evaluation. For each changed target, the plan compares the
+persisted capture principal with the restoring principal. Any cross-principal
+overwrite sets the internal `touches_other_principal` signal and reaches the
+existing F6(c) critical human-confirmation floor; caller arguments cannot lower
+this risk.
+
 ## Boundaries enforced (fail-closed)
 
 | Control | Mechanism |

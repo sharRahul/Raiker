@@ -36,6 +36,20 @@ APPROVAL_PENDING_KIND = "approval_pending"
 # surface it distinctly — critical approvals resolve *only* by a live human's
 # manual decision, so the owner should never miss one.
 CRITICAL_APPROVAL_PENDING_KIND = "critical_approval_pending"
+INTEGRITY_DEVIATION_KIND = "integrity_deviation"
+
+
+def notify_integrity_deviation(store: SQLiteStore, principal_id: str, count: int) -> str:
+    title = "Security verification needs attention"
+    body = f"Raiker found {count} integrity or security-posture deviation(s). Review Security Settings."
+    notification_id = store.insert_notification(
+        principal_id=principal_id,
+        kind=INTEGRITY_DEVIATION_KIND,
+        title=title,
+        body=body,
+    )
+    fire_os_notification(title, body)
+    return notification_id
 
 
 def resolve_owner_principal_id(

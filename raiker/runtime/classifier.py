@@ -36,6 +36,15 @@ class SimpleClassifier:
                 risk_level="medium",
                 notes="User asked to list files.",
             )
+        if any(term in text for term in ("research", "investigate", "decompose")):
+            return Classification(
+                intent="research_request",
+                confidence=0.75,
+                requires_tools=True,
+                requires_plan=True,
+                risk_level="low",
+                notes="Decomposable read-only research can use a bounded subagent.",
+            )
         if (
             text.startswith("read file")
             or text.startswith("read ")

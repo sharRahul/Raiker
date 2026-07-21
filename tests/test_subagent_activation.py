@@ -9,6 +9,7 @@ subagent's contract so the bounded run stays auditable after the fact.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from raiker.agents.orchestration import (
@@ -152,3 +153,27 @@ def test_token_budget_fails_closed(tmp_path: Path) -> None:
     outcome = SubagentRunner(ws, store).run(spec, principal_id="principal_owner")
     assert not outcome.ok
     assert outcome.reason_code == "subagent_token_budget_exceeded"
+
+
+def test_subagent_has_its_own_principal_and_parks_mutation_for_parent(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    store = SQLiteStore(ws)
+    spec = parse_subagent_spec(
+        {
+            "parent_task_id": "t",
+            "steps": [{"tool_name": "write_file", "arguments": {"path": "x.txt", "text": "nope"}}],
+        }
+    )
+
+    outcome = SubagentRunner(ws, store).run(spec, principal_id="principal_owner")
+
+    assert outcome.reason_code == "subagent_mutation_proposed"
+    contract = store.list_subagent_contracts()[0]
+    subagent = store.get_principal(outcome.ref_id)
+    assert subagent is not None and subagent["principal_type"] == "ai_agent"
+    assert json.loads(contract["allowed_tools_json"]) == sorted(
+        ["diff_files", "git_diff", "git_log", "git_status", "glob", "grep", "list_directory",
+         "memory_get", "memory_list", "memory_search", "read_file", "stat_path", "vector_get"]
+    )
+    assert store.list_approvals(status="pending")
+    assert not (ws / "x.txt").exists()

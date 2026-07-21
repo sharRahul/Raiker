@@ -115,10 +115,10 @@ def test_subagent_rejects_mutating_tool(tmp_path: Path) -> None:
         steps=[{"tool_name": "write_file", "arguments": {"path": "x.txt", "text": "nope"}}],
     )
     result = authority.route_action(action, principal)
-    # Reached the executor (allowed by gate/policy for the human owner) but the
-    # subagent itself fails closed on a non-delegable tool.
+    # C2: the subagent never mutates; its write is parked for the parent to
+    # approve through the existing queue.
     assert result.decision == "allow"
-    assert result.error is not None and result.error.startswith("subagent_tool_not_allowed")
+    assert result.error == "subagent_mutation_proposed"
     assert not (ws / "x.txt").exists()
 
 

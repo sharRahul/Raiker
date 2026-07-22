@@ -4,6 +4,7 @@
   import Topbar from "./lib/components/Topbar.svelte";
   import ResponsivePage from "./lib/components/ResponsivePage.svelte";
   import { DEFAULT_ROUTE, navItem, routeFromHash } from "./lib/nav";
+  import { routeStateFromHash } from "./lib/routeState";
   import { api } from "./lib/api";
   import { applyUiPrefs, startupRoute } from "./lib/prefs.svelte";
   import type { ProjectsList } from "./lib/apiTypes";
@@ -39,7 +40,9 @@
   let principal = $state("—");
   let projects = $state<ProjectsList | null>(null);
   const activeProjectId = $derived(projects?.active_project_id ?? null);
-  const continuedSessionId = $derived(typeof window === "undefined" ? null : new URLSearchParams(window.location.hash.split("?")[1]).get("session"));
+  const continuedSessionId = $derived(
+    typeof window === "undefined" ? null : routeStateFromHash(window.location.hash).sessionId,
+  );
 
   onMount(() => {
     const handler = () => {

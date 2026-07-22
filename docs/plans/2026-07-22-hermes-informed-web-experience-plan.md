@@ -217,6 +217,7 @@ plan.
 
 | Phase | Audited state | Evidence and remaining work |
 |---|---|---|
+| 0 | complete | Route/API/mutation inventory, non-secret route-state and UI-event contracts, Phase 1 journey baseline, missing read-model inventory, and threat-model review are recorded in `docs/guide/webapp/PHASE_1_PREREQUISITES.md`. Browser-measured usability evidence remains a Phase 1 quality-gate requirement. |
 | 0 | partial | Typed API-backed route views and component tests exist. The five measured representative journeys, UI-event schema, and documented missing-read-model inventory have not been recorded. |
 | 1 | partial | The shell has grouped navigation, responsive drawer/bottom navigation, tokenized styles, route focus handling, notification access, and a persistent stop control. Visual-regression, keyboard-route, and supported-viewport evidence are absent. |
 | 2 | partial | Workbench summaries, chat/session links, task cadence choices, session bulk actions, and approval previews exist. Persistent mounted chat, session detail side panel/cross-links, approval triage sorting/expiry/step-up flow, and browser E2E coverage are not complete. |

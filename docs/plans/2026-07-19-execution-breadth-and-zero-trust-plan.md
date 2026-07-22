@@ -180,7 +180,7 @@ silent-on-green scheduled integrity sweep. Evidence is in
 |---|---|---|
 | M1 ✅ | A1–A2, F1, F3 (grant model), F6 (critical classification), D2 (notifications) | An approved non-file action executes end-to-end; grants visible/revocable; every F6 criterion provably routes to the critical floor; full suite + validators green — **complete 2026-07-20** |
 | M2 ✅ | A3–A4, B1–B2, F7 (critical lifecycle) | Tier-2 approve-and-run behind threat-ack; restore with pre-image undo proven by tests; critical actions notify + resolve only by manual human decision, defaulting to deny — **complete 2026-07-20** |
-| M3 | C1–C3, B3–B4, F2 | Read-only subagents runnable under budget; background sweep shipping |
+| M3 ✅ | C1–C3, B3–B4, F2 | Read-only subagents runnable under budget; background sweep shipping **complete 2026-07-21**|
 | M4 | E1–E3, D1 | First real external email send + calendar push through draft→approve→send; rich TUI launchable |
 | M5 | D3, E4, C4, F4 | Desktop shell with keychain vault; step-up flows; teams enabled |
 | M6 | D4, F5, docs/ledger reconciliation | IDE surface; `docs/IMPLEMENTATION_STATUS.md`, `docs/GAP_AND_TODO_ANALYSIS.md`, `README.md` updated to the new truthful state |

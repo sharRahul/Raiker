@@ -2,38 +2,34 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_ROUTE, NAV_GROUPS, NAV_ITEMS, navItem, routeFromHash } from "./nav";
 
 describe("nav model", () => {
-  it("defaults to New Chat and resolves known hashes", () => {
-    expect(DEFAULT_ROUTE).toBe("new-chat");
-    expect(routeFromHash("")).toBe("new-chat");
+  it("defaults to the Workbench and resolves known hashes", () => {
+    expect(DEFAULT_ROUTE).toBe("home");
+    expect(routeFromHash("")).toBe("home");
     expect(routeFromHash("#/capabilities")).toBe("capabilities");
     expect(routeFromHash("#settings")).toBe("settings");
     expect(routeFromHash("#/search-chat")).toBe("search-chat");
-    expect(routeFromHash("#/nonsense")).toBe("new-chat");
+    expect(routeFromHash("#/nonsense")).toBe("home");
   });
 
-  it("renames the top two groups (Epic 4)", () => {
-    expect(NAV_GROUPS.map((g) => g.label)).toEqual(["The Hustle", "Steering", "System"]);
+  it("uses the five stable workbench destinations plus utilities", () => {
+    expect(NAV_GROUPS.map((g) => g.label)).toEqual(["Home", "Work", "Knowledge", "Control", "Observe", "Utilities"]);
   });
 
-  it("orders The Hustle with Approvals below Tasks and the chat split up top", () => {
-    expect(NAV_GROUPS[0].items.map((i) => i.id)).toEqual([
+  it("keeps work objects together", () => {
+    expect(NAV_GROUPS[1].items.map((i) => i.id)).toEqual([
       "new-chat",
       "search-chat",
-      "memory",
       "tasks",
-      "brain",
-      "work",
-      "approvals",
       "projects",
+      "sessions",
     ]);
   });
 
-  it("moves Sessions and Audit log under System", () => {
-    expect(NAV_GROUPS[2].items.map((i) => i.id)).toEqual([
-      "sessions",
+  it("keeps audit and live work under Observe", () => {
+    expect(NAV_GROUPS[4].items.map((i) => i.id)).toEqual([
       "activity",
       "diagnostics",
-      "settings",
+      "work",
     ]);
   });
 

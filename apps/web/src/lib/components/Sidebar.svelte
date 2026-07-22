@@ -17,7 +17,7 @@
   let moveOpen = $state(false);
   let busy = $state(false);
   let actionError = $state<string | null>(null);
-  const phoneNavItems = ["new-chat", "sessions", "tasks", "projects"].map(navItem);
+  const phoneNavItems = ["home", "new-chat", "approvals", "connections"].map(navItem);
   let navigationOpen = $state(false);
   let returnFocusTo: HTMLButtonElement | null = null;
 
@@ -139,7 +139,7 @@
 
 <nav id="all-navigation" class="sidebar" class:open={navigationOpen} aria-label="All navigation">
   <button type="button" class="drawer-close btn btn-ghost" onclick={() => closeNavigation()}>Close</button>
-  <a class="brand" href="#/chat">
+  <a class="brand" href="#/home">
     <Logo size={30} />
     <span class="brand-text">
       <span class="brand-name">Raiker</span>
@@ -168,7 +168,7 @@
           </li>
         {/each}
       </ul>
-      {#if group.label === "The Hustle" && recent.length > 0}
+      {#if group.label === "Work" && recent.length > 0}
         <div class="recent" aria-label="Recent chats">
           <p class="recent-label">Recent chats</p>
           {#each recent as chat (chat.session_id)}

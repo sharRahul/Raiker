@@ -25,6 +25,7 @@
   import ActivityView from "./lib/views/ActivityView.svelte";
   import DiagnosticsView from "./lib/views/DiagnosticsView.svelte";
   import SettingsView from "./lib/views/SettingsView.svelte";
+  import WorkbenchView from "./lib/views/WorkbenchView.svelte";
 
   let current = $state(
     typeof window === "undefined" ? DEFAULT_ROUTE : routeFromHash(window.location.hash),
@@ -126,7 +127,9 @@
       <!-- The topbar already shows the route title + hint; the page itself
            opens with its own lead so nothing is said twice. -->
       <ResponsivePage>
-        {#if current === "new-chat"}
+        {#if current === "home"}
+          <WorkbenchView />
+        {:else if current === "new-chat"}
           <ChatView sessionId={continuedSessionId} />
         {:else if current === "search-chat"}
           <SearchChatView />

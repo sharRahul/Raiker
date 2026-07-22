@@ -1,6 +1,7 @@
 # Hermes-Informed Web Experience Improvement Plan
 
-> **Status:** proposed; no product behavior is changed by this document.
+> **Status:** implemented (2026-07-22). This plan records the delivered local-web
+> experience and its boundaries; it does not claim deferred runtime capabilities.
 > **Reviewed source:** `NousResearch/hermes-agent` `main` at
 > `9acc4b47f5b2abda0949d07372ecf67938d50a16` (reviewed 2026-07-22), specifically
 > its `web/` application.  This is a capability and interaction review, not a
@@ -205,6 +206,27 @@ confirms it.
    Control default to scannable cards/lists. Avoid dashboard-card inflation.
 
 ## Delivery sequence
+
+### Delivery evidence — 2026-07-22
+
+All five delivery phases are complete for the implemented local, loopback web
+surface. Phase 0 reconciled the route/API inventory against the existing typed
+dashboard contracts and retained deferred capabilities as deferred. Phase 1
+delivered the stable Home/Work/Knowledge/Control/Observe navigation, responsive
+bottom navigation, tokenized shell, focus-to-main route handling, and persistent
+notification/stop controls. Phase 2 is represented by the Workbench, governed
+chat/session links, task cadence composer, approval queue, and server-confirmed
+task/approval actions. Phase 3 is represented by project/memory/brain/checkpoint
+views plus model, capability, connector, and MCP controls; Extensions remains a
+truthful label over the separate implemented connector and MCP contracts. Phase 4
+is represented by the audit, diagnostics, active-work, and notification surfaces,
+with evidence links retained on their source records.
+
+Deferred entries (channels, arbitrary plugin panels, raw secret editing, backup
+restore, and uncontracted automation delivery) remain absent rather than being
+presented as available. The companion status and coverage ledgers are current for
+the existing local web runtime; no documentation is known to be behind this UI
+change.
 
 ### Phase 0 — Evidence, usability baseline, and contracts
 

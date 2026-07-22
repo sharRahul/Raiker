@@ -4,6 +4,7 @@
   import Topbar from "./lib/components/Topbar.svelte";
   import ResponsivePage from "./lib/components/ResponsivePage.svelte";
   import { DEFAULT_ROUTE, navItem, routeFromHash } from "./lib/nav";
+  import { routeStateFromHash } from "./lib/routeState";
   import { api } from "./lib/api";
   import { applyUiPrefs, startupRoute } from "./lib/prefs.svelte";
   import type { ProjectsList } from "./lib/apiTypes";
@@ -25,6 +26,7 @@
   import ActivityView from "./lib/views/ActivityView.svelte";
   import DiagnosticsView from "./lib/views/DiagnosticsView.svelte";
   import SettingsView from "./lib/views/SettingsView.svelte";
+  import WorkbenchView from "./lib/views/WorkbenchView.svelte";
 
   let current = $state(
     typeof window === "undefined" ? DEFAULT_ROUTE : routeFromHash(window.location.hash),
@@ -38,7 +40,9 @@
   let principal = $state("—");
   let projects = $state<ProjectsList | null>(null);
   const activeProjectId = $derived(projects?.active_project_id ?? null);
-  const continuedSessionId = $derived(typeof window === "undefined" ? null : new URLSearchParams(window.location.hash.split("?")[1]).get("session"));
+  const continuedSessionId = $derived(
+    typeof window === "undefined" ? null : routeStateFromHash(window.location.hash).sessionId,
+  );
 
   onMount(() => {
     const handler = () => {
@@ -126,7 +130,9 @@
       <!-- The topbar already shows the route title + hint; the page itself
            opens with its own lead so nothing is said twice. -->
       <ResponsivePage>
-        {#if current === "new-chat"}
+        {#if current === "home"}
+          <WorkbenchView />
+        {:else if current === "new-chat"}
           <ChatView sessionId={continuedSessionId} />
         {:else if current === "search-chat"}
           <SearchChatView />

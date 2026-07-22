@@ -5,6 +5,18 @@
 
 # Implementation Status
 
+> Current truth update (2026-07-22): **Hermes-informed local web experience is
+> partially implemented; phases 0–4 are not complete.** The Svelte shell has the
+> Home/Work/Knowledge/Control/Observe information architecture and a Workbench
+> home that reads server-backed session, task, and pending-approval summaries.
+> It links only to existing governed routes; it neither adds client authority nor
+> represents deferred channels, plugins, backups, or secret controls as shipped.
+> The mobile bar preserves Home, Chat, Approvals, Extensions, and More while the
+> server-backed master stop remains persistent. See
+> `docs/plans/2026-07-22-hermes-informed-web-experience-plan.md`. The plan now
+> records the missing E2E/visual evidence and incomplete persistent-chat,
+> session-detail, checkpoint-preflight, Extensions-hub, and observability-hub work.
+
 > Current truth update (2026-07-21): **Milestone 3 complete** — C2 persists a
 > distinct bounded subagent AI principal and parks any mutation in the parent
 > approval queue; C3 emits low-risk read-only `subagent_plan` steps; B4 derives

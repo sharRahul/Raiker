@@ -74,7 +74,7 @@ Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled ·
 
 ---
 
-## Hermes-Agent / Agent Framework Coverage
+## Agent Framework Coverage
 
 | Concept | Raiker specification |
 |---|---|

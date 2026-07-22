@@ -1,12 +1,11 @@
-# Hermes-Informed Web Experience Improvement Plan
+# Raiker Web Experience Improvement Plan
 
 > **Status:** partially implemented (audited 2026-07-22). The existing local-web
 > experience delivers portions of this plan; the phase checklist below remains
 > the source of truth for work that is not yet delivered.
-> **Reviewed source:** `NousResearch/hermes-agent` `main` at
-> `9acc4b47f5b2abda0949d07372ecf67938d50a16` (reviewed 2026-07-22), specifically
-> its `web/` application.  This is a capability and interaction review, not a
-> proposal to copy Hermes's React, Tailwind, external UI dependency, or trust model.
+> **Reference review:** an external agent project's web application was reviewed
+> on 2026-07-22. This is a capability and interaction review, not a proposal to
+> copy its React, Tailwind, external UI dependency, or trust model.
 > Raiker remains a local-first Svelte client over a governed, loopback API.
 
 ## Goal
@@ -21,7 +20,7 @@ The current Control Deck plan establishes the security and visual foundations. T
 plan fills in the product-quality work it does not enumerate: progressive
 disclosure, information architecture, operation feedback, durable workspace
 navigation, polished empty/loading/error states, and a complete capability map
-informed by Hermes.
+informed by Raiker's product and governance requirements.
 
 ## Non-negotiable constraints
 
@@ -41,9 +40,9 @@ informed by Hermes.
    `aria-live` status changes, reduced motion, 44px touch targets, WCAG 2.2 AA
    contrast, and useful zero-data/error states are release requirements.
 
-## Findings from the Hermes review
+## Findings from the reference review
 
-Hermes has a broad, mature dashboard surface: sessions/chat, files, analytics,
+The reviewed reference has a broad, mature dashboard surface: sessions/chat, files, analytics,
 models, logs, cron, skills, plugins, MCP, pairing, channels, webhooks, profiles,
 configuration, credentials, docs, and system operations. It also has useful
 interaction patterns worth adapting: persistent chat, scoped profiles, a sidebar
@@ -60,14 +59,14 @@ should make those strengths legible rather than imitate a generic dashboard.
 
 ### Capability disposition
 
-| Hermes web capability | Raiker status / destination | Plan decision |
+| Reference web capability | Raiker status / destination | Plan decision |
 |---|---|---|
 | Chat, session list/search, markdown, model picker | Present across Chat, Sessions, Search Chat, and Models | Unify into the workbench's primary flow; retain sessions while navigating. |
 | Files | Project tree and workspace metadata are present; file mutation is governed | Add a project-context file explorer and diff handoff, never a privileged raw editor. |
 | Analytics and logs | Activity, Diagnostics, Brain, and Work in Action exist | Create one observability hub with progressive drill-down rather than more top-level pages. |
 | Cron / automation blueprints | Tasks support once, daily, and background work; scheduled routines exist | Improve task composer into an automation builder; preserve approval/gate context. |
 | Models and auxiliary roles | Models and provider posture exist | Add clear role/fallback summaries and an egress-aware model selector. |
-| Profiles | Projects are the current bounded work scope | Do not copy mutable Hermes profiles. Strengthen project switcher, project overview, and per-project context instead. |
+| Profiles | Projects are the current bounded work scope | Do not copy mutable external profiles. Strengthen project switcher, project overview, and per-project context instead. |
 | Skills, plugins, toolsets | Capability gates, Connections, MCP, and plugin contracts exist | Ship an **Extensions** hub only for implemented/authorized capabilities; distinguish installed, connected, enabled-for-session, and usable. |
 | MCP catalog/server CRUD/OAuth | MCP and Connections views exist | Consolidate into Extensions; preserve monitored transport, vault references, approval, and health/circuit-breaker facts. |
 | Channels, pairing, webhooks | Channel/connector work is planned or deferred | Reserve an Integrations area; do not surface controls before contracts, threat models, and runtime execution exist. |
@@ -124,7 +123,7 @@ expandable. Do not use simulated progress or decorative agent activity.
 ### 2. Conversation and sessions
 
 Keep the active chat mounted while the user visits another route, matching the
-useful Hermes persistent-chat behavior without leaking subscriptions. Add a
+useful persistent-chat behavior without leaking subscriptions. Add a
 workspace session rail with search, filters (project, status, date), pin/archive,
 rename, import/export where the backend supports it, and bulk operations only with
 clear scope/confirmation. A session detail side panel should link its turns,
@@ -233,7 +232,7 @@ in the same commit as the implementation and its verification evidence.
 
 The detailed route, API/mutation, state, capability-label, query-state, UI-event,
 missing-read-model, and representative-journey audit is recorded in
-[`docs/guide/webapp/HERMES_PHASE_0_EVIDENCE.md`](../guide/webapp/HERMES_PHASE_0_EVIDENCE.md).
+[`docs/guide/webapp/RAIKER_PHASE_0_EVIDENCE.md`](../guide/webapp/RAIKER_PHASE_0_EVIDENCE.md).
 The source inventory and contracts are complete. The five required local-browser
 journey recordings remain blocked by the browser-download restriction and must be
 completed before Phase 1 can be claimed complete.
@@ -322,10 +321,10 @@ needs updating; do not market the capability as complete.
 ## Explicit non-goals
 
 - No framework migration, remote SaaS dashboard, telemetry, CDN assets, or visual
-  clone of Hermes.
+  clone of another product.
 - No raw shell/terminal, unrestricted file editor, raw environment-secret editor,
   client-side plugin code execution, or direct system-operation controls.
 - No generic “AI is working” animation as evidence of execution, no fake progress,
   and no auto-approval/bulk approval path.
-- No implementation of deferred Hermes-style features until Raiker has the required
+- No implementation of deferred self-improving features until Raiker has the required
   runtime capability, API contract, tests, documentation, and threat model.

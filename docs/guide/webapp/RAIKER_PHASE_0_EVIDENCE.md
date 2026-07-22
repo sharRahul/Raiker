@@ -1,4 +1,4 @@
-# Hermes-informed web experience — Phase 0 evidence
+# Raiker web experience — Phase 0 evidence
 
 > **Audit date:** 2026-07-22  
 > **Status:** Phase 0 implementation evidence complete; the required live-browser

@@ -135,7 +135,7 @@ Subagent side answers are read-only unless parent escalates.
 
 ---
 
-## Hermes-Style Delegation And Learning
+## Delegation And Learning
 
 Raiker must support parallel workstreams and learning loops:
 

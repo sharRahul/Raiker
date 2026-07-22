@@ -170,7 +170,7 @@ All actions available through one enabled primary interface must have an equival
 - Gist summaries.
 - Memory correction/deletion.
 - Memory usage attribution in context bundles.
-- Hermes-style skill candidate proposals after verified successful tasks.
+- self-improving skill candidate proposals after verified successful tasks.
 
 ### Model Runtime
 

@@ -7,7 +7,7 @@ proposed, reviewed, stored, and verified, and the safety boundaries that keep se
 from becoming self-granted agency.
 
 Reference inspiration: `obra/Superpowers` (composable, reusable skills that an agent accrues and
-invokes), Hermes-Agent (closed learning loop / user modelling), and Claude Code skills
+invokes), an external agent framework (closed learning loop / user modelling), and Claude Code skills
 (`SKILL.md` units that load on demand). Raiker's source of truth remains this repository.
 
 ---

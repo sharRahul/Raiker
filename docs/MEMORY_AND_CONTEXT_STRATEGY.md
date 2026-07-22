@@ -260,7 +260,7 @@ Skill records must include trigger conditions, steps, tools, permissions, failur
 
 ## Self-Improving Skill Loop
 
-Raiker must support a Hermes-style closed learning loop:
+Raiker must support a self-improving closed learning loop:
 
 ```text
 complex task completed

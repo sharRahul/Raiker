@@ -6,14 +6,14 @@
 # Raiker Full Platform Feature Coverage Matrix
 
 > Web experience update (2026-07-22): the launchable local dashboard partially
-> implements the Hermes-informed experience and now uses
-> the Hermes-informed Workbench navigation (Home, Work, Knowledge, Control, and
+> implements the Raiker web experience and now uses
+> the Raiker Workbench navigation (Home, Work, Knowledge, Control, and
 > Observe) and server-backed home summaries. This is an information-architecture
 > and presentation delivery only: it does not change capability authority or
 > promote deferred channels, plugin panels, backup/restore, or secret editing to
 > implemented status. The phase plan is **not complete**: browser E2E/visual
 > evidence and several specified interaction surfaces remain outstanding. See
-> `docs/plans/2026-07-22-hermes-informed-web-experience-plan.md`.
+> `docs/plans/2026-07-22-raiker-web-experience-plan.md`.
 
 > Current truth (2026-06-21): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
 
@@ -122,7 +122,7 @@ Current backend implementation labels used across the hardening pass:
 | Model router | fully-specified | phase-1-to-2-build | see status ledger for current implementation | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `docs/MODEL_PROVIDER_CONTRACT.md` |
 | Scheduled automations | fully-specified | phase-3-build | specified/deferred; no scheduler runtime | `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`, `docs/UI_UX_DESIGN_SPEC.md` |
 | OpenClaw-style gateway and channels | fully-specified | phase-3-to-4-build | metadata/readiness-only; channel transports deferred | `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`, `docs/CHANNELS_SPEC.md` |
-| Hermes-style learning loop | fully-specified | phase-2-to-4-build | see status ledger for current implementation | `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
+| self-improving learning loop | fully-specified | phase-2-to-4-build | see status ledger for current implementation | `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
 | Subagents | fully-specified | phase-4-build | see status ledger for current implementation | `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
 | Multi-agent teams | fully-specified | phase-4-to-5-build | see status ledger for current implementation | `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
 | Remote execution | fully-specified | phase-4-to-5-build | see status ledger for current implementation | `docs/EXECUTION_ENVIRONMENTS_SPEC.md` |

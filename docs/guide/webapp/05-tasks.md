@@ -20,7 +20,9 @@ Pick the kind with the chips at the top-right of the **Plan work** card:
 
 1. Choose a kind (e.g. **Task**).
 2. Fill **Title** ("What should Raiker work on?").
-3. Optionally add **Instructions** (the outcome, context, or constraints).
+3. Fill **Instructions** with the outcome, context, or constraints. This is
+   required; Raiker marks it and keeps the create control unavailable until the
+   value contains text.
 4. Optionally choose **Parent work** to nest it as a subtask/subroutine under an
    existing task, and set a **Priority** (Low / Normal / High).
 5. For **Schedule once** / **Daily routine**, set the **Start time**
@@ -51,9 +53,8 @@ a workspace with **no connected model** will finish in a failed/`model_unavailab
 state — connect a model first (see [page 6](06-models-and-providers.md)) for tasks
 that actually produce output.
 
-> ℹ️ On a fresh workspace the queue's **open / scheduled / finished** numbers can
-> look surprising because immediate tasks that run without a model land in
-> *finished*, and chat turns are visible as parent-work options. See
-> [FIX-06](../TO_BE_FIXED.md#fix-06--task-queue-counts-are-confusing-on-a-fresh-workspace).
+> ℹ️ On a fresh workspace an immediate task can move to **failed** when no
+> reachable model is configured. That is an honest execution result, not a
+> failed task-creation request.
 
 Next: [Models & providers →](06-models-and-providers.md)

@@ -21,6 +21,21 @@ describe("TasksView", () => {
     expect(alert).toHaveTextContent(/unavailable \(404\)/i);
   });
 
+  it("does not create a task when instructions contain only whitespace", async () => {
+    const fetchMock = stubFetch({ "GET /api/tasks": [] });
+    render(TasksView);
+
+    await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
+    await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Plan release" } });
+    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "   " } });
+    const submit = screen.getByRole("button", { name: "Create task" });
+
+    expect(submit).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/instructions are required/i);
+    await fireEvent.click(submit);
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
+
   it("creates a daily routine with its saved schedule", async () => {
     const fetchMock = stubFetch({
       "GET /api/tasks": [],

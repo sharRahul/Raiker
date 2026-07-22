@@ -28,7 +28,8 @@ describe("App shell", () => {
     const nav = screen.getByRole("navigation", { name: /all navigation/i });
     expect(nav).toBeInTheDocument();
     for (const label of [
-      "New Chat",
+      "Workbench",
+      "Chat",
       "Search Chat",
       "Approvals",
       "Tasks",
@@ -40,7 +41,7 @@ describe("App shell", () => {
       "Diagnostics",
       "Settings",
     ]) {
-      expect(within(nav).getByRole("link", { name: new RegExp(label, "i") })).toBeInTheDocument();
+      expect(within(nav).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();
     }
     // The acting principal and mode are surfaced, honestly, from the API — the runtime
     // mode identifier is shown as a plain-English name, not the raw code.

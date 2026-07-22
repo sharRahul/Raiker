@@ -1,6 +1,8 @@
 # Hermes-Informed Web Experience Improvement Plan
 
-> **Status:** proposed; no product behavior is changed by this document.
+> **Status:** partially implemented (audited 2026-07-22). The existing local-web
+> experience delivers portions of this plan; the phase checklist below remains
+> the source of truth for work that is not yet delivered.
 > **Reviewed source:** `NousResearch/hermes-agent` `main` at
 > `9acc4b47f5b2abda0949d07372ecf67938d50a16` (reviewed 2026-07-22), specifically
 > its `web/` application.  This is a capability and interaction review, not a
@@ -205,6 +207,36 @@ confirms it.
    Control default to scannable cards/lists. Avoid dashboard-card inflation.
 
 ## Delivery sequence
+
+### Audit evidence — 2026-07-22
+
+The previous completion claim was incorrect and has been withdrawn. The current
+implementation is **partial**, with an audited route/API inventory and 198
+component tests, but without the end-to-end and visual evidence required by this
+plan.
+
+| Phase | Audited state | Evidence and remaining work |
+|---|---|---|
+| 0 | partial | Typed API-backed route views and component tests exist. The five measured representative journeys, UI-event schema, and documented missing-read-model inventory have not been recorded. |
+| 1 | partial | The shell has grouped navigation, responsive drawer/bottom navigation, tokenized styles, route focus handling, notification access, and a persistent stop control. Visual-regression, keyboard-route, and supported-viewport evidence are absent. |
+| 2 | partial | Workbench summaries, chat/session links, task cadence choices, session bulk actions, and approval previews exist. Persistent mounted chat, session detail side panel/cross-links, approval triage sorting/expiry/step-up flow, and browser E2E coverage are not complete. |
+| 3 | partial | Existing project, memory, brain, checkpoint, model/fallback, capability, connector, and MCP views cover parts of the scope. A project context home/file inspect pane, checkpoint preflight funnel, and one tabbed Extensions hub are not complete. |
+| 4 | partial | Activity, diagnostics, Work in Action, and notifications are separate implemented views. A consolidated observability hub, redacted diagnostic export contract, and offline/reconnect/denial/session-restoration browser E2E evidence are not complete. |
+
+Deferred entries (channels, arbitrary plugin panels, raw secret editing, backup
+restore, and uncontracted automation delivery) remain absent rather than being
+presented as available. Documentation was behind the actual implementation claim;
+this audit corrects it. Future changes must update the status and coverage ledgers
+in the same commit as the implementation and its verification evidence.
+
+### Phase 0 evidence update — 2026-07-22
+
+The detailed route, API/mutation, state, capability-label, query-state, UI-event,
+missing-read-model, and representative-journey audit is recorded in
+[`docs/guide/webapp/HERMES_PHASE_0_EVIDENCE.md`](../guide/webapp/HERMES_PHASE_0_EVIDENCE.md).
+The source inventory and contracts are complete. The five required local-browser
+journey recordings remain blocked by the browser-download restriction and must be
+completed before Phase 1 can be claimed complete.
 
 ### Phase 0 — Evidence, usability baseline, and contracts
 

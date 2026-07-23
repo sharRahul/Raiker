@@ -50,6 +50,63 @@ describe("App shell", () => {
     expect(screen.queryByText("Local single user runtime")).not.toBeInTheDocument();
   });
 
+  it("keeps an unsent chat draft while visiting another route", async () => {
+    stubFetch(BOOTSTRAP_ROUTES);
+    render(App);
+    await signIn();
+
+    const nav = await screen.findByRole("navigation", { name: /all navigation/i });
+    await fireEvent.click(within(nav).getByRole("link", { name: "Chat" }));
+    const prompt = await screen.findByLabelText("Prompt");
+    await fireEvent.input(prompt, { target: { value: "Keep this draft" } });
+
+    await fireEvent.click(within(nav).getByRole("link", { name: "Settings" }));
+    await screen.findByText(/appearance/i);
+
+    await fireEvent.click(within(nav).getByRole("link", { name: "Chat" }));
+    expect(await screen.findByLabelText("Prompt")).toHaveValue("Keep this draft");
+  });
+
+  it("loads a saved session after Chat has been retained off-route", async () => {
+    stubFetch({
+      ...BOOTSTRAP_ROUTES,
+      "GET /api/sessions/sess_hist": {
+        session: {
+          session_id: "sess_hist",
+          title: "Prior chat",
+          status: "open",
+          created_at: "2026-07-10T00:00:00Z",
+          updated_at: "2026-07-10T00:01:00Z",
+          turn_count: 1,
+        },
+        turns: [
+          {
+            turn_id: "turn_1",
+            session_id: "sess_hist",
+            turn_type: "prompt",
+            status: "completed",
+            prompt_text: "saved session prompt",
+            created_at: "2026-07-10T00:00:00Z",
+            completed_at: "2026-07-10T00:00:10Z",
+            summary: "saved session answer",
+          },
+        ],
+      },
+    });
+    render(App);
+    await signIn();
+
+    const nav = await screen.findByRole("navigation", { name: /all navigation/i });
+    await fireEvent.click(within(nav).getByRole("link", { name: "Chat" }));
+    await screen.findByLabelText("Prompt");
+    await fireEvent.click(within(nav).getByRole("link", { name: "Settings" }));
+    await screen.findByText(/appearance/i);
+
+    window.location.hash = "#/new-chat?session=sess_hist";
+    expect(await screen.findByText("saved session prompt")).toBeInTheDocument();
+    expect(screen.getByText("saved session answer")).toBeInTheDocument();
+  });
+
   it.skip("refreshes the topbar model chip after a selection on the Models view", async () => {
     const profileBase = {
       default_state: "disabled",

@@ -41,7 +41,11 @@
   let streaming = $state(false);
   // Reuse one session across turns so the governed conversation stays continuous.
   let sessionId = $state<string | null>(null);
-  $effect(() => { sessionId = continuedSessionId; });
+  $effect(() => {
+    if (continuedSessionId === null) return;
+    sessionId = continuedSessionId;
+    void loadHistory(continuedSessionId);
+  });
   let nextId = 1;
 
   // Optional per-prompt options. Left unset they change nothing — the backend
@@ -258,7 +262,6 @@
   onMount(() => {
     void loadProfiles();
     void api.settings().then((view) => { userName = view.status.username || "there"; }).catch(() => {});
-    if (continuedSessionId !== null) void loadHistory(continuedSessionId);
   });
 
   // Hydrate the persisted transcript for a continued session so a search result

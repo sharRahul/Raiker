@@ -401,7 +401,7 @@ describe("ChatView streaming transcript", () => {
     expect(statuses.some((el) => /loading conversation/i.test(el.textContent ?? ""))).toBe(true);
   });
 
-  it("hydrates persisted turns when opened with a session id and continues that session", async () => {
+  it("hydrates persisted turns and keeps their session when the route id clears", async () => {
     stubFetch({
       ...MODELS_ROUTE,
       "GET /api/sessions/sess_hist": {
@@ -449,7 +449,7 @@ describe("ChatView streaming transcript", () => {
       },
     );
 
-    render(ChatView, { props: { sessionId: "sess_hist" } });
+    const { rerender } = render(ChatView, { props: { sessionId: "sess_hist" } });
 
     // Both the prior prompt and the restored agent answer must render — the
     // transcript is hydrated, not a blank composer.
@@ -457,6 +457,8 @@ describe("ChatView streaming transcript", () => {
     expect(screen.getByText("It is 4.")).toBeInTheDocument();
     expect(screen.getByText("thanks")).toBeInTheDocument();
     expect(screen.getByText("You're welcome.")).toBeInTheDocument();
+
+    await rerender({ sessionId: null });
 
     // Continuing the conversation must reuse the same session id — a new
     // session must not be created merely to view history.

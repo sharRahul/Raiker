@@ -10,6 +10,9 @@
 - a **microphone** button, and
 - **Send**.
 
+Once you have opened Chat, you can visit another page and return without losing
+an unsent draft.
+
 ## Step 1 — Send a prompt
 
 Type a message and press **Send**. Your message appears as a bubble on the right,

@@ -31,7 +31,12 @@
   let current = $state(
     typeof window === "undefined" ? DEFAULT_ROUTE : routeFromHash(window.location.hash),
   );
+  let chatVisited = $state(false);
   const activeItem = $derived(navItem(current));
+
+  $effect(() => {
+    if (current === "new-chat") chatVisited = true;
+  });
 
   // Honest auth/bootstrap state machine. The workspace shell mounts only in
   // "ready": authentication alone is not enough — the runtime must verify
@@ -40,13 +45,14 @@
   let principal = $state("—");
   let projects = $state<ProjectsList | null>(null);
   const activeProjectId = $derived(projects?.active_project_id ?? null);
-  const continuedSessionId = $derived(
+  let continuedSessionId = $state<string | null>(
     typeof window === "undefined" ? null : routeStateFromHash(window.location.hash).sessionId,
   );
 
   onMount(() => {
     const handler = () => {
       current = routeFromHash(window.location.hash);
+      continuedSessionId = routeStateFromHash(window.location.hash).sessionId;
       // Route changes move focus to the main landmark so keyboard and screen
       //-reader users land on the new page content, not mid-shell.
       document.getElementById("main")?.focus();
@@ -130,10 +136,13 @@
       <!-- The topbar already shows the route title + hint; the page itself
            opens with its own lead so nothing is said twice. -->
       <ResponsivePage>
+        {#if chatVisited}
+          <div hidden={current !== "new-chat"}>
+            <ChatView sessionId={continuedSessionId} />
+          </div>
+        {/if}
         {#if current === "home"}
           <WorkbenchView />
-        {:else if current === "new-chat"}
-          <ChatView sessionId={continuedSessionId} />
         {:else if current === "search-chat"}
           <SearchChatView />
         {:else if current === "memory"}
@@ -164,7 +173,7 @@
           <ActivityView />
         {:else if current === "diagnostics"}
           <DiagnosticsView />
-        {:else}
+        {:else if current !== "new-chat"}
           <SettingsView {principal} />
         {/if}
       </ResponsivePage>

@@ -29,7 +29,7 @@ Run the full set from a clean virtual environment before merge or any main push:
 
 ```bash
 python -m ruff check .
-python -m mypy .
+python -m mypy raiker apps tests
 python -m pytest
 python scripts/validate_phase_status.py
 python scripts/validate_repo_truthfulness.py

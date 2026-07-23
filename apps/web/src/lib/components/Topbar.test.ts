@@ -59,4 +59,18 @@ describe("Topbar notifications", () => {
       );
     });
   });
+
+  it("closes the notification panel with Escape and restores focus to its trigger", async () => {
+    stubFetch({ "GET /api/notifications": NOTIFICATIONS });
+    render(Topbar, { title: "New Chat", hint: "Start a conversation" });
+
+    const bell = await screen.findByRole("button", { name: /notifications/i });
+    await fireEvent.click(bell);
+    await waitFor(() => expect(screen.getByRole("region", { name: "Notification panel" })).toBeInTheDocument());
+
+    await fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByRole("region", { name: "Notification panel" })).not.toBeInTheDocument();
+    expect(bell).toHaveFocus();
+  });
 });

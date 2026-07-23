@@ -8,8 +8,8 @@ RuntimeAuthority, and append-only audit log as the terminal client.
 
 ## Design
 
-- **Pastel design system, dual theme** — light and dark themes built from one token set in
-  `src/app.css` (iris/mint/peach/rose/sky accents). The default follows the OS
+- **Control Deck design system, dual theme** — light and dark themes built from one token set in
+  `src/app.css` (semantic surfaces, text, borders, and status colors). The default follows the OS
   (`prefers-color-scheme`); an explicit choice is applied via `data-theme` and persisted in
   `localStorage` (a UI preference, unlike the bearer token, which is memory-only).
 - **Calm by default, audit on demand** — Chat is the front door and shows the conversation, not
@@ -22,9 +22,10 @@ RuntimeAuthority, and append-only audit log as the terminal client.
 ## Shared shell
 
 `ResponsivePage` wraps authenticated route content while preserving the existing
-sidebar, topbar, skip link, and main landmark. On narrow screens the sidebar
-becomes a labelled icon rail; route-body migrations are deliberately staged in
-later Control Deck tasks.
+sidebar, topbar, skip link, and main landmark. At tablet sizes the sidebar becomes
+a focus-safe drawer; below 640px, a labelled bottom navigation keeps the primary
+destinations available. The closed compact drawer is inert, so it cannot intercept
+keyboard navigation.
 
 ## Surfaces
 

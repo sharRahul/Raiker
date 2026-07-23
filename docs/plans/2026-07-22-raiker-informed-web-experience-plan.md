@@ -218,7 +218,7 @@ plan.
 | Phase | Audited state | Evidence and remaining work |
 |---|---|---|
 | 0 | complete | Route/API/mutation inventory, actual non-secret route-state and UI-event contracts, missing read-model inventory, threat-model review, and five local-browser baseline journeys are recorded in `docs/guide/webapp/Raiker_PHASE_0_EVIDENCE.md` and `docs/guide/webapp/PHASE_1_PREREQUISITES.md`. The browser run also fixed owner visibility for sessionless connector-write approvals. Phase 1 retains its viewport, keyboard, and visual-regression quality gates. |
-| 1 | partial | The shell has grouped navigation, responsive drawer/bottom navigation, tokenized styles, route focus handling, notification access, and a persistent stop control. Visual-regression, keyboard-route, and supported-viewport evidence are absent. |
+| 1 | complete | The shell has grouped navigation, responsive drawer/bottom navigation, tokenized styles, route focus handling, notification access, and a persistent stop control. The compact drawer is inert while closed, preserving the initial keyboard route; notification dismissal returns focus to its trigger. Desktop (1280x800) and mobile (375x812) browser captures, no-horizontal-overflow inspection, keyboard checks, and theme/reduced-motion regression coverage are recorded in `docs/guide/webapp/RAIKER_PHASE_1_EVIDENCE.md`. No capability or API contract changed. |
 | 2 | partial | Workbench summaries, chat/session links, a persistent chat host, task cadence choices, session bulk actions, approval previews, client-side risk/newest approval triage ordering, server-backed approval-expiry visibility, and session-to-audit/checkpoint deep links exist. Broader session detail cross-links, approval step-up flow, and browser E2E coverage are not complete. |
 | 3 | partial | Existing project, memory, brain, checkpoint, model/fallback, capability, connector, and MCP views cover parts of the scope. A project context home/file inspect pane, checkpoint preflight funnel, and one tabbed Extensions hub are not complete. |
 | 4 | partial | Activity, diagnostics, Work in Action, and notifications are separate implemented views. A consolidated observability hub, redacted diagnostic export contract, and offline/reconnect/denial/session-restoration browser E2E evidence are not complete. |
@@ -256,11 +256,11 @@ viewport, keyboard, and visual-regression evidence.
 
 ### Phase 1 — Shell, navigation, and visual cleanup
 
-- Implement the new navigation, context bar, mobile bottom navigation, persistent
+- [x] Implement the new navigation, context bar, mobile bottom navigation, persistent
   stop/status/approval access, and route-state restoration.
-- Apply tokens and shared primitives to the shell, then migrate one representative
+- [x] Apply tokens and shared primitives to the shell, then migrate one representative
   list, form, modal, and detail view to prove the system before broad rewrites.
-- Add visual-regression screenshots at desktop/mobile, keyboard navigation tests,
+- [x] Add visual-regression screenshots at desktop/mobile, keyboard navigation tests,
   and theme/reduced-motion coverage. No capability change in this phase.
 
 ### Phase 2 — The daily work loop

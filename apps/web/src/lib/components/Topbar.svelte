@@ -20,6 +20,7 @@
   let notifications = $state<RaikerNotification[]>([]);
   let panelOpen = $state(false);
   let marking = $state(false);
+  let notificationTrigger = $state<HTMLButtonElement>();
   const unread = $derived(notifications.filter((n) => !n.read));
 
   async function loadNotifications() {
@@ -31,8 +32,17 @@
   }
 
   function togglePanel() {
-    panelOpen = !panelOpen;
-    if (panelOpen) void loadNotifications();
+    if (panelOpen) {
+      closePanel();
+    } else {
+      panelOpen = true;
+      void loadNotifications();
+    }
+  }
+
+  function closePanel() {
+    panelOpen = false;
+    notificationTrigger?.focus();
   }
 
   async function markAllRead() {
@@ -48,6 +58,15 @@
   }
 
   onMount(loadNotifications);
+
+  $effect(() => {
+    if (!panelOpen) return;
+    const closeForEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closePanel();
+    };
+    window.addEventListener("keydown", closeForEscape);
+    return () => window.removeEventListener("keydown", closeForEscape);
+  });
 </script>
 
 <header class="topbar">
@@ -68,6 +87,7 @@
         aria-label={unread.length > 0 ? `Notifications (${unread.length} unread)` : "Notifications"}
         aria-expanded={panelOpen}
         onclick={togglePanel}
+        bind:this={notificationTrigger}
       >
         <Icon name="bell" size={17} />
         {#if unread.length > 0}<span class="unread-count">{unread.length}</span>{/if}
@@ -78,7 +98,7 @@
           class="panel-backdrop"
           aria-label="Close notifications"
           tabindex="-1"
-          onclick={() => (panelOpen = false)}
+          onclick={closePanel}
         ></button>
         <section class="panel" aria-label="Notification panel">
           <div class="panel-head">

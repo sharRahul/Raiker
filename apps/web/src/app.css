@@ -347,6 +347,10 @@ code,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {
@@ -441,13 +445,14 @@ code,
   padding: 0.28rem 0.6rem;
 }
 
-/* Touch targets: on narrow (touch-first) screens every interactive control
-   meets a 40px minimum height without changing the desktop density. */
+/* Touch targets: on narrow (touch-first) screens shared shell controls meet
+   the WCAG-aligned 44px minimum without changing desktop density. */
 @media (max-width: 1023px) {
   .btn,
   .input,
-  .select {
-    min-height: 40px;
+  .select,
+  .stop-btn {
+    min-height: 44px;
   }
 }
 

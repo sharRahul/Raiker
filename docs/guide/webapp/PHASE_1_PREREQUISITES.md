@@ -1,8 +1,8 @@
 # Raiker-informed web experience — Phase 1 prerequisites
 
 > **Audit date:** 2026-07-23
-> **Decision:** Phase 0 is complete and Phase 1 may begin. This document does
-> **not** mark Phase 1 implementation complete.
+> **Decision:** Phase 0 is complete. These prerequisites enabled Phase 1; Phase
+> 1 completion evidence now lives in `RAIKER_PHASE_1_EVIDENCE.md`.
 
 ## Contract boundaries
 

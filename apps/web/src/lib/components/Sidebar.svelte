@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import Icon from "./Icon.svelte";
   import Logo from "./Logo.svelte";
   import { NAV_GROUPS, navItem } from "../nav";
@@ -20,10 +21,13 @@
   const phoneNavItems = ["home", "new-chat", "approvals", "connections"].map(navItem);
   let navigationOpen = $state(false);
   let returnFocusTo: HTMLButtonElement | null = null;
+  let compactNavigation = $state(false);
+  let closeButton: HTMLButtonElement | undefined = $state();
 
   function openNavigation(event: MouseEvent) {
     returnFocusTo = event.currentTarget as HTMLButtonElement;
     navigationOpen = true;
+    queueMicrotask(() => closeButton?.focus());
   }
 
   function closeNavigation(restoreFocus = true) {
@@ -31,6 +35,18 @@
     if (restoreFocus) returnFocusTo?.focus();
     returnFocusTo = null;
   }
+
+  onMount(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(max-width: 1023px)");
+    const updateCompactNavigation = () => {
+      compactNavigation = query.matches;
+      if (!query.matches) closeNavigation(false);
+    };
+    updateCompactNavigation();
+    query.addEventListener("change", updateCompactNavigation);
+    return () => query.removeEventListener("change", updateCompactNavigation);
+  });
 
   $effect(() => {
     if (!navigationOpen) return;
@@ -137,8 +153,15 @@
   <button type="button" class="drawer-scrim" aria-label="Close navigation" onclick={() => closeNavigation()}></button>
 {/if}
 
-<nav id="all-navigation" class="sidebar" class:open={navigationOpen} aria-label="All navigation">
-  <button type="button" class="drawer-close btn btn-ghost" onclick={() => closeNavigation()}>Close</button>
+<nav
+  id="all-navigation"
+  class="sidebar"
+  class:open={navigationOpen}
+  aria-label="All navigation"
+  aria-hidden={compactNavigation && !navigationOpen ? "true" : undefined}
+  inert={compactNavigation && !navigationOpen}
+>
+  <button type="button" class="drawer-close btn btn-ghost" onclick={() => closeNavigation()} bind:this={closeButton}>Close</button>
   <a class="brand" href="#/home">
     <Logo size={30} />
     <span class="brand-text">

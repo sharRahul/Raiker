@@ -1,9 +1,13 @@
 // The full route list lives in the adaptive drawer so every governed route
 // stays available when phone and tablet controls take over.
 import { fireEvent, render, screen, within } from "@testing-library/svelte";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Sidebar from "./Sidebar.svelte";
 import { NAV_ITEMS } from "../nav";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("Sidebar navigation", () => {
   it("keeps every route labelled in the adaptive drawer", () => {
@@ -33,5 +37,26 @@ describe("Sidebar navigation", () => {
     await fireEvent.keyDown(window, { key: "Escape" });
     expect(more).toHaveAttribute("aria-expanded", "false");
     expect(more).toHaveFocus();
+  });
+
+  it("removes the closed compact drawer from keyboard navigation", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    );
+    render(Sidebar, { current: "new-chat" });
+
+    const drawer = document.getElementById("all-navigation");
+    expect(drawer).not.toBeNull();
+    expect((drawer as HTMLElement).inert).toBe(true);
+    expect(drawer).toHaveAttribute("aria-hidden", "true");
+
+    await fireEvent.click(screen.getByRole("button", { name: "More navigation" }));
+    expect((drawer as HTMLElement).inert).toBe(false);
+    expect(drawer).not.toHaveAttribute("aria-hidden");
   });
 });

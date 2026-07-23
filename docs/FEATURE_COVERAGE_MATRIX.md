@@ -6,15 +6,15 @@
 # Raiker Full Platform Feature Coverage Matrix
 
 > Web experience update (2026-07-23): the launchable local dashboard partially
-> implements the Hermes-informed experience and now uses
-> the Hermes-informed Workbench navigation (Home, Work, Knowledge, Control, and
+> implements the Raiker-informed experience and now uses
+> the Raiker-informed Workbench navigation (Home, Work, Knowledge, Control, and
 > Observe) and server-backed home summaries. This is an information-architecture
 > and presentation delivery only: it does not change capability authority or
 > promote deferred channels, plugin panels, backup/restore, or secret editing to
-> implemented status. Phase 0 local-browser journey evidence is complete; the
-> phase plan is **not complete** because Phase 1 viewport/keyboard/visual-regression
-> evidence and several specified interaction surfaces remain outstanding. See
-> `docs/plans/2026-07-22-hermes-informed-web-experience-plan.md`.
+> implemented status. Phase 0 and Phase 1 evidence are complete; Phases 2–4
+> still have specified interaction surfaces outstanding. See
+> `docs/plans/2026-07-22-raiker-informed-web-experience-plan.md` and
+> `docs/guide/webapp/RAIKER_PHASE_1_EVIDENCE.md`.
 
 > Current truth (2026-06-21): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
 

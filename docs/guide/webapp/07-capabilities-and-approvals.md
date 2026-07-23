@@ -86,6 +86,13 @@ If the server reports it as expired, the decision controls are withheld and the
 queue asks you to refresh. The resolution endpoint checks the expiry again, so a
 browser clock or stale page can never turn an expired request into a valid decision.
 
+Critical approvals are visibly separate from ordinary metadata-only decisions.
+Their review keeps the immutable preview visible, then requires a decision note
+and a fresh password or MFA step-up before it asks the server to resolve the
+critical lifecycle. The browser never supplies a trust flag: the server requires
+an elevated session and re-checks the intent before recording a denial or
+attempting its governed execution path.
+
 > 🔑 **Approval resolution is usually metadata-only.** Approving or denying normally
 > records your decision without executing the action. The only narrow exception is a
 > principal-bound connector-write intent: its review card and final server response

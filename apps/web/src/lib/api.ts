@@ -30,6 +30,7 @@ import type {
   PromptRequestBody,
   ProviderModelList,
   ResolveApprovalResult,
+  ResolveCriticalApprovalResult,
   RuntimeMode,
   RuntimeReadiness,
   SecurityHealth,
@@ -638,6 +639,11 @@ export const api = {
   approval: (id: string) => request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(id)}`),
   resolveApproval: (id: string, body: { approve: boolean; reason: string }) =>
     postJson<ResolveApprovalResult>(`/api/approvals/${encodeURIComponent(id)}/resolve`, body),
+  resolveCriticalApproval: (id: string, body: { approve: boolean; reason: string }) =>
+    postJson<ResolveCriticalApprovalResult>(
+      `/api/approvals/${encodeURIComponent(id)}/resolve-critical`,
+      body,
+    ),
 
   // ── Runtime mutations. These reuse the existing governed control routes; the UI adds no
   // authority. Every call is enforced server-side by RuntimeAuthority. ──

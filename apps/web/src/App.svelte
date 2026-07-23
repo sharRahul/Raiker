@@ -148,15 +148,15 @@
         {:else if current === "memory"}
           <MemoryView />
         {:else if current === "approvals"}
-          <ApprovalsView />
+          <ApprovalsView sessionId={continuedSessionId} />
         {:else if current === "tasks"}
-          <TasksView projectId={activeProjectId} />
+          <TasksView projectId={activeProjectId} sessionId={continuedSessionId} />
         {:else if current === "brain"}
           <BrainView />
         {:else if current === "work"}
           <WorkInActionView />
         {:else if current === "sessions"}
-          <SessionsView projectId={activeProjectId} />
+          <SessionsView projectId={activeProjectId} sessionId={continuedSessionId} />
         {:else if current === "projects"}
           <ProjectsView onchanged={refreshProjects} />
         {:else if current === "capabilities"}

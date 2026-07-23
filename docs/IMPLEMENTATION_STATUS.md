@@ -6,7 +6,7 @@
 # Implementation Status
 
 > Current truth update (2026-07-23): **Raiker-informed local web experience has
-> Phase 0 and Phase 1 complete; Phases 2–4 remain partial.** The Svelte shell has the
+> Phases 0, 1, and 2 complete; Phases 3–4 remain partial.** The Svelte shell has the
 > Home/Work/Knowledge/Control/Observe information architecture and a Workbench
 > home that reads server-backed session, task, and pending-approval summaries.
 > It links only to existing governed routes; it neither adds client authority nor
@@ -15,8 +15,12 @@
 > server-backed master stop remains persistent. See
 > `docs/plans/2026-07-22-raiker-informed-web-experience-plan.md`. Phase 1
 > viewport, keyboard, theme/reduced-motion, and visual evidence is recorded in
-> `docs/guide/webapp/RAIKER_PHASE_1_EVIDENCE.md`. The plan still records incomplete persistent-chat,
-> session-detail, checkpoint-preflight, Extensions-hub, and observability-hub work.
+> `docs/guide/webapp/RAIKER_PHASE_1_EVIDENCE.md`. Phase 2 evidence is recorded in
+> `docs/guide/webapp/RAIKER_PHASE_2_EVIDENCE.md`: session detail now links to
+> chat, tasks, approvals, audit, and checkpoints; critical approval resolution
+> requires a short-lived elevated API session and is re-checked by
+> `RuntimeAuthority`. The plan still records incomplete checkpoint-preflight,
+> Extensions-hub, and observability-hub work.
 > **Phase 0 evidence is complete** in
 > `docs/guide/webapp/RAIKER_PHASE_0_EVIDENCE.md`: five disposable-workspace
 > local-browser journeys were recorded, and the pass fixed owner visibility for

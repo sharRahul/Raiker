@@ -219,7 +219,7 @@ plan.
 |---|---|---|
 | 0 | complete | Route/API/mutation inventory, actual non-secret route-state and UI-event contracts, missing read-model inventory, threat-model review, and five local-browser baseline journeys are recorded in `docs/guide/webapp/Raiker_PHASE_0_EVIDENCE.md` and `docs/guide/webapp/PHASE_1_PREREQUISITES.md`. The browser run also fixed owner visibility for sessionless connector-write approvals. Phase 1 retains its viewport, keyboard, and visual-regression quality gates. |
 | 1 | complete | The shell has grouped navigation, responsive drawer/bottom navigation, tokenized styles, route focus handling, notification access, and a persistent stop control. The compact drawer is inert while closed, preserving the initial keyboard route; notification dismissal returns focus to its trigger. Desktop (1280x800) and mobile (375x812) browser captures, no-horizontal-overflow inspection, keyboard checks, and theme/reduced-motion regression coverage are recorded in `docs/guide/webapp/RAIKER_PHASE_1_EVIDENCE.md`. No capability or API contract changed. |
-| 2 | partial | Workbench summaries, chat/session links, a persistent chat host, task cadence choices, session bulk actions, approval previews, client-side risk/newest approval triage ordering, server-backed approval-expiry visibility, and session-to-audit/checkpoint deep links exist. Broader session detail cross-links, approval step-up flow, and browser E2E coverage are not complete. |
+| 2 | complete | Workbench summaries, persistent chat, task cadence choices, session bulk actions, approval previews, risk/newest triage, server-backed expiry visibility, and all session cross-links are delivered. Critical approvals use a server-enforced elevated step-up resolver, and disposable-workspace browser E2E evidence is recorded in `docs/guide/webapp/RAIKER_PHASE_2_EVIDENCE.md`. |
 | 3 | partial | Existing project, memory, brain, checkpoint, model/fallback, capability, connector, and MCP views cover parts of the scope. A project context home/file inspect pane, checkpoint preflight funnel, and one tabbed Extensions hub are not complete. |
 | 4 | partial | Activity, diagnostics, Work in Action, and notifications are separate implemented views. A consolidated observability hub, redacted diagnostic export contract, and offline/reconnect/denial/session-restoration browser E2E evidence are not complete. |
 
@@ -238,8 +238,8 @@ The source inventory and contracts are complete. The five required local-browser
 journeys were recorded against a disposable local build/workspace, including the
 truthful fail-closed outcomes for an unconfigured model, hosted provider policy,
 and disabled MCP capability gate. The pass found and fixed owner visibility for a
-sessionless connector-write approval. Phase 1 completion still requires its own
-viewport, keyboard, and visual-regression evidence.
+sessionless connector-write approval. Phase 1 is complete with its viewport,
+keyboard, and visual-regression evidence.
 
 ### Phase 0 — Evidence, usability baseline, and contracts
 
@@ -265,11 +265,11 @@ viewport, keyboard, and visual-regression evidence.
 
 ### Phase 2 — The daily work loop
 
-- Ship Workbench, persistent chat host, session rail/detail, search/filter state,
+- [x] Ship Workbench, persistent chat host, session rail/detail, search/filter state,
   turn phase rail, and cross-links among session/task/approval/audit records.
-- Rebuild Approvals and Tasks/Routines using shared components, precise optimistic
+- [x] Rebuild Approvals and Tasks/Routines using shared components, precise optimistic
   state rules, API-confirmed mutations, and end-to-end test paths.
-- Measure the baseline journeys again; do not proceed while core work is slower or
+- [x] Measure the baseline journeys again; do not proceed while core work is slower or
   less accessible than the current interface.
 
 ### Phase 3 — Context and governed control

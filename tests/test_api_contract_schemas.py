@@ -57,7 +57,7 @@ TASK_VIEW = {
 APPROVAL_VIEW = {
     "approval_id", "action_id", "status", "tool_name", "capability", "risk_level", "session_id",
     "turn_id", "created_at", "age_seconds", "requires_approval", "expires_at", "is_expired",
-    "executes_action",
+    "executes_action", "critical",
 }
 APPROVAL_DETAIL = {"approval", "arguments", "diff", "diff_path", "preview_kind", "metadata_only_notice"}
 AGENT_RESPONSE = {

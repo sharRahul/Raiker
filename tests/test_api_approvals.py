@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
+from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.models import ToolAction
 from raiker.storage.sqlite import SQLiteStore
@@ -74,6 +75,7 @@ class TestApprovalsRead:
         assert item["risk_level"] == "high"
         assert item["requires_approval"] is True
         assert item["executes_action"] is False
+        assert item["critical"] is False
 
     def test_detail_has_file_diff(self, workspace: Path, client: TestClient) -> None:
         _pending_approval(workspace)
@@ -221,3 +223,38 @@ class TestApprovalsResolve:
         )
         assert again.status_code == 409
         assert again.json()["detail"]["reason_code"] == "approval_already_resolved"
+
+
+class TestCriticalApprovalResolve:
+    def test_critical_resolution_requires_an_elevated_session_and_uses_the_critical_lifecycle(
+        self, workspace: Path, client: TestClient
+    ) -> None:
+        _pending_approval(workspace)
+        store = SQLiteStore(workspace)
+        with store.connect() as connection:
+            connection.execute("UPDATE approvals SET critical = 1 WHERE approval_id = ?", ("appr_1",))
+
+        control_token = _token(client)
+        denied_without_step_up = client.post(
+            "/api/approvals/appr_1/resolve-critical",
+            json={"approve": False, "reason": "not approved"},
+            headers=_headers(control_token),
+        )
+        assert denied_without_step_up.status_code == 403
+        assert denied_without_step_up.json()["detail"]["reason_code"] == "scope_insufficient"
+        assert store.load_approval("appr_1")["status"] == "pending"  # type: ignore[index]
+
+        control_session = ApiSessionStore(workspace).get_by_token(control_token)
+        assert control_session is not None
+        elevated_token, _session = ApiSessionStore(workspace).create_session(
+            control_session.principal_id, scope="elevated", expires_in_seconds=60
+        )
+        resolved = client.post(
+            "/api/approvals/appr_1/resolve-critical",
+            json={"approve": False, "reason": "not approved"},
+            headers=_headers(elevated_token),
+        )
+        assert resolved.status_code == 200
+        assert resolved.json()["status"] == "denied"
+        assert resolved.json()["decision"] == "deny"
+        assert store.load_approval("appr_1")["status"] == "denied"  # type: ignore[index]

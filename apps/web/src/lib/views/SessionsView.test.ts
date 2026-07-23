@@ -406,4 +406,43 @@ describe("SessionsView organisation", () => {
       "#/checkpoints?session=sess_b",
     );
   });
+
+  it("cross-links a session detail to every related work surface", async () => {
+    stubFetch({
+      ...SESSIONS_ROUTE,
+      "GET /api/sessions/sess_b": {
+        session: SESSIONS_ROUTE["GET /api/sessions"][0],
+        turns: [],
+      },
+    });
+    render(SessionsView);
+
+    await fireEvent.click(await screen.findByText("Second chat"));
+
+    expect(screen.getByRole("link", { name: "Open in chat" })).toHaveAttribute(
+      "href",
+      "#/new-chat?session=sess_b",
+    );
+    expect(screen.getByRole("link", { name: "View session tasks" })).toHaveAttribute(
+      "href",
+      "#/tasks?session=sess_b",
+    );
+    expect(screen.getByRole("link", { name: "View session approvals" })).toHaveAttribute(
+      "href",
+      "#/approvals?session=sess_b",
+    );
+  });
+
+  it("opens the session named in a session deep link", async () => {
+    stubFetch({
+      ...SESSIONS_ROUTE,
+      "GET /api/sessions/sess_b": {
+        session: SESSIONS_ROUTE["GET /api/sessions"][0],
+        turns: [],
+      },
+    });
+    render(SessionsView, { sessionId: "sess_b" });
+
+    expect(await screen.findByRole("heading", { name: "Second chat" })).toBeInTheDocument();
+  });
 });

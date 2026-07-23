@@ -10,7 +10,7 @@
   import { humanize, relativeTime, shortId } from "../format";
 
   // When a project is active (topbar switcher) the list is scoped to it.
-  let { projectId = null }: { projectId?: string | null } = $props();
+  let { projectId = null, sessionId = null }: { projectId?: string | null; sessionId?: string | null } = $props();
 
   let sessions = $state<SessionSummary[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -20,6 +20,7 @@
 
   let turnDetail = $state<TurnDetail | null>(null);
   let turnError = $state<string | null>(null);
+  let openedRouteSessionId = $state<string | null | undefined>(undefined);
 
   // Conversation organisation: multi-select for bulk delete, plus a per-row
   // pin toggle. Pinned sessions surface first. These are organizing actions
@@ -267,6 +268,12 @@
     void showArchived;
     void load();
   });
+
+  $effect(() => {
+    if (sessionId === openedRouteSessionId) return;
+    openedRouteSessionId = sessionId;
+    if (sessionId) void openSession(sessionId);
+  });
 </script>
 
 <div class="head-row">
@@ -441,9 +448,11 @@
         <section class="card" aria-labelledby="session-detail-h">
           <h2 id="session-detail-h">{detail.session.title ?? shortId(detail.session.session_id)}</h2>
           <p class="sub">Created {relativeTime(detail.session.created_at)} · {detail.turns.length} turns</p>
-          <p class="sub">
+          <p class="session-links">
+            <a href={`#/new-chat?session=${encodeURIComponent(detail.session.session_id)}`}>Open in chat</a>
+            <a href={`#/tasks?session=${encodeURIComponent(detail.session.session_id)}`}>View session tasks</a>
+            <a href={`#/approvals?session=${encodeURIComponent(detail.session.session_id)}`}>View session approvals</a>
             <a href={`#/activity?session=${encodeURIComponent(detail.session.session_id)}`}>View audit events</a>
-            ·
             <a href={`#/checkpoints?session=${encodeURIComponent(detail.session.session_id)}`}>View checkpoints</a>
           </p>
           <ol class="turns">
@@ -686,6 +695,12 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
+  }
+  .session-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.8rem;
+    font-size: 0.84rem;
   }
   .turns {
     list-style: none;

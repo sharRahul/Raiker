@@ -389,6 +389,7 @@ export interface ApprovalView {
   expires_at: string | null;
   is_expired: boolean; // server-calculated snapshot; resolution re-checks the TTL
   executes_action: boolean; // true only for an approved, single-use connector write intent
+  critical: boolean; // server-supplied: needs elevated, human-only lifecycle
 }
 
 // raiker/control/dashboard.py ApprovalDetailView.to_dict()
@@ -409,6 +410,14 @@ export interface ResolveApprovalResult {
   executes_action: boolean;
   reason: string;
   connector_result?: Record<string, unknown>;
+}
+
+export interface ResolveCriticalApprovalResult {
+  approval_id: string;
+  status: string;
+  decision: string;
+  message: string;
+  executes_action: boolean;
 }
 
 // Approval proposal carried on an AgentResponse when status === "needs_approval".

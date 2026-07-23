@@ -8,7 +8,7 @@
   import { relativeTime } from "../format";
   import { taskBadge } from "../statusMaps";
 
-  let { projectId = null }: { projectId?: string | null } = $props();
+  let { projectId = null, sessionId = null }: { projectId?: string | null; sessionId?: string | null } = $props();
   let tasks = $state<TaskView[] | null>(null);
   let loadError = $state<string | null>(null);
   let notice = $state<string | null>(null);
@@ -52,7 +52,13 @@
   }
 
   async function load() {
-    try { loadError = null; tasks = await api.tasks(projectId ? { project_id: projectId } : {}); }
+    try {
+      loadError = null;
+      tasks = await api.tasks({
+        ...(projectId ? { project_id: projectId } : {}),
+        ...(sessionId ? { session_id: sessionId } : {}),
+      });
+    }
     catch (error) { tasks = null; loadError = error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable"; }
   }
 
@@ -83,7 +89,7 @@
     finally { busyTask = null; }
   }
 
-  $effect(() => { void projectId; void load(); });
+  $effect(() => { void projectId; void sessionId; void load(); });
 </script>
 
 <section class="tasks">

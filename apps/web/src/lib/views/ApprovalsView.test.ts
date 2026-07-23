@@ -34,6 +34,14 @@ const EXPIRED = {
   is_expired: true,
 };
 
+const CRITICAL = {
+  ...PENDING,
+  approval_id: "appr_critical",
+  tool_name: "shell_exec",
+  risk_level: "critical",
+  critical: true,
+};
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -183,5 +191,54 @@ describe("ApprovalsView", () => {
     await waitFor(() => {
       expect(screen.getByText(/nothing waiting on you/i)).toBeInTheDocument();
     });
+  });
+
+  it("filters the queue to the linked session and links back to its detail", async () => {
+    const anotherSession = { ...PENDING, approval_id: "appr_other", session_id: "sess_other" };
+    stubFetch({
+      "GET /api/approvals": [PENDING, anotherSession],
+      "GET /api/approvals/appr_1": DETAIL,
+    });
+    render(ApprovalsView, { sessionId: PENDING.session_id });
+
+    await screen.findByText("Write file");
+    expect(screen.queryByText("appr_other")).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: /review/i }));
+    expect(await screen.findByRole("link", { name: "View session" })).toHaveAttribute(
+      "href",
+      `#/sessions?session=${PENDING.session_id}`,
+    );
+  });
+
+  it("requires fresh server-backed step-up before resolving a critical approval", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/approvals": [CRITICAL],
+      "GET /api/approvals/appr_critical": { ...DETAIL, approval: CRITICAL },
+      "POST /api/auth/elevate": { token: "elevated-token" },
+      "POST /api/approvals/appr_critical/resolve-critical": {
+        approval_id: "appr_critical",
+        status: "denied",
+        decision: "deny",
+        message: "critical_action_rejected",
+        executes_action: false,
+      },
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await fireEvent.click(screen.getByRole("button", { name: "Begin critical denial" }));
+    await fireEvent.input(screen.getByLabelText("Decision note"), { target: { value: "Risk is too high" } });
+    await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "secret" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Deny critical action" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/approvals/appr_critical/resolve-critical",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    const call = fetchMock.mock.calls.find((item) => String(item[0]) === "/api/approvals/appr_critical/resolve-critical");
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ approve: false, reason: "Risk is too high" });
+    expect(await screen.findByText(/critical action was denied/i)).toBeInTheDocument();
   });
 });

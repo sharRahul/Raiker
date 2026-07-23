@@ -616,6 +616,8 @@ class ApprovalView:
     is_expired: bool
     # Resolving an approval records a decision; it never executes the action.
     executes_action: bool = False
+    # Critical approvals use the elevated, human-only RuntimeAuthority lifecycle.
+    critical: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -2612,6 +2614,7 @@ class DashboardService:
             requires_approval=status == "pending",
             expires_at=expires_at,
             is_expired=status == "pending" and bool(expires_at and utc_now() > expires_at),
+            critical=bool(row.get("critical")),
         )
 
     def _approval_detail(self, row: dict[str, Any]) -> ApprovalDetailView:

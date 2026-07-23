@@ -7,7 +7,9 @@ honest about its own state.
 
 Every conversation with the runtime, with its turns and the governed events behind
 each turn. Filter by tag, show archived, and open any session to replay it. Its
-detail also links directly to that session's Audit log and Checkpoints timeline.
+detail links directly to the same session in Chat, Tasks, Approvals, Audit log,
+and the Checkpoints timeline. These are non-secret route scopes: opening one
+still re-reads the server-backed record for the authenticated owner.
 
 ![Sessions](../screenshots/working/04-sessions-list.png)
 

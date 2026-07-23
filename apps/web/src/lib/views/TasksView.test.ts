@@ -81,4 +81,15 @@ describe("TasksView", () => {
       recurrence: "daily",
     });
   });
+
+  it("scopes the work list to a linked session", async () => {
+    const fetchMock = stubFetch({ "GET /api/tasks": [] });
+    render(TasksView, { sessionId: "sess_linked" });
+
+    await screen.findByText("No work queued");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tasks?session_id=sess_linked",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
 });

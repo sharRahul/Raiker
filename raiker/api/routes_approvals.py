@@ -14,6 +14,7 @@ from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import Principal
+from raiker.runtime.authority.router import RuntimeAuthority
 from raiker.runtime.connector_ecosystem import ConnectorInvoker
 from raiker.storage.sqlite import SQLiteStore
 
@@ -172,4 +173,44 @@ async def resolve_approval(
         "status": resolution.status,
         "executes_action": resolution.executes_action,
         "reason": body.reason,
+    }
+
+
+@router.post("/api/approvals/{approval_id}/resolve-critical")
+async def resolve_critical_approval(
+    approval_id: str,
+    body: ResolveApprovalRequest,
+    request: Request,
+) -> dict[str, Any]:
+    """Resolve a critical approval only through a fresh elevated API session."""
+    session, principal = AuthMiddleware(_ws(request)).authenticate(request, required_scope="elevated")
+    store = SQLiteStore(_ws(request))
+    user_id = store.principal_user_id(session.principal_id)
+    approval = store.load_approval(approval_id, user_id=user_id)
+    if approval is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": "approval_not_found"},
+        )
+    if not approval.get("critical"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"ok": False, "reason_code": "not_a_critical_approval"},
+        )
+
+    result = RuntimeAuthority(store, EventLogWriter(store)).resolve_critical_approval(
+        approval_id,
+        principal,
+        approve=body.approve,
+        step_up_verified=True,
+        session_id=session.session_id,
+        reason=body.reason,
+    )
+    current = store.load_approval(approval_id, user_id=user_id)
+    return {
+        "approval_id": approval_id,
+        "status": str((current or approval).get("status", "pending")),
+        "decision": result.decision,
+        "message": result.message,
+        "executes_action": result.message == "critical_action_executed",
     }

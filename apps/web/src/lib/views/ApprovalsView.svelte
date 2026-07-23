@@ -4,12 +4,14 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
-  import { api, ApiError } from "../api";
+  import { api, auth, getToken, setToken, ApiError } from "../api";
   import type { ApprovalDetailView, ApprovalView } from "../apiTypes";
   import { approvalBadge } from "../statusMaps";
   import { capabilityLabel } from "../capabilityModel";
-  import { formatTimestamp, humanize, relativeTime, shortId } from "../format";
+  import { formatTimestamp, humanize, relativeTime } from "../format";
   import { explainReasonCode } from "../reasonCodes";
+
+  let { sessionId = null }: { sessionId?: string | null } = $props();
 
   const FILTERS = ["pending", "approved", "denied"] as const;
   const RISK_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
@@ -24,10 +26,19 @@
   let decisionReason = $state("");
   let busy = $state(false);
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
+  let criticalDecision = $state<"approve" | "deny" | null>(null);
+  let criticalReason = $state("");
+  let criticalPassword = $state("");
+  let criticalMfaCode = $state("");
+  let criticalError = $state<string | null>(null);
+  let criticalBusy = $state(false);
 
   const orderedApprovals = $derived.by(() => {
     const requestedAt = (approval: ApprovalView) => Date.parse(approval.created_at) || 0;
-    return [...(approvals ?? [])].sort((left, right) => {
+    const scoped = sessionId
+      ? (approvals ?? []).filter((approval) => approval.session_id === sessionId)
+      : (approvals ?? []);
+    return [...scoped].sort((left, right) => {
       const newestFirst = requestedAt(right) - requestedAt(left);
       if (sort === "newest") return newestFirst || left.approval_id.localeCompare(right.approval_id);
       return (
@@ -88,6 +99,52 @@
     }
   }
 
+  function beginCriticalDecision(decision: "approve" | "deny") {
+    criticalDecision = decision;
+    criticalReason = "";
+    criticalPassword = "";
+    criticalMfaCode = "";
+    criticalError = null;
+  }
+
+  async function resolveCritical() {
+    if (selected === null || criticalDecision === null || criticalBusy || criticalReason.trim() === "") return;
+    if (criticalPassword.trim() === "" && criticalMfaCode.trim() === "") return;
+    criticalBusy = true;
+    criticalError = null;
+    const controlToken = getToken();
+    try {
+      const { token: elevatedToken } = await auth.elevate(
+        criticalPassword.trim() || undefined,
+        criticalMfaCode.trim() || undefined,
+      );
+      setToken(elevatedToken);
+      const result = await api.resolveCriticalApproval(selected.approval.approval_id, {
+        approve: criticalDecision === "approve",
+        reason: criticalReason.trim(),
+      });
+      notice = {
+        kind: "ok",
+        text: result.executes_action
+          ? "Critical action executed through the governed approval lifecycle."
+          : result.status === "denied"
+            ? "Critical action was denied."
+            : `Critical approval result: ${result.message}.`,
+      };
+      selected = null;
+      criticalDecision = null;
+      await load();
+    } catch (e) {
+      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      criticalError = explained
+        ? `${explained.plain} ${explained.remediation ?? ""}`
+        : "Step-up verification was rejected.";
+    } finally {
+      setToken(controlToken);
+      criticalBusy = false;
+    }
+  }
+
   function setFilter(value: (typeof FILTERS)[number]) {
     filter = value;
     selected = null;
@@ -140,11 +197,11 @@
   <PageState state="error" title="Couldn't load approvals" detail={loadError} />
 {:else if approvals === null}
   <PageState state="loading" title="Loading approvals…" />
-{:else if approvals.length === 0}
+{:else if orderedApprovals.length === 0}
   <div class="card">
     <EmptyState
       icon="approvals"
-      title={filter === "pending" ? "Nothing waiting on you" : `No ${filter} approvals`}
+      title={sessionId ? "No approvals for this session" : filter === "pending" ? "Nothing waiting on you" : `No ${filter} approvals`}
       body={filter === "pending"
         ? "When the agent proposes a gated action, it will appear here for your decision."
         : undefined}
@@ -204,7 +261,7 @@
     <dl class="meta">
       <div><dt>Capability</dt><dd>{capabilityLabel(selected.approval.capability)}</dd></div>
       <div><dt>Risk</dt><dd>{selected.approval.risk_level}</dd></div>
-      <div><dt>Session</dt><dd class="mono">{shortId(selected.approval.session_id)}</dd></div>
+      <div><dt>Session</dt><dd><a class="mono" href={`#/sessions?session=${encodeURIComponent(selected.approval.session_id)}`}>View session</a></dd></div>
       <div><dt>Requested</dt><dd>{relativeTime(selected.approval.created_at)}</dd></div>
       {#if selected.approval.expires_at}
         <div><dt>Expires</dt><dd>{formatTimestamp(selected.approval.expires_at)}</dd></div>
@@ -229,7 +286,17 @@
       <pre class="diff">{JSON.stringify(selected.arguments, null, 2)}</pre>
     {/if}
 
-    {#if selected.approval.status === "pending" && !selected.approval.is_expired}
+    {#if selected.approval.status === "pending" && !selected.approval.is_expired && selected.approval.critical}
+      <p class="notice notice-danger">This is a critical action. Re-authenticate before the server can resolve it through the human-only critical lifecycle.</p>
+      <div class="decision-actions">
+        <button type="button" class="btn btn-danger" onclick={() => beginCriticalDecision("deny")} disabled={busy || criticalBusy}>
+          Begin critical denial
+        </button>
+        <button type="button" class="btn btn-primary" onclick={() => beginCriticalDecision("approve")} disabled={busy || criticalBusy}>
+          Begin critical approval
+        </button>
+      </div>
+    {:else if selected.approval.status === "pending" && !selected.approval.is_expired}
       <label class="field-label" for="decision-reason">Decision note (optional)</label>
       <textarea
         id="decision-reason"
@@ -259,6 +326,29 @@
       </p>
     {/if}
   </section>
+{/if}
+
+{#if criticalDecision !== null}
+  <div class="overlay">
+    <div class="step-up" role="dialog" aria-modal="true" aria-labelledby="critical-step-up-title" tabindex="-1">
+      <h2 id="critical-step-up-title">Step up to {criticalDecision} this critical action</h2>
+      <p>Raiker will obtain a short-lived elevated session, then ask the server to re-check this immutable intent.</p>
+      <label class="field-label" for="critical-reason">Decision note</label>
+      <textarea id="critical-reason" class="textarea" rows="2" bind:value={criticalReason} disabled={criticalBusy}></textarea>
+      <label class="field-label" for="critical-password">Password</label>
+      <input id="critical-password" class="input" type="password" bind:value={criticalPassword} autocomplete="current-password" disabled={criticalBusy} />
+      <label class="field-label" for="critical-mfa">MFA code (optional)</label>
+      <input id="critical-mfa" class="input" inputmode="numeric" autocomplete="one-time-code" bind:value={criticalMfaCode} disabled={criticalBusy} />
+      <p class="hint">Provide your password or an MFA code. Neither is stored by the browser.</p>
+      {#if criticalError}<p class="error" role="alert">{criticalError}</p>{/if}
+      <div class="decision-actions">
+        <button type="button" class="btn" onclick={() => (criticalDecision = null)} disabled={criticalBusy}>Cancel</button>
+        <button type="button" class:btn-danger={criticalDecision === "deny"} class="btn btn-primary" onclick={resolveCritical} disabled={criticalBusy || criticalReason.trim() === "" || (criticalPassword.trim() === "" && criticalMfaCode.trim() === "")}>
+          {criticalBusy ? "Verifying..." : criticalDecision === "approve" ? "Approve critical action" : "Deny critical action"}
+        </button>
+      </div>
+    </div>
+  </div>
 {/if}
 
 <style>
@@ -380,4 +470,24 @@
   .error {
     color: var(--danger);
   }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: var(--overlay);
+    z-index: 60;
+  }
+  .step-up {
+    width: min(34rem, calc(100% - 2rem));
+    display: grid;
+    gap: 0.55rem;
+    padding: var(--space-5);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    background: var(--raised);
+    box-shadow: var(--shadow-2);
+  }
+  .step-up h2, .step-up p { margin: 0; }
+  .hint { color: var(--text-3); font-size: 0.8rem; }
 </style>

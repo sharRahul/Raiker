@@ -1,4 +1,4 @@
-# Hermes-informed web experience — Phase 0 evidence
+# Raiker-informed web experience — Phase 0 evidence
 
 > **Audit date:** 2026-07-23
 > **Status:** Phase 0 complete. The five representative journeys were run in a

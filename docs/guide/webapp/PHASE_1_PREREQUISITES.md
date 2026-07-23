@@ -1,4 +1,4 @@
-# Hermes-informed web experience — Phase 1 prerequisites
+# Raiker-informed web experience — Phase 1 prerequisites
 
 > **Audit date:** 2026-07-23
 > **Decision:** Phase 0 is complete and Phase 1 may begin. This document does
@@ -44,7 +44,7 @@ list drifting from the contract.
 ## Representative journey baseline
 
 The following journeys are the release baseline and were recorded on 2026-07-23
-in `HERMES_PHASE_0_EVIDENCE.md`. They must be re-run after Phase 1. They are not
+in `Raiker_PHASE_0_EVIDENCE.md`. They must be re-run after Phase 1. They are not
 population usability-study measurements; Phase 1 still needs its supported
 viewport, keyboard, and visual-regression evidence.
 

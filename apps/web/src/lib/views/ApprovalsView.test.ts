@@ -28,6 +28,12 @@ const DETAIL = {
     "Approval resolution is metadata-only. Recording a decision does NOT execute the action.",
 };
 
+const EXPIRED = {
+  ...PENDING,
+  expires_at: "2000-01-01T00:00:00Z",
+  is_expired: true,
+};
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -118,6 +124,57 @@ describe("ApprovalsView", () => {
     expect(screen.getByText(/\+hello/)).toBeInTheDocument();
     // Approve is explicit about not executing.
     expect(screen.getByRole("button", { name: /approve \(record only\)/i })).toBeInTheDocument();
+  });
+
+  it("shows a server-reported expiry warning and withholds decision controls", async () => {
+    stubFetch({
+      "GET /api/approvals": [EXPIRED],
+      "GET /api/approvals/appr_1": { ...DETAIL, approval: EXPIRED },
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+
+    expect(await screen.findByText(/expired at/i)).toBeInTheDocument();
+    expect(screen.getByText(/the server will not accept a decision/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Deny" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText((_, element) => element?.textContent?.includes("Already resolved: pending") ?? false),
+    ).not.toBeInTheDocument();
+  });
+
+  it("reports the connector-write exception after server-confirmed execution", async () => {
+    const connectorApproval = {
+      ...PENDING,
+      approval_id: "appr_connector",
+      tool_name: "connector_write",
+      executes_action: true,
+    };
+    stubFetch({
+      "GET /api/approvals": [connectorApproval],
+      "GET /api/approvals/appr_connector": {
+        ...DETAIL,
+        approval: connectorApproval,
+        preview_kind: "arguments",
+        diff: null,
+        diff_path: null,
+        metadata_only_notice: "Approving this connector write executes this exact action once.",
+      },
+      "POST /api/approvals/appr_connector/resolve": {
+        approval_id: "appr_connector",
+        action_id: "act_1",
+        status: "executed",
+        executes_action: true,
+        reason: "approved via web UI",
+      },
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /approve and execute once/i }));
+
+    expect(await screen.findByText(/executed once: executed/i)).toBeInTheDocument();
   });
 
   it("shows a friendly empty state when nothing is pending", async () => {

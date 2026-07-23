@@ -81,8 +81,14 @@ change the local ordering. This only changes the presentation of the server's
 reported risk and request time; it does not alter any approval, priority, or
 execution state.
 
-> 🔑 **Approval resolution is metadata-only.** Approving or denying records your
-> decision — it does **not** execute the approved action. This is a deliberate
-> safety boundary in the current release (execution relay is deferred).
+When an approval has a time limit, its detail shows the server-reported expiry.
+If the server reports it as expired, the decision controls are withheld and the
+queue asks you to refresh. The resolution endpoint checks the expiry again, so a
+browser clock or stale page can never turn an expired request into a valid decision.
+
+> 🔑 **Approval resolution is usually metadata-only.** Approving or denying normally
+> records your decision without executing the action. The only narrow exception is a
+> principal-bound connector-write intent: its review card and final server response
+> explicitly say that the exact intent executed once.
 
 Next: [Connections & MCP →](08-connections-and-mcp.md)

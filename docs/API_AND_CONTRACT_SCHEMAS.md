@@ -388,13 +388,13 @@ Full request/response shapes and the `reason_code` → plain-English map live in
 | `/api/prompts` | POST | `AgentGateway.submit_prompt_async` | Governed turn; returns `AgentResponse`. |
 | `/api/prompts/stream` | POST | `AgentGateway.astream_prompt` | SSE turn stream (lifecycle + text deltas + `FINAL`). |
 | `/api/interrupts` | POST | `InterruptController` / `TaskManager` | STOP switch; **human-only** (`human_principal_required`); cancel at next safe boundary, not force-kill. |
-| `/api/approvals[/{id}]` | GET | `DashboardService` / `ApprovalInbox` | Pending list + detail (redacted preview + diff). |
-| `/api/approvals/{id}/resolve` | POST | `ApprovalInbox.resolve` | **Metadata-only** (`executes_action=false`); unknown request fields rejected (`422`); tampered payload / already-resolved → `409`. |
+| `/api/approvals[/{id}]` | GET | `DashboardService` / `ApprovalInbox` | Pending list + detail (redacted preview + diff), including `expires_at` and a server-calculated `is_expired` snapshot. |
+| `/api/approvals/{id}/resolve` | POST | `ApprovalInbox.resolve` | Regular approvals are **metadata-only** (`executes_action=false`). A principal-bound, single-use connector-write intent is the narrow exception: an approved exact intent executes server-side and returns `executes_action=true`. Unknown request fields are rejected (`422`); tampered payload, expired, or already-resolved → `409`. Resolution re-checks expiry rather than trusting the displayed snapshot. |
 | `/api/runtime-mode/{activate,disable}`, `/api/capability-gates/{cap}/{set,disable}` | POST | `RuntimeControlService` / `RuntimeAuthority` | Governed mutations behind a step-up window; Tier-2 `set` accepts a forwarded `confirmation_token`. AI principals and non-`runtime_gate_manager` humans are denied (`403`). |
 
 All mutation routes are enforced server-side by `RuntimeAuthority`; the UI cannot bypass policy,
-authority, approvals, or the disabled-runtime gates. Approval resolution is metadata-only and does
-not execute the approved action.
+authority, approvals, or the disabled-runtime gates. Approval resolution is metadata-only except
+for the explicit, principal-bound connector-write intent described above.
 
 ## Persisted runtime mode and capability gate state
 

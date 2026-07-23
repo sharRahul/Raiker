@@ -27,6 +27,7 @@ export function approvalBadge(status: string): BadgeVariant {
     case "approved":
       return "done";
     case "denied":
+    case "expired":
       return "stopped";
     default:
       return "idle";

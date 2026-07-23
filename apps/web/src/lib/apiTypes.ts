@@ -386,6 +386,8 @@ export interface ApprovalView {
   created_at: string;
   age_seconds: number | null;
   requires_approval: boolean;
+  expires_at: string | null;
+  is_expired: boolean; // server-calculated snapshot; resolution re-checks the TTL
   executes_action: boolean; // true only for an approved, single-use connector write intent
 }
 

@@ -86,6 +86,40 @@ class TestApprovalsRead:
         assert "hello" in body["diff"]
         assert "NOT execute" in body["metadata_only_notice"]
 
+    def test_list_exposes_server_calculated_expiry_state(self, workspace: Path, client: TestClient) -> None:
+        _pending_approval(workspace)
+        store = SQLiteStore(workspace)
+        with store.connect() as connection:
+            connection.execute(
+                "UPDATE approvals SET expires_at = ? WHERE approval_id = ?",
+                ("2000-01-01T00:00:00Z", "appr_1"),
+            )
+
+        token = _token(client)
+        response = client.get("/api/approvals", headers=_headers(token))
+
+        assert response.status_code == 200
+        approval = response.json()[0]
+        assert approval["expires_at"] == "2000-01-01T00:00:00Z"
+        assert approval["is_expired"] is True
+
+    def test_terminal_approval_is_not_relabelled_expired_after_its_ttl(self, workspace: Path, client: TestClient) -> None:
+        _pending_approval(workspace)
+        store = SQLiteStore(workspace)
+        with store.connect() as connection:
+            connection.execute(
+                "UPDATE approvals SET status = ?, expires_at = ? WHERE approval_id = ?",
+                ("approved", "2000-01-01T00:00:00Z", "appr_1"),
+            )
+
+        token = _token(client)
+        response = client.get("/api/approvals", params={"status_filter": "approved"}, headers=_headers(token))
+
+        assert response.status_code == 200
+        approval = response.json()[0]
+        assert approval["status"] == "approved"
+        assert approval["is_expired"] is False
+
     def test_detail_unknown_is_404(self, client: TestClient) -> None:
         token = _token(client)
         assert client.get("/api/approvals/nope", headers=_headers(token)).status_code == 404

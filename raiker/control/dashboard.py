@@ -610,6 +610,10 @@ class ApprovalView:
     created_at: str
     age_seconds: int | None
     requires_approval: bool
+    # The browser displays this server-reported snapshot; the resolve endpoint
+    # re-checks the TTL before recording any decision.
+    expires_at: str | None
+    is_expired: bool
     # Resolving an approval records a decision; it never executes the action.
     executes_action: bool = False
 
@@ -2579,11 +2583,13 @@ class DashboardService:
     @classmethod
     def _approval_view(cls, row: dict[str, Any]) -> ApprovalView:
         tool_name = str(row.get("tool_name", ""))
+        status = str(row.get("status", ""))
         created_at = str(row.get("created_at", ""))
+        expires_at = str(row.get("expires_at", "")) or None
         return ApprovalView(
             approval_id=str(row["approval_id"]),
             action_id=str(row.get("action_id", "")),
-            status=str(row.get("status", "")),
+            status=status,
             tool_name=tool_name,
             capability=CAPABILITY_GATE_MAP.get(tool_name, tool_name),
             risk_level=str(row.get("risk_level", "")),
@@ -2591,7 +2597,9 @@ class DashboardService:
             turn_id=row.get("turn_id"),
             created_at=created_at,
             age_seconds=cls._age_seconds(created_at),
-            requires_approval=str(row.get("status", "")) == "pending",
+            requires_approval=status == "pending",
+            expires_at=expires_at,
+            is_expired=status == "pending" and bool(expires_at and utc_now() > expires_at),
         )
 
     def _approval_detail(self, row: dict[str, Any]) -> ApprovalDetailView:

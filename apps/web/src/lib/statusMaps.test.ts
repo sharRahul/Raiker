@@ -14,6 +14,7 @@ describe("status → badge maps", () => {
     expect(approvalBadge("pending")).toBe("needs-approval");
     expect(approvalBadge("approved")).toBe("done");
     expect(approvalBadge("denied")).toBe("stopped");
+    expect(approvalBadge("expired")).toBe("stopped");
     expect(approvalBadge("weird")).toBe("idle");
   });
 

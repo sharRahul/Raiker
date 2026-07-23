@@ -8,7 +8,7 @@
   import type { ApprovalDetailView, ApprovalView } from "../apiTypes";
   import { approvalBadge } from "../statusMaps";
   import { capabilityLabel } from "../capabilityModel";
-  import { humanize, relativeTime, shortId } from "../format";
+  import { formatTimestamp, humanize, relativeTime, shortId } from "../format";
   import { explainReasonCode } from "../reasonCodes";
 
   const FILTERS = ["pending", "approved", "denied"] as const;
@@ -71,7 +71,9 @@
       });
       notice = {
         kind: "ok",
-        text: `Recorded: ${result.status}. The action was NOT executed (metadata-only).`,
+        text: result.executes_action
+          ? `Executed once: ${result.status}.`
+          : `Recorded: ${result.status}. The action was NOT executed (metadata-only).`,
       };
       selected = null;
       await load();
@@ -97,8 +99,8 @@
 
 <div class="head-row">
   <p class="page-lead">
-    Actions the agent proposed that need a human decision. Resolving an approval
-    <strong>records your decision only</strong> — it never executes the action.
+    Actions the agent proposed that need a human decision. Most approvals
+    <strong>record your decision only</strong>; any server-confirmed execution is stated explicitly.
   </p>
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh approvals">
     <Icon name="refresh" size={15} />
@@ -167,7 +169,7 @@
             <td>{humanize(a.tool_name)}</td>
             <td>{capabilityLabel(a.capability)}</td>
             <td><Badge variant={a.risk_level === "critical" || a.risk_level === "high" ? "blocked" : "metadata-only"} label={a.risk_level} /></td>
-            <td><Badge variant={approvalBadge(a.status)} label={a.status} /></td>
+            <td><Badge variant={approvalBadge(a.is_expired ? "expired" : a.status)} label={a.is_expired ? "expired" : a.status} /></td>
             <td title={a.created_at}>{relativeTime(a.created_at)}</td>
             <td>
               <button type="button" class="btn btn-sm" onclick={() => openDetail(a.approval_id)}>
@@ -204,7 +206,17 @@
       <div><dt>Risk</dt><dd>{selected.approval.risk_level}</dd></div>
       <div><dt>Session</dt><dd class="mono">{shortId(selected.approval.session_id)}</dd></div>
       <div><dt>Requested</dt><dd>{relativeTime(selected.approval.created_at)}</dd></div>
+      {#if selected.approval.expires_at}
+        <div><dt>Expires</dt><dd>{formatTimestamp(selected.approval.expires_at)}</dd></div>
+      {/if}
     </dl>
+
+    {#if selected.approval.is_expired}
+      <p class="notice notice-danger" role="alert">
+        This approval expired at {formatTimestamp(selected.approval.expires_at)}. The server will not accept a decision.
+        Refresh the queue to retrieve the current state.
+      </p>
+    {/if}
 
     {#if selected.preview_kind === "file_diff" || selected.preview_kind === "patch"}
       <h3>{selected.preview_kind === "file_diff" ? "Proposed file change" : "Proposed patch"}</h3>
@@ -217,7 +229,7 @@
       <pre class="diff">{JSON.stringify(selected.arguments, null, 2)}</pre>
     {/if}
 
-    {#if selected.approval.status === "pending"}
+    {#if selected.approval.status === "pending" && !selected.approval.is_expired}
       <label class="field-label" for="decision-reason">Decision note (optional)</label>
       <textarea
         id="decision-reason"
@@ -232,9 +244,15 @@
           Deny
         </button>
         <button type="button" class="btn btn-primary" onclick={() => resolve(true)} disabled={busy}>
-          {busy ? "Recording…" : "Approve (record only)"}
+          {busy
+            ? "Recording…"
+            : selected.approval.tool_name === "connector_write"
+              ? "Approve and execute once"
+              : "Approve (record only)"}
         </button>
       </div>
+    {:else if selected.approval.is_expired}
+      <p class="resolved-note">Expired before a decision was recorded.</p>
     {:else}
       <p class="resolved-note">
         Already resolved: <Badge variant={approvalBadge(selected.approval.status)} label={selected.approval.status} />

@@ -60,6 +60,48 @@ describe("ApprovalsView", () => {
     expect(screen.getByText("medium")).toBeInTheDocument();
   });
 
+  it("triages approvals by risk by default and can switch to newest first", async () => {
+    const critical = {
+      ...PENDING,
+      approval_id: "appr_critical",
+      tool_name: "shell_exec",
+      risk_level: "critical",
+      created_at: "2026-07-06T00:00:00Z",
+    };
+    const low = {
+      ...PENDING,
+      approval_id: "appr_low",
+      tool_name: "http_request",
+      risk_level: "low",
+      created_at: "2026-07-08T00:00:00Z",
+    };
+    const newerMedium = {
+      ...PENDING,
+      approval_id: "appr_newer_medium",
+      tool_name: "read_file",
+      created_at: "2026-07-09T00:00:00Z",
+    };
+    stubFetch({ "GET /api/approvals": [PENDING, low, critical, newerMedium] });
+    render(ApprovalsView);
+
+    await screen.findByText("Shell exec");
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Shell exec"),
+      expect.stringContaining("Read file"),
+      expect.stringContaining("Write file"),
+      expect.stringContaining("Http request"),
+    ]);
+
+    await fireEvent.change(screen.getByLabelText("Sort approvals"), { target: { value: "newest" } });
+    expect(screen.getAllByRole("row").slice(1).map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Read file"),
+      expect.stringContaining("Http request"),
+      expect.stringContaining("Write file"),
+      expect.stringContaining("Shell exec"),
+    ]);
+  });
+
   it("shows the metadata-only notice and diff preview in the review panel", async () => {
     stubFetch({
       "GET /api/approvals": [PENDING],

@@ -12,8 +12,10 @@
   import { explainReasonCode } from "../reasonCodes";
 
   const FILTERS = ["pending", "approved", "denied"] as const;
+  const RISK_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
   let filter = $state<(typeof FILTERS)[number]>("pending");
+  let sort = $state<"risk" | "newest">("risk");
   let approvals = $state<ApprovalView[] | null>(null);
   let loadError = $state<string | null>(null);
 
@@ -22,6 +24,19 @@
   let decisionReason = $state("");
   let busy = $state(false);
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  const orderedApprovals = $derived.by(() => {
+    const requestedAt = (approval: ApprovalView) => Date.parse(approval.created_at) || 0;
+    return [...(approvals ?? [])].sort((left, right) => {
+      const newestFirst = requestedAt(right) - requestedAt(left);
+      if (sort === "newest") return newestFirst || left.approval_id.localeCompare(right.approval_id);
+      return (
+        (RISK_RANK[right.risk_level] ?? 0) - (RISK_RANK[left.risk_level] ?? 0) ||
+        newestFirst ||
+        left.approval_id.localeCompare(right.approval_id)
+      );
+    });
+  });
 
   async function load() {
     loadError = null;
@@ -95,19 +110,28 @@
   <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
 {/if}
 
-<div class="filters" role="tablist" aria-label="Approval status filter">
-  {#each FILTERS as f (f)}
-    <button
-      type="button"
-      class="filter-btn"
-      class:active={filter === f}
-      role="tab"
-      aria-selected={filter === f}
-      onclick={() => setFilter(f)}
-    >
-      {f}
-    </button>
-  {/each}
+<div class="queue-controls">
+  <div class="filters" role="tablist" aria-label="Approval status filter">
+    {#each FILTERS as f (f)}
+      <button
+        type="button"
+        class="filter-btn"
+        class:active={filter === f}
+        role="tab"
+        aria-selected={filter === f}
+        onclick={() => setFilter(f)}
+      >
+        {f}
+      </button>
+    {/each}
+  </div>
+  <label class="sort-control">
+    <span class="sr-only">Sort approvals</span>
+    <select class="select" aria-label="Sort approvals" bind:value={sort}>
+      <option value="risk">Highest risk first</option>
+      <option value="newest">Newest first</option>
+    </select>
+  </label>
 </div>
 
 {#if loadError}
@@ -138,7 +162,7 @@
         </tr>
       </thead>
       <tbody>
-        {#each approvals as a (a.approval_id)}
+        {#each orderedApprovals as a (a.approval_id)}
           <tr>
             <td>{humanize(a.tool_name)}</td>
             <td>{capabilityLabel(a.capability)}</td>
@@ -239,6 +263,20 @@
     border-radius: var(--r-pill);
     padding: 3px;
     margin-bottom: var(--space-4);
+  }
+  .queue-controls {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .sort-control .select {
+    min-width: 10.5rem;
+  }
+  @media (max-width: 520px) {
+    .queue-controls {
+      flex-direction: column;
+    }
   }
   .filter-btn {
     font: inherit;

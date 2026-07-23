@@ -75,6 +75,12 @@ When the agent proposes a gated action (because its mode is **Ask**), it lands i
 **Approvals** with **Pending / Approved / Denied** tabs. On a fresh workspace it
 reads *"Nothing waiting on you."*
 
+The queue opens with the highest reported risk first, so critical and high-risk
+requests are easier to review. Use **Highest risk first** or **Newest first** to
+change the local ordering. This only changes the presentation of the server's
+reported risk and request time; it does not alter any approval, priority, or
+execution state.
+
 > 🔑 **Approval resolution is metadata-only.** Approving or denying records your
 > decision — it does **not** execute the approved action. This is a deliberate
 > safety boundary in the current release (execution relay is deferred).

@@ -6,7 +6,8 @@ honest about its own state.
 ## Sessions
 
 Every conversation with the runtime, with its turns and the governed events behind
-each turn. Filter by tag, show archived, and open any session to replay it.
+each turn. Filter by tag, show archived, and open any session to replay it. Its
+detail also links directly to that session's Audit log and Checkpoints timeline.
 
 ![Sessions](../screenshots/working/04-sessions-list.png)
 

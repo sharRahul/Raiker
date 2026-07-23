@@ -168,9 +168,9 @@
         {:else if current === "mcp"}
           <McpView />
         {:else if current === "checkpoints"}
-          <CheckpointsView projectId={activeProjectId} />
+          <CheckpointsView projectId={activeProjectId} sessionId={continuedSessionId} />
         {:else if current === "activity"}
-          <ActivityView />
+          <ActivityView sessionId={continuedSessionId} />
         {:else if current === "diagnostics"}
           <DiagnosticsView />
         {:else if current !== "new-chat"}

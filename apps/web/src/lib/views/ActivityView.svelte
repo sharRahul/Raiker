@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
@@ -7,12 +6,14 @@
   import type { EventEntry } from "../apiTypes";
   import { humanize, relativeTime, shortId } from "../format";
 
+  let { sessionId = null }: { sessionId?: string | null } = $props();
   let events = $state<EventEntry[] | null>(null);
   let loadError = $state<string | null>(null);
 
   let sessionFilter = $state("");
   let typeFilter = $state("");
   let limit = $state("100");
+  let loadedSessionId = $state<string | null | undefined>(undefined);
 
   async function load() {
     loadError = null;
@@ -34,7 +35,12 @@
     return "risk-low";
   }
 
-  onMount(load);
+  $effect(() => {
+    if (sessionId === loadedSessionId) return;
+    loadedSessionId = sessionId;
+    sessionFilter = sessionId ?? "";
+    void load();
+  });
 </script>
 
 <div class="head-row">

@@ -49,4 +49,14 @@ describe("ActivityView", () => {
     expect(screen.getByText("runtime_monitor")).toBeInTheDocument();
     expect(screen.getByText("high")).toBeInTheDocument();
   });
+
+  it("loads the audit log scoped to a linked session", async () => {
+    const fetchMock = stubFetch({ "GET /api/events": [] });
+    render(ActivityView, { sessionId: "sess_alpha" });
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("session_id=sess_alpha"))).toBe(true);
+    });
+    expect(screen.getByLabelText("Session id")).toHaveValue("sess_alpha");
+  });
 });

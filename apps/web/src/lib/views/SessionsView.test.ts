@@ -383,4 +383,27 @@ describe("SessionsView organisation", () => {
     const link = screen.getByRole("link", { name: "Open Second chat in chat" });
     expect(link).toHaveAttribute("href", "#/new-chat?session=sess_b");
   });
+
+  it("links a session detail to its audit events and checkpoints", async () => {
+    stubFetch({
+      ...SESSIONS_ROUTE,
+      "GET /api/sessions/sess_b": {
+        session: SESSIONS_ROUTE["GET /api/sessions"][0],
+        turns: [],
+      },
+    });
+    render(SessionsView);
+
+    await waitFor(() => expect(screen.getByText("Second chat")).toBeInTheDocument());
+    await fireEvent.click(screen.getByText("Second chat"));
+
+    expect(await screen.findByRole("link", { name: "View audit events" })).toHaveAttribute(
+      "href",
+      "#/activity?session=sess_b",
+    );
+    expect(screen.getByRole("link", { name: "View checkpoints" })).toHaveAttribute(
+      "href",
+      "#/checkpoints?session=sess_b",
+    );
+  });
 });

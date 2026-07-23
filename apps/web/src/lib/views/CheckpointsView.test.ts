@@ -97,4 +97,37 @@ describe("CheckpointsView", () => {
       ).toBe(true);
     });
   });
+
+  it("loads checkpoints scoped to a linked session", async () => {
+    const fetchMock = stubFetch({ "GET /api/checkpoints": [] });
+    render(CheckpointsView, { sessionId: "sess_alpha" });
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("session_id=sess_alpha"))).toBe(true);
+    });
+    expect(screen.getByLabelText("Filter by session id")).toHaveValue("sess_alpha");
+  });
+
+  it("keeps a manual session filter when the active project changes", async () => {
+    const fetchMock = stubFetch({ "GET /api/checkpoints": CHECKPOINTS });
+    const { rerender } = render(CheckpointsView, {
+      props: { projectId: "proj_a", sessionId: "sess_route" },
+    });
+
+    await waitFor(() => expect(screen.getByLabelText("Filter by session id")).toHaveValue("sess_route"));
+    await fireEvent.input(screen.getByLabelText("Filter by session id"), {
+      target: { value: "sess_manual" },
+    });
+    await rerender({ projectId: "proj_b", sessionId: "sess_route" });
+
+    expect(screen.getByLabelText("Filter by session id")).toHaveValue("sess_manual");
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some((call) => {
+          const url = String(call[0]);
+          return url.includes("session_id=sess_manual") && url.includes("project_id=proj_b");
+        }),
+      ).toBe(true);
+    });
+  });
 });

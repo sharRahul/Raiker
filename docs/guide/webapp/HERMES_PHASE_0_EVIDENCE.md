@@ -38,13 +38,13 @@ The applicable capability labels are derived from the server-provided
 | `#/sessions` | Sessions | sessions, session, turn | rename/pin/tag/move/archive/delete/bulk delete | loading, error, empty, selection/busy |
 | `#/memory` | Memory | memories/settings | edit/pin/search/expiry/incognito/import/export/forget | loading, error, empty, saving |
 | `#/brain` | Brain | brain | add/remove source | loading, error, empty, busy |
-| `#/checkpoints` | Checkpoints | checkpoints | existing governed checkpoint actions only | loading, error, empty, busy |
+| `#/checkpoints?session=` | Checkpoints | checkpoints | existing governed checkpoint actions only | loading, error, empty, busy |
 | `#/approvals` | Approvals | approval list/detail | resolve approval | loading, error, empty, review/busy/notice |
 | `#/capabilities` | Capabilities | gates/runtime | gate/mode/ack mutations | loading, error, deferred, step-up/busy |
 | `#/models` | Models | models/provider models | select/connect/advisor/fallback | loading, error, empty, connect/busy |
 | `#/connections` | Extensions (connectors) | connector store | install/auth/enable/credentials/remove | loading, error, empty, selected/busy |
 | `#/mcp` | MCP servers | servers/sessions/findings | create/connect/rename/pause/resume/delete | loading, error, empty, selected/busy |
-| `#/activity` | Audit log | events | none | loading, error, empty, filters |
+| `#/activity?session=` | Audit log | events | none | loading, error, empty, filters |
 | `#/diagnostics` | Diagnostics | diagnostics/security health | scan/check security | loading, error, empty, checking |
 | `#/work` | Work in Action | task/activity records | existing task controls only | loading, error, empty, filtered |
 | `#/settings` | Settings | settings/security/vault/grants | preference, vault, security, grant, account mutations | loading, error, saving, step-up |
@@ -75,7 +75,7 @@ Only non-secret URL state is accepted:
 | Key | Route | Type/meaning | Invalid behavior |
 |---|---|---|---|
 | path | all | one identifier in `NAV_ITEMS` | falls back to `#/home` |
-| `session` | `#/new-chat` | opaque session ID for a resumed conversation | Chat receives no selected session if absent/invalid |
+| `session` | `#/new-chat`, `#/activity`, `#/checkpoints` | opaque session ID for a resumed conversation or scoped audit/checkpoint view | Chat receives no selected session if absent/invalid; Audit and Checkpoints remain unscoped |
 
 Current internal UI events are deliberately narrow and are not telemetry:
 

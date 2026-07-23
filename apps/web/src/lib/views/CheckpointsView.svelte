@@ -7,12 +7,14 @@
   import { humanize, relativeTime, shortId } from "../format";
 
   // When a project is active (topbar switcher) the list is scoped to it.
-  let { projectId = null }: { projectId?: string | null } = $props();
+  let { projectId = null, sessionId = null }: { projectId?: string | null; sessionId?: string | null } = $props();
 
   let checkpoints = $state<Checkpoint[] | null>(null);
   let loadError = $state<string | null>(null);
   let sessionFilter = $state("");
   let typeFilter = $state("");
+  let loadedSessionId = $state<string | null | undefined>(undefined);
+  let loadedProjectId = $state<string | null | undefined>(undefined);
 
   // The recorder timeline groups snapshots under the session that produced
   // them, newest session first, entries in recorded order.
@@ -47,9 +49,15 @@
     }
   }
 
-  // Load on mount and again whenever the active project changes.
+  // Reload when the route scope changes, but leave a manually edited filter
+  // alone until the user applies it.
   $effect(() => {
-    void projectId;
+    const sessionChanged = sessionId !== loadedSessionId;
+    const projectChanged = projectId !== loadedProjectId;
+    if (!sessionChanged && !projectChanged) return;
+    loadedSessionId = sessionId;
+    loadedProjectId = projectId;
+    if (sessionChanged) sessionFilter = sessionId ?? "";
     void load();
   });
 </script>

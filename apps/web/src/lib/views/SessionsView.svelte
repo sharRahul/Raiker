@@ -441,6 +441,11 @@
         <section class="card" aria-labelledby="session-detail-h">
           <h2 id="session-detail-h">{detail.session.title ?? shortId(detail.session.session_id)}</h2>
           <p class="sub">Created {relativeTime(detail.session.created_at)} · {detail.turns.length} turns</p>
+          <p class="sub">
+            <a href={`#/activity?session=${encodeURIComponent(detail.session.session_id)}`}>View audit events</a>
+            ·
+            <a href={`#/checkpoints?session=${encodeURIComponent(detail.session.session_id)}`}>View checkpoints</a>
+          </p>
           <ol class="turns">
             {#each detail.turns as t (t.turn_id)}
               <li>

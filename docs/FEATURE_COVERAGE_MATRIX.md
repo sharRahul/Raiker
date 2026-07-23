@@ -5,13 +5,14 @@
 
 # Raiker Full Platform Feature Coverage Matrix
 
-> Web experience update (2026-07-22): the launchable local dashboard partially
+> Web experience update (2026-07-23): the launchable local dashboard partially
 > implements the Hermes-informed experience and now uses
 > the Hermes-informed Workbench navigation (Home, Work, Knowledge, Control, and
 > Observe) and server-backed home summaries. This is an information-architecture
 > and presentation delivery only: it does not change capability authority or
 > promote deferred channels, plugin panels, backup/restore, or secret editing to
-> implemented status. The phase plan is **not complete**: browser E2E/visual
+> implemented status. Phase 0 local-browser journey evidence is complete; the
+> phase plan is **not complete** because Phase 1 viewport/keyboard/visual-regression
 > evidence and several specified interaction surfaces remain outstanding. See
 > `docs/plans/2026-07-22-hermes-informed-web-experience-plan.md`.
 

@@ -10,8 +10,10 @@ from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
+from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.context.gatherer import ContextGatherer
+from raiker.contracts.ids import utc_now
 from raiker.models.contracts import ToolCallProposal
 from raiker.models.tool_call_validation import default_tool_specs, validate_tool_call
 from raiker.runtime.connector_ecosystem import (
@@ -213,3 +215,40 @@ def test_get_executes_but_write_waits_for_approval_then_executes_once(
     )
     assert repeated.status_code == 409
     invoke.assert_awaited_once()
+
+
+def test_connector_write_approval_appears_in_owning_principals_inbox(
+    client: TestClient, workspace: Path
+) -> None:
+    """A connector-store write has no chat session, but must remain reviewable."""
+    auth = headers(client)
+    setup_connector(client, auth, "post")
+    proposed = client.post(
+        "/api/connector-store/github/actions",
+        headers=auth,
+        json={"operation_id": "postRepo", "arguments": {"path": {"owner": "acme"}}},
+    )
+
+    assert proposed.status_code == 200
+    inbox = client.get("/api/approvals?status_filter=pending", headers=auth)
+
+    assert inbox.status_code == 200
+    assert [item["approval_id"] for item in inbox.json()] == [proposed.json()["approval_id"]]
+    detail = client.get(f"/api/approvals/{proposed.json()['approval_id']}", headers=auth)
+    assert detail.status_code == 200
+
+    with SQLiteStore(workspace).connect() as connection:
+        connection.execute(
+            """INSERT INTO principals
+               (principal_id, principal_type, display_name, role_ids, domain_scopes,
+                max_runtime_mode, created_at, is_active)
+               VALUES (?, 'human', ?, '[]', '[]', 'development_preview', ?, 1)""",
+            ("principal_other", "Other", utc_now()),
+        )
+    other_token, _ = ApiSessionStore(workspace).create_session("principal_other")
+    other_auth = {"Authorization": f"Bearer {other_token}"}
+    other_inbox = client.get("/api/approvals?status_filter=pending", headers=other_auth)
+
+    assert other_inbox.status_code == 200
+    assert other_inbox.json() == []
+    assert client.get(f"/api/approvals/{proposed.json()['approval_id']}", headers=other_auth).status_code == 404

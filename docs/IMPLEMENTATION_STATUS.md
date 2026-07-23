@@ -5,7 +5,7 @@
 
 # Implementation Status
 
-> Current truth update (2026-07-22): **Hermes-informed local web experience is
+> Current truth update (2026-07-23): **Hermes-informed local web experience is
 > partially implemented; phases 0–4 are not complete.** The Svelte shell has the
 > Home/Work/Knowledge/Control/Observe information architecture and a Workbench
 > home that reads server-backed session, task, and pending-approval summaries.
@@ -16,9 +16,11 @@
 > `docs/plans/2026-07-22-hermes-informed-web-experience-plan.md`. The plan now
 > records the missing E2E/visual evidence and incomplete persistent-chat,
 > session-detail, checkpoint-preflight, Extensions-hub, and observability-hub work.
-> **Phase 0 inventory evidence is recorded** in
-> `docs/guide/webapp/HERMES_PHASE_0_EVIDENCE.md`; live-browser recordings remain
-> environment-blocked and are explicitly not claimed as completed.
+> **Phase 0 evidence is complete** in
+> `docs/guide/webapp/HERMES_PHASE_0_EVIDENCE.md`: five disposable-workspace
+> local-browser journeys were recorded, and the pass fixed owner visibility for
+> sessionless connector-write approvals. Phase 1 browser viewport, keyboard, and
+> visual-regression evidence remains outstanding.
 
 > Current truth update (2026-07-21): **Milestone 3 complete** — C2 persists a
 > distinct bounded subagent AI principal and parks any mutation in the parent

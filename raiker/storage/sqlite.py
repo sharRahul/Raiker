@@ -3231,45 +3231,90 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
-    def list_approvals(self, status: str | None = None, *, user_id: str | None = None) -> list[dict[str, Any]]:
-        # The sessions join exists only to enforce the owner filter, so it is
-        # added only when filtering. An unconditional inner join would hide
-        # every approval whose action has no registered sessions row.
+    def list_approvals(
+        self,
+        status: str | None = None,
+        *,
+        user_id: str | None = None,
+        principal_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        # Most approvals inherit their owner through a chat session. Connector
+        # store writes are deliberately sessionless, so their immutable intent
+        # binds ownership to the proposing principal instead.
         query = """
             SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id, tool_actions.tool_name, tool_actions.arguments_json, tool_actions.risk_level
             FROM approvals
             JOIN tool_actions ON approvals.action_id = tool_actions.action_id
         """
         params: list[Any] = []
-        if user_id is not None:
+        clauses: list[str] = []
+        if principal_id is not None:
+            query += """
+                LEFT JOIN sessions ON tool_actions.session_id = sessions.session_id
+                LEFT JOIN connector_write_intents
+                    ON connector_write_intents.approval_id = approvals.approval_id
+            """
+            if user_id is None:
+                clauses.append("connector_write_intents.principal_id = ?")
+                params.append(principal_id)
+            else:
+                clauses.append("(sessions.user_id = ? OR connector_write_intents.principal_id = ?)")
+                params.extend((user_id, principal_id))
+        elif user_id is not None:
             query += " JOIN sessions ON tool_actions.session_id = sessions.session_id AND sessions.user_id = ?"
             params.append(user_id)
         if status is not None:
-            query += " WHERE approvals.status = ?"
+            clauses.append("approvals.status = ?")
             params.append(status)
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
         query += " ORDER BY approvals.created_at DESC"
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
-    def load_approval(self, approval_id: str, *, user_id: str | None = None) -> dict[str, Any] | None:
-        # The sessions join exists only to enforce the owner filter. Joining it
-        # unconditionally would hide every approval whose action has no
-        # registered sessions row (the terminal client records actions without
-        # one), so it is added only when a user is actually being filtered on.
+    def load_approval(
+        self,
+        approval_id: str,
+        *,
+        user_id: str | None = None,
+        principal_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        # The normal owner filter is session-based. Connector-store writes have
+        # no session row, so their immutable intent is the owner binding.
+        owner_join = ""
+        owner_filter = ""
+        params: tuple[Any, ...]
+        if principal_id is not None:
+            owner_join = """
+                LEFT JOIN sessions ON tool_actions.session_id = sessions.session_id
+                LEFT JOIN connector_write_intents
+                    ON connector_write_intents.approval_id = approvals.approval_id
+            """
+            if user_id is None:
+                owner_filter = " AND connector_write_intents.principal_id = ?"
+                params = (approval_id, principal_id)
+            else:
+                owner_filter = " AND (sessions.user_id = ? OR connector_write_intents.principal_id = ?)"
+                params = (approval_id, user_id, principal_id)
+        elif user_id is not None:
+            owner_join = (
+                " JOIN sessions ON tool_actions.session_id = sessions.session_id"
+                " AND sessions.user_id = ?"
+            )
+            params = (user_id, approval_id)
+        else:
+            params = (approval_id,)
         with self.connect() as connection:
             row = connection.execute(
                 """
                 SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id, tool_actions.tool_name, tool_actions.arguments_json, tool_actions.risk_level
                 FROM approvals
                 JOIN tool_actions ON approvals.action_id = tool_actions.action_id
-                """ + (
-                    " JOIN sessions ON tool_actions.session_id = sessions.session_id"
-                    " AND sessions.user_id = ?" if user_id is not None else ""
-                ) + """
-                WHERE approval_id = ?
-                """,
-                (approval_id,) if user_id is None else (user_id, approval_id),
+                """ + owner_join + """
+                WHERE approvals.approval_id = ?
+                """ + owner_filter,
+                params,
             ).fetchone()
         return dict(row) if row else None
 

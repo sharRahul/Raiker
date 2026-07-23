@@ -1,28 +1,26 @@
 # Hermes-informed web experience — Phase 1 prerequisites
 
-> **Audit date:** 2026-07-22  
-> **Decision:** Phase 1 may begin. This document closes the Phase 0 prerequisite
-> work; it does **not** mark Phase 1 implementation complete.
+> **Audit date:** 2026-07-23
+> **Decision:** Phase 0 is complete and Phase 1 may begin. This document does
+> **not** mark Phase 1 implementation complete.
 
 ## Contract boundaries
 
 The browser is a local presentation client. It consumes typed DTOs through
 `apps/web/src/lib/api.ts` and `apiTypes.ts`; it does not store credentials,
 decide risk, or represent a mutation as completed until the API response confirms
-it. Route state is restricted to the non-secret selection keys `project`,
-`session`, `record`, `filter`, and `tab`. Unknown query keys are ignored and
-empty/oversized values are dropped by `routeStateFromHash`.
+it. The allowed fragment path is one `NAV_ITEMS` route. `routeStateFromHash`
+parses only the non-secret keys `project`, `session`, `record`, `filter`, and
+`tab`; unknown keys are ignored and empty/oversized values are dropped. The
+current shell consumes `session` for `new-chat`, `activity`, and `checkpoints`;
+the other parsed keys are reserved for route consumers and grant no authority.
 
 ### UI event contract
 
-| Event | Owner | Required result |
+| Event | Producer → consumer | Required result |
 |---|---|---|
-| `route_changed` | shell | URL route and allowed selection state change; focus moves to `main`. |
-| `project_selected` | top bar | `POST/PUT` selection API confirms; shared project snapshot refreshes. |
-| `prompt_submitted` | chat | streamed API lifecycle is rendered; no simulated progress. |
-| `approval_resolved` | approvals | API-confirmed status is rendered; failure preserves the pending item. |
-| `task_created` / `task_stopped` | tasks | API-confirmed task data refreshes the list. |
-| `extension_lifecycle_changed` | connections/MCP | API-confirmed installation, connection, enablement, and usability facts refresh. |
+| `hashchange` | browser navigation → `App.svelte` | Restores the allowed route and session selection; focus moves to `main`. |
+| `raiker:chats-changed` | Chat/Projects/Sidebar → Sidebar | Refreshes the recent-session list without carrying prompt content. |
 
 Events are UI semantics, not a client-side audit log. Authoritative audit events
 remain server-owned and are viewed through Activity.
@@ -45,15 +43,17 @@ list drifting from the contract.
 
 ## Representative journey baseline
 
-The following journeys are the release baseline and must be re-run after Phase
-1. They are not yet usability-study measurements; a supported browser runner is
-required to record task time and misclick counts.
+The following journeys are the release baseline and were recorded on 2026-07-23
+in `HERMES_PHASE_0_EVIDENCE.md`. They must be re-run after Phase 1. They are not
+population usability-study measurements; Phase 1 still needs its supported
+viewport, keyboard, and visual-regression evidence.
 
 1. Unlock, select/create project context, submit the first prompt, and observe a
-   completed/denied/approval-required server result.
+   completed, denied, approval-required, or truthful unavailable server result.
 2. Resume a session, search it, alter its project/filter selection, and use
    browser back/forward.
-3. Review a normal and critical approval, including denial and required step-up.
+3. Review a normal approval, including denial, and inspect the required critical
+   step-up before any mutation is committed.
 4. Select a hosted model and confirm egress acknowledgement/fallback facts.
 5. Inspect a connector or MCP failure and follow its server-provided remediation.
 

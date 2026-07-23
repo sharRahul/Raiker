@@ -1,6 +1,6 @@
 # Hermes-Informed Web Experience Improvement Plan
 
-> **Status:** partially implemented (audited 2026-07-22). The existing local-web
+> **Status:** partially implemented (audited 2026-07-23). The existing local-web
 > experience delivers portions of this plan; the phase checklist below remains
 > the source of truth for work that is not yet delivered.
 > **Reviewed source:** `NousResearch/hermes-agent` `main` at
@@ -217,8 +217,7 @@ plan.
 
 | Phase | Audited state | Evidence and remaining work |
 |---|---|---|
-| 0 | complete | Route/API/mutation inventory, non-secret route-state and UI-event contracts, Phase 1 journey baseline, missing read-model inventory, and threat-model review are recorded in `docs/guide/webapp/PHASE_1_PREREQUISITES.md`. Browser-measured usability evidence remains a Phase 1 quality-gate requirement. |
-| 0 | partial | Typed API-backed route views and component tests exist. The five measured representative journeys, UI-event schema, and documented missing-read-model inventory have not been recorded. |
+| 0 | complete | Route/API/mutation inventory, actual non-secret route-state and UI-event contracts, missing read-model inventory, threat-model review, and five local-browser baseline journeys are recorded in `docs/guide/webapp/HERMES_PHASE_0_EVIDENCE.md` and `docs/guide/webapp/PHASE_1_PREREQUISITES.md`. The browser run also fixed owner visibility for sessionless connector-write approvals. Phase 1 retains its viewport, keyboard, and visual-regression quality gates. |
 | 1 | partial | The shell has grouped navigation, responsive drawer/bottom navigation, tokenized styles, route focus handling, notification access, and a persistent stop control. Visual-regression, keyboard-route, and supported-viewport evidence are absent. |
 | 2 | partial | Workbench summaries, chat/session links, a persistent chat host, task cadence choices, session bulk actions, approval previews, client-side risk/newest approval triage ordering, server-backed approval-expiry visibility, and session-to-audit/checkpoint deep links exist. Broader session detail cross-links, approval step-up flow, and browser E2E coverage are not complete. |
 | 3 | partial | Existing project, memory, brain, checkpoint, model/fallback, capability, connector, and MCP views cover parts of the scope. A project context home/file inspect pane, checkpoint preflight funnel, and one tabbed Extensions hub are not complete. |
@@ -230,14 +229,17 @@ presented as available. Documentation was behind the actual implementation claim
 this audit corrects it. Future changes must update the status and coverage ledgers
 in the same commit as the implementation and its verification evidence.
 
-### Phase 0 evidence update — 2026-07-22
+### Phase 0 evidence update — 2026-07-23
 
 The detailed route, API/mutation, state, capability-label, query-state, UI-event,
 missing-read-model, and representative-journey audit is recorded in
 [`docs/guide/webapp/HERMES_PHASE_0_EVIDENCE.md`](../guide/webapp/HERMES_PHASE_0_EVIDENCE.md).
 The source inventory and contracts are complete. The five required local-browser
-journey recordings remain blocked by the browser-download restriction and must be
-completed before Phase 1 can be claimed complete.
+journeys were recorded against a disposable local build/workspace, including the
+truthful fail-closed outcomes for an unconfigured model, hosted provider policy,
+and disabled MCP capability gate. The pass found and fixed owner visibility for a
+sessionless connector-write approval. Phase 1 completion still requires its own
+viewport, keyboard, and visual-regression evidence.
 
 ### Phase 0 — Evidence, usability baseline, and contracts
 

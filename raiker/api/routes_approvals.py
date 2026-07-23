@@ -49,7 +49,9 @@ async def list_approvals(
     session, _principal = _auth_data
     user_id = SQLiteStore(_ws(request)).principal_user_id(session.principal_id)
     return serialize_dto(
-        _service(request).list_approvals(status=status_filter, user_id=user_id)
+        _service(request).list_approvals(
+            status=status_filter, user_id=user_id, principal_id=session.principal_id
+        )
     )
 
 
@@ -61,7 +63,9 @@ async def get_approval(
 ) -> dict[str, Any]:
     session, _principal = _auth_data
     user_id = SQLiteStore(_ws(request)).principal_user_id(session.principal_id)
-    view = _service(request).get_approval(approval_id, user_id=user_id)
+    view = _service(request).get_approval(
+        approval_id, user_id=user_id, principal_id=session.principal_id
+    )
     if view is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown approval: {approval_id}"

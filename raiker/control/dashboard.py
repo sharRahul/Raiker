@@ -1972,17 +1972,29 @@ class DashboardService:
 
     # ── Approvals (read-only views; resolution lives in ApprovalInbox) ───
     def list_approvals(
-        self, status: str = "pending", *, user_id: str | None = None
+        self,
+        status: str = "pending",
+        *,
+        user_id: str | None = None,
+        principal_id: str | None = None,
     ) -> list[ApprovalView]:
         return [
             self._approval_view(row)
-            for row in self.store.list_approvals(status=status, user_id=user_id)
+            for row in self.store.list_approvals(
+                status=status, user_id=user_id, principal_id=principal_id
+            )
         ]
 
     def get_approval(
-        self, approval_id: str, *, user_id: str | None = None
+        self,
+        approval_id: str,
+        *,
+        user_id: str | None = None,
+        principal_id: str | None = None,
     ) -> ApprovalDetailView | None:
-        row = self.store.load_approval(approval_id, user_id=user_id)
+        row = self.store.load_approval(
+            approval_id, user_id=user_id, principal_id=principal_id
+        )
         if row is None:
             return None
         return self._approval_detail(row)

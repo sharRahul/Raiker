@@ -19,7 +19,7 @@
   import TabStrip from "../components/TabStrip.svelte";
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
-  import type { ExtensionView, ExtensionsOverview } from "../apiTypes";
+  import type { ApprovalView, ExtensionView, ExtensionsOverview } from "../apiTypes";
   import { relativeTime } from "../format";
   import { HUB_TABS } from "../nav";
 
@@ -29,6 +29,16 @@
   let loadError = $state<string | null>(null);
   let selected = $state<ExtensionView | null>(null);
   let filter = $state<"all" | "usable" | "blocked">("all");
+
+  // Reverse approval link: a connector call waiting on a decision should say so
+  // here, not only in the queue. Matched on capability, which is what the
+  // approval is actually raised against.
+  let approvals = $state<ApprovalView[]>([]);
+  const pendingForSelected = $derived(
+    selected?.capability == null
+      ? []
+      : approvals.filter((approval) => approval.capability === selected?.capability),
+  );
 
   const tabs = HUB_TABS.extensions.map((id) => ({
     id,
@@ -121,6 +131,7 @@
       loadError =
         error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable";
     }
+    try { approvals = await api.approvals(); } catch { approvals = []; }
   }
 
   onMount(load);
@@ -228,6 +239,13 @@
               <p class="reason" class:blocked={selected.blocked_reason !== null}>
                 {blockedCopy(selected)}
               </p>
+              {#if pendingForSelected.length > 0}
+                <p class="pending-approval" role="status">
+                  {pendingForSelected.length === 1 ? "One call is" : `${pendingForSelected.length} calls are`}
+                  waiting on your decision before this connector can act.
+                  <a href="#/approvals">Review the decision queue</a>
+                </p>
+              {/if}
               <dl class="property-list">
                 {#if selected.capability}
                   <dt>Capability</dt><dd class="mono">{selected.capability}</dd>
@@ -370,6 +388,14 @@
   .empty-row { color: var(--text-3); padding: var(--space-4); }
   .reason { color: var(--ok); font-weight: 600; margin: 0; }
   .reason.blocked { color: var(--warn); }
+  .pending-approval {
+    margin: 0;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--accent-border);
+    background: var(--accent-soft);
+    border-radius: var(--r-sm);
+    font-size: 0.8rem;
+  }
   .note { color: var(--text-3); font-size: 0.78rem; margin: 0; }
   hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-5) 0; }
   .deferred { max-width: 46rem; }

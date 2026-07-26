@@ -68,8 +68,8 @@ is refused, and that no response carries a secret-shaped value.
 
 ### Phase 4
 
-- **Observability hub.** Overview, audit log, diagnostics, work in action, and
-  notification history are one destination with five tabs. The overview is
+- **Observability hub.** Overview, audit log, checkpoints, diagnostics, work in
+  action, and notification history are one destination with six tabs. The overview is
   organised around four questions — is Raiker ready, is anything waiting for me,
   what changed, can I safely share this — and every card links to the record it
   is derived from rather than showing a colour on its own.
@@ -81,9 +81,9 @@ is refused, and that no response carries a secret-shaped value.
 
 ### Navigation
 
-The Control and Observe groups collapse from seven entries to five. Pre-hub deep
-links (`#/activity`, `#/diagnostics`, `#/work`, `#/mcp`, `#/connections`) resolve
-to their hub and open the matching tab, so every link already emitted by session
+The Control, Knowledge, and Observe groups collapse from nine entries to six.
+Pre-hub deep links (`#/activity`, `#/checkpoints`, `#/diagnostics`, `#/work`,
+`#/mcp`, `#/connections`) resolve to their hub and open the matching tab, so every link already emitted by session
 detail, notifications, and the guides keeps working. Tab selection lives in the
 hash, so a panel is a shareable location rather than hidden client state.
 
@@ -105,13 +105,14 @@ wrong semantics and produced two competing tablists on the Extensions page.
 
 ## Automated evidence
 
-- Web suite: **276 passed, 1 skipped** (was 219 before this change). Lint,
+- Web suite: **288 passed, 1 skipped** (was 219 before this change). Lint,
   `svelte-check`, and the production build all pass with zero errors and zero
   warnings.
 - New web tests: `ExtensionsView.test.ts`, `ObserveView.test.ts`,
   `WorkbenchView.test.ts`, `TabStrip.test.ts`, `SidePanel.test.ts`, plus new
-  cases in `CheckpointsView.test.ts`, `ProjectsView.test.ts`, `nav.test.ts`,
-  `format.test.ts`, and `appCss.test.ts`.
+  cases in `CheckpointsView.test.ts`, `ProjectsView.test.ts`, `TasksView.test.ts`,
+  `nav.test.ts`, `format.test.ts`, and `appCss.test.ts`; plus
+  `tests/test_turn_model_fallback.py` for the error-code fix.
 - Backend: `tests/test_api_web_read_models.py` (14 tests). Ruff and mypy clean.
 
 ## Local browser evidence
@@ -150,6 +151,57 @@ deliberately aborted; there were no warnings and no page errors.
 Screenshots at 1280x800 and 375x812 were captured for review under an ignored
 scratch path and removed before commit. They are verification artifacts, not
 release content.
+
+## Follow-up round: navigation decisions and a live-model finding
+
+A second pass acted on four decisions taken after review.
+
+**Approvals stays top-level, with the missing reverse links added.** Approvals
+are raised by chat turns, connector writes, background agents, and checkpoint
+restores — not only by tasks — and a sessionless connector-write approval has no
+task to nest under. They are also a queue with state, expiry, and a step-up, not
+a dismissible feed. What was genuinely missing was the *reverse* pointer, so a
+blocked task card now names the decisions holding it up and links to them, and
+the extension inspector says when a call is waiting on a decision for that
+capability. Both degrade quietly: a failed approvals read leaves the page intact
+rather than blanking it.
+
+**Checkpoints moved from Knowledge to Observability.** Rewind metadata is an
+operational record, not knowledge the agent recalls. It is now a tab beside the
+audit log, `#/checkpoints` resolves to it, and Knowledge is down to Memory and
+Brain.
+
+**Capabilities is labelled Permissions.** "Integrations" was considered and
+rejected: it means third-party services, which is exactly what Extensions is, so
+the two would have collided on the one distinction governance depends on —
+Permissions is what the *agent* may do, Extensions is what *services* are
+connected. The route id stays `capabilities`, so every deep link and the backend
+vocabulary are unchanged.
+
+**A live-model run found a real error-reporting defect, now fixed.** Driving the
+whole hosted-model path against `api.anthropic.com` — runtime-mode activation,
+the capability step-up (which correctly refused to submit without a reason, a
+confirmation token, and a threat-model acknowledgement), model pinning, and
+egress labelling — all behaved correctly, and the turn failed honestly with no
+fabricated answer. But it reported `provider_connection_failed` when the actual
+cause was a rejected API key.
+
+The provider layer had classified it correctly as
+`provider_auth_failed:http_401`; `RuntimeOrchestrator` caught the broad
+`ModelProviderError` and hard-coded a single generic code, discarding it. In a
+runtime whose core rule is honest, specific failure reporting, that sends the
+owner to debug their network when the problem is their credential.
+`provider_error_code` in `raiker/models/exceptions.py` now preserves the
+provider's own code, at both the non-streaming and streaming call sites and in
+the `safe_error_code` event payload. Only code-shaped messages are trusted —
+prose and non-provider exceptions are classified by exception type — so an
+arbitrary message can never be promoted into an event payload, and `safe_error`
+still runs first so a leaked header fragment cannot travel with it.
+
+The supplied key was rejected by Anthropic (`authentication_error`), verified
+independently with curl and with httpx from the server's own environment, so the
+network path was fine and no real model response could be obtained. Everything
+up to the model call is verified; the model call itself is not.
 
 ## Known limitation recorded rather than hidden
 

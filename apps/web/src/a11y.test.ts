@@ -36,7 +36,7 @@ describe("accessibility landmarks", () => {
     render(App);
     await signIn();
     await waitFor(() => {
-      expect(screen.getByRole("link", { name: /capabilities/i })).toHaveAttribute("aria-current", "page");
+      expect(screen.getByRole("link", { name: /permissions/i })).toHaveAttribute("aria-current", "page");
     });
   });
 

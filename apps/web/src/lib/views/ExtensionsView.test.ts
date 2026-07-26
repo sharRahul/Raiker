@@ -137,6 +137,37 @@ describe("ExtensionsView", () => {
     ).toBeInTheDocument();
   });
 
+  it("points at the decision queue when a call is waiting on approval", async () => {
+    stubFetch({
+      ...overview([extension({ installed: true, connected: true, enabled: true })]),
+      "GET /api/approvals": [
+        { approval_id: "appr_1", capability: "connector_gmail_runtime", is_expired: false },
+      ],
+    });
+    render(ExtensionsView, { props: { tab: "connectors" } });
+    await waitFor(() => expect(screen.getByLabelText("Open Gmail details")).toBeInTheDocument());
+    await fireEvent.click(screen.getByLabelText("Open Gmail details"));
+
+    expect(await screen.findByText(/one call is\s+waiting on your decision/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /review the decision queue/i })).toHaveAttribute(
+      "href",
+      "#/approvals",
+    );
+  });
+
+  it("shows no approval pointer when nothing is pending for that capability", async () => {
+    stubFetch({
+      ...overview([extension({ installed: true })]),
+      "GET /api/approvals": [
+        { approval_id: "appr_1", capability: "connector_slack_runtime", is_expired: false },
+      ],
+    });
+    render(ExtensionsView, { props: { tab: "connectors" } });
+    await waitFor(() => expect(screen.getByLabelText("Open Gmail details")).toBeInTheDocument());
+    await fireEvent.click(screen.getByLabelText("Open Gmail details"));
+    expect(screen.queryByText(/waiting on your decision/i)).not.toBeInTheDocument();
+  });
+
   it("states plainly that plugin panels are not available yet", async () => {
     stubFetch({});
     render(ExtensionsView, { props: { tab: "plugins" } });

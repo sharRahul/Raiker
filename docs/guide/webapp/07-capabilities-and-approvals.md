@@ -1,4 +1,4 @@
-# 7. Capabilities & approvals
+# 7. Permissions & approvals
 
 This is the heart of Raiker's governance. **Capabilities** decides *what the agent
 may do and how it must ask*; **Approvals** is where proposed actions wait for your

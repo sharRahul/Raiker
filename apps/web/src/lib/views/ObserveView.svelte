@@ -10,6 +10,7 @@
    */
   import { onMount } from "svelte";
   import ActivityView from "./ActivityView.svelte";
+  import CheckpointsView from "./CheckpointsView.svelte";
   import DiagnosticsView from "./DiagnosticsView.svelte";
   import WorkInActionView from "./WorkInActionView.svelte";
   import Icon from "../components/Icon.svelte";
@@ -29,7 +30,11 @@
   import { humanize, isRedacted, relativeTime, shortId } from "../format";
   import { HUB_TABS } from "../nav";
 
-  let { tab = "overview", sessionId = null }: { tab?: string; sessionId?: string | null } = $props();
+  let {
+    tab = "overview",
+    sessionId = null,
+    projectId = null,
+  }: { tab?: string; sessionId?: string | null; projectId?: string | null } = $props();
 
   let diagnostics = $state<Diagnostics | null>(null);
   let readiness = $state<RuntimeReadiness | null>(null);
@@ -53,6 +58,7 @@
       label: {
         overview: "Overview",
         activity: "Audit log",
+        checkpoints: "Checkpoints",
         diagnostics: "Diagnostics",
         work: "Work in action",
         notifications: "Notifications",
@@ -264,6 +270,7 @@
             {/each}
           </ol>
           <a class="more" href="#/observe?tab=activity">Open the full audit log</a>
+          <a class="more" href="#/observe?tab=checkpoints">See the rewind timeline</a>
         {/if}
       </section>
 
@@ -298,6 +305,10 @@
 {:else if tab === "activity"}
   <div id="panel-activity" role="tabpanel" aria-labelledby="tab-activity">
     <ActivityView {sessionId} />
+  </div>
+{:else if tab === "checkpoints"}
+  <div id="panel-checkpoints" role="tabpanel" aria-labelledby="tab-checkpoints">
+    <CheckpointsView {projectId} {sessionId} />
   </div>
 {:else if tab === "diagnostics"}
   <div id="panel-diagnostics" role="tabpanel" aria-labelledby="tab-diagnostics">

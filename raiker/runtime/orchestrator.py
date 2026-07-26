@@ -18,7 +18,11 @@ from raiker.models.contracts import (
     ToolCallProposal,
     summarize_model_usage,
 )
-from raiker.models.exceptions import ModelProviderError
+from raiker.models.exceptions import (
+    UNCLASSIFIED_PROVIDER_ERROR,
+    ModelProviderError,
+    provider_error_code,
+)
 from raiker.models.router import ModelRouter
 from raiker.models.tool_call_validation import (
     ToolCallRejected,
@@ -223,6 +227,9 @@ class RuntimeOrchestrator:
     async def _acall_model(
         self, envelope: PromptEnvelope, messages: list[ModelMessage]
     ) -> ModelResponse:
+        # The last provider's own reason code, so a turn that runs out of
+        # providers reports why rather than a generic "connection failed".
+        last_error_code = UNCLASSIFIED_PROVIDER_ERROR
         for rank, (provider, model) in enumerate(self._provider_chain(envelope)):
             if rank > 0:
                 self._event(
@@ -245,6 +252,7 @@ class RuntimeOrchestrator:
                     provider, model, messages, self.tool_specs
                 )
             except ModelProviderError as exc:
+                last_error_code = provider_error_code(exc)
                 self._event(
                     envelope,
                     "model_request_failed",
@@ -252,7 +260,7 @@ class RuntimeOrchestrator:
                         "provider": provider,
                         "finish_reason": "error",
                         "error_class": type(exc).__name__,
-                        "safe_error_code": "provider_connection_failed",
+                        "safe_error_code": last_error_code,
                     },
                 )
                 continue
@@ -269,7 +277,7 @@ class RuntimeOrchestrator:
             )
             return response
         return ModelResponse(
-            text="model_unavailable: provider_connection_failed", finish_reason="error"
+            text=f"model_unavailable: {last_error_code}", finish_reason="error"
         )
 
     @staticmethod
@@ -321,6 +329,7 @@ class RuntimeOrchestrator:
         client, a later stream failure ends the turn honestly instead of mixing
         another provider's response into the same transcript.
         """
+        last_error_code = UNCLASSIFIED_PROVIDER_ERROR
         for rank, (provider, model) in enumerate(self._provider_chain(envelope)):
             if rank > 0:
                 self._event(
@@ -363,6 +372,7 @@ class RuntimeOrchestrator:
                     if provider_event.event_type == "finish":
                         finish = provider_event.finish_reason
             except Exception as exc:  # noqa: BLE001
+                last_error_code = provider_error_code(exc)
                 self._event(
                     envelope,
                     "model_request_failed",
@@ -370,7 +380,7 @@ class RuntimeOrchestrator:
                         "provider": provider,
                         "finish_reason": "error",
                         "error_class": type(exc).__name__,
-                        "safe_error_code": "provider_connection_failed",
+                        "safe_error_code": last_error_code,
                         "partial_output_exposed": output_committed,
                     },
                 )
@@ -407,7 +417,7 @@ class RuntimeOrchestrator:
             return
 
         yield ModelResponse(
-            text="model_unavailable: provider_connection_failed", finish_reason="error"
+            text=f"model_unavailable: {last_error_code}", finish_reason="error"
         )
 
     async def astream_handle(
@@ -546,7 +556,7 @@ class RuntimeOrchestrator:
                 yield pending
             if response.finish_reason == "error":
                 status = "failed"
-                message = response.text or "model_unavailable: provider_connection_failed"
+                message = response.text or f"model_unavailable: {UNCLASSIFIED_PROVIDER_ERROR}"
                 break
             if not response.tool_calls:
                 final_text = response.text

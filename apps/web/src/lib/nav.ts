@@ -18,16 +18,15 @@ export const NAV_GROUPS: NavGroup[] = [
   { label: "Knowledge", items: [
     { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },
     { id: "brain", label: "Brain", icon: "spark", hint: "Workspace relationships and sources" },
-    { id: "checkpoints", label: "Checkpoints", icon: "checkpoints", hint: "Rewind metadata for every session" },
   ] },
   { label: "Control", items: [
     { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
-    { id: "capabilities", label: "Capabilities", icon: "capabilities", hint: "What the agent may do, and how it must ask" },
+    { id: "capabilities", label: "Permissions", icon: "capabilities", hint: "What the agent may do, and how it must ask" },
     { id: "models", label: "Models", icon: "models", hint: "Model profiles and provider gates" },
     { id: "extensions", label: "Extensions", icon: "connections", hint: "Connectors, MCP servers, and what is not yet available" },
   ] },
   { label: "Observe", items: [
-    { id: "observe", label: "Observability", icon: "diagnostics", hint: "Readiness, audit log, live work, and notifications" },
+    { id: "observe", label: "Observability", icon: "diagnostics", hint: "Readiness, audit log, checkpoints, live work, and notifications" },
   ] },
   { label: "Utilities", items: [{ id: "settings", label: "Settings", icon: "settings", hint: "Runtime mode, security posture, appearance" }] },
 ];
@@ -40,7 +39,7 @@ export const DEFAULT_ROUTE = "home";
  */
 export const HUB_TABS: Record<string, string[]> = {
   extensions: ["connectors", "mcp", "plugins", "channels"],
-  observe: ["overview", "activity", "diagnostics", "work", "notifications"],
+  observe: ["overview", "activity", "checkpoints", "diagnostics", "work", "notifications"],
 };
 
 /**
@@ -53,6 +52,7 @@ const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
   connections: { route: "extensions", tab: "connectors" },
   mcp: { route: "extensions", tab: "mcp" },
   activity: { route: "observe", tab: "activity" },
+  checkpoints: { route: "observe", tab: "checkpoints" },
   diagnostics: { route: "observe", tab: "diagnostics" },
   work: { route: "observe", tab: "work" },
   notifications: { route: "observe", tab: "notifications" },

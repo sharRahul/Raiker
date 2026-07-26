@@ -27,7 +27,7 @@ connectors/MCP, and understand the governance controls.
 | 4 | [Chat: your first governed turn](04-chat.md) | Send a prompt, read the governance trail, find it later |
 | 5 | [Tasks](05-tasks.md) | The four kinds of work: task, scheduled, routine, background agent |
 | 6 | [Models & providers](06-models-and-providers.md) | Local runtimes, hosted providers, the fallback sequence |
-| 7 | [Capabilities & approvals](07-capabilities-and-approvals.md) | Decision modes, turning capabilities on, the approval queue |
+| 7 | [Permissions & approvals](07-capabilities-and-approvals.md) | Decision modes, turning capabilities on, the approval queue |
 | 8 | [Extensions: connectors & MCP](08-connections-and-mcp.md) | The Extensions hub: readiness, the Connector Store, MCP servers, and what is not available yet |
 | 9 | [Security, vault & settings](09-security-vault-and-settings.md) | Vault key, MFA, runtime mode, appearance |
 | 10 | [Sessions, search & observability](10-sessions-audit-diagnostics.md) | Where your history and the runtime's honesty live |

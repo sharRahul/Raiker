@@ -97,7 +97,10 @@ def test_provider_failure_emits_failed_event_without_prompt(tmp_path: Path) -> N
     envelope = build_prompt_envelope("RAW_PROMPT_SECRET", session_id="sess_fail")
     response = asyncio.run(_runtime(tmp_path, FailingRouter()).ahandle(envelope))
     assert response.status == "failed"
-    assert response.message == "model_unavailable: provider_connection_failed"
+    # The provider's own reason code survives to the user-facing message: a
+    # failed turn says *why* it failed rather than collapsing every cause into
+    # one generic "connection failed".
+    assert response.message == "model_unavailable: provider_unreachable"
     events = _event_payloads(tmp_path)
     model_events = [e for e in events if e["event_type"].startswith("model_request_")]
     assert any(e["event_type"] == "model_request_failed" for e in model_events)

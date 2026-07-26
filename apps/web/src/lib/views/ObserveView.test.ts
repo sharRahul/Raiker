@@ -184,6 +184,16 @@ describe("ObserveView", () => {
     expect(screen.queryByRole("link", { name: /session/i })).not.toBeInTheDocument();
   });
 
+  it("hosts the rewind timeline as a tab rather than a separate destination", async () => {
+    stubFetch({ ...routes(), "GET /api/checkpoints": [] });
+    render(ObserveView, { props: { tab: "checkpoints" } });
+    expect(await screen.findByRole("tab", { name: "Checkpoints" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(await screen.findByText(/the recorder timeline/i)).toBeInTheDocument();
+  });
+
   it("exposes each section through the ARIA tabs pattern", async () => {
     stubFetch(routes());
     render(ObserveView, { props: { tab: "overview" } });

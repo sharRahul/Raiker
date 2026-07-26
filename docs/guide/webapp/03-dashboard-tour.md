@@ -31,14 +31,13 @@ carries the page title, the active-project switcher, a **notification bell**, a
 |------|-----------|
 | **Memory** | Approved memories the agent may recall, each with provenance, scope, and sensitivity. Pin or forget them. |
 | **Brain** | A map of stored runtime records (sessions, tasks, tools, approvals, memory, schedules, backups). |
-| **Checkpoints** | Metadata snapshots taken at safe points as sessions run, each with a read-only restore preflight. |
 
 ### Control — where intent becomes governed action
 
 | Item | What it is |
 |------|-----------|
 | **Approvals** | Actions the agent proposed that need your decision. Critical decisions require a separate, server-enforced step-up. |
-| **Capabilities** | For every capability, choose Ask / Allow / Auto / Deny, and turn integrated capabilities on or off. |
+| **Permissions** | For every capability, choose Ask / Allow / Auto / Deny, and turn integrated capabilities on or off. Capabilities are what the *agent* may do; Extensions is where *services* are connected. |
 | **Models** | Model profiles, roles, fallback order, and provider gates: pick where Raiker "thinks". |
 | **Extensions** | One hub with four tabs — Connectors, MCP servers, Plugins, Channels. Each extension reports four separate facts: installed, account connected, enabled for the session, and usable now. Plugins and channels state that they are not available yet. |
 
@@ -46,7 +45,7 @@ carries the page title, the active-project switcher, a **notification bell**, a
 
 | Item | What it is |
 |------|-----------|
-| **Observability** | One hub with five tabs. **Overview** answers four questions — is Raiker ready, is anything waiting for me, what changed, can I safely share this — and every card links to the record behind it. The other tabs are the **Audit log**, **Diagnostics**, **Work in action**, and **Notification history**. |
+| **Observability** | One hub with six tabs. **Overview** answers four questions — is Raiker ready, is anything waiting for me, what changed, can I safely share this — and every card links to the record behind it. The other tabs are the **Audit log**, **Checkpoints** (metadata snapshots taken at safe points, each with a read-only restore preflight), **Diagnostics**, **Work in action**, and **Notification history**. |
 
 ### Utilities
 
@@ -54,10 +53,11 @@ carries the page title, the active-project switcher, a **notification bell**, a
 |------|-----------|
 | **Settings** | Runtime mode, security posture, appearance, per-account preferences. |
 
-> Older links still work. `#/activity`, `#/diagnostics`, and `#/work` open the
-> Observability hub on the matching tab; `#/connections` and `#/mcp` open
-> Extensions on theirs. Tab selection lives in the address bar, so any panel is
-> a shareable location.
+> Older links still work. `#/activity`, `#/checkpoints`, `#/diagnostics`, and
+> `#/work` open the Observability hub on the matching tab; `#/connections` and
+> `#/mcp` open Extensions on theirs. `#/capabilities` still resolves — only the
+> label changed to **Permissions**. Tab selection lives in the address bar, so
+> any panel is a shareable location.
 
 ## Always-present controls
 

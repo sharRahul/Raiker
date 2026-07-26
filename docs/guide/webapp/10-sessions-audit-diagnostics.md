@@ -15,9 +15,9 @@ still re-reads the server-backed record for the authenticated owner.
 
 ## Audit log
 
-The Audit log, Diagnostics, Work in action, and notification history now live
-as tabs inside the **Observability** hub, alongside an Overview that summarises
-readiness and links each claim to the record behind it. Older `#/activity`,
+The Audit log, Checkpoints, Diagnostics, Work in action, and notification
+history now live as tabs inside the **Observability** hub, alongside an Overview that summarises
+readiness and links each claim to the record behind it. Older `#/activity`, `#/checkpoints`,
 `#/diagnostics`, and `#/work` links open the hub on the matching tab.
 
 The **append-only** event record — every governed step the runtime took, in full

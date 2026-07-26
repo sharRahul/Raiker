@@ -93,3 +93,85 @@ describe("TasksView", () => {
     );
   });
 });
+
+
+// Reverse approval link: you should learn a task is blocked where you are
+// looking at the task, not only by going to the decision queue.
+describe("TasksView blocked-on-approval pointer", () => {
+  const TASK = {
+    task_id: "task_1",
+    session_id: "sess_alpha",
+    status: "running",
+    title: "Publish the release note",
+    objective: "Draft and file it.",
+    current_step: null,
+    progress_percent: null,
+    created_at: "2026-07-24T00:00:00Z",
+    updated_at: "2026-07-24T00:01:00Z",
+    completed_at: null,
+    summary: null,
+    priority: "normal",
+    scheduled_at: null,
+    recurrence: null,
+    reminder_at: null,
+    parent_task_id: null,
+    project_id: null,
+  };
+
+  it("says a task is blocked and links to the decision that blocks it", async () => {
+    stubFetch({
+      "GET /api/tasks": [TASK],
+      "GET /api/approvals": [
+        { approval_id: "appr_1", session_id: "sess_alpha", is_expired: false },
+      ],
+    });
+    render(TasksView);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Publish the release note" })).toBeInTheDocument(),
+    );
+
+    expect(await screen.findByText(/waiting on a decision/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /review it/i })).toHaveAttribute(
+      "href",
+      "#/approvals?session=sess_alpha",
+    );
+  });
+
+  it("counts multiple blocking decisions", async () => {
+    stubFetch({
+      "GET /api/tasks": [TASK],
+      "GET /api/approvals": [
+        { approval_id: "appr_1", session_id: "sess_alpha", is_expired: false },
+        { approval_id: "appr_2", session_id: "sess_alpha", is_expired: false },
+      ],
+    });
+    render(TasksView);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Publish the release note" })).toBeInTheDocument(),
+    );
+    expect(await screen.findByText(/waiting on 2 decisions/i)).toBeInTheDocument();
+  });
+
+  it("shows no pointer when the pending decision belongs to another session", async () => {
+    stubFetch({
+      "GET /api/tasks": [TASK],
+      "GET /api/approvals": [
+        { approval_id: "appr_1", session_id: "sess_other", is_expired: false },
+      ],
+    });
+    render(TasksView);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Publish the release note" })).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/waiting on/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the task list usable when approvals cannot be read", async () => {
+    stubFetch({ "GET /api/tasks": [TASK] });
+    render(TasksView);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Publish the release note" })).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/waiting on/i)).not.toBeInTheDocument();
+  });
+});

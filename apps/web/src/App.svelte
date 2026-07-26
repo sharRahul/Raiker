@@ -21,7 +21,6 @@
   import ModelsView from "./lib/views/ModelsView.svelte";
   import ExtensionsView from "./lib/views/ExtensionsView.svelte";
   import ObserveView from "./lib/views/ObserveView.svelte";
-  import CheckpointsView from "./lib/views/CheckpointsView.svelte";
   import SettingsView from "./lib/views/SettingsView.svelte";
   import WorkbenchView from "./lib/views/WorkbenchView.svelte";
 
@@ -166,10 +165,12 @@
           <ModelsView />
         {:else if current === "extensions"}
           <ExtensionsView tab={currentTab ?? "connectors"} />
-        {:else if current === "checkpoints"}
-          <CheckpointsView projectId={activeProjectId} sessionId={continuedSessionId} />
         {:else if current === "observe"}
-          <ObserveView tab={currentTab ?? "overview"} sessionId={continuedSessionId} />
+          <ObserveView
+            tab={currentTab ?? "overview"}
+            sessionId={continuedSessionId}
+            projectId={activeProjectId}
+          />
         {:else if current !== "new-chat"}
           <SettingsView {principal} />
         {/if}

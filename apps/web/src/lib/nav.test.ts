@@ -23,6 +23,19 @@ describe("nav model", () => {
     expect(NAV_GROUPS.map((g) => g.label)).toEqual(["Home", "Work", "Knowledge", "Control", "Observe", "Utilities"]);
   });
 
+  it("keeps Knowledge to what Raiker has stored", () => {
+    // Checkpoints moved to Observe: rewind data is an operational record, not
+    // knowledge the agent recalls.
+    expect(NAV_GROUPS[2].items.map((i) => i.id)).toEqual(["memory", "brain"]);
+  });
+
+  it("labels the capability gates as Permissions", () => {
+    // The route id stays `capabilities` so every existing deep link and the
+    // backend vocabulary keep working; only the human label changes.
+    expect(navItem("capabilities").label).toBe("Permissions");
+    expect(routeFromHash("#/capabilities")).toBe("capabilities");
+  });
+
   it("keeps work objects together", () => {
     expect(NAV_GROUPS[1].items.map((i) => i.id)).toEqual([
       "new-chat",
@@ -38,6 +51,7 @@ describe("nav model", () => {
     expect(HUB_TABS.observe).toEqual([
       "overview",
       "activity",
+      "checkpoints",
       "diagnostics",
       "work",
       "notifications",
@@ -68,7 +82,6 @@ describe("nav model", () => {
       "capabilities",
       "models",
       "extensions",
-      "checkpoints",
       "observe",
       "settings",
     ]) {
@@ -90,6 +103,8 @@ describe("nav model", () => {
     expect(tabFromHash("#/mcp")).toBe("mcp");
     expect(routeFromHash("#/connections")).toBe("extensions");
     expect(tabFromHash("#/connections")).toBe("connectors");
+    expect(routeFromHash("#/checkpoints")).toBe("observe");
+    expect(tabFromHash("#/checkpoints")).toBe("checkpoints");
   });
 
   it("falls back to a hub's first panel for an unknown or absent tab", () => {

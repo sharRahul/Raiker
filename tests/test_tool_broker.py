@@ -7,6 +7,8 @@ from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.broker import ToolBroker
+from raiker.models.tool_call_validation import default_tool_specs, validate_tool_call
+from raiker.models.contracts import ToolCallProposal
 
 
 def _broker(tmp_path):  # type: ignore[no-untyped-def]
@@ -53,6 +55,15 @@ def test_broker_shell_returns_approval_required(tmp_path) -> None:  # type: igno
     )
     assert decision.decision == "needs_approval"
     assert result.status == "approval_required"
+
+
+def test_chat_task_tools_accept_no_model_supplied_session_id() -> None:  # type: ignore[no-untyped-def]
+    names = {spec.name for spec in default_tool_specs()}
+    assert {"create_task", "assign_session_project"} <= names
+    action = validate_tool_call(
+        ToolCallProposal(call_id="call_1", tool_name="assign_session_project", arguments={"project_id": "proj_1"})
+    )
+    assert action.arguments == {"project_id": "proj_1"}
 
 
 def test_broker_memory_write_requires_approval_and_does_not_mutate(tmp_path) -> None:  # type: ignore[no-untyped-def]

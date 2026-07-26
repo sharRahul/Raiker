@@ -1,0 +1,403 @@
+<script lang="ts">
+  /**
+   * Extensions hub — one destination for connectors, MCP servers, and the
+   * surfaces that are not available yet.
+   *
+   * The hub's own tab is Overview: it reads the server's lifecycle aggregate and
+   * shows the four facts per extension, so nothing appears available from
+   * metadata alone. The Connectors and MCP tabs mount the existing governed
+   * views unchanged — this consolidates navigation, it does not re-implement or
+   * loosen any mutation path.
+   */
+  import { onMount } from "svelte";
+  import ConnectionsView from "./ConnectionsView.svelte";
+  import McpView from "./McpView.svelte";
+  import LifecycleTrack from "../components/LifecycleTrack.svelte";
+  import PageState from "../components/PageState.svelte";
+  import SidePanel from "../components/SidePanel.svelte";
+  import StatTile from "../components/StatTile.svelte";
+  import TabStrip from "../components/TabStrip.svelte";
+  import Icon from "../components/Icon.svelte";
+  import { api, ApiError } from "../api";
+  import type { ApprovalView, ExtensionView, ExtensionsOverview } from "../apiTypes";
+  import { relativeTime } from "../format";
+  import { HUB_TABS } from "../nav";
+
+  let { tab = "connectors" }: { tab?: string } = $props();
+
+  let overview = $state<ExtensionsOverview | null>(null);
+  let loadError = $state<string | null>(null);
+  let selected = $state<ExtensionView | null>(null);
+  let filter = $state<"all" | "usable" | "blocked">("all");
+
+  // Reverse approval link: a connector call waiting on a decision should say so
+  // here, not only in the queue. Matched on capability, which is what the
+  // approval is actually raised against.
+  let approvals = $state<ApprovalView[]>([]);
+  const pendingForSelected = $derived(
+    selected?.capability == null
+      ? []
+      : approvals.filter((approval) => approval.capability === selected?.capability),
+  );
+
+  const tabs = HUB_TABS.extensions.map((id) => ({
+    id,
+    label: {
+      connectors: "Connectors",
+      mcp: "MCP servers",
+      plugins: "Plugins",
+      channels: "Channels",
+    }[id] as string,
+  }));
+
+  const visible = $derived(
+    (overview?.extensions ?? []).filter((extension) =>
+      filter === "all"
+        ? true
+        : filter === "usable"
+          ? extension.usable
+          : !extension.usable,
+    ),
+  );
+
+  function selectTab(next: string) {
+    window.location.hash = `#/extensions?tab=${encodeURIComponent(next)}`;
+  }
+
+  function blockedCopy(extension: ExtensionView): string {
+    switch (extension.blocked_reason) {
+      case "not_installed":
+        return "Not installed yet. Install it on the Connectors tab.";
+      case "reauthentication_required":
+        return "The stored credential expired. Reconnect the account to continue.";
+      case "account_not_connected":
+        return "Installed, but no account credential is stored for it.";
+      case "not_enabled_for_session":
+        return "Connected, but not enabled for this session.";
+      case "capability_gate_closed":
+        return "Its capability gate is closed, so the runtime refuses every call.";
+      case "egress_host_not_allowlisted":
+        return "Its host is not on the connector egress allowlist.";
+      case "connection_killed":
+        return "The connection was killed and will not restart on its own.";
+      case "circuit_breaker_paused":
+        return "The monitor paused this connection after an anomaly.";
+      case "not_connected":
+        return "No successful handshake yet, so no tools are available.";
+      default:
+        return "Ready to use in a governed turn.";
+    }
+  }
+
+  function steps(extension: ExtensionView) {
+    return [
+      {
+        label: "Installed",
+        met: extension.installed,
+        note: extension.installed ? "Present in this workspace" : "Not added yet",
+      },
+      {
+        label: "Account connected",
+        met: extension.connected,
+        note: extension.connected
+          ? "A credential is stored in the vault"
+          : "No stored credential — the value is never shown here either way",
+      },
+      {
+        label: "Enabled for the session",
+        met: extension.enabled,
+        note: extension.enabled ? "Turned on for this session" : "Turned off",
+      },
+      {
+        label: "Usable now",
+        met: extension.usable,
+        note: extension.usable
+          ? "The runtime will accept a governed call"
+          : "The runtime still refuses calls",
+      },
+    ];
+  }
+
+  async function load() {
+    loadError = null;
+    try {
+      overview = await api.extensions();
+      if (selected !== null) {
+        selected =
+          overview.extensions.find((e) => e.extension_id === selected?.extension_id) ?? null;
+      }
+    } catch (error) {
+      overview = null;
+      loadError =
+        error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable";
+    }
+    try { approvals = await api.approvals(); } catch { approvals = []; }
+  }
+
+  onMount(load);
+</script>
+
+<TabStrip {tabs} selected={tab} onselect={selectTab} label="Extension categories" />
+
+{#if tab === "connectors"}
+  <div id="panel-connectors" role="tabpanel" aria-labelledby="tab-connectors">
+    <section class="overview" aria-labelledby="lifecycle-h">
+      <div class="overview-head">
+        <div>
+          <h2 id="lifecycle-h">Readiness</h2>
+          <p class="page-lead">
+            Installed, account connected, enabled for the session, and usable now are four separate
+            facts. An extension is usable only when the server confirms all four — never because it
+            appears in a catalogue.
+          </p>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
+          <Icon name="refresh" size={15} /> Refresh
+        </button>
+      </div>
+
+      {#if loadError}
+        <PageState state="error" title="Couldn't load extension readiness" detail={loadError} />
+      {:else if overview === null}
+        <PageState state="loading" title="Reading extension readiness…" />
+      {:else}
+        <div class="tiles">
+          <StatTile
+            label="Usable now"
+            value={overview.counts.usable}
+            detail="Every condition confirmed by the server."
+            tone={overview.counts.usable > 0 ? "ok" : "neutral"}
+          />
+          <StatTile
+            label="Installed"
+            value={overview.counts.installed}
+            detail="Present in the workspace, whatever their credential state."
+          />
+          <StatTile
+            label="Connected"
+            value={overview.counts.connected}
+            detail="An account credential is stored — its value is never shown."
+          />
+          <StatTile
+            label="Credential vault"
+            value={overview.vault_configured ? "Configured" : "Not configured"}
+            detail={overview.vault_configured
+              ? "Credentials can be encrypted at rest."
+              : "Linking an account fails closed until the vault key is set."}
+            tone={overview.vault_configured ? "ok" : "warn"}
+          />
+        </div>
+
+        <div class="chip-row filters" role="group" aria-label="Filter extensions">
+          {#each [["all", "All"], ["usable", "Usable"], ["blocked", "Blocked"]] as [id, label] (id)}
+            <button
+              type="button"
+              class="chip"
+              onclick={() => (filter = id as typeof filter)}
+              aria-pressed={filter === id}
+            >{label}</button>
+          {/each}
+        </div>
+
+        <div class="split">
+          <ul class="extension-list">
+            {#each visible as extension (extension.extension_id)}
+              <li>
+                <button
+                  type="button"
+                  class="extension-row"
+                  class:selected={selected?.extension_id === extension.extension_id}
+                  onclick={() => (selected = extension)}
+                  aria-label={`Open ${extension.display_name} details`}
+                >
+                  <span class="row-main">
+                    <span class="name">{extension.display_name}</span>
+                    <span class="category">{extension.category}</span>
+                  </span>
+                  <span class="facts">
+                    <span class="fact" class:on={extension.installed}>installed</span>
+                    <span class="fact" class:on={extension.connected}>connected</span>
+                    <span class="fact" class:on={extension.enabled}>enabled</span>
+                    <span class="fact strong" class:on={extension.usable}>usable</span>
+                  </span>
+                </button>
+              </li>
+            {:else}
+              <li class="empty-row">No extension matches this filter.</li>
+            {/each}
+          </ul>
+
+          <SidePanel
+            open={selected !== null}
+            title={selected?.display_name ?? ""}
+            subtitle={selected?.category ?? null}
+            onclose={() => (selected = null)}
+          >
+            {#if selected}
+              <p>{selected.detail}</p>
+              <LifecycleTrack steps={steps(selected)} blockedReason={selected.blocked_reason} />
+              <p class="reason" class:blocked={selected.blocked_reason !== null}>
+                {blockedCopy(selected)}
+              </p>
+              {#if pendingForSelected.length > 0}
+                <p class="pending-approval" role="status">
+                  {pendingForSelected.length === 1 ? "One call is" : `${pendingForSelected.length} calls are`}
+                  waiting on your decision before this connector can act.
+                  <a href="#/approvals">Review the decision queue</a>
+                </p>
+              {/if}
+              <dl class="property-list">
+                {#if selected.capability}
+                  <dt>Capability</dt><dd class="mono">{selected.capability}</dd>
+                {/if}
+                {#if selected.gate_state}
+                  <dt>Gate state</dt><dd>{selected.gate_state}</dd>
+                {/if}
+                {#if selected.decision_mode}
+                  <dt>Decision mode</dt><dd>{selected.decision_mode}</dd>
+                {/if}
+                {#if selected.egress_host}
+                  <dt>Egress host</dt>
+                  <dd>
+                    <span class="mono">{selected.egress_host}</span>
+                    {#if selected.egress_allowed !== null}
+                      · {selected.egress_allowed ? "on the allowlist" : "not allowlisted"}
+                    {/if}
+                  </dd>
+                {/if}
+                {#if selected.transport}
+                  <dt>Transport</dt><dd>{selected.transport}</dd>
+                {/if}
+                {#if selected.monitor_state}
+                  <dt>Monitor</dt><dd>{selected.monitor_state}</dd>
+                {/if}
+                {#if selected.kind === "mcp_server"}
+                  <dt>Tools discovered</dt><dd>{selected.tool_count}</dd>
+                {/if}
+                {#if selected.last_activity_at}
+                  <dt>Last activity</dt>
+                  <dd title={selected.last_activity_at}>{relativeTime(selected.last_activity_at)}</dd>
+                {/if}
+              </dl>
+              <p class="note">
+                Changing any of these goes through the governed control plane — the capability gate,
+                the credential vault, and the approval path. This panel reports state; it never
+                grants it.
+              </p>
+            {/if}
+          </SidePanel>
+        </div>
+      {/if}
+    </section>
+
+    <hr />
+    <ConnectionsView />
+  </div>
+{:else if tab === "mcp"}
+  <div id="panel-mcp" role="tabpanel" aria-labelledby="tab-mcp">
+    <McpView />
+  </div>
+{:else if tab === "plugins"}
+  <div id="panel-plugins" role="tabpanel" aria-labelledby="tab-plugins">
+    <section class="card deferred">
+      <h2>Plugin panels are not available yet</h2>
+      <p>
+        A plugin cannot render its own page here until Raiker has an accepted route, permission, and
+        accessibility contract for it. Listing them early would suggest an authority the runtime does
+        not enforce, so this tab stays empty on purpose.
+      </p>
+      <p class="note">Nothing is installed, and no plugin code runs in this browser.</p>
+    </section>
+  </div>
+{:else}
+  <div id="panel-channels" role="tabpanel" aria-labelledby="tab-channels">
+    <section class="card deferred">
+      <h2>Channels and webhooks are not available yet</h2>
+      <p>
+        Inbound and outbound delivery needs an accepted contract and threat model before Raiker
+        offers controls for it. Until then there is nothing to configure here, and no channel can
+        deliver work on your behalf.
+      </p>
+      <p class="note">This tab exists so the gap is visible rather than silently missing.</p>
+    </section>
+  </div>
+{/if}
+
+<style>
+  .overview { margin-bottom: var(--space-5); }
+  .overview-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .overview-head h2 { margin: 0 0 0.2rem; }
+  .overview-head .page-lead { margin-bottom: var(--space-4); }
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+  .filters { margin-bottom: var(--space-3); }
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+    gap: var(--space-4);
+    align-items: start;
+  }
+  @media (max-width: 63.9rem) { .split { grid-template-columns: 1fr; } }
+  .extension-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+  .extension-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    text-align: left;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    color: inherit;
+    font: inherit;
+    padding: var(--space-3) var(--space-4);
+    cursor: pointer;
+    transition: border-color 120ms var(--ease), background 120ms var(--ease);
+  }
+  .extension-row:hover { background: var(--sunken); }
+  .extension-row.selected {
+    border-color: var(--accent-border);
+    box-shadow: 0 0 0 1px var(--accent-border);
+  }
+  .row-main { display: grid; gap: 0.1rem; min-width: 0; }
+  .name { font-weight: 650; }
+  .category { color: var(--text-3); font-size: 0.75rem; }
+  .facts { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+  .fact {
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    color: var(--text-3);
+    font-size: 0.68rem;
+    font-weight: 650;
+    padding: 0.1rem 0.5rem;
+    text-transform: lowercase;
+  }
+  .fact.on { border-color: var(--ok-border); background: var(--ok-soft); color: var(--ok); }
+  .fact.strong.on { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent); }
+  .empty-row { color: var(--text-3); padding: var(--space-4); }
+  .reason { color: var(--ok); font-weight: 600; margin: 0; }
+  .reason.blocked { color: var(--warn); }
+  .pending-approval {
+    margin: 0;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--accent-border);
+    background: var(--accent-soft);
+    border-radius: var(--r-sm);
+    font-size: 0.8rem;
+  }
+  .note { color: var(--text-3); font-size: 0.78rem; margin: 0; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-5) 0; }
+  .deferred { max-width: 46rem; }
+  .deferred h2 { margin-top: 0; }
+</style>

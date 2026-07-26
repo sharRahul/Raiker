@@ -23,14 +23,14 @@ connectors/MCP, and understand the governance controls.
 |---|------|----------------|
 | 1 | [Install & launch](01-install-and-launch.md) | Build the SPA and start `raiker-web` |
 | 2 | [Create your account & unlock](02-account-and-login.md) | First-run registration, login, MFA, recovery |
-| 3 | [Dashboard tour](03-dashboard-tour.md) | Every view in the left navigation |
+| 3 | [Dashboard tour](03-dashboard-tour.md) | The Workbench and every destination in the left navigation |
 | 4 | [Chat: your first governed turn](04-chat.md) | Send a prompt, read the governance trail, find it later |
 | 5 | [Tasks](05-tasks.md) | The four kinds of work: task, scheduled, routine, background agent |
 | 6 | [Models & providers](06-models-and-providers.md) | Local runtimes, hosted providers, the fallback sequence |
-| 7 | [Capabilities & approvals](07-capabilities-and-approvals.md) | Decision modes, turning capabilities on, the approval queue |
-| 8 | [Connections & MCP](08-connections-and-mcp.md) | The Connector Store and MCP servers |
+| 7 | [Permissions & approvals](07-capabilities-and-approvals.md) | Decision modes, turning capabilities on, the approval queue |
+| 8 | [Extensions: connectors & MCP](08-connections-and-mcp.md) | The Extensions hub: readiness, the Connector Store, MCP servers, and what is not available yet |
 | 9 | [Security, vault & settings](09-security-vault-and-settings.md) | Vault key, MFA, runtime mode, appearance |
-| 10 | [Sessions, search, audit & diagnostics](10-sessions-audit-diagnostics.md) | Where your history and the runtime's honesty live |
+| 10 | [Sessions, search & observability](10-sessions-audit-diagnostics.md) | Where your history and the runtime's honesty live |
 
 ## The one thing to understand first: *fail-closed*
 

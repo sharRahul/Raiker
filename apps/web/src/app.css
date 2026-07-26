@@ -77,9 +77,14 @@
   --font-serif:
     "Source Serif 4", Georgia, "Times New Roman", serif;
 
+  /* Radii climb with the surface's importance: controls stay tight, cards get
+     a softer corner, and the panels that hold a whole object get the largest.
+     Nothing here is decorative — the step tells you what kind of thing you are
+     looking at. */
   --r-sm: 8px;
   --r-md: 12px;
   --r-lg: 16px;
+  --r-xl: 20px;
   --r-pill: 999px;
 
   --space-1: 0.25rem;
@@ -581,4 +586,97 @@ code,
 .skip-link:focus {
   left: var(--space-3);
   top: 0;
+}
+
+/* ── Shared layout and control primitives ──
+   These exist so views stop inventing their own filter pills, property lists,
+   and card hover treatments. Each one is a token composition, never a new
+   colour, so both themes stay in lockstep and a view cannot drift. */
+
+/* A card the user can act on. The lift is small and motion-gated: it signals
+   "this responds", it does not animate for its own sake. */
+.card-interactive {
+  transition:
+    border-color 120ms var(--ease),
+    box-shadow 120ms var(--ease),
+    transform 120ms var(--ease);
+}
+.card-interactive:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-1px);
+}
+.card-interactive:focus-within {
+  border-color: var(--accent-border);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-interactive:hover {
+    transform: none;
+  }
+}
+
+/* Responsive card grid. Views set --card-min when their content needs a
+   different comfortable width; the default suits a summary card. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min, 18rem), 1fr));
+  gap: var(--space-4);
+}
+
+/* Filter chips. A horizontally scrollable row keeps long filter sets usable at
+   375px without wrapping into a wall of buttons. */
+.chip-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.chip {
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.32rem 0.7rem;
+  cursor: pointer;
+  transition:
+    background 120ms var(--ease),
+    border-color 120ms var(--ease),
+    color 120ms var(--ease);
+}
+.chip:hover:not(:disabled) {
+  color: var(--text-1);
+}
+.chip[aria-pressed="true"],
+.chip.chip-selected {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+/* Label/value rows for detail panels. Machine values carry .mono; everything
+   else stays in the reading face. */
+.property-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem var(--space-3);
+  margin: 0;
+}
+.property-list dt {
+  color: var(--text-3);
+  font-size: 0.76rem;
+}
+.property-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Section headings that stay visible while a long list scrolls under them. */
+.sticky-heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  padding: var(--space-2) 0;
 }

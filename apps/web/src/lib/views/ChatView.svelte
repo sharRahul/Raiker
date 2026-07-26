@@ -262,6 +262,22 @@
   onMount(() => {
     void loadProfiles();
     void api.settings().then((view) => { userName = view.status.username || "there"; }).catch(() => {});
+    // The Workbench composer hands its text to this mounted chat rather than
+    // sending a prompt of its own. There is one governed send path, and it is
+    // `submit()` below — the Workbench never talks to the API directly, so a
+    // prompt started there is identical to one typed here.
+    const onCompose = (event: Event) => {
+      const detail = (event as CustomEvent<{ text: string; sessionId: string | null }>).detail;
+      if (detail === undefined || detail.text.trim() === "") return;
+      if (detail.sessionId !== null && detail.sessionId !== sessionId) {
+        sessionId = detail.sessionId;
+        void loadHistory(detail.sessionId);
+      }
+      promptText = detail.text;
+      void submit();
+    };
+    window.addEventListener("raiker:compose", onCompose);
+    return () => window.removeEventListener("raiker:compose", onCompose);
   });
 
   // Hydrate the persisted transcript for a continued session so a search result

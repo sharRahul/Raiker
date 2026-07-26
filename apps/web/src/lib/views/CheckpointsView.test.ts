@@ -131,3 +131,91 @@ describe("CheckpointsView", () => {
     });
   });
 });
+
+// ── Restore preflight ─────────────────────────────────────────────────────
+// Restoring is a funnel, not a button. The preflight reads a server-computed,
+// metadata-only plan; this view must never perform or claim a restore.
+describe("CheckpointsView restore preflight", () => {
+  const PLAN = {
+    status: "restore_plan",
+    checkpoint_id: "cp_1",
+    session_id: "sess_alpha",
+    checkpoint_created_at: "2026-07-17T10:00:00Z",
+    can_execute: true,
+    requires_approval: true,
+    files: [
+      {
+        workspace_path: "notes/brief.md",
+        op: "restore_content",
+        pre_image_sha256: "abc",
+        pre_image_size: 120,
+        current_sha256: "def",
+        current_size: 200,
+        changed: true,
+        changed_by_other_principal: false,
+      },
+    ],
+    restore_content_count: 1,
+    delete_count: 0,
+    skip_count: 0,
+    changed_count: 1,
+    touches_other_principal: false,
+  };
+
+  it("shows the affected files and says reading the plan changed nothing", async () => {
+    stubFetch({
+      "GET /api/checkpoints": CHECKPOINTS,
+      "GET /api/checkpoints/cp_1/restore-plan": PLAN,
+    });
+    render(CheckpointsView);
+    await waitFor(() => expect(screen.getByLabelText(/checkpoint cp_1 would change/i)).toBeInTheDocument());
+    await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
+
+    expect(await screen.findByText("notes/brief.md")).toBeInTheDocument();
+    expect(screen.getByText(/rewinds every workspace file changed after this checkpoint/i)).toBeInTheDocument();
+    expect(screen.getByText(/it is a preview computed from stored metadata/i)).toBeInTheDocument();
+    expect(screen.getByText(/this panel cannot start a restore/i)).toBeInTheDocument();
+  });
+
+  it("names a cross-principal escalation before anything is requested", async () => {
+    stubFetch({
+      "GET /api/checkpoints": CHECKPOINTS,
+      "GET /api/checkpoints/cp_1/restore-plan": {
+        ...PLAN,
+        touches_other_principal: true,
+        files: [{ ...PLAN.files[0], changed_by_other_principal: true }],
+      },
+    });
+    render(CheckpointsView);
+    await waitFor(() => expect(screen.getByLabelText(/checkpoint cp_1 would change/i)).toBeInTheDocument());
+    await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/cross-principal escalation/i);
+    expect(screen.getAllByText(/last changed by a different principal/i).length).toBeGreaterThan(0);
+  });
+
+  it("withholds the request instructions until the impact is acknowledged", async () => {
+    stubFetch({
+      "GET /api/checkpoints": CHECKPOINTS,
+      "GET /api/checkpoints/cp_1/restore-plan": PLAN,
+    });
+    render(CheckpointsView);
+    await waitFor(() => expect(screen.getByLabelText(/checkpoint cp_1 would change/i)).toBeInTheDocument());
+    await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
+
+    expect(await screen.findByText(/confirm you have read the impact/i)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByText(/raises it as a governed approval/i)).toBeInTheDocument();
+  });
+
+  it("reports a failed preflight instead of an empty plan", async () => {
+    stubFetch({ "GET /api/checkpoints": CHECKPOINTS });
+    render(CheckpointsView);
+    await waitFor(() => expect(screen.getByLabelText(/checkpoint cp_1 would change/i)).toBeInTheDocument());
+    await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
+
+    expect(await screen.findByText(/preflight unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/to rewrite/i)).not.toBeInTheDocument();
+  });
+});

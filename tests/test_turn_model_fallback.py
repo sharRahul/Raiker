@@ -21,9 +21,16 @@ from raiker.contracts.models import (
     PromptPayload,
     UserMetadata,
 )
+from raiker.events.query import EventViewer
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.models.contracts import ModelResponse
-from raiker.models.exceptions import ProviderConnectionError, ProviderPolicyError
+from raiker.models.exceptions import (
+    ProviderAuthenticationError,
+    ProviderConnectionError,
+    ProviderModelNotFoundError,
+    ProviderPolicyError,
+    ProviderRateLimitError,
+)
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 
 
@@ -198,3 +205,94 @@ class TestFallbackEngagement:
         gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
         response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
         assert response.finish_reason == "error"
+
+
+class TestFailureReasonIsSpecific:
+    """A failed turn must say *why* it failed, not just that it failed.
+
+    The provider layer already classifies its failures precisely. Collapsing all
+    of them into "provider_connection_failed" sends the owner to debug their
+    network when the real cause is an invalid credential — the exact confusion a
+    live run against a rejected API key produced.
+    """
+
+    def test_authentication_failure_is_not_reported_as_a_connection_failure(
+        self, tmp_path: Path
+    ) -> None:
+        gw = _gateway(tmp_path)
+
+        async def fake_achat(provider, model, messages, tools=None):  # type: ignore[no-untyped-def]
+            raise ProviderAuthenticationError("provider_auth_failed:http_401")
+
+        gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
+        response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
+        assert response.finish_reason == "error"
+        assert response.text == "model_unavailable: provider_auth_failed:http_401"
+        assert "connection" not in response.text
+
+    def test_missing_model_names_the_model_not_the_network(self, tmp_path: Path) -> None:
+        gw = _gateway(tmp_path)
+
+        async def fake_achat(provider, model, messages, tools=None):  # type: ignore[no-untyped-def]
+            raise ProviderModelNotFoundError("model_not_found:local-gguf")
+
+        gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
+        response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
+        assert response.text == "model_unavailable: model_not_found:local-gguf"
+
+    def test_rate_limit_is_reported_as_a_rate_limit(self, tmp_path: Path) -> None:
+        gw = _gateway(tmp_path)
+
+        async def fake_achat(provider, model, messages, tools=None):  # type: ignore[no-untyped-def]
+            raise ProviderRateLimitError("provider_rate_limited")
+
+        gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
+        response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
+        assert response.text == "model_unavailable: provider_rate_limited"
+
+    def test_prose_message_falls_back_to_the_class_code(self, tmp_path: Path) -> None:
+        # A provider that raises prose rather than a code must not have that
+        # prose promoted into an event payload as if it were one.
+        gw = _gateway(tmp_path)
+
+        async def fake_achat(provider, model, messages, tools=None):  # type: ignore[no-untyped-def]
+            raise ProviderConnectionError("the socket went away, sorry")
+
+        gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
+        response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
+        assert response.text == "model_unavailable: provider_connection_failed"
+
+    def test_last_providers_reason_survives_the_fallback_chain(self, tmp_path: Path) -> None:
+        gw = _gateway(tmp_path)
+        _select_anthropic(gw)
+        gw.store.save_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID, ["anthropic-hosted"])
+
+        async def fake_achat(provider, model, messages, tools=None):  # type: ignore[no-untyped-def]
+            if provider == "llama.cpp":
+                raise ProviderConnectionError("provider_connection_failed")
+            raise ProviderAuthenticationError("provider_auth_failed:http_401")
+
+        gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
+        response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
+        assert response.text == "model_unavailable: provider_auth_failed:http_401"
+
+    def test_the_event_payload_carries_the_same_specific_code(self, tmp_path: Path) -> None:
+        gw = _gateway(tmp_path)
+        env = _envelope()
+
+        async def fake_achat(provider, model, messages, tools=None):  # type: ignore[no-untyped-def]
+            raise ProviderAuthenticationError("provider_auth_failed:http_401")
+
+        gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
+        asyncio.run(gw.runtime._acall_model(env, []))
+
+        viewer = EventViewer(gw.store)
+        failures = viewer.list_events(
+            session_id=env.session_id, event_type="model_request_failed"
+        )
+        assert failures, "no model_request_failed event was recorded"
+        record = viewer.read_event_payload(str(failures[-1]["event_id"]))
+        assert record is not None
+        payload = record.get("payload", record)
+        assert payload["safe_error_code"] == "provider_auth_failed:http_401"
+        assert payload["error_class"] == "ProviderAuthenticationError"

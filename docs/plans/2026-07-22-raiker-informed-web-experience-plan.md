@@ -1,8 +1,9 @@
 # Raiker-Informed Web Experience Improvement Plan
 
-> **Status:** partially implemented (audited 2026-07-23). The existing local-web
-> experience delivers portions of this plan; the phase checklist below remains
-> the source of truth for work that is not yet delivered.
+> **Status:** implemented (phases 0-4 complete, verified 2026-07-26). The phase
+> checklist below remains the source of truth; the deferred entries at the end of
+> the delivery sequence stay deferred and are surfaced in the interface as
+> explicitly not available rather than hidden.
 > **Reviewed source:** `NousResearch/Raiker-agent` `main` at
 > `9acc4b47f5b2abda0949d07372ecf67938d50a16` (reviewed 2026-07-22), specifically
 > its `web/` application.  This is a capability and interaction review, not a
@@ -220,14 +221,21 @@ plan.
 | 0 | complete | Route/API/mutation inventory, actual non-secret route-state and UI-event contracts, missing read-model inventory, threat-model review, and five local-browser baseline journeys are recorded in `docs/guide/webapp/Raiker_PHASE_0_EVIDENCE.md` and `docs/guide/webapp/PHASE_1_PREREQUISITES.md`. The browser run also fixed owner visibility for sessionless connector-write approvals. Phase 1 retains its viewport, keyboard, and visual-regression quality gates. |
 | 1 | complete | The shell has grouped navigation, responsive drawer/bottom navigation, tokenized styles, route focus handling, notification access, and a persistent stop control. The compact drawer is inert while closed, preserving the initial keyboard route; notification dismissal returns focus to its trigger. Desktop (1280x800) and mobile (375x812) browser captures, no-horizontal-overflow inspection, keyboard checks, and theme/reduced-motion regression coverage are recorded in `docs/guide/webapp/RAIKER_PHASE_1_EVIDENCE.md`. No capability or API contract changed. |
 | 2 | complete | Workbench summaries, persistent chat, task cadence choices, session bulk actions, approval previews, risk/newest triage, server-backed expiry visibility, and all session cross-links are delivered. Critical approvals use a server-enforced elevated step-up resolver, and disposable-workspace browser E2E evidence is recorded in `docs/guide/webapp/RAIKER_PHASE_2_EVIDENCE.md`. |
-| 3 | partial | Existing project, memory, brain, checkpoint, model/fallback, capability, connector, and MCP views cover parts of the scope. A project context home/file inspect pane, checkpoint preflight funnel, and one tabbed Extensions hub are not complete. |
-| 4 | partial | Activity, diagnostics, Work in Action, and notifications are separate implemented views. A consolidated observability hub, redacted diagnostic export contract, and offline/reconnect/denial/session-restoration browser E2E evidence are not complete. |
+| 3 | complete | The project context home with its metadata-only file explorer and provenance inspect pane, the preflighted checkpoint restore funnel, and one tabbed Extensions hub are delivered on four new read-only endpoints. Evidence: `docs/guide/webapp/RAIKER_PHASE_3_4_EVIDENCE.md`. |
+| 4 | complete | Activity, diagnostics, Work in Action, and notification history are consolidated into one Observability hub with an evidence-linked overview and a server-built redacted support bundle. Offline/reconnect, denial, deep-link restoration, project switching, and 375px behaviour are covered by the browser run recorded in the same evidence document. |
+
+The 2026-07-23 audit of the Phase 0-2 boxes was re-run before this work and
+confirmed them, with one real gap: the Workbench shipped two navigation buttons
+where §1 specifies a natural-language composer. That composer now exists and
+hands its text to the persistently mounted Chat view, so there is still exactly
+one governed send path.
 
 Deferred entries (channels, arbitrary plugin panels, raw secret editing, backup
-restore, and uncontracted automation delivery) remain absent rather than being
-presented as available. Documentation was behind the actual implementation claim;
-this audit corrects it. Future changes must update the status and coverage ledgers
-in the same commit as the implementation and its verification evidence.
+restore, and uncontracted automation delivery) remain absent as capabilities. The
+Extensions hub now names the plugin and channel gaps explicitly as "not available
+yet" so they read as deliberate rather than missing. Future changes must update
+the status and coverage ledgers in the same commit as the implementation and its
+verification evidence.
 
 ### Phase 0 evidence update — 2026-07-23
 
@@ -274,22 +282,22 @@ keyboard, and visual-regression evidence.
 
 ### Phase 3 — Context and governed control
 
-- Deliver the project context home, plain-language knowledge views, preflighted
+- [x] Deliver the project context home, plain-language knowledge views, preflighted
   checkpoint flow, model-role/fallback UX, capabilities detail, and Extensions hub.
-- Add only backend read models needed for honest summaries (for example, an
+- [x] Add only backend read models needed for honest summaries (for example, an
   extension lifecycle/readiness aggregate or project work overview). Every mutation
   continues through existing gate, approval, vault, and audit checks.
-- Keep channels, webhooks, plugin route slots, automation delivery targets, backup
+- [x] Keep channels, webhooks, plugin route slots, automation delivery targets, backup
   restore, and localization behind their own accepted contracts and threat-model
   work; their navigation entries stay absent or explicitly “not yet available.”
 
 ### Phase 4 — Observability, recovery, and quality bar
 
-- Consolidate Activity, Diagnostics, Work in Action, and notification history;
+- [x] Consolidate Activity, Diagnostics, Work in Action, and notification history;
   add evidence/deep links and redacted support export if a server contract permits.
-- Add browser end-to-end coverage for offline/error/reconnect, expired approvals,
+- [x] Add browser end-to-end coverage for offline/error/reconnect, expired approvals,
   denied gates, session restoration, project switching, and critical-action denial.
-- Reconcile `docs/IMPLEMENTATION_STATUS.md`, `docs/FEATURE_COVERAGE_MATRIX.md`,
+- [x] Reconcile `docs/IMPLEMENTATION_STATUS.md`, `docs/FEATURE_COVERAGE_MATRIX.md`,
   guides, screenshots, and the accessibility report with what actually shipped.
 
 ## Acceptance criteria and measures

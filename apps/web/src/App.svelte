@@ -3,7 +3,7 @@
   import Sidebar from "./lib/components/Sidebar.svelte";
   import Topbar from "./lib/components/Topbar.svelte";
   import ResponsivePage from "./lib/components/ResponsivePage.svelte";
-  import { DEFAULT_ROUTE, navItem, routeFromHash } from "./lib/nav";
+  import { DEFAULT_ROUTE, navItem, routeFromHash, tabFromHash } from "./lib/nav";
   import { routeStateFromHash } from "./lib/routeState";
   import { api } from "./lib/api";
   import { applyUiPrefs, startupRoute } from "./lib/prefs.svelte";
@@ -16,20 +16,21 @@
   import ApprovalsView from "./lib/views/ApprovalsView.svelte";
   import TasksView from "./lib/views/TasksView.svelte";
   import BrainView from "./lib/views/BrainView.svelte";
-  import WorkInActionView from "./lib/views/WorkInActionView.svelte";
   import SessionsView from "./lib/views/SessionsView.svelte";
   import CapabilitiesView from "./lib/views/CapabilitiesView.svelte";
   import ModelsView from "./lib/views/ModelsView.svelte";
-  import ConnectionsView from "./lib/views/ConnectionsView.svelte";
-  import McpView from "./lib/views/McpView.svelte";
-  import CheckpointsView from "./lib/views/CheckpointsView.svelte";
-  import ActivityView from "./lib/views/ActivityView.svelte";
-  import DiagnosticsView from "./lib/views/DiagnosticsView.svelte";
+  import ExtensionsView from "./lib/views/ExtensionsView.svelte";
+  import ObserveView from "./lib/views/ObserveView.svelte";
   import SettingsView from "./lib/views/SettingsView.svelte";
   import WorkbenchView from "./lib/views/WorkbenchView.svelte";
 
   let current = $state(
     typeof window === "undefined" ? DEFAULT_ROUTE : routeFromHash(window.location.hash),
+  );
+  // The hub tab lives in the hash so a deep link, the sidebar, and the hub's own
+  // tab strip all resolve to the same panel.
+  let currentTab = $state(
+    typeof window === "undefined" ? null : tabFromHash(window.location.hash),
   );
   let chatVisited = $state(false);
   const activeItem = $derived(navItem(current));
@@ -52,6 +53,7 @@
   onMount(() => {
     const handler = () => {
       current = routeFromHash(window.location.hash);
+      currentTab = tabFromHash(window.location.hash);
       continuedSessionId = routeStateFromHash(window.location.hash).sessionId;
       // Route changes move focus to the main landmark so keyboard and screen
       //-reader users land on the new page content, not mid-shell.
@@ -153,8 +155,6 @@
           <TasksView projectId={activeProjectId} sessionId={continuedSessionId} />
         {:else if current === "brain"}
           <BrainView />
-        {:else if current === "work"}
-          <WorkInActionView />
         {:else if current === "sessions"}
           <SessionsView projectId={activeProjectId} sessionId={continuedSessionId} />
         {:else if current === "projects"}
@@ -163,16 +163,14 @@
           <CapabilitiesView {principal} />
         {:else if current === "models"}
           <ModelsView />
-        {:else if current === "connections"}
-          <ConnectionsView />
-        {:else if current === "mcp"}
-          <McpView />
-        {:else if current === "checkpoints"}
-          <CheckpointsView projectId={activeProjectId} sessionId={continuedSessionId} />
-        {:else if current === "activity"}
-          <ActivityView sessionId={continuedSessionId} />
-        {:else if current === "diagnostics"}
-          <DiagnosticsView />
+        {:else if current === "extensions"}
+          <ExtensionsView tab={currentTab ?? "connectors"} />
+        {:else if current === "observe"}
+          <ObserveView
+            tab={currentTab ?? "overview"}
+            sessionId={continuedSessionId}
+            projectId={activeProjectId}
+          />
         {:else if current !== "new-chat"}
           <SettingsView {principal} />
         {/if}

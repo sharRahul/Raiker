@@ -321,6 +321,122 @@ export interface Checkpoint {
   can_restore_files: boolean;
 }
 
+/**
+ * Metadata-only preflight for a checkpoint restore. `files` carries content
+ * addresses and sizes; the server never sends file content to the browser, and
+ * computing a plan performs no restore.
+ */
+export interface RestorePlanFile {
+  workspace_path: string;
+  op: string;
+  pre_image_sha256: string | null;
+  pre_image_size: number;
+  current_sha256: string | null;
+  current_size: number;
+  changed: boolean;
+  changed_by_other_principal: boolean;
+}
+
+export interface RestorePlan {
+  status: string;
+  checkpoint_id: string;
+  session_id: string;
+  checkpoint_created_at: string;
+  can_execute: boolean;
+  requires_approval: boolean;
+  files: RestorePlanFile[];
+  restore_content_count: number;
+  delete_count: number;
+  skip_count: number;
+  changed_count: number;
+  touches_other_principal: boolean;
+}
+
+/**
+ * One extension's lifecycle, as four independent server-derived facts. `usable`
+ * is a conclusion, never a claim the browser makes on its own; `blocked_reason`
+ * names the first unmet condition.
+ */
+export interface ExtensionView {
+  extension_id: string;
+  kind: string;
+  display_name: string;
+  category: string;
+  installed: boolean;
+  connected: boolean;
+  enabled: boolean;
+  usable: boolean;
+  blocked_reason: string | null;
+  detail: string;
+  capability: string | null;
+  gate_state: string | null;
+  decision_mode: string | null;
+  egress_host: string | null;
+  egress_allowed: boolean | null;
+  transport: string | null;
+  monitor_state: string | null;
+  tool_count: number;
+  last_activity_at: string | null;
+}
+
+export interface ExtensionsOverview {
+  extensions: ExtensionView[];
+  counts: { total: number; installed: number; connected: number; enabled: number; usable: number };
+  vault_configured: boolean;
+  connector_egress_allowlist_configured: boolean;
+  deferred: Array<{ kind: string; status: string; detail: string }>;
+}
+
+export interface ProjectFile {
+  workspace_path: string;
+  name: string;
+  is_directory: boolean;
+  size_bytes: number;
+  modified_at: string;
+  depth: number;
+}
+
+export interface FileProvenanceEntry {
+  turn_id: string | null;
+  action_id: string | null;
+  session_id: string;
+  capability: string;
+  principal_id: string;
+  capture_status: string;
+  existed_before: boolean;
+  pre_image_size: number;
+  created_at: string;
+}
+
+export interface ProjectFilesView {
+  project_id: string;
+  root_subpath: string;
+  root_exists: boolean;
+  files: ProjectFile[];
+  truncated: boolean;
+  provenance: Record<string, FileProvenanceEntry[]>;
+  note: string;
+}
+
+/** Redacted, copyable support bundle. Shape is intentionally loose: the server
+ *  owns which readiness facts it includes, and the UI renders it verbatim. */
+export interface DiagnosticsExport {
+  generated_at: string;
+  scope: string;
+  runtime_mode: string;
+  counts: Record<string, number>;
+  missing_config: string[];
+  disabled_capabilities: string[];
+  gates: Array<{
+    capability: string;
+    state: string;
+    decision_mode: string;
+    runtime_enabled: boolean;
+  }>;
+  note: string;
+  [key: string]: unknown;
+}
+
 export interface SessionSummary {
   session_id: string;
   title: string | null;

@@ -5,26 +5,43 @@
 
 # Implementation Status
 
-> Current truth update (2026-07-23): **Raiker-informed local web experience has
-> Phases 0, 1, and 2 complete; Phases 3–4 remain partial.** The Svelte shell has the
-> Home/Work/Knowledge/Control/Observe information architecture and a Workbench
-> home that reads server-backed session, task, and pending-approval summaries.
-> It links only to existing governed routes; it neither adds client authority nor
-> represents deferred channels, plugins, backups, or secret controls as shipped.
-> The mobile bar preserves Home, Chat, Approvals, Extensions, and More while the
-> server-backed master stop remains persistent. See
-> `docs/plans/2026-07-22-raiker-informed-web-experience-plan.md`. Phase 1
-> viewport, keyboard, theme/reduced-motion, and visual evidence is recorded in
-> `docs/guide/webapp/RAIKER_PHASE_1_EVIDENCE.md`. Phase 2 evidence is recorded in
-> `docs/guide/webapp/RAIKER_PHASE_2_EVIDENCE.md`: session detail now links to
-> chat, tasks, approvals, audit, and checkpoints; critical approval resolution
-> requires a short-lived elevated API session and is re-checked by
-> `RuntimeAuthority`. The plan still records incomplete checkpoint-preflight,
-> Extensions-hub, and observability-hub work.
-> **Phase 0 evidence is complete** in
-> `docs/guide/webapp/RAIKER_PHASE_0_EVIDENCE.md`: five disposable-workspace
-> local-browser journeys were recorded, and the pass fixed owner visibility for
-> sessionless connector-write approvals.
+> Current truth update (2026-07-26): **Raiker-informed local web experience is
+> complete across Phases 0-4.** The Svelte shell has the
+> Home/Work/Knowledge/Control/Observe information architecture, a Workbench whose
+> natural-language composer hands its prompt to the persistently mounted Chat
+> view (there is still exactly one governed send path), a project context home
+> with a metadata-only file explorer and provenance inspect pane, a read-only
+> checkpoint restore preflight funnel, one tabbed Extensions hub, and one
+> Observability hub over the audit log, diagnostics, live work, and notification
+> history.
+>
+> Four read-only endpoints were added — `GET /api/extensions`,
+> `GET /api/checkpoints/{checkpoint_id}/restore-plan`,
+> `GET /api/projects/{project_id}/files`, and `GET /api/diagnostics/export`
+> (`raiker/control/web_read_models.py`). None of them mutates the runtime,
+> reaches the network, reads a credential value, or returns workspace file
+> content; the restore preflight performs no restore, and the file explorer fails
+> closed on any path that resolves outside the workspace. The web app adds no
+> client authority and does not represent deferred channels, plugins, backups, or
+> secret controls as shipped — the Extensions hub states the plugin and channel
+> gaps explicitly as "not available yet". The mobile bar preserves Home, Chat,
+> Approvals, Observability, and More while the server-backed master stop remains
+> persistent.
+>
+> Evidence: `docs/plans/2026-07-22-raiker-informed-web-experience-plan.md`,
+> `docs/guide/webapp/RAIKER_PHASE_0_EVIDENCE.md` (five disposable-workspace
+> browser journeys; the pass fixed owner visibility for sessionless
+> connector-write approvals), `RAIKER_PHASE_1_EVIDENCE.md` (viewport, keyboard,
+> theme/reduced-motion), `RAIKER_PHASE_2_EVIDENCE.md` (session cross-links and
+> server-enforced critical step-up), and `RAIKER_PHASE_3_4_EVIDENCE.md` (the new
+> read models, the hubs, and a 21-check browser run at 1280x800 and 375x812 with
+> 164 API calls and no 4xx/5xx response).
+>
+> One limitation is recorded rather than hidden: the API redactor sometimes
+> replaces a randomly generated session id with `[REDACTED_SECRET]`, which cannot
+> address a session. The new surfaces detect this and say "session withheld"
+> instead of offering a dead link. Loosening the redactor is a security-sensitive
+> change and is deliberately not made as part of a UX phase.
 
 > Current truth update (2026-07-21): **Milestone 3 complete** — C2 persists a
 > distinct bounded subagent AI principal and parks any mutation in the parent

@@ -1,5 +1,10 @@
 # Chat task and project-assignment actions
 
+> Implementation note (2026-07-26): the narrow governed tool schemas and
+> trusted active-session/principal broker context are delivered. Clarification,
+> ambiguity resolution, user-facing receipts, and exact-once approval resumption
+> remain specified work.
+
 ## Purpose
 
 Let a user create tasks, reminders, and alarms, or assign the current chat to

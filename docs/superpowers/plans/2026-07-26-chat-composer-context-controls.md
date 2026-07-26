@@ -16,6 +16,19 @@
 - Permission changes use existing authorized/audited capability decision modes; no unrestricted mode is added.
 - Governance evidence stays in Sessions/Checkpoints, not normal chat bubbles.
 
+## Implementation status (2026-07-26)
+
+The configured-profile selector, conservative transcript estimate, read-only
+context popover, and global permission control are implemented. The selector
+does not expose provider catalogues or arbitrary model ids. The current context
+meter is explicitly an estimate derived from chat text because no configured
+profile currently supplies a trusted capacity/usage source.
+
+The following remain open and must not be represented as shipped: provider
+token/accounting data, configured pricing and local-currency display, weekly
+quota data, a session usage endpoint, and automatic 90% compaction. The
+checkboxes below remain the source of truth for those unimplemented steps.
+
 ---
 
 ### Task 1: Profile context/pricing contract

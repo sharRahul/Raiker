@@ -15,6 +15,12 @@
 - The wide layout uses a right-side pane; narrow layout uses a dismissible overlay.
 - Unsupported, malformed, or unauthorized files have safe unavailable/404 states.
 
+## Implementation status (2026-07-26)
+
+This feature is specified but not implemented. There is currently no
+session-authorized preview endpoint or Chat file-inspector UI. Attachments and
+artifacts therefore must not be described as inspectable in the shipped chat.
+
 ---
 
 ### Task 1: Authorize and produce safe preview representations

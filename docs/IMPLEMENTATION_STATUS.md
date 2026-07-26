@@ -1947,3 +1947,24 @@ Phase 9 adds advanced memory and graph features: vector index, AST-based symbol 
 | CLI commands (`/vector-index`, `/symbol-graph`, `/project-graph`, `/skill-candidates`) | `implemented_verified` | `raiker/cli/commands.py` | `tests/test_phase_9_advanced_memory_graph.py` |
 
 All features are in-memory runtime modules with SQLite persistence for records. No external vector DB or LLM calls are required. All disabled runtime flags remain false.
+
+## Conversational chat delivery status (2026-07-26)
+
+The local dashboard Chat transcript now uses responsive conversational bubbles:
+the user is right-aligned in Raiker teal-blue, and Raiker is left-aligned in a
+neutral bubble. The regular transcript no longer renders governed-turn cards;
+technical evidence remains in Sessions and Checkpoints. Streaming presents quiet
+thinking/typing states and Raiker replies may carry an automatic familiar emoji
+reaction.
+
+The composer lists configured model profiles only and has a read-only context
+popover. Current usage is a clearly labelled text-derived estimate, not provider
+token metering. Existing capability decision modes are available from the
+composer. Provider usage/cost/quota data, locale currency conversion, 90%
+automatic compaction, and the view-only file inspector are planned rather than
+implemented.
+
+Two chat-local tool schemas (`create_task`, `assign_session_project`) now use
+trusted broker session/principal context and delegate to `DashboardService`.
+Natural-language clarification, ambiguous-project selection, transcript
+receipts, and approval-time exactly-once resumption are not yet implemented.

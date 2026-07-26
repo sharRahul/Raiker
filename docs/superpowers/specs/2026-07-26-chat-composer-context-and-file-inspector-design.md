@@ -1,5 +1,10 @@
 # Chat composer context controls and file inspector
 
+> Implementation note (2026-07-26): configured-model selection, a labelled
+> transcript estimate, and the existing global permission modes are delivered.
+> Trusted provider usage/cost/quota data, 90% automatic compaction, and the
+> view-only file inspector remain specified work.
+
 ## Purpose
 
 Extend the conversational Chat view with truthful, model-aware context and

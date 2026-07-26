@@ -16,6 +16,18 @@
 - Existing global approval/decision policy controls action execution; successful chat receipts contain no governance payload.
 - An approved task/project action resumes the exact validated action once with stored trusted context; approval never reconstructs model arguments.
 
+## Implementation status (2026-07-26)
+
+The governed tool registry now validates `create_task` and
+`assign_session_project`; the broker passes the active session and acting
+principal as trusted execution context, so neither can be supplied by a model.
+The handlers delegate to the existing `DashboardService` mutation methods.
+
+The planner/clarification state, duplicate-project choice flow, persistent
+exactly-once approval resumption, API coverage, and transcript receipts are
+still open. Until those steps are complete, the feature must not be presented as
+natural-language task/project automation or as an approved action that resumes.
+
 ---
 
 ### Task 1: Structured intents and clarification state

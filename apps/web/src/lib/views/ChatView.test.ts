@@ -124,9 +124,6 @@ describe("ChatView streaming transcript", () => {
 
     await waitFor(() => expect(screen.getByText("DONE")).toBeInTheDocument());
     expect(screen.queryByText(/cache hit|128 tok|completed/i)).not.toBeInTheDocument();
-    if (false) await waitFor(() => {
-      expect(screen.getByText(/cache hit · 128 tok/i)).toBeInTheDocument();
-    });
   });
 
   it("lists only configured models and sends the selected profile without a model override", async () => {

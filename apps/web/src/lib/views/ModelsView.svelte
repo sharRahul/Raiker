@@ -8,6 +8,7 @@
   import type { ModelProfile, ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
   import { humanize, providerName } from "../format";
+  import { providerErrorGuidance, type ProviderErrorGuidance } from "../providerErrors";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
   // so a selection here is reflected there without a full page reload.
@@ -60,6 +61,9 @@
   let testFor = $state<string | null>(null);
   let testResult = $state<string | null>(null);
   let detailsFor = $state<ModelProfile | null>(null);
+  // Governed refusals are policy outcomes, not faults. Hold the reason code so
+  // the dialog can render the control that unblocks it instead of a bare code.
+  let signInGuidance = $state<ProviderErrorGuidance | null>(null);
 
   const signInProfile = $derived(models?.profiles.find((p) => p.profile_id === signInFor) ?? null);
 
@@ -69,15 +73,18 @@
     signInEndpoint = "";
     signInAdvanced = false;
     signInError = null;
+    signInGuidance = null;
   }
   function closeSignIn() {
     signInFor = null;
     signInError = null;
+    signInGuidance = null;
   }
 
   async function saveConnection(profileId: string) {
     signInSaving = true;
     signInError = null;
+    signInGuidance = null;
     try {
       // Email is captured for a friendlier sign-in feel but only the API key
       // and optional endpoint are stored server-side (the backend vault has no
@@ -88,9 +95,12 @@
       signInFor = null;
       await load();
     } catch (e) {
-      signInError = e instanceof ApiError
-        ? `Could not connect (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
-        : "Could not connect";
+      signInGuidance = e instanceof ApiError ? providerErrorGuidance(e.reasonCode) : null;
+      signInError = signInGuidance !== null
+        ? null
+        : e instanceof ApiError
+          ? `Could not connect (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+          : "Could not connect";
     } finally {
       signInSaving = false;
     }
@@ -695,6 +705,16 @@
         <button type="button" class="btn btn-ghost" onclick={closeSignIn}>Cancel</button>
       </div>
       {#if signInError}<p class="error" role="alert">{signInError}</p>{/if}
+      {#if signInGuidance}
+        <div class="signin-guidance" role="alert">
+          <p class="sg-message">{signInGuidance.message}</p>
+          <p class="sg-fix">{signInGuidance.fix}</p>
+          {#if signInGuidance.href}
+            <a class="sg-link" href={signInGuidance.href} onclick={closeSignIn}>{signInGuidance.linkLabel} →</a>
+          {/if}
+          <p class="sg-code">Reason code: <code>{signInGuidance.code}</code></p>
+        </div>
+      {/if}
       <p class="signin-foot">Your key is encrypted in this instance’s vault and never leaves this device.</p>
     </div>
   </div>
@@ -780,6 +800,13 @@
   .signin-connect { flex:1; background:var(--brand); border-color:var(--brand); color:#fff; }
   .signin-connect:hover:not(:disabled) { background:color-mix(in srgb, var(--brand) 88%, #000); border-color:color-mix(in srgb, var(--brand) 88%, #000); }
   .signin-foot { margin:0.4rem 0 0; text-align:center; color:var(--text-3); font-size:0.7rem; }
+  .signin-guidance { background:var(--warn-soft); border:1px solid var(--warn-border); border-radius:var(--r-sm); display:grid; gap:0.35rem; padding:0.7rem 0.8rem; }
+  .signin-guidance p { margin:0; font-size:0.8rem; line-height:1.45; overflow-wrap:anywhere; }
+  .signin-guidance code { overflow-wrap:anywhere; }
+  .sg-message { color:var(--text-1); font-weight:600; }
+  .sg-fix { color:var(--text-2); }
+  .sg-link { color:var(--accent); font-size:0.8rem; font-weight:600; }
+  .sg-code { color:var(--text-3); font-size:0.72rem; }
 
   /* ── Details modal ── */
   .details-overlay { align-items:center; background:color-mix(in srgb, #000 45%, transparent); display:flex; inset:0; justify-content:center; padding:var(--space-4); position:fixed; z-index:30; }

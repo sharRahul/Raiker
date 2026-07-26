@@ -8,6 +8,9 @@ superseded guides, and screenshots are not maintained here.
 
 ## Start here
 
+- [User guide](guide/README.md): task-shaped instructions for running the local
+  dashboard — install, connect a model, permissions, Chat, tasks, MCP, and
+  troubleshooting by reason code.
 - [Architecture](ARCHITECTURE.md): components and governed action flow.
 - [Security architecture](SECURITY_ARCHITECTURE.md): trust boundaries and
   fail-closed controls.
@@ -35,3 +38,7 @@ superseded guides, and screenshots are not maintained here.
 - [Verification](VERIFICATION_PLAN.md)
 - [Local validation](LOCAL_VALIDATION_GATE.md)
 - [Coverage and open gaps](FEATURE_COVERAGE_MATRIX.md)
+- [Live manual test plan](plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md): a repeatable
+  end-to-end browser plan, with the last round's recorded results and evidence.
+- [To be fixed](plans/TO_BE_FIXED.md): defects found by that plan, each with a
+  reproduction, root cause, and proposed fix.

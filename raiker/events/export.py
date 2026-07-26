@@ -26,6 +26,39 @@ SECRET_PATTERNS = (
 )
 
 
+# Numeric accounting fields whose names contain "token" but which are counts, not
+# credentials. Redacting them turned the Chat context meter into "0 / NaN (NaN%)"
+# and stripped the normalised usage numbers out of the audit record. The exemption
+# is deliberately narrow: an exact key name from this set AND a non-boolean integer
+# value. Anything else — including a string under one of these names — stays
+# redacted, so a credential can never ride out under a count-shaped key.
+NON_SECRET_TOKEN_COUNT_KEYS = frozenset(
+    {
+        "cache_creation_input_tokens",
+        "cache_read_input_tokens",
+        "completion_tokens",
+        "context_window_tokens",
+        "input_tokens",
+        "max_tokens",
+        "output_tokens",
+        "prompt_tokens",
+        "total_tokens",
+        "used_tokens",
+    }
+)
+
+
+def is_token_count_field(key: str, value: Any) -> bool:
+    """True when *key*/*value* is a token **count**, not a credential.
+
+    ``None`` is included because "capacity unknown" must reach the UI as an
+    honest absence; redacting it to a string made the browser compute NaN.
+    """
+    if key.lower() not in NON_SECRET_TOKEN_COUNT_KEYS:
+        return False
+    return value is None or (isinstance(value, int) and not isinstance(value, bool))
+
+
 def _is_secret_key(key: str) -> bool:
     lower = key.lower()
     return any(p in lower for p in SECRET_PATTERNS)
@@ -54,6 +87,9 @@ def _redact_string_value(value: str) -> str:
 def redact_event_payload(payload: dict[str, Any]) -> dict[str, Any]:
     redacted: dict[str, Any] = {}
     for key, value in payload.items():
+        if is_token_count_field(key, value):
+            redacted[key] = value
+            continue
         if _is_secret_key(key):
             redacted[key] = "***REDACTED***"
             continue

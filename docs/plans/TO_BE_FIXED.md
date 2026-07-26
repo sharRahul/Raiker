@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Three are marked **FIXED** and were resolved on this
+and the proposed fix. Six are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -19,7 +19,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-03 | Medium | Models / Chat / Build | Fixed |
 | FIXED-04 | **Critical** | Chat orchestration | Fixed (was BUG-02) |
 | FIXED-05 | High | Models / policy | Fixed |
-| BUG-03 | High | Chat rendering | Open |
+| FIXED-06 | High | Chat / Build rendering | Fixed (was BUG-03) |
 | BUG-04 | High | API redaction | Open |
 | BUG-06 | Medium | Approvals | Open (by design — needs a decision) |
 | BUG-07 | Medium | Chat | Open (specified, unimplemented) |
@@ -292,7 +292,9 @@ registered and documented in `docs/EVENT_CATALOG.md`.
 
 ---
 
-## BUG-03 — Markdown is not rendered in Chat
+## FIXED-06 — Markdown is not rendered in Chat
+
+**Status: fixed in this change (was BUG-03).**
 
 **Observed.** Asked for a markdown document; the reply bubble showed literal
 `# Quarterly Report`, `- bullet`, `| Metric | Value |` and ``` fences as plain
@@ -302,12 +304,56 @@ text. DOM audit of the transcript: `h1: 0, table: 0, pre: 0, code: 0, ul: 0`.
 **Impact.** Every code block, table, and list a model produces is unreadable.
 This is the single most visible quality gap in the product.
 
-**Proposed fix.** Render assistant text through a sanitising markdown renderer.
-The file-inspector design already specifies the security posture to reuse:
-*"Markdown is sanitized before rendering"* and *"Preview renderers never execute
-embedded code or macros."* Escape first, allow a fixed tag set (headings, lists,
-tables, `pre`/`code`, links with `rel="noopener noreferrer"`), never `innerHTML`
-of raw model output.
+**Root cause.** `ChatView.svelte` and `BuildView.svelte` bound the answer into a
+`<p class="bubble-text">{answer}</p>`. Svelte escapes an interpolation, so the
+model's markdown reached the DOM as one text node — correct as security, wrong
+as product.
+
+**Fix applied.** New `apps/web/src/lib/markdown.ts` — a dependency-free,
+escape-first renderer — behind `apps/web/src/lib/components/Markdown.svelte`,
+the single supported caller and the only place `{@html}` is used for model
+output. Chat and Build both render assistant answers through it. Supported:
+ATX headings, ordered/unordered lists with nesting, GFM tables with alignment,
+fenced code with a language label, blockquotes, thematic breaks, soft line
+breaks, and inline code, emphasis, strong, strikethrough and links.
+
+**Security posture**, matching what the file-inspector design already specifies
+(*"Markdown is sanitized before rendering"*, *"Preview renderers never execute
+embedded code or macros"*):
+
+- **Escape first, mark up second.** Every run of source text goes through
+  `escapeHtml` *before* any tag is emitted, so raw HTML in a model reply is
+  data, not markup. There is no sanitiser to bypass — raw HTML is never parsed
+  as HTML at all.
+- **A closed tag set.** Only tags written literally in the module can reach the
+  DOM. No attribute is ever copied from the source: the only ones emitted are a
+  `class` from a fixed allowlist and an `href` that must match `http(s):` or
+  `mailto:`, or the link degrades to plain text. A `javascript:`, `data:` or
+  `vbscript:` URL cannot be emitted. Links carry
+  `rel="noopener noreferrer nofollow ugc"`.
+- **No remote fetches.** An image renders as a labelled link, never an `<img>`,
+  so a model cannot make the browser call a third-party host — Raiker's built UI
+  still makes no external request of any kind.
+
+**Deliberately not done here.** No syntax highlighting (it would mean shipping a
+grammar bundle and a second pass over untrusted text for a cosmetic gain), no
+copy-to-clipboard button on code blocks, and no markdown in the *user's* own
+bubble — what someone typed is shown as they typed it.
+
+**Verified.** 33 renderer unit tests (`markdown.test.ts`), 5 component tests
+(`components/Markdown.test.ts`), and view-level regressions in
+`ChatView.test.ts` / `BuildView.test.ts` that re-run the DOM audit from this
+entry. In Chromium against the shipped component in the chat bubble, in both
+themes: `h1: 1, h2: 1, table: 1, pre: 1, code: 2, ul: 2, ol: 1, li: 8,
+blockquote: 1, a: 2, hr: 1` with `img: 0, script: 0`, no literal `# Quarterly
+Report` or `| Metric |` left in the text, no page-level horizontal scroll, no
+dialog raised by an injected `onerror`, and zero external requests.
+`working/83-FIXED-06-chat-markdown-rendered.png`. That capture is a Chromium
+render of `Markdown.svelte` inside the chat bubble markup, not a live model
+turn — this environment has no provider credential.
+
+**Follow-on.** BUG-08 (export / one-click PDF) is now unblocked on the rendering
+side: there is real HTML to print. The control itself is still missing.
 
 ---
 
@@ -380,9 +426,9 @@ as|print`. The only match anywhere is Memory's JSON import/export. There is no
 way to get a chat, a document, or a generated artifact out of Raiker as a file.
 
 **Proposed fix.** Smallest useful version: a per-message "Copy" and a per-chat
-"Export as Markdown". "One-click Markdown → PDF" additionally needs BUG-03
-(rendering) and a print stylesheet; browser print-to-PDF over the rendered
-transcript is the cheapest honest implementation.
+"Export as Markdown". "One-click Markdown → PDF" now needs only a print
+stylesheet — the rendering half is done (FIXED-06); browser print-to-PDF over
+the rendered transcript is the cheapest honest implementation.
 
 ---
 

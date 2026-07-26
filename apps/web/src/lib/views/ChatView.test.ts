@@ -640,4 +640,88 @@ describe("ChatView streaming transcript", () => {
     expect(document.querySelector(".message-group-raiker .message-bubble-raiker")).not.toBeNull();
     expect(screen.queryByText(/governing this turn|cache hit|completed/i)).not.toBeInTheDocument();
   });
+
+  // BUG-03 regression. The DOM audit taken against the running app recorded
+  // `h1: 0, table: 0, pre: 0, code: 0, ul: 0` for a reply that was entirely
+  // markdown; every heading, table and code block reached the user as literal
+  // syntax. This asserts the same audit now comes back non-zero.
+  it("renders a markdown answer as real elements, not literal syntax", async () => {
+    stubFetch(MODELS_ROUTE);
+    const markdown = [
+      "# Quarterly Report",
+      "",
+      "- bullet one",
+      "- bullet two",
+      "",
+      "| Metric | Value |",
+      "| --- | --- |",
+      "| Revenue | 42 |",
+      "",
+      "```python",
+      "print('hi')",
+      "```",
+    ].join("\n");
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: finalResponse(markdown),
+        } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "write me a report" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    const transcript = await waitFor(() => {
+      const el = document.querySelector(".message-bubble-raiker .markdown");
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+
+    expect(transcript.querySelectorAll("h1")).toHaveLength(1);
+    expect(transcript.querySelectorAll("table")).toHaveLength(1);
+    expect(transcript.querySelectorAll("pre")).toHaveLength(1);
+    expect(transcript.querySelectorAll("code")).toHaveLength(1);
+    expect(transcript.querySelectorAll("ul")).toHaveLength(1);
+    expect(transcript.querySelectorAll("li")).toHaveLength(2);
+    expect(transcript.textContent).not.toContain("# Quarterly Report");
+    expect(transcript.textContent).not.toContain("| Metric |");
+    expect(screen.getByRole("heading", { name: "Quarterly Report" })).toBeInTheDocument();
+  });
+
+  it("never executes markup a model puts in its answer", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: finalResponse('<img src=x onerror="window.__pwned = true"> and <script>window.__pwned = true</script>'),
+        } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "hi" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    const transcript = await waitFor(() => {
+      const el = document.querySelector(".message-bubble-raiker .markdown");
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    expect(transcript.querySelector("img")).toBeNull();
+    expect(transcript.querySelector("script")).toBeNull();
+    expect(transcript.textContent).toContain("<script>");
+    expect((window as unknown as Record<string, unknown>).__pwned).toBeUndefined();
+  });
 });

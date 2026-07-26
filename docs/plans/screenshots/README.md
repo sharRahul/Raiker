@@ -5,6 +5,11 @@ Browser screenshots captured while executing
 **2026-07-26** against a running `raiker-web` (Chromium, hosted Anthropic
 `claude-haiku-4-5-20251001`).
 
+One exception, marked where it appears:
+`working/83-FIXED-06-chat-markdown-rendered.png` is a Chromium render of the
+shipped `Markdown.svelte` inside the chat bubble markup rather than a live model
+turn — it was captured in an environment with no provider credential.
+
 | Folder | Contents |
 |---|---|
 | [`working/`](working) | Verified behaviour — every surface that did what it claims |
@@ -16,7 +21,7 @@ Browser screenshots captured while executing
 |---|---|
 | `BUG-01-context-window-NaN.png` | Context popover read `0 / NaN (NaN%)` — **fixed**, see `80-FIXED-…` and `81-FIXED-…` in `working/` |
 | `BUG-02-no-conversation-memory.png` | The model denies having seen the previous turn in the same chat |
-| `BUG-03-chat-markdown-not-rendered.png` | Headings, tables, and fenced code render as raw text |
+| `BUG-03-chat-markdown-not-rendered.png` | Headings, tables, and fenced code render as raw text — **fixed**, see `83-FIXED-…` in `working/` |
 | `BUG-04-response-text-over-redacted.png` | Prose containing "secret" replaced with `***REDACTED***`; chat title became `***REDACTED***` |
 | `BUG-05-model-connect-raw-reason-code.png` | Connect failed with a bare reason code — **fixed**, see `82-FIXED-…` in `working/` |
 | `BUG-06-approval-never-executes.png` | Approving a file write records the decision but writes no file |
@@ -36,7 +41,7 @@ Browser screenshots captured while executing
 | `60`–`65` | Theme, notification centre, STOP switch |
 | `70`–`71` | Responsive layout at 375 / 768 / 1024 / 1440 px |
 | `72`–`77` | Attachments and project creation |
-| `80`–`82` | Verified fixes from the first round |
+| `80`–`83` | Verified fixes from the first round |
 | `90`–`93` | Context and API-cost panel in Chat and Build; Models provider count and spend bars |
 
 No screenshot contains a credential: keys were entered into `type="password"`

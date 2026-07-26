@@ -197,11 +197,18 @@ the **Build** composer (`93-build-context-cost-popover.png`).
 
 ### 5.7 Markdown rendering and one-click PDF
 
-**Neither works.** ❌ Ask for a markdown document; the reply renders as **raw
-markdown text** — `# Quarterly Report`, pipe tables and ``` fences shown
-literally. DOM check: `h1: 0, table: 0, pre: 0, code: 0, ul: 0`. There is **no
-export / download / PDF / print control anywhere in the app**. BUG-03 and
-BUG-08. `not-working/BUG-03-chat-markdown-not-rendered.png`.
+**Rendering: fixed.** ✅ Assistant answers in Chat and Build now render through
+the sanitising renderer (`apps/web/src/lib/markdown.ts` behind
+`components/Markdown.svelte`): headings, nested lists, GFM tables, fenced code
+with a language label, blockquotes, rules, and inline code/emphasis/links. The
+DOM check that read `h1: 0, table: 0, pre: 0, code: 0, ul: 0` now returns
+`h1: 1, table: 1, pre: 1, code: 2, ul: 2` on the same reply, with `img: 0` and
+`script: 0` for injected markup. FIXED-06.
+`working/83-FIXED-06-chat-markdown-rendered.png` (was
+`not-working/BUG-03-chat-markdown-not-rendered.png`).
+
+**Export: still missing.** ❌ There is **no export / download / PDF / print
+control anywhere in the app**. BUG-08.
 
 ---
 
@@ -355,7 +362,7 @@ from the session `⋯` menu. `73-`, `74-`.
 | Can you see how many tokens remain? | **Yes** (was `0 / NaN (NaN%)`; FIXED-02) — provider-reported usage against a provider-reported capacity |
 | Can you see what a chat has cost? | **Yes** — per-chat and provider all-time, in Chat and Build, for API-key providers only |
 | Can you generate a markdown file and view it in the sidebar? | **No** — approval is metadata-only so no file is written (BUG-06), and there is no file inspector (BUG-07) |
-| Can you convert markdown to PDF in one click? | **No** — no export control exists, and markdown is not even rendered (BUG-03, BUG-08) |
+| Can you convert markdown to PDF in one click? | **No** — markdown now renders (FIXED-06), but no export or print control exists (BUG-08) |
 | Do the different task types work? | **Yes** — all four create, schedule, and run |
 | Can you set an API key from the web app? | **Yes** — Connect, paste, done. No gate, allowlist, or vault-key setup first (FIXED-05) |
 | Does the MCP server work? | **Partly** — create/connect/monitor yes, tools in Chat no (BUG-12) |

@@ -970,19 +970,26 @@
     flex-wrap: wrap;
     justify-content: flex-end;
   }
+  /* Same setting pill as the Chat composer, so the two conversation surfaces
+     present their per-turn controls identically. */
   .bar-select {
-    border: 1px solid transparent;
-    background: transparent;
+    border: 1px solid var(--neutral-border);
+    background: var(--surface);
     color: var(--text-2);
     font: inherit;
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     font-weight: 600;
-    padding: 0.25rem 0.4rem;
-    border-radius: var(--r-md);
-    max-width: 15rem;
+    padding: 0.2rem 0.45rem;
+    border-radius: var(--r-pill);
+    max-width: 11rem;
+    text-overflow: ellipsis;
   }
   .bar-select:hover:not(:disabled) {
-    background: var(--neutral-soft);
+    border-color: var(--accent-border);
+    color: var(--text-1);
+  }
+  .bar-select:disabled {
+    opacity: 0.6;
   }
   .bar-select:focus-visible {
     outline: 2px solid var(--focus-ring);

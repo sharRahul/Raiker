@@ -23,6 +23,7 @@ afterEach(() => {
 const MODELS_ROUTE = {
   "GET /api/models": {
     profiles: [],
+    chat_profiles: [],
     current_profile_id: null,
     current_model: null,
     advisor_profile_id: null,
@@ -95,7 +96,7 @@ describe("ChatView streaming transcript", () => {
     expect(streamPromptMock).toHaveBeenCalledOnce();
   });
 
-  it("shows a cache-hit chip from the model_request_completed usage", async () => {
+  it("keeps model runtime metadata out of the conversation", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockImplementation(
       async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
@@ -121,12 +122,14 @@ describe("ChatView streaming transcript", () => {
     await fireEvent.input(box, { target: { value: "hi" } });
     await fireEvent.keyDown(box, { key: "Enter" });
 
-    await waitFor(() => {
+    await waitFor(() => expect(screen.getByText("DONE")).toBeInTheDocument());
+    expect(screen.queryByText(/cache hit|128 tok|completed/i)).not.toBeInTheDocument();
+    if (false) await waitFor(() => {
       expect(screen.getByText(/cache hit · 128 tok/i)).toBeInTheDocument();
     });
   });
 
-  it("lets the user pick a provider and one of its models for the turn", async () => {
+  it("lists only configured models and sends the selected profile without a model override", async () => {
     stubFetch({
       ...MODELS_ROUTE,
       "GET /api/models": {
@@ -135,7 +138,7 @@ describe("ChatView streaming transcript", () => {
           {
             profile_id: "ollama-local-openai-compatible",
             provider: "ollama",
-            model: "<model>",
+            model: "qwen2.5",
             default_state: "disabled",
             local_only: true,
             requires_network: false,
@@ -146,15 +149,29 @@ describe("ChatView streaming transcript", () => {
             off_machine: false,
             selected: false,
             prompt_cache_ttl: null,
+            context_window_tokens: 131072,
+            configured: true,
           },
         ],
-      },
-      "GET /api/models/ollama-local-openai-compatible/provider-models": {
-        profile_id: "ollama-local-openai-compatible",
-        provider: "ollama",
-        status: "available",
-        reason_code: null,
-        models: ["qwen2.5", "llama3.2"],
+        chat_profiles: [
+          {
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "qwen2.5",
+            default_state: "disabled",
+            local_only: true,
+            requires_network: false,
+            endpoint_kind: "local",
+            requires_egress_policy: false,
+            requires_budget_policy: false,
+            runtime_gate: null,
+            off_machine: false,
+            selected: false,
+            prompt_cache_ttl: null,
+            context_window_tokens: 131072,
+            configured: true,
+          },
+        ],
       },
     });
     streamPromptMock.mockImplementation(
@@ -170,18 +187,12 @@ describe("ChatView streaming transcript", () => {
     );
 
     render(ChatView);
-    const providerSelect = screen.getByLabelText("Provider") as HTMLSelectElement;
-    // Wait for the profiles fetch to populate the provider options.
-    await waitFor(() => expect(providerSelect.options.length).toBeGreaterThan(1));
-    await fireEvent.change(providerSelect, {
+    const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
+    await waitFor(() => expect(modelSelect.options.length).toBeGreaterThan(1));
+    expect(modelSelect.textContent).toContain("Ollama · qwen2.5");
+    await fireEvent.change(modelSelect, {
       target: { value: "ollama-local-openai-compatible" },
     });
-
-    // The provider's catalogue loads on demand and populates the model select.
-    await waitFor(() => expect(screen.getByLabelText("Model")).toBeTruthy());
-    const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
-    expect(modelSelect.textContent).toContain("qwen2.5");
-    await fireEvent.change(modelSelect, { target: { value: "qwen2.5" } });
 
     const box = screen.getByRole("textbox", { name: /prompt/i });
     await fireEvent.input(box, { target: { value: "hi" } });
@@ -190,7 +201,7 @@ describe("ChatView streaming transcript", () => {
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalledOnce());
     const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
     expect(body.model_profile).toBe("ollama-local-openai-compatible");
-    expect(body.model).toBe("qwen2.5");
+    expect(body.model).toBeUndefined();
   });
 
   it("sends the server's safe-only planning mode when Never plan is selected", async () => {
@@ -220,7 +231,7 @@ describe("ChatView streaming transcript", () => {
     expect(body.planning_mode).toBe("never_safe_only");
   });
 
-  it("names the persisted selection in the provider dropdown default option", async () => {
+  it("names the persisted selection in the configured model dropdown", async () => {
     stubFetch({
       ...MODELS_ROUTE,
       "GET /api/models": {
@@ -240,13 +251,34 @@ describe("ChatView streaming transcript", () => {
             off_machine: false,
             selected: true,
             prompt_cache_ttl: null,
+            context_window_tokens: 131072,
+            configured: true,
+          },
+        ],
+        chat_profiles: [
+          {
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "gemma4:31b-cloud",
+            default_state: "disabled",
+            local_only: true,
+            requires_network: false,
+            endpoint_kind: "local",
+            requires_egress_policy: false,
+            requires_budget_policy: false,
+            runtime_gate: null,
+            off_machine: false,
+            selected: true,
+            prompt_cache_ttl: null,
+            context_window_tokens: 131072,
+            configured: true,
           },
         ],
       },
     });
 
     render(ChatView);
-    const providerSelect = screen.getByLabelText("Provider") as HTMLSelectElement;
+    const providerSelect = screen.getByLabelText("Model") as HTMLSelectElement;
     await waitFor(() => expect(providerSelect.options.length).toBeGreaterThan(1));
     // The default option must name the actual persisted selection, not just
     // say "Selected model" — the user has to see what will serve the turn.
@@ -505,5 +537,110 @@ describe("ChatView streaming transcript", () => {
     await waitFor(() =>
       expect(screen.getByText(/could not load history/i)).toBeInTheDocument(),
     );
+  });
+
+  it("opens context details without changing or compacting the chat", async () => {
+    stubFetch({
+      ...MODELS_ROUTE,
+      "GET /api/models": {
+        ...(MODELS_ROUTE["GET /api/models"] as Record<string, unknown>),
+        chat_profiles: [
+          {
+            profile_id: "configured-model",
+            provider: "anthropic",
+            model: "claude",
+            default_state: "enabled",
+            local_only: false,
+            requires_network: true,
+            endpoint_kind: "remote_hosted",
+            requires_egress_policy: true,
+            requires_budget_policy: false,
+            runtime_gate: "hosted_model_runtime",
+            off_machine: true,
+            selected: true,
+            prompt_cache_ttl: null,
+            context_window_tokens: 1_000_000,
+            configured: true,
+          },
+        ],
+      },
+    });
+    render(ChatView);
+    await fireEvent.click(screen.getByRole("button", { name: "Context window" }));
+    expect(screen.getByText("0 / 1.0M (0%)")).toBeInTheDocument();
+    expect(screen.queryByText(/context compacted/i)).not.toBeInTheDocument();
+  });
+
+  it("shows safe expandable thinking while Raiker prepares a response", async () => {
+    stubFetch(MODELS_ROUTE);
+    let finishStream: (() => void) | undefined;
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "lifecycle",
+          text: "internal intent payload",
+          event_type: "intent_classified",
+          payload: {},
+          response: null,
+        } as StreamEvent);
+        await new Promise<void>((resolve) => {
+          finishStream = resolve;
+        });
+      },
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "help me plan this" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    expect(await screen.findByText("Raiker is thinking…")).toBeInTheDocument();
+    const details = screen.getByLabelText("Raiker's thinking") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    await fireEvent.click(screen.getByText("See what Raiker is thinking"));
+    expect(details.open).toBe(true);
+    expect(screen.getByText("Understanding what you need.")).toBeInTheDocument();
+    expect(screen.queryByText("internal intent payload")).not.toBeInTheDocument();
+
+    finishStream?.();
+  });
+
+  it("uses conversation bubbles, typing status, and a reaction without runtime metadata", async () => {
+    stubFetch(MODELS_ROUTE);
+    let finishStream: (() => void) | undefined;
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "text_delta",
+          text: "You're welcome — happy to help!",
+          event_type: "",
+          payload: {},
+          response: null,
+        } as StreamEvent);
+        await new Promise<void>((resolve) => {
+          finishStream = resolve;
+        });
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: finalResponse("You're welcome — happy to help!"),
+        } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "thanks" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    expect(await screen.findByText("Raiker is typing…")).toBeInTheDocument();
+    finishStream?.();
+
+    expect(await screen.findByLabelText("Raiker reacted with Heart")).toHaveTextContent("❤️");
+    expect(document.querySelector(".message-group-user .message-bubble-user")).not.toBeNull();
+    expect(document.querySelector(".message-group-raiker .message-bubble-raiker")).not.toBeNull();
+    expect(screen.queryByText(/governing this turn|cache hit|completed/i)).not.toBeInTheDocument();
   });
 });

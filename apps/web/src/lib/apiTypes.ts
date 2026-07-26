@@ -177,10 +177,13 @@ export interface ModelProfile {
   selected: boolean;
   connection_configured?: boolean;
   prompt_cache_ttl: string | null;
+  context_window_tokens?: number | null;
+  configured?: boolean;
 }
 
 export interface ModelsView {
   profiles: ModelProfile[];
+  chat_profiles?: ModelProfile[];
   current_profile_id: string | null;
   current_model: string | null;
   advisor_profile_id: string | null;

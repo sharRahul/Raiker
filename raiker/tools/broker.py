@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,14 @@ from raiker.tools.memory_tools import (
 )
 from raiker.tools.search import glob, grep
 from raiker.tools.vector_tools import vector_get
+
+
+@dataclass(frozen=True)
+class ToolExecutionContext:
+    """Trusted turn identity supplied by the broker, never by a model tool call."""
+
+    session_id: str
+    principal_id: str
 
 # Tools whose arguments/results are scrubbed to metadata before entering event
 # payloads or the stored tool-action record. The advisor question/answer flow
@@ -190,6 +199,54 @@ class ToolBroker:
                 args.get("arguments") if isinstance(args.get("arguments"), dict) else {},
                 store=self.store,
             ),
+        }
+        self.context_executors: dict[
+            str, Callable[[dict[str, Any], ToolExecutionContext], dict[str, Any]]
+        ] = {
+            "create_task": self._create_task,
+            "assign_session_project": self._assign_session_project,
+        }
+
+    def _create_task(self, args: dict[str, Any], context: ToolExecutionContext) -> dict[str, Any]:
+        from raiker.control.dashboard import DashboardService
+
+        title = str(args.get("title", "")).strip()
+        if not title:
+            return {"status": "failed", "error": {"type": "task_title_required"}}
+        service = DashboardService(self.workspace_root)
+        task = service.create_task(
+            title=title,
+            objective=str(args.get("description", "")).strip(),
+            user_id=self.store.principal_user_id(context.principal_id) if self.store else None,
+            principal_id=context.principal_id,
+            scheduled_at=str(args["scheduled_at"]) if args.get("scheduled_at") else None,
+            reminder_at=str(args["reminder_at"]) if args.get("reminder_at") else None,
+            recurrence=str(args["recurrence"]) if args.get("recurrence") else None,
+            project_id=str(args["project_id"]) if args.get("project_id") else None,
+        )
+        return {
+            "status": "success",
+            "receipt": {"kind": "task", "title": task.title, "href": "#/tasks", "label": "Review in Tasks"},
+            "task_id": task.task_id,
+        }
+
+    def _assign_session_project(self, args: dict[str, Any], context: ToolExecutionContext) -> dict[str, Any]:
+        from raiker.control.dashboard import DashboardService
+
+        project_id = str(args.get("project_id", "")).strip()
+        if not project_id:
+            return {"status": "failed", "error": {"type": "project_id_required"}}
+        service = DashboardService(self.workspace_root)
+        result = service.set_session_project(context.session_id, project_id, context.principal_id)
+        if not result.ok:
+            return {"status": "failed", "error": {"type": result.reason_code}}
+        project = self.store.load_project(
+            project_id, user_id=self.store.principal_user_id(context.principal_id)
+        ) if self.store else None
+        return {
+            "status": "success",
+            "receipt": {"kind": "project_assignment", "title": str(project.get("name")) if project else project_id, "href": "#/projects", "label": "Review in Projects"},
+            "session_id": context.session_id,
         }
 
     @property
@@ -575,7 +632,8 @@ class ToolBroker:
             payload={"action_id": action.action_id, "tool_name": action.tool_name},
             client=client,
         )
-        if executor is None:
+        context_executor = self.context_executors.get(action.tool_name)
+        if executor is None and context_executor is None:
             if action.tool_name == "memory_write":
                 raw = self.memory_service.write_from_action(
                     action,
@@ -615,7 +673,14 @@ class ToolBroker:
                 return failed, decision
         else:
             try:
-                raw = executor(action.arguments)
+                raw = (
+                    context_executor(
+                        action.arguments,
+                        ToolExecutionContext(session_id=session_id, principal_id=self.principal_id),
+                    )
+                    if context_executor is not None
+                    else executor(action.arguments)
+                )
             except FilesystemSafetyError as exc:
                 raw = {"status": "failed", "error": {"type": str(exc)}}
         status = "success" if raw.get("status") == "success" else ("denied" if raw.get("status") == "denied" else "failed")

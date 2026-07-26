@@ -437,6 +437,10 @@ class ModelProfileView:
     # Prompt-cache TTL breakpoint the provider uses for this profile ("5m"/"1h"),
     # or None when the provider/profile does not cache. Read-only status.
     prompt_cache_ttl: str | None = None
+    # Context capacity and pricing are configuration-owned facts. They stay
+    # unset for placeholder or provider-discovered models rather than guessed.
+    context_window_tokens: int | None = None
+    configured: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -470,6 +474,9 @@ class ProviderModelListView:
 @dataclass(frozen=True)
 class ModelsView:
     profiles: tuple[ModelProfileView, ...]
+    # Profiles with a concrete configured model are the only choices surfaced
+    # by the conversational composer. The full list remains for Models setup.
+    chat_profiles: tuple[ModelProfileView, ...]
     current_profile_id: str | None
     hosted_model_gate_state: str
     private_network_model_gate_state: str
@@ -495,6 +502,7 @@ class ModelsView:
     def to_dict(self) -> dict[str, Any]:
         return {
             "profiles": [p.to_dict() for p in self.profiles],
+            "chat_profiles": [p.to_dict() for p in self.chat_profiles],
             "current_profile_id": self.current_profile_id,
             "current_model": self.current_model,
             "advisor_profile_id": self.advisor_profile_id,
@@ -2042,6 +2050,16 @@ class DashboardService:
                     and get_model_connection(self.store, acting_principal_id, p.profile_id)
                 ),
                 prompt_cache_ttl=(str(p.raw.get("prompt_cache_ttl")) if p.raw.get("prompt_cache_ttl") else None),
+                context_window_tokens=(
+                    int(p.raw["context_window_tokens"])
+                    if isinstance(p.raw.get("context_window_tokens"), int)
+                    and not isinstance(p.raw.get("context_window_tokens"), bool)
+                    and int(p.raw["context_window_tokens"]) > 0
+                    else None
+                ),
+                configured=(
+                    (override if override and p.profile_id == current else p.model) != "<model>"
+                ),
             )
             for p in registry.list_profiles()
             # Test-harness profiles (mock/deterministic) are not selectable outside
@@ -2052,6 +2070,7 @@ class DashboardService:
         )
         return ModelsView(
             profiles=profiles,
+            chat_profiles=tuple(profile for profile in profiles if profile.configured),
             current_profile_id=current,
             hosted_model_gate_state=hosted_gate.state if hosted_gate is not None else "unknown",
             private_network_model_gate_state=private_gate.state if private_gate is not None else "unknown",

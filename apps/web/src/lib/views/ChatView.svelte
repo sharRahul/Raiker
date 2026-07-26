@@ -1,15 +1,15 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import Icon from "../components/Icon.svelte";
-  import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
+  import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
+  import PermissionModeControl from "../components/PermissionModeControl.svelte";
   import { api, ApiError, streamPrompt } from "../api";
-  import type { AgentResponse, ModelProfile, ProviderModelList, SessionDetail, StreamEvent } from "../apiTypes";
-  import { groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
-  import { responseBadge } from "../statusMaps";
-  import { collectText } from "../turnPhases";
+  import type { AgentResponse, ModelProfile, SessionDetail, StreamEvent } from "../apiTypes";
+  import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, providerName } from "../format";
+  import { reactionForResponse, thinkingSteps } from "../chatPresentation";
 
   // One composer attachment chip: a workspace path, an image, or a text
   // document already uploaded into the governed attachment store (referenced by
@@ -55,18 +55,16 @@
   let planningMode = $state("");
   let profiles = $state<ModelProfile[]>([]);
 
-  // Per-turn model for the chosen profile. Populated on demand from the
-  // provider's own catalogue; when the catalogue is unavailable the user can
-  // still type a model id. Empty means the profile/persisted default.
-  let modelChoice = $state("");
-  let providerModels = $state<ProviderModelList | null>(null);
-  let loadingModels = $state(false);
-
-  const chosenProfile = $derived(profiles.find((p) => p.profile_id === modelProfile) ?? null);
-
   // The persisted selection (Models view / /model use). The default provider
   // option names it so the user can see what will actually serve the turn.
   const selectedProfile = $derived(profiles.find((p) => p.selected) ?? null);
+  const activeProfile = $derived(profiles.find((p) => p.profile_id === modelProfile) ?? selectedProfile);
+  let contextOpen = $state(false);
+  // The backend will replace this conservative presentation estimate with
+  // provider-reported usage when available. It is intentionally labeled.
+  const estimatedContextTokens = $derived(
+    Math.ceil(turns.reduce((count, turn) => count + turn.prompt.length + answerText(turn).length, 0) / 4),
+  );
 
   // Attachments for the next prompt: workspace paths (resolved server-side
   // inside the workspace — anything outside fails closed — and included as
@@ -232,31 +230,6 @@
     return parts.length > 0 ? parts[parts.length - 1] : path;
   }
 
-  async function onProfileChange() {
-    modelChoice = "";
-    providerModels = null;
-    if (modelProfile === "") return;
-    loadingModels = true;
-    try {
-      providerModels = await api.providerModels(modelProfile);
-    } catch {
-      providerModels = null; // manual entry still works below
-    } finally {
-      loadingModels = false;
-    }
-  }
-
-  function providerModelsNote(list: ProviderModelList): string {
-    switch (list.status) {
-      case "policy_denied":
-        return "Model list denied by provider policy — enable the provider's gate first.";
-      case "unsupported":
-        return "This provider does not support model listing.";
-      default:
-        return "Provider unreachable — type a model id if you know it.";
-    }
-  }
-
   let scrollEl: HTMLDivElement | undefined = $state();
 
   onMount(() => {
@@ -332,7 +305,9 @@
   async function loadProfiles() {
     try {
       const models = await api.models();
-      profiles = models.profiles;
+      // Chat is intentionally limited to concrete configured profiles. Older
+      // servers fall back to their profile list, filtering the same fact.
+      profiles = models.chat_profiles ?? models.profiles.filter((profile) => profile.configured);
     } catch {
       // The options panel simply omits the model list; prompting still works.
     }
@@ -341,22 +316,6 @@
   function currentPhase(turn: ChatTurn): PhaseId | null {
     const rows = groupPhases(turn.events);
     return rows.length > 0 ? rows[rows.length - 1].phase : null;
-  }
-
-  // Provider-agnostic cache metrics from the last model_request_completed event.
-  // The runtime normalises every provider's usage into the same shape, so this
-  // reads cache-hit tokens irrespective of which model served the turn.
-  function cacheInfo(turn: ChatTurn): { read: number; hit: boolean } | null {
-    for (let i = turn.events.length - 1; i >= 0; i--) {
-      const ev = turn.events[i];
-      if (ev.kind !== "lifecycle" || ev.event_type !== "model_request_completed") continue;
-      const usage = ev.payload?.usage as Record<string, number> | undefined;
-      if (usage && typeof usage.cache_read_tokens === "number") {
-        return { read: usage.cache_read_tokens, hit: usage.cache_read_tokens > 0 };
-      }
-      return null;
-    }
-    return null;
   }
 
   function answerText(turn: ChatTurn): string {
@@ -394,7 +353,6 @@
           text,
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
-          model: modelChoice.trim() || undefined,
           attachments:
             sentAttachments.length > 0
               ? sentAttachments.map((a) =>
@@ -462,14 +420,18 @@
       <EmptyState
         icon="chat"
         title={`What would you like to work on, ${userName}?`}
-        body="Start with a question, a task, or a file. Every turn is governed, observable, and stays in this Raiker instance."
+        body="Start with a question, a task, or a file."
         serif={true}
       />
     {/if}
 
     {#each turns as turn (turn.id)}
+      {@const answer = answerText(turn)}
+      {@const thinking = thinkingSteps(turn.events)}
+      {@const reaction = reactionForResponse(answer)}
       <div class="turn">
-        <div class="bubble user">
+        <div class="message-group message-group-user">
+          <div class="message-bubble message-bubble-user">
           <p class="bubble-text">{turn.prompt}</p>
           {#if turn.attachments.length > 0}
             <p class="turn-attachments">
@@ -482,8 +444,11 @@
             </p>
           {/if}
         </div>
+        </div>
 
-        <div class="bubble agent">
+        <div class="message-group message-group-raiker">
+          {#if turn.response !== null}
+          {#if false}
           {#if turn.streaming}
             <p class="phase-line" role="status">
               <span class="pulse" aria-hidden="true"></span>
@@ -506,8 +471,10 @@
           {/if}
 
           {#if turn.response !== null}
+            <!-- Legacy runtime metadata intentionally omitted from Chat. -->
+            <!--
             <div class="response-meta">
-              <Badge variant={responseBadge(turn.response.status)} label={turn.response.status} />
+              <Badge variant={responseBadge(turn.response!.status)} label={turn.response!.status} />
               {#if cacheInfo(turn)}
                 {@const cache = cacheInfo(turn)}
                 <span
@@ -519,18 +486,21 @@
                 </span>
               {/if}
             </div>
+            -->
 
-            {#if turn.response.status === "needs_approval" && turn.response.approval}
+            {#if turn.response!.status === "needs_approval" && turn.response!.approval}
               <div class="approval-card">
                 <p class="approval-title">
                   <Icon name="approvals" size={15} />
                   This action is waiting for your approval
                 </p>
+                <!--
                 <p class="approval-body">
                   <strong>{humanize(turn.response.approval.tool_name)}</strong> — risk
                   <strong>{turn.response.approval.risk_level}</strong>.
                   {turn.response.approval.message}
                 </p>
+                -->
                 <p class="approval-note">
                   Review it in the Approvals inbox. Recording a decision never executes the action.
                 </p>
@@ -563,6 +533,45 @@
                 <p class="tool-line">{humanize(ev.event_type)} {ev.text}</p>
               {/each}
             </details>
+          {/if}
+          {/if}
+          {/if}
+
+          {#if turn.streaming}
+            <p class="streaming-label" role="status">
+              <span class="pulse" aria-hidden="true"></span>
+              {answer === "" ? "Raiker is thinking…" : "Raiker is typing…"}
+            </p>
+            {#if thinking.length > 0}
+              <details class="thinking-details" aria-label="Raiker's thinking">
+                <summary>See what Raiker is thinking</summary>
+                {#each thinking as step (step)}
+                  <p>{step}</p>
+                {/each}
+              </details>
+            {/if}
+          {/if}
+
+          {#if answer !== ""}
+            <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer">{answer}</p></div>
+          {:else if !turn.streaming && turn.error === null && turn.response !== null}
+            <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">(No answer text was returned.)</p></div>
+          {/if}
+
+          {#if turn.error !== null}
+            <p class="error-line" role="alert">{turn.error}</p>
+          {/if}
+
+          {#if turn.response?.status === "needs_approval" && turn.response.approval}
+            <div class="approval-card">
+              <p class="approval-title"><Icon name="approvals" size={15} /> Your approval is needed to continue</p>
+              <p class="approval-body">{turn.response.approval.message}</p>
+              <a class="btn btn-soft btn-sm" href="#/approvals">Review approval</a>
+            </div>
+          {/if}
+
+          {#if !turn.streaming && reaction}
+            <span class="reaction" aria-label={`Raiker reacted with ${reaction.label}`}>{reaction.emoji}</span>
           {/if}
         </div>
       </div>
@@ -707,10 +716,9 @@
           <select
             class="bar-select"
             bind:value={modelProfile}
-            onchange={() => void onProfileChange()}
             disabled={streaming}
-            aria-label="Provider"
-            title="Provider for this turn (default: your selected model)"
+            aria-label="Model"
+            title="Configured model for this turn"
           >
             <option value="">
               {selectedProfile !== null
@@ -718,44 +726,30 @@
                 : "Selected model"}
             </option>
             {#each profiles as p (p.profile_id)}
-              <option value={p.profile_id}>{providerName(p.provider)}</option>
+              <option value={p.profile_id}>{providerName(p.provider)} · {p.model}</option>
             {/each}
           </select>
 
-          {#if modelProfile !== ""}
-            {#if loadingModels}
-              <span class="bar-note" role="status">Loading models…</span>
-            {:else if providerModels !== null && providerModels.status === "available" && providerModels.models.length > 0}
-              <select
-                class="bar-select"
-                bind:value={modelChoice}
-                disabled={streaming}
-                aria-label="Model"
-                title="Model for this turn, from the provider's catalogue"
-              >
-                <option value="">
-                  {chosenProfile !== null && chosenProfile.model !== "<model>"
-                    ? `Default (${chosenProfile.model})`
-                    : "Pick a model…"}
-                </option>
-                {#each providerModels.models as m (m)}
-                  <option value={m}>{m}</option>
-                {/each}
-              </select>
-            {:else}
-              <input
-                class="bar-input"
-                type="text"
-                placeholder="model id"
-                bind:value={modelChoice}
-                disabled={streaming}
-                aria-label="Model"
-                title={providerModels !== null && providerModels.status !== "available"
-                  ? providerModelsNote(providerModels)
-                  : "Model for this turn"}
+          <div class="context-control">
+            <button
+              type="button"
+              class="bar-select context-trigger"
+              aria-label="Context window"
+              aria-expanded={contextOpen}
+              onclick={() => (contextOpen = !contextOpen)}
+            >
+              Context
+            </button>
+            {#if contextOpen}
+              <ContextMeterPopover
+                usedTokens={estimatedContextTokens}
+                contextWindowTokens={activeProfile?.context_window_tokens ?? null}
+                estimated={true}
               />
             {/if}
-          {/if}
+          </div>
+
+          <PermissionModeControl />
 
           <button
             type="button"
@@ -779,16 +773,6 @@
         </div>
       </div>
     </div>
-
-    {#if modelProfile !== "" && !loadingModels}
-      {#if providerModels !== null && providerModels.status !== "available"}
-        <p class="model-note">{providerModelsNote(providerModels)}</p>
-      {:else if chosenProfile !== null && chosenProfile.model === "<model>" && modelChoice.trim() === ""}
-        <p class="model-note">
-          This provider needs a concrete model — without one the turn uses your persisted selection.
-        </p>
-      {/if}
-    {/if}
   </form>
 </div>
 
@@ -813,22 +797,67 @@
     flex-direction: column;
     gap: var(--space-3);
   }
-  .bubble {
-    border-radius: var(--r-lg);
-    padding: 0.75rem 1rem;
-    max-width: 85%;
+  .message-group {
+    display: flex;
+    flex-direction: column;
+    max-width: min(76%, 48rem);
+    position: relative;
   }
-  .bubble.user {
+  .message-group-user {
     align-self: flex-end;
-    background: var(--accent-soft);
-    border: 1px solid var(--accent-border);
+    align-items: flex-end;
   }
-  .bubble.agent {
+  .message-group-raiker {
     align-self: flex-start;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .message-bubble {
+    position: relative;
+    border-radius: 1.25rem;
+    padding: 0.72rem 0.95rem;
     box-shadow: var(--shadow-1);
-    min-width: 14rem;
+  }
+  .message-bubble-user {
+    background: var(--accent);
+    color: var(--text-inverse);
+    border-bottom-right-radius: 0.35rem;
+  }
+  .message-bubble-raiker {
+    background: var(--sunken);
+    color: var(--text-1);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 0.35rem;
+  }
+  .streaming-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0 0 0.3rem;
+    color: var(--text-3);
+    font-size: 0.78rem;
+    font-weight: 650;
+  }
+  .thinking-details {
+    margin: 0 0 0.4rem;
+    color: var(--text-2);
+    font-size: 0.78rem;
+  }
+  .thinking-details summary {
+    cursor: pointer;
+    color: var(--text-3);
+  }
+  .thinking-details p {
+    margin: 0.35rem 0 0;
+  }
+  .reaction {
+    margin: -0.25rem 0.75rem 0;
+    padding: 0.12rem 0.38rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+    font-size: 1rem;
+    line-height: 1.2;
   }
   .bubble-text {
     margin: 0;
@@ -869,27 +898,6 @@
     color: var(--danger);
     font-size: 0.86rem;
     margin: 0.35rem 0 0;
-  }
-  .response-meta {
-    margin-top: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-  .cache-chip {
-    font-size: 0.72rem;
-    font-weight: 600;
-    border-radius: var(--r-pill);
-    border: 1px solid var(--neutral-border);
-    background: var(--neutral-soft);
-    color: var(--text-3);
-    padding: 0.08rem 0.55rem;
-  }
-  .cache-chip.hit {
-    border-color: var(--ok-border);
-    background: var(--ok-soft);
-    color: var(--ok);
   }
   .approval-card {
     margin-top: 0.65rem;
@@ -1034,8 +1042,7 @@
     min-width: 0;
     justify-content: flex-end;
   }
-  .bar-select,
-  .bar-input {
+  .bar-select {
     border: none;
     background: transparent;
     color: var(--text-2);
@@ -1045,26 +1052,12 @@
     border-radius: var(--r-md);
     max-width: 15rem;
   }
-  .bar-select:hover:not(:disabled),
-  .bar-input:hover:not(:disabled) {
+  .bar-select:hover:not(:disabled) {
     background: var(--neutral-soft);
   }
   .bar-select:focus-visible,
-  .bar-input:focus-visible,
   .round-btn:focus-visible {
     outline: 2px solid var(--focus-ring);
-  }
-  .bar-input {
-    border: 1px dashed var(--neutral-border);
-  }
-  .bar-note {
-    font-size: 0.76rem;
-    color: var(--text-3);
-  }
-  .model-note {
-    font-size: 0.74rem;
-    color: var(--text-3);
-    margin: 0.35rem 0.2rem 0;
   }
   .attach-popover {
     display: flex;
@@ -1117,5 +1110,12 @@
   }
   .send {
     min-width: 6.5rem;
+  }
+  .context-control { position: relative; }
+  .context-trigger { cursor: pointer; }
+  @media (max-width: 720px) {
+    .message-group {
+      max-width: 88%;
+    }
   }
 </style>

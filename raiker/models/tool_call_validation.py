@@ -38,6 +38,10 @@ _TOOL_RISK: dict[str, tuple[str, bool]] = {
     "slack_read": ("medium", False),
     "connector_read": ("medium", False),
     "connector_write": ("high", True),
+    # Local planning/organisation actions are reversible but mutate owner data;
+    # they retain the normal approval path.
+    "create_task": ("high", True),
+    "assign_session_project": ("high", True),
 }
 
 _MODEL_EXPOSED_TOOLS = frozenset(_TOOL_RISK)
@@ -66,6 +70,9 @@ _REQUIRED_ARGS: dict[str, tuple[str, ...]] = {
     "slack_read": ("resource", "channel"),
     "connector_read": ("connector_id", "operation_id"),
     "connector_write": ("connector_id", "operation_id"),
+    "create_task": ("title",),
+    # The active session is trusted broker context, never a model argument.
+    "assign_session_project": ("project_id",),
 }
 
 _TOOL_DESCRIPTIONS: dict[str, str] = {
@@ -115,6 +122,14 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
     "connector_write": (
         "Propose one POST, PUT, PATCH, or DELETE connector operation. Every call requires "
         "explicit user approval before the external request is sent."
+    ),
+    "create_task": (
+        "Create a local task or reminder. Requires title; optional description, "
+        "scheduled_at, reminder_at, recurrence, and project_id."
+    ),
+    "assign_session_project": (
+        "Move the active conversation into a visible project. Requires project_id; "
+        "the active session is supplied by Raiker and cannot be chosen by the model."
     ),
 }
 

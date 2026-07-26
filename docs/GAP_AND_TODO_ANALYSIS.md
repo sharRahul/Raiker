@@ -153,6 +153,17 @@ All items below are specified but not implemented unless explicitly marked other
 
 ## Security architecture and deferred-control gaps
 
+### Conversational chat follow-up (2026-07-26)
+
+The normal Chat UI is delivered as a presentation-only transcript; it hides
+governance cards and keeps evidence in Sessions/Checkpoints. The open work is
+server-backed provider token accounting/cost/quota reporting, safe automatic
+compaction at the approved global 90% threshold, session-authorized file
+previews, and the conversational task/project workflow. The latter still needs
+clarification/ambiguity state, normal completion receipts, and persistent
+exactly-once approval resumption. Do not enable or advertise those deferred
+behaviours until their storage, authorization, and regression tests exist.
+
 `docs/SECURITY_ARCHITECTURE.md` is the dedicated current security architecture document. The remaining security items below are missing/deferred unless a future implementation task explicitly marks them implemented with code, tests, validation, and documentation.
 
 | Security gap | Current status | Required future work |

@@ -192,27 +192,55 @@
 {/if}
 
 <style>
+  /* The shell *is* the viewport. Clipping here is what guarantees the sidebar
+     and topbar can never scroll away: whatever a page renders, the only thing
+     that scrolls is `.content`. Without it a page that overflows its column
+     hands the overflow to the document, and the whole shell — navigation
+     included — slides up with the content. */
   .app-shell {
     display: flex;
     height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
   }
   .app-main {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* Flex items refuse to shrink below their content unless told otherwise;
+       without this the column grows past the shell and takes the scroll with it. */
+    min-height: 0;
   }
   .content {
     flex: 1;
+    min-height: 0;
     overflow: auto;
+    /* Containing block for absolutely-positioned descendants. Without it an
+       element that has no positioned ancestor — a visually-hidden `.sr-only`
+       label, say — resolves against the viewport instead of this scroller and
+       reports its offset as root overflow, which some browsers answer with a
+       stray page scrollbar. */
+    position: relative;
     padding: var(--space-5) var(--space-6);
     background: var(--bg);
+    /* The room a page has between the topbar and the bottom of the viewport.
+       Views that pin a footer — a chat composer — size themselves from this
+       instead of re-deriving the shell's padding, so they stay correct when the
+       padding changes at a breakpoint. */
+    --content-h: calc(100dvh - var(--topbar-h) - var(--space-5) * 2);
   }
   .content:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: -2px;
   }
   @media (max-width: 639px) {
-    .content { padding: var(--space-4) var(--space-3) calc(var(--space-5) + 4rem + env(safe-area-inset-bottom)); }
+    .content {
+      padding: var(--space-4) var(--space-3) calc(var(--space-5) + 4rem + env(safe-area-inset-bottom));
+      /* Same room, minus the phone bottom navigation the padding reserves. */
+      --content-h: calc(
+        100dvh - var(--topbar-h) - var(--space-4) - var(--space-5) - 4rem - env(safe-area-inset-bottom)
+      );
+    }
   }
 </style>

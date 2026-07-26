@@ -278,7 +278,13 @@
     padding: var(--space-4) var(--space-3);
     border-right: 1px solid var(--border);
     background: var(--surface);
+    /* The navigation scrolls within itself when it is taller than the viewport,
+       so a long nav never pushes the shell. `position: relative` keeps its
+       absolutely-positioned children (the per-chat menu button) anchored inside
+       this scroller rather than against the viewport. */
+    min-height: 0;
     overflow-y: auto;
+    position: relative;
   }
   .tablet-toggle, .phone-nav, .drawer-scrim, .drawer-close { display: none; }
   .brand {

@@ -627,10 +627,9 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
-    /* The workspace claims the viewport rather than inheriting a percentage
-       height through the shared page shell, so the transcript scrolls inside
-       the page instead of stretching it. */
-    height: calc(100vh - var(--topbar-h) - var(--space-5) * 2);
+    /* The room the shell gives a page, so the transcript scrolls inside the
+       workspace instead of stretching it and taking the shell's scroll with it. */
+    height: var(--content-h);
     min-height: 32rem;
   }
   .build.with-rail {

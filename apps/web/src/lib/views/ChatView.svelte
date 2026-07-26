@@ -777,15 +777,26 @@
 </div>
 
 <style>
+  /* A chat column is as tall as the room the shell gives it — not as tall as
+     its transcript. `height: 100%` cannot express that here (the page wrapper
+     is auto-height, so the percentage resolved to `auto` and the column simply
+     grew), which pushed the composer off the bottom of the screen and handed
+     the scroll to the shell. Sizing from `--content-h` makes the height
+     definite, so the transcript scrolls inside itself and the composer stays
+     where you left it. */
   .chat {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: var(--content-h);
+    min-height: 24rem;
     max-width: 52rem;
     margin: 0 auto;
   }
   .thread {
     flex: 1;
+    /* Without this the thread refuses to shrink below its content and never
+       becomes a scroller. */
+    min-height: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;

@@ -34,10 +34,87 @@ from raiker.security.credentials import CredentialLifecycle, CredentialLifecycle
 from raiker.security.monitoring import SecurityMonitor
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
+from raiker.tasks.scheduler import RECURRING_INTERVALS
 from raiker.tools.filesystem import FilesystemSafetyError, proposed_write_snapshot
 
 # Capability states that mean the gate is off / fail-closed.
 _DISABLED_STATES = {"disabled", "planned"}
+
+# Cadences a task/schedule may carry. `background` runs one governed cycle now;
+# the recurring cadences re-arm after every cycle so a standing agent keeps
+# working until the owner stops it. An unknown cadence is refused rather than
+# silently stored as a one-shot, which would make a "keep going" schedule stop
+# after its first run.
+TASK_RECURRENCES = frozenset({"background", *RECURRING_INTERVALS})
+
+# GitHub coordinate shapes. Validation is strict and local — a repository
+# reference is stored only when it *could* name a real repository, and no
+# network call is made to find out.
+_GITHUB_NAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9_])?")
+_GITHUB_REF = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._/-]{0,98}[A-Za-z0-9_-])?")
+
+
+@dataclass(frozen=True)
+class CodeRepoView:
+    """One repository a coding chat can be pointed at.
+
+    A row is a *reference*, not an integration: it stores no credential, opens no
+    network connection, and grants no capability. A ``local`` repository is a
+    workspace-contained subpath — anything resolving outside the workspace is
+    refused (fail closed) — and its files reach a turn as bounded, untrusted
+    context through the same governed attachment path as any other workspace
+    path. A ``github`` repository records the ``owner/repo`` coordinate only; the
+    content is read through the brokered ``github_read`` tool, which stays
+    subject to the ``connector_github_runtime`` gate and its decision mode, so
+    a reference here never becomes read access on its own.
+    """
+
+    repo_id: str
+    kind: str
+    label: str
+    selected: bool
+    created_at: str
+    local_subpath: str | None = None
+    local_exists: bool = False
+    github_owner: str | None = None
+    github_repo: str | None = None
+    branch: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class CodeReposView:
+    """Every repository reference for one account, plus the honest read posture.
+
+    ``github_gate_state``/``github_decision_mode`` report what the
+    ``connector_github_runtime`` gate currently permits, so the interface can say
+    whether a connected GitHub repository is actually readable instead of
+    implying it is.
+    """
+
+    repos: tuple[CodeRepoView, ...]
+    selected_repo_id: str | None
+    github_gate_state: str
+    github_decision_mode: str
+    github_token_configured: bool
+    note: str = (
+        "References only. Connecting a repository grants no capability: a local folder "
+        "stays workspace-contained, and every GitHub read still runs through the brokered "
+        "github_read tool under the connector_github_runtime gate and its decision mode — "
+        "a disabled gate fails closed no matter what is connected here."
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "repos": [repo.to_dict() for repo in self.repos],
+            "selected_repo_id": self.selected_repo_id,
+            "github_gate_state": self.github_gate_state,
+            "github_decision_mode": self.github_decision_mode,
+            "github_token_configured": self.github_token_configured,
+            "note": self.note,
+        }
 
 
 @dataclass(frozen=True)
@@ -710,6 +787,188 @@ class DashboardService:
             relative_path = raw_path.strip()
         self.store.remove_brain_source(owner_principal_id, relative_path)
         return {"ok": True, "path": relative_path}
+
+    # ── Code workspace repositories ─────────────────────────────────────
+    # The Build workspace points a coding chat at a repository. Connecting one is
+    # governance-neutral bookkeeping: a local folder must resolve inside the
+    # workspace (fail closed), a GitHub repository records only its `owner/repo`
+    # coordinate, and neither stores a credential nor grants a capability. GitHub
+    # content still reaches a turn only through the brokered `github_read` tool
+    # under the `connector_github_runtime` gate, which is disabled/fail-closed
+    # until the owner enables it.
+
+    def list_code_repos(self, *, owner_principal_id: str) -> CodeReposView:
+        from raiker.runtime.connectors import GITHUB_TOKEN_ENV
+
+        gate = self.control.get_capability_gate("connector_github_runtime", owner_principal_id)
+        rows = self.store.list_code_repos(owner_principal_id)
+        return CodeReposView(
+            repos=tuple(self._code_repo_view(row) for row in rows),
+            selected_repo_id=next(
+                (str(row["repo_id"]) for row in rows if row.get("selected")), None
+            ),
+            github_gate_state=gate.state if gate is not None else "unknown",
+            github_decision_mode=gate.decision_mode if gate is not None else "ask",
+            github_token_configured=bool(os.environ.get(GITHUB_TOKEN_ENV, "").strip()),
+        )
+
+    def _code_repo_view(self, row: dict[str, Any]) -> CodeRepoView:
+        local_subpath = row.get("local_subpath")
+        exists = False
+        if local_subpath:
+            candidate = (self.workspace_root / str(local_subpath)).resolve()
+            root = self.workspace_root.resolve()
+            exists = (candidate == root or root in candidate.parents) and candidate.is_dir()
+        return CodeRepoView(
+            repo_id=str(row["repo_id"]),
+            kind=str(row["kind"]),
+            label=str(row["label"]),
+            selected=bool(row.get("selected")),
+            created_at=str(row["created_at"]),
+            local_subpath=str(local_subpath) if local_subpath else None,
+            local_exists=exists,
+            github_owner=str(row["github_owner"]) if row.get("github_owner") else None,
+            github_repo=str(row["github_repo"]) if row.get("github_repo") else None,
+            branch=str(row["branch"]) if row.get("branch") else None,
+        )
+
+    def connect_local_repo(
+        self, raw_path: str, *, owner_principal_id: str, user_id: str | None = None
+    ) -> ControlResult:
+        """Reference a workspace-contained folder as a repository.
+
+        Reuses the same containment check as every other workspace path read:
+        a path that resolves outside the workspace, or does not exist, is refused.
+        """
+        try:
+            relative_path, path = self._workspace_source(raw_path)
+        except ValueError as exc:
+            reason = str(exc).replace("brain_source", "repo")
+            return ControlResult(ok=False, reason_code=reason)
+        if not path.is_dir():
+            return ControlResult(ok=False, reason_code="repo_not_a_directory")
+        repo_id = new_id("repo_")
+        label = Path(relative_path).name or relative_path
+        if not self.store.insert_code_repo(
+            repo_id=repo_id,
+            owner_principal_id=owner_principal_id,
+            kind="local",
+            label=label,
+            local_subpath=relative_path,
+        ):
+            return ControlResult(ok=False, reason_code="repo_already_connected")
+        self._record_repo_event(
+            "code_repo_connected",
+            owner_principal_id,
+            user_id,
+            {"repo_id": repo_id, "kind": "local", "local_subpath": relative_path},
+        )
+        return ControlResult(
+            ok=True, data={"repo_id": repo_id, "kind": "local", "local_subpath": relative_path}
+        )
+
+    def connect_github_repo(
+        self,
+        owner: str,
+        repo: str,
+        branch: str | None,
+        *,
+        owner_principal_id: str,
+        user_id: str | None = None,
+    ) -> ControlResult:
+        """Record a GitHub `owner/repo` coordinate. Performs no network call.
+
+        Reads against it later go through the brokered ``github_read`` tool, so a
+        disabled ``connector_github_runtime`` gate still fails closed.
+        """
+        clean_owner = owner.strip()
+        clean_repo = repo.strip()
+        clean_branch = (branch or "").strip() or None
+        if not _GITHUB_NAME.fullmatch(clean_owner) or not _GITHUB_NAME.fullmatch(clean_repo):
+            return ControlResult(ok=False, reason_code="invalid_github_repo")
+        if clean_branch is not None and not _GITHUB_REF.fullmatch(clean_branch):
+            return ControlResult(ok=False, reason_code="invalid_github_branch")
+        repo_id = new_id("repo_")
+        if not self.store.insert_code_repo(
+            repo_id=repo_id,
+            owner_principal_id=owner_principal_id,
+            kind="github",
+            label=f"{clean_owner}/{clean_repo}",
+            github_owner=clean_owner,
+            github_repo=clean_repo,
+            branch=clean_branch,
+        ):
+            return ControlResult(ok=False, reason_code="repo_already_connected")
+        self._record_repo_event(
+            "code_repo_connected",
+            owner_principal_id,
+            user_id,
+            {
+                "repo_id": repo_id,
+                "kind": "github",
+                "github_owner": clean_owner,
+                "github_repo": clean_repo,
+                "branch": clean_branch or "",
+            },
+        )
+        return ControlResult(
+            ok=True,
+            data={
+                "repo_id": repo_id,
+                "kind": "github",
+                "label": f"{clean_owner}/{clean_repo}",
+                "branch": clean_branch,
+            },
+        )
+
+    def disconnect_code_repo(
+        self, repo_id: str, *, owner_principal_id: str, user_id: str | None = None
+    ) -> ControlResult:
+        """Forget a repository reference. Never touches the folder or the remote."""
+        if not self.store.delete_code_repo(owner_principal_id, repo_id):
+            return ControlResult(ok=False, reason_code="unknown_repo")
+        self._record_repo_event(
+            "code_repo_disconnected", owner_principal_id, user_id, {"repo_id": repo_id}
+        )
+        return ControlResult(ok=True, data={"repo_id": repo_id})
+
+    def select_code_repo(
+        self, repo_id: str | None, *, owner_principal_id: str
+    ) -> ControlResult:
+        """Point the Build workspace at one repository, or at none with ``None``."""
+        if repo_id is not None and self.store.load_code_repo(owner_principal_id, repo_id) is None:
+            return ControlResult(ok=False, reason_code="unknown_repo")
+        self.store.select_code_repo(owner_principal_id, repo_id)
+        return ControlResult(ok=True, data={"selected_repo_id": repo_id})
+
+    def _record_repo_event(
+        self,
+        event_type: str,
+        owner_principal_id: str,
+        user_id: str | None,
+        payload: dict[str, Any],
+    ) -> None:
+        """Audit one repository reference change in the account's Inbox session.
+
+        The Inbox session is created the same way scheduled work creates it, so
+        the record is visible to the account that made the change rather than
+        landing in a session nobody can read.
+        """
+        from raiker.events.types import make_event
+
+        session_id = f"sess_inbox_{owner_principal_id}"
+        self.store.create_session(
+            session_id, str(self.store.paths.workspace_root), title="Inbox", user_id=user_id
+        )
+        EventLogWriter(self.store).append(
+            make_event(
+                session_id=session_id,
+                turn_id=None,
+                event_type=event_type,
+                actor="dashboard_service",
+                payload={**payload, "principal_id": owner_principal_id},
+            )
+        )
 
     # ── Sessions / turns ────────────────────────────────────────────────
     def list_sessions(
@@ -1944,6 +2203,8 @@ class DashboardService:
         project stays scoped to it. The stamp is an organizing label — it
         grants nothing.
         """
+        if recurrence is not None and recurrence not in TASK_RECURRENCES:
+            raise ValueError(f"invalid_recurrence:{recurrence}")
         # An unscheduled task is work requested now; the resident host claims
         # it on its next scheduler tick. Explicit times remain untouched.
         if scheduled_at is None:

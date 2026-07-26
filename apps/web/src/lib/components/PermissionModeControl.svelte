@@ -33,16 +33,20 @@
 
 <div class="permission-control">
   <select aria-label="Global permissions" value={mode} disabled={busy} onchange={(event) => void setMode((event.currentTarget as HTMLSelectElement).value as ComposerMode)}>
-    <option value="ask">Ask every time</option>
-    <option value="safe_auto">Approve safe actions</option>
+    <!-- Named, because "Ask every time" alone does not say what it governs. -->
+    <option value="ask">Permissions: ask</option>
+    <option value="safe_auto">Permissions: safe auto</option>
     <option value="custom">Custom permissions…</option>
   </select>
   {#if error}<span role="status">{error}</span>{/if}
 </div>
 
 <style>
+  /* Matches the composer's setting pills so the bar reads as one control set
+     rather than a borderless select sitting among bordered ones. */
   .permission-control { display:flex; align-items:center; gap:.35rem; }
-  select { border:none; background:transparent; color:var(--text-2); font:inherit; font-size:.78rem; font-weight:600; padding:.25rem .35rem; border-radius:var(--r-md); }
-  select:hover:not(:disabled) { background:var(--neutral-soft); }
+  select { border:1px solid var(--neutral-border); background:var(--surface); color:var(--text-2); font:inherit; font-size:.76rem; font-weight:600; padding:.2rem .45rem; border-radius:var(--r-pill); max-width:11rem; }
+  select:hover:not(:disabled) { border-color:var(--accent-border); color:var(--text-1); }
+  select:disabled { opacity:.6; }
   span { color:var(--danger, #b3292f); font-size:.74rem; }
 </style>

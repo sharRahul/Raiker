@@ -44,6 +44,19 @@ are enforced. Disabled runtime flags remain false where no executor exists:
 `process_execution_enabled`, `shell_execution_enabled`,
 `network_execution_enabled`, and `runtime_execution_enabled`.
 
+The dashboard's Build workspace is a client of these controls and adds no
+authority of its own. Its Plan/Edit/Auto composer modes set the existing
+per-capability decision modes (`deny`/`ask`/`auto`) on
+`file_write_execution`, `patch_apply_execution`, `shell_execution`, and
+`process_execution` — a human `runtime_gate_manager` operation, refused
+otherwise — so the mode shown is the posture the runtime enforces. Repository
+references are `implemented_read_only` bookkeeping: a local folder must resolve
+inside the workspace or it fails closed, a GitHub `owner/repo` coordinate is
+recorded without any network call, and GitHub content still reaches a turn only
+through the brokered `github_read` tool under the `connector_github_runtime`
+gate. Scheduled agents are ordinary tasks with a cadence; each cycle is one
+discrete governed turn. See [the Build workspace](BUILD_WORKSPACE_SPEC.md).
+
 See [feature coverage](FEATURE_COVERAGE_MATRIX.md) for a concise area-by-area
 view and [open gaps](GAP_AND_TODO_ANALYSIS.md) for deferred work.
 

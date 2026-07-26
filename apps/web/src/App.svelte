@@ -10,6 +10,7 @@
   import type { ProjectsList } from "./lib/apiTypes";
   import LoginView from "./lib/views/LoginView.svelte";
   import ChatView from "./lib/views/ChatView.svelte";
+  import BuildView from "./lib/views/BuildView.svelte";
   import SearchChatView from "./lib/views/SearchChatView.svelte";
   import MemoryView from "./lib/views/MemoryView.svelte";
   import ProjectsView from "./lib/views/ProjectsView.svelte";
@@ -33,10 +34,15 @@
     typeof window === "undefined" ? null : tabFromHash(window.location.hash),
   );
   let chatVisited = $state(false);
+  // Build keeps its transcript, its unsent draft, and its streaming turn alive
+  // across route visits for the same reason Chat does: a coding conversation is
+  // long-running, and stepping over to Approvals must not throw it away.
+  let buildVisited = $state(false);
   const activeItem = $derived(navItem(current));
 
   $effect(() => {
     if (current === "new-chat") chatVisited = true;
+    if (current === "build") buildVisited = true;
   });
 
   // Honest auth/bootstrap state machine. The workspace shell mounts only in
@@ -143,6 +149,11 @@
             <ChatView sessionId={continuedSessionId} />
           </div>
         {/if}
+        {#if buildVisited}
+          <div hidden={current !== "build"}>
+            <BuildView {projects} onProjectsChanged={refreshProjects} />
+          </div>
+        {/if}
         {#if current === "home"}
           <WorkbenchView />
         {:else if current === "search-chat"}
@@ -171,7 +182,7 @@
             sessionId={continuedSessionId}
             projectId={activeProjectId}
           />
-        {:else if current !== "new-chat"}
+        {:else if current !== "new-chat" && current !== "build"}
           <SettingsView {principal} />
         {/if}
       </ResponsivePage>
@@ -181,27 +192,55 @@
 {/if}
 
 <style>
+  /* The shell *is* the viewport. Clipping here is what guarantees the sidebar
+     and topbar can never scroll away: whatever a page renders, the only thing
+     that scrolls is `.content`. Without it a page that overflows its column
+     hands the overflow to the document, and the whole shell — navigation
+     included — slides up with the content. */
   .app-shell {
     display: flex;
     height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
   }
   .app-main {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* Flex items refuse to shrink below their content unless told otherwise;
+       without this the column grows past the shell and takes the scroll with it. */
+    min-height: 0;
   }
   .content {
     flex: 1;
+    min-height: 0;
     overflow: auto;
+    /* Containing block for absolutely-positioned descendants. Without it an
+       element that has no positioned ancestor — a visually-hidden `.sr-only`
+       label, say — resolves against the viewport instead of this scroller and
+       reports its offset as root overflow, which some browsers answer with a
+       stray page scrollbar. */
+    position: relative;
     padding: var(--space-5) var(--space-6);
     background: var(--bg);
+    /* The room a page has between the topbar and the bottom of the viewport.
+       Views that pin a footer — a chat composer — size themselves from this
+       instead of re-deriving the shell's padding, so they stay correct when the
+       padding changes at a breakpoint. */
+    --content-h: calc(100dvh - var(--topbar-h) - var(--space-5) * 2);
   }
   .content:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: -2px;
   }
   @media (max-width: 639px) {
-    .content { padding: var(--space-4) var(--space-3) calc(var(--space-5) + 4rem + env(safe-area-inset-bottom)); }
+    .content {
+      padding: var(--space-4) var(--space-3) calc(var(--space-5) + 4rem + env(safe-area-inset-bottom));
+      /* Same room, minus the phone bottom navigation the padding reserves. */
+      --content-h: calc(
+        100dvh - var(--topbar-h) - var(--space-4) - var(--space-5) - 4rem - env(safe-area-inset-bottom)
+      );
+    }
   }
 </style>

@@ -12,6 +12,8 @@
 | Policy, approvals, audit, checkpoints | implemented_verified | Ordinary approval resolution is metadata-only |
 | Local runtime executors | implemented_policy_gated | Gate and decision mode checked per action |
 | Memory MVP | implemented_verified | Durable mutation remains approval-required |
+| Build workspace (coding surface) | implemented_policy_gated | Composer modes set real decision modes; repository references grant nothing and fail closed |
+| Scheduled background agents | implemented_policy_gated | One governed turn per cycle; unknown cadences refused |
 | Remote/cloud and sensitive domains | disabled_deferred | Fail closed without a real executor |
 
 Strict non-allow blocking, role revoke governed, and capability gate per action

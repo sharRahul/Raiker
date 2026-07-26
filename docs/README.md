@@ -19,6 +19,9 @@ superseded guides, and screenshots are not maintained here.
 
 ## Reference
 
+- [Build workspace](BUILD_WORKSPACE_SPEC.md): the coding surface, its Plan/Edit/Auto
+  modes, repository references, and scheduled agents.
+- [Decision modes](DECISION_MODES_SPEC.md)
 - [Models](MODEL_RUNTIME_AND_LOCAL_INFERENCE.md)
 - [Tools and permissions](TOOLS_AND_PERMISSIONS_SPEC.md)
 - [Tool and plugin catalog](RAIKER_TOOL_AND_PLUGIN_CATALOG.md)

@@ -83,6 +83,10 @@ _PREFIXES = {
     "ntf_",
     # Scoped standing approval grants (Workstream F / F3).
     "grn_",
+    # Build workspace repository references: a workspace-contained local folder
+    # or a GitHub `owner/repo` coordinate. A reference holds no credential and
+    # grants no capability.
+    "repo_",
 }
 
 

@@ -680,25 +680,39 @@
       {/if}
 
       <div class="composer-bar">
-        <button
-          type="button"
-          class="round-btn"
-          onclick={() => (showAttach = !showAttach)}
-          aria-label="Add attachment"
-          aria-expanded={showAttach}
-          title="Attach a workspace file or folder"
-          disabled={streaming}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          onclick={newConversation}
-          disabled={streaming || turns.length === 0}
-        >
-          New chat
-        </button>
+        <!-- Left: what you do to the conversation. Right: how the next turn
+             runs, then the send action. Grouping them keeps the bar from
+             reading as one undifferentiated run of words. -->
+        <div class="bar-left">
+          <button
+            type="button"
+            class="round-btn"
+            onclick={() => (showAttach = !showAttach)}
+            aria-label="Add attachment"
+            aria-expanded={showAttach}
+            title="Attach a workspace file or folder"
+            disabled={streaming}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            class="round-btn"
+            disabled
+            aria-label="Voice input (coming soon)"
+            title="Voice input — planned: local transcription via whisper.cpp; not wired up yet"
+          >
+            <Icon name="mic" size={15} />
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            onclick={newConversation}
+            disabled={streaming || turns.length === 0}
+          >
+            New chat
+          </button>
+        </div>
 
         <div class="bar-right">
           <select
@@ -752,16 +766,6 @@
           <PermissionModeControl />
 
           <button
-            type="button"
-            class="round-btn"
-            disabled
-            aria-label="Voice input (coming soon)"
-            title="Voice input — planned: local transcription via whisper.cpp; not wired up yet"
-          >
-            <Icon name="mic" size={15} />
-          </button>
-
-          <button
             type="submit"
             class="btn btn-primary send"
             disabled={streaming || promptText.trim() === ""}
@@ -777,15 +781,26 @@
 </div>
 
 <style>
+  /* A chat column is as tall as the room the shell gives it — not as tall as
+     its transcript. `height: 100%` cannot express that here (the page wrapper
+     is auto-height, so the percentage resolved to `auto` and the column simply
+     grew), which pushed the composer off the bottom of the screen and handed
+     the scroll to the shell. Sizing from `--content-h` makes the height
+     definite, so the transcript scrolls inside itself and the composer stays
+     where you left it. */
   .chat {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: var(--content-h);
+    min-height: 24rem;
     max-width: 52rem;
     margin: 0 auto;
   }
   .thread {
     flex: 1;
+    /* Without this the thread refuses to shrink below its content and never
+       becomes a scroller. */
+    min-height: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -979,7 +994,9 @@
     border-radius: var(--r-lg);
     background: var(--surface);
     box-shadow: var(--shadow-1);
-    padding: 0.75rem 0.85rem 0.6rem;
+    /* Even padding all round: the old tighter bottom made the control bar look
+       cropped against the card edge. */
+    padding: 0.75rem 0.85rem;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -1004,10 +1021,15 @@
   .composer-bar {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.5rem 0.75rem;
     border-top: 1px solid var(--border);
-    padding-top: 0.5rem;
+    padding-top: 0.55rem;
     flex-wrap: wrap;
+  }
+  .bar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
   }
   .round-btn {
     width: 1.9rem;
@@ -1032,28 +1054,38 @@
     opacity: 0.55;
     cursor: default;
   }
-  /* Model/planning controls sit on the right of the bar, like the reference. */
+  /* Per-turn settings sit on the right of the bar, ending in the send action. */
   .bar-right {
     margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.3rem;
     flex-wrap: wrap;
     min-width: 0;
     justify-content: flex-end;
   }
+  /* Each setting is a pill so a control reads as a control. Previously they
+     were borderless and shared the body weight, which ran the whole bar
+     together as one line of prose; and a fixed max-width stretched the select
+     so its chevron floated far from its own label. */
   .bar-select {
-    border: none;
-    background: transparent;
+    border: 1px solid var(--neutral-border);
+    background: var(--surface);
     color: var(--text-2);
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     font-weight: 600;
-    padding: 0.25rem 0.35rem;
-    border-radius: var(--r-md);
-    max-width: 15rem;
+    padding: 0.2rem 0.45rem;
+    border-radius: var(--r-pill);
+    width: auto;
+    max-width: 11rem;
+    text-overflow: ellipsis;
   }
   .bar-select:hover:not(:disabled) {
-    background: var(--neutral-soft);
+    border-color: var(--accent-border);
+    color: var(--text-1);
+  }
+  .bar-select:disabled {
+    opacity: 0.6;
   }
   .bar-select:focus-visible,
   .round-btn:focus-visible {
@@ -1116,6 +1148,19 @@
   @media (max-width: 720px) {
     .message-group {
       max-width: 88%;
+    }
+  }
+  /* Narrow: the settings stop competing with the left actions for one line and
+     take a row of their own, so nothing wraps into a ragged half-row with the
+     send button stranded from its group. */
+  @media (max-width: 34rem) {
+    .bar-right {
+      margin-left: 0;
+      width: 100%;
+      justify-content: flex-start;
+    }
+    .send {
+      margin-left: auto;
     }
   }
 </style>

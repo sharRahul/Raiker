@@ -39,6 +39,7 @@ describe("nav model", () => {
   it("keeps work objects together", () => {
     expect(NAV_GROUPS[1].items.map((i) => i.id)).toEqual([
       "new-chat",
+      "build",
       "search-chat",
       "tasks",
       "projects",
@@ -72,6 +73,7 @@ describe("nav model", () => {
     const ids = NAV_ITEMS.map((i) => i.id);
     for (const required of [
       "new-chat",
+      "build",
       "search-chat",
       "memory",
       "approvals",

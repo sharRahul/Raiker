@@ -45,8 +45,9 @@ class TaskScheduler:
             current = self.store.load_task(task.task_id)
             if current is None or current.status == "cancelled":
                 continue
-            if task.recurrence == "daily" and task.scheduled_at:
-                next_run = _next_daily(task.scheduled_at)
+            interval = RECURRING_INTERVALS.get(task.recurrence or "")
+            if interval is not None and task.scheduled_at:
+                next_run = next_run_after(task.scheduled_at, interval)
                 manager.store.reschedule_task(task.task_id, next_run, response.message[:500])
             elif response.status == "completed":
                 manager.complete_task(task.task_id, response.message[:500])
@@ -55,9 +56,35 @@ class TaskScheduler:
         return len(tasks)
 
 
-def _next_daily(iso: str) -> str:
-    next_run = datetime.fromisoformat(iso.replace("Z", "+00:00")) + timedelta(days=1)
+# Recurring cadences and the gap between one governed cycle and the next. A
+# recurring task is re-armed after every cycle rather than closed, so a standing
+# agent — "keep improving the landing page", "watch the build" — keeps working
+# until the owner stops it. `continuous` is the shortest cadence offered: it is
+# still one discrete governed turn per cycle, never an unbounded loop, so every
+# cycle passes through policy, gates, and approvals exactly like a typed prompt.
+CONTINUOUS_INTERVAL = timedelta(minutes=20)
+RECURRING_INTERVALS: dict[str, timedelta] = {
+    "continuous": CONTINUOUS_INTERVAL,
+    "hourly": timedelta(hours=1),
+    "daily": timedelta(days=1),
+    "weekly": timedelta(weeks=1),
+}
+
+
+def next_run_after(iso: str, interval: timedelta) -> str:
+    """The first `iso + n*interval` that is still in the future.
+
+    Stepping forward from the original slot (rather than from "now") keeps a
+    schedule anchored to the time the owner picked, and skipping past every
+    elapsed slot means a host that was asleep does not wake up owing a backlog
+    of identical runs.
+    """
+    next_run = datetime.fromisoformat(iso.replace("Z", "+00:00")) + interval
     now = datetime.now(UTC)
     while next_run <= now:
-        next_run += timedelta(days=1)
+        next_run += interval
     return next_run.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _next_daily(iso: str) -> str:
+    return next_run_after(iso, RECURRING_INTERVALS["daily"])

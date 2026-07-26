@@ -1874,3 +1874,24 @@ CREATE TABLE IF NOT EXISTS brain_sources (
 );
 CREATE INDEX IF NOT EXISTS idx_brain_sources_owner ON brain_sources(owner_principal_id, created_at);
 """
+
+CODE_REPOS_MIGRATION_ID = "RAIKER-2024-code-workspace-repos"
+CODE_REPOS_SQL = """
+CREATE TABLE IF NOT EXISTS code_repos (
+  repo_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  label TEXT NOT NULL,
+  local_subpath TEXT,
+  github_owner TEXT,
+  github_repo TEXT,
+  branch TEXT,
+  selected INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_code_repos_owner ON code_repos(owner_principal_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_code_repos_local
+  ON code_repos(owner_principal_id, local_subpath) WHERE local_subpath IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_code_repos_github
+  ON code_repos(owner_principal_id, github_owner, github_repo) WHERE github_owner IS NOT NULL;
+"""

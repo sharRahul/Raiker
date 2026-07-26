@@ -13,6 +13,7 @@ from raiker.api.schemas import (
     BrainSourceRequest,
     BreachCheckRequest,
     BulkDeleteSessionsRequest,
+    ConnectCodeRepoRequest,
     ContainMcpServerRequest,
     CreateMcpServerRequest,
     CreateProjectRequest,
@@ -22,6 +23,7 @@ from raiker.api.schemas import (
     RenameMcpServerRequest,
     RenameSessionRequest,
     SaveProjectContextRequest,
+    SelectCodeRepoRequest,
     SelectProjectRequest,
     SetModelAdvisorRequest,
     SetModelFallbackRequest,
@@ -652,6 +654,109 @@ async def remove_brain_source(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     return _service(request).remove_brain_source(path, owner_principal_id=auth_data[0].principal_id)
+
+
+@router.get("/api/code/repos")
+async def list_code_repos(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Repositories this account's Build workspace can point a coding chat at.
+
+    References only: a local folder stays workspace-contained, and a GitHub
+    coordinate carries no credential. The response also reports the
+    ``connector_github_runtime`` gate state and decision mode so the interface
+    can say whether a connected GitHub repository is actually readable — it is
+    disabled and fails closed until the owner enables it.
+    """
+    return serialize_dto(
+        _service(request).list_code_repos(owner_principal_id=auth_data[0].principal_id)
+    )
+
+
+@router.post("/api/code/repos", status_code=status.HTTP_201_CREATED)
+async def connect_code_repo(
+    body: ConnectCodeRepoRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Connect a workspace-contained folder or a GitHub `owner/repo` coordinate.
+
+    Never reaches the network and grants no capability. A local path that
+    resolves outside the workspace, a missing folder, or a malformed GitHub
+    coordinate is refused (fail closed).
+    """
+    session, principal = auth_data
+    service = _service(request)
+    if body.kind == "local":
+        if not body.path:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"ok": False, "reason_code": "repo_path_required"},
+            )
+        result = service.connect_local_repo(
+            body.path,
+            owner_principal_id=session.principal_id,
+            user_id=principal.delegated_by_user_id,
+        )
+    else:
+        if not body.owner or not body.repo:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"ok": False, "reason_code": "github_owner_and_repo_required"},
+            )
+        result = service.connect_github_repo(
+            body.owner,
+            body.repo,
+            body.branch,
+            owner_principal_id=session.principal_id,
+            user_id=principal.delegated_by_user_id,
+        )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/code/repos/selection")
+async def select_code_repo(
+    body: SelectCodeRepoRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Point the Build workspace at one repository, or at none with ``null``."""
+    result = _service(request).select_code_repo(
+        body.repo_id, owner_principal_id=auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.delete("/api/code/repos/{repo_id}")
+async def disconnect_code_repo(
+    repo_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Forget one repository reference. Never touches the folder or the remote."""
+    session, principal = auth_data
+    result = _service(request).disconnect_code_repo(
+        repo_id,
+        owner_principal_id=session.principal_id,
+        user_id=principal.delegated_by_user_id,
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
 
 
 @router.get("/api/checkpoints")

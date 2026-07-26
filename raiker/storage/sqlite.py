@@ -60,6 +60,8 @@ from raiker.storage.migrations import (
     CAPABILITY_DECISION_MODE_SQL,
     CHECKPOINT_CAPTURE_MANIFEST_MIGRATION_ID,
     CHECKPOINT_CAPTURE_MANIFEST_SQL,
+    CODE_REPOS_MIGRATION_ID,
+    CODE_REPOS_SQL,
     CONNECTOR_ECOSYSTEM_MIGRATION_ID,
     CONNECTOR_ECOSYSTEM_SQL,
     CONNECTOR_INVOCATIONS_MIGRATION_ID,
@@ -683,6 +685,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 SUBAGENT_BUDGETS_MIGRATION_ID, SUBAGENT_BUDGETS_SQL, connection
             )
+            self._apply_migration(CODE_REPOS_MIGRATION_ID, CODE_REPOS_SQL, connection)
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -996,6 +999,89 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "DELETE FROM brain_sources WHERE owner_principal_id = ? AND path = ?",
                 (owner_principal_id, path),
             )
+
+    # ── Code workspace repositories ─────────────────────────────────────
+    # Account-scoped references the Build workspace points a coding chat at: a
+    # workspace-contained local folder, or a `owner/repo` GitHub coordinate read
+    # through the governed `github_read` tool. A row is a reference only — it
+    # holds no credential and grants no capability.
+
+    def list_code_repos(self, owner_principal_id: str) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM code_repos WHERE owner_principal_id = ? ORDER BY created_at, repo_id",
+                (owner_principal_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_code_repo(self, owner_principal_id: str, repo_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM code_repos WHERE owner_principal_id = ? AND repo_id = ?",
+                (owner_principal_id, repo_id),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def insert_code_repo(
+        self,
+        *,
+        repo_id: str,
+        owner_principal_id: str,
+        kind: str,
+        label: str,
+        local_subpath: str | None = None,
+        github_owner: str | None = None,
+        github_repo: str | None = None,
+        branch: str | None = None,
+    ) -> bool:
+        """Store one repository reference, or return False if it already exists.
+
+        The unique indexes make "already connected" a storage-layer fact, so the
+        duplicate is reported as a value rather than surfacing a driver exception
+        to the service layer.
+        """
+        with self.connect() as connection:
+            return bool(
+                connection.execute(
+                    """INSERT OR IGNORE INTO code_repos
+                       (repo_id, owner_principal_id, kind, label, local_subpath,
+                        github_owner, github_repo, branch, selected, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)""",
+                    (
+                        repo_id,
+                        owner_principal_id,
+                        kind,
+                        label,
+                        local_subpath,
+                        github_owner,
+                        github_repo,
+                        branch,
+                        utc_now(),
+                    ),
+                ).rowcount
+            )
+
+    def delete_code_repo(self, owner_principal_id: str, repo_id: str) -> bool:
+        with self.connect() as connection:
+            return bool(
+                connection.execute(
+                    "DELETE FROM code_repos WHERE owner_principal_id = ? AND repo_id = ?",
+                    (owner_principal_id, repo_id),
+                ).rowcount
+            )
+
+    def select_code_repo(self, owner_principal_id: str, repo_id: str | None) -> None:
+        """Point the account's Build workspace at one repository, or none."""
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE code_repos SET selected = 0 WHERE owner_principal_id = ?",
+                (owner_principal_id,),
+            )
+            if repo_id is not None:
+                connection.execute(
+                    "UPDATE code_repos SET selected = 1 WHERE owner_principal_id = ? AND repo_id = ?",
+                    (owner_principal_id, repo_id),
+                )
 
     def original_account_principal_id(self) -> str | None:
         """Return the sole destination for unattributed legacy data, if one exists."""

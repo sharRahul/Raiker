@@ -9,6 +9,13 @@ and the proposed fix. Six are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
+Two entries — GAP-BUILD and GAP-CHAT — are not defects. They are the itemised
+distance between what Build and Chat ship today and what each is meant to be:
+Build as an autonomous coding agent that closes its own loop, Chat as a general
+agentic work assistant that acts across the owner's tools and files. They are
+written to the same standard as the defects: what exists today with the file
+that proves it, what is missing, and the concrete work.
+
 Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 [`screenshots/working/`](screenshots/working) (verified behaviour).
 
@@ -29,6 +36,8 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-11 | Medium | Permissions | Open |
 | BUG-12 | High | MCP | Open (specified, unimplemented) |
 | BUG-13 | Low | Permissions | Open |
+| GAP-BUILD | — | Build — coding-agent parity | Analysis (20 items) |
+| GAP-CHAT | — | Chat — work-assistant parity | Analysis (18 items) |
 
 ---
 
@@ -505,6 +514,361 @@ likely to stop here believing they lack a credential they never had.
 
 **Proposed fix.** Reword to *"Type any phrase to confirm you intend this change.
 It is recorded with your decision."*
+
+---
+
+## GAP-BUILD — What Build needs to stand against a class-leading coding agent
+
+**Status: analysis, not a defect.** Nothing below is broken; this is the
+distance between what Build ships today and the bar set by the best autonomous
+coding agents — the ones that read a repository, make the change, run the tests,
+read the failure, and iterate until it is green, in one uninterrupted session.
+
+Build already clears part of that bar. It runs a genuine agentic loop
+(`raiker/runtime/orchestrator.py`, model → tool call → broker → model, capped by
+`max_tool_calls`, default `10_000` in `raiker/contracts/models.py`), its read
+tools really execute, and its Plan/Edit/Auto modes are enforced by the runtime
+rather than by prompt wording (`apps/web/src/lib/buildModes.ts` sets the
+per-capability decision mode server-side, so a write proposed in Plan mode is
+refused by the policy engine). The governance, audit and checkpoint story is
+*ahead* of the field, not behind it.
+
+The gap is that **Build cannot close a loop.** Everything below follows from
+that, and the order is the order they should be done in — each tier is worthless
+without the one above it.
+
+### Tier 0 — the blocking three (without these, nothing else matters)
+
+**B1. An approved action must actually execute.** *(depends on BUG-06)*
+Today `write_file`, `edit_file`, `apply_patch` and `shell` are all
+`("high", True)` in `raiker/models/tool_call_validation.py`, and approval
+resolution is metadata-only, so no file is ever written and no command ever
+runs. `ApprovalExecutionRelay`
+(`raiker/runtime/executors/tier1_approval.py`) already implements the hard part
+correctly — TTL check, argument-hash TOCTOU check, posture check, atomic
+`pending → executing → executed` transition, and re-routing through
+`RuntimeAuthority` so the target re-passes its own gate and policy review at
+execution time. **Work:** wire the Approvals resolution path to invoke the relay
+for `file_write_execution` and `patch_apply_execution` when the owner has
+enabled it, and surface the executed/refused outcome in the transcript. Until
+this lands, Build is a proposal generator.
+
+**There is already a working precedent in the codebase.** A model-proposed
+`connector_write` is parked as a `connector_write_intents` row and, on approval,
+is genuinely executed by `ConnectorInvoker.invoke`
+(`raiker/api/routes_approvals.py`), returning `executes_action: true`. File
+writes take the other branch and report *"Approval resolution is metadata-only
+and does not execute the action"* (`raiker/tools/broker.py`). So the question is
+not whether the architecture can execute an approved action — it demonstrably
+can, through the audited path — but whether the owner wants that door open for
+the filesystem and the shell as well.
+
+**B2. The turn must resume after an approval.** The loop `break`s on
+`needs_approval` (`raiker/runtime/orchestrator.py`) and the turn returns. Even
+once B1 lands, the agent stops dead at its first write and the user must
+re-prompt to continue — which discards the model's working state and re-pays for
+the context. **Work:** persist the suspended loop state against the approval id,
+and on resolution resume the same turn with the tool result appended (approved →
+the real result; rejected → a refusal the model can react to). This is the
+single highest-value change in this document: it converts a one-shot proposer
+into an agent.
+
+**B3. Real patch application.** `edit_file_content` is literally
+`return write_file_content(...)`, and `apply_patch_content` writes `new_text`
+over the whole file (`raiker/tools/filesystem.py`). Despite the names, there is
+no hunk-level editing: the model must reproduce an entire file to change one
+line, which is slow, expensive, and the dominant source of accidental deletion
+in long files. **Work:** a `str_replace`-style tool (old string + new string +
+uniqueness check, failing closed on an ambiguous match) and a true unified-diff
+applier with context matching and a rejected-hunk report. Both are already
+covered by the existing approval preview, which renders a diff.
+
+### Tier 1 — loop mechanics
+
+**B4. Parallel tool calls are silently dropped.** The orchestrator takes
+`response.tool_calls[0]` and ignores the rest. A model that asks to read six
+files in one round gets one read and no signal that five were discarded.
+**Work:** execute every proposed call in the response — concurrently for
+read-only tools, serially for anything mutating — and return all results in one
+batch. Emit a `model_tool_calls_dropped` event in the interim so the current
+behaviour is at least auditable.
+
+**B5. No test/command feedback channel.** The only way to run anything is
+`shell`, which is approval-gated per call, so "run the tests" costs a round trip
+through a human on every iteration. **Work:** a standing, per-session grant for
+a *narrow* command allowlist the owner defines per repository (e.g. `pytest`,
+`npm test`, `ruff`) with the workspace as cwd, no network, and a wall-clock
+cap — governed by a new capability so it is opt-in, revocable, and logged, and
+falling back to per-call approval for anything outside the list.
+
+**B6. No task/plan state across the loop.** Nothing tracks what the agent
+intends to do next, so a long change has no visible spine and no recovery point
+after a failure. **Work:** a lightweight, model-visible plan structure (ordered
+steps with a status each), rendered in Build as a live checklist. `raiker/tasks`
+already stores tasks; this is a turn-scoped sibling, not a scheduled task.
+
+**B7. No subagents at the model's disposal.** `raiker/agents/subagents.py`
+implements bounded subagent contracts, and `raiker/agents/orchestration.py`
+already defines a narrower tool set for them, but no spawn tool is exposed in
+`_MODEL_EXPOSED_TOOLS`. **Work:** expose a governed `spawn_subagent` (bounded
+tokens, tool subset, no egress widening, results returned as untrusted data) so
+wide searches stop consuming the main context.
+
+**B8. MCP tools are unreachable.** See BUG-12 — connected servers are a
+monitoring surface only. Every third-party capability the ecosystem offers is
+therefore unavailable to Build.
+
+### Tier 2 — what the agent can see
+
+**B9. No repository index.** Every turn starts cold: no symbol index, no code
+map, no embeddings over the tree. `graph_indexing_enabled` and
+`semantic_memory_writes_enabled` are hardcoded `False`
+(`raiker/context/gatherer.py`), and `retrieve_hybrid_memory` — lexical + vector
++ graph, already written in `raiker/memory/retrieval.py` — is called only by the
+evaluation harness. On a large repository the agent greps blind.
+**Work:** build the code map described in
+`docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md` on repository connect, refresh it
+incrementally on approved writes, and inject the top-ranked slices into the turn
+bundle as scoped, untrusted context.
+
+**B10. No language intelligence.** No symbol lookup, no
+definition/reference navigation, no type or lint feedback loop. **Work:** an
+LSP-backed read tool set (`find_definition`, `find_references`,
+`document_symbols`, `diagnostics`) — read-only, so it needs no approval path.
+
+**B11. No git write path.** `git_status`, `git_diff` and `git_log` are exposed;
+branch, commit, push and pull-request creation are not. The agent can describe a
+change it can neither commit nor propose. **Work:** governed
+`git_branch` / `git_commit` (high risk, approval, diff preview) and a
+`github_write` bound to the existing connector credential and egress allowlist.
+
+**B12. No web access.** No fetch and no search anywhere in `_TOOL_RISK`, so the
+agent cannot read the documentation for a library it is being asked to use.
+**Work:** an egress-allowlisted `web_fetch` returning sanitised text as
+untrusted data; search behind the same gate, off by default.
+
+### Tier 3 — the workspace surface (UI/UX)
+
+Build's transcript is a chat column plus a background-work rail
+(`BuildSidePanel.svelte`) and a "Waiting on you" decisions block. A coding agent
+needs a workbench.
+
+**B13. No file tree and no editor.** `ProjectTreeNode.svelte` exists but Build
+mounts no explorer, so a user cannot see the repository the agent is working in,
+open a file, or read the result of a change without leaving the app.
+**Work:** a resizable left explorer over the connected repository plus a
+read-only viewer with syntax highlighting, promoted to an editor once B1 lands.
+
+**B14. No diff review surface in Build.** The unified diff lives in the
+Approvals inbox, in a different route — so the core act of coding review is a
+context switch away, and it is all-or-nothing: no per-hunk accept, no edit
+before accept, no partial rejection. **Work:** an inline side-by-side diff in
+the Build transcript with per-hunk accept/reject and an "edit then accept" path,
+resolving straight into the existing approval record.
+
+**B15. No terminal or output pane.** Command output, once B5 lands, has nowhere
+to stream. **Work:** a collapsible output pane with live streaming, exit status,
+and a jump-to-failure affordance.
+
+**B16. Tool activity is buried.** Tool events render inside a collapsed
+governance `details`, so during a long turn the transcript looks idle.
+**Work:** promote tool calls to first-class transcript rows — file read, files
+matched, command started — with a progress affordance, keeping the full
+governed record in the disclosure.
+
+**B17. No way to stop or steer a running turn.** `POST /api/interrupts` exists
+and `api.interrupt` is already in `apps/web/src/lib/api.ts`, but no view calls
+it. A turn heading the wrong way must be waited out. **Work:** a Stop control on
+the composer while streaming, and a queued-steer input that appends to the
+running turn at the next safe boundary.
+
+**B18. No checkpoint or rewind control where the work happens.** Checkpoints are
+recorded and browsable in their own route, but Build offers no "rewind to before
+this turn" — the one control that makes an autonomous agent safe to let run.
+**Work:** a per-turn rewind in the transcript, restoring workspace and
+conversation state from the existing checkpoint manifest.
+
+**B19. Composer ergonomics.** No `@`-mention autocomplete for workspace files
+(attaching a path means typing it exactly), no slash commands, no keyboard
+shortcut map, no copy button on code blocks, no syntax highlighting in
+transcript code (deliberately deferred in FIXED-06), no message edit-and-resend,
+no regenerate. Each is small; together they are most of the felt difference in
+daily use.
+
+**B20. No sandboxed execution environment.** `container_execution_enabled`,
+`remote_execution_enabled` and `cloud_execution_enabled` are all `False`, so
+even after B5 every command runs on the host.
+`docs/EXECUTION_ENVIRONMENTS_SPEC.md` specifies the alternative. **Work:**
+implement at least the container executor so Auto mode can be genuinely
+autonomous without the host as the blast radius.
+
+### Suggested order
+
+B1 → B2 → B3 make Build an agent. B4–B6 make it efficient. B13–B16 make the
+result reviewable. Everything else is depth. B1 and B20 are both *policy*
+decisions before they are engineering ones and belong to the owner, not to an
+implementer.
+
+---
+
+## GAP-CHAT — What Chat needs to work as a general agentic work assistant
+
+**Status: analysis, not a defect.** Chat is intended to be more than a chat box:
+an assistant that works across the owner's documents, mail, calendar, chat
+tools and schedule, produces real files, and keeps working while the owner is
+away. This entry states the distance to that bar.
+
+Chat already clears real parts of it. Turns stream with conversational status;
+conversation memory within a chat works (FIXED-04); documents and images upload
+and reach the model; projects carry instructions and approved memory; chat
+search covers titles and message text; and — genuinely ahead of the field —
+`raiker/tasks/scheduler.py` runs *due tasks as governed turns* on `continuous`
+(20 min), `hourly`, `daily` and `weekly` cadences, re-arming after each cycle,
+so standing routines are already real rather than aspirational.
+
+Three things stop it being a work assistant: it cannot produce an artifact, it
+cannot act on the tools it can read, and it cannot remember across the work.
+
+### Tier 0 — the blocking three
+
+**C1. It cannot produce a file.** *(depends on BUG-06)* Every route to a durable
+artifact runs through `write_file`, which is approval-gated and — unlike
+`connector_write`, see C2 — metadata-only on resolution, so "draft the report and
+save it" cannot complete. The assistant can compose a
+document in the transcript and nothing more. **Work:** as B1 — wire approval
+resolution to `ApprovalExecutionRelay` for file writes — then add first-class
+document output (Markdown now; DOCX/XLSX/PDF generation behind a capability),
+written into the session's workspace and listed in the chat.
+
+**C2. Acting in the owner's tools works, but only through one narrow door.**
+This is the one place the approval loop is already closed end to end, and it
+should be read as the precedent for C1 rather than as a gap in itself:
+`github_read`, `gmail_read`, `gcal_read`, `slack_read` and `connector_read`
+execute directly; a `connector_write` proposed by the model is parked as a
+`connector_write_intents` row (`raiker/tools/broker.py`) with the honest
+`expected_effect` *"Approving executes this exact connector mutation once"*, and
+resolving that approval really does call `ConnectorInvoker.invoke`, returning
+`"status": "executed", "executes_action": true`
+(`raiker/api/routes_approvals.py`). Approved connector mutations are sent.
+
+What is missing around it: **coverage and confidence.** Only
+manifest-declared operations of an enabled, credentialed connector are
+reachable, so "reply to that email", "put it on my calendar" and "post the
+summary to the channel" depend entirely on which operations each shipped
+manifest declares — and that inventory is not stated anywhere a user can see.
+There is also no pre-send preview of the exact outbound request body, no
+per-operation standing grant in the UI (`/api/standing-grants` exists as a
+route), and no undo window for operations that support one. **Work:** publish
+and complete the per-connector write-operation inventory, add the outbound
+preview to the approval card, and expose standing grants per operation so a
+routine the owner has already blessed does not stop for an approval every
+cycle.
+
+**C3. It cannot recall anything outside the current chat.** The turn bundle
+(`raiker/context/gatherer.py`) injects session-scoped events, tasks, checkpoints
+and approvals plus — only when the session is filed under a project with memory
+enabled and incognito off — up to ten approved `project:<id>` memories. There is
+no profile-scope memory, no retrieval across chats, and the memory tools
+(`memory_search`, `memory_list`, `memory_get`, `memory_write`) exist in
+`ToolBroker` but are **absent from `_MODEL_EXPOSED_TOOLS`**, so the model cannot
+search its own memory even when the answer is sitting in it. `retrieve_hybrid_memory`
+— lexical + vector + graph, in `raiker/memory/retrieval.py` — is called only by
+`raiker/memory/evaluation.py`. **Work, in three steps:**
+1. expose the read-side memory tools to the model (read-only, no approval);
+2. call `retrieve_hybrid_memory` during context gathering, scoped to the owner,
+   budgeted, labelled untrusted, with every injected memory attributed in the UI
+   so recall is visible and correctable;
+3. decide the durable-write posture — today `durable_writes_enabled` is `False`
+   and a `memory_write` becomes a candidate awaiting approval. Silent
+   remembering is a real privacy decision and belongs to the owner; the
+   defensible default is *propose, show, one-click accept*.
+
+Cross-surface recall — "what did we decide in that other chat", "what is that
+scheduled routine finding" — is the single largest felt gap versus the field,
+and step 2 is most of it.
+
+### Tier 1 — working with the owner's material
+
+**C4. No file inspector.** See BUG-07: attachment chips are inert `span`s. An
+assistant that reads documents must be able to show the owner what it read, with
+the passage it used. **Work:** the plan in
+`docs/superpowers/plans/2026-07-26-chat-file-inspector.md`, Tasks 1–2, reusing
+the sanitising renderer shipped in FIXED-06 for the Markdown case.
+
+**C5. No export.** See BUG-08 — no download, print, or PDF anywhere. FIXED-06
+removed the blocker on the rendering side; a print stylesheet plus a per-chat
+"Export as Markdown" and a per-message copy is now a small change.
+
+**C6. No citations on tool-derived answers.** When an answer comes from an
+email, a calendar entry or an attached document, the transcript does not say
+which one. For an assistant acting on the owner's real data this is a
+correctness feature, not a nicety. **Work:** carry source ids through the tool
+result into the response and render an inline, clickable provenance chip.
+
+**C7. No web access.** As B12 — the assistant cannot look anything up. For a
+work assistant this is the difference between answering and guessing.
+
+**C8. MCP tools unreachable.** As BUG-12/B8. Every connector the owner adds
+through the ecosystem stays a monitoring entry.
+
+**C9. No skills or reusable procedures.** `raiker/skills/` holds a candidate
+store and nothing else; `docs/SELF_IMPROVEMENT_MODEL.md` describes procedural
+memory that is never consulted at turn time. A work assistant should learn "how
+we do the weekly report here" once. **Work:** promote approved procedural
+memories into a named, model-selectable skill set, injected only when relevant.
+
+### Tier 2 — presence and continuity
+
+**C10. The assistant lives in one browser tab.** `config/channel-connectors.json`
+declares cli, tui, rest, web_ui, desktop, dashboard, ide, apple_mobile,
+android_mobile and webhooks — but `external_channels_enabled` and
+`notifications_enabled` are both hardcoded `False`
+(`raiker/context/gatherer.py`), so there is no mail, chat-tool or mobile surface
+where the assistant reaches the owner. Scheduled routines therefore run and
+finish with nobody told. **Work:** enable the notification path first (it is the
+cheapest and it makes routines useful), then one external channel end to end.
+
+**C11. Background work is not conversational.** Scheduled and background tasks
+run as isolated turns; their output lands in a task record, not in a thread the
+owner can reply to. **Work:** file each routine's cycle into a durable
+conversation, so "what did the overnight run find?" is answerable in Chat and a
+reply steers the next cycle.
+
+**C12. No collaboration.** No sharing of a chat, a project, or a document; no
+second participant; no per-recipient scoping. Governance is built for a single
+owner, so this is a genuine architectural decision rather than a missing screen —
+`docs/NESTED_BOUNDARIES_ARCHITECTURE.md` is the place it has to be answered.
+
+### Tier 3 — conversation surface (UI/UX)
+
+**C13. No stop or steer.** As B17: `POST /api/interrupts` and `api.interrupt`
+exist; nothing calls them. A long turn cannot be stopped.
+
+**C14. No message-level actions.** No copy, no edit-and-resend, no regenerate,
+no branch-from-here, no per-message feedback. Editing a prompt and re-running is
+the most-used control in an assistant of this kind.
+
+**C15. Attachments are one-way.** The composer uploads; the transcript cannot
+hand a file back (C1), preview one (C4), or let the owner drag one out.
+
+**C16. Voice is a label.** The control is present and marked "(coming soon)" —
+honest, but a work assistant used from a phone needs dictation and, ideally,
+read-back.
+
+**C17. Recall is invisible.** Once C3 lands, the owner must be able to see what
+was remembered, why it was injected, and correct or forget it inline. The
+Memory route exists for management; the *moment of use* is in Chat.
+
+**C18. No cross-chat surface.** Chat search covers titles and message text only.
+There is no "what am I working on", no cross-project view, no resumption of the
+threads a routine is advancing.
+
+### Suggested order
+
+C1 and C2 make Chat capable of work; C3 makes it feel like it knows the owner;
+C10/C11 make it present when the owner is not watching. C4–C6 and C13–C15 are
+the daily-use polish that determines whether any of it gets used. C2, C3(3),
+C10 and C12 are owner policy decisions before they are implementation tasks.
 
 ---
 

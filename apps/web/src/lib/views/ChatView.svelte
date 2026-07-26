@@ -4,6 +4,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
+  import PermissionModeControl from "../components/PermissionModeControl.svelte";
   import { api, ApiError, streamPrompt } from "../api";
   import type { AgentResponse, ModelProfile, SessionDetail, StreamEvent } from "../apiTypes";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
@@ -747,6 +748,8 @@
               />
             {/if}
           </div>
+
+          <PermissionModeControl />
 
           <button
             type="button"

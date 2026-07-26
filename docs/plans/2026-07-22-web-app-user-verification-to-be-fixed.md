@@ -28,3 +28,15 @@ key or user data was stored.
   value, add a clear required marker and inline validation, and cover the
   title-only form state in `TasksView.test.ts`. Keep the backend contract as the
   source of truth.
+
+## Verification refresh — 2026-07-26
+
+The resolved task form was driven again against a disposable, live `raiker-web`
+workspace. A task with instructions was created, the four work-kind controls
+were selected, and both labelled task dropdowns were exercised. The current
+capture is [the task-controls screenshot](../guide/screenshots/working/33-live-task-controls.png).
+
+The same run found and fixed a separate control-contract mismatch in Chat:
+**Never plan** had sent `never`, while the governed prompt contract accepts
+`never_safe_only`. The selector now sends the valid safe-only mode; a live
+Anthropic conversation completed with that mode selected.

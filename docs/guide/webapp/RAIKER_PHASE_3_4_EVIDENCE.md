@@ -255,3 +255,20 @@ still affects other views that link by session id. Loosening the redactor is a
 security-sensitive change and is deliberately **not** made as part of a UX
 phase; it needs its own contract and threat-model review. Recording it here
 keeps the documentation ahead of the implementation claim rather than behind it.
+
+## Follow-up live verification — 2026-07-26
+
+A fresh disposable workspace was driven through the production build after the
+Chat planning-selector regression was corrected. **Never plan** now sends the
+contract's `never_safe_only` value instead of the rejected `never` value. The
+run enabled the hosted-model gate through its step-up dialog, generated and
+saved a disposable vault key, connected Anthropic, selected
+`claude-haiku-4-5-20251001`, and received two completed governed replies in
+separate chats (`BLUE`, then `GREEN`).
+
+The same browser session selected all four task work kinds, changed the
+labelled task dropdowns, and created a task with instructions. It recorded no
+API response at 4xx/5xx and no browser console errors. The credential existed
+only in the process environment and the disposable workspace was removed after
+the run. Review captures are `30-live-anthropic-model-selected.png` through
+`33-live-task-controls.png` in `docs/guide/screenshots/working/`.

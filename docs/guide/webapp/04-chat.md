@@ -68,6 +68,11 @@ The **Planning** selector controls whether the agent runs its plan step:
 
 - **auto** — Raiker decides per turn (default).
 - **Always plan** — force the gather → plan → act → verify loop every turn.
-- **Never plan** — go straight to acting for simple turns.
+- **Never plan** — sends the governed `never_safe_only` mode, so simple turns
+  skip planning while retaining the safe-only execution boundary.
+
+The 2026-07-26 live verification selected **Never plan** and completed two
+separate Anthropic chats. See [the first completed reply](../screenshots/working/31-live-anthropic-first-chat.png)
+and [the second completed reply](../screenshots/working/32-live-anthropic-second-chat.png).
 
 Next: [Tasks →](05-tasks.md)

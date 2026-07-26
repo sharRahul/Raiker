@@ -198,10 +198,49 @@ prose and non-provider exceptions are classified by exception type — so an
 arbitrary message can never be promoted into an event payload, and `safe_error`
 still runs first so a leaked header fragment cannot travel with it.
 
-The supplied key was rejected by Anthropic (`authentication_error`), verified
-independently with curl and with httpx from the server's own environment, so the
-network path was fine and no real model response could be obtained. Everything
-up to the model call is verified; the model call itself is not.
+The first key supplied for this was rejected by Anthropic
+(`authentication_error`), verified independently with curl and with httpx from
+the server's own environment — which is how the mis-reporting was noticed at all.
+A working key was supplied afterwards and the run was completed; see below.
+
+## Live run against a real hosted model
+
+With a valid credential the whole path was driven in a browser against
+`api.anthropic.com`, on a disposable loopback workspace, with the key held only
+in the server's environment.
+
+**Getting to a usable model.** The Workbench refused to start a turn while no
+model was selected. Activating a runtime mode, then opening the hosted-model
+capability, required the step-up to be satisfied — it stayed disabled until a
+reason, a confirmation token, and an explicit threat-model acknowledgement were
+all given. With the gate open the model picker fetched the provider's real
+catalogue (11 models) rather than falling back to free-text entry, and the
+Workbench then named the egress boundary: *the turn leaves your device*.
+
+**Real turns.** A prompt started from the Workbench composer was handed to Chat
+and answered by the hosted model, completing with a "How this turn was governed"
+disclosure. A prompt typed directly into Chat returned `391` for 17 × 23. Both
+turns are recorded in Sessions and the audit log.
+
+**The governance loop, end to end.** Asked to create `governance-note.txt`, the
+model proposed the write and the runtime withheld it:
+
+> Write file — risk high. Approval required. The action was not executed.
+
+The file was **not** on disk. The decision queue showed one pending, high-risk
+`Write file` against the `File writes` capability, with an expiry. Its detail
+pane stated *"Approval resolution is metadata-only. Recording a decision does NOT
+execute the action"*, rendered the proposed diff, and labelled its control
+**"Approve (record only)"**. Approving returned *"Recorded: approved. The action
+was NOT executed (metadata-only)"*, moved the record to the Approved filter — and
+the file was still not on disk. The documented `metadata_only` resolution
+contract holds under a real model.
+
+**Nothing leaked.** The API key appears in no transcript, no audit-log entry, and
+no support bundle; the audit log also does not carry the file content the model
+was asked to write. The Observability overview read one pending approval and one
+unread notification, and its "what changed" timeline linked back to the real
+session and turn. Zero console errors or warnings across the run.
 
 ## Known limitation recorded rather than hidden
 

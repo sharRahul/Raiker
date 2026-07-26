@@ -4,7 +4,7 @@
 
 **Goal:** Let Raiker create tasks/reminders and assign the active chat to a project through governed natural-language chat actions.
 
-**Architecture:** Add two narrow action intents and tool executors that delegate to `DashboardService`; a small conversation state layer collects missing task details and resolves project ambiguity. The normal transcript receives only human-readable completion receipts.
+**Architecture:** Add two narrow action intents and tool executors that delegate to `DashboardService`; the broker supplies trusted active-session/principal context while model arguments remain untrusted. A small conversation state layer collects missing task details and resolves project ambiguity. The normal transcript receives only human-readable completion receipts.
 
 **Tech Stack:** Python/FastAPI/SQLite/existing tool broker, Svelte 5/TypeScript/Vitest.
 
@@ -87,7 +87,7 @@ git commit -m "feat(chat): plan task and project actions"
 
 **Interfaces:**
 - `create_task` accepts `{title, description, scheduled_at?, reminder_at?, recurrence?, project_id?}`.
-- `assign_session_project` accepts `{project_id}` and obtains `session_id` solely from the active envelope.
+- `assign_session_project` accepts `{project_id}` and obtains `session_id` solely from trusted broker execution context.
 - Completion returns `ChatActionReceipt(kind, title, destination, href)`.
 
 - [ ] **Step 1: Write failing service-delegation tests**
@@ -98,9 +98,9 @@ def test_task_action_delegates_to_dashboard_and_returns_a_tasks_receipt(service,
     assert receipt.href == "#/tasks"
     assert "Send report" in receipt.message
 
-def test_project_action_cannot_move_a_model_supplied_other_session(service, owner) -> None:
-    result = ChatActionExecutor(service, active_session_id="sess_1", principal_id=owner).assign_session_project({"project_id": "p1", "session_id": "sess_2"})
-    assert result.reason_code == "unexpected_session_id"
+def test_project_action_uses_the_broker_session_not_model_arguments(service, owner) -> None:
+    receipt = ChatActionExecutor(service, active_session_id="sess_1", principal_id=owner).assign_session_project({"project_id": "p1"})
+    assert receipt.session_id == "sess_1"
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -109,10 +109,12 @@ Run: `python -m pytest --basetemp .pytest_tmp tests/test_chat_actions.py -v`
 
 - [ ] **Step 3: Register and implement tools**
 
-Add validated tool specifications and broker handlers. Handlers instantiate the
-existing dashboard service with the authenticated principal, call its existing
-methods, and translate only successful results into receipts. Reuse the normal
-tool approval/decision path; do not add an HTTP shortcut or direct SQLite write.
+Add validated tool specifications and extend `ToolBroker.execute` so executor
+handlers receive a trusted `ToolExecutionContext(session_id, principal_id)`.
+Handlers instantiate the existing dashboard service with that principal, call
+its existing methods, and translate only successful results into receipts.
+Reuse the normal tool approval/decision path; do not add an HTTP shortcut or
+direct SQLite write.
 
 - [ ] **Step 4: Run backend tests**
 

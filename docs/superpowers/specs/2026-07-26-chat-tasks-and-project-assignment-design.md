@@ -31,8 +31,10 @@ Successful moves state the chat title and destination and link to Projects.
 ## Architecture and authorization
 
 Add focused `create_task` and `assign_session_project` tool specifications to
-the governed chat tool registry. Their executors validate structured arguments
-and call the existing `DashboardService.create_task` and
+the governed chat tool registry. The tool broker carries the authenticated
+principal and active session id to executors as trusted execution context; those
+values are never model-provided arguments. Their executors validate structured
+arguments and call the existing `DashboardService.create_task` and
 `DashboardService.set_session_project` methods; they do not write SQLite
 directly or make a browser-side mutation.
 
@@ -52,7 +54,7 @@ events provide the audit trail in Tasks, Sessions, and Checkpoints.
 - Project matching is case-insensitive exact-name first, then a bounded
   case-insensitive contains match. Matches are scoped to the current user.
 - Session assignment may target only the active chat session and a project
-  visible to the user; no arbitrary session id may be supplied by the model.
+  visible to the user; no session id is accepted from the model.
 
 ## Verification
 

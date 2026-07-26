@@ -3,6 +3,7 @@
   import Icon from "../components/Icon.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
+  import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
   import { api, ApiError, streamPrompt } from "../api";
   import type { AgentResponse, ModelProfile, SessionDetail, StreamEvent } from "../apiTypes";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
@@ -56,6 +57,13 @@
   // The persisted selection (Models view / /model use). The default provider
   // option names it so the user can see what will actually serve the turn.
   const selectedProfile = $derived(profiles.find((p) => p.selected) ?? null);
+  const activeProfile = $derived(profiles.find((p) => p.profile_id === modelProfile) ?? selectedProfile);
+  let contextOpen = $state(false);
+  // The backend will replace this conservative presentation estimate with
+  // provider-reported usage when available. It is intentionally labeled.
+  const estimatedContextTokens = $derived(
+    Math.ceil(turns.reduce((count, turn) => count + turn.prompt.length + answerText(turn).length, 0) / 4),
+  );
 
   // Attachments for the next prompt: workspace paths (resolved server-side
   // inside the workspace — anything outside fails closed — and included as
@@ -721,6 +729,25 @@
             {/each}
           </select>
 
+          <div class="context-control">
+            <button
+              type="button"
+              class="bar-select context-trigger"
+              aria-label="Context window"
+              aria-expanded={contextOpen}
+              onclick={() => (contextOpen = !contextOpen)}
+            >
+              Context
+            </button>
+            {#if contextOpen}
+              <ContextMeterPopover
+                usedTokens={estimatedContextTokens}
+                contextWindowTokens={activeProfile?.context_window_tokens ?? null}
+                estimated={true}
+              />
+            {/if}
+          </div>
+
           <button
             type="button"
             class="round-btn"
@@ -1081,6 +1108,8 @@
   .send {
     min-width: 6.5rem;
   }
+  .context-control { position: relative; }
+  .context-trigger { cursor: pointer; }
   @media (max-width: 720px) {
     .message-group {
       max-width: 88%;

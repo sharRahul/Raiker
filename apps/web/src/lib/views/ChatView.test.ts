@@ -539,6 +539,38 @@ describe("ChatView streaming transcript", () => {
     );
   });
 
+  it("opens context details without changing or compacting the chat", async () => {
+    stubFetch({
+      ...MODELS_ROUTE,
+      "GET /api/models": {
+        ...(MODELS_ROUTE["GET /api/models"] as Record<string, unknown>),
+        chat_profiles: [
+          {
+            profile_id: "configured-model",
+            provider: "anthropic",
+            model: "claude",
+            default_state: "enabled",
+            local_only: false,
+            requires_network: true,
+            endpoint_kind: "remote_hosted",
+            requires_egress_policy: true,
+            requires_budget_policy: false,
+            runtime_gate: "hosted_model_runtime",
+            off_machine: true,
+            selected: true,
+            prompt_cache_ttl: null,
+            context_window_tokens: 1_000_000,
+            configured: true,
+          },
+        ],
+      },
+    });
+    render(ChatView);
+    await fireEvent.click(screen.getByRole("button", { name: "Context window" }));
+    expect(screen.getByText("0 / 1.0M (0%)")).toBeInTheDocument();
+    expect(screen.queryByText(/context compacted/i)).not.toBeInTheDocument();
+  });
+
   it("shows safe expandable thinking while Raiker prepares a response", async () => {
     stubFetch(MODELS_ROUTE);
     let finishStream: (() => void) | undefined;

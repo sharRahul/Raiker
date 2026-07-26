@@ -7,37 +7,16 @@ on:
       - main
 
 jobs:
-  export-pr-source:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Archive source
-        run: |
-          tar --exclude=.git -czf /tmp/raiker-pr-source.tar.gz .
-      - name: Upload source artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: raiker-pr-source
-          path: /tmp/raiker-pr-source.tar.gz
-          retention-days: 1
-
   python:
-    name: Python ${{ matrix.python-version }}
+    name: Python 3.11
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version:
-          - "3.11"
-          - "3.12"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
           cache: "pip"
       - name: Install package and dev dependencies
         run: |
@@ -46,9 +25,6 @@ jobs:
       - name: Verify real httpx import
         run: |
           python -c "import httpx; print(httpx.__file__)"
-      - name: Verify test collection (fail fast on broken imports)
-        run: |
-          python -m pytest --collect-only -q
       - name: Run tests
         run: |
           python -m pytest

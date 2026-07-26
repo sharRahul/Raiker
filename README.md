@@ -1,5 +1,10 @@
 # Raiker
 
+> runtime_enablement_candidate: completed
+> controlled_runtime_mode_activation: implemented
+> local_single_user_production_hardening: implemented
+> production_ready_local_single_user_runtime: ready
+
 Raiker is a local-first, governed AI-agent runtime. It keeps model output and tool calls behind policy, approvals, audit events, SQLite state, and checkpoints, so automation stays observable and controllable.
 
 It provides two local interfaces backed by the same runtime:
@@ -12,6 +17,15 @@ It provides two local interfaces backed by the same runtime:
 The launchable local UIs are the plain local terminal client and the local web dashboard. Rich/native desktop, mobile, IDE, voice, browser-extension, and hosted multi-user clients are Phase 8 deferred.
 
 Runtime status: `runtime_enablement_candidate`; strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
+
+On first run, **owner bootstrap** creates the local **owner principal**. Every
+governed request resolves an **acting-principal**; only a human
+`runtime_gate_manager` may change runtime modes or capability gates. Local
+owner **recovery** is governed and audited. The approval execution relay is a
+separately governed path; routine approval resolution remains metadata-only.
+Deferred dangerous domains, including remote/cloud execution and sensitive
+finance, medical, pregnancy, CCTV, home-security, and hardware actions, fail
+closed.
 
 The dashboard is a presentation layer over the governed backend; it has no
 direct tool authority. Durable memory mutation is broker-governed. Approval

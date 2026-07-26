@@ -35,7 +35,14 @@ python -m ruff check .
 python -m mypy raiker apps tests
 ```
 
-CI runs on `ubuntu-latest` with Python 3.11. See `.github/workflows/ci.yml`. Phase/status ledger validation runs separately in `.github/workflows/phase-status.yml` with `python scripts/validate_phase_status.py`.
+CI runs on `ubuntu-latest` in one Python 3.11 job. It runs the full pytest suite,
+`ruff check .`, `mypy raiker apps tests`, and `compileall`; pytest's normal collection
+also catches import failures, so no separate collection-only pass is needed. See
+`.github/workflows/ci.yml`. Licensing, phase/status validation, and the path-filtered
+web UI workflow remain separate checks; phase/status validation runs
+`python scripts/validate_phase_status.py` from `.github/workflows/phase-status.yml`.
+Historical, documentation-only phase assertions are covered by those dedicated validators
+rather than being repeated inside pytest; behavioural and safety tests remain in the suite.
 
 ## Required Validation Commands
 

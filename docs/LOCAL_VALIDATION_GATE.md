@@ -238,7 +238,7 @@ For any branch that changes approval planning preview behavior, storage, CLI, ev
 docs, validation evidence must include:
 
 ```bash
-python -m pytest tests/test_phase_3_slice_b_approval_preview_models.py tests/test_phase_3_slice_b_approval_preview_storage.py tests/test_phase_3_slice_b_approval_preview_cli.py tests/test_phase_3_slice_b_approval_preview_safety.py tests/test_phase_3_slice_b_docs_truthfulness.py
+python -m pytest tests/test_phase_3_slice_b_approval_preview_models.py tests/test_phase_3_slice_b_approval_preview_storage.py tests/test_phase_3_slice_b_approval_preview_cli.py tests/test_phase_3_slice_b_approval_preview_safety.py
 python -m pytest
 python -m ruff check .
 python -m mypy raiker apps tests

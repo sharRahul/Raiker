@@ -1233,8 +1233,8 @@ Scope and boundaries:
 Evidence: `tests/test_phase_3_slice_a_proposal_lifecycle_models.py`,
 `tests/test_phase_3_slice_a_proposal_lifecycle_storage.py`,
 `tests/test_phase_3_slice_a_proposal_lifecycle_cli.py`,
-`tests/test_phase_3_slice_a_proposal_lifecycle_safety.py`,
-`tests/test_phase_3_slice_a_docs_truthfulness.py`.
+`tests/test_phase_3_slice_a_proposal_lifecycle_safety.py`, and the repository
+truthfulness validators.
 
 Spec: `docs/IMPLEMENTATION_STATUS.md`.
 
@@ -1272,8 +1272,8 @@ Scope and boundaries:
 Evidence: `tests/test_phase_3_slice_b_approval_preview_models.py`,
 `tests/test_phase_3_slice_b_approval_preview_storage.py`,
 `tests/test_phase_3_slice_b_approval_preview_cli.py`,
-`tests/test_phase_3_slice_b_approval_preview_safety.py`,
-`tests/test_phase_3_slice_b_docs_truthfulness.py`.
+`tests/test_phase_3_slice_b_approval_preview_safety.py`, and the repository
+truthfulness validators.
 
 Spec: `docs/IMPLEMENTATION_STATUS.md`.
 

@@ -3,12 +3,12 @@ from __future__ import annotations
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import ClientMetadata, ToolAction
 from raiker.events.writer import EventLogWriter
+from raiker.models.contracts import ToolCallProposal
+from raiker.models.tool_call_validation import default_tool_specs, validate_tool_call
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.broker import ToolBroker
-from raiker.models.tool_call_validation import default_tool_specs, validate_tool_call
-from raiker.models.contracts import ToolCallProposal
 
 
 def _broker(tmp_path):  # type: ignore[no-untyped-def]

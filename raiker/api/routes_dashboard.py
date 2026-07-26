@@ -19,6 +19,7 @@ from raiker.api.schemas import (
     CreateProjectRequest,
     CreateRemoteMcpServerRequest,
     ModelConnectionRequest,
+    ModelPriceRequest,
     MoveProjectRequest,
     RenameMcpServerRequest,
     RenameSessionRequest,
@@ -35,6 +36,7 @@ from raiker.api.schemas import (
     serialize_dto,
 )
 from raiker.api.sessions import ApiSession
+from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import AuthSessionView, DashboardService
 from raiker.control.web_read_models import WebReadModels
 from raiker.models.connections import clear_model_connection, put_model_connection
@@ -1064,6 +1066,52 @@ async def list_provider_models(
     return serialize_dto(view)
 
 
+@router.get("/api/sessions/{session_id}/context-usage")
+async def get_session_context_usage(
+    session_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Token usage and API cost for one conversation, plus the provider total.
+
+    Owner-scoped: the ledger is queried by the authenticated principal, so one
+    account can never read another's spend. Every figure is optional and names
+    its source; nothing is estimated server-side.
+    """
+    session, _principal = auth_data
+    return serialize_dto(_service(request).get_context_usage(session_id, session.principal_id))
+
+
+@router.put("/api/models/{profile_id}/price")
+async def set_model_price(
+    profile_id: str,
+    body: ModelPriceRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Set or clear the owner's price override for one model on one profile.
+
+    An owner price outranks both the provider-published price and the shipped
+    list price, and re-prices history immediately because cost is derived at
+    read time rather than stored.
+    """
+    session, _principal = auth_data
+    result = _service(request).set_model_price(
+        profile_id,
+        body.model,
+        input_per_mtok=body.input_per_mtok,
+        output_per_mtok=body.output_per_mtok,
+        currency=body.currency or "USD",
+        acting_principal_id=session.principal_id,
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
 @router.put("/api/model-selection")
 async def set_model_selection(
     body: SetModelSelectionRequest,
@@ -1109,9 +1157,18 @@ async def set_model_connection(
     if not values:
         clear_model_connection(store, session.principal_id, profile_id)
         return {"ok": True, "connection_configured": False}
+    # The vault key encrypts what we are about to store. It is a local
+    # encryption key, not a secret the owner has to invent, so requiring them to
+    # go and generate one before they may save an API key is friction with no
+    # security benefit — the key would be identical either way. Provision it on
+    # demand; Settings keeps the controls to view, rotate, and clear it.
+    ensure_vault_key(request.app.state.workspace_root)  # type: ignore[attr-defined]
     try:
         ModelProviderFactory(
-            policy=provider_runtime_policy_from_gates(store, session.principal_id), connection=values
+            policy=provider_runtime_policy_from_gates(
+                store, session.principal_id, configuring_profile_id=profile_id
+            ),
+            connection=values,
         ).create(profile, require_model=False)
         put_model_connection(store, session.principal_id, profile_id, values)
     except ValueError as exc:

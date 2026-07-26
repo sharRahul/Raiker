@@ -47,6 +47,9 @@ EVENT_TYPES = {
     "intent_classified",
     "risk_classified",
     "context_gathered",
+    # Prior turns of this conversation replayed to the model. Counts only —
+    # message count and character total — never the transcript itself.
+    "conversation_history_replayed",
     "retrieval_augmentation",
     "plan_created",
     "plan_skipped",

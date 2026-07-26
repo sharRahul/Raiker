@@ -4,14 +4,26 @@ import json
 from typing import Any
 
 from raiker.context.redaction import redact_text
-from raiker.events.export import SECRET_PATTERNS, _is_secret_key
+from raiker.events.export import SECRET_PATTERNS, _is_secret_key, is_token_count_field
 
 REDACTED_LABEL = "[REDACTED]"
 
 
 def _redact_value(value: Any) -> Any:
     if isinstance(value, dict):
-        return {k: (_redact_value("***REDACTED***") if _is_secret_key(k) else _redact_value(v)) for k, v in value.items()}
+        # A token *count* is an integer, never a credential. Without this the
+        # models contract returned `context_window_tokens: "***REDACTED***"` and
+        # the Chat context meter rendered "0 / NaN (NaN%)".
+        return {
+            k: (
+                v
+                if is_token_count_field(k, v)
+                else _redact_value("***REDACTED***")
+                if _is_secret_key(k)
+                else _redact_value(v)
+            )
+            for k, v in value.items()
+        }
     if isinstance(value, list):
         return [_redact_value(item) for item in value]
     if isinstance(value, str):
@@ -36,6 +48,8 @@ def assert_no_secrets_in_body(body: Any) -> None:
 def _check_no_secrets(value: Any, path: str = "$") -> None:
     if isinstance(value, dict):
         for k, v in value.items():
+            if is_token_count_field(k, v):
+                continue
             if _is_secret_key(k):
                 raise AssertionError(f"Secret-like key at {path}.{k}: {k}")
             _check_no_secrets(v, f"{path}.{k}")

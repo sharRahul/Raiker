@@ -8,6 +8,8 @@
   import type { ModelProfile, ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
   import { humanize, providerName } from "../format";
+  import { formatCost, sourceNote, spendShares } from "../contextPresentation";
+  import { providerErrorGuidance, type ProviderErrorGuidance } from "../providerErrors";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
   // so a selection here is reflected there without a full page reload.
@@ -60,6 +62,9 @@
   let testFor = $state<string | null>(null);
   let testResult = $state<string | null>(null);
   let detailsFor = $state<ModelProfile | null>(null);
+  // Governed refusals are policy outcomes, not faults. Hold the reason code so
+  // the dialog can render the control that unblocks it instead of a bare code.
+  let signInGuidance = $state<ProviderErrorGuidance | null>(null);
 
   const signInProfile = $derived(models?.profiles.find((p) => p.profile_id === signInFor) ?? null);
 
@@ -69,15 +74,18 @@
     signInEndpoint = "";
     signInAdvanced = false;
     signInError = null;
+    signInGuidance = null;
   }
   function closeSignIn() {
     signInFor = null;
     signInError = null;
+    signInGuidance = null;
   }
 
   async function saveConnection(profileId: string) {
     signInSaving = true;
     signInError = null;
+    signInGuidance = null;
     try {
       // Email is captured for a friendlier sign-in feel but only the API key
       // and optional endpoint are stored server-side (the backend vault has no
@@ -88,9 +96,12 @@
       signInFor = null;
       await load();
     } catch (e) {
-      signInError = e instanceof ApiError
-        ? `Could not connect (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
-        : "Could not connect";
+      signInGuidance = e instanceof ApiError ? providerErrorGuidance(e.reasonCode) : null;
+      signInError = signInGuidance !== null
+        ? null
+        : e instanceof ApiError
+          ? `Could not connect (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+          : "Could not connect";
     } finally {
       signInSaving = false;
     }
@@ -287,7 +298,36 @@
 
   const sections = ["Local", "Hosted", "Advanced"] as const;
   const configuredProfiles = $derived((models?.profiles ?? []).filter((p) => p.connection_configured || p.selected));
-  const setupPercent = $derived(models?.profiles.length ? Math.round((configuredProfiles.length / models.profiles.length) * 100) : 0);
+  // A percentage of "all shipped profiles" was a meaningless denominator — a
+  // user who connects the one provider they intend to use is finished, not 10%
+  // finished. The honest headline is how many providers are actually ready.
+  const readyCount = $derived(configuredProfiles.length);
+
+  // Each provider's bar is its share of total spend across every provider, so
+  // it needs no configured budget to mean something. Providers with no cost
+  // (local runtimes, or ones never used) simply have no bar.
+  const spendByProfile = $derived(
+    spendShares(
+      (models?.profiles ?? []).map((p) => ({ id: p.profile_id, cost: p.total_cost })),
+    ),
+  );
+  const totalSpend = $derived(
+    (models?.profiles ?? []).reduce((sum, p) => {
+      const value = Number(p.total_cost);
+      return Number.isFinite(value) && value > 0 ? sum + value : sum;
+    }, 0),
+  );
+  const spendCurrency = $derived(
+    (models?.profiles ?? []).find((p) => p.total_cost && p.cost_currency)?.cost_currency ?? "USD",
+  );
+
+  function usageLine(profile: ModelProfile): string {
+    if (!profile.billable) return "No API cost — runs on this machine";
+    const used = profile.models_used ?? 0;
+    if (used === 0) return "Not used yet";
+    const turns = profile.turns_used ?? 0;
+    return `${used} model${used === 1 ? "" : "s"} used · ${turns} turn${turns === 1 ? "" : "s"}`;
+  }
   function profilesFor(section: "Local" | "Hosted" | "Advanced") {
     return (models?.profiles ?? []).filter((profile) => sectionFor(profile) === section);
   }
@@ -329,7 +369,13 @@
       case "anthropic":
         return { tint: "#d97757", headline: "Connect to Anthropic", credentialLabel: "Anthropic API key", hint: "Create a key at console.anthropic.com. Anthropic uses API keys only — no email login.", authMethods: ["apikey"], loginUrl: "https://console.anthropic.com/settings/keys", loginLabel: "Get an Anthropic key" };
       case "openai":
-        return { tint: "#10a37f", headline: "Connect to OpenAI", credentialLabel: "OpenAI API key", hint: "Create a key at platform.openai.com. OpenAI also lets you sign in to your account to manage keys.", authMethods: ["login", "apikey"], loginUrl: "https://platform.openai.com/api-keys", loginLabel: "Sign in to OpenAI" };
+        // Sign-in here means signing in to the OpenAI *platform* account —
+        // Google, Microsoft, and Apple all work — to create an API key, which
+        // is then pasted below. It deliberately does not claim to use a ChatGPT
+        // subscription: ChatGPT Plus/Pro and the API are separately billed, and
+        // no subscription grants a third-party app API access. Saying so here
+        // is cheaper than a user discovering it through a 401.
+        return { tint: "#10a37f", headline: "Connect to OpenAI", credentialLabel: "OpenAI API key", hint: "Sign in to platform.openai.com with Google, Microsoft, Apple, or email, then create an API key and paste it below. API usage is billed separately from a ChatGPT subscription — a Plus or Pro plan does not include API access.", authMethods: ["login", "apikey"], loginUrl: "https://platform.openai.com/api-keys", loginLabel: "Sign in with Google or email" };
       case "gemini":
         return { tint: "#4285f4", headline: "Connect to Google AI", credentialLabel: "Gemini API key", hint: "Create a key in Google AI Studio. Google also supports sign-in with your Google account via Vertex AI.", authMethods: ["login", "apikey"], loginUrl: "https://aistudio.google.com/apikey", loginLabel: "Sign in with Google" };
       case "openrouter":
@@ -375,11 +421,14 @@
       <div>
         <p class="eyebrow">Model setup</p>
         <h2 id="model-setup-title">Choose where Raiker thinks</h2>
-        <p class="sub">{configuredProfiles.length} of {models.profiles.length} providers are ready or selected. Each connection belongs only to this Raiker instance.</p>
+        <p class="sub">Each connection belongs only to this Raiker instance. One ready provider is enough to work.</p>
       </div>
-      <div class="setup-meter" aria-label={`${setupPercent}% provider setup complete`}>
-        <strong>{setupPercent}%</strong><span>setup complete</span>
-        <div class="meter-track"><span style={`width: ${setupPercent}%`}></span></div>
+      <div class="setup-meter" aria-label={`${readyCount} of ${models.profiles.length} providers set up`}>
+        <strong>{readyCount} <span class="of">of {models.profiles.length}</span></strong>
+        <span>providers set up</span>
+        {#if totalSpend > 0}
+          <p class="total-spend">{formatCost(String(totalSpend), spendCurrency)} total API cost</p>
+        {/if}
       </div>
     </section>
 
@@ -413,6 +462,7 @@
                     {#if p.prompt_cache_ttl}<span class="chip chip-ok" title="Prompt caching cuts cost and latency by reusing the stable prompt prefix">Cache {p.prompt_cache_ttl}</span>{/if}
                   </div>
                 </div>
+                <div class="row-usage"><span>{usageLine(p)}</span></div>
                 <div class="row-actions">
                   <button type="button" class="btn btn-ghost btn-sm" onclick={() => void testConnection(p)} disabled={testFor === p.profile_id}>{testFor === p.profile_id ? "Testing…" : "Test"}</button>
                   <button type="button" class="btn btn-ghost btn-sm" onclick={() => detailsFor = p}>Details</button>
@@ -479,6 +529,30 @@
                   {#if p.runtime_gate}<span class="chip" title="Runtime gate that must be enabled">{capabilityLabel(p.runtime_gate)}</span>{/if}
                   {#if p.prompt_cache_ttl}<span class="chip chip-ok" title="Prompt caching cuts cost and latency">Cache {p.prompt_cache_ttl}</span>{/if}
                 </div>
+                <div class="usage-strip">
+                  <div class="usage-line">
+                    <span>{usageLine(p)}</span>
+                    {#if p.billable}
+                      <strong>{formatCost(p.total_cost, p.cost_currency) ?? "—"}</strong>
+                    {/if}
+                  </div>
+                  {#if spendByProfile[p.profile_id] !== undefined}
+                    <div
+                      class="meter-track"
+                      role="progressbar"
+                      aria-label={`${providerName(p.provider)} share of total API spend`}
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                      aria-valuenow={spendByProfile[p.profile_id]}
+                    >
+                      <span style={`width: ${spendByProfile[p.profile_id]}%`}></span>
+                    </div>
+                    <p class="usage-note">{spendByProfile[p.profile_id]}% of your total API spend{#if sourceNote(p.price_source, p.price_as_of)}&nbsp;· {sourceNote(p.price_source, p.price_as_of)}{/if}</p>
+                  {:else if p.billable && (p.turns_used ?? 0) > 0}
+                    <p class="usage-note">No price configured for the models used, so cost is unknown.</p>
+                  {/if}
+                </div>
+
                 <div class="pc-actions">
                   {#if !p.connection_configured}
                     <button type="button" class="btn btn-primary btn-sm pc-connect" onclick={() => openSignIn(p.profile_id)} style={`--brand:${b.tint}`}>Connect</button>
@@ -695,6 +769,16 @@
         <button type="button" class="btn btn-ghost" onclick={closeSignIn}>Cancel</button>
       </div>
       {#if signInError}<p class="error" role="alert">{signInError}</p>{/if}
+      {#if signInGuidance}
+        <div class="signin-guidance" role="alert">
+          <p class="sg-message">{signInGuidance.message}</p>
+          <p class="sg-fix">{signInGuidance.fix}</p>
+          {#if signInGuidance.href}
+            <a class="sg-link" href={signInGuidance.href} onclick={closeSignIn}>{signInGuidance.linkLabel} →</a>
+          {/if}
+          <p class="sg-code">Reason code: <code>{signInGuidance.code}</code></p>
+        </div>
+      {/if}
       <p class="signin-foot">Your key is encrypted in this instance’s vault and never leaves this device.</p>
     </div>
   </div>
@@ -711,7 +795,14 @@
   .eyebrow { color:var(--accent); font-size:0.7rem; font-weight:750; letter-spacing:0.08em; margin:0 0 0.25rem; text-transform:uppercase; }
   .setup-meter { min-width:9rem; text-align:right; }
   .setup-meter strong { display:block; font-size:1.35rem; }
+  .setup-meter strong .of { color:var(--text-3); font-size:0.9rem; font-weight:500; }
   .setup-meter span { color:var(--text-3); font-size:0.75rem; }
+  .setup-meter .total-spend { color:var(--text-2); font-size:0.78rem; margin:0.35rem 0 0; }
+  .usage-strip { border-top:1px solid var(--border); margin-top:0.7rem; padding-top:0.6rem; }
+  .usage-line { align-items:baseline; color:var(--text-2); display:flex; font-size:0.8rem; gap:0.75rem; justify-content:space-between; }
+  .usage-line strong { color:var(--text-1); }
+  .usage-note { color:var(--text-3); font-size:0.72rem; margin:0.35rem 0 0; }
+  .row-usage { color:var(--text-3); font-size:0.78rem; grid-column:1 / -1; }
   .meter-track { background:var(--neutral-soft); border-radius:var(--r-pill); height:0.42rem; margin-top:0.35rem; overflow:hidden; }
   .meter-track span { background:var(--accent); border-radius:inherit; display:block; height:100%; }
 
@@ -780,6 +871,13 @@
   .signin-connect { flex:1; background:var(--brand); border-color:var(--brand); color:#fff; }
   .signin-connect:hover:not(:disabled) { background:color-mix(in srgb, var(--brand) 88%, #000); border-color:color-mix(in srgb, var(--brand) 88%, #000); }
   .signin-foot { margin:0.4rem 0 0; text-align:center; color:var(--text-3); font-size:0.7rem; }
+  .signin-guidance { background:var(--warn-soft); border:1px solid var(--warn-border); border-radius:var(--r-sm); display:grid; gap:0.35rem; padding:0.7rem 0.8rem; }
+  .signin-guidance p { margin:0; font-size:0.8rem; line-height:1.45; overflow-wrap:anywhere; }
+  .signin-guidance code { overflow-wrap:anywhere; }
+  .sg-message { color:var(--text-1); font-weight:600; }
+  .sg-fix { color:var(--text-2); }
+  .sg-link { color:var(--accent); font-size:0.8rem; font-weight:600; }
+  .sg-code { color:var(--text-3); font-size:0.72rem; }
 
   /* ── Details modal ── */
   .details-overlay { align-items:center; background:color-mix(in srgb, #000 45%, transparent); display:flex; inset:0; justify-content:center; padding:var(--space-4); position:fixed; z-index:30; }

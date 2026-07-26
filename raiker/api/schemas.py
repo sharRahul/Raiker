@@ -152,6 +152,22 @@ class SetModelSelectionRequest(BaseModel):
     model: str | None = None
 
 
+class ModelPriceRequest(BaseModel):
+    """An owner's price override for one model, quoted per million tokens.
+
+    Both rates null clears the override and returns the model to the
+    provider-published or shipped list price. Rates are strings so a decimal
+    price survives the round trip without binary float drift.
+    """
+
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    model: str
+    input_per_mtok: str | None = None
+    output_per_mtok: str | None = None
+    currency: str | None = None
+
+
 class ModelConnectionRequest(BaseModel):
     """Encrypted per-user endpoint/key data for one model profile."""
 

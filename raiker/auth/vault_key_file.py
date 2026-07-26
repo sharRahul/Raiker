@@ -58,6 +58,28 @@ def clear_vault_key(workspace_root: str | Path) -> None:
         path.unlink()
 
 
+def ensure_vault_key(workspace_root: str | Path) -> str:
+    """Return this workspace's vault key, generating one if there is none.
+
+    The vault key is a locally generated encryption key, not a passphrase the
+    owner chooses or needs to remember. Blocking a credential save until they
+    visit Settings and press "Generate key" produced `connector_vault_key_unset`
+    for no security gain — the generated key is the same either way. Provision
+    it on first use instead, at 0600, and leave Settings owning rotation and
+    removal.
+
+    An existing key (file or environment) is never replaced: silently rotating a
+    key would orphan every credential already encrypted under it.
+    """
+    existing = effective_vault_key(workspace_root)
+    if existing:
+        return existing
+    generated = Fernet.generate_key().decode("ascii")
+    write_vault_key(workspace_root, generated)
+    load_vault_key_into_env(workspace_root)
+    return generated
+
+
 def load_vault_key_into_env(workspace_root: str | Path) -> None:
     """Populate the env var from the key-file when the env is unset and valid."""
     if os.environ.get(VAULT_KEY_ENV, "").strip():

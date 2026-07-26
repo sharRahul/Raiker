@@ -15,6 +15,8 @@ _PREFIXES = {
     # Checkpoint pre-image capture manifest entry (Workstream B / B1).
     "ckcap_",
     "task_",
+    # One row of per-turn token accounting in the model usage ledger.
+    "usage_",
     "appr_",
     "memcand_",
     "ver_",

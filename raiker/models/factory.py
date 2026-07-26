@@ -137,11 +137,29 @@ class ModelProviderFactory:
             raise ProviderPolicyError("private_network_provider_requires_explicit_policy")
         if endpoint_kind == "remote_hosted" and not self.allow_hosted_provider:
             raise ProviderPolicyError("hosted_provider_requires_explicit_policy")
-        # Off-machine endpoints must also be on the owner egress allowlist —
-        # fail closed even when the capability gate / runtime policy allows them.
-        saved_host = urlparse(str(self.connection.get("endpoint", ""))).hostname if self.connection else None
-        saved_allowlist = frozenset({saved_host.lower()}) if saved_host else None
-        enforce_model_egress(endpoint, kind=endpoint_kind, configured_allowlist=saved_allowlist)
+        # Egress for a provider the owner has configured.
+        #
+        # Raiker is owner-authoritative and monitored, not prevention-by-
+        # restriction (docs/HANDOFF.md, "Security posture"). Saving a credential
+        # for a provider is a deliberate, authenticated act; making the owner
+        # then discover a *separate* environment allowlist before the host they
+        # just chose can be reached is exactly the wall that posture rejects.
+        #
+        # So a configured connection authorises this profile's own resolved
+        # endpoint — and only that endpoint, never a blanket opening. The
+        # environment allowlist stays available for pre-authorising hosts ahead
+        # of configuration, and an unconfigured profile still falls back to it
+        # and fails closed without one. Every request remains policy-checked,
+        # audited, and stoppable.
+        configured_allowlist: frozenset[str] | None = None
+        if self.connection:
+            saved_host = urlparse(str(self.connection.get("endpoint", ""))).hostname
+            effective_host = urlparse(endpoint).hostname
+            hosts = {host.lower() for host in (saved_host, effective_host) if host}
+            configured_allowlist = frozenset(hosts) if hosts else None
+        enforce_model_egress(
+            endpoint, kind=endpoint_kind, configured_allowlist=configured_allowlist
+        )
         if provider == "openrouter" and raw.get("default_state") == "enabled":
             raise ProviderPolicyError("openrouter_must_not_be_enabled_by_default")
         headers: dict[str, str] = {}

@@ -20,6 +20,7 @@
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
   import RepoConnector from "../components/RepoConnector.svelte";
   import { api, ApiError, streamPrompt } from "../api";
   import type {
@@ -27,6 +28,7 @@
     ApprovalView,
     CodeRepo,
     CodeReposView,
+    ContextUsage,
     ModelProfile,
     ProjectsList,
     StreamEvent,
@@ -65,6 +67,35 @@
   let turns = $state<BuildTurn[]>([]);
   let streaming = $state(false);
   let sessionId = $state<string | null>(null);
+  // Build runs the same governed turns as Chat against the same providers, so
+  // it gets the same read-only context and spend panel rather than a variant.
+  let contextOpen = $state(false);
+  let contextUsage = $state<ContextUsage | null>(null);
+  // Roughly four characters per token — a deliberately coarse local fallback,
+  // always labelled as an estimate, used only until the server reports real
+  // provider usage for this session.
+  const estimatedContextTokens = $derived(
+    Math.ceil(
+      (promptText.length +
+        turns.reduce(
+          (total, turn) => total + turn.prompt.length + (turn.response?.message?.length ?? 0),
+          0,
+        )) /
+        4,
+    ),
+  );
+
+  async function refreshContextUsage() {
+    if (sessionId === null) {
+      contextUsage = null;
+      return;
+    }
+    try {
+      contextUsage = await api.sessionContextUsage(sessionId);
+    } catch {
+      contextUsage = null;
+    }
+  }
   let nextId = 1;
   let scrollEl: HTMLDivElement | undefined = $state();
   let promptEl: HTMLTextAreaElement | undefined = $state();
@@ -109,6 +140,9 @@
   let profiles = $state<ModelProfile[]>([]);
   let modelProfile = $state("");
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
+  const activeProfile = $derived(
+    profiles.find((profile) => profile.profile_id === modelProfile) ?? selectedProfile,
+  );
 
   onMount(() => {
     void loadRepos();
@@ -234,6 +268,7 @@
           if (event.kind === "final" && event.response !== null) {
             turn.response = event.response;
             sessionId = event.response.session_id;
+            if (contextOpen) void refreshContextUsage();
             window.dispatchEvent(new Event("raiker:chats-changed"));
             void applyPendingProject();
             void loadApprovals();
@@ -595,6 +630,26 @@
                 </option>
               {/each}
             </select>
+
+            <div class="context-wrap">
+              <button
+                type="button"
+                class="bar-select context-trigger"
+                aria-label="Context window"
+                aria-expanded={contextOpen}
+                onclick={() => { contextOpen = !contextOpen; if (contextOpen) void refreshContextUsage(); }}
+              >
+                Context
+              </button>
+              {#if contextOpen}
+                <ContextMeterPopover
+                  usedTokens={estimatedContextTokens}
+                  contextWindowTokens={activeProfile?.context_window_tokens ?? null}
+                  estimated={true}
+                  usage={contextUsage}
+                />
+              {/if}
+            </div>
 
             <button
               type="submit"

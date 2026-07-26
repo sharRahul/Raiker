@@ -16,18 +16,29 @@
 - Permission changes use existing authorized/audited capability decision modes; no unrestricted mode is added.
 - Governance evidence stays in Sessions/Checkpoints, not normal chat bubbles.
 
-## Implementation status (2026-07-26)
+## Implementation status (2026-07-26, updated)
 
-The configured-profile selector, conservative transcript estimate, read-only
-context popover, and global permission control are implemented. The selector
-does not expose provider catalogues or arbitrary model ids. The current context
-meter is explicitly an estimate derived from chat text because no configured
-profile currently supplies a trusted capacity/usage source.
+The configured-profile selector, read-only context popover, and global
+permission control were already implemented. The selector does not expose
+provider catalogues or arbitrary model ids.
 
-The following remain open and must not be represented as shipped: provider
-token/accounting data, configured pricing and local-currency display, weekly
-quota data, a session usage endpoint, and automatic 90% compaction. The
-checkboxes below remain the source of truth for those unimplemented steps.
+**Now also implemented** (see
+`../specs/2026-07-26-model-cost-accounting-design.md`):
+
+- Provider-reported token usage, persisted per turn in `model_usage_ledger`
+  and served by `GET /api/sessions/{id}/context-usage`. The transcript estimate
+  remains only as the pre-first-turn fallback and stays labelled as an estimate.
+- Context capacity resolved per model, preferring what the provider publishes
+  (Anthropic's `max_input_tokens`) over anything configured.
+- Configured pricing with owner override and provider-published prices where
+  they exist, each fact naming its source; cost for the current chat and the
+  provider's all-time total, in both Chat and Build.
+- The same controls in the Build composer, not only Chat.
+
+**Still open and not to be represented as shipped:** weekly quota data, local
+currency conversion, automatic 90% compaction, and a Settings form for price
+overrides (the route and storage exist; the UI does not). The checkboxes below
+remain the source of truth for those steps.
 
 ---
 

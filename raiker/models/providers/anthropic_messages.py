@@ -229,8 +229,16 @@ class AsyncAnthropicMessagesProvider:
         models: list[ProviderModelInfo] = []
         for item in raw:
             if isinstance(item, dict) and isinstance(item.get("id"), str):
+                # Anthropic publishes the usable context window per model
+                # (`max_input_tokens`), so capacity never has to be guessed or
+                # pinned in config. It publishes no price.
+                metadata: dict[str, Any] = {}
+                for key in ("max_input_tokens", "max_tokens"):
+                    value = item.get(key)
+                    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                        metadata[key] = value
                 models.append(
-                    ProviderModelInfo(id=item["id"], owned_by="anthropic", metadata={})
+                    ProviderModelInfo(id=item["id"], owned_by="anthropic", metadata=metadata)
                 )
         return models
 

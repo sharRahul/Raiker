@@ -127,6 +127,8 @@ from raiker.storage.migrations import (
     MODEL_FALLBACK_SEQUENCE_SQL,
     MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
     MODEL_SESSION_RESOLVED_MODEL_SQL,
+    MODEL_USAGE_LEDGER_MIGRATION_ID,
+    MODEL_USAGE_LEDGER_SQL,
     OWNED_CONTEXT_DATA_MIGRATION_ID,
     OWNED_CONTEXT_DATA_SQL,
     OWNED_MEMORY_METADATA_MIGRATION_ID,
@@ -686,6 +688,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 SUBAGENT_BUDGETS_MIGRATION_ID, SUBAGENT_BUDGETS_SQL, connection
             )
             self._apply_migration(CODE_REPOS_MIGRATION_ID, CODE_REPOS_SQL, connection)
+            self._apply_migration(
+                MODEL_USAGE_LEDGER_MIGRATION_ID, MODEL_USAGE_LEDGER_SQL, connection
+            )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",

@@ -20,6 +20,21 @@ def put_model_connection(
     ConnectorVault(store).put(principal_id, f"{_PREFIX}{profile_id}", values)
 
 
+def list_model_connections(store: SQLiteStore, principal_id: str) -> list[str]:
+    """Profile ids this principal has saved a connection for.
+
+    Reads ids only — never a credential value — because callers use this to
+    answer "has the owner configured this provider", not to obtain the secret.
+    """
+    with store.connect() as connection:
+        rows = connection.execute(
+            "SELECT connector_id FROM connector_credentials "
+            "WHERE principal_id=? AND connector_id LIKE ?",
+            (principal_id, f"{_PREFIX}%"),
+        ).fetchall()
+    return [str(row[0])[len(_PREFIX) :] for row in rows if str(row[0]).startswith(_PREFIX)]
+
+
 def clear_model_connection(store: SQLiteStore, principal_id: str, profile_id: str) -> None:
     with store.connect() as connection:
         connection.execute(

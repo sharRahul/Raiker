@@ -178,7 +178,41 @@ export interface ModelProfile {
   connection_configured?: boolean;
   prompt_cache_ttl: string | null;
   context_window_tokens?: number | null;
+  /** "provider" | "config" — which source supplied the capacity above. */
+  context_window_source?: string | null;
   configured?: boolean;
+  /** Only API-key providers can accrue an API bill; local runtimes cannot. */
+  billable?: boolean;
+  models_used?: number;
+  turns_used?: number;
+  total_tokens?: number;
+  /** Decimal string, or null when no price is resolvable. Never "0" for unknown. */
+  total_cost?: string | null;
+  cost_currency?: string | null;
+  price_source?: string | null;
+  price_as_of?: string | null;
+}
+
+/** Token usage and API cost for one conversation. Every figure names its source. */
+export interface ContextUsage {
+  session_id: string;
+  profile_id: string | null;
+  provider: string | null;
+  model: string | null;
+  used_tokens: number | null;
+  context_window_tokens: number | null;
+  context_window_source: string | null;
+  /** "provider" once a turn has run, else "unavailable". */
+  usage_source: string;
+  billable: boolean;
+  session_cost: string | null;
+  provider_total_cost: string | null;
+  currency: string | null;
+  price_source: string | null;
+  price_as_of: string | null;
+  session_turns: number;
+  session_input_tokens: number;
+  session_output_tokens: number;
 }
 
 export interface ModelsView {

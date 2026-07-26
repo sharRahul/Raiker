@@ -140,6 +140,13 @@ EVENT_TYPES = {
     # payload is redacted metadata only (name, transport, host) — never a token.
     "mcp_connection_added",
     "mcp_connection_removed",
+    # A repository reference was connected to, or removed from, the Build
+    # workspace: a workspace-contained local subpath, or a GitHub `owner/repo`
+    # coordinate. The payload is the reference only — never a credential — and
+    # the reference grants nothing: local paths stay workspace-contained, and
+    # GitHub reads stay governed by the `connector_github_runtime` gate.
+    "code_repo_connected",
+    "code_repo_disconnected",
     # Per-session MCP monitoring (Phase B). A governed MCP session completed —
     # redacted telemetry only (counts, hosts, byte totals, outcome). An anomaly
     # rule tripped — a redacted finding was raised (never a payload or token).

@@ -32,6 +32,7 @@ keyboard navigation.
 | Page | What it covers |
 | --- | --- |
 | Chat | Streaming governed turns (SSE), per-prompt options (provider + model picked from the provider's live catalogue, planning, tool budget), workspace path attachments (bounded, untrusted-labelled, workspace-scoped fail-closed), inline needs-approval hand-off |
+| Build | Coding workspace: Plan/Edit/Auto composer modes backed by per-capability decision modes (`deny`/`ask`/`auto`) plus the per-turn planning option, repository references (workspace-contained folder, or a GitHub `owner/repo` coordinate read through the governed connector), inline accept/reject for pending changes, a collapsible background-work rail, scheduled agents, and filing the chat into a project |
 | Approvals | Pending/approved/denied inbox, redacted diff/argument previews, metadata-only resolution |
 | Tasks | Active tasks with progress + safe-boundary stop, task history |
 | Sessions | Session browser → turns → per-turn governed events |
@@ -64,6 +65,11 @@ isolated here and does not affect the Python package or its `ruff`/`mypy`/`pytes
 
 The typed API client lives in `src/lib/api.ts` / `src/lib/apiTypes.ts`; the backend contract test
 `tests/test_api_contract_schemas.py` guards the response keys the client reads.
+
+The Build workspace's mode mapping and cadence list are pure modules
+(`src/lib/buildModes.ts`, `src/lib/agentCadence.ts`) so the posture a label
+promises is unit-tested apart from the view. See
+[docs/BUILD_WORKSPACE_SPEC.md](../../docs/BUILD_WORKSPACE_SPEC.md).
 
 Shared presentational primitives live in `src/lib/components/`: `PageState`,
 `ResponsivePage`, `SessionMenu`, and `ToolControlBoard`. They only render server

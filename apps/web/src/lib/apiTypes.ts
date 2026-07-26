@@ -271,6 +271,36 @@ export interface ProjectsList {
   active_project_id: string | null;
 }
 
+/**
+ * One repository the Build workspace can point a coding chat at. A reference
+ * only: it carries no credential and grants no capability. A `local` repository
+ * is a workspace-contained subpath; a `github` repository is an `owner/repo`
+ * coordinate read through the brokered `github_read` tool.
+ */
+export interface CodeRepo {
+  repo_id: string;
+  kind: "local" | "github";
+  label: string;
+  selected: boolean;
+  created_at: string;
+  local_subpath: string | null;
+  local_exists: boolean;
+  github_owner: string | null;
+  github_repo: string | null;
+  branch: string | null;
+}
+
+export interface CodeReposView {
+  repos: CodeRepo[];
+  selected_repo_id: string | null;
+  // What the connector_github_runtime gate currently permits, so the page can
+  // say whether a connected GitHub repository is actually readable.
+  github_gate_state: string;
+  github_decision_mode: string;
+  github_token_configured: boolean;
+  note: string;
+}
+
 export interface ProjectDetail {
   project: ProjectView;
   sessions: SessionSummary[];

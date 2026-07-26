@@ -69,6 +69,14 @@ PROJECT_VIEW = {
     "parent_id", "path", "is_archived", "archived_at",
 }
 PROJECTS_LIST = {"projects", "active_project_id"}
+CODE_REPO = {
+    "repo_id", "kind", "label", "selected", "created_at", "local_subpath", "local_exists",
+    "github_owner", "github_repo", "branch",
+}
+CODE_REPOS_VIEW = {
+    "repos", "selected_repo_id", "github_gate_state", "github_decision_mode",
+    "github_token_configured", "note",
+}
 MEMORY_CONTROL = {
     "memory_id", "text", "scope", "sensitivity", "memory_type", "created_at", "tags",
     "source", "provenance", "confidence", "trust_score", "retention", "approval_state",
@@ -227,6 +235,14 @@ class TestListContracts:
         listing = client.get("/api/projects", headers=h).json()
         _assert_contract(PROJECTS_LIST, listing, "ProjectsList")
         _assert_contract(PROJECT_VIEW, listing["projects"][0], "ProjectView")
+
+    def test_code_repos(self, workspace: Path, client: TestClient) -> None:
+        h = _headers(_token(client))
+        (workspace / "projects" / "app").mkdir(parents=True)
+        client.post("/api/code/repos", json={"kind": "local", "path": "projects/app"}, headers=h)
+        view = client.get("/api/code/repos", headers=h).json()
+        _assert_contract(CODE_REPOS_VIEW, view, "CodeReposView")
+        _assert_contract(CODE_REPO, view["repos"][0], "CodeRepo")
 
     def test_memories(self, workspace: Path, client: TestClient) -> None:
         write_memory(

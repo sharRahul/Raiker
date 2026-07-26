@@ -8,6 +8,7 @@ import type {
   CapabilityDecisionMode,
   CapabilityGate,
   Checkpoint,
+  CodeReposView,
   CredentialLifecycle,
   ConnectionsView,
   ConnectorStoreView,
@@ -501,6 +502,34 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ incognito }),
     }),
+
+  // ── Build workspace repositories ────────────────────────────────────────
+  // References only. A local folder must resolve inside the workspace (fail
+  // closed server-side); a GitHub repository records an `owner/repo` coordinate
+  // and performs no network call — its content still reaches a turn through the
+  // brokered `github_read` tool under the connector_github_runtime gate.
+  codeRepos: () => request<CodeReposView>("/api/code/repos"),
+  connectLocalRepo: (path: string) =>
+    postJson<{ ok: boolean; repo_id: string; local_subpath: string }>("/api/code/repos", {
+      kind: "local",
+      path,
+    }),
+  connectGithubRepo: (owner: string, repo: string, branch?: string) =>
+    postJson<{ ok: boolean; repo_id: string; label: string; branch: string | null }>(
+      "/api/code/repos",
+      { kind: "github", owner, repo, branch: branch || null },
+    ),
+  selectCodeRepo: (repo_id: string | null) =>
+    request<{ ok: boolean; selected_repo_id: string | null }>("/api/code/repos/selection", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repo_id }),
+    }),
+  disconnectCodeRepo: (repoId: string) =>
+    request<{ ok: boolean; repo_id: string }>(
+      `/api/code/repos/${encodeURIComponent(repoId)}`,
+      { method: "DELETE" },
+    ),
 
   // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
   projects: () => request<ProjectsList>("/api/projects"),

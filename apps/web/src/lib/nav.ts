@@ -10,6 +10,7 @@ export const NAV_GROUPS: NavGroup[] = [
   { label: "Home", items: [{ id: "home", label: "Workbench", icon: "spark", hint: "Resume governed work and see what needs attention" }] },
   { label: "Work", items: [
     { id: "new-chat", label: "Chat", icon: "chat", hint: "Start or continue a governed conversation" },
+    { id: "build", label: "Build", icon: "code", hint: "Code against a repository with Plan, Edit, and Auto" },
     { id: "search-chat", label: "Search Chat", icon: "search", hint: "Search your chat history" },
     { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
     { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },

@@ -188,6 +188,33 @@ class BrainSourceRequest(BaseModel):
     path: str
 
 
+class ConnectCodeRepoRequest(BaseModel):
+    """Reference a repository from the Build workspace.
+
+    ``kind="local"`` needs ``path`` — a folder already inside this Raiker
+    workspace; anything resolving outside it is refused server-side.
+    ``kind="github"`` needs ``owner`` and ``repo`` and performs no network call:
+    it records the coordinate, and reads still run through the brokered
+    ``github_read`` tool under the ``connector_github_runtime`` gate.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["local", "github"]
+    path: str | None = None
+    owner: str | None = None
+    repo: str | None = None
+    branch: str | None = None
+
+
+class SelectCodeRepoRequest(BaseModel):
+    """Point the Build workspace at one repository, or at none with ``null``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    repo_id: str | None = None
+
+
 class InstanceCreateRequest(BaseModel):
     """Name and optional first account for a locally isolated Raiker instance."""
 

@@ -10,6 +10,7 @@
   import type { ProjectsList } from "./lib/apiTypes";
   import LoginView from "./lib/views/LoginView.svelte";
   import ChatView from "./lib/views/ChatView.svelte";
+  import BuildView from "./lib/views/BuildView.svelte";
   import SearchChatView from "./lib/views/SearchChatView.svelte";
   import MemoryView from "./lib/views/MemoryView.svelte";
   import ProjectsView from "./lib/views/ProjectsView.svelte";
@@ -33,10 +34,15 @@
     typeof window === "undefined" ? null : tabFromHash(window.location.hash),
   );
   let chatVisited = $state(false);
+  // Build keeps its transcript, its unsent draft, and its streaming turn alive
+  // across route visits for the same reason Chat does: a coding conversation is
+  // long-running, and stepping over to Approvals must not throw it away.
+  let buildVisited = $state(false);
   const activeItem = $derived(navItem(current));
 
   $effect(() => {
     if (current === "new-chat") chatVisited = true;
+    if (current === "build") buildVisited = true;
   });
 
   // Honest auth/bootstrap state machine. The workspace shell mounts only in
@@ -143,6 +149,11 @@
             <ChatView sessionId={continuedSessionId} />
           </div>
         {/if}
+        {#if buildVisited}
+          <div hidden={current !== "build"}>
+            <BuildView {projects} onProjectsChanged={refreshProjects} />
+          </div>
+        {/if}
         {#if current === "home"}
           <WorkbenchView />
         {:else if current === "search-chat"}
@@ -171,7 +182,7 @@
             sessionId={continuedSessionId}
             projectId={activeProjectId}
           />
-        {:else if current !== "new-chat"}
+        {:else if current !== "new-chat" && current !== "build"}
           <SettingsView {principal} />
         {/if}
       </ResponsivePage>

@@ -12,6 +12,8 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 | `tool_started` | A governed executor started work |
 | `tool_completed` | A governed executor completed work |
 | `tool_failed` | A governed executor failed safely |
+| `code_repo_connected` | A repository reference was added to the Build workspace (workspace-relative subpath, or a GitHub `owner/repo` coordinate) |
+| `code_repo_disconnected` | A repository reference was removed; the folder and the remote are untouched |
 | `checkpoint_created` | The gateway recorded a turn checkpoint |
 | `turn_closed` | The gateway finalised a turn |
 | `phase3.external_channels_notifications.readiness.metadata_defined` | External-channel readiness metadata was defined; runtime dispatch events are introduced only with a governed executor |

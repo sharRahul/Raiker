@@ -1,44 +1,34 @@
-# Raiker Documentation
+# Raiker documentation
 
-Raiker is a security-first AI agent that connects to any backend LLM — local,
-home-lab, or hosted — while keeping every capability governed, integrated gates default-ask,
-and no-executor capabilities fail-closed. This is the documentation home.
-
-The user-facing guide lives under [`guide/`](guide/) and is organized into seven
-sections (Claude-Code-docs style). Each section has an index page plus focused
-sub-pages; the machine-readable navigation is [`guide/manifest.json`](guide/manifest.json),
-which the web dashboard's Docs/Help panel can render. The canonical detailed
-documents (executor spec, threat models, implementation ledger, …) stay at the
-`docs/` root and remain the source of truth.
-
-| Section | Index | About |
-|---|---|---|
-| **Getting Started** | [guide/getting-started.md](guide/getting-started.md) | Install → bootstrap → model → first governed action |
-| **Core Concepts** | [guide/core-concepts.md](guide/core-concepts.md) | The governance model, one concept per page |
-| **Use Raiker** | [guide/use-raiker.md](guide/use-raiker.md) | Surfaces, commands, and everyday workflows |
-| **Platform & Integrations** | [guide/platform-integrations.md](guide/platform-integrations.md) | Models, channels, execution environments, plugins |
-| **Capabilities** | [guide/capabilities.md](guide/capabilities.md) | The capability model, tiers, and catalog |
-| **Implementation** | [guide/implementation.md](guide/implementation.md) | Sources of truth, slice discipline, validation |
-| **Best Practices** | [guide/best-practices.md](guide/best-practices.md) | Staying safe as you grant power |
+This is the entry point for Raiker's current product documentation. The core
+references below describe how the runtime behaves today; specialist security,
+executor, licensing, and threat-model documents remain available where they
+define active constraints or verification requirements. Historical plans,
+superseded guides, and screenshots are not maintained here.
 
 ## Start here
 
-1. **[Getting Started](guide/getting-started.md)** — install, bootstrap the
-   owner, connect a model, enable your first capability, run.
-2. **[Core Concepts](guide/core-concepts.md)** — the governed action path,
-   principals and roles, runtime modes, capability gates, decision modes,
-   executors, and audit.
+- [Architecture](ARCHITECTURE.md): components and governed action flow.
+- [Security architecture](SECURITY_ARCHITECTURE.md): trust boundaries and
+  fail-closed controls.
+- [Commands](COMMANDS_AND_INTERACTIVE_MODE_SPEC.md): terminal command surface.
+- [API and contracts](API_AND_CONTRACT_SCHEMAS.md): local web API and data shape.
+- [Implementation status](IMPLEMENTATION_STATUS.md): what is available now.
+- [User-centric zero-trust policy](USER_CENTRIC_ZERO_TRUST_POLICY.md): the
+  owner policy that keeps safe work frictionless without weakening control.
 
-## Canonical references
+## Reference
 
-- **[Implementation Status](IMPLEMENTATION_STATUS.md)** — the control ledger of
-  what is built, verified, or intentionally deferred (source of truth).
-- **[User-Centric Zero Trust Policy](USER_CENTRIC_ZERO_TRUST_POLICY.md)** — the
-  owner's normative security policy and its numbered requirements (ZT-1 …
-  ZT-12), the traceability targets for governance code and tests.
-- **[Runtime Executors Spec](RUNTIME_EXECUTORS_SPEC.md)** — per-capability truth
-  about what can execute today.
-- **[Handoff](HANDOFF.md)** — where the current build effort stands and what is
-  next.
-- **[Desktop Distribution Design](DESKTOP_DISTRIBUTION_DESIGN.md)** — the
-  installer, per-user background service, update, backup, and release design.
+- [Models](MODEL_RUNTIME_AND_LOCAL_INFERENCE.md)
+- [Tools and permissions](TOOLS_AND_PERMISSIONS_SPEC.md)
+- [Tool and plugin catalog](RAIKER_TOOL_AND_PLUGIN_CATALOG.md)
+- [Events](EVENT_CATALOG.md)
+- [Memory governance](MEMORY_GOVERNANCE_RULES.md)
+- [Runtime orchestration](RUNTIME_ORCHESTRATION_SPEC.md)
+- [Runtime executors](RUNTIME_EXECUTORS_SPEC.md)
+- [Security and policy](SECURITY_AND_POLICY.md)
+- [Security threat models](threat-models/)
+- [Licensing policy](licensing/LICENSING_POLICY.md)
+- [Verification](VERIFICATION_PLAN.md)
+- [Local validation](LOCAL_VALIDATION_GATE.md)
+- [Coverage and open gaps](FEATURE_COVERAGE_MATRIX.md)

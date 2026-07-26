@@ -1,15 +1,11 @@
 # Contributing to Raiker
 
-Open an issue for a bug, security concern, or proposed change before substantial
-work. Make focused changes, update relevant documentation, and run the checks
-in `README.md` before opening a pull request.
+Keep changes focused, update the affected canonical documentation, and run the
+validation commands in [docs/LOCAL_VALIDATION_GATE.md](docs/LOCAL_VALIDATION_GATE.md).
 
-You must have the right to submit every contribution. By opening a pull
-request you agree that your contribution is licensed under the
-[Apache License 2.0](LICENSE), the same licence as the project. Raiker does
-not require a Contributor License Agreement or a sign-off trailer.
+Use Python 3.11+, install `.[dev]`, and keep generated caches, build outputs,
+virtual environments, and credentials out of commits. Add or update tests for
+behaviour changes.
 
-Preserve third-party licences, copyright notices, and attribution. Add tests
-for behaviour changes and update user-facing or governance documentation when
-needed. Report vulnerabilities under the process in [SECURITY.md](SECURITY.md),
-not in a public issue.
+Contributions are licensed under the repository's Apache-2.0 license. Report
+security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).

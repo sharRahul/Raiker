@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatTimestamp, groupByDay, humanize, providerName, relativeTime, shortId } from "./format";
+import {
+  formatTimestamp,
+  groupByDay,
+  humanize,
+  isRedacted,
+  providerName,
+  relativeTime,
+  shortId,
+} from "./format";
 
 describe("format helpers", () => {
   it("renders compact relative times", () => {
@@ -61,5 +69,22 @@ describe("format helpers", () => {
     expect(providerName("llama.cpp")).toBe("llama.cpp");
     expect(providerName("something-else")).toBe("something-else");
     expect(providerName(null)).toBe("—");
+  });
+});
+
+// The API redacts secret-shaped values, and a randomly generated record id can
+// be caught by that rule. A redacted id addresses nothing, so views must be
+// able to tell the difference before offering a deep link.
+describe("isRedacted", () => {
+  it("recognises both server redaction markers", () => {
+    expect(isRedacted("[REDACTED_SECRET]")).toBe(true);
+    expect(isRedacted("***REDACTED***")).toBe(true);
+  });
+
+  it("treats a real id and an absent value as not redacted", () => {
+    expect(isRedacted("sess_6cb389a696484e6b906ace63c7d5ad6d")).toBe(false);
+    expect(isRedacted("")).toBe(false);
+    expect(isRedacted(null)).toBe(false);
+    expect(isRedacted(undefined)).toBe(false);
   });
 });

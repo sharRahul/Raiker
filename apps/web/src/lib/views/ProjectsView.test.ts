@@ -246,3 +246,124 @@ describe("ProjectsView", () => {
     await waitFor(() => expect(screen.getByText(/invalid_project_name/)).toBeInTheDocument());
   });
 });
+
+// ── Project context home ──────────────────────────────────────────────────
+// Opening a project shows its files and the work scoped to it. Files are
+// metadata plus provenance — never content — and selecting one links the change
+// back to the turn that made it.
+describe("ProjectsView context home", () => {
+  const DETAIL = {
+    project: project({}),
+    context: { instructions: "", attachment_ids: [], memory_enabled: false, memory_mode: "inherit" },
+    sessions: [],
+    checkpoints: [],
+  };
+
+  const FILES = {
+    project_id: "proj_1",
+    root_subpath: "projects/alpha",
+    root_exists: true,
+    truncated: false,
+    note: "Metadata only. Raiker never serves workspace file content to the browser.",
+    files: [
+      {
+        workspace_path: "projects/alpha/brief.md",
+        name: "brief.md",
+        is_directory: false,
+        size_bytes: 2048,
+        modified_at: "2026-07-24T00:00:00Z",
+        depth: 0,
+      },
+    ],
+    provenance: {
+      "projects/alpha/brief.md": [
+        {
+          turn_id: "turn_9",
+          action_id: "act_9",
+          session_id: "sess_alpha",
+          capability: "filesystem_write",
+          principal_id: "principal_owner",
+          capture_status: "captured",
+          existed_before: true,
+          pre_image_size: 1024,
+          created_at: "2026-07-24T00:00:00Z",
+        },
+      ],
+    },
+  };
+
+  function routes(overrides: Record<string, unknown> = {}) {
+    return {
+      "GET /api/projects": { projects: [project({})], active_project_id: null },
+      "GET /api/projects/tree": [],
+      "GET /api/projects/proj_1": DETAIL,
+      "GET /api/projects/proj_1/files": FILES,
+      "GET /api/tasks": [],
+      ...overrides,
+    };
+  }
+
+  async function openDetail(routeMap: Record<string, unknown>) {
+    stubFetch(routeMap);
+    render(ProjectsView);
+    await waitFor(() => expect(screen.getByText("Details")).toBeInTheDocument());
+    await fireEvent.click(screen.getByText("Details"));
+  }
+
+  it("lists project files as metadata and flags governed changes", async () => {
+    await openDetail(routes());
+    expect(await screen.findByLabelText("Inspect projects/alpha/brief.md")).toBeInTheDocument();
+    expect(screen.getByText("2.0 KB")).toBeInTheDocument();
+    expect(screen.getByText("governed change")).toBeInTheDocument();
+  });
+
+  it("links a file's provenance back to the session and audit log", async () => {
+    await openDetail(routes());
+    await fireEvent.click(await screen.findByLabelText("Inspect projects/alpha/brief.md"));
+
+    expect(await screen.findByText("Provenance")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /session sess_alpha/i })).toHaveAttribute(
+      "href",
+      "#/sessions?session=sess_alpha",
+    );
+    expect(screen.getByRole("link", { name: /turn_9 in the audit log/i })).toHaveAttribute(
+      "href",
+      "#/observe?tab=activity&session=sess_alpha",
+    );
+  });
+
+  it("states that content is never shown, only what changed", async () => {
+    await openDetail(routes());
+    await fireEvent.click(await screen.findByLabelText("Inspect projects/alpha/brief.md"));
+    expect(
+      await screen.findByText(/shows what changed and who changed it, never the file's contents/i),
+    ).toBeInTheDocument();
+  });
+
+  it("says a file has no recorded governed write rather than implying one", async () => {
+    await openDetail(routes({ "GET /api/projects/proj_1/files": { ...FILES, provenance: {} } }));
+    await fireEvent.click(await screen.findByLabelText("Inspect projects/alpha/brief.md"));
+    expect(
+      await screen.findByText(/no governed write is recorded against this path/i),
+    ).toBeInTheDocument();
+  });
+
+  it("explains a project folder that does not exist on disk yet", async () => {
+    await openDetail(
+      routes({
+        "GET /api/projects/proj_1/files": { ...FILES, root_exists: false, files: [], provenance: {} },
+      }),
+    );
+    expect(await screen.findByText(/does not exist on disk yet/i)).toBeInTheDocument();
+  });
+
+  it("degrades politely when the file listing is unavailable", async () => {
+    const withoutFiles = Object.fromEntries(
+      Object.entries(routes()).filter(([key]) => key !== "GET /api/projects/proj_1/files"),
+    );
+    await openDetail(withoutFiles);
+    expect(await screen.findByText(/files unavailable \(404\)/i)).toBeInTheDocument();
+    // The rest of the project home stays usable.
+    expect(await screen.findByText("Project context")).toBeInTheDocument();
+  });
+});

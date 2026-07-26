@@ -2,8 +2,9 @@
   import Icon from "../components/Icon.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
+  import SidePanel from "../components/SidePanel.svelte";
   import { api, ApiError } from "../api";
-  import type { Checkpoint } from "../apiTypes";
+  import type { Checkpoint, RestorePlan } from "../apiTypes";
   import { humanize, relativeTime, shortId } from "../format";
 
   // When a project is active (topbar switcher) the list is scoped to it.
@@ -38,6 +39,51 @@
   const types = $derived(
     checkpoints === null ? [] : [...new Set(checkpoints.map((cp) => cp.checkpoint_type))].sort(),
   );
+
+  // ── Restore preflight ────────────────────────────────────────────────
+  // Restoring to a checkpoint is deliberately a funnel, not a button. Step one
+  // reads a server-computed, metadata-only plan: which files would be rewritten,
+  // deleted, or skipped, and whether any of them were last changed by another
+  // principal. Reading the plan performs no restore, and this view never claims
+  // one happened — execution belongs to the governed approval path.
+  let planFor = $state<Checkpoint | null>(null);
+  let plan = $state<RestorePlan | null>(null);
+  let planError = $state<string | null>(null);
+  let planBusy = $state(false);
+  let acknowledged = $state(false);
+
+  const escalates = $derived(plan?.touches_other_principal === true);
+
+  async function openPreflight(checkpoint: Checkpoint) {
+    planFor = checkpoint;
+    plan = null;
+    planError = null;
+    acknowledged = false;
+    planBusy = true;
+    try {
+      plan = await api.checkpointRestorePlan(checkpoint.checkpoint_id);
+    } catch (e) {
+      planError =
+        e instanceof ApiError
+          ? `Could not compute the restore plan (${e.status}).`
+          : "Could not compute the restore plan.";
+    } finally {
+      planBusy = false;
+    }
+  }
+
+  function closePreflight() {
+    planFor = null;
+    plan = null;
+    planError = null;
+    acknowledged = false;
+  }
+
+  function opLabel(op: string): string {
+    if (op === "restore_content") return "Rewrite to its checkpoint state";
+    if (op === "delete") return "Delete — it did not exist at the checkpoint";
+    return "Skipped — too large to have been captured";
+  }
 
   async function load() {
     loadError = null;
@@ -135,6 +181,14 @@
                   </dd>
                 </div>
               </dl>
+              <button
+                type="button"
+                class="btn btn-sm preflight-btn"
+                onclick={() => openPreflight(cp)}
+                aria-label={`Preview what restoring to checkpoint ${shortId(cp.checkpoint_id)} would change`}
+              >
+                Preview restore impact
+              </button>
             </div>
           </li>
         {/each}
@@ -142,6 +196,86 @@
     </section>
   {/each}
 {/if}
+
+<SidePanel
+  open={planFor !== null}
+  title="Restore preflight"
+  subtitle={planFor ? `Checkpoint ${shortId(planFor.checkpoint_id)}` : null}
+  onclose={closePreflight}
+  scrollIntoViewOnOpen
+>
+  {#if planBusy}
+    <PageState state="loading" title="Computing what a restore would change…" />
+  {:else if planError}
+    <PageState state="error" title="Preflight unavailable" detail={planError} />
+  {:else if plan}
+    <p class="preflight-lead">
+      Restoring rewinds every workspace file changed after this checkpoint back to the state it had
+      then. Reading this plan changed nothing — it is a preview computed from stored metadata.
+    </p>
+    <div class="impact">
+      <span><strong>{plan.restore_content_count}</strong> to rewrite</span>
+      <span><strong>{plan.delete_count}</strong> to delete</span>
+      <span><strong>{plan.skip_count}</strong> skipped</span>
+      <span><strong>{plan.changed_count}</strong> changed since</span>
+    </div>
+
+    {#if plan.files.length === 0}
+      <p class="quiet">
+        No captured file changes after this checkpoint, so a restore would rewind nothing.
+      </p>
+    {:else}
+      <ul class="affected">
+        {#each plan.files as file (file.workspace_path)}
+          <li class:changed={file.changed}>
+            <span class="path mono">{file.workspace_path}</span>
+            <span class="op">{opLabel(file.op)}</span>
+            {#if file.changed_by_other_principal}
+              <span class="escalation">Last changed by a different principal</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
+    {#if escalates}
+      <div class="notice notice-danger" role="alert">
+        <Icon name="warning" size={16} />
+        <span>
+          This restore would overwrite work last changed by a different principal. That is a
+          cross-principal escalation and the runtime requires an explicit approval for it.
+        </span>
+      </div>
+    {/if}
+
+    <div class="undo-facts">
+      <h3>Before you ask for this</h3>
+      <ul>
+        <li>The restore itself is captured, so it can be rewound the same way.</li>
+        <li>Skipped files are left exactly as they are — they were never captured.</li>
+        <li>
+          Every step is written to the append-only record.
+          <a href={`#/observe?tab=activity&session=${encodeURIComponent(plan.session_id)}`}>
+            Open this session's audit log
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <label class="ack">
+      <input type="checkbox" bind:checked={acknowledged} />
+      I have read what this would change.
+    </label>
+    <p class="handoff" class:ready={acknowledged}>
+      {acknowledged
+        ? "Ask for the restore in the conversation that owns this work. The runtime raises it as a governed approval, and it only runs once you approve it there."
+        : "Confirm you have read the impact above to see how to request the restore."}
+    </p>
+    <p class="quiet">
+      This panel cannot start a restore. Raiker never executes one from a read-only view.
+    </p>
+  {/if}
+</SidePanel>
 
 <style>
   .head-row {
@@ -255,6 +389,87 @@
     margin: 0;
     font-size: 0.8rem;
     color: var(--text-2);
+  }
+  .preflight-btn {
+    margin-top: var(--space-3);
+  }
+  .preflight-lead {
+    margin: 0;
+    color: var(--text-2);
+  }
+  .impact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    font-size: 0.8rem;
+    color: var(--text-2);
+  }
+  .impact strong {
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .affected {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+    max-height: 16rem;
+    overflow: auto;
+  }
+  .affected li {
+    display: grid;
+    gap: 0.1rem;
+    border-left: 2px solid var(--border);
+    padding: 0.2rem 0 0.2rem 0.55rem;
+  }
+  .affected li.changed {
+    border-left-color: var(--warn);
+  }
+  .path {
+    overflow-wrap: anywhere;
+    font-size: 0.78rem;
+  }
+  .op {
+    color: var(--text-3);
+    font-size: 0.75rem;
+  }
+  .escalation {
+    color: var(--danger);
+    font-size: 0.75rem;
+    font-weight: 650;
+  }
+  .undo-facts h3 {
+    margin: 0 0 0.3rem;
+    font-size: 0.82rem;
+  }
+  .undo-facts ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    color: var(--text-2);
+    font-size: 0.8rem;
+    display: grid;
+    gap: 0.2rem;
+  }
+  .ack {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+  }
+  .handoff {
+    margin: 0;
+    color: var(--text-3);
+    font-size: 0.8rem;
+  }
+  .handoff.ready {
+    color: var(--text-1);
+  }
+  .quiet {
+    color: var(--text-3);
+    font-size: 0.78rem;
+    margin: 0;
   }
   @media (max-width: 720px) {
     .head-row {

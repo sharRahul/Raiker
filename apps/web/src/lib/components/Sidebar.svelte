@@ -18,7 +18,10 @@
   let moveOpen = $state(false);
   let busy = $state(false);
   let actionError = $state<string | null>(null);
-  const phoneNavItems = ["home", "new-chat", "approvals", "connections"].map(navItem);
+  // Narrow-screen primary navigation: the workbench, the work itself, the
+  // decisions blocking it, and the operational record — plus More for the rest.
+  // The master stop stays in the context bar and is never behind this drawer.
+  const phoneNavItems = ["home", "new-chat", "approvals", "observe"].map(navItem);
   let navigationOpen = $state(false);
   let returnFocusTo: HTMLButtonElement | null = null;
   let compactNavigation = $state(false);

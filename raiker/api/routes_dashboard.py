@@ -34,6 +34,7 @@ from raiker.api.schemas import (
 )
 from raiker.api.sessions import ApiSession
 from raiker.control.dashboard import AuthSessionView, DashboardService
+from raiker.control.web_read_models import WebReadModels
 from raiker.models.connections import clear_model_connection, put_model_connection
 from raiker.models.factory import ModelProviderFactory
 from raiker.models.policy_state import provider_runtime_policy_from_gates
@@ -1061,3 +1062,91 @@ async def get_diagnostics(
 ) -> dict[str, Any]:
     _session, principal = _auth_data
     return serialize_dto(_service(request).get_diagnostics(principal.principal_id))
+
+
+# ── Web workbench read models (plan phases 3 and 4) ───────────────────────────
+# Read-only aggregates. None of these mutate the runtime, reach the network,
+# read a credential value, or return workspace file content.
+def _read_models(request: Request) -> WebReadModels:
+    ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
+    return WebReadModels(ws)
+
+
+@router.get("/api/extensions")
+async def get_extensions(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Extension lifecycle as four independent facts per row.
+
+    ``installed``, ``connected``, ``enabled``, and ``usable`` are reported
+    separately so the interface never presents an extension as available on
+    metadata alone; ``blocked_reason`` names the first unmet condition.
+    """
+    session, principal = auth_data
+    return serialize_dto(
+        _read_models(request).extensions_overview(
+            acting_principal_id=session.principal_id,
+            user_id=principal.delegated_by_user_id,
+        )
+    )
+
+
+@router.get("/api/checkpoints/{checkpoint_id}/restore-plan")
+async def get_checkpoint_restore_plan(
+    checkpoint_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Metadata-only preflight for restoring to a checkpoint.
+
+    Computing the plan changes nothing. It reports which files a restore would
+    rewrite, delete, or skip, and whether any of them were last changed by a
+    different principal. Executing a restore still goes through the governed
+    approval path — this endpoint never performs one.
+    """
+    session, principal = auth_data
+    plan = _read_models(request).checkpoint_restore_plan(
+        checkpoint_id,
+        principal_id=session.principal_id,
+        user_id=principal.delegated_by_user_id,
+    )
+    if plan is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown checkpoint: {checkpoint_id}"
+        )
+    return plan
+
+
+@router.get("/api/projects/{project_id}/files")
+async def get_project_files(
+    project_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """List a project's files as metadata plus governed-write provenance.
+
+    File *content* is never served to the browser. Each entry carries a
+    workspace-relative path, size, and modification time; ``provenance`` links a
+    path to the turns and actions that wrote it, so the owner can trace a change
+    back to the approval that allowed it.
+    """
+    _session, principal = auth_data
+    view = _read_models(request).project_files(
+        project_id, user_id=principal.delegated_by_user_id
+    )
+    if view is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown project: {project_id}"
+        )
+    return serialize_dto(view)
+
+
+@router.get("/api/diagnostics/export")
+async def get_diagnostics_export(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """A copyable, redacted support bundle of the runtime's readiness facts."""
+    _session, principal = auth_data
+    return _read_models(request).diagnostics_export(acting_principal_id=principal.principal_id)

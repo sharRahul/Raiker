@@ -12,7 +12,9 @@ import type {
   ConnectionsView,
   ConnectorStoreView,
   Diagnostics,
+  DiagnosticsExport,
   EventEntry,
+  ExtensionsOverview,
   InterruptRequestBody,
   InstanceLaunchResult,
   InterruptResult,
@@ -25,12 +27,14 @@ import type {
   ModelsView,
   PasswordRecoveryBeginResult,
   ProjectDetail,
+  ProjectFilesView,
   ProjectTreeNode,
   ProjectsList,
   PromptRequestBody,
   ProviderModelList,
   ResolveApprovalResult,
   ResolveCriticalApprovalResult,
+  RestorePlan,
   RuntimeMode,
   RuntimeReadiness,
   SecurityHealth,
@@ -420,6 +424,14 @@ export const api = {
       withQuery("/api/checkpoints", { session_id: sessionId, project_id: projectId }),
     ),
   checkpoint: (id: string) => request<Checkpoint>(`/api/checkpoints/${encodeURIComponent(id)}`),
+  // Preflight only. Reading a plan performs no restore; executing one still
+  // goes through the governed approval path.
+  checkpointRestorePlan: (id: string) =>
+    request<RestorePlan>(`/api/checkpoints/${encodeURIComponent(id)}/restore-plan`),
+  extensions: () => request<ExtensionsOverview>("/api/extensions"),
+  projectFiles: (id: string) =>
+    request<ProjectFilesView>(`/api/projects/${encodeURIComponent(id)}/files`),
+  diagnosticsExport: () => request<DiagnosticsExport>("/api/diagnostics/export"),
   sessions: (projectId?: string, includeArchived = false) =>
     request<SessionSummary[]>(
       withQuery("/api/sessions", {

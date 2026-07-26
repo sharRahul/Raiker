@@ -58,6 +58,19 @@ export function shortId(id: string | null | undefined, keep = 10): string {
   return id.length <= keep + 1 ? id : `${id.slice(0, keep)}…`;
 }
 
+/**
+ * True when the server replaced a value with a redaction marker.
+ *
+ * The API redacts any field whose value looks secret-shaped, which sometimes
+ * catches a randomly generated record id. A redacted id cannot address
+ * anything, so callers must render it as plain text rather than a link that
+ * would take the user nowhere.
+ */
+export function isRedacted(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return value.startsWith("[REDACTED") || value.startsWith("***REDACTED");
+}
+
 /** "shell_execution" → "Shell execution". */
 export function humanize(name: string | null | undefined): string {
   if (!name) return "—";

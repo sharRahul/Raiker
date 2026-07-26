@@ -48,7 +48,9 @@ describe("ConnectionsView", () => {
     render(ConnectionsView);
     await waitFor(() => expect(screen.getByText("GitHub")).toBeInTheDocument());
     expect(screen.getByText("Booking.com")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Travel" })).toBeInTheDocument();
+    // Categories filter the list; they do not switch panels, so they are
+    // pressable chips rather than tabs.
+    expect(screen.getByRole("button", { name: "Travel", pressed: false })).toBeInTheDocument();
     await fireEvent.input(screen.getByPlaceholderText("Search connectors"), {
       target: { value: "uber" },
     });

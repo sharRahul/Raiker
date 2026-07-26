@@ -7,13 +7,18 @@ honest about its own state.
 
 Every conversation with the runtime, with its turns and the governed events behind
 each turn. Filter by tag, show archived, and open any session to replay it. Its
-detail links directly to the same session in Chat, Tasks, Approvals, Audit log,
+detail links directly to the same session in Chat, Tasks, Approvals, the Audit log,
 and the Checkpoints timeline. These are non-secret route scopes: opening one
 still re-reads the server-backed record for the authenticated owner.
 
 ![Sessions](../screenshots/working/04-sessions-list.png)
 
 ## Audit log
+
+The Audit log, Diagnostics, Work in action, and notification history now live
+as tabs inside the **Observability** hub, alongside an Overview that summarises
+readiness and links each claim to the record behind it. Older `#/activity`,
+`#/diagnostics`, and `#/work` links open the hub on the matching tab.
 
 The **append-only** event record — every governed step the runtime took, in full
 detail. Filter by **session id**, **event type**, and **limit** (50 / 100 / 250 /

@@ -37,8 +37,8 @@ describe("App shell", () => {
       "Capabilities",
       "Models",
       "Checkpoints",
-      "Audit log",
-      "Diagnostics",
+      "Extensions",
+      "Observability",
       "Settings",
     ]) {
       expect(within(nav).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();

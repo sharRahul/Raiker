@@ -5,17 +5,26 @@
 
 # Raiker Full Platform Feature Coverage Matrix
 
-> Web experience update (2026-07-23): the launchable local dashboard partially
-> implements the Raiker-informed experience and now uses
-> the Raiker-informed Workbench navigation (Home, Work, Knowledge, Control, and
-> Observe) and server-backed home summaries. This is an information-architecture
-> and presentation delivery only: it does not change capability authority or
-> promote deferred channels, plugin panels, backup/restore, or secret editing to
-> implemented status. Phases 0, 1, and 2 evidence are complete; Phases 3–4
-> still have specified interaction surfaces outstanding. See
-> `docs/plans/2026-07-22-raiker-informed-web-experience-plan.md` and
-> `docs/guide/webapp/RAIKER_PHASE_1_EVIDENCE.md` and
-> `docs/guide/webapp/RAIKER_PHASE_2_EVIDENCE.md`.
+> Web experience update (2026-07-26): the launchable local dashboard implements
+> the Raiker-informed experience across phases 0-4. It uses the Workbench
+> navigation (Home, Work, Knowledge, Control, Observe), a natural-language
+> Workbench composer that hands its prompt to the one governed send path, a
+> project context home with a metadata-only file explorer and provenance inspect
+> pane, a preflighted checkpoint restore funnel, one tabbed Extensions hub, and
+> one Observability hub with a server-built redacted support bundle.
+>
+> This is an information-architecture, presentation, and read-model delivery
+> only. It adds four read-only endpoints (`/api/extensions`,
+> `/api/checkpoints/{id}/restore-plan`, `/api/projects/{id}/files`,
+> `/api/diagnostics/export`) that never mutate the runtime, reach the network,
+> read a credential value, or return workspace file content. It does not change
+> capability authority and does not promote deferred channels, plugin panels,
+> backup/restore, or secret editing to implemented status — the Extensions hub
+> now states those gaps explicitly as "not available yet". See
+> `docs/plans/2026-07-22-raiker-informed-web-experience-plan.md`,
+> `docs/guide/webapp/RAIKER_PHASE_1_EVIDENCE.md`,
+> `docs/guide/webapp/RAIKER_PHASE_2_EVIDENCE.md`, and
+> `docs/guide/webapp/RAIKER_PHASE_3_4_EVIDENCE.md`.
 
 > Current truth (2026-06-21): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
 

@@ -5,9 +5,17 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import ProjectTreeNode from "../components/ProjectTreeNode.svelte";
+  import SidePanel from "../components/SidePanel.svelte";
   import { api, ApiError } from "../api";
-  import type { ProjectDetail, ProjectsList, ProjectTreeNode as TreeNode } from "../apiTypes";
-  import { relativeTime, shortId } from "../format";
+  import type {
+    ProjectDetail,
+    ProjectFile,
+    ProjectFilesView,
+    ProjectsList,
+    ProjectTreeNode as TreeNode,
+    TaskView,
+  } from "../apiTypes";
+  import { humanize, isRedacted, relativeTime, shortId } from "../format";
 
   let { onchanged }: { onchanged?: () => void } = $props();
 
@@ -156,11 +164,53 @@
     }
   }
 
+  // ── Project context home ─────────────────────────────────────────────
+  // Opening a project shows everything scoped to it in one place: its files,
+  // the work running under it, its stored knowledge, and its checkpoint
+  // timeline. Files are metadata only — Raiker never serves workspace content
+  // to the browser — and selecting one opens an inspect pane whose provenance
+  // links back to the turn that wrote it.
+  let files = $state<ProjectFilesView | null>(null);
+  let filesError = $state<string | null>(null);
+  let selectedFile = $state<ProjectFile | null>(null);
+  let projectTasks = $state<TaskView[]>([]);
+
+  const fileProvenance = $derived(
+    selectedFile === null ? [] : (files?.provenance[selectedFile.workspace_path] ?? []),
+  );
+
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  async function loadProjectContext(projectId: string) {
+    filesError = null;
+    files = null;
+    selectedFile = null;
+    projectTasks = [];
+    try {
+      files = await api.projectFiles(projectId);
+    } catch (e) {
+      filesError =
+        e instanceof ApiError ? `Files unavailable (${e.status}).` : "Files unavailable.";
+    }
+    try {
+      projectTasks = await api.tasks({ project_id: projectId });
+    } catch {
+      // Task scoping is supplementary context; a failed read leaves the rest
+      // of the project home intact rather than blanking it.
+      projectTasks = [];
+    }
+  }
+
   async function open(projectId: string) {
     detailError = null;
     exportError = null;
     try {
       detail = await api.project(projectId);
+      await loadProjectContext(projectId);
     } catch (e) {
       detail = null;
       detailError =
@@ -274,10 +324,10 @@
   </div>
 {:else}
   <div class="layout">
-    <div class="project-grid">
+    <div class="card-grid project-grid">
       {#each list.projects as p (p.project_id)}
         <article
-          class="card project"
+          class="card card-interactive project"
           class:active={p.selected}
           class:drag-over={dragOverId === p.project_id}
           ondragover={(e) => onDragOver(e, p.project_id)}
@@ -419,6 +469,70 @@
             {/each}
           </ul>
         {/if}
+        <h3 class="kicker">Work under this project</h3>
+        {#if projectTasks.length === 0}
+          <p class="sub">
+            No tasks are scoped to this project. Tasks created while it is active land here.
+          </p>
+        {:else}
+          <ul class="plain-list">
+            {#each projectTasks.slice(0, 8) as task (task.task_id)}
+              <li>
+                <span>{task.title}</span>
+                <span class="sub">{humanize(task.status)}</span>
+                <span class="sub" title={task.updated_at}>{relativeTime(task.updated_at)}</span>
+              </li>
+            {/each}
+          </ul>
+          <a class="cross-link" href="#/tasks">Open Tasks</a>
+        {/if}
+
+        <h3 class="kicker">Files</h3>
+        {#if filesError}
+          <!-- A failed file read degrades this one section politely: the rest of
+               the project home stays usable, so it announces rather than
+               interrupts. -->
+          <p class="error" role="status">{filesError}</p>
+        {:else if files === null}
+          <p class="sub">Reading the project folder…</p>
+        {:else if !files.root_exists}
+          <p class="sub">
+            <code class="mono">{files.root_subpath}</code> does not exist on disk yet. It is created
+            the first time a governed action writes into this project.
+          </p>
+        {:else if files.files.length === 0}
+          <p class="sub">The project folder is empty.</p>
+        {:else}
+          <p class="sub">{files.note}</p>
+          <ul class="file-list">
+            {#each files.files as file (file.workspace_path)}
+              <li style={`--depth:${file.depth}`}>
+                <button
+                  type="button"
+                  class="file-row"
+                  class:selected={selectedFile?.workspace_path === file.workspace_path}
+                  onclick={() => (selectedFile = file)}
+                  aria-label={`Inspect ${file.workspace_path}`}
+                >
+                  <Icon name={file.is_directory ? "projects" : "file"} size={14} />
+                  <span class="file-name">{file.name}</span>
+                  {#if !file.is_directory}
+                    <span class="file-meta">{formatBytes(file.size_bytes)}</span>
+                  {/if}
+                  {#if (files.provenance[file.workspace_path] ?? []).length > 0}
+                    <span class="file-flag">governed change</span>
+                  {/if}
+                </button>
+              </li>
+            {/each}
+          </ul>
+          {#if files.truncated}
+            <p class="sub">
+              The listing stopped at its size limit. Deeper folders are not shown.
+            </p>
+          {/if}
+        {/if}
+
         <h3 class="kicker">Checkpoints</h3>
         {#if detail.checkpoints.length === 0}
           <p class="sub">No checkpoints for this project's sessions yet.</p>
@@ -432,9 +546,76 @@
               </li>
             {/each}
           </ul>
+          <a class="cross-link" href="#/checkpoints">Open the checkpoint timeline</a>
         {/if}
       </section>
     {/if}
+
+    <SidePanel
+      open={selectedFile !== null}
+      title={selectedFile?.name ?? ""}
+      subtitle={selectedFile?.workspace_path ?? null}
+      onclose={() => (selectedFile = null)}
+    >
+      {#if selectedFile}
+        <dl class="property-list inspect">
+          <dt>Kind</dt>
+          <dd>{selectedFile.is_directory ? "Folder" : "File"}</dd>
+          {#if !selectedFile.is_directory}
+            <dt>Size</dt>
+            <dd>{formatBytes(selectedFile.size_bytes)}</dd>
+          {/if}
+          <dt>Modified</dt>
+          <dd title={selectedFile.modified_at}>{relativeTime(selectedFile.modified_at)}</dd>
+        </dl>
+
+        <h3 class="panel-h">Provenance</h3>
+        {#if fileProvenance.length === 0}
+          <p class="sub">
+            No governed write is recorded against this path. It was not changed through a Raiker
+            action that captures a checkpoint.
+          </p>
+        {:else}
+          <ul class="provenance">
+            {#each fileProvenance as entry (entry.created_at + (entry.action_id ?? ""))}
+              <li>
+                <p class="prov-head">
+                  {humanize(entry.capability)}
+                  <time title={entry.created_at}>{relativeTime(entry.created_at)}</time>
+                </p>
+                <p class="prov-detail">
+                  {entry.existed_before
+                    ? `Overwrote ${entry.pre_image_size} bytes`
+                    : "Created this file"} · captured as
+                  <span class="mono">{entry.capture_status}</span>
+                </p>
+                <p class="prov-links">
+                  {#if isRedacted(entry.session_id)}
+                    <!-- A redacted id addresses nothing; a link here would be
+                         dead, so the fact is stated instead. -->
+                    <span title="The server redacted this identifier.">Session withheld</span>
+                  {:else}
+                    <a href={`#/sessions?session=${encodeURIComponent(entry.session_id)}`}>
+                      Session {shortId(entry.session_id)}
+                    </a>
+                    {#if entry.turn_id}
+                      ·
+                      <a
+                        href={`#/observe?tab=activity&session=${encodeURIComponent(entry.session_id)}`}
+                      >Turn {shortId(entry.turn_id)} in the audit log</a>
+                    {/if}
+                  {/if}
+                </p>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        <p class="sub">
+          Raiker shows what changed and who changed it, never the file's contents. Editing goes
+          through a governed action with its own approval.
+        </p>
+      {/if}
+    </SidePanel>
 
     {#if tree.length > 0}
       <section class="card tree-section" aria-labelledby="tree-h">
@@ -477,9 +658,7 @@
     gap: var(--space-4);
   }
   .project-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-    gap: var(--space-4);
+    --card-min: 18rem;
   }
   .project.active {
     border-color: var(--accent-border);
@@ -577,5 +756,100 @@
   }
   .error {
     color: var(--danger);
+  }
+  .cross-link {
+    display: inline-block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: var(--space-2);
+  }
+  .file-list {
+    list-style: none;
+    margin: 0 0 var(--space-2);
+    padding: 0;
+    display: grid;
+    gap: 1px;
+    max-height: 20rem;
+    overflow: auto;
+  }
+  .file-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    margin-left: calc(var(--depth) * 0.9rem);
+    max-width: calc(100% - var(--depth) * 0.9rem);
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: var(--r-sm);
+    color: var(--text-2);
+    font: inherit;
+    font-size: 0.82rem;
+    padding: 0.28rem 0.45rem;
+    cursor: pointer;
+  }
+  .file-row:hover {
+    background: var(--sunken);
+    color: var(--text-1);
+  }
+  .file-row.selected {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .file-meta {
+    margin-left: auto;
+    color: var(--text-3);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .file-flag {
+    border: 1px solid var(--info-border);
+    background: var(--info-soft);
+    color: var(--info);
+    border-radius: var(--r-pill);
+    font-size: 0.65rem;
+    font-weight: 650;
+    padding: 0 0.45rem;
+    white-space: nowrap;
+  }
+  .panel-h {
+    margin: var(--space-2) 0 0;
+    font-size: 0.82rem;
+  }
+  .provenance {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  .provenance li {
+    border-left: 2px solid var(--accent-border);
+    padding-left: 0.55rem;
+  }
+  .prov-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 650;
+  }
+  .prov-head time {
+    color: var(--text-3);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .prov-detail,
+  .prov-links {
+    margin: 0;
+    font-size: 0.76rem;
+    color: var(--text-3);
   }
 </style>

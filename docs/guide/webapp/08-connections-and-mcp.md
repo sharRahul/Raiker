@@ -1,8 +1,38 @@
-# 8. Connections & MCP
+# 8. Extensions: connectors & MCP
 
-## Connections (the Connector Store)
+**Extensions** is one destination with four tabs — Connectors, MCP servers,
+Plugins, and Channels. The Connectors tab opens on a **Readiness** overview.
 
-**Connections** is a store of governed service connectors — GitHub, Gmail, Google
+## Readiness: four facts, not one badge
+
+Every extension reports four independent, server-derived facts:
+
+| Fact | What it means |
+|------|---------------|
+| **Installed** | It is present in this workspace. |
+| **Account connected** | A credential is stored in the vault. Its value is never shown here, or anywhere else in the dashboard. |
+| **Enabled for the session** | You turned it on for this session. |
+| **Usable now** | The runtime will accept a governed call. |
+
+An extension is usable only when the server confirms all four. Selecting a row
+opens an inspector that shows each step, names the first unmet condition in plain
+language, and reports the governance facts behind it — capability, gate state,
+decision mode, egress host, and whether that host is on the allowlist.
+
+Nothing here grants anything. Changing any of these still goes through the
+capability gate, the credential vault, and the approval path.
+
+## Plugins and Channels
+
+Both tabs say plainly that they are not available yet, and why. Plugin panels
+need an accepted route, permission, and accessibility contract; channels and
+webhooks need an accepted delivery contract and threat model. The tabs exist so
+the gap is visible rather than silently missing — nothing is installed, and no
+plugin code runs in the browser.
+
+## Connectors (the Connector Store)
+
+The Connectors tab lists governed service connectors — GitHub, Gmail, Google
 Calendar, Slack, Hugging Face, NVIDIA, Vercel, Wolfram, Google Drive, YouTube,
 Signal, Booking.com, and more — filterable by category (Development,
 Productivity, Communication, Media, Travel, On-demand).
@@ -32,9 +62,9 @@ search connectors by name.
 > connector to "Authentication required". Without a valid vault key, credential
 > storage fails closed — as intended.
 
-## MCP Servers
+## MCP servers
 
-**MCP Servers** lets you build, connect, and monitor governed local or remote
+The **MCP servers** tab lets you build, connect, and monitor governed local or remote
 Model Context Protocol servers for this workspace.
 
 ![The MCP Servers view](../screenshots/working/17-mcp-servers.png)

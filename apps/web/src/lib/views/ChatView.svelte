@@ -1,15 +1,13 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import Icon from "../components/Icon.svelte";
-  import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError, streamPrompt } from "../api";
   import type { AgentResponse, ModelProfile, ProviderModelList, SessionDetail, StreamEvent } from "../apiTypes";
-  import { groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
-  import { responseBadge } from "../statusMaps";
-  import { collectText } from "../turnPhases";
+  import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, providerName } from "../format";
+  import { reactionForResponse, thinkingSteps } from "../chatPresentation";
 
   // One composer attachment chip: a workspace path, an image, or a text
   // document already uploaded into the governed attachment store (referenced by
@@ -343,22 +341,6 @@
     return rows.length > 0 ? rows[rows.length - 1].phase : null;
   }
 
-  // Provider-agnostic cache metrics from the last model_request_completed event.
-  // The runtime normalises every provider's usage into the same shape, so this
-  // reads cache-hit tokens irrespective of which model served the turn.
-  function cacheInfo(turn: ChatTurn): { read: number; hit: boolean } | null {
-    for (let i = turn.events.length - 1; i >= 0; i--) {
-      const ev = turn.events[i];
-      if (ev.kind !== "lifecycle" || ev.event_type !== "model_request_completed") continue;
-      const usage = ev.payload?.usage as Record<string, number> | undefined;
-      if (usage && typeof usage.cache_read_tokens === "number") {
-        return { read: usage.cache_read_tokens, hit: usage.cache_read_tokens > 0 };
-      }
-      return null;
-    }
-    return null;
-  }
-
   function answerText(turn: ChatTurn): string {
     const streamed = collectText(turn.events);
     if (streamed.trim() !== "") return streamed;
@@ -462,14 +444,18 @@
       <EmptyState
         icon="chat"
         title={`What would you like to work on, ${userName}?`}
-        body="Start with a question, a task, or a file. Every turn is governed, observable, and stays in this Raiker instance."
+        body="Start with a question, a task, or a file."
         serif={true}
       />
     {/if}
 
     {#each turns as turn (turn.id)}
+      {@const answer = answerText(turn)}
+      {@const thinking = thinkingSteps(turn.events)}
+      {@const reaction = reactionForResponse(answer)}
       <div class="turn">
-        <div class="bubble user">
+        <div class="message-group message-group-user">
+          <div class="message-bubble message-bubble-user">
           <p class="bubble-text">{turn.prompt}</p>
           {#if turn.attachments.length > 0}
             <p class="turn-attachments">
@@ -482,8 +468,11 @@
             </p>
           {/if}
         </div>
+        </div>
 
-        <div class="bubble agent">
+        <div class="message-group message-group-raiker">
+          {#if turn.response !== null}
+          {#if false}
           {#if turn.streaming}
             <p class="phase-line" role="status">
               <span class="pulse" aria-hidden="true"></span>
@@ -506,8 +495,10 @@
           {/if}
 
           {#if turn.response !== null}
+            <!-- Legacy runtime metadata intentionally omitted from Chat. -->
+            <!--
             <div class="response-meta">
-              <Badge variant={responseBadge(turn.response.status)} label={turn.response.status} />
+              <Badge variant={responseBadge(turn.response!.status)} label={turn.response!.status} />
               {#if cacheInfo(turn)}
                 {@const cache = cacheInfo(turn)}
                 <span
@@ -519,18 +510,21 @@
                 </span>
               {/if}
             </div>
+            -->
 
-            {#if turn.response.status === "needs_approval" && turn.response.approval}
+            {#if turn.response!.status === "needs_approval" && turn.response!.approval}
               <div class="approval-card">
                 <p class="approval-title">
                   <Icon name="approvals" size={15} />
                   This action is waiting for your approval
                 </p>
+                <!--
                 <p class="approval-body">
                   <strong>{humanize(turn.response.approval.tool_name)}</strong> — risk
                   <strong>{turn.response.approval.risk_level}</strong>.
                   {turn.response.approval.message}
                 </p>
+                -->
                 <p class="approval-note">
                   Review it in the Approvals inbox. Recording a decision never executes the action.
                 </p>
@@ -563,6 +557,45 @@
                 <p class="tool-line">{humanize(ev.event_type)} {ev.text}</p>
               {/each}
             </details>
+          {/if}
+          {/if}
+          {/if}
+
+          {#if turn.streaming}
+            <p class="streaming-label" role="status">
+              <span class="pulse" aria-hidden="true"></span>
+              {answer === "" ? "Raiker is thinking…" : "Raiker is typing…"}
+            </p>
+            {#if thinking.length > 0}
+              <details class="thinking-details" aria-label="Raiker's thinking">
+                <summary>See what Raiker is thinking</summary>
+                {#each thinking as step (step)}
+                  <p>{step}</p>
+                {/each}
+              </details>
+            {/if}
+          {/if}
+
+          {#if answer !== ""}
+            <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer">{answer}</p></div>
+          {:else if !turn.streaming && turn.error === null && turn.response !== null}
+            <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">(No answer text was returned.)</p></div>
+          {/if}
+
+          {#if turn.error !== null}
+            <p class="error-line" role="alert">{turn.error}</p>
+          {/if}
+
+          {#if turn.response?.status === "needs_approval" && turn.response.approval}
+            <div class="approval-card">
+              <p class="approval-title"><Icon name="approvals" size={15} /> Your approval is needed to continue</p>
+              <p class="approval-body">{turn.response.approval.message}</p>
+              <a class="btn btn-soft btn-sm" href="#/approvals">Review approval</a>
+            </div>
+          {/if}
+
+          {#if !turn.streaming && reaction}
+            <span class="reaction" aria-label={`Raiker reacted with ${reaction.label}`}>{reaction.emoji}</span>
           {/if}
         </div>
       </div>
@@ -813,22 +846,67 @@
     flex-direction: column;
     gap: var(--space-3);
   }
-  .bubble {
-    border-radius: var(--r-lg);
-    padding: 0.75rem 1rem;
-    max-width: 85%;
+  .message-group {
+    display: flex;
+    flex-direction: column;
+    max-width: min(76%, 48rem);
+    position: relative;
   }
-  .bubble.user {
+  .message-group-user {
     align-self: flex-end;
-    background: var(--accent-soft);
-    border: 1px solid var(--accent-border);
+    align-items: flex-end;
   }
-  .bubble.agent {
+  .message-group-raiker {
     align-self: flex-start;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .message-bubble {
+    position: relative;
+    border-radius: 1.25rem;
+    padding: 0.72rem 0.95rem;
     box-shadow: var(--shadow-1);
-    min-width: 14rem;
+  }
+  .message-bubble-user {
+    background: var(--accent);
+    color: var(--text-inverse);
+    border-bottom-right-radius: 0.35rem;
+  }
+  .message-bubble-raiker {
+    background: var(--sunken);
+    color: var(--text-1);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 0.35rem;
+  }
+  .streaming-label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0 0 0.3rem;
+    color: var(--text-3);
+    font-size: 0.78rem;
+    font-weight: 650;
+  }
+  .thinking-details {
+    margin: 0 0 0.4rem;
+    color: var(--text-2);
+    font-size: 0.78rem;
+  }
+  .thinking-details summary {
+    cursor: pointer;
+    color: var(--text-3);
+  }
+  .thinking-details p {
+    margin: 0.35rem 0 0;
+  }
+  .reaction {
+    margin: -0.25rem 0.75rem 0;
+    padding: 0.12rem 0.38rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+    font-size: 1rem;
+    line-height: 1.2;
   }
   .bubble-text {
     margin: 0;
@@ -869,27 +947,6 @@
     color: var(--danger);
     font-size: 0.86rem;
     margin: 0.35rem 0 0;
-  }
-  .response-meta {
-    margin-top: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-  .cache-chip {
-    font-size: 0.72rem;
-    font-weight: 600;
-    border-radius: var(--r-pill);
-    border: 1px solid var(--neutral-border);
-    background: var(--neutral-soft);
-    color: var(--text-3);
-    padding: 0.08rem 0.55rem;
-  }
-  .cache-chip.hit {
-    border-color: var(--ok-border);
-    background: var(--ok-soft);
-    color: var(--ok);
   }
   .approval-card {
     margin-top: 0.65rem;
@@ -1117,5 +1174,10 @@
   }
   .send {
     min-width: 6.5rem;
+  }
+  @media (max-width: 720px) {
+    .message-group {
+      max-width: 88%;
+    }
   }
 </style>

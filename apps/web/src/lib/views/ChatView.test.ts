@@ -95,7 +95,7 @@ describe("ChatView streaming transcript", () => {
     expect(streamPromptMock).toHaveBeenCalledOnce();
   });
 
-  it("shows a cache-hit chip from the model_request_completed usage", async () => {
+  it("keeps model runtime metadata out of the conversation", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockImplementation(
       async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
@@ -121,7 +121,9 @@ describe("ChatView streaming transcript", () => {
     await fireEvent.input(box, { target: { value: "hi" } });
     await fireEvent.keyDown(box, { key: "Enter" });
 
-    await waitFor(() => {
+    await waitFor(() => expect(screen.getByText("DONE")).toBeInTheDocument());
+    expect(screen.queryByText(/cache hit|128 tok|completed/i)).not.toBeInTheDocument();
+    if (false) await waitFor(() => {
       expect(screen.getByText(/cache hit · 128 tok/i)).toBeInTheDocument();
     });
   });
@@ -505,5 +507,78 @@ describe("ChatView streaming transcript", () => {
     await waitFor(() =>
       expect(screen.getByText(/could not load history/i)).toBeInTheDocument(),
     );
+  });
+
+  it("shows safe expandable thinking while Raiker prepares a response", async () => {
+    stubFetch(MODELS_ROUTE);
+    let finishStream: (() => void) | undefined;
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "lifecycle",
+          text: "internal intent payload",
+          event_type: "intent_classified",
+          payload: {},
+          response: null,
+        } as StreamEvent);
+        await new Promise<void>((resolve) => {
+          finishStream = resolve;
+        });
+      },
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "help me plan this" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    expect(await screen.findByText("Raiker is thinking…")).toBeInTheDocument();
+    const details = screen.getByLabelText("Raiker's thinking") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    await fireEvent.click(screen.getByText("See what Raiker is thinking"));
+    expect(details.open).toBe(true);
+    expect(screen.getByText("Understanding what you need.")).toBeInTheDocument();
+    expect(screen.queryByText("internal intent payload")).not.toBeInTheDocument();
+
+    finishStream?.();
+  });
+
+  it("uses conversation bubbles, typing status, and a reaction without runtime metadata", async () => {
+    stubFetch(MODELS_ROUTE);
+    let finishStream: (() => void) | undefined;
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "text_delta",
+          text: "You're welcome — happy to help!",
+          event_type: "",
+          payload: {},
+          response: null,
+        } as StreamEvent);
+        await new Promise<void>((resolve) => {
+          finishStream = resolve;
+        });
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: finalResponse("You're welcome — happy to help!"),
+        } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "thanks" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    expect(await screen.findByText("Raiker is typing…")).toBeInTheDocument();
+    finishStream?.();
+
+    expect(await screen.findByLabelText("Raiker reacted with Heart")).toHaveTextContent("❤️");
+    expect(document.querySelector(".message-group-user .message-bubble-user")).not.toBeNull();
+    expect(document.querySelector(".message-group-raiker .message-bubble-raiker")).not.toBeNull();
+    expect(screen.queryByText(/governing this turn|cache hit|completed/i)).not.toBeInTheDocument();
   });
 });

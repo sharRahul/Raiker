@@ -4,10 +4,14 @@
   // test is the panel's, not the caller's.
   import SidePanel from "./SidePanel.svelte";
 
-  let { open = true, onclose = () => {} }: { open?: boolean; onclose?: () => void } = $props();
+  let {
+    open = true,
+    onclose = () => {},
+    scrollIntoViewOnOpen = false,
+  }: { open?: boolean; onclose?: () => void; scrollIntoViewOnOpen?: boolean } = $props();
 </script>
 
-<SidePanel {open} title="Model detail" subtitle="local-default" {onclose}>
+<SidePanel {open} title="Model detail" subtitle="local-default" {onclose} {scrollIntoViewOnOpen}>
   <p>Panel body</p>
   {#snippet footer()}
     <button type="button">Panel action</button>

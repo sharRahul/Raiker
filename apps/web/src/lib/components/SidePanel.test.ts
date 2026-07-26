@@ -42,6 +42,50 @@ describe("SidePanel", () => {
     expect(onclose).not.toHaveBeenCalled();
   });
 
+  it("still opens where the DOM has no scrollIntoView", async () => {
+    // jsdom does not implement scrollIntoView, and neither do some embedded
+    // browsers. Opening the panel must not throw past the focus move.
+    expect(Element.prototype.scrollIntoView).toBeUndefined();
+    render(SidePanelHarness, { props: { open: true, scrollIntoViewOnOpen: true } });
+    const close = await screen.findByRole("button", { name: "Close details" });
+    await vi.waitFor(() => expect(document.activeElement).toBe(close));
+  });
+
+  it("scrolls itself into view when asked and the DOM supports it", async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      value: scrollIntoView,
+      configurable: true,
+      writable: true,
+    });
+    try {
+      render(SidePanelHarness, { props: { open: true, scrollIntoViewOnOpen: true } });
+      await screen.findByRole("complementary");
+      await vi.waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" }));
+    } finally {
+      Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    }
+  });
+
+  it("does not scroll when the caller did not ask for it", async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      value: scrollIntoView,
+      configurable: true,
+      writable: true,
+    });
+    try {
+      render(SidePanelHarness, { props: { open: true } });
+      await screen.findByRole("complementary");
+      await vi.waitFor(() =>
+        expect(screen.getByRole("button", { name: "Close details" })).toBeInTheDocument(),
+      );
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    }
+  });
+
   it("shows its subtitle and footer content", async () => {
     render(SidePanelHarness, { props: { open: true } });
     expect(await screen.findByText("local-default")).toBeInTheDocument();

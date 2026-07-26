@@ -45,7 +45,10 @@
     returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     queueMicrotask(() => {
       closeButton?.focus();
-      if (scrollIntoViewOnOpen) panel?.scrollIntoView({ block: "nearest" });
+      // scrollIntoView is a convenience, not a requirement, and it is absent in
+      // some DOM implementations. Calling it optionally keeps the panel working
+      // where it does not exist instead of throwing past the focus move.
+      if (scrollIntoViewOnOpen) panel?.scrollIntoView?.({ block: "nearest" });
     });
     const onKeydown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;

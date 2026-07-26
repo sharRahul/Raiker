@@ -84,31 +84,34 @@ route, permission, and accessibility contract for it") and Channels.
 
 ---
 
-## 4. Enable a hosted model end to end
+## 4. Connect a hosted model
 
-This is the sequence a new user must follow. **Order matters** — doing it in any
-other order produces a governed refusal.
+Re-verified on **2026-07-26 (second round)** against a workspace with **no**
+`RAIKER_MODEL_EGRESS_ALLOWLIST`, **no** vault key, **no** runtime mode, and
+**no** capability gates — i.e. exactly what a new user has.
 
 | # | Step | Expected | Result |
 |---|---|---|---|
-| 4.1 | Settings → General → Runtime mode → **Local single user runtime** → Activate → give a reason → Confirm | `POST /runtime-mode/activate` 200, banner "Local single user runtime · active" | ✅ `55-`, `56-` |
-| 4.2 | Settings → Security & Login → **Generate key** → confirm password → **Save key** | Elevated re-auth, `PUT /api/vault/key` 200, "Active / Valid" | ✅ `13-`, `14-` |
-| 4.3 | Permissions → search "Hosted" → expand **Hosted models** → **Turn on** → reason + confirmation token + threat-model ack → Confirm | `threat-ack` 200 then `set` 200 → `enabled_runtime` | ✅ `07-`…`11-` |
-| 4.4 | Models → Anthropic card → **Connect** → paste API key → Connect | `PUT /api/models/anthropic-hosted/connection` 200, card flips to **Connected** | ✅ `05-`, `06-` |
-| 4.5 | Models → Anthropic → **Choose model…** | Live provider catalogue: 11 models returned from `api.anthropic.com` | ✅ `15-` |
-| 4.6 | Pick `claude-haiku-4-5-20251001` → **Use model** | `PUT /api/model-selection` 200, "selected" badge, setup meter 0 % → 10 % | ✅ `16-` |
-| 4.7 | Models → **Test** on the connected card | "Anthropic responded and exposed 11 models." | ✅ |
-| 4.8 | Models header | "1 of 10 providers set up · $0.0030 total API cost" — a count, not a percentage of the shipped catalogue | ✅ `91-` |
-| 4.9 | Each provider card | usage line + spend-share bar; local providers read "No API cost — runs on this machine"; unused read "Not used yet" | ✅ `92-` |
+| 4.1 | Register the owner account | Dashboard mounts | ✅ |
+| 4.2 | Models → Anthropic → **Connect** → paste API key → Connect | `PUT /api/models/anthropic-hosted/connection` **200** `{"connection_configured": true}` | ✅ `95-clean-first-run-connect.png` |
+| 4.3 | **Choose model…** | Live catalogue from `api.anthropic.com` | ✅ `15-` |
+| 4.4 | Pick a model → **Use model** | `PUT /api/model-selection` 200, "selected" badge | ✅ `16-` |
+| 4.5 | Send a prompt in Chat | Streamed reply from the real provider | ✅ `96-` |
+| 4.6 | Models header | "1 of 10 providers set up" + total API cost | ✅ `91-` |
+| 4.7 | Each provider card | usage line + spend-share bar; local providers read "No API cost" | ✅ `92-` |
 
-**If step 4.4 is attempted first**, the dialog reports, in order:
-`provider_requires_explicit_policy_approval` (4.3 missing) →
-`model_egress_denied:no_allowlist` (§1 export missing) →
-`connector_vault_key_unset` (4.2 missing). All three are **correct fail-closed
-policy outcomes**, not faults. See `TO_BE_FIXED.md` §FIXED-01 for the
-remediation text now shown alongside each code.
+**Three refusals that used to block this are gone** — see `TO_BE_FIXED.md`
+**FIXED-05**. Configuring a provider is the owner's authorization, the endpoint
+configured is authorised with it, and the vault key provisions itself.
 
----
+**Still refused** (each covered by a test): a provider that was never configured;
+a host belonging to no configured provider; a capability gate the owner
+*explicitly* turned off; another principal's connections; every deferred
+dangerous domain.
+
+Optional hardening still available: set `RAIKER_MODEL_EGRESS_ALLOWLIST` to
+pre-authorise hosts before configuring them, and use Settings → Security & Login
+to rotate the vault key.
 
 ## 5. Chat
 
@@ -133,19 +136,25 @@ project, Pin, Archive, Delete). `25-sidebar-recent-chats.png`,
 conversation →" to resume. Searching `codeword` returned the 2 matching
 conversations with turn counts. `26-`, `27-`.
 
-### 5.4 Do multiple chats in one session remember context?
+### 5.4 Does a conversation remember its context?
 
-**No — and neither does a single chat.** ❌ See `TO_BE_FIXED.md` **BUG-02**.
+**Yes, after the fix in this round.** ❌→✅ Originally, asking a follow-up in the
+**same** chat produced *"I don't have any record of you providing me with a
+codeword in our conversation history. This is the first message in our current
+session."* — the transcript rendered on screen but prior turns were never sent to
+the provider (`not-working/BUG-02-no-conversation-memory.png`).
 
-Steps: send "Remember this codeword: MARIGOLD-42"; in the **same** chat ask
-"What was the codeword I gave you?".
+Re-run on a bare workspace:
 
-Recorded reply: *"I don't have any record of you providing me with a codeword in
-our conversation history. This is the first message in our current session."*
-The transcript shows both turns on screen, but prior turns are never sent to the
-provider (`raiker/runtime/orchestrator.py` builds the message list from the
-current prompt only). Cross-chat isolation is therefore correct by accident, not
-by design. `not-working/BUG-02-no-conversation-memory.png`.
+| Step | Reply |
+|---|---|
+| "Remember this codeword: MARIGOLD-42. Reply with just OK." | `OK.` |
+| "What was the codeword I gave you? Answer with just the word." | `MARIGOLD-42` ✅ |
+| **New chat** → "What codeword did I give you earlier? If you have none, say NONE." | `NONE` ✅ |
+
+Memory within a conversation, isolation between conversations.
+`working/96-conversation-memory-fixed.png`,
+`working/97-cross-chat-isolation.png`. See `TO_BE_FIXED.md` **FIXED-04**.
 
 ### 5.5 Can you see how many tokens remain, and what they cost?
 
@@ -342,13 +351,13 @@ from the session `⋯` menu. `73-`, `74-`.
 |---|---|
 | Does a new chat create a chat on the left? | **Yes** — RECENT CHATS, with a row menu |
 | Is the chat searchable? | **Yes** — titles and message text |
-| Do multiple chats in one session remember context? | **No** — and neither does a single chat (BUG-02) |
+| Do conversations remember context? | **Yes** (was broken; FIXED-04) — prior completed turns are replayed, bounded by the model's window; other chats are never mixed in |
 | Can you see how many tokens remain? | **Yes** (was `0 / NaN (NaN%)`; FIXED-02) — provider-reported usage against a provider-reported capacity |
 | Can you see what a chat has cost? | **Yes** — per-chat and provider all-time, in Chat and Build, for API-key providers only |
 | Can you generate a markdown file and view it in the sidebar? | **No** — approval is metadata-only so no file is written (BUG-06), and there is no file inspector (BUG-07) |
 | Can you convert markdown to PDF in one click? | **No** — no export control exists, and markdown is not even rendered (BUG-03, BUG-08) |
 | Do the different task types work? | **Yes** — all four create, schedule, and run |
-| Can you set an API key from the web app? | **Yes**, after runtime mode + vault key + Hosted models gate (§4) |
+| Can you set an API key from the web app? | **Yes** — Connect, paste, done. No gate, allowlist, or vault-key setup first (FIXED-05) |
 | Does the MCP server work? | **Partly** — create/connect/monitor yes, tools in Chat no (BUG-12) |
 | Do Permissions / Capabilities work? | **Yes** — all 62 gates, four decision modes, step-up enforced |
 

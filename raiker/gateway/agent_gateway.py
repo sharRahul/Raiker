@@ -24,6 +24,8 @@ from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
 from raiker.tools.broker import ToolBroker
 
+# Upper bound on the assistant reply persisted with a turn.
+TURN_SUMMARY_MAX_CHARS = 8000
 
 class AgentGateway:
     def __init__(self, workspace_root: str | Path, principal_id: str = "local_user") -> None:
@@ -268,7 +270,14 @@ class AgentGateway:
                 client=prompt_envelope.client,
             )
         )
-        self.sessions.close_turn(prompt_envelope.turn_id, response.status, response.message[:500])
+        # The stored reply is the conversation record: the Chat view renders it as
+        # the assistant's message and the orchestrator replays it as history on
+        # the next turn. 500 characters truncated both, so a resumed conversation
+        # lost most of every answer. The bound stays generous but finite — a turn
+        # row is a transcript entry, not an unbounded blob.
+        self.sessions.close_turn(
+            prompt_envelope.turn_id, response.status, response.message[:TURN_SUMMARY_MAX_CHARS]
+        )
         events_path = str(self.writer.path_for_session(prompt_envelope.session_id))
         return AgentResponse(
             request_id=response.request_id,

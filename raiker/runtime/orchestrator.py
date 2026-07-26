@@ -30,6 +30,7 @@ from raiker.models.tool_call_validation import (
     validate_tool_call,
 )
 from raiker.runtime.classifier import SimpleClassifier
+from raiker.runtime.conversation_history import conversation_messages, history_char_budget
 from raiker.runtime.model_usage import ModelUsageLedger
 from raiker.runtime.planner import SimplePlanner
 from raiker.runtime.retrieval import RetrievalAugmentor
@@ -109,6 +110,38 @@ class RuntimeOrchestrator:
             self._sink.append(
                 StreamEvent(kind=LIFECYCLE, event_type=event_type, payload=dict(payload))
             )
+
+    def _conversation_history(self, envelope: PromptEnvelope) -> list[ModelMessage]:
+        """Prior completed exchanges in this session, bounded by model capacity."""
+        store = getattr(self.tool_broker, "store", None)
+        if store is None:
+            return []
+        capacity: int | None = None
+        try:
+            provider, model = self._provider_chain(envelope)[0]
+            capacity = self._context_window_tokens(provider, model)
+        except Exception:  # noqa: BLE001 — an unknown capacity uses the safe default
+            capacity = None
+        return conversation_messages(
+            store,
+            envelope.session_id,
+            exclude_turn_id=envelope.turn_id,
+            char_budget=history_char_budget(capacity),
+        )
+
+    def _context_window_tokens(self, provider: str, model: str) -> int | None:
+        """The bound the model actually advertises, when Raiker knows it."""
+        store = getattr(self.tool_broker, "store", None)
+        principal_id = getattr(self.tool_broker, "principal_id", None)
+        if store is None or not principal_id:
+            return None
+        try:
+            from raiker.runtime.model_facts_store import ModelFactsStore
+
+            facts = ModelFactsStore(store).provider_facts(str(principal_id), provider, model)
+        except Exception:  # noqa: BLE001
+            return None
+        return facts.context_window_tokens if facts is not None else None
 
     def _record_usage(
         self,
@@ -552,6 +585,20 @@ class RuntimeOrchestrator:
         ]
         if retrieval_context is not None:
             messages.append(ModelMessage(role="system", content=retrieval_context))
+        # Prior turns of this conversation. Without these the provider receives a
+        # single-shot request and answers a follow-up as if it were the opening
+        # message, however much transcript the user can see on screen.
+        history = self._conversation_history(envelope)
+        if history:
+            messages.extend(history)
+            self._event(
+                envelope,
+                "conversation_history_replayed",
+                {
+                    "history_messages": len(history),
+                    "history_chars": sum(len(message.content) for message in history),
+                },
+            )
         messages.append(
             ModelMessage(
                 role="user",

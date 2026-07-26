@@ -36,6 +36,7 @@ from raiker.api.schemas import (
     serialize_dto,
 )
 from raiker.api.sessions import ApiSession
+from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import AuthSessionView, DashboardService
 from raiker.control.web_read_models import WebReadModels
 from raiker.models.connections import clear_model_connection, put_model_connection
@@ -1156,9 +1157,18 @@ async def set_model_connection(
     if not values:
         clear_model_connection(store, session.principal_id, profile_id)
         return {"ok": True, "connection_configured": False}
+    # The vault key encrypts what we are about to store. It is a local
+    # encryption key, not a secret the owner has to invent, so requiring them to
+    # go and generate one before they may save an API key is friction with no
+    # security benefit — the key would be identical either way. Provision it on
+    # demand; Settings keeps the controls to view, rotate, and clear it.
+    ensure_vault_key(request.app.state.workspace_root)  # type: ignore[attr-defined]
     try:
         ModelProviderFactory(
-            policy=provider_runtime_policy_from_gates(store, session.principal_id), connection=values
+            policy=provider_runtime_policy_from_gates(
+                store, session.principal_id, configuring_profile_id=profile_id
+            ),
+            connection=values,
         ).create(profile, require_model=False)
         put_model_connection(store, session.principal_id, profile_id, values)
     except ValueError as exc:

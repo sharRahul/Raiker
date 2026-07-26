@@ -6,15 +6,21 @@ alongside the code, this table is the complete reference.
 
 ## Connecting a model
 
+Three codes that used to block a first-time setup no longer occur when you
+connect a provider through the app — configuring it is your authorization, the
+endpoint you configured is authorised with it, and the vault key provisions
+itself. They remain below because they can still appear for a provider you have
+**not** configured, or one you explicitly revoked.
+
 | Reason code | Meaning | Fix |
 |---|---|---|
-| `provider_requires_explicit_policy_approval` | The provider's runtime gate is off | Permissions → **Hosted models** (or **Home-lab models**) → Turn on |
-| `hosted_provider_requires_explicit_policy` | Hosted access not enabled for your account | Permissions → **Hosted models** |
-| `private_network_provider_requires_explicit_policy` | Private-network access not enabled | Permissions → **Home-lab models** |
-| `model_egress_denied:no_allowlist` | No host is allowlisted for model egress | Restart with `RAIKER_MODEL_EGRESS_ALLOWLIST=<host>` |
-| `model_egress_denied:<host>` | That host is not allowlisted | Add it to `RAIKER_MODEL_EGRESS_ALLOWLIST` and restart |
-| `connector_vault_key_unset` | No vault key, so no credential can be encrypted | Settings → Security & Login → Generate key → Save key |
-| `connector_vault_key_invalid` | The stored key is not a valid Fernet key | Same place; regenerate |
+| `provider_requires_explicit_policy_approval` | You have configured no provider, or you explicitly turned this one off | Connect the provider in **Models**. If you previously turned **Hosted models** off in Permissions, turn it back on — an explicit revocation outranks a saved connection. |
+| `hosted_provider_requires_explicit_policy` | Same, for hosted providers | As above |
+| `private_network_provider_requires_explicit_policy` | Same, for a home-lab endpoint | As above, via **Home-lab models** |
+| `model_egress_denied:<host>` | That host is not the endpoint of any provider you configured | Connect the provider whose endpoint it is, or pre-authorise it with `RAIKER_MODEL_EGRESS_ALLOWLIST=<host>` |
+| `model_egress_denied:no_allowlist` | An off-machine endpoint with no configured connection and no environment allowlist | Connect the provider, or set `RAIKER_MODEL_EGRESS_ALLOWLIST` |
+| `connector_vault_key_invalid` | The stored key is not a valid Fernet key | Settings → Security & Login → Generate key |
+| `connector_vault_key_unset` | Only on a **read**: credentials exist but the key is gone, so they cannot be decrypted | Restore the key, or clear and re-enter the affected credentials. Writes provision a key automatically; reads deliberately do not, because minting a new key would hide a real problem. |
 | `hosted_api_key_missing` | Hosted provider needs a key | Paste it into the sign-in dialog |
 | `provider_api_key_missing:<VAR>` | Key absent from dialog and environment | Paste it, or set `<VAR>` before starting |
 | `model_name_not_configured` | No model pinned on the profile | **Choose model…** on the provider card |
@@ -23,10 +29,11 @@ alongside the code, this table is the complete reference.
 | `unknown_provider:<name>` | Unrecognised provider in a profile | Fix the profile in `config/model-profiles.json` |
 | `test_provider_not_available` | Raiker ships no mock provider | Pick a real backend |
 
-**Why the egress allowlist is not editable in the app.** It is the last boundary
-before bytes leave your machine. If a browser session could widen it, a
-compromised session could widen its own egress. It stays process configuration
-on purpose.
+**How egress is decided.** Configuring a provider authorises that profile's own
+endpoint — that host, and nothing else. There is no blanket opening, and no
+in-app control that widens egress to an arbitrary host: to reach a host that
+belongs to no configured provider you still set `RAIKER_MODEL_EGRESS_ALLOWLIST`
+in the process environment.
 
 ## Capabilities and runtime
 
@@ -42,7 +49,7 @@ on purpose.
 | Symptom | Cause |
 |---|---|
 | "No model is selected yet, so the runtime will refuse the turn" | Choose a profile in Models, or the Chat model selector |
-| Raiker forgets what you said one message ago | **Known defect BUG-02** — prior turns are not sent to the model. Restate context in each turn. |
+| Raiker forgets what you said one message ago | **Fixed.** Prior completed turns of the session are replayed to the model, bounded by the model's context window. A turn with no reply is skipped, and other chats are never mixed in. |
 | Reply shows `# heading` and `\|table\|` as raw text | **Known defect BUG-03** — markdown is not rendered |
 | Part of a reply reads `***REDACTED***` | **Known defect BUG-04** — over-broad redaction can wipe prose containing "secret", "token", or "password" |
 | "Context capacity is not configured for this model" | That profile has no documented context window. Honest, not an error. |

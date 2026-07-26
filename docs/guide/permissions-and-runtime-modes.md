@@ -10,6 +10,32 @@ how the agent must ask before doing something it is already allowed to do.
 
 ---
 
+## Configuring something is permission for it
+
+Raiker's stated posture (`docs/HANDOFF.md` → "Security posture") is
+**owner-authoritative and monitored, not prevention-by-restriction**. A gate in
+front of a choice the owner has already, deliberately made is not security — it
+is friction that teaches people to click through warnings.
+
+So **saving a provider's credential is the authorization to use that provider**,
+and the endpoint you configured is authorised with it. You are not asked to
+separately flip a switch, separately allowlist the host, and separately create
+an encryption key before the thing you just set up will work.
+
+What that does *not* change:
+
+- Every turn still runs through the same policy, approval, audit, and
+  monitoring paths. Consent by configuration changes who has to click, not what
+  gets recorded.
+- **Explicit revocation wins.** A capability you deliberately turn off stays
+  off, whatever is configured.
+- Consent is **scoped**. Configuring Anthropic authorises `api.anthropic.com`,
+  not every host on the internet.
+- Deferred dangerous domains remain unavailable, and critical actions still stop
+  for approval.
+
+---
+
 ## Runtime modes
 
 **Settings → General → Runtime mode.** Modes, least to most permissive:

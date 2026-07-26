@@ -53,14 +53,29 @@ Approving **records your decision; it does not run the action**
 (`executes_action: false`). Filters (Pending / Approved / Denied) and sorting
 (highest risk / newest) are on the same page.
 
+## Conversation memory
+
+Raiker replays the prior completed turns of the conversation to the model, so a
+follow-up question works: tell it a codeword and ask for it two turns later and
+it has it.
+
+- Only **completed** exchanges are replayed. A turn still running, failed, or
+  waiting on an approval is skipped — a prompt with no answer would read to the
+  model as an unanswered question.
+- History is bounded by the model's context window (half of a known capacity,
+  or a conservative default when it publishes none). When it will not all fit,
+  the **oldest** exchanges are dropped, because a follow-up depends on what was
+  said recently.
+- History never crosses conversations. A new chat starts genuinely empty.
+
+The replay is recorded as a `conversation_history_replayed` audit event carrying
+counts only — how many messages and how many characters — never the transcript.
+
 ## Known limits
 
 Three things do not work yet. They are tracked in
 [To be fixed](../plans/TO_BE_FIXED.md):
 
-- **No conversation memory (BUG-02).** Prior turns are shown on screen but are
-  not sent to the model. Ask a follow-up question and Raiker will say it has no
-  record of what you just told it. Put everything a turn needs into that turn.
 - **Markdown is not rendered (BUG-03).** Headings, tables, lists, and fenced
   code blocks appear as raw text.
 - **No export (BUG-08).** There is no download, PDF, or print control, and an

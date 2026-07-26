@@ -17,7 +17,8 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-01 | High | Models | Fixed |
 | FIXED-02 | High | Chat / API redaction | Fixed |
 | FIXED-03 | Medium | Models / Chat / Build | Fixed |
-| BUG-02 | **Critical** | Chat orchestration | Open |
+| FIXED-04 | **Critical** | Chat orchestration | Fixed (was BUG-02) |
+| FIXED-05 | High | Models / policy | Fixed |
 | BUG-03 | High | Chat rendering | Open |
 | BUG-04 | High | API redaction | Open |
 | BUG-06 | Medium | Approvals | Open (by design — needs a decision) |
@@ -175,7 +176,69 @@ now pulled from the provider and the hardcoded value is gone.
 
 ---
 
-## BUG-02 — Chat has no conversation memory at all *(critical)*
+## FIXED-05 — Three separate walls in front of a provider the owner had already chosen
+
+**Status: fixed in this change.**
+
+**Observed.** A first-time setup hit three refusals in sequence, each requiring a
+different surface to resolve:
+
+1. `provider_requires_explicit_policy_approval` — the `hosted_model_runtime`
+   capability gate was off.
+2. `model_egress_denied:no_allowlist` — no host on `RAIKER_MODEL_EGRESS_ALLOWLIST`.
+3. `connector_vault_key_unset` — no Fernet key to encrypt the credential with.
+
+FIXED-01 made each one *explainable*. It did not make any of them go away.
+
+**Why they were wrong.** `docs/HANDOFF.md` → "Security posture" is explicit:
+
+> Raiker is **owner-authoritative and monitored, not prevention-by-restriction.**
+> […] Do **not** put a hard block in front of the owner's legitimate choices by
+> default — allow, monitor, surface anomalies […] Reserve hard prevention for a
+> last resort.
+
+and reconciles it with the fail-closed rule:
+
+> Fail closed: a missing gate, policy, credential, allowlist, executor, or
+> approval denies the action. *(This is honesty — no fabricated success — not a
+> wall in front of the owner.)*
+
+Pasting an API key **is** the owner's legitimate choice, made deliberately while
+authenticated. Requiring them to then discover a capability gate, an environment
+variable, and a key-generation button before that choice took effect was a wall,
+not honesty.
+
+**Fix applied.**
+
+- **Gate.** `provider_runtime_policy_from_gates` now treats a saved connection as
+  the authorization. `gate_explicitly_disabled` distinguishes "no decision
+  recorded" (the runtime's synthesised fail-closed default) from "the owner
+  turned this off", so **revocation still wins absolutely**.
+- **Egress.** A configured connection authorises that profile's own resolved
+  endpoint — that host and no other. `RAIKER_MODEL_EGRESS_ALLOWLIST` still works
+  for pre-authorising hosts, and an unconfigured profile still fails closed.
+- **Vault key.** Provisioned on the credential **write** path at `0600`. It is a
+  locally generated encryption key, not a passphrase the owner invents, so the
+  resulting key was identical either way. Reads deliberately do **not**
+  provision: a missing key on read means existing credentials genuinely cannot
+  be decrypted, and minting a fresh one would hide a real problem.
+
+**Verified live** on a workspace with no environment allowlist, no vault key, no
+runtime mode, and no gates: register → Models → Connect → paste key →
+`200 {"connection_configured": true}`.
+`working/95-clean-first-run-connect.png`.
+
+**What is still refused**, covered by `tests/test_owner_consent_and_history.py`:
+an account that has configured nothing; a host belonging to no configured
+provider; a gate the owner explicitly disabled; another principal's connections;
+and every deferred dangerous domain. Approvals, audit, and the STOP switch are
+untouched.
+
+---
+
+## FIXED-04 — Chat had no conversation memory at all *(was BUG-02, critical)*
+
+**Status: fixed in this change.**
 
 **Observed.** In a **single** chat:
 
@@ -198,11 +261,34 @@ impossible. It also makes the context meter meaningless even once FIXED-02 lands
 `assign_session_project` / clarification flows in
 `2026-07-26-chat-tasks-and-project-assignment-design.md` cannot work without it.
 
-**Proposed fix.** Load the session's prior turns in the gateway and append them
-as alternating `user`/`assistant` `ModelMessage`s before the current prompt,
-bounded by the profile's context window, with the existing checkpoint and
-compaction machinery trimming the head. This is the natural consumer of Task 2 in
-the composer-context plan and should land with it.
+**Fix applied.** `raiker/runtime/conversation_history.py` rebuilds the prior
+completed exchanges from the persisted `turns` rows — the same rows the Chat view
+hydrates from, so what the model sees and what the user sees have one source —
+and the orchestrator appends them before the current prompt.
+
+- Only **completed** exchanges are replayed. A turn with no reply would put an
+  unanswered question in front of the model and skew the next response.
+- Bounded by the model's context window: half of a provider-reported capacity,
+  or a conservative default. When it will not all fit, the **oldest** exchanges
+  are dropped, because a follow-up depends on recent context.
+- Scoped to the session, so a new chat still starts genuinely empty.
+- Recorded as a `conversation_history_replayed` audit event carrying counts
+  only, never the transcript.
+
+Also raised: `close_turn` truncated the persisted reply to 500 characters, which
+silently truncated both the replayed history *and* the transcript the Chat view
+renders on resume. Now `TURN_SUMMARY_MAX_CHARS = 8000`.
+
+**Verified live** on a bare workspace: "Remember this codeword: MARIGOLD-42" then
+"What was the codeword?" → `MARIGOLD-42`. A separate new chat asked the same
+question replied `NONE`. `working/96-conversation-memory-fixed.png`,
+`working/97-cross-chat-isolation.png`. Covered by
+`tests/test_owner_consent_and_history.py`.
+
+**Caught during this fix:** the first implementation emitted an unregistered
+event type and killed the stream mid-turn — a direct violation of HANDOFF's
+"Add a typed event to `EVENT_TYPES` before emitting it". The event is now
+registered and documented in `docs/EVENT_CATALOG.md`.
 
 ---
 

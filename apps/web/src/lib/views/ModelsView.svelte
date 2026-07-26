@@ -369,7 +369,13 @@
       case "anthropic":
         return { tint: "#d97757", headline: "Connect to Anthropic", credentialLabel: "Anthropic API key", hint: "Create a key at console.anthropic.com. Anthropic uses API keys only — no email login.", authMethods: ["apikey"], loginUrl: "https://console.anthropic.com/settings/keys", loginLabel: "Get an Anthropic key" };
       case "openai":
-        return { tint: "#10a37f", headline: "Connect to OpenAI", credentialLabel: "OpenAI API key", hint: "Create a key at platform.openai.com. OpenAI also lets you sign in to your account to manage keys.", authMethods: ["login", "apikey"], loginUrl: "https://platform.openai.com/api-keys", loginLabel: "Sign in to OpenAI" };
+        // Sign-in here means signing in to the OpenAI *platform* account —
+        // Google, Microsoft, and Apple all work — to create an API key, which
+        // is then pasted below. It deliberately does not claim to use a ChatGPT
+        // subscription: ChatGPT Plus/Pro and the API are separately billed, and
+        // no subscription grants a third-party app API access. Saying so here
+        // is cheaper than a user discovering it through a 401.
+        return { tint: "#10a37f", headline: "Connect to OpenAI", credentialLabel: "OpenAI API key", hint: "Sign in to platform.openai.com with Google, Microsoft, Apple, or email, then create an API key and paste it below. API usage is billed separately from a ChatGPT subscription — a Plus or Pro plan does not include API access.", authMethods: ["login", "apikey"], loginUrl: "https://platform.openai.com/api-keys", loginLabel: "Sign in with Google or email" };
       case "gemini":
         return { tint: "#4285f4", headline: "Connect to Google AI", credentialLabel: "Gemini API key", hint: "Create a key in Google AI Studio. Google also supports sign-in with your Google account via Vertex AI.", authMethods: ["login", "apikey"], loginUrl: "https://aistudio.google.com/apikey", loginLabel: "Sign in with Google" };
       case "openrouter":

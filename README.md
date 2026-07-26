@@ -34,27 +34,35 @@ request thereafter resolves an **acting-principal**.
 
 To connect a hosted model, start the server with the provider's host allowlisted:
 
-```bash
-RAIKER_MODEL_EGRESS_ALLOWLIST='api.anthropic.com' raiker-web --workspace . --no-browser
-```
+To connect a hosted model, open **Models**, press **Connect** on the provider,
+and paste your API key. That is the whole flow — see
+[Connecting a model](docs/guide/connecting-a-model.md).
 
-Then follow [Connecting a model](docs/guide/connecting-a-model.md) — four steps,
-about ten minutes.
+## Owner-authoritative and monitored
 
-## Raiker fails closed, and that is the point
+Raiker is **owner-authoritative and monitored, not prevention-by-restriction**.
+Security here is not restricting you; it is letting you operate without having
+your own access taken away.
 
-On a fresh account **every one of Raiker's 62 capability gates is off**, no model
-provider is reachable, and no credential can be stored. Nothing is broken; you
-have not opened anything yet.
+**Configuring something is permission for it.** Saving a provider's credential
+is the authorization to use that provider, and the endpoint you configured is
+authorised with it. You are not then asked to satisfy a separate switch, a
+separate host allowlist, and a separate encryption key before the thing you just
+set up will run.
 
-Four independent controls stand between an AI-proposed action and it happening:
+That consent is scoped and revocable, never a blanket opening: configuring
+Anthropic authorises `api.anthropic.com` and nothing else, a provider you have
+not configured still fails closed, and a capability you *explicitly* turn off
+stays off whatever is configured.
+
+Controls that stand between an AI-proposed action and it happening:
 
 | Control | Where | What it decides |
 |---|---|---|
 | **Runtime mode** | Settings → General | How far *any* capability may be enabled |
 | **Capability gate** | Permissions | Whether this capability exists for you at all |
 | **Decision mode** | Permissions, or the Chat composer | Ask / Allow / Auto / Deny before each action |
-| **Egress allowlist** | `RAIKER_MODEL_EGRESS_ALLOWLIST` (process configuration) | Which hosts may be reached |
+| **Approval** | Approvals | A human decision on the specific proposed action |
 
 Opening a higher-risk gate is a governed step-up: a human `runtime_gate_manager`,
 a reason, a confirmation token, and a threat-model acknowledgement — all recorded
@@ -108,8 +116,6 @@ plus drawer to 1023 px, and the full sidebar at 1024 px and above.
 
 Raiker's documentation does not run ahead of its code. As of 2026-07-26:
 
-- **Chat has no conversation memory.** Prior turns render on screen but are not
-  sent to the model.
 - **Markdown is not rendered in Chat**, and there is no export, download, or PDF
   control anywhere.
 - **MCP servers cannot be used by the agent** — create, connect, and monitor all

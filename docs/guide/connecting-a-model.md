@@ -1,110 +1,64 @@
 # Connecting a model
 
-Raiker will not talk to any model until you say so, and a hosted provider needs
-four separate permissions. This is the fail-closed design working as intended —
-but the order matters, and doing it out of order produces refusals that look
-like faults. Follow the four steps below.
+Connecting a provider is one step: paste your API key. That act is your
+authorization — Raiker does not then ask you to satisfy a separate switch, a
+separate allowlist, and a separate key before it will use what you just
+configured.
 
-> **Local models (llama.cpp, Ollama, LM Studio) skip steps 1–3.** Start the
-> local server, then go straight to step 4 and press **Select**. Nothing leaves
-> your machine, so no gate, vault key, or allowlist is involved.
+This follows the project's stated posture (`docs/HANDOFF.md` → "Security
+posture"): Raiker is **owner-authoritative and monitored, not
+prevention-by-restriction**. Every turn is still policy-checked, audited, and
+stoppable; what changed is that you are not made to prove a choice you already
+made.
+
+> **Local models (llama.cpp, Ollama, LM Studio)**: start the local server, press
+> **Choose model…**, then **Select**. Nothing leaves your machine.
 
 ---
 
-## Step 0 (hosted only) — allow the provider's host to be reached
+## Connect a hosted provider
 
-The model egress allowlist is **process configuration**, not an in-app setting.
-It is the last boundary before bytes leave your machine, so a browser session
-can never widen it. Set it before starting the server:
+**Models** → the provider's card → **Connect** → paste the key → **Connect**.
 
-```bash
-export RAIKER_MODEL_EGRESS_ALLOWLIST='api.anthropic.com'
-raiker-web --workspace . --no-browser
-```
+That is the whole flow. Behind it:
 
-Comma-separated hostname globs. Common values:
-
-| Provider | Host |
+| What used to be required | What happens now |
 |---|---|
-| Anthropic | `api.anthropic.com` |
-| OpenAI | `api.openai.com` |
-| Gemini | `generativelanguage.googleapis.com` |
-| OpenRouter | `openrouter.ai` |
-| Hugging Face | `router.huggingface.co` |
-| Ollama Cloud | `ollama.com` |
+| Turn on the **Hosted models** capability gate first | A saved connection is the authorization. The gate remains, and turning it **off** still revokes access. |
+| Add the host to `RAIKER_MODEL_EGRESS_ALLOWLIST` and restart | The endpoint on the profile you configured is authorised — that host and no other. The environment variable still works for pre-authorising hosts before you configure them. |
+| Generate a vault key in Settings first | The key is generated on first use at `0600`. Settings still owns viewing, rotating, and clearing it. |
 
-Without it, connecting reports `model_egress_denied:no_allowlist`.
+Then press **Choose model…** — Raiker asks the provider for its live catalogue —
+pick a model, and **Use model**.
 
----
+### What is still refused
 
-## Step 1 — activate a runtime mode
+Consent by configuration is scoped, not a blanket opening:
 
-**Settings → General → Runtime mode.** The default, *Development preview*, keeps
-every capability off, so gates can only reach a policy-gated state and surfaces
-that require a true runtime capability stay disabled.
+- A provider you have **not** configured still fails closed.
+- Configuring Anthropic authorises `api.anthropic.com`. It does not authorise
+  any other host.
+- A capability gate you **explicitly** turn off wins over a saved connection.
+  Revocation is absolute, or the control would be theatre.
+- Deferred dangerous domains — remote and cloud execution, finance, medical,
+  pregnancy, CCTV, home security, hardware — have no governed executor and stay
+  unavailable regardless.
+- Critical actions still stop for approval, and the STOP switch still halts work
+  at a safe boundary.
 
-Choose **Local single user runtime**, press **Activate**, give a reason, and
-confirm. The banner then reads *"Local single user runtime · active"*.
+### Signing in with Google
 
----
+**OpenAI** and **Gemini** cards offer a sign-in link. It opens the provider's own
+console — where Google, Microsoft, and Apple sign-in all work — so you can create
+an API key, which you then paste into Raiker.
 
-## Step 2 — set a vault key
+**A ChatGPT subscription does not include API access.** ChatGPT Plus and Pro are
+billed separately from the OpenAI API, and no subscription grants a third-party
+application API access on your behalf. If you have Plus or Pro and no API
+credit, calls will fail with a quota error however you signed in. The dialog says
+this up front so it is not discovered through a 401.
 
-**Settings → Security & Login → Connector Vault Key.** This Fernet key encrypts
-every credential Raiker stores, so without it your API key cannot be saved at
-all (`connector_vault_key_unset`).
-
-Press **Generate key**, enter your password under *Confirm password (elevated
-re-auth)*, then **Save key**. The badge flips to **Active / Valid**.
-
-You can also generate one yourself:
-
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-
-A passphrase will not work — it must be 32 random bytes as URL-safe base64.
-
----
-
-## Step 3 — open the model capability gate
-
-**Permissions.** Search for `Hosted` (or `Home-lab` for a private-network
-endpoint), expand **Hosted models**, and press **Turn on**. The step-up dialog
-asks for three things:
-
-| Field | What to enter |
-|---|---|
-| Reason | Why you are making this change. Recorded against your principal. |
-| Confirmation token | **Any phrase you type.** It is not a secret you have to obtain — it is a deliberate speed bump recording that a human intended this. |
-| Threat-model acknowledgement | Tick to confirm you accept the risk. |
-
-Without this you get `provider_requires_explicit_policy_approval`.
-
----
-
-## Step 4 — connect the provider and pick a model
-
-**Models.** Providers are grouped **On this device** (llama.cpp, Ollama, LM
-Studio), **Your hosted providers** (Anthropic, OpenAI, Gemini), and **Advanced
-connections** (Ollama Cloud, OpenAI-compatible, OpenRouter, Hugging Face). A
-setup meter at the top tracks how many are ready.
-
-1. Press **Connect** on the provider card.
-2. Paste the API key. It is encrypted into this instance's vault and never
-   returned to the browser. Use **Advanced: custom endpoint** for a proxy or a
-   self-hosted gateway.
-3. Press **Connect**. The card flips to **Connected**.
-4. Press **Choose model…**. Raiker asks the provider for its live catalogue —
-   for Anthropic that returns the current Claude models. If a provider does not
-   support listing, type the model id instead.
-5. Select a model and press **Use model**, then **Select** to make the profile
-   active.
-6. **Test** confirms the provider responds.
-
-Chat's model selector then offers every *configured* profile — one with a pinned
-model. It never lists an unconfigured provider and never accepts a free-text
-model id.
+Anthropic issues API keys only — there is no account sign-in to connect.
 
 ---
 

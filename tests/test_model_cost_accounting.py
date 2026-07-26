@@ -8,10 +8,12 @@ never as zero. "$0.00" must always mean "this was free".
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
 from raiker.models.pricing import (
+    ModelFacts,
     ModelPrice,
     facts_from_provider_metadata,
     price_from_config,
@@ -29,7 +31,7 @@ CONFIG_PRICING = {
 
 
 @pytest.fixture()
-def store(tmp_path):
+def store(tmp_path: Path) -> SQLiteStore:
     created = SQLiteStore(tmp_path)
     created.bootstrap()
     return created
@@ -129,7 +131,7 @@ class TestCost:
 
 
 class TestLedger:
-    def test_a_turn_is_recorded_and_aggregated_by_model(self, store) -> None:
+    def test_a_turn_is_recorded_and_aggregated_by_model(self, store: SQLiteStore) -> None:
         ledger = ModelUsageLedger(store)
         assert ledger.record(
             owner_principal_id="p1",
@@ -151,7 +153,7 @@ class TestLedger:
         assert rows[0].totals.output_tokens == 500
         assert rows[0].totals.turns == 2
 
-    def test_a_turn_with_no_reported_usage_writes_no_row(self, store) -> None:
+    def test_a_turn_with_no_reported_usage_writes_no_row(self, store: SQLiteStore) -> None:
         # A missing count must not become a zero that later reads call "free".
         ledger = ModelUsageLedger(store)
         assert not ledger.record(
@@ -162,7 +164,7 @@ class TestLedger:
         )
         assert ledger.session_usage("p1", "s") == []
 
-    def test_usage_is_scoped_to_its_owner(self, store) -> None:
+    def test_usage_is_scoped_to_its_owner(self, store: SQLiteStore) -> None:
         ledger = ModelUsageLedger(store)
         ledger.record(
             owner_principal_id="p1",
@@ -174,7 +176,7 @@ class TestLedger:
         assert ledger.provider_usage("p1") != []
         assert ledger.provider_usage("p2") == []
 
-    def test_provider_totals_span_sessions_and_models(self, store) -> None:
+    def test_provider_totals_span_sessions_and_models(self, store: SQLiteStore) -> None:
         ledger = ModelUsageLedger(store)
         for session, model in (("s1", "haiku"), ("s2", "haiku"), ("s2", "opus")):
             ledger.record(
@@ -201,11 +203,11 @@ class TestMixedModelPricing:
     CHEAP = {"models": {"cheap": {"input": 1.0, "output": 5.0}}, "currency": "USD"}
     DEAR = {"models": {"dear": {"input": 15.0, "output": 75.0}}, "currency": "USD"}
 
-    def _facts(self, model: str):
+    def _facts(self, model: str) -> ModelFacts:
         pricing = self.CHEAP if model == "cheap" else self.DEAR
         return resolve_model_facts(provider="anthropic", model=model, config_pricing=pricing)
 
-    def test_each_model_is_priced_at_its_own_rate(self, store) -> None:
+    def test_each_model_is_priced_at_its_own_rate(self, store: SQLiteStore) -> None:
         ledger = ModelUsageLedger(store)
         for model in ("cheap", "dear"):
             ledger.record(
@@ -228,7 +230,7 @@ class TestMixedModelPricing:
         assert blended == Decimal("30")
         assert blended != per_model
 
-    def test_an_unpriced_model_is_skipped_not_counted_as_free(self, store) -> None:
+    def test_an_unpriced_model_is_skipped_not_counted_as_free(self, store: SQLiteStore) -> None:
         ledger = ModelUsageLedger(store)
         ledger.record(
             owner_principal_id="p1",

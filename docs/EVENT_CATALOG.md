@@ -6,6 +6,7 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 | Event | Meaning |
 |---|---|
 | `prompt_received` | A client submitted a turn |
+| `conversation_history_replayed` | Prior turns of the session were sent to the model as context (message count and character total only — never the transcript) |
 | `policy_decision` | Policy classified the requested action |
 | `approval_requested` | A human decision is required |
 | `approval_denied` | A human or policy denied the action |

@@ -11,7 +11,7 @@ from urllib.parse import quote, urlencode, urlparse
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
 
-from raiker.auth.vault_key_file import effective_vault_key
+from raiker.auth.vault_key_file import effective_vault_key, ensure_vault_key
 from raiker.contracts.ids import new_id, utc_now
 from raiker.runtime.executors.sandbox import connector_egress_allowlist
 from raiker.storage.sqlite import SQLiteStore
@@ -71,8 +71,24 @@ class ConnectorVault:
             return False
         return True
 
-    def _fernet(self) -> Fernet:
+    def _fernet(self, *, provision: bool = False) -> Fernet:
+        """The workspace's vault cipher.
+
+        ``provision`` is set only on the write path. The vault key is a locally
+        generated encryption key, not a passphrase the owner invents, so making
+        them go and press "Generate key" before they may save a credential was
+        friction with no security benefit — the resulting key is identical
+        either way, and `connector_vault_key_unset` was the most common
+        first-run dead end.
+
+        Reads never provision. If the key is missing on a read, existing
+        credentials genuinely cannot be decrypted, and saying so is the honest
+        answer; minting a fresh key there would hide a real problem behind an
+        empty result.
+        """
         value = effective_vault_key(self.store.paths.workspace_root)
+        if not value and provision:
+            value = ensure_vault_key(self.store.paths.workspace_root)
         if not value:
             raise ValueError("connector_vault_key_unset")
         try:
@@ -90,7 +106,7 @@ class ConnectorVault:
         clean = {str(k): str(v) for k, v in payload.items() if str(v)}
         if not clean:
             raise ValueError("credential_empty")
-        encrypted = self._fernet().encrypt(
+        encrypted = self._fernet(provision=True).encrypt(
             json.dumps(clean, sort_keys=True, separators=(",", ":")).encode("utf-8")
         )
         now = utc_now()

@@ -673,14 +673,14 @@ class ToolBroker:
                 return failed, decision
         else:
             try:
-                raw = (
-                    context_executor(
+                if context_executor is not None:
+                    raw = context_executor(
                         action.arguments,
                         ToolExecutionContext(session_id=session_id, principal_id=self.principal_id),
                     )
-                    if context_executor is not None
-                    else executor(action.arguments)
-                )
+                else:
+                    assert executor is not None
+                    raw = executor(action.arguments)
             except FilesystemSafetyError as exc:
                 raw = {"status": "failed", "error": {"type": str(exc)}}
         status = "success" if raw.get("status") == "success" else ("denied" if raw.get("status") == "denied" else "failed")

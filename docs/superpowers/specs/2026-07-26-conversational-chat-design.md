@@ -26,6 +26,13 @@ the runtime's complete technical record in Sessions and Checkpoints.
 - Show one automatic, compact reaction below an applicable Raiker reply. The
   supported repertoire includes smileys, hand gestures, hearts, and related
   conversational emoji. Reactions are optional and never shown as a status.
+- Render Raiker's reply as Markdown — headings, lists, GFM tables, fenced code
+  with its language, blockquotes, rules, and inline code, emphasis and links.
+  The user's own bubble stays verbatim text. Rendering is escape-first over a
+  closed tag set, so raw HTML in a model reply is shown as characters and never
+  executed, links carry `rel="noopener noreferrer nofollow ugc"` and a
+  scheme allowlist, and an image renders as a link so nothing fetches remotely.
+  This is the same posture the file-inspector design states for previews.
 
 ## Information boundaries
 
@@ -42,7 +49,10 @@ It derives response text, a conversational streaming label, and a safe
 plain-language thinking summary from existing stream events. A small,
 deterministic reaction selector derives at most one emoji from the completed
 assistant response, avoiding a backend contract change. Existing persisted
-session history continues to render as normal message bubbles.
+session history continues to render as normal message bubbles. Assistant text
+passes through `components/Markdown.svelte`, the single supported caller of the
+dependency-free renderer in `lib/markdown.ts` and the only place `{@html}` is
+used for model output; Build renders its answers through the same component.
 
 ## Error handling and accessibility
 
@@ -56,5 +66,7 @@ label. Reaction emoji have descriptive accessible text.
 Add focused component tests that prove the transcript has no governance or
 completion metadata, shows each streaming label at the correct time, toggles
 the thinking disclosure, renders appropriate automatic reactions, and preserves
-history and error behaviour. Run the Chat view tests, the web type check, and
+history and error behaviour. Markdown carries its own unit and component suites
+covering each supported construct and, separately, that raw HTML, event-handler
+attributes, unsafe URL schemes and remote images cannot reach the DOM. Run the Chat view tests, the web type check, and
 the production web build.

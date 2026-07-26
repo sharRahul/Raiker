@@ -4,6 +4,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
+  import Markdown from "../components/Markdown.svelte";
   import PermissionModeControl from "../components/PermissionModeControl.svelte";
   import { api, ApiError, streamPrompt } from "../api";
   import type { AgentResponse, ContextUsage, ModelProfile, SessionDetail, StreamEvent } from "../apiTypes";
@@ -572,7 +573,9 @@
           {/if}
 
           {#if answer !== ""}
-            <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer">{answer}</p></div>
+            <div class="message-bubble message-bubble-raiker">
+              <Markdown text={answer} />
+            </div>
           {:else if !turn.streaming && turn.error === null && turn.response !== null}
             <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">(No answer text was returned.)</p></div>
           {/if}

@@ -21,6 +21,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
+  import Markdown from "../components/Markdown.svelte";
   import RepoConnector from "../components/RepoConnector.svelte";
   import { api, ApiError, streamPrompt } from "../api";
   import type {
@@ -488,7 +489,7 @@
             {/if}
 
             {#if answer !== ""}
-              <div class="answer"><p class="bubble-text">{answer}</p></div>
+              <div class="answer"><Markdown text={answer} /></div>
             {:else if !turn.streaming && turn.error === null && turn.response !== null}
               <div class="answer"><p class="bubble-text muted">(No answer text was returned.)</p></div>
             {/if}

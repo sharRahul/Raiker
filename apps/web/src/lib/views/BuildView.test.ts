@@ -386,3 +386,28 @@ describe("Build background work rail", () => {
     });
   });
 });
+
+describe("Build transcript rendering", () => {
+  // Build shows the same model prose as Chat, so the BUG-03 fix has to reach
+  // it too — a plan full of code fences is exactly what this view produces.
+  it("renders a markdown answer as real elements", async () => {
+    stubFetch(baseRoutes());
+    respondWith("## Plan\n\n1. Read the file\n2. Patch it\n\n```ts\nconst x = 1;\n```");
+    render(BuildView);
+
+    await fireEvent.input(await screen.findByLabelText("Describe the change"), {
+      target: { value: "Plan the change" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+
+    const answer = await waitFor(() => {
+      const el = document.querySelector(".from-raiker .markdown");
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    expect(answer.querySelectorAll("h2")).toHaveLength(1);
+    expect(answer.querySelectorAll("ol > li")).toHaveLength(2);
+    expect(answer.querySelector("pre code")?.textContent).toBe("const x = 1;");
+    expect(answer.textContent).not.toContain("## Plan");
+  });
+});

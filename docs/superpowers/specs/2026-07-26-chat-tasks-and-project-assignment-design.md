@@ -44,6 +44,12 @@ chat receipt. Failed, denied, or unresolved actions receive a concise
 user-facing explanation without claiming completion. Existing task and session
 events provide the audit trail in Tasks, Sessions, and Checkpoints.
 
+For these two local, reversible actions, approval resolution resumes the exact
+previously validated action once. The resume record carries the original action
+id plus trusted principal/session context, rejects a second execution, and
+emits the normal tool completion evidence. It never reconstructs arguments from
+new model text or a browser request.
+
 ## Data and validation
 
 - Task title is required and follows the existing task title limits.

@@ -14,6 +14,7 @@
 - The model never provides an arbitrary session id; project assignment targets the active chat session.
 - Ask for missing or ambiguous details; never silently select among duplicate projects.
 - Existing global approval/decision policy controls action execution; successful chat receipts contain no governance payload.
+- An approved task/project action resumes the exact validated action once with stored trusted context; approval never reconstructs model arguments.
 
 ---
 
@@ -82,6 +83,9 @@ git commit -m "feat(chat): plan task and project actions"
 - Modify: `raiker/tools/broker.py`
 - Modify: `raiker/gateway/agent_gateway.py`
 - Modify: `raiker/control/dashboard.py`
+- Modify: `raiker/approvals/inbox.py`
+- Modify: `raiker/storage/migrations.py`
+- Modify: `raiker/storage/sqlite.py`
 - Test: `tests/test_chat_actions.py`
 - Test: `tests/test_api_dashboard.py`
 
@@ -89,6 +93,7 @@ git commit -m "feat(chat): plan task and project actions"
 - `create_task` accepts `{title, description, scheduled_at?, reminder_at?, recurrence?, project_id?}`.
 - `assign_session_project` accepts `{project_id}` and obtains `session_id` solely from trusted broker execution context.
 - Completion returns `ChatActionReceipt(kind, title, destination, href)`.
+- `resume_local_chat_action(approval_id)` executes the stored action once after approval.
 
 - [ ] **Step 1: Write failing service-delegation tests**
 
@@ -101,6 +106,11 @@ def test_task_action_delegates_to_dashboard_and_returns_a_tasks_receipt(service,
 def test_project_action_uses_the_broker_session_not_model_arguments(service, owner) -> None:
     receipt = ChatActionExecutor(service, active_session_id="sess_1", principal_id=owner).assign_session_project({"project_id": "p1"})
     assert receipt.session_id == "sess_1"
+
+def test_approved_task_action_resumes_once_from_the_stored_action(client, owner_token) -> None:
+    approval = request_task_action(client, owner_token)
+    assert resolve_approval(client, approval, owner_token).json()["status"] == "executed"
+    assert resolve_approval(client, approval, owner_token).status_code == 409
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -114,7 +124,9 @@ handlers receive a trusted `ToolExecutionContext(session_id, principal_id)`.
 Handlers instantiate the existing dashboard service with that principal, call
 its existing methods, and translate only successful results into receipts.
 Reuse the normal tool approval/decision path; do not add an HTTP shortcut or
-direct SQLite write.
+direct SQLite write. Persist an action-resume record for only `create_task` and
+`assign_session_project`; approval resolution atomically claims it before calling
+the same executor, making retries idempotent.
 
 - [ ] **Step 4: Run backend tests**
 

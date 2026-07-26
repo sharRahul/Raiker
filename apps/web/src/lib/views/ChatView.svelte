@@ -701,7 +701,7 @@
           >
             <option value="">Planning: auto</option>
             <option value="always">Always plan</option>
-            <option value="never">Never plan</option>
+            <option value="never_safe_only">Never plan</option>
           </select>
 
           <select

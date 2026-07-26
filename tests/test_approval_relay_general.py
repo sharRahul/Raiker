@@ -286,7 +286,9 @@ def test_relay_dispatches_tier2_shell(tmp_path: Path) -> None:
         action_id="act_1",
         tool_name="shell",
         risk_level="medium",
-        arguments={"command": ["echo", "relayed"]},
+        # `echo` is a shell builtin on Windows, whereas `python` is an
+        # explicitly allowed executable on every supported test platform.
+        arguments={"command": ["python", "-c", "print('relayed')"]},
     )
 
     relay = ApprovalExecutionRelay(ws, store)

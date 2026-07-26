@@ -12,6 +12,8 @@ owner can approve from any surface. These tests pin:
 
 from __future__ import annotations
 
+import shlex
+import sys
 from pathlib import Path
 
 import pytest
@@ -111,8 +113,16 @@ def test_os_notification_fires_when_configured(
 ) -> None:
     marker = tmp_path / "fired.txt"
     # A harmless owner-configured command that records that it ran. Title/body are
-    # appended as $1/$2 (here ignored) — `$0` is the marker path, so no stray
-    # files are created from the notification copy.
-    monkeypatch.setenv(OS_NOTIFY_ENV, f'sh -c \'touch "$0"\' {marker}')
+    # appended after the marker and ignored by the Python snippet.  Using the
+    # current interpreter keeps this hook-contract test portable on Windows.
+    command = shlex.join(
+        [
+            sys.executable,
+            "-c",
+            "from pathlib import Path; import sys; Path(sys.argv[1]).touch()",
+            str(marker),
+        ]
+    )
+    monkeypatch.setenv(OS_NOTIFY_ENV, command)
     assert fire_os_notification("Approval needed", "body") is True
     assert marker.exists()

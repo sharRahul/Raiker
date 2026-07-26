@@ -193,6 +193,33 @@ describe("ChatView streaming transcript", () => {
     expect(body.model).toBe("qwen2.5");
   });
 
+  it("sends the server's safe-only planning mode when Never plan is selected", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: finalResponse("OK"),
+        } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    await fireEvent.change(screen.getByLabelText("Planning"), {
+      target: { value: "never_safe_only" },
+    });
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "hi" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledOnce());
+    const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(body.planning_mode).toBe("never_safe_only");
+  });
+
   it("names the persisted selection in the provider dropdown default option", async () => {
     stubFetch({
       ...MODELS_ROUTE,

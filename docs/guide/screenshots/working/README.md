@@ -35,5 +35,9 @@ documented (including Raiker correctly *failing closed* with honest errors).
 | `27-anthropic-connected.png` | Anthropic key connected after enabling the gate |
 | `28-anthropic-model-selected.png` | `claude-haiku-4-5-…` selected as the active model |
 | `29-hosted-anthropic-live-reply.png` | A **live governed Anthropic reply** in Chat |
+| `30-live-anthropic-model-selected.png` | 2026-07-26: Anthropic connected and `claude-haiku-4-5-20251001` selected |
+| `31-live-anthropic-first-chat.png` | 2026-07-26: first completed live Anthropic chat (`BLUE`) |
+| `32-live-anthropic-second-chat.png` | 2026-07-26: second completed live Anthropic chat (`GREEN`) |
+| `33-live-task-controls.png` | 2026-07-26: task work-kind buttons, labelled dropdowns, and saved task |
 | `2026-07-22-workbench.png` | Current Control Deck workbench on a fresh local workspace |
 | `2026-07-22-task-types.png` | Task queue from the 2026-07-22 verification run after creating immediate, background, daily, and one-time work |

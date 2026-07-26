@@ -8,6 +8,7 @@
   import type { ModelProfile, ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
   import { humanize, providerName } from "../format";
+  import { formatCost, sourceNote, spendShares } from "../contextPresentation";
   import { providerErrorGuidance, type ProviderErrorGuidance } from "../providerErrors";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
@@ -297,7 +298,36 @@
 
   const sections = ["Local", "Hosted", "Advanced"] as const;
   const configuredProfiles = $derived((models?.profiles ?? []).filter((p) => p.connection_configured || p.selected));
-  const setupPercent = $derived(models?.profiles.length ? Math.round((configuredProfiles.length / models.profiles.length) * 100) : 0);
+  // A percentage of "all shipped profiles" was a meaningless denominator — a
+  // user who connects the one provider they intend to use is finished, not 10%
+  // finished. The honest headline is how many providers are actually ready.
+  const readyCount = $derived(configuredProfiles.length);
+
+  // Each provider's bar is its share of total spend across every provider, so
+  // it needs no configured budget to mean something. Providers with no cost
+  // (local runtimes, or ones never used) simply have no bar.
+  const spendByProfile = $derived(
+    spendShares(
+      (models?.profiles ?? []).map((p) => ({ id: p.profile_id, cost: p.total_cost })),
+    ),
+  );
+  const totalSpend = $derived(
+    (models?.profiles ?? []).reduce((sum, p) => {
+      const value = Number(p.total_cost);
+      return Number.isFinite(value) && value > 0 ? sum + value : sum;
+    }, 0),
+  );
+  const spendCurrency = $derived(
+    (models?.profiles ?? []).find((p) => p.total_cost && p.cost_currency)?.cost_currency ?? "USD",
+  );
+
+  function usageLine(profile: ModelProfile): string {
+    if (!profile.billable) return "No API cost — runs on this machine";
+    const used = profile.models_used ?? 0;
+    if (used === 0) return "Not used yet";
+    const turns = profile.turns_used ?? 0;
+    return `${used} model${used === 1 ? "" : "s"} used · ${turns} turn${turns === 1 ? "" : "s"}`;
+  }
   function profilesFor(section: "Local" | "Hosted" | "Advanced") {
     return (models?.profiles ?? []).filter((profile) => sectionFor(profile) === section);
   }
@@ -385,11 +415,14 @@
       <div>
         <p class="eyebrow">Model setup</p>
         <h2 id="model-setup-title">Choose where Raiker thinks</h2>
-        <p class="sub">{configuredProfiles.length} of {models.profiles.length} providers are ready or selected. Each connection belongs only to this Raiker instance.</p>
+        <p class="sub">Each connection belongs only to this Raiker instance. One ready provider is enough to work.</p>
       </div>
-      <div class="setup-meter" aria-label={`${setupPercent}% provider setup complete`}>
-        <strong>{setupPercent}%</strong><span>setup complete</span>
-        <div class="meter-track"><span style={`width: ${setupPercent}%`}></span></div>
+      <div class="setup-meter" aria-label={`${readyCount} of ${models.profiles.length} providers set up`}>
+        <strong>{readyCount} <span class="of">of {models.profiles.length}</span></strong>
+        <span>providers set up</span>
+        {#if totalSpend > 0}
+          <p class="total-spend">{formatCost(String(totalSpend), spendCurrency)} total API cost</p>
+        {/if}
       </div>
     </section>
 
@@ -423,6 +456,7 @@
                     {#if p.prompt_cache_ttl}<span class="chip chip-ok" title="Prompt caching cuts cost and latency by reusing the stable prompt prefix">Cache {p.prompt_cache_ttl}</span>{/if}
                   </div>
                 </div>
+                <div class="row-usage"><span>{usageLine(p)}</span></div>
                 <div class="row-actions">
                   <button type="button" class="btn btn-ghost btn-sm" onclick={() => void testConnection(p)} disabled={testFor === p.profile_id}>{testFor === p.profile_id ? "Testing…" : "Test"}</button>
                   <button type="button" class="btn btn-ghost btn-sm" onclick={() => detailsFor = p}>Details</button>
@@ -489,6 +523,30 @@
                   {#if p.runtime_gate}<span class="chip" title="Runtime gate that must be enabled">{capabilityLabel(p.runtime_gate)}</span>{/if}
                   {#if p.prompt_cache_ttl}<span class="chip chip-ok" title="Prompt caching cuts cost and latency">Cache {p.prompt_cache_ttl}</span>{/if}
                 </div>
+                <div class="usage-strip">
+                  <div class="usage-line">
+                    <span>{usageLine(p)}</span>
+                    {#if p.billable}
+                      <strong>{formatCost(p.total_cost, p.cost_currency) ?? "—"}</strong>
+                    {/if}
+                  </div>
+                  {#if spendByProfile[p.profile_id] !== undefined}
+                    <div
+                      class="meter-track"
+                      role="progressbar"
+                      aria-label={`${providerName(p.provider)} share of total API spend`}
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                      aria-valuenow={spendByProfile[p.profile_id]}
+                    >
+                      <span style={`width: ${spendByProfile[p.profile_id]}%`}></span>
+                    </div>
+                    <p class="usage-note">{spendByProfile[p.profile_id]}% of your total API spend{#if sourceNote(p.price_source, p.price_as_of)}&nbsp;· {sourceNote(p.price_source, p.price_as_of)}{/if}</p>
+                  {:else if p.billable && (p.turns_used ?? 0) > 0}
+                    <p class="usage-note">No price configured for the models used, so cost is unknown.</p>
+                  {/if}
+                </div>
+
                 <div class="pc-actions">
                   {#if !p.connection_configured}
                     <button type="button" class="btn btn-primary btn-sm pc-connect" onclick={() => openSignIn(p.profile_id)} style={`--brand:${b.tint}`}>Connect</button>
@@ -731,7 +789,14 @@
   .eyebrow { color:var(--accent); font-size:0.7rem; font-weight:750; letter-spacing:0.08em; margin:0 0 0.25rem; text-transform:uppercase; }
   .setup-meter { min-width:9rem; text-align:right; }
   .setup-meter strong { display:block; font-size:1.35rem; }
+  .setup-meter strong .of { color:var(--text-3); font-size:0.9rem; font-weight:500; }
   .setup-meter span { color:var(--text-3); font-size:0.75rem; }
+  .setup-meter .total-spend { color:var(--text-2); font-size:0.78rem; margin:0.35rem 0 0; }
+  .usage-strip { border-top:1px solid var(--border); margin-top:0.7rem; padding-top:0.6rem; }
+  .usage-line { align-items:baseline; color:var(--text-2); display:flex; font-size:0.8rem; gap:0.75rem; justify-content:space-between; }
+  .usage-line strong { color:var(--text-1); }
+  .usage-note { color:var(--text-3); font-size:0.72rem; margin:0.35rem 0 0; }
+  .row-usage { color:var(--text-3); font-size:0.78rem; grid-column:1 / -1; }
   .meter-track { background:var(--neutral-soft); border-radius:var(--r-pill); height:0.42rem; margin-top:0.35rem; overflow:hidden; }
   .meter-track span { background:var(--accent); border-radius:inherit; display:block; height:100%; }
 

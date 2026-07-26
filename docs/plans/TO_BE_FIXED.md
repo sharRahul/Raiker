@@ -5,8 +5,8 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Two were fixed in the same change and are marked
-**FIXED**; the rest are open and deliberately left for a maintainer decision
+and the proposed fix. Three are marked **FIXED** and were resolved on this
+branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
 Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
@@ -16,6 +16,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 |---|---|---|---|
 | FIXED-01 | High | Models | Fixed |
 | FIXED-02 | High | Chat / API redaction | Fixed |
+| FIXED-03 | Medium | Models / Chat / Build | Fixed |
 | BUG-02 | **Critical** | Chat orchestration | Open |
 | BUG-03 | High | Chat rendering | Open |
 | BUG-04 | High | API redaction | Open |
@@ -113,10 +114,64 @@ under one of those names is still redacted, so a credential cannot ride out
 under a count-shaped key. Wired into `redact_event_payload`, `redact_response_body`
 and `assert_no_secrets_in_body`. Covered by `tests/test_token_count_redaction.py`.
 
-**Remaining work (not done here).** The meter is still labelled *"Estimated from
-this chat's text"* because no configured profile supplies provider-reported
-prompt usage. `docs/superpowers/plans/2026-07-26-chat-composer-context-controls.md`
-Task 2 (session usage ledger, cost, weekly quota, 90 % compaction) is still open.
+**Follow-on.** The estimate fallback and the missing cost data were addressed
+separately in FIXED-03 below; automatic 90 % compaction and weekly quota remain
+open in `docs/superpowers/plans/2026-07-26-chat-composer-context-controls.md`.
+
+---
+
+## FIXED-03 — No token or cost accounting; Models showed a meaningless percentage
+
+**Status: fixed in this change.**
+
+**Observed.** Two related gaps. The context popover could show how full a window
+was but never what a conversation had cost, and Build had no context control at
+all. Separately, the Models page headline read **"0% setup complete"** against a
+denominator of every profile Raiker ships — a user who connects the one provider
+they intend to use is finished, not 10% finished.
+
+**Fix applied.**
+
+*Accounting.* `model_usage_ledger` records the normalised token counts the
+runtime already emits on `model_request_completed`. Counts only — no prompt or
+response text — and **cost is never stored**, only derived at read time, so
+correcting a price re-prices history rather than leaving stale money on disk.
+`GET /api/sessions/{id}/context-usage` serves per-chat and provider all-time
+figures; the same `ContextMeterPopover` now renders them in **Chat and Build**.
+
+*Prices.* `raiker/models/pricing.py` resolves each fact from three sources in a
+fixed precedence — owner override, provider-published, shipped list price — and
+the winning source is always named in the UI. Capacity and price resolve
+independently, so Anthropic yields a provider-reported context window next to a
+config-sourced price. Only providers that are both off-machine and API-key
+authenticated can accrue cost; LM Studio reads `LM_API_TOKEN` but runs on
+`127.0.0.1` and correctly reports "no API cost".
+
+*Models page.* The percentage is now a count — "1 of 10 providers set up" —
+with the total API cost beside it, and every provider card carries its own
+usage line and a bar showing its share of total spend.
+
+**Also corrected here:** the flat `context_window_tokens: 200000` added for
+Anthropic in the previous change was already wrong — Anthropic's `/v1/models`
+reports `max_input_tokens` per model, and Opus 5 returns 1,000,000. Capacity is
+now pulled from the provider and the hardcoded value is gone.
+
+**Open follow-ups, deliberately not done here:**
+
+- **Shipped list prices are unverified.** `config/model-profiles.json` seeds
+  rates only for models whose published price is recorded, each stamped
+  `as_of: 2026-07`. They should be checked against each provider's pricing page
+  and refreshed. A model absent from the table reports its cost as unknown
+  rather than borrowing a sibling's rate — Claude models differ by ~15x.
+- **No periodic refresh.** Provider facts are cached when a catalogue listing
+  runs (opening "Choose model…" or pressing Test). A background refresh on a TTL
+  would keep OpenRouter's published prices current without a manual step.
+- **No Settings UI for price overrides.** The route
+  (`PUT /api/models/{id}/price`) and storage exist and are owner-scoped; only
+  the form is missing.
+- **Cache reads are billed at the full input rate**, so a cached-heavy turn
+  reads slightly high. Deliberate: over-estimating is the safe direction for a
+  bill. Splitting the rate needs a per-provider cache-discount fact.
 
 ---
 

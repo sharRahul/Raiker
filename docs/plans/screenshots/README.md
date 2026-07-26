@@ -36,7 +36,8 @@ Browser screenshots captured while executing
 | `60`–`65` | Theme, notification centre, STOP switch |
 | `70`–`71` | Responsive layout at 375 / 768 / 1024 / 1440 px |
 | `72`–`77` | Attachments and project creation |
-| `80`–`82` | Verified fixes from this round |
+| `80`–`82` | Verified fixes from the first round |
+| `90`–`93` | Context and API-cost panel in Chat and Build; Models provider count and spend bars |
 
 No screenshot contains a credential: keys were entered into `type="password"`
 fields and the response-redaction layer never returns a stored value.

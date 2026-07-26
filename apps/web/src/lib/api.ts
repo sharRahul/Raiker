@@ -7,6 +7,7 @@ import type {
   BrainSourceResult,
   CapabilityDecisionMode,
   CapabilityGate,
+  ContextUsage,
   Checkpoint,
   CodeReposView,
   CredentialLifecycle,
@@ -256,6 +257,24 @@ export const api = {
     }),
 
   // ── Read-only governed views ──
+  sessionContextUsage: (sessionId: string) =>
+    request<ContextUsage>(`/api/sessions/${encodeURIComponent(sessionId)}/context-usage`),
+  setModelPrice: (
+    profileId: string,
+    model: string,
+    inputPerMtok: string | null,
+    outputPerMtok: string | null,
+    currency = "USD",
+  ) =>
+    request<{ ok: boolean }>(`/api/models/${encodeURIComponent(profileId)}/price`, {
+      method: "PUT",
+      body: JSON.stringify({
+        model,
+        input_per_mtok: inputPerMtok,
+        output_per_mtok: outputPerMtok,
+        currency,
+      }),
+    }),
   capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),
   capabilityGate: (capability: string) =>
     request<CapabilityGate>(`/api/capability-gates/${encodeURIComponent(capability)}`),

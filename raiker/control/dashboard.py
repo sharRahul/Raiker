@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import difflib
 import json
 import os
@@ -7,6 +8,7 @@ import re
 import shutil
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +32,7 @@ from raiker.models.router import ModelRouter
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 from raiker.runtime.authority.models import PrincipalType
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
+from raiker.runtime.model_facts_store import ModelFactsStore
 from raiker.security.credentials import CredentialLifecycle, CredentialLifecycleView
 from raiker.security.monitoring import SecurityMonitor
 from raiker.storage.sqlite import SQLiteStore
@@ -517,7 +520,57 @@ class ModelProfileView:
     # Context capacity and pricing are configuration-owned facts. They stay
     # unset for placeholder or provider-discovered models rather than guessed.
     context_window_tokens: int | None = None
+    context_window_source: str | None = None
     configured: bool = False
+    # Only a provider Raiker authenticates with an API key can accrue an API
+    # bill, so only those carry cost. A local runtime reports `billable=False`
+    # and the UI says "no API cost" rather than an unexplained blank.
+    billable: bool = False
+    # All-time usage on this provider for the acting owner. `cost` is None when
+    # no price is resolvable — never 0, which would read as "free".
+    models_used: int = 0
+    turns_used: int = 0
+    total_tokens: int = 0
+    total_cost: str | None = None
+    cost_currency: str | None = None
+    # Where the active model's price came from: "owner" | "provider" | "config".
+    price_source: str | None = None
+    price_as_of: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ContextUsageView:
+    """What one conversation has used, and what it has cost.
+
+    Every figure is optional and every one names its source. A missing price, a
+    provider that reports no usage, or a model with no published capacity all
+    resolve to None here and to an explicit "unavailable" in the UI — this view
+    never substitutes a zero or an estimate for a fact it does not have.
+    """
+
+    session_id: str
+    profile_id: str | None
+    provider: str | None
+    model: str | None
+    # Provider-reported prompt tokens for the newest turn, when one exists.
+    used_tokens: int | None
+    context_window_tokens: int | None
+    context_window_source: str | None
+    # "provider" once a turn has run; "unavailable" before that, at which point
+    # the browser falls back to its own labelled transcript estimate.
+    usage_source: str
+    billable: bool
+    session_cost: str | None
+    provider_total_cost: str | None
+    currency: str | None
+    price_source: str | None
+    price_as_of: str | None
+    session_turns: int = 0
+    session_input_tokens: int = 0
+    session_output_tokens: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -2291,6 +2344,52 @@ class DashboardService:
         private_gate = self.control.get_capability_gate(PRIVATE_NETWORK_MODEL_GATE, acting_principal_id)
         advisor_gate = self.control.get_capability_gate("advisor_model_runtime", acting_principal_id)
         from raiker.models.connections import get_model_connection
+        from raiker.runtime.model_usage import ModelUsageLedger, sum_totals
+
+        # One ledger read for the whole page, grouped by provider, so each card
+        # can show its own spend without a query per card.
+        usage_by_provider: dict[str, list[Any]] = {}
+        if acting_principal_id:
+            for row in ModelUsageLedger(self.store).provider_usage(acting_principal_id):
+                usage_by_provider.setdefault(row.provider, []).append(row)
+
+        def _usage_fields(profile: Any) -> dict[str, Any]:
+            rows = usage_by_provider.get(profile.provider, [])
+            totals = sum_totals(rows)
+            billable = self._profile_is_billable(profile)
+            cost = None
+            currency = None
+            price_source = None
+            price_as_of = None
+            if billable and rows:
+                # Price each model at its own rate and add them up: a provider's
+                # cheap and expensive models differ by an order of magnitude, so
+                # one blended rate across the provider would be meaningless.
+                total = Decimal(0)
+                priced_any = False
+                for row in rows:
+                    facts = self._resolve_facts(profile, row.model, acting_principal_id)
+                    row_cost = row.totals.cost(facts)
+                    if row_cost is None:
+                        continue
+                    priced_any = True
+                    total += row_cost
+                    if facts.price is not None and price_source is None:
+                        currency = facts.price.currency
+                        price_source = facts.price.source
+                        price_as_of = facts.price.as_of
+                if priced_any:
+                    cost = str(total)
+            return {
+                "billable": billable,
+                "models_used": len({row.model for row in rows}),
+                "turns_used": totals.turns,
+                "total_tokens": totals.total_tokens,
+                "total_cost": cost,
+                "cost_currency": currency,
+                "price_source": price_source,
+                "price_as_of": price_as_of,
+            }
 
         profiles = tuple(
             ModelProfileView(
@@ -2311,16 +2410,18 @@ class DashboardService:
                     and get_model_connection(self.store, acting_principal_id, p.profile_id)
                 ),
                 prompt_cache_ttl=(str(p.raw.get("prompt_cache_ttl")) if p.raw.get("prompt_cache_ttl") else None),
-                context_window_tokens=(
-                    int(p.raw["context_window_tokens"])
-                    if isinstance(p.raw.get("context_window_tokens"), int)
-                    and not isinstance(p.raw.get("context_window_tokens"), bool)
-                    and int(p.raw["context_window_tokens"]) > 0
-                    else None
-                ),
+                context_window_tokens=self._resolve_facts(
+                    p, (override if override and p.profile_id == current else p.model),
+                    acting_principal_id,
+                ).context_window_tokens,
+                context_window_source=self._resolve_facts(
+                    p, (override if override and p.profile_id == current else p.model),
+                    acting_principal_id,
+                ).context_window_source,
                 configured=(
                     (override if override and p.profile_id == current else p.model) != "<model>"
                 ),
+                **_usage_fields(p),
             )
             for p in registry.list_profiles()
             # Test-harness profiles (mock/deterministic) are not selectable outside
@@ -2558,6 +2659,197 @@ class DashboardService:
             self.store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, profile.profile_id)
         return ControlResult(ok=True, data={"advisor_profile_id": profile.profile_id})
 
+    # ── Model cost and usage accounting ─────────────────────────────────
+
+    @staticmethod
+    def _profile_is_billable(profile: Any) -> bool:
+        """True only for off-machine providers Raiker authenticates with a key.
+
+        A local runtime costs nothing per token however many tokens it burns, so
+        attaching money to it would be a lie. An API key alone is not enough to
+        decide: LM Studio reads `LM_API_TOKEN` yet runs on `127.0.0.1` and bills
+        nothing. Both conditions must hold — the endpoint leaves this machine
+        **and** a credential authenticates it.
+        """
+        raw = getattr(profile, "raw", {}) or {}
+        off_machine = str(raw.get("endpoint_kind", "")) in {"remote_hosted", "private_network"}
+        if not off_machine and getattr(profile, "local_only", False):
+            return False
+        keyed = bool(raw.get("requires_api_key")) or bool(raw.get("api_key_env"))
+        return off_machine and keyed
+
+    def _resolve_facts(self, profile: Any, model: str, principal_id: str | None) -> Any:
+        """Merge owner override, cached provider report, and shipped config."""
+        from raiker.models.pricing import resolve_model_facts
+        facts_store = ModelFactsStore(self.store)
+        owner_price = (
+            facts_store.owner_price(principal_id, profile.provider, model)
+            if principal_id and model else None
+        )
+        provider_facts = (
+            facts_store.provider_facts(principal_id, profile.provider, model)
+            if principal_id and model else None
+        )
+        raw = getattr(profile, "raw", {}) or {}
+        configured_window = raw.get("context_window_tokens")
+        return resolve_model_facts(
+            provider=profile.provider,
+            model=model,
+            owner_price=owner_price,
+            provider_facts=provider_facts,
+            config_pricing=raw.get("pricing"),
+            config_context_window=(
+                configured_window
+                if isinstance(configured_window, int) and not isinstance(configured_window, bool)
+                else None
+            ),
+        )
+
+    def get_context_usage(
+        self, session_id: str, acting_principal_id: str | None = None
+    ) -> ContextUsageView:
+        """Usage and cost for one conversation, plus the provider's all-time total.
+
+        Reads only what the ledger recorded. A session with no completed turn
+        reports `usage_source="unavailable"`, which is the browser's signal to
+        show its own clearly-labelled transcript estimate instead of pretending
+        this is provider-reported.
+        """
+        from raiker.runtime.model_usage import ModelUsageLedger, sum_totals
+
+        registry = ModelProfileRegistry.load()
+        state = (
+            self.store.load_principal_model_state(acting_principal_id)
+            if acting_principal_id and self.store.get_account(acting_principal_id) is not None
+            else self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        )
+        profile_id = state.profile_id if state is not None else None
+        profile = None
+        if profile_id:
+            try:
+                profile = registry.resolve_profile_id(profile_id)
+            except Exception:  # noqa: BLE001 — an unknown selection is simply unpriced
+                profile = None
+
+        ledger = ModelUsageLedger(self.store)
+        principal = acting_principal_id or ""
+        session_rows = ledger.session_usage(principal, session_id) if principal else []
+        session_totals = sum_totals(session_rows)
+
+        # The model that actually served this conversation beats the currently
+        # selected one: re-pricing history at a newly picked model's rate would
+        # misreport what the user already spent.
+        model = session_rows[-1].model if session_rows else (
+            (state.model if state is not None and state.model else None)
+            or (profile.model if profile is not None else None)
+        )
+        if model in (None, "", "<model>"):
+            model = None
+
+        billable = bool(profile is not None and self._profile_is_billable(profile))
+        facts = (
+            self._resolve_facts(profile, model, acting_principal_id)
+            if profile is not None and model else None
+        )
+
+        def _priced_total(rows: list[Any]) -> Decimal | None:
+            """Sum cost by pricing each model at its own rate.
+
+            Summing tokens first and applying one model's rate would charge a
+            cheap model's tokens at an expensive model's price — Claude models
+            differ by roughly 15x, so a mixed history would be badly wrong.
+            Returns None when no row could be priced at all.
+            """
+            total = Decimal(0)
+            priced_any = False
+            for row in rows:
+                row_facts = self._resolve_facts(profile, row.model, acting_principal_id)
+                row_cost = row.totals.cost(row_facts)
+                if row_cost is None:
+                    continue
+                priced_any = True
+                total += row_cost
+            return total if priced_any else None
+
+        session_cost = _priced_total(session_rows) if billable and profile is not None else None
+        provider_total: Decimal | None = None
+        if billable and profile is not None and principal:
+            matching = [
+                row for row in ledger.provider_usage(principal)
+                if row.provider == profile.provider
+            ]
+            provider_total = _priced_total(matching) if matching else None
+
+        price = facts.price if facts is not None else None
+        return ContextUsageView(
+            session_id=session_id,
+            profile_id=profile.profile_id if profile is not None else None,
+            provider=profile.provider if profile is not None else None,
+            model=model,
+            used_tokens=session_rows[-1].totals.input_tokens if session_rows else None,
+            context_window_tokens=facts.context_window_tokens if facts is not None else None,
+            context_window_source=facts.context_window_source if facts is not None else None,
+            usage_source="provider" if session_rows else "unavailable",
+            billable=billable,
+            session_cost=str(session_cost) if session_cost is not None else None,
+            provider_total_cost=str(provider_total) if provider_total is not None else None,
+            currency=price.currency if price is not None else None,
+            price_source=price.source if price is not None else None,
+            price_as_of=price.as_of if price is not None else None,
+            session_turns=session_totals.turns,
+            session_input_tokens=session_totals.input_tokens,
+            session_output_tokens=session_totals.output_tokens,
+        )
+
+    def set_model_price(
+        self,
+        profile_id: str,
+        model: str,
+        *,
+        input_per_mtok: str | None,
+        output_per_mtok: str | None,
+        currency: str = "USD",
+        acting_principal_id: str | None,
+    ) -> ControlResult:
+        """Set or clear one model's owner price override.
+
+        Both rates absent clears the override. A price is owner data, not a
+        capability, so this needs no gate — but it is scoped to the acting
+        principal, so it can never change what another account is charged.
+        """
+        if not acting_principal_id:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if not model or model == "<model>":
+            return ControlResult(ok=False, reason_code="model_not_specified")
+        registry = ModelProfileRegistry.load()
+        try:
+            profile = registry.resolve_profile_id(profile_id)
+        except Exception:  # noqa: BLE001 — unknown profile fails closed
+            return ControlResult(ok=False, reason_code="unknown_model_profile")
+        facts_store = ModelFactsStore(self.store)
+        if input_per_mtok is None and output_per_mtok is None:
+            facts_store.clear_owner_price(acting_principal_id, profile.provider, model)
+            return ControlResult(ok=True, data={"model": model, "cleared": True})
+        try:
+            price_in = Decimal(str(input_per_mtok))
+            price_out = Decimal(str(output_per_mtok))
+        except Exception:  # noqa: BLE001 — a malformed price is rejected, not guessed
+            return ControlResult(ok=False, reason_code="model_price_invalid")
+        if not (price_in.is_finite() and price_out.is_finite()) or price_in < 0 or price_out < 0:
+            return ControlResult(ok=False, reason_code="model_price_invalid")
+        facts_store.set_owner_price(
+            acting_principal_id,
+            profile.provider,
+            model,
+            input_per_mtok=price_in,
+            output_per_mtok=price_out,
+            currency=currency or "USD",
+        )
+        return ControlResult(
+            ok=True, data={"model": model, "input_per_mtok": str(price_in),
+                           "output_per_mtok": str(price_out), "currency": currency or "USD"}
+        )
+
     async def list_provider_models(
         self, profile_id: str, acting_principal_id: str | None = None
     ) -> ProviderModelListView | None:
@@ -2613,6 +2905,15 @@ class DashboardService:
                 reason_code=safe_error(type(exc).__name__),
                 models=(),
             )
+        # A successful listing is the one moment Raiker legitimately hears from
+        # the provider, so whatever it published about its models (Anthropic's
+        # context window, OpenRouter's prices) is cached here for the meter and
+        # the cost rows to read without a second round trip.
+        if acting_principal_id:
+            with contextlib.suppress(Exception):  # caching never fails a listing
+                ModelFactsStore(self.store).save_provider_facts(
+                    acting_principal_id, profile.provider, list(models)
+                )
         return ProviderModelListView(
             profile_id=profile.profile_id,
             provider=profile.provider,

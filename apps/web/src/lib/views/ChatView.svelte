@@ -6,7 +6,7 @@
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
   import PermissionModeControl from "../components/PermissionModeControl.svelte";
   import { api, ApiError, streamPrompt } from "../api";
-  import type { AgentResponse, ModelProfile, SessionDetail, StreamEvent } from "../apiTypes";
+  import type { AgentResponse, ContextUsage, ModelProfile, SessionDetail, StreamEvent } from "../apiTypes";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, providerName } from "../format";
   import { reactionForResponse, thinkingSteps } from "../chatPresentation";
@@ -41,6 +41,24 @@
   let streaming = $state(false);
   // Reuse one session across turns so the governed conversation stays continuous.
   let sessionId = $state<string | null>(null);
+  // Provider-reported usage and API cost for this conversation. Null until the
+  // popover is opened at least once; the meter falls back to the labelled local
+  // estimate until the server has something real to report.
+  let contextUsage = $state<ContextUsage | null>(null);
+
+  async function refreshContextUsage() {
+    if (sessionId === null) {
+      contextUsage = null;
+      return;
+    }
+    try {
+      contextUsage = await api.sessionContextUsage(sessionId);
+    } catch {
+      // Cost is supplementary — a failed read leaves the meter on its estimate
+      // rather than replacing the popover with an error.
+      contextUsage = null;
+    }
+  }
   $effect(() => {
     if (continuedSessionId === null) return;
     sessionId = continuedSessionId;
@@ -369,6 +387,7 @@
           if (event.kind === "final" && event.response !== null) {
             turn.response = event.response;
             sessionId = event.response.session_id;
+            if (contextOpen) void refreshContextUsage();
             window.dispatchEvent(new Event("raiker:chats-changed"));
           } else {
             turn.events = [...turn.events, event];
@@ -750,7 +769,7 @@
               class="bar-select context-trigger"
               aria-label="Context window"
               aria-expanded={contextOpen}
-              onclick={() => (contextOpen = !contextOpen)}
+              onclick={() => { contextOpen = !contextOpen; if (contextOpen) void refreshContextUsage(); }}
             >
               Context
             </button>
@@ -759,6 +778,7 @@
                 usedTokens={estimatedContextTokens}
                 contextWindowTokens={activeProfile?.context_window_tokens ?? null}
                 estimated={true}
+                usage={contextUsage}
               />
             {/if}
           </div>

@@ -1895,3 +1895,43 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_code_repos_local
 CREATE UNIQUE INDEX IF NOT EXISTS idx_code_repos_github
   ON code_repos(owner_principal_id, github_owner, github_repo) WHERE github_owner IS NOT NULL;
 """
+
+MODEL_USAGE_LEDGER_MIGRATION_ID = "RAIKER-2025-model-usage-ledger"
+MODEL_USAGE_LEDGER_SQL = """
+-- Per-turn token accounting. Counts only: this table never holds prompt or
+-- response text, and cost is derived at read time from the resolved price so a
+-- price correction re-prices history instead of leaving stale money on disk.
+CREATE TABLE IF NOT EXISTS model_usage_ledger (
+  usage_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_write_tokens INTEGER NOT NULL DEFAULT 0,
+  recorded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_model_usage_session
+  ON model_usage_ledger(owner_principal_id, session_id, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_model_usage_provider
+  ON model_usage_ledger(owner_principal_id, provider, model);
+
+-- Owner overrides for per-model prices, and the cached provider-reported facts
+-- (context window, and price where the provider publishes one). `source` keeps
+-- the two apart so the UI can always name where a number came from.
+CREATE TABLE IF NOT EXISTS model_facts_cache (
+  owner_principal_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  source TEXT NOT NULL,
+  context_window_tokens INTEGER,
+  max_output_tokens INTEGER,
+  input_price_per_mtok TEXT,
+  output_price_per_mtok TEXT,
+  currency TEXT,
+  fetched_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, provider, model, source)
+);
+"""

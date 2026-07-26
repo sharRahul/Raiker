@@ -67,6 +67,31 @@ def _json(response: httpx.Response) -> dict[str, Any]:
     return data
 
 
+def _model_facts_metadata(item: Mapping[str, Any]) -> dict[str, Any]:
+    """Capacity and price facts an OpenAI-compatible catalogue may publish.
+
+    Most endpoints publish neither and return an empty dict. OpenRouter is the
+    exception: it exposes `context_length` and a `pricing` block quoted per
+    single token. Both are passed through untouched — unit conversion belongs to
+    `raiker.models.pricing`, which owns the per-million-token convention.
+    """
+    metadata: dict[str, Any] = {}
+    context_length = item.get("context_length")
+    if isinstance(context_length, int) and not isinstance(context_length, bool) and context_length > 0:
+        metadata["context_length"] = context_length
+    pricing = item.get("pricing")
+    if isinstance(pricing, Mapping):
+        quoted = {
+            key: pricing[key]
+            for key in ("prompt", "completion", "currency")
+            if isinstance(pricing.get(key), (str, int, float))
+            and not isinstance(pricing.get(key), bool)
+        }
+        if "prompt" in quoted and "completion" in quoted:
+            metadata["pricing"] = quoted
+    return metadata
+
+
 def _raise_in_band_error(value: Any) -> None:
     if isinstance(value, dict):
         code = value.get("code")
@@ -205,7 +230,11 @@ class AsyncOpenAICompatibleProvider:
         for item in raw:
             if isinstance(item, dict) and isinstance(item.get("id"), str):
                 owned_by = item.get("owned_by") if isinstance(item.get("owned_by"), str) else None
-                models.append(ProviderModelInfo(id=item["id"], owned_by=owned_by, metadata={}))
+                models.append(
+                    ProviderModelInfo(
+                        id=item["id"], owned_by=owned_by, metadata=_model_facts_metadata(item)
+                    )
+                )
         return models
 
     def _message_dict(self, message: ModelMessage) -> dict[str, Any]:

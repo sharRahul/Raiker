@@ -98,6 +98,8 @@ other order produces a governed refusal.
 | 4.5 | Models → Anthropic → **Choose model…** | Live provider catalogue: 11 models returned from `api.anthropic.com` | ✅ `15-` |
 | 4.6 | Pick `claude-haiku-4-5-20251001` → **Use model** | `PUT /api/model-selection` 200, "selected" badge, setup meter 0 % → 10 % | ✅ `16-` |
 | 4.7 | Models → **Test** on the connected card | "Anthropic responded and exposed 11 models." | ✅ |
+| 4.8 | Models header | "1 of 10 providers set up · $0.0030 total API cost" — a count, not a percentage of the shipped catalogue | ✅ `91-` |
+| 4.9 | Each provider card | usage line + spend-share bar; local providers read "No API cost — runs on this machine"; unused read "Not used yet" | ✅ `92-` |
 
 **If step 4.4 is attempted first**, the dialog reports, in order:
 `provider_requires_explicit_policy_approval` (4.3 missing) →
@@ -145,11 +147,30 @@ provider (`raiker/runtime/orchestrator.py` builds the message list from the
 current prompt only). Cross-chat isolation is therefore correct by accident, not
 by design. `not-working/BUG-02-no-conversation-memory.png`.
 
-### 5.5 Can you see how many tokens remain?
+### 5.5 Can you see how many tokens remain, and what they cost?
 
-**No.** ❌ The Context popover opened with `0 / NaN (NaN%)` and
-`aria-valuenow="NaN"`. Root cause and fix: `TO_BE_FIXED.md` **FIXED-02**.
-`not-working/BUG-01-context-window-NaN.png`.
+**Yes, after the fixes in this round.** ❌→✅ The popover originally opened at
+`0 / NaN (NaN%)` with `aria-valuenow="NaN"`
+(`not-working/BUG-01-context-window-NaN.png`); see `TO_BE_FIXED.md`
+**FIXED-02**.
+
+It now reads, against a live Anthropic turn:
+
+```
+Context window                    2.9K / 200.0K (1%)
+Provider-reported usage. Capacity provider-reported.
+This chat                                   $0.0030
+anthropic, all time                         $0.0059
+claude-haiku-4-5-20251001 — list price, as of 2026-07
+```
+
+Verified: capacity is pulled from Anthropic's own `max_input_tokens` rather than
+configured; used tokens are the provider's reported prompt count; the all-time
+figure accumulated correctly across a Chat turn and a Build turn; a local
+profile shows *"Runs on this machine — no API cost"*; and a model with no
+resolvable price says so instead of showing `$0.00`. The identical control is in
+the **Build** composer (`93-build-context-cost-popover.png`).
+`working/90-chat-context-cost-popover.png`.
 
 ### 5.6 Composer controls
 
@@ -322,7 +343,8 @@ from the session `⋯` menu. `73-`, `74-`.
 | Does a new chat create a chat on the left? | **Yes** — RECENT CHATS, with a row menu |
 | Is the chat searchable? | **Yes** — titles and message text |
 | Do multiple chats in one session remember context? | **No** — and neither does a single chat (BUG-02) |
-| Can you see how many tokens remain? | **No** — showed `0 / NaN (NaN%)` (FIXED-02) |
+| Can you see how many tokens remain? | **Yes** (was `0 / NaN (NaN%)`; FIXED-02) — provider-reported usage against a provider-reported capacity |
+| Can you see what a chat has cost? | **Yes** — per-chat and provider all-time, in Chat and Build, for API-key providers only |
 | Can you generate a markdown file and view it in the sidebar? | **No** — approval is metadata-only so no file is written (BUG-06), and there is no file inspector (BUG-07) |
 | Can you convert markdown to PDF in one click? | **No** — no export control exists, and markdown is not even rendered (BUG-03, BUG-08) |
 | Do the different task types work? | **Yes** — all four create, schedule, and run |

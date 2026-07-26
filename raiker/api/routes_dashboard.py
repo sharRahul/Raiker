@@ -19,6 +19,7 @@ from raiker.api.schemas import (
     CreateProjectRequest,
     CreateRemoteMcpServerRequest,
     ModelConnectionRequest,
+    ModelPriceRequest,
     MoveProjectRequest,
     RenameMcpServerRequest,
     RenameSessionRequest,
@@ -1062,6 +1063,52 @@ async def list_provider_models(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown model profile: {profile_id}"
         )
     return serialize_dto(view)
+
+
+@router.get("/api/sessions/{session_id}/context-usage")
+async def get_session_context_usage(
+    session_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Token usage and API cost for one conversation, plus the provider total.
+
+    Owner-scoped: the ledger is queried by the authenticated principal, so one
+    account can never read another's spend. Every figure is optional and names
+    its source; nothing is estimated server-side.
+    """
+    session, _principal = auth_data
+    return serialize_dto(_service(request).get_context_usage(session_id, session.principal_id))
+
+
+@router.put("/api/models/{profile_id}/price")
+async def set_model_price(
+    profile_id: str,
+    body: ModelPriceRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Set or clear the owner's price override for one model on one profile.
+
+    An owner price outranks both the provider-published price and the shipped
+    list price, and re-prices history immediately because cost is derived at
+    read time rather than stored.
+    """
+    session, _principal = auth_data
+    result = _service(request).set_model_price(
+        profile_id,
+        body.model,
+        input_per_mtok=body.input_per_mtok,
+        output_per_mtok=body.output_per_mtok,
+        currency=body.currency or "USD",
+        acting_principal_id=session.principal_id,
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
 
 
 @router.put("/api/model-selection")

@@ -30,6 +30,7 @@ from raiker.models.tool_call_validation import (
     validate_tool_call,
 )
 from raiker.runtime.classifier import SimpleClassifier
+from raiker.runtime.model_usage import ModelUsageLedger
 from raiker.runtime.planner import SimplePlanner
 from raiker.runtime.retrieval import RetrievalAugmentor
 from raiker.runtime.state_machine import RuntimeStateMachine
@@ -108,6 +109,34 @@ class RuntimeOrchestrator:
             self._sink.append(
                 StreamEvent(kind=LIFECYCLE, event_type=event_type, payload=dict(payload))
             )
+
+    def _record_usage(
+        self,
+        envelope: PromptEnvelope,
+        provider: str,
+        model: str,
+        usage: dict[str, int],
+    ) -> None:
+        """Mirror this turn's token counts into the queryable usage ledger.
+
+        Best-effort by design: accounting must never be able to fail a turn that
+        the model already completed, so a storage problem is swallowed here. The
+        durable event log remains the authoritative record either way.
+        """
+        store = getattr(self.tool_broker, "store", None)
+        principal_id = getattr(self.tool_broker, "principal_id", None)
+        if store is None or not principal_id:
+            return
+        try:
+            ModelUsageLedger(store).record(
+                owner_principal_id=str(principal_id),
+                session_id=envelope.session_id,
+                provider=provider,
+                model=model,
+                usage=usage,
+            )
+        except Exception:  # noqa: BLE001 - accounting never breaks a completed turn
+            return
 
     def _drain_sink(self) -> list[StreamEvent]:
         drained: list[StreamEvent] = []
@@ -264,6 +293,7 @@ class RuntimeOrchestrator:
                     },
                 )
                 continue
+            usage = summarize_model_usage(response.usage)
             self._event(
                 envelope,
                 "model_request_completed",
@@ -272,9 +302,10 @@ class RuntimeOrchestrator:
                     "finish_reason": response.finish_reason,
                     "tool_call_count": len(response.tool_calls),
                     "text_length": len(response.text),
-                    "usage": summarize_model_usage(response.usage),
+                    "usage": usage,
                 },
             )
+            self._record_usage(envelope, provider, model, usage)
             return response
         return ModelResponse(
             text=f"model_unavailable: {last_error_code}", finish_reason="error"
@@ -400,6 +431,7 @@ class RuntimeOrchestrator:
                 tool_calls=self._reconstruct_tool_calls(tool_deltas),
                 usage=usage,
             )
+            normalised_usage = summarize_model_usage(response.usage)
             self._event(
                 envelope,
                 "model_request_completed",
@@ -408,9 +440,10 @@ class RuntimeOrchestrator:
                     "finish_reason": response.finish_reason,
                     "tool_call_count": len(response.tool_calls),
                     "text_length": len(response.text),
-                    "usage": summarize_model_usage(response.usage),
+                    "usage": normalised_usage,
                 },
             )
+            self._record_usage(envelope, provider, model, normalised_usage)
             for lifecycle in self._drain_sink():
                 yield lifecycle
             yield response

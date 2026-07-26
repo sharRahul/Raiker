@@ -108,6 +108,30 @@ model id.
 
 ---
 
+## What each provider has cost you
+
+Every provider card carries its own usage line: how many of its models you have
+used, how many turns, and what they cost. A bar underneath shows that provider's
+share of your total API spend, so it means something without you configuring a
+budget. The page header totals it: *"1 of 10 providers set up · $0.0030 total
+API cost"*.
+
+Local providers show *"No API cost — runs on this machine"* instead of a bar.
+A provider you have not used yet says *"Not used yet"*.
+
+Prices come from the provider where one publishes them, from the list prices
+shipped in `config/model-profiles.json` otherwise, and from your own override
+above both. A model with no resolvable price reports its cost as unknown rather
+than as zero. To set your own rate:
+
+```
+PUT /api/models/{profile_id}/price
+{"model": "claude-opus-5", "input_per_mtok": "15", "output_per_mtok": "75"}
+```
+
+Send both rates as `null` to clear the override and fall back to the published
+or shipped price.
+
 ## Fallback sequence
 
 Below the provider grid, **Model fallback sequence** orders the backends Raiker

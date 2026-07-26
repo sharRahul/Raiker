@@ -93,8 +93,9 @@ Highlights, each verified against a live instance:
   persistent background agent; nestable, prioritised, and stoppable at a safe
   boundary.
 - **Models** — local, home-lab, hosted, and advanced providers; live provider
-  catalogues; an encrypted per-instance credential vault; and a user-owned
-  fallback sequence with no silent hosted fallback.
+  catalogues; an encrypted per-instance credential vault; a user-owned fallback
+  sequence with no silent hosted fallback; and per-provider token and API-cost
+  accounting with each figure's source named.
 - **Extensions** — governed service connectors and Model Context Protocol
   servers you can build, connect, monitor, and contain.
 - **Observability** — an append-only audit log, metadata-only checkpoints, and
@@ -115,8 +116,13 @@ Raiker's documentation does not run ahead of its code. As of 2026-07-26:
   work; their tools are not offered to the model in Chat.
 - **Approved file writes do not create files**, because approval is
   metadata-only.
-- Automatic context compaction, provider token accounting, cost and quota
-  display, and the view-only file inspector are specified but not shipped.
+- Automatic context compaction at 90 %, weekly quota display, and the view-only
+  file inspector are specified but not shipped.
+- **Shipped list prices are unverified defaults.** `config/model-profiles.json`
+  seeds prices only for the models whose published rate is recorded there, each
+  stamped with an `as_of` date. Check them against your provider's current
+  pricing page and override anything that has moved; an unpriced model reports
+  its cost as unknown rather than as zero.
 
 Each is written up with a reproduction and a proposed fix in
 [docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md).

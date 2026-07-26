@@ -4,7 +4,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError, streamPrompt } from "../api";
-  import type { AgentResponse, ModelProfile, ProviderModelList, SessionDetail, StreamEvent } from "../apiTypes";
+  import type { AgentResponse, ModelProfile, SessionDetail, StreamEvent } from "../apiTypes";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, providerName } from "../format";
   import { reactionForResponse, thinkingSteps } from "../chatPresentation";
@@ -52,15 +52,6 @@
   let modelProfile = $state("");
   let planningMode = $state("");
   let profiles = $state<ModelProfile[]>([]);
-
-  // Per-turn model for the chosen profile. Populated on demand from the
-  // provider's own catalogue; when the catalogue is unavailable the user can
-  // still type a model id. Empty means the profile/persisted default.
-  let modelChoice = $state("");
-  let providerModels = $state<ProviderModelList | null>(null);
-  let loadingModels = $state(false);
-
-  const chosenProfile = $derived(profiles.find((p) => p.profile_id === modelProfile) ?? null);
 
   // The persisted selection (Models view / /model use). The default provider
   // option names it so the user can see what will actually serve the turn.
@@ -230,31 +221,6 @@
     return parts.length > 0 ? parts[parts.length - 1] : path;
   }
 
-  async function onProfileChange() {
-    modelChoice = "";
-    providerModels = null;
-    if (modelProfile === "") return;
-    loadingModels = true;
-    try {
-      providerModels = await api.providerModels(modelProfile);
-    } catch {
-      providerModels = null; // manual entry still works below
-    } finally {
-      loadingModels = false;
-    }
-  }
-
-  function providerModelsNote(list: ProviderModelList): string {
-    switch (list.status) {
-      case "policy_denied":
-        return "Model list denied by provider policy — enable the provider's gate first.";
-      case "unsupported":
-        return "This provider does not support model listing.";
-      default:
-        return "Provider unreachable — type a model id if you know it.";
-    }
-  }
-
   let scrollEl: HTMLDivElement | undefined = $state();
 
   onMount(() => {
@@ -330,7 +296,9 @@
   async function loadProfiles() {
     try {
       const models = await api.models();
-      profiles = models.profiles;
+      // Chat is intentionally limited to concrete configured profiles. Older
+      // servers fall back to their profile list, filtering the same fact.
+      profiles = models.chat_profiles ?? models.profiles.filter((profile) => profile.configured);
     } catch {
       // The options panel simply omits the model list; prompting still works.
     }
@@ -376,7 +344,6 @@
           text,
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
-          model: modelChoice.trim() || undefined,
           attachments:
             sentAttachments.length > 0
               ? sentAttachments.map((a) =>
@@ -740,10 +707,9 @@
           <select
             class="bar-select"
             bind:value={modelProfile}
-            onchange={() => void onProfileChange()}
             disabled={streaming}
-            aria-label="Provider"
-            title="Provider for this turn (default: your selected model)"
+            aria-label="Model"
+            title="Configured model for this turn"
           >
             <option value="">
               {selectedProfile !== null
@@ -751,44 +717,9 @@
                 : "Selected model"}
             </option>
             {#each profiles as p (p.profile_id)}
-              <option value={p.profile_id}>{providerName(p.provider)}</option>
+              <option value={p.profile_id}>{providerName(p.provider)} · {p.model}</option>
             {/each}
           </select>
-
-          {#if modelProfile !== ""}
-            {#if loadingModels}
-              <span class="bar-note" role="status">Loading models…</span>
-            {:else if providerModels !== null && providerModels.status === "available" && providerModels.models.length > 0}
-              <select
-                class="bar-select"
-                bind:value={modelChoice}
-                disabled={streaming}
-                aria-label="Model"
-                title="Model for this turn, from the provider's catalogue"
-              >
-                <option value="">
-                  {chosenProfile !== null && chosenProfile.model !== "<model>"
-                    ? `Default (${chosenProfile.model})`
-                    : "Pick a model…"}
-                </option>
-                {#each providerModels.models as m (m)}
-                  <option value={m}>{m}</option>
-                {/each}
-              </select>
-            {:else}
-              <input
-                class="bar-input"
-                type="text"
-                placeholder="model id"
-                bind:value={modelChoice}
-                disabled={streaming}
-                aria-label="Model"
-                title={providerModels !== null && providerModels.status !== "available"
-                  ? providerModelsNote(providerModels)
-                  : "Model for this turn"}
-              />
-            {/if}
-          {/if}
 
           <button
             type="button"
@@ -812,16 +743,6 @@
         </div>
       </div>
     </div>
-
-    {#if modelProfile !== "" && !loadingModels}
-      {#if providerModels !== null && providerModels.status !== "available"}
-        <p class="model-note">{providerModelsNote(providerModels)}</p>
-      {:else if chosenProfile !== null && chosenProfile.model === "<model>" && modelChoice.trim() === ""}
-        <p class="model-note">
-          This provider needs a concrete model — without one the turn uses your persisted selection.
-        </p>
-      {/if}
-    {/if}
   </form>
 </div>
 
@@ -1091,8 +1012,7 @@
     min-width: 0;
     justify-content: flex-end;
   }
-  .bar-select,
-  .bar-input {
+  .bar-select {
     border: none;
     background: transparent;
     color: var(--text-2);
@@ -1102,26 +1022,12 @@
     border-radius: var(--r-md);
     max-width: 15rem;
   }
-  .bar-select:hover:not(:disabled),
-  .bar-input:hover:not(:disabled) {
+  .bar-select:hover:not(:disabled) {
     background: var(--neutral-soft);
   }
   .bar-select:focus-visible,
-  .bar-input:focus-visible,
   .round-btn:focus-visible {
     outline: 2px solid var(--focus-ring);
-  }
-  .bar-input {
-    border: 1px dashed var(--neutral-border);
-  }
-  .bar-note {
-    font-size: 0.76rem;
-    color: var(--text-3);
-  }
-  .model-note {
-    font-size: 0.74rem;
-    color: var(--text-3);
-    margin: 0.35rem 0.2rem 0;
   }
   .attach-popover {
     display: flex;

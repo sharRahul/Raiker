@@ -164,6 +164,8 @@ class TestReads:
         assert all(p["provider"] not in {"mock", "test"} for p in body["profiles"])
         assert body["remote_profile_count"] >= 1
         assert all("selected" in p and "provider" in p for p in body["profiles"])
+        assert all("context_window_tokens" in p and "configured" in p for p in body["profiles"])
+        assert all(profile["configured"] for profile in body["chat_profiles"])
         hosted = next(p for p in body["profiles"] if p["profile_id"] == "openai-hosted")
         assert hosted["runtime_gate"] == "hosted_model_runtime"
         assert hosted["requires_egress_policy"] is True

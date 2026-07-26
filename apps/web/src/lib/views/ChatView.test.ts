@@ -23,6 +23,7 @@ afterEach(() => {
 const MODELS_ROUTE = {
   "GET /api/models": {
     profiles: [],
+    chat_profiles: [],
     current_profile_id: null,
     current_model: null,
     advisor_profile_id: null,
@@ -128,7 +129,7 @@ describe("ChatView streaming transcript", () => {
     });
   });
 
-  it("lets the user pick a provider and one of its models for the turn", async () => {
+  it("lists only configured models and sends the selected profile without a model override", async () => {
     stubFetch({
       ...MODELS_ROUTE,
       "GET /api/models": {
@@ -137,7 +138,7 @@ describe("ChatView streaming transcript", () => {
           {
             profile_id: "ollama-local-openai-compatible",
             provider: "ollama",
-            model: "<model>",
+            model: "qwen2.5",
             default_state: "disabled",
             local_only: true,
             requires_network: false,
@@ -148,15 +149,29 @@ describe("ChatView streaming transcript", () => {
             off_machine: false,
             selected: false,
             prompt_cache_ttl: null,
+            context_window_tokens: 131072,
+            configured: true,
           },
         ],
-      },
-      "GET /api/models/ollama-local-openai-compatible/provider-models": {
-        profile_id: "ollama-local-openai-compatible",
-        provider: "ollama",
-        status: "available",
-        reason_code: null,
-        models: ["qwen2.5", "llama3.2"],
+        chat_profiles: [
+          {
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "qwen2.5",
+            default_state: "disabled",
+            local_only: true,
+            requires_network: false,
+            endpoint_kind: "local",
+            requires_egress_policy: false,
+            requires_budget_policy: false,
+            runtime_gate: null,
+            off_machine: false,
+            selected: false,
+            prompt_cache_ttl: null,
+            context_window_tokens: 131072,
+            configured: true,
+          },
+        ],
       },
     });
     streamPromptMock.mockImplementation(
@@ -172,18 +187,12 @@ describe("ChatView streaming transcript", () => {
     );
 
     render(ChatView);
-    const providerSelect = screen.getByLabelText("Provider") as HTMLSelectElement;
-    // Wait for the profiles fetch to populate the provider options.
-    await waitFor(() => expect(providerSelect.options.length).toBeGreaterThan(1));
-    await fireEvent.change(providerSelect, {
+    const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
+    await waitFor(() => expect(modelSelect.options.length).toBeGreaterThan(1));
+    expect(modelSelect.textContent).toContain("Ollama · qwen2.5");
+    await fireEvent.change(modelSelect, {
       target: { value: "ollama-local-openai-compatible" },
     });
-
-    // The provider's catalogue loads on demand and populates the model select.
-    await waitFor(() => expect(screen.getByLabelText("Model")).toBeTruthy());
-    const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
-    expect(modelSelect.textContent).toContain("qwen2.5");
-    await fireEvent.change(modelSelect, { target: { value: "qwen2.5" } });
 
     const box = screen.getByRole("textbox", { name: /prompt/i });
     await fireEvent.input(box, { target: { value: "hi" } });
@@ -192,7 +201,7 @@ describe("ChatView streaming transcript", () => {
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalledOnce());
     const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
     expect(body.model_profile).toBe("ollama-local-openai-compatible");
-    expect(body.model).toBe("qwen2.5");
+    expect(body.model).toBeUndefined();
   });
 
   it("sends the server's safe-only planning mode when Never plan is selected", async () => {
@@ -222,7 +231,7 @@ describe("ChatView streaming transcript", () => {
     expect(body.planning_mode).toBe("never_safe_only");
   });
 
-  it("names the persisted selection in the provider dropdown default option", async () => {
+  it("names the persisted selection in the configured model dropdown", async () => {
     stubFetch({
       ...MODELS_ROUTE,
       "GET /api/models": {
@@ -242,13 +251,34 @@ describe("ChatView streaming transcript", () => {
             off_machine: false,
             selected: true,
             prompt_cache_ttl: null,
+            context_window_tokens: 131072,
+            configured: true,
+          },
+        ],
+        chat_profiles: [
+          {
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "gemma4:31b-cloud",
+            default_state: "disabled",
+            local_only: true,
+            requires_network: false,
+            endpoint_kind: "local",
+            requires_egress_policy: false,
+            requires_budget_policy: false,
+            runtime_gate: null,
+            off_machine: false,
+            selected: true,
+            prompt_cache_ttl: null,
+            context_window_tokens: 131072,
+            configured: true,
           },
         ],
       },
     });
 
     render(ChatView);
-    const providerSelect = screen.getByLabelText("Provider") as HTMLSelectElement;
+    const providerSelect = screen.getByLabelText("Model") as HTMLSelectElement;
     await waitFor(() => expect(providerSelect.options.length).toBeGreaterThan(1));
     // The default option must name the actual persisted selection, not just
     // say "Selected model" — the user has to see what will serve the turn.

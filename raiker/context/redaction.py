@@ -22,6 +22,20 @@ def _redact_high_entropy(match: re.Match[str]) -> str:
         return token
     return REDACTED_SECRET
 
+
+def _redact_spoken_credential(match: re.Match[str]) -> str:
+    """Redact "the password is hunter2" but not "the secret is out".
+
+    The pattern already requires the credential word to sit *immediately* before
+    the copula, so prose with an intervening noun ("the secret project code is
+    ORCHID-9") never reaches here. This second filter drops the remaining false
+    positives by keeping ordinary short English words, which no credential is.
+    """
+    value = match.group("value")
+    if value.isalpha() and len(value) < 12:
+        return match.group(0)
+    return REDACTED_SECRET
+
 # Ordered (pattern, replacement) pairs. Private keys and known token shapes are matched
 # before the broad high-entropy fallback so they get specific placeholders. Each pattern is
 # deterministic and never raises on unusual input.
@@ -48,6 +62,18 @@ _PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], .
             re.IGNORECASE,
         ),
         REDACTED_SECRET,
+    ),
+    # Credentials disclosed in prose rather than as an assignment ("the token is
+    # abc123"). The keyword must be the word immediately before the copula, so
+    # sentences that merely mention a secret ("the secret project code is
+    # ORCHID-9") are untouched; the callable then spares plain English values.
+    (
+        re.compile(
+            r"\b(?:api[_-]?key|secret|token|password|passwd|pwd)s?\s+(?:is|was)\s*[:=]?\s*"
+            r"['\"]?(?P<value>[^\s'\"]{2,}[^\s'\".,;:!?])",
+            re.IGNORECASE,
+        ),
+        _redact_spoken_credential,
     ),
     (
         re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"),

@@ -41,9 +41,11 @@ snippet + headers as untrusted data.
 | Browser console errors | ✅ 0 (both states) |
 
 The read-only Connections surface never reaches the network and never shows a
-credential value (the response redaction layer scrubs even the env-var name to
-`***REDACTED***`). Enabling a connector stays on the capability-gate +
-decision-mode control plane, gate-manager only.
+credential value (at the time of this run the response redaction layer scrubbed
+even the env-var *name* to `***REDACTED***`; since `TO_BE_FIXED.md` FIXED-07 the
+name is returned as-is — it is remediation guidance, not a credential — and the
+value is still never read into a response). Enabling a connector stays on the
+capability-gate + decision-mode control plane, gate-manager only.
 
 ## Result — 2026-07-11 (uploaded-document attachments: PDF + docx + image, hosted Anthropic Haiku 4.5)
 
@@ -125,9 +127,11 @@ control plane (threat ack + confirm), decision mode raised to `allow`.
 | Browser console errors | ✅ 0 (both states) |
 
 The read-only Connections surface never reaches the network and never shows a
-credential value (the response redaction layer scrubs even the env-var name to
-`***REDACTED***`). Enabling a connector stays on the capability-gate +
-decision-mode control plane, gate-manager only.
+credential value (at the time of this run the response redaction layer scrubbed
+even the env-var *name* to `***REDACTED***`; since `TO_BE_FIXED.md` FIXED-07 the
+name is returned as-is — it is remediation guidance, not a credential — and the
+value is still never read into a response). Enabling a connector stays on the
+capability-gate + decision-mode control plane, gate-manager only.
 
 ## Result — 2026-07-10 (hosted Anthropic, Haiku 4.5)
 

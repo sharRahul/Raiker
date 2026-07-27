@@ -4,9 +4,35 @@ import json
 from typing import Any
 
 from raiker.context.redaction import redact_text
-from raiker.events.export import SECRET_PATTERNS, _is_secret_key, is_token_count_field
+from raiker.events.export import _is_secret_key, is_token_count_field
 
 REDACTED_LABEL = "[REDACTED]"
+REDACTED_VALUE = "***REDACTED***"
+
+# Why free-form strings are scrubbed by *pattern* and not by keyword
+# ------------------------------------------------------------------
+# A value's **key** is the reliable signal that it holds a credential, and every
+# such value is discarded whole below. A value's **words** are not: assistant
+# replies, chat titles, and document excerpts talk about secrets, tokens, and
+# passwords constantly without containing one.
+#
+# This layer used to replace the entire string whenever it merely contained the
+# substring "secret", "token", "password", "bearer", or "authorization". That
+# destroyed ordinary prose — a reply about an attached file came back as
+# "(sample.md***REDACTED***comes directly from" because each streamed chunk
+# holding the word was nuked, and a conversation titled from its first message
+# appeared in Recent chats as literally "***REDACTED***".
+#
+# Free-form text is now handed to ``redact_text``, which matches real credential
+# *shapes* (``sk-…``, ``ghp_…``, ``AKIA…``, ``Bearer …``, ``token=…``, PEM
+# blocks, high-entropy runs) and substitutes only the matched span. Secrets are
+# still caught, sentences survive, and nothing is silently lost: a redaction is
+# always visible as a ``[REDACTED_*]`` marker in place.
+#
+# Deliberately unchanged: the keyword sweep in ``raiker/events/export.py`` still
+# guards audit exports, which leave the machine in bulk and are read by
+# machines, not people. There the cost of over-redaction is low and the value of
+# belt-and-braces is high.
 
 
 def _redact_value(value: Any) -> Any:
@@ -18,7 +44,7 @@ def _redact_value(value: Any) -> Any:
             k: (
                 v
                 if is_token_count_field(k, v)
-                else _redact_value("***REDACTED***")
+                else REDACTED_VALUE
                 if _is_secret_key(k)
                 else _redact_value(v)
             )
@@ -27,12 +53,8 @@ def _redact_value(value: Any) -> Any:
     if isinstance(value, list):
         return [_redact_value(item) for item in value]
     if isinstance(value, str):
-        redacted, changed = redact_text(value)
-        if changed:
-            return redacted
-        if len(value) > 0 and any(p in value.lower() for p in SECRET_PATTERNS):
-            return "***REDACTED***"
-        return value
+        redacted, _changed = redact_text(value)
+        return redacted
     return value
 
 
@@ -46,6 +68,8 @@ def assert_no_secrets_in_body(body: Any) -> None:
 
 
 def _check_no_secrets(value: Any, path: str = "$") -> None:
+    # Mirrors _redact_value exactly, so the guard proves what the middleware
+    # emits rather than a stricter rule the middleware never applied.
     if isinstance(value, dict):
         for k, v in value.items():
             if is_token_count_field(k, v):
@@ -60,8 +84,6 @@ def _check_no_secrets(value: Any, path: str = "$") -> None:
         redacted, changed = redact_text(value)
         if changed:
             raise AssertionError(f"Secret-like string at {path}: {value[:80]}")
-        if len(value) > 0 and any(p in value.lower() for p in SECRET_PATTERNS):
-            raise AssertionError(f"Secret-pattern string at {path}: {value[:80]}")
 
 
 def response_json_body(response_body: bytes) -> Any:

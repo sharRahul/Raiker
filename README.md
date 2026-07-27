@@ -81,8 +81,7 @@ and executes nothing. Disabling either the `approval_execution_relay` or
 critical approval always uses the human-only, step-up-verified lifecycle
 instead.
 
-Deferred dangerous domains — remote and cloud execution, finance, medical,
-pregnancy, CCTV, home security, and hardware actions — have no governed executor
+Deferred dangerous domains — remote and cloud execution, finance, medical, CCTV, home security, and hardware actions — have no governed executor
 and therefore offer no enable path at all. They fail closed and are listed under
 Observability → Diagnostics.
 

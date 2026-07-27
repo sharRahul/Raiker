@@ -50,6 +50,12 @@ EVENT_TYPES = {
     # Prior turns of this conversation replayed to the model. Counts only —
     # message count and character total — never the transcript itself.
     "conversation_history_replayed",
+    # B2 — a turn parked for an approval, and the same turn picking up again
+    # once the owner resolved it. Counts and ids only; the parked conversation
+    # stays in the encrypted store and never enters an event payload.
+    "turn_suspended_for_approval",
+    "turn_suspension_failed",
+    "turn_resumed_after_approval",
     "retrieval_augmentation",
     "plan_created",
     "plan_skipped",

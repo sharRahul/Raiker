@@ -238,6 +238,8 @@ from raiker.storage.migrations import (
     STANDING_GRANTS_SQL,
     SUBAGENT_BUDGETS_MIGRATION_ID,
     SUBAGENT_BUDGETS_SQL,
+    SUSPENDED_TURNS_MIGRATION_ID,
+    SUSPENDED_TURNS_SQL,
     THREAT_MODEL_ACKS_MIGRATION_ID,
     THREAT_MODEL_ACKS_SQL,
 )
@@ -690,6 +692,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(CODE_REPOS_MIGRATION_ID, CODE_REPOS_SQL, connection)
             self._apply_migration(
                 MODEL_USAGE_LEDGER_MIGRATION_ID, MODEL_USAGE_LEDGER_SQL, connection
+            )
+            self._apply_migration(
+                SUSPENDED_TURNS_MIGRATION_ID, SUSPENDED_TURNS_SQL, connection
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -2803,6 +2808,82 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "UPDATE approvals SET status = 'pending', approved_by = NULL, resolved_at = NULL "
                 "WHERE approval_id = ? AND status = 'executing'",
                 (approval_id,),
+            )
+        return cursor.rowcount == 1
+
+    # ── suspended turns (B2 — resume the same turn after an approval) ─────────
+
+    def insert_suspended_turn(self, record: dict[str, Any]) -> None:
+        """Park one turn's working state against the approval that blocked it.
+
+        ``INSERT OR REPLACE`` keyed on ``approval_id``: an approval blocks exactly
+        one turn, and re-suspending the same approval is a re-park, not a second
+        row.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO suspended_turns
+                   (approval_id, session_id, turn_id, request_id, principal_id, action_id,
+                    tool_name, call_id, prompt_text, messages_json, options_json, client_json,
+                    tool_calls_made, status, outcome_json, created_at, resumed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'suspended', NULL, ?, NULL)""",
+                (
+                    record["approval_id"], record["session_id"], record["turn_id"],
+                    record["request_id"], record["principal_id"], record["action_id"],
+                    record["tool_name"], record["call_id"], record["prompt_text"],
+                    record["messages_json"], record["options_json"], record["client_json"],
+                    int(record.get("tool_calls_made", 0)), utc_now(),
+                ),
+            )
+
+    def load_suspended_turn(
+        self, approval_id: str, *, principal_id: str | None = None
+    ) -> dict[str, Any] | None:
+        """Load a parked turn. Scoping by principal keeps turns owner-isolated."""
+        query = "SELECT * FROM suspended_turns WHERE approval_id = ?"
+        params: tuple[Any, ...] = (approval_id,)
+        if principal_id is not None:
+            query += " AND principal_id = ?"
+            params = (approval_id, principal_id)
+        with self.connect() as connection:
+            row = connection.execute(query, params).fetchone()
+        return dict(row) if row is not None else None
+
+    def record_suspended_turn_outcome(self, approval_id: str, outcome_json: str) -> bool:
+        """Attach the resolution outcome the model will see as its tool result.
+
+        Guarded on ``suspended`` so a resumed (or abandoned) turn cannot have its
+        outcome rewritten after the model has already acted on it.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE suspended_turns SET outcome_json = ? "
+                "WHERE approval_id = ? AND status = 'suspended'",
+                (outcome_json, approval_id),
+            )
+        return cursor.rowcount == 1
+
+    def claim_suspended_turn(self, approval_id: str) -> bool:
+        """Atomically claim a parked turn for resumption (suspended → resuming).
+
+        The single-resumption primitive: a turn's working state may be replayed
+        into the model exactly once, so a double-click or a racing client cannot
+        run the continuation twice.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE suspended_turns SET status = 'resuming', resumed_at = ? "
+                "WHERE approval_id = ? AND status = 'suspended'",
+                (utc_now(), approval_id),
+            )
+        return cursor.rowcount == 1
+
+    def finalize_suspended_turn(self, approval_id: str, *, status: str) -> bool:
+        """Resolve a claimed turn to a terminal state (resuming → status)."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE suspended_turns SET status = ? WHERE approval_id = ? AND status = 'resuming'",
+                (status, approval_id),
             )
         return cursor.rowcount == 1
 

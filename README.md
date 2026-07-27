@@ -131,7 +131,10 @@ Raiker's documentation does not run ahead of its code. As of 2026-07-26:
 - **Approved shell, network, and process actions still do not run** — approval
   resolution executes file changes only. This is deliberate, not an oversight:
   a file write is local, checkpointed, and reversible, and the other three are
-  not.
+  not. Resolving any of them still continues the parked turn, with an honest
+  "approved, but not executed" result the agent can react to.
+- **A model proposing several tool calls at once gets one of them.** The
+  orchestrator takes the first and drops the rest without telling the model.
 - Automatic context compaction at 90 %, weekly quota display, and the view-only
   file inspector are specified but not shipped.
 - **Shipped list prices are unverified defaults.** `config/model-profiles.json`

@@ -699,6 +699,9 @@ export const api = {
   approval: (id: string) => request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(id)}`),
   resolveApproval: (id: string, body: { approve: boolean; reason: string }) =>
     postJson<ResolveApprovalResult>(`/api/approvals/${encodeURIComponent(id)}/resolve`, body),
+  // B2 — non-streaming continuation of a turn that was parked for this approval.
+  resumeAfterApproval: (id: string) =>
+    postJson<AgentResponse>(`/api/approvals/${encodeURIComponent(id)}/resume`, {}),
   resolveCriticalApproval: (id: string, body: { approve: boolean; reason: string }) =>
     postJson<ResolveCriticalApprovalResult>(
       `/api/approvals/${encodeURIComponent(id)}/resolve-critical`,
@@ -757,18 +760,52 @@ export async function streamPrompt(
   onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
+  return streamSse("/api/prompts/stream", JSON.stringify(body), onEvent, signal);
+}
+
+/**
+ * Stream the continuation of a turn that was parked for an approval (B2).
+ *
+ * Resolving an approval closes the tool call the model was waiting on, so the
+ * *same* turn can pick up from where it stopped instead of the owner re-prompting
+ * and the model losing its working state. Same governed path as an ordinary
+ * turn — this only surfaces the continuation as it happens.
+ */
+export async function streamResumeAfterApproval(
+  approvalId: string,
+  onEvent: (event: StreamEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  return streamSse(
+    `/api/approvals/${encodeURIComponent(approvalId)}/resume/stream`,
+    null,
+    onEvent,
+    signal,
+  );
+}
+
+async function streamSse(
+  path: string,
+  body: string | null,
+  onEvent: (event: StreamEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
   const headers = new Headers({ "Content-Type": "application/json" });
   if (token !== null) {
     headers.set("Authorization", `Bearer ${token}`);
   }
-  const resp = await fetch("/api/prompts/stream", {
+  // Streaming routes go through `instancePath` like every other call, so a
+  // dashboard served under /instances/<name> streams from its own instance
+  // rather than the default workspace.
+  const url = instancePath(path);
+  const resp = await fetch(url, {
     method: "POST",
     headers,
-    body: JSON.stringify(body),
+    ...(body === null ? {} : { body }),
     signal,
   });
   if (!resp.ok || resp.body === null) {
-    throw new ApiError(resp.status, null, `Stream failed: ${resp.status} /api/prompts/stream`);
+    throw new ApiError(resp.status, null, `Stream failed: ${resp.status} ${url}`);
   }
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();

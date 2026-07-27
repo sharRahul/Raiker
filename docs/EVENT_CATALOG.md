@@ -10,6 +10,9 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 | `policy_decision` | Policy classified the requested action |
 | `approval_requested` | A human decision is required |
 | `approval_denied` | A human or policy denied the action |
+| `turn_suspended_for_approval` | A turn parked its working state against an approval so resolving it resumes the same turn (approval id, tool name, and counts only — the parked conversation stays in the encrypted store) |
+| `turn_suspension_failed` | The working state could not be parked, so the turn is not resumable; the approval itself is unaffected |
+| `turn_resumed_after_approval` | A parked turn picked up again with the resolved tool result appended (approval id and counts only) |
 | `tool_started` | A governed executor started work |
 | `tool_completed` | A governed executor completed work |
 | `tool_failed` | A governed executor failed safely |

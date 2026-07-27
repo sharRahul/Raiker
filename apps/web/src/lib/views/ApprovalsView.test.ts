@@ -205,6 +205,64 @@ describe("ApprovalsView", () => {
     expect(await screen.findByText(/was NOT executed \(metadata-only\)/i)).toBeInTheDocument();
   });
 
+  // B2 — resolving an approval closes the tool call the model was waiting on,
+  // so the turn it parked can continue instead of costing the owner a re-prompt.
+  it("offers to continue the parked turn when the server says one is waiting", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/approvals": [PENDING],
+      "GET /api/approvals/appr_1": { ...DETAIL, executes_on_approval: true },
+      "POST /api/approvals/appr_1/resolve": {
+        approval_id: "appr_1",
+        action_id: "act_1",
+        status: "executed",
+        executes_action: true,
+        reason: "approved via web UI",
+        execution: { capability: "file_write_execution", path: "notes.txt" },
+        resume: { resumable: true, session_id: "sess_abcdef123456", turn_id: "turn_1" },
+      },
+      "POST /api/approvals/appr_1/resume": {
+        request_id: "req_1",
+        session_id: "sess_abcdef123456",
+        turn_id: "turn_1",
+        status: "completed",
+        message: "Done — notes.txt is written.",
+      },
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /approve and execute once/i }));
+
+    await fireEvent.click(await screen.findByRole("button", { name: /continue the turn/i }));
+
+    expect(await screen.findByText(/done — notes\.txt is written/i)).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some((call) => String(call[0]) === "/api/approvals/appr_1/resume"),
+    ).toBe(true);
+  });
+
+  it("does not offer to continue when no turn was parked on the approval", async () => {
+    stubFetch({
+      "GET /api/approvals": [PENDING],
+      "GET /api/approvals/appr_1": DETAIL,
+      "POST /api/approvals/appr_1/resolve": {
+        approval_id: "appr_1",
+        action_id: "act_1",
+        status: "approved",
+        executes_action: false,
+        reason: "approved via web UI",
+        resume: { resumable: false },
+      },
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /approve \(record only\)/i }));
+
+    await screen.findByText(/was NOT executed/i);
+    expect(screen.queryByRole("button", { name: /continue the turn/i })).not.toBeInTheDocument();
+  });
+
   it("keeps executed approvals reachable through their own filter tab", async () => {
     // `executed` is the terminal status the relay writes, so without this tab
     // every approval the owner actually carried out would vanish from the queue.

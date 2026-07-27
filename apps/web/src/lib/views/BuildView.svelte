@@ -23,7 +23,7 @@
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
   import Markdown from "../components/Markdown.svelte";
   import RepoConnector from "../components/RepoConnector.svelte";
-  import { api, ApiError, streamPrompt } from "../api";
+  import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
   import type {
     AgentResponse,
     ApprovalView,
@@ -291,6 +291,45 @@
     }
   }
 
+  /** Continue the turn this approval parked, streaming into its own transcript row. */
+  async function resumeTurn(approvalId: string) {
+    const parked = turns.findLast((candidate) => candidate.response?.status === "needs_approval");
+    const turn =
+      parked ??
+      (() => {
+        turns = [
+          ...turns,
+          { id: nextId++, prompt: "", mode, events: [], response: null, streaming: true, error: null },
+        ];
+        return turns[turns.length - 1];
+      })();
+    turn.streaming = true;
+    turn.error = null;
+    streaming = true;
+    void scrollToEnd();
+    try {
+      await streamResumeAfterApproval(approvalId, (event) => {
+        if (event.kind === "final" && event.response !== null) {
+          turn.response = event.response;
+          if (contextOpen) void refreshContextUsage();
+          void loadApprovals();
+        } else {
+          turn.events = [...turn.events, event];
+        }
+        void scrollToEnd();
+      });
+    } catch (error) {
+      turn.error =
+        error instanceof ApiError
+          ? `The turn could not continue (${error.reasonCode ?? error.status}).`
+          : "Could not reach the local runtime to continue the turn.";
+    } finally {
+      turn.streaming = false;
+      streaming = false;
+      void scrollToEnd();
+    }
+  }
+
   async function scrollToEnd() {
     await tick();
     // Guarded: jsdom has no scrollTo implementation.
@@ -374,6 +413,11 @@
             : "Applied once, under a fresh capability, policy and posture check."
           : "Decision recorded. Raiker re-governs the action before anything runs.";
       await loadApprovals();
+      // B2 — the decision closed the tool call the model was waiting on, so the
+      // turn it parked picks up from here instead of costing a re-prompt.
+      if (result.resume?.resumable) {
+        await resumeTurn(approval.approval_id);
+      }
     } catch (error) {
       approvalNotice =
         error instanceof ApiError

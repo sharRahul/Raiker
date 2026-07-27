@@ -56,6 +56,13 @@ previous contents checkpointed first; accepting anything else records the
 decision and executes nothing. The decisions rail reports which happened after
 the fact, so "Accept" is never read as "already applied".
 
+Accepting also **continues the turn**. The conversation that proposed the change
+kept its working state, so the decision is handed back to the model as the result
+of its own tool call — the real result when the change was applied, an explicit
+refusal when it was rejected — and the same turn streams on from there, in place.
+Nothing has to be re-asked, and the transcript shows one exchange rather than
+two. A turn continues at most once per decision.
+
 ## Repositories
 
 A coding chat can be pointed at one repository. Connecting one is bookkeeping,

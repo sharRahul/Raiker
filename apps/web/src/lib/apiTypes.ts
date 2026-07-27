@@ -597,6 +597,8 @@ export interface ResolveApprovalResult {
   connector_result?: Record<string, unknown>;
   // Present when an approved file mutation was carried out by the execution relay.
   execution?: { capability: string; path: string | null };
+  // B2 — whether a turn was parked on this approval and can now pick up again.
+  resume?: { resumable: boolean; session_id?: string; turn_id?: string };
 }
 
 export interface ResolveCriticalApprovalResult {
@@ -618,6 +620,10 @@ export interface ApprovalInfo {
   reasons: string[];
   message: string;
   expected_effect?: string;
+  approval_id?: string;
+  // True when the turn's working state was parked, so resolving this approval
+  // continues the same turn rather than costing a re-prompt.
+  resumable?: boolean;
 }
 
 // raiker.contracts.models.AgentResponse.to_dict()

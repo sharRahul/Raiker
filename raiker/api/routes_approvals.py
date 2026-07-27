@@ -1,22 +1,27 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 
 from raiker.api.auth import AuthMiddleware
+from raiker.api.routes_prompts import _sse
 from raiker.api.schemas import ResolveApprovalRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.approvals import ApprovalInbox
-from raiker.approvals.execution import ApprovalExecutionBridge
+from raiker.approvals.execution import ApprovalExecutionBridge, executable_capability
 from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.events.writer import EventLogWriter
+from raiker.gateway.agent_gateway import AgentGateway
 from raiker.runtime.authority.models import Principal
 from raiker.runtime.authority.router import RuntimeAuthority
 from raiker.runtime.connector_ecosystem import ConnectorInvoker
+from raiker.runtime.turn_suspension import TurnSuspensionError, approval_outcome
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -49,6 +54,28 @@ def _service(request: Request) -> DashboardService:
 
 def _auth(request: Request) -> tuple[ApiSession, Principal]:
     return AuthMiddleware(_ws(request)).authenticate(request)
+
+
+def _record_resume_outcome(
+    store: SQLiteStore, approval_id: str, outcome: dict[str, Any]
+) -> dict[str, Any]:
+    """Attach the decision's outcome to the turn it unblocked, if there is one (B2).
+
+    Returns what the client needs to continue: whether a parked turn exists and,
+    if so, which session and turn the continuation belongs to. Not every approval
+    has one — a connector-store write has no chat turn behind it, and a turn that
+    failed to park is simply not resumable.
+    """
+    row = store.load_suspended_turn(approval_id)
+    if row is None or str(row.get("status")) != "suspended":
+        return {"resumable": False}
+    if not store.record_suspended_turn_outcome(approval_id, json.dumps(outcome, sort_keys=True)):
+        return {"resumable": False}
+    return {
+        "resumable": True,
+        "session_id": str(row["session_id"]),
+        "turn_id": str(row["turn_id"]),
+    }
 
 
 @router.get("/api/approvals")
@@ -139,6 +166,7 @@ async def resolve_approval(
                 ),
                 detail={"ok": False, "reason_code": execution.reason_code},
             )
+        artifacts = {k: v for k, v in execution.artifacts.items() if v is not None}
         return {
             "approval_id": approval_id,
             "action_id": str(approval_row.get("action_id", "")),
@@ -149,6 +177,16 @@ async def resolve_approval(
                 "capability": execution.capability,
                 "path": execution.artifacts.get("path"),
             },
+            "resume": _record_resume_outcome(
+                store,
+                approval_id,
+                approval_outcome(
+                    approved=True,
+                    executed=True,
+                    capability=execution.capability,
+                    artifacts=artifacts,
+                ),
+            ),
         }
 
     try:
@@ -216,6 +254,13 @@ async def resolve_approval(
                 "executes_action": True,
                 "reason": body.reason,
                 "connector_result": output,
+                "resume": _record_resume_outcome(
+                    store,
+                    approval_id,
+                    approval_outcome(
+                        approved=True, executed=True, capability="connector_write"
+                    ),
+                ),
             }
     return {
         "approval_id": resolution.approval_id,
@@ -223,7 +268,83 @@ async def resolve_approval(
         "status": resolution.status,
         "executes_action": resolution.executes_action,
         "reason": body.reason,
+        # B2 — the decision closes the tool call the model is still waiting on,
+        # so a parked turn can pick up from here. Rejection is carried through as
+        # a refusal rather than silence, which is what lets the model react.
+        "resume": _record_resume_outcome(
+            store,
+            approval_id,
+            approval_outcome(
+                approved=body.approve,
+                executed=False,
+                capability=executable_capability(str(approval_row.get("tool_name", "")))
+                or str(approval_row.get("tool_name", "")),
+            ),
+        ),
     }
+
+
+# B2 — resolving an approval unblocks the turn that proposed the action; these
+# two routes are how it picks up again. The parked conversation itself never
+# leaves the machine: both return an AgentResponse, exactly like a fresh turn.
+_RESUME_ERRORS = {
+    "suspended_turn_not_found": status.HTTP_404_NOT_FOUND,
+    "suspended_turn_already_resumed": status.HTTP_409_CONFLICT,
+    "approval_not_resolved": status.HTTP_409_CONFLICT,
+    "suspended_turn_unreadable": status.HTTP_409_CONFLICT,
+}
+
+
+def _resume_error(exc: TurnSuspensionError) -> HTTPException:
+    code = str(exc)
+    return HTTPException(
+        status_code=_RESUME_ERRORS.get(code, status.HTTP_409_CONFLICT),
+        detail={"ok": False, "reason_code": code},
+    )
+
+
+@router.post("/api/approvals/{approval_id}/resume")
+async def resume_after_approval(
+    approval_id: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Continue the turn this approval blocked, once it has been resolved."""
+    session, _principal = _auth_data
+    gateway = AgentGateway(_ws(request), principal_id=session.principal_id)
+    try:
+        response = await gateway.aresume_after_approval(approval_id)
+    except TurnSuspensionError as exc:
+        raise _resume_error(exc) from exc
+    return response.to_dict()
+
+
+@router.post("/api/approvals/{approval_id}/resume/stream")
+async def stream_resume_after_approval(
+    approval_id: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> StreamingResponse:
+    """Stream the continuation, so it lands in the transcript as it happens."""
+    session, _principal = _auth_data
+    gateway = AgentGateway(_ws(request), principal_id=session.principal_id)
+    try:
+        stream = gateway.astream_resume_after_approval(approval_id)
+        first = await stream.__anext__()
+    except TurnSuspensionError as exc:
+        raise _resume_error(exc) from exc
+    except StopAsyncIteration:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": "suspended_turn_produced_no_events"},
+        ) from None
+
+    async def gen() -> AsyncIterator[str]:
+        yield _sse(first)
+        async for event in stream:
+            yield _sse(event)
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 @router.post("/api/approvals/{approval_id}/resolve-critical")

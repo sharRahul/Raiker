@@ -141,3 +141,10 @@ gates, not assumed:
 Disabling either capability in Permissions returns file approvals to
 record-only, and the detail view says so. A **critical** approval never takes
 either path: it uses the human-only, step-up-verified critical lifecycle.
+
+Either way, **your decision continues the work.** The turn that proposed the
+action keeps its place: resolving the approval hands the model the real result —
+or an explicit refusal when you said no — and the same turn picks up from there
+rather than making you re-ask. Build streams the continuation straight back into
+the conversation; the Approvals inbox offers **Continue the turn** and reports
+what the agent did. A turn continues at most once per decision.

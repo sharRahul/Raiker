@@ -1935,3 +1935,42 @@ CREATE TABLE IF NOT EXISTS model_facts_cache (
   PRIMARY KEY (owner_principal_id, provider, model, source)
 );
 """
+
+
+# B2 — a turn parked for approval keeps its working state, so resolving the
+# approval resumes the *same* turn instead of forcing the owner to re-prompt.
+#
+# `messages_json` is the model conversation as it stood when the loop suspended,
+# including the assistant message carrying the proposed tool call. It is
+# transcript-grade content and never leaves the encrypted store: the resume
+# endpoints return only an AgentResponse.
+#
+# `outcome_json` is written when the approval is resolved and is what the model
+# sees as the tool result on resume — the real execution result when the action
+# ran, or an honest refusal when it did not.
+SUSPENDED_TURNS_MIGRATION_ID = "RAIKER-2026-suspended-turns"
+SUSPENDED_TURNS_SQL = """
+CREATE TABLE IF NOT EXISTS suspended_turns (
+  approval_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  request_id TEXT NOT NULL,
+  principal_id TEXT NOT NULL,
+  action_id TEXT NOT NULL,
+  tool_name TEXT NOT NULL,
+  call_id TEXT NOT NULL,
+  prompt_text TEXT NOT NULL,
+  messages_json TEXT NOT NULL,
+  options_json TEXT NOT NULL,
+  client_json TEXT NOT NULL,
+  tool_calls_made INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'suspended',
+  outcome_json TEXT,
+  created_at TEXT NOT NULL,
+  resumed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_suspended_turns_session
+  ON suspended_turns(session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_suspended_turns_status
+  ON suspended_turns(principal_id, status);
+"""

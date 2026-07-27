@@ -77,6 +77,76 @@ class RuntimeOrchestrator:
         self.tool_specs = default_tool_specs()
         self._sink: list[StreamEvent] | None = None
 
+    def _suspend_turn(
+        self,
+        envelope: PromptEnvelope,
+        *,
+        approval_id: str,
+        action: ToolAction,
+        proposal: ToolCallProposal,
+        messages: list[ModelMessage],
+        tool_calls_made: int,
+    ) -> bool:
+        """Park this turn's working state against *approval_id* (B2).
+
+        Returns whether the turn is resumable. Best-effort by design: a failure
+        to park must never break the approval itself — the owner still gets their
+        decision, they just have to re-prompt for the continuation, which is
+        exactly the pre-B2 behaviour. Anything else would make a storage problem
+        into a lost approval.
+        """
+        store = getattr(self.tool_broker, "store", None)
+        if store is None or not approval_id:
+            return False
+        try:
+            from raiker.runtime.turn_suspension import serialize_messages
+
+            store.insert_suspended_turn({
+                "approval_id": approval_id,
+                "session_id": envelope.session_id,
+                "turn_id": envelope.turn_id,
+                "request_id": envelope.request_id,
+                "principal_id": self.tool_broker.principal_id,
+                "action_id": action.action_id,
+                "tool_name": action.tool_name,
+                "call_id": proposal.call_id,
+                # The turn's own prompt: the resumed envelope is the *same* turn,
+                # so it carries the same prompt rather than a synthetic blank one.
+                "prompt_text": envelope.prompt.text,
+                "messages_json": serialize_messages(messages),
+                "options_json": json.dumps({
+                    "planning_mode": envelope.options.planning_mode,
+                    "approval_mode": envelope.options.approval_mode,
+                    "model_profile": envelope.options.model_profile,
+                    "model": envelope.options.model,
+                    "max_tool_calls": envelope.options.max_tool_calls,
+                }),
+                "client_json": json.dumps({
+                    "type": envelope.client.type,
+                    "name": envelope.client.name,
+                    "version": envelope.client.version,
+                }),
+                "tool_calls_made": tool_calls_made,
+            })
+        except Exception as exc:
+            self._event(
+                envelope,
+                "turn_suspension_failed",
+                {"approval_id": approval_id, "reason": type(exc).__name__},
+            )
+            return False
+        self._event(
+            envelope,
+            "turn_suspended_for_approval",
+            {
+                "approval_id": approval_id,
+                "tool_name": action.tool_name,
+                "suspended_messages": len(messages),
+                "tool_calls_made": tool_calls_made,
+            },
+        )
+        return True
+
     def _state(
         self, machine: RuntimeStateMachine, envelope: PromptEnvelope, new_state: str
     ) -> None:
@@ -607,8 +677,71 @@ class RuntimeOrchestrator:
             )
         )
 
+        async for event in self._arun_agent_loop(
+            envelope, machine, messages, stream=stream
+        ):
+            yield event
+
+    async def aresume_events(
+        self,
+        envelope: PromptEnvelope,
+        messages: list[ModelMessage],
+        *,
+        stream: bool,
+        tool_calls_made: int = 0,
+        approval_id: str = "",
+    ) -> AsyncIterator[StreamEvent]:
+        """Continue a turn that was parked for an approval (B2).
+
+        *messages* is the conversation exactly as it stood when the loop
+        suspended, with the resolved tool result already appended by the caller.
+        No re-classification, no fresh context bundle, no new user message: this
+        is the same turn picking up where it stopped, which is the whole point —
+        re-prompting would discard the model's working state and re-pay for the
+        context.
+        """
+        self._sink = [] if stream else None
+        try:
+            machine = RuntimeStateMachine()
+            self._state(machine, envelope, "NORMALISED")
+            self._state(machine, envelope, "CLASSIFIED")
+            self._state(machine, envelope, "CONTEXT_READY")
+            self._state(machine, envelope, "PLAN_SKIPPED")
+            self._event(
+                envelope,
+                "turn_resumed_after_approval",
+                {
+                    "approval_id": approval_id,
+                    "replayed_messages": len(messages),
+                    "tool_calls_made": tool_calls_made,
+                },
+            )
+            async for event in self._arun_agent_loop(
+                envelope,
+                machine,
+                messages,
+                stream=stream,
+                tool_calls_made=tool_calls_made,
+            ):
+                yield event
+        finally:
+            self._sink = None
+
+    async def _arun_agent_loop(
+        self,
+        envelope: PromptEnvelope,
+        machine: RuntimeStateMachine,
+        messages: list[ModelMessage],
+        *,
+        stream: bool,
+        tool_calls_made: int = 0,
+    ) -> AsyncIterator[StreamEvent]:
+        """The model → tool → model loop, shared by a fresh turn and a resumed one.
+
+        Extracted so resumption is the *same* loop rather than a parallel
+        implementation that could drift from it.
+        """
         max_tool_calls = envelope.options.max_tool_calls
-        tool_calls_made = 0
         started_action_ids: set[str] = set()
         status: str | None = None
         message = ""
@@ -688,14 +821,41 @@ class RuntimeOrchestrator:
                 # enabled (BUG-06). Carried through so the transcript never has
                 # to guess.
                 proposal_output = tool_result.output or {}
+                approval_id = str(proposal_output.get("approval_id", ""))
+                # B2 — park the loop's working state against this approval, with
+                # the assistant message carrying the proposed call appended, so
+                # resolving the approval resumes *this* turn instead of costing
+                # the owner a re-prompt and the model its context.
+                resumable = self._suspend_turn(
+                    envelope,
+                    approval_id=approval_id,
+                    action=action,
+                    proposal=proposal,
+                    messages=[
+                        *messages,
+                        ModelMessage(
+                            role="assistant",
+                            content=response.text,
+                            tool_calls=(proposal,),
+                        ),
+                    ],
+                    tool_calls_made=tool_calls_made,
+                )
                 approval = {
                     "action_id": action.action_id,
+                    "approval_id": approval_id,
                     "tool_name": action.tool_name,
                     "arguments": action.arguments,
                     "risk_level": "high",
                     "reasons": decision.reasons,
-                    "message": "Approval required. The action was not executed.",
+                    "message": (
+                        "Approval required. The action was not executed. Resolving it "
+                        "continues this turn."
+                        if resumable
+                        else "Approval required. The action was not executed."
+                    ),
                     "expected_effect": str(proposal_output.get("expected_effect", "")),
+                    "resumable": resumable,
                 }
                 message = "Approval required for local action. No command was executed."
                 break

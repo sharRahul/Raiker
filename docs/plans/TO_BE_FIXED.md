@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Eight are marked **FIXED** and were resolved on this
+and the proposed fix. Nine are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -29,6 +29,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-06 | High | Chat / Build rendering | Fixed (was BUG-03) |
 | FIXED-07 | High | API redaction | Fixed (was BUG-04) |
 | FIXED-08 | **Critical** | Approvals / file output | Fixed (was BUG-06) |
+| FIXED-09 | **Critical** | Build / Chat agent loop | Fixed (was GAP-BUILD B2) |
 | BUG-07 | Medium | Chat | Open (specified, unimplemented) |
 | BUG-08 | Medium | Export | Open (not specified) |
 | BUG-09 | Medium | Tasks | Open |
@@ -557,6 +558,84 @@ instead of leaving it to be discovered.
 
 ---
 
+## FIXED-09 — The agent stopped dead at its first write *(was GAP-BUILD B2)*
+
+**Status: fixed in this change.**
+
+**Observed.** With FIXED-08 landed, approving a proposed `write_file` really
+wrote the file — and then nothing else happened. The turn had already ended at
+`needs_approval`, so the model never learned its own tool call had succeeded.
+Continuing meant the owner re-prompting, which starts a *new* turn: the model's
+working state is gone and the whole context is paid for again. A coding agent
+that has to be re-prompted after every write is a proposal generator with extra
+steps.
+
+**Root cause.** `raiker/runtime/orchestrator.py` `break`s out of the agent loop
+on `needs_approval` and returns. The loop's working state — the message list it
+had built up, the tool-call budget it had spent — lived only in local variables
+and went out of scope with the generator.
+
+**Fix applied.** Three parts, deliberately small:
+
+- **Park it.** A new `suspended_turns` table keyed by `approval_id` holds the
+  conversation as it stood when the loop stopped, including the assistant
+  message carrying the proposed call (a `tool` result is only valid against the
+  call it answers). `raiker/runtime/turn_suspension.py` owns the serialisation.
+- **Close the call.** Resolving the approval writes the outcome the model will
+  see as its tool result. Three genuinely different things can have happened and
+  the model has to tell them apart: **executed** replays the real executor result
+  and its artifacts; **rejected** is an explicit refusal that tells the model not
+  to retry; **approved but not executed** says so plainly, so a capability that
+  is still metadata-only can never be mistaken for success.
+- **Resume the same loop.** `_arun_agent_loop` was extracted from
+  `_aturn_events_inner` so a resumed turn runs the *same* code as a fresh one
+  rather than a parallel implementation that could drift. `POST
+  /api/approvals/{id}/resume` and `…/resume/stream` continue it, under the same
+  turn id, with the same checkpoint and `turn_closed` finalisation — one
+  exchange in the transcript, not two.
+
+**Boundaries.**
+
+- **A turn resumes at most once.** Two independent guards — a status check on
+  read and an atomic `suspended → resuming` claim — because replaying a parked
+  turn would re-send the whole conversation and let the model act twice on one
+  decision.
+- **Resuming before the approval is resolved is refused.** There is no tool
+  result to hand back yet.
+- **Parking is best-effort; the approval is not.** If the state cannot be
+  stored, the turn is simply not resumable (`turn_suspension_failed`) and the
+  owner re-prompts — exactly the pre-B2 behaviour. A storage problem must never
+  become a lost approval.
+- **The parked conversation never leaves the machine.** It lives in the
+  encrypted store; the events carry counts and ids only, and both resume
+  endpoints return an `AgentResponse`.
+- **Owner-scoped.** A parked turn is loaded by principal, so one account cannot
+  resume another's.
+
+**Surfaces.** Build resolves inline and streams the continuation straight into
+the same transcript row, which is where this change is felt. Approvals — which
+is an inbox, not a transcript — offers **Continue the turn** after a decision
+and reports what the agent did, rather than resuming behind the owner's back.
+
+**Verified.** `tests/test_turn_resume_after_approval.py` (15 tests): the working
+state is parked with the assistant tool-call message; the event payload carries
+no transcript; approving resumes the same turn id with the real result as the
+tool message; the resumed call still contains everything the first call had;
+rejecting resumes with a refusal and writes nothing; a resumed turn can park
+again on its *own* approval; resuming unresolved, twice, or for an unknown
+approval each fail closed; auth is required; an approval with no parked turn
+reports `resumable: false`; and the streaming route yields a completed final
+event. Two `ApprovalsView` tests cover the offered continuation. The
+single-resumption test was mutation-checked — it fails when both guards are
+removed.
+
+**Still not done, deliberately.** Chat does not auto-continue when the owner
+resolves from the Approvals route in another tab; the continuation is offered
+there and streamed in Build. Parallel tool calls (B4) are still dropped, so a
+resumed turn proposes one call at a time.
+
+---
+
 ## BUG-07 — No file inspector; attachment chips are not interactive
 
 **Observed.** An uploaded `sample.md` renders as a chip inside the user bubble.
@@ -677,8 +756,9 @@ refused by the policy engine). The governance, audit and checkpoint story is
 
 The gap is that **Build cannot close a loop.** Everything below follows from
 that, and the order is the order they should be done in — each tier is worthless
-without the one above it. B1 has since been closed (FIXED-08): an approved file
-change is now really written. B2 is what still stops the loop.
+without the one above it. B1 (FIXED-08) and B2 (FIXED-09) have since been closed:
+an approved file change is really written, and the turn continues through the
+approval instead of ending at it. B3 is what now costs the most.
 
 ### Tier 0 — the blocking three (without these, nothing else matters)
 
@@ -691,19 +771,13 @@ Build is no longer a proposal generator for file work.
 **What is left of B1:** `shell` is still metadata-only on resolution, and that
 is deliberate — a command is neither local-only nor reversible, so it belongs
 with B5 (a narrow, owner-defined command allowlist under its own capability)
-rather than with the file relay. And the executed/refused outcome is surfaced in
-the Approvals inbox and the Build decisions rail, but is **not yet threaded back
-into the transcript as a tool result** — that is B2's job, below.
+rather than with the file relay. The executed/refused outcome is now threaded
+back into the transcript as a real tool result by B2 (FIXED-09).
 
-**B2. The turn must resume after an approval.** *(now the blocking one)* The
-loop `break`s on `needs_approval` (`raiker/runtime/orchestrator.py`) and the turn
-returns. With B1 landed the write really happens, but the agent still stops dead
-at it and the user must re-prompt to continue — which discards the model's working state and re-pays for
-the context. **Work:** persist the suspended loop state against the approval id,
-and on resolution resume the same turn with the tool result appended (approved →
-the real result; rejected → a refusal the model can react to). This is the
-single highest-value change in this document: it converts a one-shot proposer
-into an agent.
+**B2. The turn resumes after an approval.** ✅ **Done — see FIXED-09.** The loop
+parks its working state against the approval and picks the same turn up on
+resolution, with the real result (or an honest refusal) appended as the tool
+result. Build no longer stops dead at its first write.
 
 **B3. Real patch application.** `edit_file_content` is literally
 `return write_file_content(...)`, and `apply_patch_content` writes `new_text`
@@ -836,12 +910,12 @@ autonomous without the host as the blast radius.
 
 ### Suggested order
 
-B1 → B2 → B3 make Build an agent. **B1 has landed (FIXED-08), so B2 is now the
-blocking item** — until the turn resumes after an approval, an approved write
-still costs a re-prompt and the model's working state. B4–B6 make it efficient.
-B13–B16 make the result reviewable. Everything else is depth. B20 is a *policy*
-decision before it is an engineering one and belongs to the owner, not to an
-implementer.
+B1 → B2 → B3 make Build an agent. **B1 (FIXED-08) and B2 (FIXED-09) have both
+landed**, so an approved change is really made and the turn continues through it;
+**B3 is now the blocking item** — until hunk-level editing exists, every change
+costs a whole-file rewrite. B4–B6 make it efficient. B13–B16 make the result
+reviewable. Everything else is depth. B20 is a *policy* decision before it is an
+engineering one and belongs to the owner, not to an implementer.
 
 ---
 

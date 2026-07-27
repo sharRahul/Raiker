@@ -60,6 +60,14 @@ REDACTED_VALUE = "***REDACTED***"
 # discarded whole even if it also ends in one of these.
 _LOCATOR_KEY_SUFFIXES = ("_url", "_urls", "_uri", "_path", "_paths", "_subpath")
 
+# Field names whose values are server-issued record identifiers. Same failure as
+# the locators above and the same cure: `sess_inbox_principal_user_<16 hex>` is
+# 42 characters of joined prefixes, so the entropy fallback ate it and the API
+# handed the client `"session_id": "[REDACTED_SECRET]"` — an id it cannot open,
+# link to, or stop work in. Checked *after* the secret-key sweep, so a key that
+# names a credential is still discarded whole.
+_IDENTIFIER_KEY_SUFFIXES = ("_id", "_ids")
+
 
 def is_locator_field(key: str) -> bool:
     """True when a field's name says its value is a URL or filesystem path."""
@@ -67,7 +75,13 @@ def is_locator_field(key: str) -> bool:
     return lower.endswith(_LOCATOR_KEY_SUFFIXES)
 
 
-def _redact_value(value: Any, *, locator: bool = False) -> Any:
+def is_identifier_field(key: str) -> bool:
+    """True when a field's name says its value is a server-issued record id."""
+    lower = key.lower()
+    return lower.endswith(_IDENTIFIER_KEY_SUFFIXES)
+
+
+def _redact_value(value: Any, *, locator: bool = False, identifier: bool = False) -> Any:
     if isinstance(value, dict):
         # A token *count* is an integer, never a credential. Without this the
         # models contract returned `context_window_tokens: "***REDACTED***"` and
@@ -78,15 +92,20 @@ def _redact_value(value: Any, *, locator: bool = False) -> Any:
                 if is_token_count_field(k, v)
                 else REDACTED_VALUE
                 if _is_secret_key(k)
-                else _redact_value(v, locator=is_locator_field(k))
+                else _redact_value(
+                    v, locator=is_locator_field(k), identifier=is_identifier_field(k)
+                )
             )
             for k, v in value.items()
         }
     if isinstance(value, list):
-        # A list under a locator key (``attachment_urls``) is a list of locators.
-        return [_redact_value(item, locator=locator) for item in value]
+        # A list under a locator key (``attachment_urls``) is a list of locators;
+        # one under an id key (``task_ids``) is a list of ids.
+        return [_redact_value(item, locator=locator, identifier=identifier) for item in value]
     if isinstance(value, str):
-        redacted, _changed = redact_text(value, locator_value=locator)
+        redacted, _changed = redact_text(
+            value, locator_value=locator, identifier_value=identifier
+        )
         return redacted
     return value
 
@@ -100,7 +119,9 @@ def assert_no_secrets_in_body(body: Any) -> None:
     _check_no_secrets(body)
 
 
-def _check_no_secrets(value: Any, path: str = "$", *, locator: bool = False) -> None:
+def _check_no_secrets(
+    value: Any, path: str = "$", *, locator: bool = False, identifier: bool = False
+) -> None:
     # Mirrors _redact_value exactly, so the guard proves what the middleware
     # emits rather than a stricter rule the middleware never applied.
     if isinstance(value, dict):
@@ -109,12 +130,19 @@ def _check_no_secrets(value: Any, path: str = "$", *, locator: bool = False) -> 
                 continue
             if _is_secret_key(k):
                 raise AssertionError(f"Secret-like key at {path}.{k}: {k}")
-            _check_no_secrets(v, f"{path}.{k}", locator=is_locator_field(k))
+            _check_no_secrets(
+                v,
+                f"{path}.{k}",
+                locator=is_locator_field(k),
+                identifier=is_identifier_field(k),
+            )
     elif isinstance(value, list):
         for i, item in enumerate(value):
-            _check_no_secrets(item, f"{path}[{i}]", locator=locator)
+            _check_no_secrets(item, f"{path}[{i}]", locator=locator, identifier=identifier)
     elif isinstance(value, str):
-        redacted, changed = redact_text(value, locator_value=locator)
+        redacted, changed = redact_text(
+            value, locator_value=locator, identifier_value=identifier
+        )
         if changed:
             raise AssertionError(f"Secret-like string at {path}: {value[:80]}")
 

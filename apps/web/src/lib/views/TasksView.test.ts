@@ -166,6 +166,40 @@ describe("TasksView blocked-on-approval pointer", () => {
     expect(screen.queryByText(/waiting on/i)).not.toBeInTheDocument();
   });
 
+  it("keeps a blocked run in the open list, says why, and still offers Stop", async () => {
+    stubFetch({
+      "GET /api/tasks": [
+        { ...TASK, status: "waiting_for_approval", summary: "Waiting for your approval before this run can continue." },
+      ],
+      "GET /api/approvals": [],
+    });
+    render(TasksView);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Publish the release note" })).toBeInTheDocument(),
+    );
+
+    expect(screen.getByText("waiting for approval")).toBeInTheDocument();
+    expect(screen.getByText(/waiting for your approval before this run can continue/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+  });
+
+  // BUG-09 — "failed" was the entire story the finished list told. The reason
+  // the backend recorded is the point of the row.
+  it("states why a finished run ended", async () => {
+    stubFetch({
+      "GET /api/tasks": [
+        { ...TASK, task_id: "task_failed", status: "failed", summary: "The model was unreachable." },
+        { ...TASK, task_id: "task_silent", title: "Nightly sweep", status: "cancelled", summary: "  " },
+      ],
+      "GET /api/approvals": [],
+    });
+    render(TasksView);
+
+    await waitFor(() => expect(screen.getByText("Finished work")).toBeInTheDocument());
+    expect(screen.getByText("The model was unreachable.")).toBeInTheDocument();
+    expect(screen.getByText("No reason was recorded for this outcome.")).toBeInTheDocument();
+  });
+
   it("keeps the task list usable when approvals cannot be read", async () => {
     stubFetch({ "GET /api/tasks": [TASK] });
     render(TasksView);

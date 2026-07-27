@@ -45,15 +45,55 @@ class TaskScheduler:
             current = self.store.load_task(task.task_id)
             if current is None or current.status == "cancelled":
                 continue
+            outcome, summary = run_outcome(response.status, response.message)
             interval = RECURRING_INTERVALS.get(task.recurrence or "")
             if interval is not None and task.scheduled_at:
                 next_run = next_run_after(task.scheduled_at, interval)
-                manager.store.reschedule_task(task.task_id, next_run, response.message[:500])
-            elif response.status == "completed":
-                manager.complete_task(task.task_id, response.message[:500])
+                # A recurring task keeps its slot whatever one cycle did, so the
+                # summary has to say which it was — otherwise a cycle that never
+                # ran reads exactly like one that succeeded.
+                manager.store.reschedule_task(
+                    task.task_id,
+                    next_run,
+                    summary if outcome == "completed" else f"Last run did not complete: {summary}",
+                )
+            elif outcome == "completed":
+                manager.complete_task(task.task_id, summary)
+            elif outcome == "waiting_for_approval":
+                manager.block_task_on_approval(task.task_id, summary)
             else:
-                manager.fail_task(task.task_id, response.message[:500])
+                manager.fail_task(task.task_id, summary)
         return len(tasks)
+
+
+# How a governed turn's terminal status lands on the task the scheduler ran, and
+# what the owner is told when the turn leaves no message of its own (BUG-09).
+# Treating every non-`completed` status as a failure was wrong twice over: a run
+# parked on an approval had not failed at all, and a blank message produced a
+# `Task failed` card and audit line that said nothing about why.
+SUMMARY_MAX_CHARS = 500
+RUN_OUTCOMES: dict[str, tuple[str, str]] = {
+    "completed": ("completed", "The run finished without a summary."),
+    "needs_approval": (
+        "waiting_for_approval",
+        "Waiting for your approval before this run can continue.",
+    ),
+    "denied": ("failed", "Policy denied an action this run needed."),
+    "failed": ("failed", "The run failed without a stated reason."),
+}
+
+
+def run_outcome(status: str, message: str) -> tuple[str, str]:
+    """Map one governed turn's result onto ``(task status, stated summary)``.
+
+    An unrecognised status fails closed *and* says so, rather than recording a
+    terminal state the owner cannot account for.
+    """
+    task_status, fallback = RUN_OUTCOMES.get(
+        status,
+        ("failed", f"The run ended with an unrecognised status: {status or 'unknown'}."),
+    )
+    return task_status, ((message or "").strip()[:SUMMARY_MAX_CHARS] or fallback)
 
 
 # Recurring cadences and the gap between one governed cycle and the next. A

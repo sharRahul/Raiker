@@ -128,6 +128,38 @@ class TestDashboardTaskFiltering:
         assert reloaded is not None
         assert reloaded.status == "failed"
 
+    # BUG-09 — `Task failed` with an empty reason told the owner nothing. The
+    # manager is the last place that can guarantee a reason exists, so it does.
+    def test_fail_task_without_a_reason_still_states_one(
+        self, manager: TaskManager, store: SQLiteStore
+    ) -> None:
+        sid = self._create_session(store)
+        task = manager.create_task(session_id=sid, title="Fail", objective="Check failure")
+        manager.fail_task(task.task_id, reason="   ")
+        reloaded = manager.get_task(task.task_id)
+        assert reloaded is not None
+        assert reloaded.summary == "The run ended without a stated reason."
+        recorded = [
+            row for row in store.list_event_index(session_id=sid)
+            if row["event_type"] == "task_failed"
+        ]
+        assert len(recorded) == 1
+
+    def test_block_task_on_approval_parks_the_task_without_ending_it(
+        self, manager: TaskManager, store: SQLiteStore
+    ) -> None:
+        sid = self._create_session(store)
+        task = manager.create_task(session_id=sid, title="Publish", objective="Publish it")
+        blocked = manager.block_task_on_approval(task.task_id, "Waiting on your decision.")
+        assert blocked is not None
+        reloaded = manager.get_task(task.task_id)
+        assert reloaded is not None
+        assert reloaded.status == "waiting_for_approval"
+        assert reloaded.summary == "Waiting on your decision."
+        assert reloaded.completed_at is None
+        types = [row["event_type"] for row in store.list_event_index(session_id=sid)]
+        assert "task_blocked" in types
+
     def test_cancel_task(self, manager: TaskManager, store: SQLiteStore) -> None:
         sid = self._create_session(store)
         task = manager.create_task(session_id=sid, title="Cancel", objective="Check cancellation")

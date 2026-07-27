@@ -29,6 +29,7 @@
   } from "../apiTypes";
   import { humanize, isRedacted, relativeTime, shortId } from "../format";
   import { HUB_TABS } from "../nav";
+  import { isActiveTask } from "../statusMaps";
 
   let {
     tab = "overview",
@@ -71,7 +72,7 @@
   );
 
   const activeTasks = $derived(
-    (tasks ?? []).filter((task) => ["queued", "running", "paused"].includes(task.status)),
+    (tasks ?? []).filter((task) => isActiveTask(task.status)),
   );
   const expiredApprovals = $derived((approvals ?? []).filter((a) => a.is_expired));
   const blockedGates = $derived(
@@ -224,7 +225,7 @@
             label="Open work"
             value={activeTasks.length}
             detail={activeTasks.length === 0
-              ? "No task is queued, running, or paused."
+              ? "No task is queued, running, paused, or waiting for approval."
               : "You can stop any of these at a safe boundary."}
             href="#/observe?tab=work"
             linkLabel="Open the live board"

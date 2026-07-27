@@ -15,6 +15,14 @@ REDACTED_PRIVATE_KEY = "[REDACTED_PRIVATE_KEY]"
 # digits and never match this shape.
 _SNAKE_IDENTIFIER = re.compile(r"[a-z]+(?:_[a-z]+)+")
 
+# A server-issued record identifier: a lowercase prefix followed by underscore-
+# joined lowercase-alphanumeric segments (`sess_inbox_principal_user_e8b7…`,
+# `task_f9d9…`). Offered only for values whose *key* names an id (see
+# ``raiker/api/redaction.py``), never for free-form text: the shape is loose
+# enough that a lowercase secret containing an underscore would match it, and
+# only the caller knows the field is an id rather than prose.
+_SERVER_ISSUED_ID = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)+")
+
 
 def _is_segmented_path(token: str) -> bool:
     """True for a run that is only long because its *segments* were joined.
@@ -45,6 +53,21 @@ def _redact_high_entropy_in_locator(match: re.Match[str]) -> str:
     """The fallback as applied to a value the caller has declared a locator."""
     token = match.group(0)
     if _is_segmented_path(token):
+        return token
+    return _redact_high_entropy(match)
+
+
+def _redact_high_entropy_in_identifier(match: re.Match[str]) -> str:
+    """The fallback as applied to a value the caller has declared an id.
+
+    A record id is long because its prefixes were joined, exactly like a path:
+    ``sess_inbox_principal_user_<16 hex>`` crosses 40 characters without holding
+    40 characters of entropy anywhere. Anything under an id key that does *not*
+    look like a server-issued id — mixed case, base64 padding, a dash-separated
+    token — still redacts.
+    """
+    token = match.group(0)
+    if _SERVER_ISSUED_ID.fullmatch(token):
         return token
     return _redact_high_entropy(match)
 
@@ -124,23 +147,37 @@ _LOCATOR_PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] |
     _PATTERNS[:-1] + ((_PATTERNS[-1][0], _redact_high_entropy_in_locator),)
 )
 
+# The same rules with an id-aware fallback, used only for values whose *key*
+# declares them a record identifier.
+_IDENTIFIER_PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], ...] = (
+    _PATTERNS[:-1] + ((_PATTERNS[-1][0], _redact_high_entropy_in_identifier),)
+)
 
-def redact_text(text: str, *, locator_value: bool = False) -> tuple[str, bool]:
+
+def redact_text(
+    text: str, *, locator_value: bool = False, identifier_value: bool = False
+) -> tuple[str, bool]:
     """Mask obvious secrets/tokens/emails/private keys in ``text``.
 
     Returns ``(redacted_text, changed)``. Deterministic and total: it never raises on
     unusual input and never removes the whole item, it only substitutes sensitive spans.
 
     ``locator_value`` says the caller knows this string is a URL or filesystem
-    path — a fact only the caller has, from the field's key. It relaxes the
-    high-entropy fallback for slash-segmented runs *and nothing else*; every
-    credential shape is still matched. Default off, so free-form text (model
-    output, chat titles, document excerpts) keeps the strict scan.
+    path, and ``identifier_value`` that it is a server-issued record id — facts
+    only the caller has, from the field's key. Each relaxes the high-entropy
+    fallback for one shape and nothing else; every credential shape is still
+    matched. Both default off, so free-form text (model output, chat titles,
+    document excerpts) keeps the strict scan.
     """
 
     if not isinstance(text, str):
         text = str(text)
+    patterns = _PATTERNS
+    if locator_value:
+        patterns = _LOCATOR_PATTERNS
+    elif identifier_value:
+        patterns = _IDENTIFIER_PATTERNS
     redacted = text
-    for pattern, replacement in _LOCATOR_PATTERNS if locator_value else _PATTERNS:
+    for pattern, replacement in patterns:
         redacted = pattern.sub(replacement, redacted)
     return redacted, redacted != text

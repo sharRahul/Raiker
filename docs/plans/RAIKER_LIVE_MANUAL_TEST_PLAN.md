@@ -253,8 +253,10 @@ from existing tasks), Priority Low/Normal/High, the `4 open / 4 scheduled /
 showing the same records. `34-task-form-*.png`, `35-tasks-all-types-created.png`.
 
 Two blemishes: one background-agent run emitted `Task failed` in the audit log
-with no user-facing reason (BUG-09), and task runs create sessions that appear
-in **RECENT CHATS** alongside real conversations (BUG-10).
+with no user-facing reason (fixed — FIXED-13: a run's outcome is now classified,
+always carries a stated reason, and is shown on the task card and in Work in
+action), and task runs create sessions that appear in **RECENT CHATS** alongside
+real conversations (BUG-10).
 
 ---
 

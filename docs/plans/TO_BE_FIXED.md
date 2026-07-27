@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Eleven are marked **FIXED** and were resolved on this
+and the proposed fix. Fourteen are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -33,7 +33,8 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-10 | Medium | Chat / attachments | Fixed (was BUG-07) |
 | FIXED-11 | High | API redaction | Fixed (found while fixing BUG-07) |
 | FIXED-12 | Medium | Export | Fixed (was BUG-08) |
-| BUG-09 | Medium | Tasks | Open |
+| FIXED-13 | Medium | Tasks | Fixed (was BUG-09) |
+| FIXED-14 | High | API redaction | Fixed (found while fixing BUG-09) |
 | BUG-10 | Low | Chat / Tasks | Open |
 | BUG-11 | Medium | Permissions | Open |
 | BUG-12 | High | MCP | Open (specified, unimplemented) |
@@ -789,11 +790,26 @@ a print stylesheet. It makes no server request and exports no hidden governance
 metadata.
 
 The serializer and filename are covered by `apps/web/src/lib/chatExport.test.ts`;
-the rendered controls, clipboard payload, and print invocation are covered by
-`apps/web/src/lib/views/ChatView.test.ts`. A live Chromium run verified the
-downloaded file contents, clipboard text, print media layout, zero horizontal
-overflow, and zero console errors. The disposable live-test screenshot is not
-retained in the repository.
+the rendered controls, clipboard payload, download, and print invocation are
+covered by `apps/web/src/lib/views/ChatView.test.ts`. A live Chromium run
+verified the downloaded file contents, clipboard text, print media layout, zero
+horizontal overflow, and zero console errors. The disposable live-test
+screenshot is not retained in the repository.
+
+**Follow-ups applied while verifying this entry.** Three gaps between what the
+controls did and what they reported:
+
+* **Copy failed silently.** `navigator.clipboard.writeText` was awaited with no
+  `catch`, so an insecure origin or a denied permission produced an unhandled
+  rejection and no message at all. It is now caught and reported.
+* **A successful copy was invisible.** The only confirmation was an `sr-only`
+  live region, so a sighted owner clicking **Copy response** saw nothing happen.
+  The notice is now visible ("Response copied.", "Downloaded raiker-chat-….md")
+  and still announced.
+* **The download raced its own object URL.** The anchor was never attached to the
+  document and `URL.revokeObjectURL` ran in the same tick as `click()` — a
+  download some browsers drop. The anchor is now attached, clicked, removed, and
+  the URL released afterwards.
 
 **Scope kept honest.** This is chat transcript export, not an arbitrary artifact
 or attachment download system. The latter remains outside this smallest useful
@@ -801,16 +817,119 @@ fix and must retain the existing session-authorized file boundary if added.
 
 ---
 
-## BUG-09 — A background-agent run reported `Task failed` with no user-facing reason
+## FIXED-13 — A background-agent run reported `Task failed` with no user-facing reason *(was BUG-09)*
+
+**Status: fixed in this change.**
 
 **Observed.** The "Manual test Background agent" task produced a real response
 and a checkpoint, then the audit log recorded `Task failed` (`task_manager`).
 Tasks still showed the task as `queued`; nothing in the UI said what failed or
 why.
 
-**Proposed fix.** Surface the task's terminal reason on the task card and in
-Observability → Work in action. A run that produced a completed response should
-not be able to end `failed` with an empty summary.
+**Root cause.** Three separate defects stacked into one unreadable outcome.
+
+1. `raiker/tasks/scheduler.py` treated **every** non-`completed` turn status as a
+   failure. A governed turn ends on one of four statuses, and two of them are not
+   failures: `needs_approval` means the run reached an approval boundary and
+   stopped there — exactly what a governed run is supposed to do — and `denied`
+   means policy refused one action. A run parked on the owner's own decision was
+   recorded as `failed`.
+2. The reason was whatever the turn's message happened to be, truncated to 500
+   characters and never checked. An empty message produced a `task_failed` event
+   with `reason: ""` and a task row whose `summary` was blank.
+3. Nothing rendered the reason even when one existed. `TasksView` showed a status
+   badge, the objective, and a timestamp; the finished list showed title, badge,
+   time. Work in action filtered tasks down to `queued`/`running`/`paused`, so a
+   finished run vanished from the page rather than reporting how it ended, and a
+   task's `detail` was its `current_step` — the step the run last reached, not
+   what ended it.
+
+The `queued` reading was the same page never refreshing: the list loaded on mount
+and on a project change only, while the run was claimed, executed, and closed by
+the resident scheduler outside it.
+
+**Fix applied.**
+
+*A run's outcome is classified, not assumed.* `run_outcome()` maps each terminal
+turn status onto a task status and a stated summary: `completed` → `completed`,
+`needs_approval` → `waiting_for_approval` (a contract status that existed and was
+never used), `denied`/`failed` → `failed`. An unrecognised status fails closed
+**and** names itself rather than recording a state the owner cannot account for.
+
+*A terminal task always carries a reason.* `TaskManager.fail_task` and
+`cancel_task` substitute a stated reason when the caller passes a blank one, so
+neither the audit event nor the card can end up empty. `block_task_on_approval`
+parks a blocked run without stamping `completed_at` — the work is unfinished —
+and emits the new `task_blocked` event, which is distinct from `task_failed`
+precisely because nothing went wrong. A recurring cadence keeps its slot whatever
+one cycle did, so a cycle that did not complete now says so in the summary
+instead of reading like a success.
+
+*The reason is visible in both surfaces.* Tasks shows the outcome line on the
+card and in the (now correctly named) **Finished work** list, reads
+`waiting for approval` as English rather than a snake_case identifier, keeps a
+blocked run in the open list where it can be reviewed or stopped, and refreshes
+on a 15-second interval so a run that ends elsewhere stops reading as `queued`.
+Work in action keeps blocked runs among live work, adds **How the last runs
+ended**, and reports a terminal task's outcome instead of its stale step.
+"Stop everything" reaches a blocked task too (`_ACTIVE_TASK_STATES`).
+
+Covered by `tests/test_task_scheduler.py`, `tests/test_phase_2_task_manager.py`,
+`tests/test_api_dashboard.py`, `apps/web/src/lib/statusMaps.test.ts`,
+`apps/web/src/lib/views/TasksView.test.ts`, and
+`apps/web/src/lib/views/WorkInActionView.test.ts`.
+
+**Deliberately not done.** Resolving the approval that blocks a scheduled run
+still does not resume that run: the resume relay (FIXED-09) is driven by the
+client that submitted the turn, and a scheduler-launched turn has no client
+watching it. The task stays `waiting_for_approval` with its reason on the card
+and can be stopped from there. Auto-resuming scheduled work after an approval is
+a feature on top of this defect, not part of it.
+
+---
+
+## FIXED-14 — Redaction destroyed every server-issued record id
+
+**Status: fixed in this change.** Found while verifying FIXED-13 against a live
+`raiker-web`; not caused by it.
+
+**Observed.** With the task fixes in place, `GET /api/tasks` returned:
+
+> `"session_id": "[REDACTED_SECRET]"`
+
+for every task, and `GET /api/sessions` did the same for the Inbox session. The
+task cards rendered correctly, but every control that carries the id was broken:
+**Stop** posted `session_id: "[REDACTED_SECRET]"` (`interrupt_target_not_found`),
+the blocked-task pointer linked to `#/approvals?session=[REDACTED_SECRET]`, the
+session was unopenable from Sessions, and the approval match — `task.session_id
+=== approval.session_id` — compared one redaction marker against another.
+
+**Root cause.** The fourth instance of the family behind FIXED-02, FIXED-07 and
+FIXED-11: the high-entropy fallback matching a value that is long without being
+opaque. A server-issued id is long because its *prefixes* were joined —
+`sess_inbox_principal_user_<16 hex>` is 42 characters and carries no 40-character
+run of entropy anywhere. Short ids (`sess_<16 hex>`, 21 characters) stayed under
+the threshold, which is why this only appeared for accounts created through
+registration: their principal id is what makes the Inbox session id long enough,
+and the Inbox session is where every task lives.
+
+**Fix applied.** The field's **key** decides, exactly as it does for locators in
+FIXED-11. `raiker/api/redaction.py` marks values under `*_id`/`*_ids` as record
+identifiers, and only those get a fallback that spares a token matching the
+server-issued id shape — lowercase, underscore-joined, alphanumeric segments.
+Nothing else changes:
+
+* The exemption is a *shape*, not a blanket pass for `*_id`. A mixed-case token,
+  base64 with padding, or a dash-separated opaque value under an id key still
+  redacts.
+* A key that names a credential still wins: `token_id` is discarded whole.
+* Free-form text is untouched and keeps the strict scan, so the same string
+  quoted in an assistant reply is still scanned as prose.
+
+`assert_no_secrets_in_body` mirrors the rule, so the guard still proves exactly
+what the middleware emits. Covered by
+`tests/test_over_broad_redaction.py::TestServerIssuedIdentifiersSurvive` and
+verified over real HTTP against a running `raiker-web`.
 
 ---
 

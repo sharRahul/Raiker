@@ -3284,6 +3284,20 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         now = utc_now()
         self._update_task(task_id, status="cancelled", completed_at=now, summary=reason)
 
+    def block_task_on_approval(self, task_id: str, reason: str) -> None:
+        """A run reached an approval boundary: blocked, not finished.
+
+        No ``completed_at`` is stamped — the work is unfinished and the owner's
+        decision is what moves it. Recording it as `failed` (BUG-09) told the
+        owner the run had gone wrong when nothing had.
+        """
+        self._update_task(
+            task_id,
+            status="waiting_for_approval",
+            current_step="Waiting for your approval",
+            summary=reason,
+        )
+
     def list_event_index(
         self,
         session_id: str | None = None,

@@ -50,6 +50,11 @@ _DISABLED_STATES = {"disabled", "planned"}
 # after its first run.
 TASK_RECURRENCES = frozenset({"background", *RECURRING_INTERVALS})
 
+# Task states in which the stored summary *is* the outcome — what the run ended
+# on, or what it is parked against. In those states `current_step` is the step
+# the run last reached, which is not what the owner needs to be told (BUG-09).
+TASK_OUTCOME_STATES = frozenset({"completed", "failed", "cancelled", "waiting_for_approval"})
+
 # GitHub coordinate shapes. Validation is strict and local — a repository
 # reference is stored only when it *could* name a real repository, and no
 # network call is made to find out.
@@ -497,6 +502,13 @@ class TaskView:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def _task_detail(task: TaskView) -> str | None:
+    """What a live view should say about a task: its outcome, else its step."""
+    if task.status in TASK_OUTCOME_STATES:
+        return task.summary or task.current_step
+    return task.current_step
 
 
 @dataclass(frozen=True)
@@ -1084,9 +1096,12 @@ class DashboardService:
             edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "owns"))
         for task in tasks:
             node_id = f"task:{task.task_id}"
-            nodes.append(BrainNodeView(node_id, "task", task.title or "Untitled task", task.status, task.current_step, task.progress_percent))
+            nodes.append(BrainNodeView(node_id, "task", task.title or "Untitled task", task.status, _task_detail(task), task.progress_percent))
             edges.append(BrainEdgeView(f"session:{task.session_id}", node_id, "tracks", task.status == "running"))
-            if task.scheduled_at:
+            # Only work that is actually waiting for its slot is scheduled work.
+            # A task that has already run keeps its `scheduled_at`, so listing it
+            # here showed a finished or blocked run as "Waiting" indefinitely.
+            if task.scheduled_at and task.status == "queued":
                 schedule_id = f"schedule:{task.task_id}"
                 nodes.append(BrainNodeView(schedule_id, "schedule", "Scheduled work", "waiting", task.scheduled_at))
                 edges.append(BrainEdgeView(schedule_id, node_id, "starts"))

@@ -23,7 +23,7 @@
   import type { ProjectsList, TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
-  import { taskBadge } from "../statusMaps";
+  import { isActiveTask, taskBadge } from "../statusMaps";
 
   let {
     projectId = null,
@@ -51,11 +51,11 @@
   let creating = $state(false);
 
   const running = $derived(
-    (tasks ?? []).filter((task) => ["queued", "running", "paused"].includes(task.status)),
+    (tasks ?? []).filter((task) => isActiveTask(task.status)),
   );
   const standing = $derived(running.filter((task) => task.recurrence));
   const finished = $derived(
-    (tasks ?? []).filter((task) => !["queued", "running", "paused"].includes(task.status)).slice(0, 6),
+    (tasks ?? []).filter((task) => !isActiveTask(task.status)).slice(0, 6),
   );
 
   async function load() {

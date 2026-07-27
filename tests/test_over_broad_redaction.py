@@ -228,3 +228,45 @@ class TestServerIssuedLocatorsSurvive:
 
     def test_the_guard_accepts_what_the_middleware_emits_for_locators(self) -> None:
         assert_no_secrets_in_body(redact_response_body({"pdf_url": self.PDF_URL}))
+
+
+class TestServerIssuedIdentifiersSurvive:
+    """FIXED-14 — the same failure, one field family further along.
+
+    A record id is long for the same reason a path is: its prefixes were joined.
+    ``sess_inbox_principal_user_<16 hex>`` is 42 characters without holding 40
+    characters of entropy anywhere, so the fallback ate it and every task in the
+    Inbox session came back with ``"session_id": "[REDACTED_SECRET]"`` — an id
+    the client cannot open, link to, or stop work in.
+    """
+
+    INBOX = "sess_inbox_principal_user_e8b7bf68bd74bd5e"
+
+    def test_a_long_inbox_session_id_survives(self) -> None:
+        body = {"session_id": self.INBOX, "task_id": "task_f9d9572193994e1a91bbb188ee39008d"}
+        assert redact_response_body(body) == body
+
+    def test_a_list_of_ids_survives(self) -> None:
+        body = {"task_ids": [self.INBOX, "turn_3f21c0d94b6e4d1fa0b7c2e58d9a4413"]}
+        assert redact_response_body(body) == body
+
+    def test_the_same_string_in_free_form_text_is_still_scanned_strictly(self) -> None:
+        assert redact_response_body({"answer": self.INBOX}) != {"answer": self.INBOX}
+
+    def test_an_opaque_value_under_an_id_key_is_still_redacted(self) -> None:
+        # The exemption is a *shape*, not a blanket pass for `*_id`: anything
+        # that is not a lowercase, underscore-joined record id fails closed.
+        for value in (
+            "AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKK",
+            "aGVsbG8gd29ybGQgc2VjcmV0IHRva2VuIGxvbmdlciBzdGlsbA==",
+            "abcdefghij-klmnopqrst-uvwxyz0123-456789abcdef",
+        ):
+            assert redact_response_body({"external_id": value}) != {"external_id": value}
+
+    def test_a_secret_named_key_still_wins_over_the_identifier_rule(self) -> None:
+        assert redact_response_body({"token_id": "sess_inbox_principal_user_e8b7bf68"}) == {
+            "token_id": "***REDACTED***"
+        }
+
+    def test_the_guard_accepts_what_the_middleware_emits_for_identifiers(self) -> None:
+        assert_no_secrets_in_body(redact_response_body({"session_id": self.INBOX}))

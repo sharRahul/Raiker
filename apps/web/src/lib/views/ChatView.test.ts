@@ -73,9 +73,80 @@ describe("ChatView streaming transcript", () => {
 
     await fireEvent.click(await screen.findByRole("button", { name: "Copy response" }));
     expect(writeText).toHaveBeenCalledWith("**Done**");
+    expect(await screen.findByText("Response copied.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export as Markdown" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Print / Save as PDF" }));
     expect(print).toHaveBeenCalledOnce();
+  });
+
+  // A copy button that silently does nothing is worse than none: an insecure
+  // origin or a denied permission has to be said out loud.
+  it("says so when the browser blocks the clipboard", async () => {
+    stubFetch(MODELS_ROUTE);
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("Answer") } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "Make it so" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Copy response" }));
+    expect(await screen.findByText(/browser blocked clipboard access/i)).toBeInTheDocument();
+  });
+
+  it("downloads the transcript as a dated Markdown file", async () => {
+    stubFetch(MODELS_ROUTE);
+    const exported: Blob[] = [];
+    const createObjectURL = vi.fn((blob: Blob) => {
+      exported.push(blob);
+      return "blob:transcript";
+    });
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("- First\n- Second") } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "Summarise this" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    // The anchor must be in the document when it is clicked: a detached anchor
+    // is a download some browsers drop on the floor.
+    let attached = false;
+    const clicked: Array<{ href: string; download: string }> = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      attached = this.isConnected;
+      clicked.push({ href: this.href, download: this.download });
+    });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Export as Markdown" }));
+
+    expect(attached).toBe(true);
+    expect(clicked).toHaveLength(1);
+    expect(clicked[0].href).toContain("blob:transcript");
+    expect(clicked[0].download).toMatch(/^raiker-chat-\d{4}-\d{2}-\d{2}\.md$/);
+    expect(document.querySelector("a[download]")).toBeNull();
+    const blob = exported[0];
+    expect(blob.type).toContain("text/markdown");
+    // jsdom's Blob has no `.text()`; FileReader is the portable read.
+    const text = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsText(blob);
+    });
+    expect(text).toContain("## Raiker\n\n- First\n- Second");
+    expect(await screen.findByText(/^Downloaded raiker-chat-/)).toBeInTheDocument();
   });
 
   it("renders streamed lifecycle events and settles on the final response", async () => {

@@ -4,12 +4,13 @@
   import Icon from "./Icon.svelte";
   import { api, ApiError } from "../api";
   import { humanize } from "../format";
+  import { ACTIVE_TASK_STATES } from "../statusMaps";
   import type { EventEntry } from "../apiTypes";
 
   type Phase = "confirm" | "working" | "done" | "empty" | "error";
 
   const INTERRUPT_EVENT_TYPES = ["interrupt_received", "safe_boundary_reached", "task_cancelled"];
-  const ACTIVE_STATES = ["queued", "running", "paused"];
+  const ACTIVE_STATES = ACTIVE_TASK_STATES;
 
   let open = $state(false);
   let phase = $state<Phase>("confirm");
@@ -104,7 +105,8 @@
 
       {#if phase === "confirm"}
         <p>
-          This requests cancellation of every queued, running, or paused task at the next
+          This requests cancellation of every task that is queued, running, paused, or waiting
+          for your approval, at the next
           <strong>safe boundary</strong>. It is governed and audited — not a force-kill.
         </p>
         <div class="actions">

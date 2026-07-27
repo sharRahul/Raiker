@@ -474,11 +474,15 @@ export const api = {
   projectFiles: (id: string) =>
     request<ProjectFilesView>(`/api/projects/${encodeURIComponent(id)}/files`),
   diagnosticsExport: () => request<DiagnosticsExport>("/api/diagnostics/export"),
-  sessions: (projectId?: string, includeArchived = false) =>
+  // `origin: "chat"` narrows the list to conversations the owner typed. Task
+  // runs live in a server-owned session that is still listed in Sessions; it is
+  // only "recent chats" that must mean chats (BUG-10).
+  sessions: (projectId?: string, includeArchived = false, origin?: string) =>
     request<SessionSummary[]>(
       withQuery("/api/sessions", {
         project_id: projectId,
         include_archived: includeArchived ? "true" : undefined,
+        origin,
       }),
     ),
   searchChats: (q: string) => request<SessionSummary[]>(withQuery("/api/chat-search", { q })),

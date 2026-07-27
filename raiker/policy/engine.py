@@ -8,6 +8,7 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import PolicyDecision, ToolAction
 from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
 from raiker.policy.config import StaticPolicyConfig
+from raiker.tools.mcp_tools import is_mcp_tool
 
 
 class PolicyEngine:
@@ -127,6 +128,24 @@ class PolicyEngine:
                     risk_level="blocked",
                     timestamp=utc_now(),
                 )
+        if is_mcp_tool(action.tool_name):
+            # A projected MCP tool call (BUG-12). Read-shaped at this layer for
+            # the same reason `connector_read` is: what actually governs it is
+            # enforced inside the tool — the `mcp_connector_runtime` gate, the
+            # decision mode (default `ask` withholds), containment, and the
+            # server's own advertised tool list. Its arguments are opaque
+            # server-defined values, never workspace paths, so the path check
+            # below does not apply to them.
+            return PolicyDecision(
+                decision_id=new_id("pol_"),
+                action_id=action.action_id,
+                decision="allow",
+                reasons=["mcp_tool_call_governed_inside_tool"],
+                requires_user_approval=False,
+                policy_version=self.config.policy_version,
+                risk_level=action.risk_level,
+                timestamp=utc_now(),
+            )
         if action.tool_name in self.config.allowed_read_actions:
             inside, reasons = self._path_arguments_inside_workspace(action)
             if not inside:

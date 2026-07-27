@@ -33,6 +33,7 @@ from raiker.tools.filesystem import (
     stat_path,
 )
 from raiker.tools.git import run_git
+from raiker.tools.mcp_tools import is_mcp_tool, mcp_call
 from raiker.tools.memory_tools import (
     memory_get,
     memory_list,
@@ -56,6 +57,18 @@ class ToolExecutionContext:
 # Tools whose *arguments* are scrubbed to lengths before entering events (the
 # argument text is itself sensitive prompt content — the advisor question).
 _METADATA_ONLY_TOOLS = frozenset({"consult_advisor"})
+
+
+def _drops_argument_values(tool_name: str) -> bool:
+    """True when a tool's *argument values* must not enter an event payload.
+
+    A projected MCP tool's arguments are opaque values the model composes for an
+    outside program — they can carry anything the conversation contained, and
+    unlike a connector's repo/number they name nothing governance-relevant. The
+    MCP session log already records their *shape* rather than their value; the
+    broker events do the same (BUG-12).
+    """
+    return tool_name in _METADATA_ONLY_TOOLS or is_mcp_tool(tool_name)
 # Tools whose *result content* is dropped from events. The advisor answer and the
 # fetched GitHub body are untrusted content that flows only to the calling model;
 # the audit trail keeps metadata (lengths, ids), never the content itself.
@@ -67,6 +80,16 @@ _CONTENT_RESULT_TOOLS = frozenset(
     {"consult_advisor", "github_read", "gmail_read", "gcal_read", "slack_read", "connector_read"}
 )
 _CONTENT_RESULT_FIELDS = ("answer", "content")
+
+
+def _drops_result_content(tool_name: str) -> bool:
+    """True when a tool's *content* must never enter an event payload.
+
+    Projected MCP tools (``mcp__<server>__<tool>``) join the connector family:
+    what an owner-registered server returned flows to the calling model as
+    untrusted data, while the audit trail keeps metadata only (BUG-12).
+    """
+    return tool_name in _CONTENT_RESULT_TOOLS or is_mcp_tool(tool_name)
 
 
 class ToolBroker:
@@ -207,6 +230,22 @@ class ToolBroker:
             "assign_session_project": self._assign_session_project,
         }
 
+    def _mcp_call(self, action: ToolAction) -> dict[str, Any]:
+        """Run one projected MCP tool call (BUG-12).
+
+        The broker has already applied hooks, the policy engine, and the
+        approval flow by the time this runs; the MCP service adds the capability
+        gate, the decision mode, containment, and the advertised-tool check.
+        """
+        nested = action.arguments.get("arguments")
+        return mcp_call(
+            self.workspace_root,
+            action.tool_name,
+            nested if isinstance(nested, dict) else {},
+            store=self.store,
+            principal_id=self.principal_id,
+        )
+
     def _create_task(self, args: dict[str, Any], context: ToolExecutionContext) -> dict[str, Any]:
         from raiker.control.dashboard import DashboardService
 
@@ -282,7 +321,7 @@ class ToolBroker:
         Metadata-only tools replace their content-bearing arguments with
         lengths; everything else is secret-redacted verbatim.
         """
-        if action.tool_name in _METADATA_ONLY_TOOLS:
+        if _drops_argument_values(action.tool_name):
             return {
                 f"{key}_length": len(str(value))
                 for key, value in action.arguments.items()
@@ -293,7 +332,7 @@ class ToolBroker:
     def _event_safe_result_payload(cls, result: ToolResult) -> dict[str, Any]:
         """Result payload for events: metadata-only tools drop content fields."""
         payload = result.to_dict()
-        if result.tool_name in _CONTENT_RESULT_TOOLS and isinstance(payload.get("output"), dict):
+        if _drops_result_content(result.tool_name) and isinstance(payload.get("output"), dict):
             output = dict(payload["output"])
             for field in _CONTENT_RESULT_FIELDS:
                 output.pop(field, None)
@@ -657,7 +696,9 @@ class ToolBroker:
             client=client,
         )
         context_executor = self.context_executors.get(action.tool_name)
-        if executor is None and context_executor is None:
+        if executor is None and context_executor is None and is_mcp_tool(action.tool_name):
+            raw = self._mcp_call(action)
+        elif executor is None and context_executor is None:
             if action.tool_name == "memory_write":
                 raw = self.memory_service.write_from_action(
                     action,

@@ -67,7 +67,10 @@
 
   async function loadRecent() {
     try {
-      const all = await api.sessions();
+      // Conversations only: a task run stores a server-owned session (the
+      // Inbox) that appeared here beside real chats (BUG-10). It stays
+      // reachable from Tasks and Sessions; this list means conversations.
+      const all = await api.sessions(undefined, false, "chat");
       // Drop untitled chats from the sidebar — they are freshly-created empty
       // conversations with no first prompt yet. They still exist in Sessions
       // (where they show as their short id), but here they would read as

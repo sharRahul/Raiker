@@ -16,6 +16,7 @@ from raiker.models.contracts import (
     ModelMessage,
     ModelResponse,
     ToolCallProposal,
+    ToolSpec,
     summarize_model_usage,
 )
 from raiker.models.exceptions import (
@@ -36,6 +37,7 @@ from raiker.runtime.planner import SimplePlanner
 from raiker.runtime.retrieval import RetrievalAugmentor
 from raiker.runtime.state_machine import RuntimeStateMachine
 from raiker.tools.broker import ToolBroker
+from raiker.tools.mcp_tools import mcp_tool_specs
 from raiker.verification.models import VerificationResult
 from raiker.verification.verifier import Verifier
 
@@ -76,6 +78,21 @@ class RuntimeOrchestrator:
         self.verifier = Verifier()
         self.tool_specs = default_tool_specs()
         self._sink: list[StreamEvent] | None = None
+
+    def _turn_tool_specs(self) -> list[ToolSpec]:
+        """The tools this turn may call: the built-ins plus projected MCP tools.
+
+        Recomputed per turn because the owner can connect, pause, or kill an MCP
+        server between turns (BUG-12). Discovery is fail-closed: a disabled
+        `mcp_connector_runtime` gate, a server that never completed a handshake,
+        and a contained connection all contribute nothing, so the model is never
+        offered a tool the runtime would refuse.
+        """
+        store = getattr(self.tool_broker, "store", None)
+        return [
+            *self.tool_specs,
+            *mcp_tool_specs(self.workspace_root, store, self.tool_broker.principal_id),
+        ]
 
     def _suspend_turn(
         self,
@@ -381,7 +398,7 @@ class RuntimeOrchestrator:
             )
             try:
                 response = await self.model_router.achat(
-                    provider, model, messages, self.tool_specs
+                    provider, model, messages, self._turn_tool_specs()
                 )
             except ModelProviderError as exc:
                 last_error_code = provider_error_code(exc)
@@ -491,7 +508,7 @@ class RuntimeOrchestrator:
             output_committed = False
             try:
                 async for provider_event in self.model_router.astream(
-                    provider, model, messages, self.tool_specs
+                    provider, model, messages, self._turn_tool_specs()
                 ):
                     if provider_event.text_delta:
                         output_committed = True

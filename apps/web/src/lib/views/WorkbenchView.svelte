@@ -58,7 +58,9 @@
     unavailable = false;
     try {
       [sessions, tasks, approvals, projects] = await Promise.all([
-        api.sessions(),
+        // Conversations only — "Resume a conversation" must not offer the
+        // server-owned session a task run executes in (BUG-10).
+        api.sessions(undefined, false, "chat"),
         api.tasks(),
         api.approvals(),
         api.projects(),

@@ -256,7 +256,8 @@ Two blemishes: one background-agent run emitted `Task failed` in the audit log
 with no user-facing reason (fixed — FIXED-13: a run's outcome is now classified,
 always carries a stated reason, and is shown on the task card and in Work in
 action), and task runs create sessions that appear in **RECENT CHATS** alongside
-real conversations (BUG-10).
+real conversations (fixed — FIXED-15: task runs are tagged `origin=task` and the
+recent-conversation lists ask for `origin=chat`).
 
 ---
 
@@ -275,8 +276,8 @@ real conversations (BUG-10).
 Note the two-step model: with **Development preview** active a gate can only
 reach `enabled_policy_gated`; `enabled_runtime` needs a runtime-enablement mode
 (§4.1). Surfaces that check `runtime_enabled` (e.g. MCP) stay disabled until
-then. The Permissions banner says this, but nothing in the failing surface
-repeats it — BUG-11.
+then. The Permissions banner says this; the failing surface now repeats it
+instead of claiming the capability is disabled (fixed — FIXED-16).
 
 ---
 
@@ -301,14 +302,16 @@ the trigger. Matches `2026-07-18-adaptive-navigation-design.md` exactly.
 
 | # | Step | Result |
 |---|---|---|
-| 10.1.1 | With MCP gates off: form disabled + "Enable them in Capabilities" | ✅ |
+| 10.1.1 | With MCP gates off: form disabled + a notice naming which of the three shut states it is (FIXED-16) | ✅ |
 | 10.1.2 | With `mcp_builder_runtime` + `mcp_connector_runtime` at `enabled_runtime`: name a server, pick "Sample echo server (safe starter)", **Create server** | ✅ `POST /mcp/servers` 200 `53-`, `54-` |
 | 10.1.3 | **Test** | `connected · 2 tool(s)` — `echo`, `workspace_ping`; monitored session recorded `mcp_connect · 0 tool calls · ok` | ✅ `57-` |
 | 10.1.4 | Stop / Resume / Rename / Delete | ✅ present and wired |
-| 10.1.5 | **Use an MCP tool from Chat** | ❌ **not possible** — MCP tools are never offered to the model (BUG-12) |
+| 10.1.5 | **Use an MCP tool from Chat** | ✅ after FIXED-17 — a connected server's tools are offered as `mcp__<server>__<tool>` once the owner raises the `mcp_connector_runtime` decision mode above the default `ask` |
 
-So MCP works as a *management and monitoring* surface, and does not yet work as
-an *agent capability*.
+MCP now works as an *agent capability* as well as a management and monitoring
+surface. Discovery is fail-closed (gate off, never connected, or contained ⇒ no
+tools offered), the decision mode is what permits a call, and the tool's output
+reaches the model as untrusted data while the audit trail keeps metadata only.
 
 ### 10.2 Connectors
 
@@ -371,10 +374,10 @@ from the session `⋯` menu. `73-`, `74-`.
 | Can you see how many tokens remain? | **Yes** (was `0 / NaN (NaN%)`; FIXED-02) — provider-reported usage against a provider-reported capacity |
 | Can you see what a chat has cost? | **Yes** — per-chat and provider all-time, in Chat and Build, for API-key providers only |
 | Can you generate a markdown file and view it in the sidebar? | **Partly** — approving a file change now writes the file (FIXED-08), and an *attached* file opens in the inspector (FIXED-10); a file Raiker itself creates is not yet an inspectable chip |
-| Can you convert markdown to PDF in one click? | **No** — markdown now renders (FIXED-06), but no export or print control exists (BUG-08) |
+| Can you convert markdown to PDF in one click? | **Yes** — markdown renders (FIXED-06) and the chat toolbar offers Export as Markdown and Print / Save as PDF (FIXED-12) |
 | Do the different task types work? | **Yes** — all four create, schedule, and run |
 | Can you set an API key from the web app? | **Yes** — Connect, paste, done. No gate, allowlist, or vault-key setup first (FIXED-05) |
-| Does the MCP server work? | **Partly** — create/connect/monitor yes, tools in Chat no (BUG-12) |
+| Does the MCP server work? | **Yes** — create/connect/monitor, and its tools are callable from Chat under the owner's decision mode (FIXED-17) |
 | Do Permissions / Capabilities work? | **Yes** — all 62 gates, four decision modes, step-up enforced |
 
 ---

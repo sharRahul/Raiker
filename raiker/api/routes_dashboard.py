@@ -92,13 +92,16 @@ async def list_sessions(
     limit: int = 50,
     project_id: str | None = None,
     include_archived: bool = False,
+    origin: str | None = None,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> list[dict[str, Any]]:
     """List the authenticated account's sessions.
 
     Defaults to active sessions only; ``include_archived=true`` also returns the
-    caller's archived sessions. Listing is always owner-scoped — the flag never
-    widens visibility beyond the caller's own sessions.
+    caller's archived sessions. ``origin=chat`` narrows the list to conversations
+    the owner typed, leaving out the server-owned sessions task runs execute in
+    (BUG-10); omitting it lists every session. Listing is always owner-scoped —
+    neither flag ever widens visibility beyond the caller's own sessions.
     """
     user_id = auth_data[1].delegated_by_user_id
     return serialize_dto(
@@ -107,6 +110,7 @@ async def list_sessions(
             project_id=project_id,
             user_id=user_id,
             include_archived=include_archived,
+            origin=origin,
         )
     )
 

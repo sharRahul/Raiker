@@ -6,6 +6,7 @@ import {
   enableableTargets,
   explainCapability,
   gateBadge,
+  runtimeBlock,
   groupByPhase,
   isDeferred,
   isDisabled,
@@ -116,5 +117,44 @@ describe("enableability for Security Settings", () => {
     expect(requiresStepUpToken("mcp_builder_runtime")).toBe(true);
     expect(requiresStepUpToken("mcp_connector_runtime")).toBe(true);
     expect(requiresStepUpToken("audit_export")).toBe(false);
+  });
+
+  // BUG-11 — three shut states, three different actions. Telling an owner to
+  // "enable it in Capabilities" when the capability is already enabled sends
+  // them somewhere that cannot fix it.
+  it("names why a runtime-gated surface is blocked, and where to fix it", () => {
+    expect(runtimeBlock(gate({ runtime_enabled: true }), "MCP").kind).toBe("none");
+
+    const off = runtimeBlock(
+      gate({ state: "disabled", runtime_enabled: false, allowed_transitions: ["enabled_runtime"] }),
+      "MCP",
+    );
+    expect(off.kind).toBe("gate_off");
+    expect(off.reason).toMatch(/turned off/i);
+    expect(off.href).toBe("#/capabilities");
+
+    const below = runtimeBlock(
+      gate({
+        state: "enabled_policy_gated",
+        runtime_enabled: false,
+        allowed_transitions: ["enabled_runtime"],
+      }),
+      "MCP",
+    );
+    expect(below.kind).toBe("below_runtime");
+    expect(below.reason).toMatch(/enabled, but only at/i);
+    expect(below.href).toBe("#/settings");
+
+    // No executor in this runtime: nowhere to send the owner, so say that
+    // rather than offer an action that cannot work.
+    const deferred = runtimeBlock(
+      gate({ state: "disabled", runtime_enabled: false, allowed_transitions: [] }),
+      "MCP",
+    );
+    expect(deferred.kind).toBe("not_available");
+    expect(deferred.href).toBeNull();
+
+    // A gate that could not be read is treated as shut, never as open.
+    expect(runtimeBlock(undefined, "MCP").kind).toBe("gate_off");
   });
 });

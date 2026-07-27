@@ -54,17 +54,62 @@ describe("McpView", () => {
     expect(screen.getByText(/python .raiker\/mcp\/servers\/echo.py/)).toBeInTheDocument();
   });
 
-  it("warns and points to Capabilities when the gate is disabled", async () => {
+  it("warns and points to Permissions when the gate is off", async () => {
     stubFetch({
       "GET /api/mcp/servers": [],
       "GET /api/capability-gates": [
-        makeGate({ capability: "mcp_builder_runtime", runtime_enabled: false }),
-        makeGate({ capability: "mcp_connector_runtime", runtime_enabled: false }),
+        makeGate({
+          capability: "mcp_builder_runtime",
+          state: "disabled",
+          runtime_enabled: false,
+          allowed_transitions: ["enabled_policy_gated", "enabled_runtime"],
+        }),
+        makeGate({
+          capability: "mcp_connector_runtime",
+          state: "disabled",
+          runtime_enabled: false,
+          allowed_transitions: ["enabled_policy_gated", "enabled_runtime"],
+        }),
       ],
     });
     render(McpView);
-    await waitFor(() => expect(screen.getByText(/disabled/i)).toBeInTheDocument());
-    expect(screen.getByRole("link", { name: "Capabilities" })).toHaveAttribute("href", "#/capabilities");
+    await waitFor(() => expect(screen.getAllByText(/is turned off/i).length).toBe(2));
+    expect(screen.getAllByRole("link", { name: "Open Permissions" })[0]).toHaveAttribute(
+      "href",
+      "#/capabilities",
+    );
+  });
+
+  // BUG-11 — the old copy said "disabled … enable it in Capabilities" even when
+  // the capability was already enabled, just below runtime level. Following it
+  // changed nothing; the real blocker is the runtime mode.
+  it("says a capability is enabled but below runtime level, and points at the runtime mode", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [],
+      "GET /api/capability-gates": [
+        makeGate({
+          capability: "mcp_builder_runtime",
+          state: "enabled_policy_gated",
+          runtime_enabled: false,
+          allowed_transitions: ["disabled", "enabled_runtime"],
+        }),
+        makeGate({
+          capability: "mcp_connector_runtime",
+          state: "enabled_policy_gated",
+          runtime_enabled: false,
+          allowed_transitions: ["disabled", "enabled_runtime"],
+        }),
+      ],
+    });
+    render(McpView);
+    await waitFor(() =>
+      expect(screen.getAllByText(/enabled, but only at/i).length).toBe(2),
+    );
+    expect(screen.queryByText(/is turned off/i)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Settings → Runtime mode" })[0]).toHaveAttribute(
+      "href",
+      "#/settings",
+    );
   });
 
   it("creates a server from a template through the governed API", async () => {

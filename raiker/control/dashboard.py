@@ -150,6 +150,11 @@ class SessionView:
     # never deletes transcripts, events, checkpoints, or permissions.
     archived: bool = False
     archived_at: str | None = None
+    # Where the session came from: "chat" for a conversation the owner typed,
+    # "task" for the server-owned session a task runs in (BUG-10). Provenance
+    # only — it grants nothing and hides nothing; a task session stays fully
+    # readable here and from Tasks.
+    origin: str = "chat"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -1048,7 +1053,14 @@ class DashboardService:
         project_id: str | None = None,
         user_id: str | None = None,
         include_archived: bool = False,
+        origin: str | None = None,
     ) -> list[SessionView]:
+        """List the caller's sessions, newest first.
+
+        ``origin`` filters by provenance (BUG-10): ``"chat"`` is the owner's own
+        conversations, which is what a "recent chats" list means. Omitting it
+        lists every session, so Sessions still shows task runs.
+        """
         return [
             self._session_view(row)
             for row in self.store.list_sessions(
@@ -1056,6 +1068,7 @@ class DashboardService:
                 project_id=project_id,
                 user_id=user_id,
                 include_archived=include_archived,
+                origin=origin,
             )
         ]
 
@@ -2296,12 +2309,17 @@ class DashboardService:
             ):
                 raise ValueError(f"unknown_parent_task:{parent_task_id}")
         inbox_session_id = f"sess_inbox_{principal_id}"
+        # Task origin (BUG-10): the Inbox is a server-owned session that task
+        # runs execute in, not a conversation the owner had. Tagging it keeps it
+        # out of RECENT CHATS while leaving it fully readable in Sessions.
         self.store.create_session(
             inbox_session_id,
             str(self.store.paths.workspace_root),
             title="Inbox",
             user_id=user_id,
+            origin="task",
         )
+        self.store.set_session_origin(inbox_session_id, "task")
         task = TaskManager(self.store, EventLogWriter(self.store)).create_task(
             session_id=inbox_session_id,
             title=title,
@@ -3142,6 +3160,7 @@ class DashboardService:
             project_id=row.get("project_id"),
             archived=bool(row.get("archived", 0)),
             archived_at=row.get("archived_at"),
+            origin=str(row.get("origin") or "chat"),
         )
 
     @staticmethod

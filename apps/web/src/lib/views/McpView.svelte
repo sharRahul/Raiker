@@ -3,6 +3,7 @@
   import Icon from "../components/Icon.svelte";
   import NotificationCenter from "../components/NotificationCenter.svelte";
   import { api, ApiError } from "../api";
+  import { runtimeBlock } from "../capabilityModel";
   import type { CapabilityGate, McpFinding, McpServer, McpSession, Notification } from "../apiTypes";
 
   // Reviewed server templates the builder can generate. `id` is the backend
@@ -35,6 +36,15 @@
   );
   const connectorEnabled = $derived(
     gates.find((g) => g.capability === "mcp_connector_runtime")?.runtime_enabled ?? false,
+  );
+  // BUG-11 — say which of the three shut states this is. "Enable it in
+  // Capabilities" was wrong whenever the capability was already enabled but
+  // below runtime level: following it changed nothing.
+  const blocks = $derived(
+    [
+      runtimeBlock(gates.find((g) => g.capability === "mcp_builder_runtime"), "The MCP builder"),
+      runtimeBlock(gates.find((g) => g.capability === "mcp_connector_runtime"), "The MCP connector"),
+    ].filter((block) => block.kind !== "none"),
   );
 
   function reason(e: unknown): string {
@@ -187,15 +197,16 @@
   <button class="icon" aria-label="Refresh servers" onclick={load}><Icon name="refresh" size={17} /></button>
 </div>
 
-{#if !builderEnabled || !connectorEnabled}
+{#each blocks as block (block.reason)}
   <div class="notice notice-warn" role="status">
     <Icon name="warning" size={16} />
     <span>
-      The MCP {!builderEnabled && !connectorEnabled ? "builder and connector capabilities are" : !builderEnabled ? "builder capability is" : "connector capability is"} disabled.
-      Enable {!builderEnabled && !connectorEnabled ? "them" : "it"} in <a href="#/capabilities">Capabilities</a> to create or test servers.
+      {block.reason}
+      {#if block.action}{block.action}{/if}
+      {#if block.href}<a href={block.href}>{block.linkLabel}</a>{/if}
     </span>
   </div>
-{/if}
+{/each}
 
 {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
 {#if notice}<div class="notice notice-ok"><Icon name="check" size={15} /> {notice}</div>{/if}

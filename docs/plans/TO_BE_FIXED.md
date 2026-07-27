@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Fourteen are marked **FIXED** and were resolved on this
+and the proposed fix. Seventeen are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -35,9 +35,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-12 | Medium | Export | Fixed (was BUG-08) |
 | FIXED-13 | Medium | Tasks | Fixed (was BUG-09) |
 | FIXED-14 | High | API redaction | Fixed (found while fixing BUG-09) |
-| BUG-10 | Low | Chat / Tasks | Open |
-| BUG-11 | Medium | Permissions | Open |
-| BUG-12 | High | MCP | Open (specified, unimplemented) |
+| FIXED-15 | Low | Chat / Tasks | Fixed (was BUG-10) |
+| FIXED-16 | Medium | Permissions | Fixed (was BUG-11) |
+| FIXED-17 | High | MCP | Fixed (was BUG-12) |
 | BUG-13 | Low | Permissions | Open |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (20 items) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (18 items) |
@@ -933,18 +933,38 @@ verified over real HTTP against a running `raiker-web`.
 
 ---
 
-## BUG-10 — Task runs pollute RECENT CHATS
+## FIXED-15 — Task runs polluted RECENT CHATS *(was BUG-10)*
+
+**Status: fixed in this change.**
 
 **Observed.** After creating tasks, an entry titled **Inbox** appeared in the
 sidebar's RECENT CHATS beside real conversations, and task-run sessions appear in
 Sessions with the task's prompt as the title.
 
-**Proposed fix.** Tag task-created sessions with their origin and exclude them
-from the RECENT CHATS list (they remain reachable from Tasks and Sessions).
+**Root cause.** A task runs as a real governed turn, and a governed turn needs a
+session, so `create_task` creates a server-owned `sess_inbox_<principal>` row.
+Nothing recorded that this session came from anywhere different, so every list
+of sessions — the sidebar's recent chats, and the Workbench's "Resume a
+conversation" — treated it as a conversation the owner had.
+
+**Fix applied.** Sessions carry an `origin` column: `chat` for a conversation
+the owner typed, `task` for the session a task run executes in. It is
+provenance and nothing else — it grants nothing, hides nothing, and changes no
+gate, policy, or ownership. `GET /api/sessions?origin=chat` narrows the list,
+and the two surfaces that mean *conversations* ask for that; Sessions still
+lists everything, and a task session stays reachable from Tasks.
+
+Creating a task also re-stamps an Inbox that predates the column, so a workspace
+that already had one stops reading as a chat rather than needing a reset.
+
+Covered by `tests/test_session_origin.py` and the sidebar case in
+`apps/web/src/lib/components/Sidebar.test.ts`.
 
 ---
 
-## BUG-11 — A surface blocked by runtime mode does not say so
+## FIXED-16 — A surface blocked by runtime mode did not say so *(was BUG-11)*
+
+**Status: fixed in this change.**
 
 **Observed.** With `mcp_builder_runtime` and `mcp_connector_runtime` set to
 `enabled_policy_gated`, the MCP tab still said *"The MCP builder and connector
@@ -954,33 +974,98 @@ servers."* — but they **were** enabled in Capabilities. The real blocker was t
 mode (Settings → Runtime mode). Following the message's own advice does not
 resolve it.
 
-**Proposed fix.** When a gate is enabled but not at `enabled_runtime`, say so:
-*"Enabled, but not at runtime level — activate a runtime mode in Settings →
-Runtime mode."* with a link. Applies to every `runtime_enabled` consumer, not
-just MCP.
+**Root cause.** Every consumer read one boolean, `runtime_enabled`, and rendered
+one sentence for everything it could mean. A `runtime_enabled` surface is shut
+in four distinguishable ways, and they need different actions: the capability
+has no executor in this runtime (nothing to do), the gate is off (turn it on),
+the gate is on but below runtime level (activate a runtime mode), or the
+decision mode is `deny` (change the mode). Collapsing them sent the owner to a
+page where the capability already read as enabled.
+
+**Fix applied.** `runtimeBlock(gate, label)` in
+`apps/web/src/lib/capabilityModel.ts` classifies the four cases and returns the
+reason, the one action that resolves it, and where that action lives. A gate
+that could not be read is treated as shut, never as open. MCP renders one notice
+per blocked capability from it.
+
+The same distinction is now made server-side for the Extensions hub, where a
+connector below runtime level reported `capability_gate_closed` ("its capability
+gate is closed") with the identical problem: `_connector_block_reason` returns
+`capability_below_runtime_level` and `capability_decision_mode_deny` as separate
+reasons, and each has its own copy.
+
+Covered by the `runtimeBlock` cases in
+`apps/web/src/lib/capabilityModel.test.ts`, the blocked-banner cases in
+`apps/web/src/lib/views/McpView.test.ts`, and
+`tests/test_api_web_read_models.py::TestBlockedReasonNamesTheRealBlocker`.
 
 ---
 
-## BUG-12 — MCP servers cannot be used by the agent
+## FIXED-17 — MCP servers could not be used by the agent *(was BUG-12)*
+
+**Status: fixed in this change.**
 
 **Observed.** Created and connected a governed local MCP server from the Sample
 echo template; **Test** reported `connected · 2 tool(s)` (`echo`,
-`workspace_ping`) and recorded a monitored session. The model can never call
-them: `raiker/models/tool_call_validation.py::_MODEL_EXPOSED_TOOLS` is a fixed
-frozenset, and there is no `mcp` reference anywhere in
+`workspace_ping`) and recorded a monitored session. The model could never call
+them: `raiker/models/tool_call_validation.py::_MODEL_EXPOSED_TOOLS` was a fixed
+frozenset, and there was no `mcp` reference anywhere in
 `raiker/runtime/orchestrator.py`, `raiker/tools/broker.py`, or
-`tool_call_validation.py`.
+`tool_call_validation.py`. MCP was a management/monitoring surface only, while
+a user who follows the UI to connect a server reasonably expects its tools in
+Chat.
 
-**Impact.** MCP is a management/monitoring surface only. A user who follows the
-UI to connect a server reasonably expects its tools in Chat.
+**Fix applied.** Each tool a connected server advertised becomes one
+model-callable tool named `mcp__<server>__<tool>`
+(`raiker/tools/mcp_tools.py`). Four seams:
 
-**Proposed fix.** Project the tools of connected, non-contained MCP servers into
-the per-turn tool specification with a namespaced id (`mcp__<server>__<tool>`),
-route execution through `ToolBroker` so the existing policy, approval, and audit
-path applies unchanged, and treat every result as untrusted data — the same
-framing the GitHub/Gmail connectors already use.
+* **Discovery** — the orchestrator recomputes the turn's tool specification, so
+  a server connected, paused, or killed between turns is reflected immediately.
+  Fail-closed: a disabled `mcp_connector_runtime` gate, a server that never
+  completed a handshake, and a contained connection all contribute nothing, so
+  the model is never offered a tool the runtime would refuse.
+* **Validation** — `validate_tool_call` recognises a projected tool by *shape*
+  and stays store-free. Whether that server and tool exist is answered at
+  execution, with a stated reason.
+* **Governance** — execution goes through `ToolBroker` unchanged (hooks, the
+  policy engine, the approval flow, the audit events, the stored tool-action
+  record). On top of that the tool enforces the capability gate, the decision
+  mode (**default `ask` withholds**, exactly like the GitHub/Gmail connectors —
+  reaching a registered server runs code Raiker does not own), containment, and
+  the server's own advertised tool list. The session monitor still records
+  redacted telemetry and can still trip an anomaly rule.
+* **Results** — the tool's text reaches the calling model framed as untrusted
+  data, never instructions, and reaches nothing else. The executor takes an
+  in-process `content_sink`; artifacts, the `action_executed` event, the broker
+  events, and the session log keep carrying counts and labels only. Broker
+  events also drop the *argument values* (they are opaque values composed for
+  an outside program, not governance-relevant identifiers like a repo and
+  number), and the result is bounded to 20 000 characters.
 
----
+Two deliberate narrowings. A server whose own name contains the `__` separator
+is not projected at all, because `mcp__a__b__c` would otherwise be ambiguous
+between two servers; and the policy layer treats a projected call as
+read-shaped (like `connector_read`), because what actually governs it is
+enforced inside the tool.
+
+Covered by `tests/test_mcp_agent_tools.py` (30 cases: naming, validation,
+fail-closed discovery, every decision mode, an end-to-end call against the real
+echo template, and the audit-trail exclusions).
+
+**Found while verifying this live: calling a tool erased the server's tool
+list.** `_record_connection` refreshes a profile's runtime fields after every
+session, and a `tools/call` session passed `tools or []` — an empty list, not
+"nothing discovered". The connected server then read `TOOLS (0)` in the UI, and
+the projection, which is built from exactly that list, went silent from the
+second turn onward. `update_mcp_server_runtime` now treats `tools=None` as "this
+operation enumerated nothing" and leaves the stored list alone (`COALESCE`);
+only an enumerating session rewrites it. The defect predates this change — any
+`mcp_call_tool` emptied the profile — but the projection is what made it fatal
+rather than cosmetic.
+
+**Threat model updated.** `docs/threat-models/mcp-connector.md` no longer claims
+tool output is redacted in every direction — it now states exactly where the
+content goes and where it does not.
 
 ## BUG-13 — "Confirmation token" is unexplained in the step-up dialog
 

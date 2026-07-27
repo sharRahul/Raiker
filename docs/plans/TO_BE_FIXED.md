@@ -32,13 +32,15 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-09 | **Critical** | Build / Chat agent loop | Fixed (was GAP-BUILD B2) |
 | FIXED-10 | Medium | Chat / attachments | Fixed (was BUG-07) |
 | FIXED-11 | High | API redaction | Fixed (found while fixing BUG-07) |
-| FIXED-12 | Medium | Export | Fixed (was BUG-08) |
+| FIXED-12 | Medium | Export | Superseded by FIXED-19 (was BUG-08) |
 | FIXED-13 | Medium | Tasks | Fixed (was BUG-09) |
 | FIXED-14 | High | API redaction | Fixed (found while fixing BUG-09) |
 | FIXED-15 | Low | Chat / Tasks | Fixed (was BUG-10) |
 | FIXED-16 | Medium | Permissions | Fixed (was BUG-11) |
 | FIXED-17 | High | MCP | Fixed (was BUG-12) |
-| BUG-13 | Low | Permissions | Open |
+| FIXED-18 | Low | Permissions | Fixed (was BUG-13) |
+| FIXED-19 | Medium | Chat / file output | Fixed (found while fixing BUG-13) |
+| BUG-14 | Low | Chat / cost presentation tests | Open (found while fixing BUG-13) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (20 items) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (18 items) |
 
@@ -772,29 +774,24 @@ and verified over real HTTP through the full middleware stack.
 
 ---
 
-## FIXED-12 — Chat export path *(was BUG-08)*
+## FIXED-12 — Chat transcript export path *(was BUG-08; superseded by FIXED-19)*
 
-**Status: fixed in this change.**
+**Status: superseded by FIXED-19.**
 
 **Observed.** Swept every `button`/`a` in the app for `pdf|export|download|save
 as|print`. The only match anywhere is Memory's JSON import/export. There is no
 way to get a chat, a document, or a generated artifact out of Raiker as a file.
 
-**Fix applied.** Every completed Raiker message has a **Copy response** action.
-Once a transcript exists, its chat-level toolbar offers **Export as Markdown**
-and **Print / Save as PDF**. Markdown export preserves prompt/response order and
-the response's original Markdown in a dated, local `.md` download. Print uses
-the browser's native print dialog (and therefore its Save as PDF destination)
-with navigation, composer, file inspector, and interactive controls removed by
-a print stylesheet. It makes no server request and exports no hidden governance
-metadata.
+**Original fix.** Every completed Raiker message received a **Copy response**
+action and the chat toolbar exported the transcript as Markdown or through the
+browser print dialog.
 
-The serializer and filename are covered by `apps/web/src/lib/chatExport.test.ts`;
-the rendered controls, clipboard payload, download, and print invocation are
-covered by `apps/web/src/lib/views/ChatView.test.ts`. A live Chromium run
-verified the downloaded file contents, clipboard text, print media layout, zero
-horizontal overflow, and zero console errors. The disposable live-test
-screenshot is not retained in the repository.
+**Current behaviour.** FIXED-19 removes transcript downloads and transcript
+printing: a conversation is not a generated file. **Copy response** remains.
+Supported files created by a chat turn, along with stored session attachments,
+are represented by a session-authorized chip and open in the right-hand
+inspector. There is deliberately no general workspace-file browser or download
+surface.
 
 **Follow-ups applied while verifying this entry.** Three gaps between what the
 controls did and what they reported:
@@ -811,9 +808,9 @@ controls did and what they reported:
   download some browsers drop. The anchor is now attached, clicked, removed, and
   the URL released afterwards.
 
-**Scope kept honest.** This is chat transcript export, not an arbitrary artifact
-or attachment download system. The latter remains outside this smallest useful
-fix and must retain the existing session-authorized file boundary if added.
+**Historical coverage.** The obsolete transcript serializer and its tests were
+removed. `ChatView.test.ts` now covers the absence of transcript exports and a
+generated file opening in the right-hand inspector.
 
 ---
 
@@ -1067,7 +1064,9 @@ rather than cosmetic.
 tool output is redacted in every direction — it now states exactly where the
 content goes and where it does not.
 
-## BUG-13 — "Confirmation token" is unexplained in the step-up dialog
+## FIXED-18 — "Confirmation token" is explained in the step-up dialog *(was BUG-13)*
+
+**Status: fixed in this change.**
 
 **Observed.** Enabling a tier-2 capability requires a *"Confirmation token
 (required to enable this capability)"* with no hint about where to obtain one.
@@ -1076,8 +1075,40 @@ The backend
 non-empty — it is a deliberate human-intent speed bump, not a secret. A user is
 likely to stop here believing they lack a credential they never had.
 
-**Proposed fix.** Reword to *"Type any phrase to confirm you intend this change.
-It is recorded with your decision."*
+**Fix applied.** The Tier-2 step-up now says: *"Type any phrase to confirm you
+intend this change. It is recorded with your decision."* The README describes
+the same value as an intent-recording phrase, not a credential. The backend
+continues to enforce the non-empty confirmation requirement.
+
+---
+
+## FIXED-19 — Chat transcripts were offered as files even when no file existed
+
+**Status: fixed in this change.**
+
+**Observed.** Chat showed **Export as Markdown** and **Print / Save as PDF** for
+every transcript. Those controls exported a conversation rather than a file
+Raiker had created or stored, while a supported file written by a chat turn had
+no inspector chip despite the existing right-hand preview surface.
+
+**Fix applied.** Transcript-level export and print controls are removed. A new,
+supported file created by a governed chat turn is validated, copied into the
+owner-scoped attachment store, and bound to that exact session and turn. The
+chat refreshes its file chips after the final event; selecting a chip opens the
+existing read-only right-hand inspector. This is limited to new supported
+document/image types and never turns the workspace into a general file browser.
+
+---
+
+## BUG-14 — The cost-popover test asserts a different currency label than the UI
+
+**Observed.** `apps/web/src/lib/components/ContextMeterPopover.test.ts` expects
+`$0.0030`, while the rendered component displays `US$0.0030`. The full web test
+run therefore has one failure even though the focused BUG-13/FIXED-19 tests,
+type check, lint, and build pass.
+
+**Proposed fix.** Decide whether the product’s currency convention is `$` or
+`US$`, then make the component and its test use that one value consistently.
 
 ---
 
@@ -1339,17 +1370,18 @@ and step 2 is most of it.
 
 ### Tier 1 — working with the owner's material
 
-**C4. File inspector — done for attachments.** FIXED-10 shipped Tasks 1–2 of
+**C4. File inspector — done for attachments and generated files.** FIXED-10 shipped Tasks 1–2 of
 `docs/superpowers/plans/2026-07-26-chat-file-inspector.md`: chips are buttons and
 open a session-authorized, view-only pane, reusing the sanitising renderer from
-FIXED-06 for the Markdown case. **Remaining work:** an assistant that reads a
-document should also be able to show *the passage it used*, and a file Raiker
-itself writes is not yet an inspectable chip — both build on the same preview
-endpoint.
+FIXED-06 for the Markdown case. FIXED-19 records a supported, newly generated
+file against its exact session and turn so it uses that same pane. **Remaining
+work:** an assistant that reads a document should also be able to show *the
+passage it used*.
 
-**C5. Chat export — done.** FIXED-12 provides per-response copy, a per-chat
-Markdown download, and browser print/Save as PDF over the rendered transcript.
-Generated artifacts and attachments do not yet have a general download surface.
+**C5. Chat file output — done.** FIXED-19 keeps per-response copy but removes
+per-chat Markdown download and browser print/Save as PDF. Generated artifacts
+and stored attachments use the right-hand inspector rather than a general
+download surface.
 
 **C6. No citations on tool-derived answers.** When an answer comes from an
 email, a calendar entry or an attached document, the transcript does not say

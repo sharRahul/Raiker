@@ -208,14 +208,12 @@ DOM check that read `h1: 0, table: 0, pre: 0, code: 0, ul: 0` now returns
 `working/83-FIXED-06-chat-markdown-rendered.png` (was
 `not-working/BUG-03-chat-markdown-not-rendered.png`).
 
-**Export: fixed.** ✅ After a completed turn, **Copy response** writes exactly
-the rendered answer's source Markdown to the clipboard. **Export as Markdown**
-downloads a dated `.md` transcript with alternating `## You` / `## Raiker`
-sections. **Print / Save as PDF** opens Chromium's native print flow; print
-media retains the transcript and removes the app navigation, composer, preview,
-and action controls. The live check also confirmed zero horizontal overflow,
-the expected download contents, and zero browser console errors. FIXED-12. The
-disposable screenshot from this verification is intentionally not retained.
+**Chat file output: fixed.** After a completed turn, **Copy response** still
+copies the rendered answer's source Markdown. Chat no longer offers transcript
+export or print actions. When a governed chat turn creates a supported file,
+Raiker stores a validated owner-scoped preview copy and adds a chip to that
+turn; selecting it opens the read-only file inspector beside the conversation.
+Unsupported files are not exposed as generic workspace downloads. FIXED-19.
 
 ---
 
@@ -373,8 +371,8 @@ from the session `⋯` menu. `73-`, `74-`.
 | Do conversations remember context? | **Yes** (was broken; FIXED-04) — prior completed turns are replayed, bounded by the model's window; other chats are never mixed in |
 | Can you see how many tokens remain? | **Yes** (was `0 / NaN (NaN%)`; FIXED-02) — provider-reported usage against a provider-reported capacity |
 | Can you see what a chat has cost? | **Yes** — per-chat and provider all-time, in Chat and Build, for API-key providers only |
-| Can you generate a markdown file and view it in the sidebar? | **Partly** — approving a file change now writes the file (FIXED-08), and an *attached* file opens in the inspector (FIXED-10); a file Raiker itself creates is not yet an inspectable chip |
-| Can you convert markdown to PDF in one click? | **Yes** — markdown renders (FIXED-06) and the chat toolbar offers Export as Markdown and Print / Save as PDF (FIXED-12) |
+| Can you generate a markdown file and view it in the sidebar? | **Yes** — a supported file created by a governed chat turn is stored as a session-authorized preview and opens in the right-hand inspector (FIXED-19) |
+| Can you convert markdown to PDF in one click? | **Not from the chat transcript** — transcript export/print controls were removed; generated PDF files open in the right-hand inspector when supported (FIXED-19) |
 | Do the different task types work? | **Yes** — all four create, schedule, and run |
 | Can you set an API key from the web app? | **Yes** — Connect, paste, done. No gate, allowlist, or vault-key setup first (FIXED-05) |
 | Does the MCP server work? | **Yes** — create/connect/monitor, and its tools are callable from Chat under the owner's decision mode (FIXED-17) |

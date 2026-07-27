@@ -22,6 +22,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
+from raiker.api.routes_prompts import _record_generated_file_attachments
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.runtime.attachment_preview import (
@@ -42,6 +43,7 @@ from raiker.runtime.attachments import (
     store_image,
 )
 from raiker.storage.sqlite import SQLiteStore
+from raiker.contracts.ids import utc_now
 from tests.test_document_attachments import DOCX_BYTES, PDF_BYTES, make_docx
 
 OWNER_PRINCIPAL = "principal_owner"
@@ -619,6 +621,41 @@ class TestPromptRecordsReferences:
             ).status_code
             == 404
         )
+
+    def test_chat_generated_markdown_is_stored_and_previewable(
+        self, client: TestClient, store: SQLiteStore, owner_token: str, workspace: Path
+    ) -> None:
+        from types import SimpleNamespace
+
+        (workspace / "draft.md").write_text("# Generated draft", encoding="utf-8")
+        store.insert_checkpoint_capture_entry(
+            manifest_id="ckcap_generated",
+            session_id=SESSION_ID,
+            turn_id="turn_generated",
+            action_id="act_generated",
+            capability="file_write_execution",
+            principal_id=OWNER_PRINCIPAL,
+            workspace_path="draft.md",
+            pre_image_sha256=None,
+            pre_image_size=0,
+            existed_before=False,
+            capture_status="absent",
+            created_at=utc_now(),
+        )
+
+        _record_generated_file_attachments(
+            workspace,
+            SimpleNamespace(session_id=SESSION_ID, turn_id="turn_generated"),
+            OWNER_PRINCIPAL,
+        )
+
+        files = client.get(f"/api/sessions/{SESSION_ID}/attachments", headers=_auth(owner_token)).json()["files"]
+        assert len(files) == 1
+        assert files[0]["filename"] == "draft.md"
+        assert files[0]["turn_id"] == "turn_generated"
+        preview = client.get(_preview_url(files[0]["attachment_id"]), headers=_auth(owner_token))
+        assert preview.status_code == 200
+        assert preview.json()["text"] == "# Generated draft"
 
 
 def test_docx_fixture_is_shared_with_the_document_suite() -> None:

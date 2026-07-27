@@ -19,7 +19,6 @@
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, providerName } from "../format";
   import { reactionForResponse, thinkingSteps } from "../chatPresentation";
-  import { chatAsMarkdown, markdownFilename } from "../chatExport";
 
   // One composer attachment chip: a workspace path, an image, or a text
   // document already uploaded into the governed attachment store (referenced by
@@ -48,8 +47,8 @@
   let promptText = $state("");
   let userName = $state("there");
   let turns = $state<ChatTurn[]>([]);
-  // What the last export action did. Shown, not only announced: a copy or a
-  // download that reports nothing leaves the owner guessing whether it worked.
+  // What the last copy action did. Shown, not only announced: a copy that
+  // reports nothing leaves the owner guessing whether it worked.
   let exportNotice = $state<string | null>(null);
   let streaming = $state(false);
   // Reuse one session across turns so the governed conversation stays continuous.
@@ -509,6 +508,11 @@
           if (event.kind === "final" && event.response !== null) {
             turn.response = event.response;
             sessionId = event.response.session_id;
+            // A file written by this turn is stored as a session-authorized
+            // attachment before the final SSE event reaches us. Refreshing the
+            // chips here makes the generated file immediately openable in the
+            // existing right-hand inspector, without exposing the workspace.
+            void restoreAttachmentChips(event.response.session_id);
             if (contextOpen) void refreshContextUsage();
             window.dispatchEvent(new Event("raiker:chats-changed"));
           } else {
@@ -549,23 +553,6 @@
     sessionId = null;
   }
 
-  function exportTurns() {
-    const markdown = chatAsMarkdown(turns.map((turn) => ({ prompt: turn.prompt, answer: answerText(turn) })));
-    const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = markdownFilename();
-    // The anchor is attached before it is clicked and the object URL is released
-    // only after the click has been dispatched: a detached anchor, or a URL
-    // revoked in the same tick, is a download some browsers silently drop.
-    link.hidden = true;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-    exportNotice = `Downloaded ${link.download}`;
-  }
-
   async function copyAnswer(turn: ChatTurn) {
     // The clipboard is not always available (an insecure origin, or a denied
     // permission). Say so rather than failing silently — a copy button that
@@ -584,13 +571,7 @@
      wrapper, not a reflow of the whole transcript's markup. -->
 <div class="chat-layout" class:with-inspector={inspecting !== null}>
 <div class="chat">
-  {#if turns.length > 0}
-    <div class="export-bar" aria-label="Chat export actions">
-      <button type="button" class="btn btn-soft btn-sm" onclick={exportTurns}>Export as Markdown</button>
-      <button type="button" class="btn btn-soft btn-sm" onclick={() => window.print()}>Print / Save as PDF</button>
-      {#if exportNotice}<span class="export-notice" role="status" aria-live="polite">{exportNotice}</span>{/if}
-    </div>
-  {/if}
+  {#if exportNotice}<span class="export-notice" role="status" aria-live="polite">{exportNotice}</span>{/if}
   <div class="thread" bind:this={scrollEl}>
     {#if historyError !== null}
       <p class="error-line" role="alert">{historyError}</p>
@@ -1048,14 +1029,6 @@
     gap: var(--space-4);
     padding-bottom: var(--space-4);
   }
-  .export-bar {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    justify-content: flex-end;
-    padding-bottom: var(--space-3);
-  }
   .export-notice {
     color: var(--text-2);
     font-size: .78rem;
@@ -1074,7 +1047,7 @@
   .copy-message:hover { color: var(--text-1); }
 
   @media print {
-    :global(.sidebar), :global(.topbar), :global(.skip-link), .composer, .export-bar,
+    :global(.sidebar), :global(.topbar), :global(.skip-link), .composer,
     .copy-message, :global(.file-inspector) { display: none !important; }
     :global(.app-shell), :global(.app-main), :global(.content), :global(.responsive-page),
     .chat-layout, .chat { display: block !important; height: auto !important; max-width: none !important; }

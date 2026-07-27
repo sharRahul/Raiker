@@ -65,8 +65,9 @@ Controls that stand between an AI-proposed action and it happening:
 | **Approval** | Approvals | A human decision on the specific proposed action |
 
 Opening a higher-risk gate is a governed step-up: a human `runtime_gate_manager`,
-a reason, a confirmation token, and a threat-model acknowledgement — all recorded
-against your principal. Owner **recovery** is governed and audited.
+a reason, a short phrase they type to record their intent, and a threat-model
+acknowledgement — all recorded against your principal. The phrase is not a
+credential. Owner **recovery** is governed and audited.
 
 A human `runtime_gate_manager` alone may change runtime modes and capability
 gates.

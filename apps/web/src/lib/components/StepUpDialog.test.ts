@@ -44,6 +44,20 @@ describe("StepUpDialog", () => {
     expect(onConfirm).toHaveBeenCalledWith({ reason: "why", confirmationToken: "tok", threatAck: true });
   });
 
+  it("explains that any phrase is a recorded intent confirmation", () => {
+    render(StepUpDialog, {
+      title: "Enable Shell commands",
+      principal: "prin_owner",
+      requireToken: true,
+      onConfirm: vi.fn(),
+      onCancel: vi.fn(),
+    });
+
+    expect(
+      screen.getByText("Type any phrase to confirm you intend this change. It is recorded with your decision."),
+    ).toBeInTheDocument();
+  });
+
   it("names the acting principal and cancels on Escape", async () => {
     const onCancel = vi.fn();
     render(StepUpDialog, {

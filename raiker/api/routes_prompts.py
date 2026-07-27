@@ -29,7 +29,16 @@ from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.runtime.authority.models import Principal, PrincipalType
 from raiker.runtime.interrupts import InterruptController
+from raiker.runtime.attachments import (
+    DOCX_MEDIA_TYPE,
+    PDF_MEDIA_TYPE,
+    XLSX_MEDIA_TYPE,
+    AttachmentValidationError,
+    store_document,
+    store_image,
+)
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tools.filesystem import FilesystemSafetyError, resolve_writable_workspace_path
 from raiker.tasks.manager import TaskManager
 
 router = APIRouter()
@@ -145,6 +154,71 @@ def _record_attachment_refs(
         )
 
 
+_GENERATED_FILE_MEDIA_TYPES = {
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".markdown": "text/markdown",
+    ".csv": "text/csv",
+    ".pdf": PDF_MEDIA_TYPE,
+    ".docx": DOCX_MEDIA_TYPE,
+    ".xlsx": XLSX_MEDIA_TYPE,
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+}
+
+
+def _record_generated_file_attachments(
+    workspace: str | Path, envelope: PromptEnvelope, principal_id: str
+) -> None:
+    """Make files newly written by this chat turn available to its inspector.
+
+    A capture entry names a governed mutation without ever containing its
+    contents. Once the turn has written a *new* supported file, validate and
+    copy its bytes into the owner-scoped attachment store, then bind that
+    attachment to the originating session and turn. Existing files are not
+    copied: an unsuccessful edit must never turn a stale workspace file into a
+    chat download, and this feature is for generated outputs rather than a
+    general workspace browser.
+    """
+    store = SQLiteStore(workspace)
+    entries = store.list_checkpoint_capture_entries(session_id=envelope.session_id, limit=200)
+    paths: set[str] = set()
+    for entry in entries:
+        if (
+            entry.get("turn_id") != envelope.turn_id
+            or entry.get("capability") not in {"file_write_execution", "patch_apply_execution"}
+            or bool(entry.get("existed_before"))
+        ):
+            continue
+        paths.add(str(entry.get("workspace_path", "")))
+
+    for workspace_path in paths:
+        media_type = _GENERATED_FILE_MEDIA_TYPES.get(Path(workspace_path).suffix.lower())
+        if media_type is None:
+            continue
+        try:
+            source = resolve_writable_workspace_path(workspace, workspace_path)
+            if not source.is_file():
+                continue
+            data = source.read_bytes()
+            stored = (
+                store_image(store, filename=source.name, media_type=media_type, data=data, owner_principal_id=principal_id)
+                if media_type.startswith("image/")
+                else store_document(store, filename=source.name, media_type=media_type, data=data, owner_principal_id=principal_id)
+            )
+        except (AttachmentValidationError, FilesystemSafetyError, OSError):
+            continue
+        store.save_session_attachment_ref(
+            session_id=envelope.session_id,
+            attachment_id=stored.attachment_id,
+            owner_principal_id=principal_id,
+            turn_id=envelope.turn_id,
+        )
+
+
 def _invalid_response(exc: Exception) -> AgentResponse:
     return AgentResponse(
         request_id="req_invalid",
@@ -173,6 +247,7 @@ async def submit_prompt(
     _record_attachment_refs(_ws(request), envelope, session.principal_id)
     gateway = AgentGateway(_ws(request), principal_id=session.principal_id)
     response = await gateway.submit_prompt_async(envelope)
+    _record_generated_file_attachments(_ws(request), envelope, session.principal_id)
     return response.to_dict()
 
 
@@ -215,6 +290,8 @@ async def stream_prompt(
 
     async def gen() -> AsyncIterator[str]:
         async for event in gateway.astream_prompt(envelope):
+            if event.kind == FINAL:
+                _record_generated_file_attachments(_ws(request), envelope, session.principal_id)
             yield _sse(event)
 
     return StreamingResponse(gen(), media_type="text/event-stream")

@@ -97,8 +97,7 @@
         autocomplete="off"
       />
       <p class="hint">
-        Higher-risk capabilities (shell, network, web-fetch, process, hosted model
-        runtimes) require a human confirmation token to enable.
+        Type any phrase to confirm you intend this change. It is recorded with your decision.
       </p>
     {/if}
 

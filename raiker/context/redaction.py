@@ -16,9 +16,34 @@ REDACTED_PRIVATE_KEY = "[REDACTED_PRIVATE_KEY]"
 _SNAKE_IDENTIFIER = re.compile(r"[a-z]+(?:_[a-z]+)+")
 
 
+def _is_api_locator(token: str) -> bool:
+    """True for a same-origin API path that only *looks* long once joined.
+
+    A path like ``api/sessions/sess_…/attachments/att_…/preview/pdf`` is not an
+    opaque run: it reached the 40-character fallback because its segments were
+    joined by slashes, and redacting it turns a working locator into
+    ``[REDACTED_SECRET]`` (which is how the file inspector's ``pdf_url`` first
+    arrived at the browser).
+
+    Both conditions are required, and together they cannot spare a credential:
+
+    1. It starts with ``api/``. A base64 or hex secret beginning with exactly
+       those four characters is a one-in-millions coincidence.
+    2. Every slash-separated segment is itself under the entropy threshold. So
+       an API path with a real key embedded in it (``api/v1/key/<44 chars>``)
+       still redacts — the key is its own over-length segment.
+
+    Specific credential shapes (``sk-…``, ``ghp_…``, ``bearer …``, ``token=…``)
+    are matched by earlier patterns and never reach this function at all.
+    """
+    return token.startswith("api/") and all(len(part) < 40 for part in token.split("/"))
+
+
 def _redact_high_entropy(match: re.Match[str]) -> str:
     token = match.group(0)
     if _SNAKE_IDENTIFIER.fullmatch(token):
+        return token
+    if _is_api_locator(token):
         return token
     return REDACTED_SECRET
 

@@ -18,10 +18,15 @@ export function stubFetch(routes: Record<string, unknown>): ReturnType<typeof vi
     const method = (init?.method ?? "GET").toUpperCase();
     const key = `${method} ${path}`;
     if (key in routes) {
+      const value = routes[key];
       return {
         ok: true,
         status: 200,
-        json: async () => routes[key],
+        json: async () => value,
+        // Binary routes (the PDF preview) are read with `.blob()`. A route may
+        // declare a Blob directly; anything else is serialised so the stub
+        // still answers rather than throwing "blob is not a function".
+        blob: async () => (value instanceof Blob ? value : new Blob([JSON.stringify(value)])),
       } as Response;
     }
     return {

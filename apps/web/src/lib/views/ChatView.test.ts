@@ -429,7 +429,7 @@ describe("ChatView streaming transcript", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/only plain-text, markdown, csv, pdf, or word/i),
+        screen.getByText(/only plain-text, markdown, csv, pdf, word .* or excel/i),
       ).toBeInTheDocument(),
     );
     expect(screen.queryByText("archive.zip")).not.toBeInTheDocument();
@@ -723,5 +723,184 @@ describe("ChatView streaming transcript", () => {
     expect(transcript.querySelector("script")).toBeNull();
     expect(transcript.textContent).toContain("<script>");
     expect((window as unknown as Record<string, unknown>).__pwned).toBeUndefined();
+  });
+});
+
+// ── BUG-07: attachment chips open a view-only file inspector ───────────────
+// A chip used to be dead text. It is now a button, and clicking it opens a
+// session-authorized preview beside the transcript. Nothing is fetched until
+// the click, and the pane carries no upload, edit, or download control.
+
+const SESSION_ROUTES = {
+  ...MODELS_ROUTE,
+  "GET /api/sessions/sess_1": {
+    session: {
+      session_id: "sess_1",
+      title: "Manual test",
+      status: "active",
+      created_at: "2026-07-27T00:00:00Z",
+      updated_at: "2026-07-27T00:00:00Z",
+      turn_count: 1,
+      pinned: false,
+      tags: [],
+      project_id: null,
+      archived: false,
+      archived_at: null,
+    },
+    turns: [
+      {
+        turn_id: "turn_1",
+        session_id: "sess_1",
+        turn_type: "chat",
+        status: "completed",
+        prompt_text: "what is in this file?",
+        created_at: "2026-07-27T00:00:00Z",
+        completed_at: "2026-07-27T00:00:01Z",
+        summary: "It is a sample.",
+      },
+    ],
+  },
+  "GET /api/sessions/sess_1/attachments": {
+    session_id: "sess_1",
+    files: [
+      {
+        attachment_id: "att_1",
+        turn_id: "turn_1",
+        kind: "document",
+        filename: "report.xlsx",
+        media_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        byte_size: 4096,
+        previewable: true,
+      },
+    ],
+  },
+};
+
+const XLSX_PREVIEW = {
+  attachment_id: "att_1",
+  session_id: "sess_1",
+  filename: "report.xlsx",
+  media_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  kind: "table",
+  byte_size: 4096,
+  text: "",
+  rows: [
+    ["Quarterly report", "Owner"],
+    ["Revenue", "42"],
+  ],
+  truncated: false,
+  pdf_url: null,
+  unavailable_reason: null,
+};
+
+const PREVIEW_ROUTE = "GET /api/sessions/sess_1/attachments/att_1/preview";
+
+describe("ChatView file inspector", () => {
+  it("restores attachment chips as buttons and opens the inspector on click", async () => {
+    const fetchMock = stubFetch({ ...SESSION_ROUTES, [PREVIEW_ROUTE]: XLSX_PREVIEW });
+    render(ChatView, { props: { sessionId: "sess_1" } });
+
+    const chip = await screen.findByRole("button", { name: /report\.xlsx/i });
+    // Metadata only so far: the file's contents are not fetched until asked for.
+    expect(
+      fetchMock.mock.calls.some((call) => String(call[0]).includes("/preview")),
+    ).toBe(false);
+
+    await fireEvent.click(chip);
+
+    const pane = await screen.findByRole("complementary", { name: /file preview/i });
+    expect(pane).toBeInTheDocument();
+    expect(await screen.findByText("Quarterly report")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /close file preview/i })).toBeInTheDocument();
+  });
+
+  it("closes the inspector again", async () => {
+    stubFetch({ ...SESSION_ROUTES, [PREVIEW_ROUTE]: XLSX_PREVIEW });
+    render(ChatView, { props: { sessionId: "sess_1" } });
+    await fireEvent.click(await screen.findByRole("button", { name: /report\.xlsx/i }));
+    await screen.findByRole("complementary", { name: /file preview/i });
+    await fireEvent.click(screen.getByRole("button", { name: /close file preview/i }));
+    await waitFor(() =>
+      expect(screen.queryByRole("complementary", { name: /file preview/i })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("says so when a file is no longer available in this conversation", async () => {
+    // The preview route is unrouted, so the stub answers 404 — exactly what the
+    // server returns for a file this session never carried.
+    stubFetch(SESSION_ROUTES);
+    render(ChatView, { props: { sessionId: "sess_1" } });
+    await fireEvent.click(await screen.findByRole("button", { name: /report\.xlsx/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no longer available/i);
+  });
+
+  it("fetches PDF bytes with the session token and hands the viewer a blob URL", async () => {
+    const createObjectURL = vi.fn(() => "blob:preview");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
+    stubFetch({
+      ...SESSION_ROUTES,
+      "GET /api/sessions/sess_1/attachments": {
+        session_id: "sess_1",
+        files: [
+          {
+            attachment_id: "att_1",
+            turn_id: "turn_1",
+            kind: "document",
+            filename: "doc.pdf",
+            media_type: "application/pdf",
+            byte_size: 2048,
+            previewable: true,
+          },
+        ],
+      },
+      [PREVIEW_ROUTE]: {
+        ...XLSX_PREVIEW,
+        filename: "doc.pdf",
+        media_type: "application/pdf",
+        kind: "pdf",
+        rows: [],
+        pdf_url: "/api/sessions/sess_1/attachments/att_1/preview/pdf",
+      },
+      "GET /api/sessions/sess_1/attachments/att_1/preview/pdf": {},
+    });
+
+    render(ChatView, { props: { sessionId: "sess_1" } });
+    await fireEvent.click(await screen.findByRole("button", { name: /doc\.pdf/i }));
+    await screen.findByRole("complementary", { name: /file preview/i });
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(document.querySelector("object")?.getAttribute("data")).toBe("blob:preview"),
+    );
+    // Closing releases the blob rather than leaving the document in memory.
+    await fireEvent.click(screen.getByRole("button", { name: /close file preview/i }));
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview");
+  });
+
+  it("leaves a workspace-path chip inert — there are no stored bytes to show", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: finalResponse("OK"),
+        } as StreamEvent);
+      },
+    );
+    render(ChatView);
+    await fireEvent.click(screen.getByRole("button", { name: "Add attachment" }));
+    const pathInput = screen.getByLabelText("Attachment path");
+    await fireEvent.input(pathInput, { target: { value: "docs/notes.md" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Attach" }));
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "read it" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    await waitFor(() => expect(screen.getByText("OK")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /notes\.md/i })).not.toBeInTheDocument();
+    expect(screen.getByTitle("docs/notes.md")).toBeInTheDocument();
   });
 });

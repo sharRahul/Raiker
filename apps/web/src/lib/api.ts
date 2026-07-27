@@ -2,6 +2,7 @@ import type {
   AgentResponse,
   ApprovalDetailView,
   ApprovalView,
+  AttachmentPreview,
   AuthSession,
   BrainView,
   BrainSourceResult,
@@ -40,6 +41,7 @@ import type {
   RuntimeMode,
   RuntimeReadiness,
   SecurityHealth,
+  SessionAttachmentsView,
   SessionDetail,
   SessionSummary,
   StandingGrant,
@@ -433,6 +435,25 @@ export const api = {
   // sniff); the response is metadata only.
   uploadAttachment: (body: { filename: string; media_type: string; data_base64: string }) =>
     postJson<UploadedAttachment>("/api/attachments", body),
+  // ── File inspector (view-only, session-scoped) ──
+  // The preview is authorized by the session that carried the attachment, so
+  // these paths 404 for a file this conversation never had. Nothing here
+  // uploads, mutates, or downloads.
+  sessionAttachments: (sessionId: string) =>
+    request<SessionAttachmentsView>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/attachments`,
+    ),
+  attachmentPreview: (sessionId: string, attachmentId: string) =>
+    request<AttachmentPreview>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/preview`,
+    ),
+  // PDFs are displayed by the browser's own viewer. The bytes are fetched with
+  // the in-memory bearer token (an <object> tag cannot send one) and handed to
+  // the viewer as a same-origin blob URL; the caller revokes it on close.
+  attachmentPreviewPdfUrl: async (pdfPath: string): Promise<string> => {
+    const blob = await requestBlob(pdfPath);
+    return URL.createObjectURL(blob);
+  },
   events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
     request<EventEntry[]>(withQuery("/api/events", params)),
   brain: () => request<BrainView>("/api/brain"),

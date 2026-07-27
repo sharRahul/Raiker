@@ -137,3 +137,42 @@ class TestRedactTextStillMatchesKnownShapes:
 
     def test_trailing_sentence_punctuation_is_kept_outside_the_mask(self) -> None:
         assert redact_text("the password is hunter2xyz.")[0] == "the [REDACTED_SECRET]."
+
+
+class TestServerIssuedApiPathsSurvive:
+    """BUG-07 — the file inspector's PDF locator came back as a placeholder.
+
+    A path is not one opaque run. It only reached the 40-character high-entropy
+    fallback because its segments were joined by slashes, and redacting it
+    replaced a working same-origin URL with ``[REDACTED_SECRET]`` — the browser
+    then had nothing to point its PDF viewer at.
+    """
+
+    PDF_URL = (
+        "/api/sessions/sess_10ba5586e6d74065847e7b219ee215b0"
+        "/attachments/att_3f21c0d94b6e4d1fa0b7c2e58d9a4413/preview/pdf"
+    )
+
+    def test_a_preview_url_survives_response_redaction(self) -> None:
+        body = {"kind": "pdf", "pdf_url": self.PDF_URL}
+        assert redact_response_body(body) == body
+
+    def test_a_long_api_path_is_not_a_secret(self) -> None:
+        assert redact_text(self.PDF_URL) == (self.PDF_URL, False)
+
+    def test_a_key_embedded_in_an_api_path_is_still_redacted(self) -> None:
+        # The exemption is per segment, so a credential riding in the path is
+        # its own over-length segment and still fails closed.
+        embedded = "/api/v1/key/AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKK"
+        redacted, changed = redact_text(embedded)
+        assert changed is True
+        assert "AAAABBBB" not in redacted
+
+    def test_an_opaque_token_with_slashes_is_still_redacted(self) -> None:
+        # Base64 secrets contain slashes; sparing them is exactly what the
+        # `api/` prefix requirement prevents.
+        secret = "aGVsbG8vd29ybGQvc2VjcmV0/dG9rZW4vbG9uZ2VyL3N0aWxsL2hlcmU="
+        assert redact_text(secret)[1] is True
+
+    def test_a_bearer_token_in_an_api_path_is_still_redacted(self) -> None:
+        assert redact_text("api/x?authorization=bearer abcdefghijklmnop")[1] is True

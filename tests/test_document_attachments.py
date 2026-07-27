@@ -3,8 +3,8 @@
 Uploaded bytes are untrusted data behind fail-closed, per-type validation:
 media-type allowlist, a hard size cap (32 MB, matching Claude's document limit),
 and a type-specific sniff — clean UTF-8 (no NUL) for text, a ``%PDF-`` header
-pypdf can parse for PDF, a well-formed OOXML zip for .docx. Extraction is
-local-only (decode / pypdf / stdlib zip+XML), and the bounded extracted text
+pypdf can parse for PDF, a well-formed OOXML zip for .docx and .xlsx. Extraction
+is local-only (decode / pypdf / stdlib zip+XML), and the bounded extracted text
 reaches a model as an ``untrusted_external`` context item — document content is
 data, never instructions.
 """
@@ -31,6 +31,7 @@ from raiker.runtime.attachments import (
     MAX_DOCUMENT_BYTES,
     MAX_DOCUMENT_TEXT_CHARS,
     PDF_MEDIA_TYPE,
+    XLSX_MEDIA_TYPE,
     AttachmentValidationError,
     extract_document_text,
     load_document,
@@ -182,6 +183,44 @@ class TestDocumentValidation:
         with pytest.raises(AttachmentValidationError, match="docx_too_large"):
             validate_document(DOCX_MEDIA_TYPE, payload)
 
+    def test_valid_xlsx_passes(self) -> None:
+        from tests.test_attachment_preview import XLSX_BYTES
+
+        validate_document(XLSX_MEDIA_TYPE, XLSX_BYTES)
+
+    def test_non_zip_labelled_xlsx_fails_closed(self) -> None:
+        with pytest.raises(AttachmentValidationError, match="content_does_not_match_media_type"):
+            validate_document(XLSX_MEDIA_TYPE, b"not a zip package")
+
+    def test_xlsx_without_a_worksheet_fails_closed(self) -> None:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as archive:
+            archive.writestr("xl/workbook.xml", b"<workbook/>")
+        with pytest.raises(AttachmentValidationError, match="content_does_not_match_media_type"):
+            validate_document(XLSX_MEDIA_TYPE, buf.getvalue())
+
+    def test_xlsx_with_doctype_fails_closed(self) -> None:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as archive:
+            archive.writestr(
+                "xl/workbook.xml",
+                b'<!DOCTYPE workbook [<!ENTITY a "boom">]><workbook/>',
+            )
+            archive.writestr("xl/worksheets/sheet1.xml", b"<worksheet/>")
+        with pytest.raises(AttachmentValidationError, match="content_does_not_match_media_type"):
+            validate_document(XLSX_MEDIA_TYPE, buf.getvalue())
+
+    def test_xlsx_zip_bomb_fails_closed(self) -> None:
+        from raiker.runtime.attachments import MAX_XLSX_XML_BYTES
+
+        bomb = b"<workbook>" + b" " * (MAX_XLSX_XML_BYTES + 1) + b"</workbook>"
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("xl/workbook.xml", bomb)
+            archive.writestr("xl/worksheets/sheet1.xml", b"<worksheet/>")
+        with pytest.raises(AttachmentValidationError, match="xlsx_too_large"):
+            validate_document(XLSX_MEDIA_TYPE, buf.getvalue())
+
 
 # ── extraction bounds ───────────────────────────────────────────────────────
 
@@ -200,6 +239,15 @@ class TestDocumentExtraction:
 
     def test_extract_docx_text(self) -> None:
         assert "Hello Raiker DOCX" in extract_document_text(DOCX_MEDIA_TYPE, DOCX_BYTES)
+
+    def test_extract_xlsx_text(self) -> None:
+        # Cell values become tab-separated lines, so a spreadsheet reaches
+        # context as the same bounded untrusted text as every other document.
+        from tests.test_attachment_preview import XLSX_BYTES
+
+        text = extract_document_text(XLSX_MEDIA_TYPE, XLSX_BYTES)
+        assert "Quarterly report\tOwner" in text
+        assert "Revenue\t42" in text
 
 
 # ── store / load round-trip ─────────────────────────────────────────────────

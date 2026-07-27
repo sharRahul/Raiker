@@ -1974,3 +1974,27 @@ CREATE INDEX IF NOT EXISTS idx_suspended_turns_session
 CREATE INDEX IF NOT EXISTS idx_suspended_turns_status
   ON suspended_turns(principal_id, status);
 """
+
+
+# BUG-07 — the file inspector's authorization record.
+#
+# An uploaded attachment is owned by a principal, but "this account may read
+# these bytes" is not the same claim as "this conversation may show them". A
+# reference is written only when a prompt turn actually carries the attachment,
+# after the prompt route has confirmed both the session and the attachment
+# belong to the caller. The preview route reads nothing without a matching row,
+# so an attachment id guessed or replayed against a different conversation is a
+# 404 rather than a disclosure.
+SESSION_ATTACHMENT_REFS_MIGRATION_ID = "RAIKER-2027-session-attachment-refs"
+SESSION_ATTACHMENT_REFS_SQL = """
+CREATE TABLE IF NOT EXISTS session_attachment_refs (
+  session_id TEXT NOT NULL,
+  attachment_id TEXT NOT NULL,
+  owner_principal_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (session_id, attachment_id)
+);
+CREATE INDEX IF NOT EXISTS idx_session_attachment_refs_owner
+  ON session_attachment_refs(owner_principal_id, session_id, created_at);
+"""

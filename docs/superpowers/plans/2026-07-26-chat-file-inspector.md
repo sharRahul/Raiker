@@ -15,11 +15,45 @@
 - The wide layout uses a right-side pane; narrow layout uses a dismissible overlay.
 - Unsupported, malformed, or unauthorized files have safe unavailable/404 states.
 
-## Implementation status (2026-07-26)
+## Implementation status (2026-07-27) — implemented
 
-This feature is specified but not implemented. There is currently no
-session-authorized preview endpoint or Chat file-inspector UI. Attachments and
-artifacts therefore must not be described as inspectable in the shipped chat.
+Both tasks are implemented and shipped (this closes BUG-07). Attachment chips in
+Chat are buttons; clicking one opens a view-only preview of the file, authorized
+by the conversation that carried it.
+
+**What was built:** `raiker/runtime/attachment_preview.py`
+(`AttachmentPreviewService`), a `session_attachment_refs` migration written by
+the prompt route after ownership validation, `GET
+/api/sessions/{id}/attachments/{id}/preview` (+ `/preview/pdf` for inline
+bytes), `.xlsx` on the document allowlist with a bounded stdlib zip+XML parser,
+and `apps/web/src/lib/components/FileInspector.svelte` wired into `ChatView`.
+
+**Three deliberate deviations from the plan as written:**
+
+1. **No server-rendered HTML.** Task 1 sketched a `preview_markdown(...).html`
+   field. The preview returns Markdown *source text* instead, and the client
+   renders it through the escape-first renderer it already ships
+   (`apps/web/src/lib/markdown.ts`, `Markdown.svelte`). Shipping HTML from the
+   server would have added a second place where document bytes can become
+   markup; returning text means there is none. `<script>` in an uploaded file
+   renders as visible characters — asserted in
+   `tests/test_attachment_preview.py` and `FileInspector.test.ts`.
+2. **PDFs are fetched, not linked.** `pdf_url` is a same-origin authorized path
+   as specified, but the browser cannot attach the in-memory bearer token to an
+   `<object data=…>`, so the client fetches the bytes with the token and hands
+   the viewer a blob URL, revoking it on close.
+3. **One route the plan did not list:** `GET /api/sessions/{id}/attachments`
+   (metadata only). A transcript persists prompt text, not the files that rode
+   with each turn, so without it a reloaded conversation showed no chips at all
+   and the inspector was unreachable for every past chat.
+
+**One defect fixed outside these files.** The response-redaction layer's
+high-entropy fallback treated the joined path in `pdf_url` as one opaque token
+and returned `[REDACTED_SECRET]`, so the viewer had nothing to point at.
+`raiker/context/redaction.py` now spares a run that starts `api/` *and* whose
+every slash-separated segment is under the entropy threshold — a key embedded in
+a path is still its own over-length segment and still redacts
+(`tests/test_over_broad_redaction.py`).
 
 ---
 
@@ -37,7 +71,7 @@ artifacts therefore must not be described as inspectable in the shipped chat.
 - `AttachmentPreviewService.get(session_id, attachment_id, owner_id) -> AttachmentPreview | None`.
 - `GET /api/sessions/{session_id}/attachments/{attachment_id}/preview` returns metadata/text preview or an inline session-authorized PDF response.
 
-- [ ] **Step 1: Write failing scope and sanitizer tests**
+- [x] **Step 1: Write failing scope and sanitizer tests**
 
 ```python
 def test_preview_is_limited_to_the_attachment_owner_and_session(client, owner_token, other_token):
@@ -49,11 +83,11 @@ def test_markdown_preview_escapes_raw_html_and_docx_extracts_text(store):
     assert "Quarterly report" in preview_docx(DOCX_BYTES).text
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `pytest tests/test_attachment_preview.py -v`
 
-- [ ] **Step 3: Implement references and safe parsers**
+- [x] **Step 3: Implement references and safe parsers**
 
 Add a `session_attachment_refs` migration and save each attachment id against the
 session only after prompt ownership validation. Allow XLSX uploads through the
@@ -63,16 +97,22 @@ escaped text only. Serve PDF bytes with session authorization, explicit PDF
 content type, `nosniff`, and inline disposition. Return an unavailable preview
 for parse errors and unsupported content.
 
-- [ ] **Step 4: Run server verification**
+- [x] **Step 4: Run server verification**
 
 Run: `pytest tests/test_attachment_preview.py tests/test_api_dashboard.py -v`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add raiker/runtime/attachment_preview.py raiker/storage/migrations.py raiker/storage/sqlite.py raiker/api/routes_attachments.py raiker/runtime/attachments.py tests/test_attachment_preview.py
 git commit -m "feat(attachments): add safe session file previews"
 ```
+
+**Result.** `tests/test_attachment_preview.py` (25 tests) covers owner/session
+scoping, an uploaded-but-never-prompted file (ownership alone is not a grant),
+each representation, the bounded caps, the PDF headers, and the prompt route
+writing the reference. `.xlsx` validation and extraction bounds live with the
+other document formats in `tests/test_document_attachments.py`.
 
 ### Task 2: File inspector components and responsive Chat integration
 
@@ -88,7 +128,7 @@ git commit -m "feat(attachments): add safe session file previews"
 - `FileInspector` accepts `preview: AttachmentPreview | null`, `loading`, `error`, and dispatches `close`.
 - `api.attachmentPreview(sessionId, attachmentId)` returns the metadata/text preview; `pdf_url` is a same-origin authorized URL.
 
-- [ ] **Step 1: Write failing inspector tests**
+- [x] **Step 1: Write failing inspector tests**
 
 ```ts
 await user.click(screen.getByRole("button", { name: /report\.xlsx/i }));
@@ -97,11 +137,11 @@ expect(screen.getByText("Quarterly report")).toBeInTheDocument();
 expect(screen.getByRole("button", { name: /close file preview/i })).toBeInTheDocument();
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npm.cmd test -- FileInspector ChatView`
 
-- [ ] **Step 3: Implement the inspector**
+- [x] **Step 3: Implement the inspector**
 
 Make attachment chips semantic buttons. Fetch only after click, render safe text
 or a PDF object from the same-origin URL, and render unavailable/error states as
@@ -109,13 +149,20 @@ plain text. Use CSS grid for the wide split layout and a dialog-style overlay at
 the narrow breakpoint. The inspector has no upload, mutation, or download
 control.
 
-- [ ] **Step 4: Run web verification**
+- [x] **Step 4: Run web verification**
 
 Run: `npm.cmd test -- FileInspector ChatView; npm.cmd run check; npm.cmd run build`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/lib/components/FileInspector.svelte apps/web/src/lib/components/FileInspector.test.ts apps/web/src/lib/api.ts apps/web/src/lib/apiTypes.ts apps/web/src/lib/views/ChatView.svelte apps/web/src/lib/views/ChatView.test.ts
 git commit -m "feat(chat): preview session files in an inspector"
 ```
+
+**Result.** 13 `FileInspector` tests and 5 `ChatView` tests. Verified in the
+built app under Chromium: the chip is a button, the pane opens beside the
+transcript at 1440px and as a sheet at 420px (no horizontal overflow either
+way), Markdown/`.xlsx`/PDF all render, an uploaded `<script>` stays visible text
+and never executes, and resuming the conversation restores the chips and reopens
+the same previews.

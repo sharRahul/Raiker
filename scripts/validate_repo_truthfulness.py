@@ -128,7 +128,30 @@ REQUIRED_DISABLED_MARKERS = {
 FORBIDDEN_GLOBAL = (
     "memory_reviewing",
     "approval executes pending action",
-    "approval resolution executes",
+    # BUG-06 narrowed this guard rather than removing it. Resolution really does
+    # execute an approved *file mutation* now, so a flat ban on "approval
+    # resolution executes" would forbid the truth. What must stay forbidden is
+    # the **unbounded** claim — that approving runs whatever was approved.
+    "approval resolution executes any",
+    "approval resolution executes every",
+    "approval resolution executes the approved action",
+    "approving executes any action",
+)
+
+# Wording that correctly states the boundary. A doc discussing approval
+# resolution must carry one of these: either the old flat metadata-only claim
+# (still true of every capability outside the relayed pair) or a phrasing that
+# names what executes *and* that everything else does not.
+APPROVAL_BOUNDARY_MARKERS = (
+    "approval resolution is metadata-only",
+    "does not execute approved action",
+    "metadata-only for every other capability",
+    "metadata-only for every capability except",
+    "for every capability except an approved",
+    "metadata-only otherwise",
+    "executes exactly one narrow class of action",
+    "metadata-only: it records the human decision",
+    "records the decision and executes nothing",
 )
 
 
@@ -164,12 +187,10 @@ def _validate_snippet(name: str, text: str) -> list[str]:
         and "metadata only" not in lowered
     ):
         errors.append(f"{name} missing metadata-only wording")
-    if (
-        ("approval resolution" in lowered or "/approve" in lowered)
-        and "approval resolution is metadata-only" not in lowered
-        and "does not execute approved action" not in lowered
+    if ("approval resolution" in lowered or "/approve" in lowered) and not any(
+        marker in lowered for marker in APPROVAL_BOUNDARY_MARKERS
     ):
-        errors.append(f"{name} missing approval metadata-only wording")
+        errors.append(f"{name} missing approval execution-boundary wording")
     if (
         "no-executor" not in lowered
         and "fail closed" not in lowered
@@ -208,7 +229,7 @@ def main() -> int:
         # client and the local web dashboard. Native/hosted clients stay Phase 8 deferred (below).
         "launchable local UIs are the plain local terminal client and the local web dashboard",
         "Phase 8 deferred",
-        "approval resolution is metadata-only",
+        "every other approval records a decision only",
         "durable memory mutation is broker-governed",
     ):
         if marker.lower() not in readme.lower():
@@ -228,7 +249,8 @@ def main() -> int:
         "remote execution | disabled/fail-closed",
         "cloud execution | disabled/fail-closed",
         "finance/investment/medical/pregnancy/CCTV/home-security/hardware domains | disabled/fail-closed",
-        "approval resolution is metadata-only",
+        "Approval resolution executes exactly one narrow class of action",
+        "remains metadata-only: it records the decision and executes nothing",
         "no tamper-proof logging is implemented",
     ):
         if marker.lower() not in security_arch.lower():
@@ -252,7 +274,8 @@ def main() -> int:
     for marker in (
         "implemented_approval_required",
         "metadata_only",
-        "Does not execute approved action.",
+        "executed once through the governed approval execution relay",
+        "metadata-only for every other capability",
     ):
         if marker not in catalog:
             errors.append(f"catalog_missing_marker:{marker}")

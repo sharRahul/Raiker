@@ -522,7 +522,9 @@
                 </p>
                 -->
                 <p class="approval-note">
-                  Review it in the Approvals inbox. Recording a decision never executes the action.
+                  Review it in the Approvals inbox.
+                  {turn.response!.approval!.expected_effect ||
+                    "Recording a decision never executes the action."}
                 </p>
                 <a class="btn btn-soft btn-sm" href="#/approvals">Open Approvals</a>
               </div>

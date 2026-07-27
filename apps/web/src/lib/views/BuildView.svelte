@@ -23,7 +23,7 @@
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
   import Markdown from "../components/Markdown.svelte";
   import RepoConnector from "../components/RepoConnector.svelte";
-  import { api, ApiError, streamPrompt } from "../api";
+  import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
   import type {
     AgentResponse,
     ApprovalView,
@@ -291,6 +291,45 @@
     }
   }
 
+  /** Continue the turn this approval parked, streaming into its own transcript row. */
+  async function resumeTurn(approvalId: string) {
+    const parked = turns.findLast((candidate) => candidate.response?.status === "needs_approval");
+    const turn =
+      parked ??
+      (() => {
+        turns = [
+          ...turns,
+          { id: nextId++, prompt: "", mode, events: [], response: null, streaming: true, error: null },
+        ];
+        return turns[turns.length - 1];
+      })();
+    turn.streaming = true;
+    turn.error = null;
+    streaming = true;
+    void scrollToEnd();
+    try {
+      await streamResumeAfterApproval(approvalId, (event) => {
+        if (event.kind === "final" && event.response !== null) {
+          turn.response = event.response;
+          if (contextOpen) void refreshContextUsage();
+          void loadApprovals();
+        } else {
+          turn.events = [...turn.events, event];
+        }
+        void scrollToEnd();
+      });
+    } catch (error) {
+      turn.error =
+        error instanceof ApiError
+          ? `The turn could not continue (${error.reasonCode ?? error.status}).`
+          : "Could not reach the local runtime to continue the turn.";
+    } finally {
+      turn.streaming = false;
+      streaming = false;
+      void scrollToEnd();
+    }
+  }
+
   async function scrollToEnd() {
     await tick();
     // Guarded: jsdom has no scrollTo implementation.
@@ -362,14 +401,23 @@
     approvalBusy = approval.approval_id;
     approvalNotice = null;
     try {
-      await api.resolveApproval(approval.approval_id, {
+      const result = await api.resolveApproval(approval.approval_id, {
         approve,
         reason: approve ? "accepted in the Build workspace" : "rejected in the Build workspace",
       });
-      approvalNotice = approve
-        ? "Decision recorded. Raiker re-governs the action before anything runs."
-        : "Rejection recorded.";
+      approvalNotice = !approve
+        ? "Rejection recorded."
+        : result.executes_action
+          ? result.execution?.path
+            ? `Applied once — wrote ${result.execution.path}. The previous contents were checkpointed.`
+            : "Applied once, under a fresh capability, policy and posture check."
+          : "Decision recorded. Raiker re-governs the action before anything runs.";
       await loadApprovals();
+      // B2 — the decision closed the tool call the model was waiting on, so the
+      // turn it parked picks up from here instead of costing a re-prompt.
+      if (result.resume?.resumable) {
+        await resumeTurn(approval.approval_id);
+      }
     } catch (error) {
       approvalNotice =
         error instanceof ApiError
@@ -519,8 +567,8 @@
         <section class="decisions" aria-labelledby="build-decisions">
           <h2 id="build-decisions">Waiting on you</h2>
           <p class="decisions-lead">
-            Accepting records your decision. Raiker re-governs the action before anything runs — a recorded decision is
-            never treated as permission it already had.
+            Raiker re-governs every accepted action before it runs — a recorded decision is never treated as permission
+            it already had. Each decision below reports afterwards whether it was applied or only recorded.
           </p>
           {#each approvals as approval (approval.approval_id)}
             <div class="decision">

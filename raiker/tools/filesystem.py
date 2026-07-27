@@ -9,6 +9,21 @@ class FilesystemSafetyError(ValueError):
     pass
 
 
+# Top-level workspace directories a governed file mutation may never target.
+#
+# Confinement to the workspace is not sufficient once an approved write really
+# executes (BUG-06): the workspace *contains* the substrate that makes owner
+# authority meaningful. `.raiker/` holds the encrypted store and its audit log,
+# the vault key, the hook definitions (which run commands), and the MCP server
+# scripts; `.git/` holds hooks that run on the next commit. A write to either is
+# not "the owner's legitimate choice" being blocked — it is the agent rewriting
+# the machinery that records and constrains it, so this is one of the last-resort
+# hard preventions HANDOFF reserves.
+#
+# Reads are untouched: the agent may still read anything inside the workspace.
+PROTECTED_WORKSPACE_DIRS: frozenset[str] = frozenset({".raiker", ".git"})
+
+
 def resolve_workspace_path(workspace_root: str | Path, requested_path: str | Path) -> Path:
     root = Path(workspace_root).resolve()
     candidate = Path(requested_path)
@@ -21,6 +36,25 @@ def resolve_workspace_path(workspace_root: str | Path, requested_path: str | Pat
         resolved.relative_to(root)
     except ValueError as exc:
         raise FilesystemSafetyError("outside_workspace") from exc
+    return resolved
+
+
+def resolve_writable_workspace_path(
+    workspace_root: str | Path, requested_path: str | Path
+) -> Path:
+    """Resolve *requested_path* for **writing**, refusing protected directories.
+
+    Every mutating filesystem path goes through here rather than through
+    :func:`resolve_workspace_path`, so confinement and the protected-directory
+    refusal can never drift apart.
+    """
+    root = Path(workspace_root).resolve()
+    resolved = resolve_workspace_path(root, requested_path)
+    if resolved == root:
+        raise FilesystemSafetyError("protected_workspace_path")
+    parts = resolved.relative_to(root).parts
+    if parts and parts[0] in PROTECTED_WORKSPACE_DIRS:
+        raise FilesystemSafetyError("protected_workspace_path")
     return resolved
 
 
@@ -169,7 +203,10 @@ def diff_files(
 def proposed_write_snapshot(
     workspace_root: str | Path, path: str | Path, new_text: str
 ) -> dict[str, Any]:
-    resolved = resolve_workspace_path(workspace_root, path)
+    # Refused here as well as at execution time, so a proposal the runtime could
+    # never carry out is rejected while the model can still react to it, rather
+    # than sitting in the Approvals inbox looking actionable.
+    resolved = resolve_writable_workspace_path(workspace_root, path)
     before = (
         resolved.read_text(encoding="utf-8")
         if resolved.exists() and resolved.is_file() and is_text_file(resolved)
@@ -185,7 +222,7 @@ def proposed_write_snapshot(
 
 
 def write_file_content(workspace_root: str | Path, path: str | Path, text: str) -> dict[str, Any]:
-    resolved = resolve_workspace_path(workspace_root, path)
+    resolved = resolve_writable_workspace_path(workspace_root, path)
     resolved.parent.mkdir(parents=True, exist_ok=True)
     resolved.write_text(text, encoding="utf-8")
     return {
@@ -200,7 +237,7 @@ def edit_file_content(workspace_root: str | Path, path: str | Path, text: str) -
 
 
 def apply_patch_content(workspace_root: str | Path, path: str | Path, new_text: str) -> dict[str, Any]:
-    resolved = resolve_workspace_path(workspace_root, path)
+    resolved = resolve_writable_workspace_path(workspace_root, path)
     resolved.parent.mkdir(parents=True, exist_ok=True)
     resolved.write_text(new_text, encoding="utf-8")
     return {

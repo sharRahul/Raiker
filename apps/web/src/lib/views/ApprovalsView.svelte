@@ -13,7 +13,10 @@
 
   let { sessionId = null }: { sessionId?: string | null } = $props();
 
-  const FILTERS = ["pending", "approved", "denied"] as const;
+  // `executed` is the terminal status of an approval the execution relay
+  // actually carried out, so it needs its own tab — otherwise the file writes
+  // the owner approved would vanish from every filter.
+  const FILTERS = ["pending", "approved", "executed", "denied"] as const;
   const RISK_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
   let filter = $state<(typeof FILTERS)[number]>("pending");
@@ -32,6 +35,11 @@
   let criticalMfaCode = $state("");
   let criticalError = $state<string | null>(null);
   let criticalBusy = $state(false);
+  // B2 — a decision closes the tool call the model was waiting on, so the turn
+  // it parked can pick up from here. Offered rather than automatic: the inbox is
+  // not the transcript, and continuing is the owner's call.
+  let resumable = $state<{ approval_id: string; session_id: string } | null>(null);
+  let resumeBusy = $state(false);
 
   const orderedApprovals = $derived.by(() => {
     const requestedAt = (approval: ApprovalView) => Date.parse(approval.created_at) || 0;
@@ -83,9 +91,15 @@
       notice = {
         kind: "ok",
         text: result.executes_action
-          ? `Executed once: ${result.status}.`
+          ? result.execution?.path
+            ? `Executed once — wrote ${result.execution.path}. The previous contents were checkpointed.`
+            : `Executed once: ${result.status}.`
           : `Recorded: ${result.status}. The action was NOT executed (metadata-only).`,
       };
+      resumable =
+        result.resume?.resumable && result.resume.session_id
+          ? { approval_id: result.approval_id, session_id: result.resume.session_id }
+          : null;
       selected = null;
       await load();
     } catch (e) {
@@ -96,6 +110,26 @@
       };
     } finally {
       busy = false;
+    }
+  }
+
+  async function resumeTurn() {
+    if (resumable === null || resumeBusy) return;
+    resumeBusy = true;
+    try {
+      const response = await api.resumeAfterApproval(resumable.approval_id);
+      notice = { kind: "ok", text: `The agent continued the turn: ${response.message}` };
+      resumable = null;
+    } catch (e) {
+      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      notice = {
+        kind: "error",
+        text: explained
+          ? `${explained.plain} ${explained.remediation ?? ""}`
+          : "The turn could not be continued.",
+      };
+    } finally {
+      resumeBusy = false;
     }
   }
 
@@ -156,8 +190,9 @@
 
 <div class="head-row">
   <p class="page-lead">
-    Actions the agent proposed that need a human decision. Most approvals
-    <strong>record your decision only</strong>; any server-confirmed execution is stated explicitly.
+    Actions the agent proposed that need a human decision. Each one states whether approving
+    <strong>performs it</strong> or only <strong>records your decision</strong> — the server
+    decides which, from the capability gates you control.
   </p>
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh approvals">
     <Icon name="refresh" size={15} />
@@ -167,6 +202,23 @@
 
 {#if notice}
   <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+{/if}
+
+{#if resumable !== null}
+  <div class="notice notice-ok resume-row">
+    <span>
+      A turn was waiting on this decision. Continuing picks it up where it stopped, so the agent keeps
+      what it had already worked out.
+    </span>
+    <span class="resume-actions">
+      <button type="button" class="btn btn-primary btn-sm" onclick={resumeTurn} disabled={resumeBusy}>
+        {resumeBusy ? "Continuing…" : "Continue the turn"}
+      </button>
+      <a class="btn btn-ghost btn-sm" href={`#/sessions?session=${encodeURIComponent(resumable.session_id)}`}>
+        Open the session
+      </a>
+    </span>
+  </div>
 {/if}
 
 <div class="queue-controls">
@@ -312,8 +364,10 @@
         </button>
         <button type="button" class="btn btn-primary" onclick={() => resolve(true)} disabled={busy}>
           {busy
-            ? "Recording…"
-            : selected.approval.tool_name === "connector_write"
+            ? selected.executes_on_approval
+              ? "Executing…"
+              : "Recording…"
+            : selected.executes_on_approval
               ? "Approve and execute once"
               : "Approve (record only)"}
         </button>
@@ -409,6 +463,18 @@
   }
   .detail {
     margin-top: var(--space-4);
+  }
+  .resume-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+  .resume-actions {
+    display: inline-flex;
+    gap: var(--space-2);
+    flex-shrink: 0;
   }
   .detail-head {
     display: flex;

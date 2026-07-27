@@ -29,7 +29,9 @@ principal; only humans with the required role may make governance changes.
 Policy evaluates the principal, capability, domain, risk, workspace scope,
 decision mode, and available executor. Strict non-allow blocking, role revoke
 governed, and capability gate per action are enforced. AI principals may propose
-work but cannot grant themselves authority. Approval resolution is metadata-only.
+work but cannot grant themselves authority. Approval resolution executes an
+approved local file mutation through the governed execution relay and is
+metadata-only for every other capability.
 
 Strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
 

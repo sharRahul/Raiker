@@ -583,6 +583,8 @@ export interface ApprovalDetailView {
   diff_path: string | null;
   preview_kind: "file_diff" | "patch" | "arguments";
   metadata_only_notice: string;
+  // Server-computed: does pressing Approve actually perform this action?
+  executes_on_approval: boolean;
 }
 
 // POST /api/approvals/{id}/resolve response.
@@ -593,6 +595,10 @@ export interface ResolveApprovalResult {
   executes_action: boolean;
   reason: string;
   connector_result?: Record<string, unknown>;
+  // Present when an approved file mutation was carried out by the execution relay.
+  execution?: { capability: string; path: string | null };
+  // B2 — whether a turn was parked on this approval and can now pick up again.
+  resume?: { resumable: boolean; session_id?: string; turn_id?: string };
 }
 
 export interface ResolveCriticalApprovalResult {
@@ -604,7 +610,8 @@ export interface ResolveCriticalApprovalResult {
 }
 
 // Approval proposal carried on an AgentResponse when status === "needs_approval".
-// Mirrors the `approval` dict built in raiker/runtime/orchestrator.py. No action is executed.
+// Mirrors the `approval` dict built in raiker/runtime/orchestrator.py. Nothing has
+// been executed at this point; `expected_effect` states what approving will do.
 export interface ApprovalInfo {
   action_id: string;
   tool_name: string;
@@ -612,6 +619,11 @@ export interface ApprovalInfo {
   risk_level: string;
   reasons: string[];
   message: string;
+  expected_effect?: string;
+  approval_id?: string;
+  // True when the turn's working state was parked, so resolving this approval
+  // continues the same turn rather than costing a re-prompt.
+  resumable?: boolean;
 }
 
 // raiker.contracts.models.AgentResponse.to_dict()

@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
-from raiker.contracts.models import AgentResponse, ContractValidationError, PromptEnvelope
+from raiker.contracts.models import (
+    DEFAULT_MAX_TOOL_CALLS,
+    AgentResponse,
+    ClientMetadata,
+    ContractValidationError,
+    PromptEnvelope,
+    PromptOptions,
+    PromptPayload,
+    UserMetadata,
+)
 from raiker.contracts.streaming import FINAL, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
@@ -12,6 +22,7 @@ from raiker.hooks.contracts import HookInput
 from raiker.hooks.dispatcher import HookDispatcher
 from raiker.hooks.registry import HooksRegistry
 from raiker.models.connections import get_model_connection
+from raiker.models.contracts import ModelMessage
 from raiker.models.policy_state import provider_runtime_policy_from_gates
 from raiker.models.registry import ModelProfileRegistry, RegistryError, profile_with_model
 from raiker.models.router import ModelRouter
@@ -19,6 +30,7 @@ from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.orchestrator import RuntimeOrchestrator
+from raiker.runtime.turn_suspension import TurnSuspensionError, deserialize_messages
 from raiker.sessions.manager import SessionManager
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
@@ -350,6 +362,125 @@ class AgentGateway:
                     tasks.fail_task(task.task_id, final.message if final is not None else "stream ended")
                 else:
                     tasks.complete_task(task.task_id, final.message)
+
+    # ── B2: resume a turn that was parked for an approval ────────────────────
+
+    def _restore_suspended_turn(
+        self, approval_id: str
+    ) -> tuple[PromptEnvelope, list[ModelMessage], int]:
+        """Rebuild the parked turn's envelope, conversation, and tool budget.
+
+        Raises :class:`TurnSuspensionError` when the row is missing, already
+        claimed, unresolved, or unreadable — every one of which must fail closed
+        rather than resume a turn from half a state.
+        """
+        row = self.store.load_suspended_turn(
+            approval_id, principal_id=self.tool_broker.principal_id
+        )
+        if row is None:
+            raise TurnSuspensionError("suspended_turn_not_found")
+        if str(row.get("status")) != "suspended":
+            raise TurnSuspensionError("suspended_turn_already_resumed")
+        outcome_raw = row.get("outcome_json")
+        if not outcome_raw:
+            raise TurnSuspensionError("approval_not_resolved")
+        try:
+            outcome = json.loads(str(outcome_raw))
+            options_raw = json.loads(str(row.get("options_json") or "{}"))
+            client_raw = json.loads(str(row.get("client_json") or "{}"))
+        except (ValueError, TypeError) as exc:
+            raise TurnSuspensionError("suspended_turn_unreadable") from exc
+
+        messages = deserialize_messages(str(row["messages_json"]))
+        # The resolved tool result closes the call the model is still waiting on.
+        # Approved-and-executed replays the real result; rejected and
+        # approved-but-not-executed say so, so the model reacts to what happened.
+        messages.append(
+            ModelMessage(
+                role="tool",
+                content=json.dumps(outcome, sort_keys=True),
+                tool_call_id=str(row["call_id"]),
+                name=str(row["tool_name"]),
+            )
+        )
+        envelope = PromptEnvelope(
+            request_id=str(row["request_id"]),
+            session_id=str(row["session_id"]),
+            # The *same* turn id: this is one turn continuing, not a new one, so
+            # the transcript shows a single exchange and `close_turn` updates the
+            # row the parked turn already owns.
+            turn_id=str(row["turn_id"]),
+            client=ClientMetadata(
+                type=str(client_raw.get("type", "web_ui")),
+                name=str(client_raw.get("name", "raiker-web")),
+                version=str(client_raw.get("version", "0.0.0")),
+            ),
+            user=UserMetadata(id=self.tool_broker.principal_id),
+            prompt=PromptPayload(
+                text=str(row["prompt_text"]),
+                metadata={"resumed_from_approval": approval_id},
+            ),
+            options=PromptOptions(
+                planning_mode=str(options_raw.get("planning_mode", "auto")),
+                approval_mode=str(options_raw.get("approval_mode", "interactive")),
+                model_profile=str(options_raw.get("model_profile", "")),
+                model=str(options_raw.get("model", "")),
+                max_tool_calls=int(options_raw.get("max_tool_calls", DEFAULT_MAX_TOOL_CALLS)),
+            ),
+        )
+        return envelope, messages, int(row.get("tool_calls_made", 0))
+
+    async def aresume_after_approval(self, approval_id: str) -> AgentResponse:
+        envelope, messages, tool_calls_made = self._restore_suspended_turn(approval_id)
+        if not self.store.claim_suspended_turn(approval_id):
+            raise TurnSuspensionError("suspended_turn_already_resumed")
+        final: AgentResponse | None = None
+        try:
+            async for event in self.runtime.aresume_events(
+                envelope,
+                messages,
+                stream=False,
+                tool_calls_made=tool_calls_made,
+                approval_id=approval_id,
+            ):
+                if event.kind == FINAL and event.response is not None:
+                    final = event.response
+            assert final is not None
+            return self._finalize_turn(envelope, final)
+        finally:
+            self.store.finalize_suspended_turn(
+                approval_id, status="resumed" if final is not None else "resume_failed"
+            )
+
+    async def astream_resume_after_approval(self, approval_id: str):  # type: ignore[no-untyped-def]
+        """Stream the continuation of a parked turn.
+
+        Same authority and the same finalisation as an ordinary turn — this only
+        surfaces it incrementally, so the continuation lands in the transcript
+        the way the interrupted turn would have.
+        """
+        envelope, messages, tool_calls_made = self._restore_suspended_turn(approval_id)
+        if not self.store.claim_suspended_turn(approval_id):
+            raise TurnSuspensionError("suspended_turn_already_resumed")
+        final: AgentResponse | None = None
+        try:
+            async for event in self.runtime.aresume_events(
+                envelope,
+                messages,
+                stream=True,
+                tool_calls_made=tool_calls_made,
+                approval_id=approval_id,
+            ):
+                if event.kind == FINAL and event.response is not None:
+                    final = event.response
+                    continue
+                yield event
+            assert final is not None
+            yield StreamEvent(kind=FINAL, response=self._finalize_turn(envelope, final))
+        finally:
+            self.store.finalize_suspended_turn(
+                approval_id, status="resumed" if final is not None else "resume_failed"
+            )
 
     def submit_prompt(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
         import asyncio

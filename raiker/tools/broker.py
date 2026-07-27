@@ -347,6 +347,34 @@ class ToolBroker:
             }
         return None
 
+    def _expected_effect(self, action: ToolAction, connector_write: bool) -> str:
+        """What approving this proposal will actually do, stated at proposal time.
+
+        BUG-06: this sentence used to say "metadata-only … does not execute the
+        action" for every non-connector tool, which stopped being true for file
+        mutations once approval resolution was wired to the execution relay. It
+        is now derived from the same check the resolve endpoint makes, so the
+        model and the transcript are told the truth in both configurations.
+        """
+        if connector_write:
+            return "Approving executes this exact connector mutation once."
+        if self.store is not None:
+            from raiker.approvals.execution import ApprovalExecutionBridge
+
+            if ApprovalExecutionBridge(self.store).executes_on_resolution(
+                action.tool_name, self.principal_id
+            ):
+                # The sentence is stored in events and returned to the client, so
+                # the model-supplied path is scrubbed by credential shape first —
+                # the same treatment every other argument gets on the way out.
+                raw_path = str(action.arguments.get("path", ""))
+                path = str(self._redact_value(raw_path)) or "the proposed path"
+                return f"Approving writes this exact change to {path}, once."
+        return (
+            "Records an action-bound approval request only. Approval resolution is "
+            "metadata-only and does not execute the action."
+        )
+
     def _pre_tool_use(
         self,
         action: ToolAction,
@@ -504,11 +532,7 @@ class ToolBroker:
             approval_id = new_id("appr_")
             proposal_preview = self._approval_preview(action)
             connector_write = action.tool_name == "connector_write"
-            expected_effect = (
-                "Approving executes this exact connector mutation once."
-                if connector_write
-                else "Records an action-bound approval request only. Approval resolution is metadata-only and does not execute the action."
-            )
+            expected_effect = self._expected_effect(action, connector_write)
             self._event(
                 session_id=session_id,
                 turn_id=turn_id,

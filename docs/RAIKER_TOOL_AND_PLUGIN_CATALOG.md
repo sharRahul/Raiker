@@ -9,12 +9,13 @@ This catalog is the canonical visible terminal command surface. Commands remain
 governed by the acting principal, policy, capability gate, decision mode, and
 executor availability.
 
-Approval resolution is `metadata_only`. A supported durable mutation is
-`implemented_approval_required`. It is metadata-only and **Does not execute
-approved action.** Strict non-allow blocking, role revoke governed, and
-capability gate per action are enforced.
+Approval resolution is `metadata_only` except for an approved local **file
+mutation** (`write_file` / `edit_file` / `apply_patch`), which is
+executed once through the governed approval execution relay. A supported durable mutation is
+`implemented_approval_required`. Strict non-allow blocking, role revoke
+governed, and capability gate per action are enforced.
 
-Approval resolution is metadata-only. Does not execute approved action. Unsupported capabilities are disabled and fail-closed. Strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
+Approval resolution executes an approved local file mutation through the governed relay and is metadata-only for every other capability. Unsupported capabilities are disabled and fail-closed. Strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
 
 ## CLI Command Surface
 

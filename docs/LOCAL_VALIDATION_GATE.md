@@ -32,4 +32,4 @@ npm --prefix apps/web run build
 Strict non-allow blocking, role revoke governed, and capability gate per action
 must remain documented and validated.
 
-Approval resolution is metadata-only; unsupported capabilities are disabled and fail-closed.
+Approval resolution executes an approved local file mutation through the governed relay and is metadata-only otherwise; unsupported capabilities are disabled and fail-closed.

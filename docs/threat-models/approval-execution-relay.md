@@ -36,7 +36,11 @@ The immutable **approval intent** is captured at creation time by
 
 | Control | Mechanism |
 |---|---|
-| Governed entry only | The relay runs only when the outer `route_action()` returns `decision="allow"` for `approval_execution_relay`. |
+| Governed entry only | The relay runs only when the outer `route_action()` returns `decision="allow"` for `approval_execution_relay`. `approval_execution_relay` is named in `CAPABILITY_GATE_MAP`, so that outer call really does consult the relay's own gate and decision mode — disabling the gate stops every relayed execution, including the API resolution path. |
+| Narrow API entry (BUG-06) | `POST /api/approvals/{id}/resolve` reaches the relay only for `file_write_execution` and `patch_apply_execution` (`raiker/approvals/execution.py::EXECUTABLE_ON_APPROVAL`), and never for a `critical` approval. Every other capability keeps metadata-only resolution, so widening what an ordinary approval can execute is an explicit edit to that frozenset, not a side effect. |
+| Protected workspace paths | A relayed file mutation resolves through `resolve_writable_workspace_path`, which refuses the `.raiker/` and `.git/` trees — the encrypted store, audit log, vault key, hook definitions and MCP server scripts. Workspace confinement alone would have handed those over once approved writes became real. Reads are unaffected. |
+| Bounded resumption (B2) | Resolving an approval unblocks the turn that proposed the action. The parked conversation is principal-scoped, resumable at most once (status check + atomic `suspended → resuming` claim), and never resumable before the approval is resolved. The result handed back names what actually happened — executed, rejected, or approved-but-not-executed — so a metadata-only capability cannot be mistaken for success. |
+| Reversible by construction | `route_action` snapshots the target file's pre-image into the checkpoint blob store before the executor runs, so an approved overwrite can be rewound. |
 | Immutable arguments (TOCTOU, A1) | At execution the relay recomputes `tool_action_payload_sha256` from the tool action *as it stands now* and compares it to the hash stored at approval time. Any drift → `approval_payload_tampered`, no execution, approval left `pending`. |
 | Bounded lifetime (A1) | An approval past `expires_at` resolves to `expired` (via `expire_approval`, guarded on `status='pending'`) and never executes → `approval_expired`. Default TTL 24h. |
 | Execution-time re-governance (A2/A3) | The approved action is re-routed through `RuntimeAuthority.route_action` as the approving human. The **target's** capability gate state, decision mode, PolicyEngine review, and (for Tier-2) the threat-ack-gated enablement all apply *again* at execution time — approval-time state is never trusted. |
@@ -86,6 +90,23 @@ The immutable **approval intent** is captured at creation time by
 - **T7 — Sensitive data leaked into the audit log.** Mitigated: relay events and
   results are metadata-only (approval id, target action id, capability, decision,
   posture). Never arguments or content.
+- **T8 — An approved write rewrites the governance substrate (BUG-06).** Once
+  approval resolution really executes, a model-proposed `write_file` targeting
+  `.raiker/hooks.json` (hooks run commands), the vault key, the encrypted store,
+  or `.git/hooks/*` would be inside the workspace and therefore inside
+  `resolve_workspace_path`'s boundary. Mitigated by
+  `resolve_writable_workspace_path`, applied at both proposal time (so no
+  un-executable approval is parked) and at the executor — the authoritative
+  boundary. Refusal is `protected_workspace_path`, the approval becomes terminal
+  `execution_failed`, and nothing is written. Covered by
+  `tests/test_filesystem_tools.py` and
+  `tests/test_approval_execution_wiring.py::TestWriteBoundaries`.
+- **T9 — Resolution widening beyond what was reviewed (BUG-06).** The API path
+  could have relayed *any* approved capability, silently turning `shell` into a
+  one-click execution. Mitigated: the relayable set is an explicit frozenset of
+  two local, checkpointed, reversible file capabilities, and
+  `tests/test_security_regression_ui.py::TestApprovalExecutionIsNarrow` fails if
+  a Tier-2 approval ever starts executing on resolution.
 
 ## What Workstream A does not cover
 

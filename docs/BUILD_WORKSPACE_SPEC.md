@@ -48,9 +48,20 @@ Notes that keep the mapping honest:
 - `Shift+Tab` cycles Plan → Edit → Auto without leaving the prompt.
 
 Accepting a proposed change from the transcript uses the ordinary approval
-route. **Approval resolution is metadata-only**: it records the human decision,
-and the action is re-governed before anything runs. The page says so where the
-buttons are, so "Accept" is never read as "already applied".
+route, and the action is **re-governed before anything runs** — the capability
+gate, decision mode, policy review and the resolver's posture are all re-checked
+at execution time, so a recorded decision is never treated as permission it
+already had. Accepting a proposed **file change** then applies it once, with the
+previous contents checkpointed first; accepting anything else records the
+decision and executes nothing. The decisions rail reports which happened after
+the fact, so "Accept" is never read as "already applied".
+
+Accepting also **continues the turn**. The conversation that proposed the change
+kept its working state, so the decision is handed back to the model as the result
+of its own tool call — the real result when the change was applied, an explicit
+refusal when it was rejected — and the same turn streams on from there, in place.
+Nothing has to be re-asked, and the transcript shows one exchange rather than
+two. A turn continues at most once per decision.
 
 ## Repositories
 

@@ -1557,7 +1557,10 @@ def handle_approvals(*, workspace_root: str | Path = ".") -> str:
     approvals = inbox.list_pending()
     if not approvals:
         return "No pending approvals."
-    lines = ["Pending approvals (metadata only; resolution does not execute actions):"]
+    # The terminal client resolves metadata-only for *every* capability. The
+    # web dashboard additionally executes an approved file mutation through the
+    # governed relay (BUG-06); resolving here never does, and says so.
+    lines = ["Pending approvals (metadata only here; /approve does not execute actions):"]
     for approval in approvals:
         lines.append(
             f"- {approval['approval_id']} action={approval['action_id']} tool={approval['tool_name']} risk={approval['risk_level']} args={approval['arguments_json']}"
@@ -1574,7 +1577,11 @@ def handle_approval_resolution(command: str, *, workspace_root: str | Path = "."
         resolution = inbox.resolve(parts[1], approve=parts[0] == "/approve")
     except ValueError as exc:
         return f"Approval resolution failed: {exc}"
-    return f"Approval {resolution.approval_id} {resolution.status} for action {resolution.action_id}. Metadata only; no action was executed."
+    return (
+        f"Approval {resolution.approval_id} {resolution.status} for action "
+        f"{resolution.action_id}. Metadata only; no action was executed. "
+        "(Approving a file change in the web dashboard does perform it.)"
+    )
 
 
 def _profile_status(profile: ModelProfile) -> str:

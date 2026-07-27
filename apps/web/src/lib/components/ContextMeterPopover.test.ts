@@ -35,9 +35,9 @@ describe("ContextMeterPopover", () => {
   });
 
   it("shows this chat and the provider all-time total, and names the price source", () => {
-    render(ContextMeterPopover, { usage: usage() });
-    expect(screen.getByText("$0.0030")).toBeInTheDocument();
-    expect(screen.getByText("$0.0059")).toBeInTheDocument();
+    render(ContextMeterPopover, { usage: usage(), locale: "en-GB" });
+    expect(screen.getByText("US$0.0030")).toBeInTheDocument();
+    expect(screen.getByText("US$0.0059")).toBeInTheDocument();
     expect(screen.getByText(/list price, as of 2026-07/)).toBeInTheDocument();
   });
 

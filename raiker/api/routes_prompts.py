@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -27,8 +28,6 @@ from raiker.contracts.models import (
 from raiker.contracts.streaming import FINAL, StreamEvent
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
-from raiker.runtime.authority.models import Principal, PrincipalType
-from raiker.runtime.interrupts import InterruptController
 from raiker.runtime.attachments import (
     DOCX_MEDIA_TYPE,
     PDF_MEDIA_TYPE,
@@ -37,9 +36,11 @@ from raiker.runtime.attachments import (
     store_document,
     store_image,
 )
+from raiker.runtime.authority.models import Principal, PrincipalType
+from raiker.runtime.interrupts import InterruptController
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.filesystem import FilesystemSafetyError, resolve_writable_workspace_path
 from raiker.tasks.manager import TaskManager
+from raiker.tools.filesystem import FilesystemSafetyError, resolve_writable_workspace_path
 
 router = APIRouter()
 
@@ -183,12 +184,42 @@ def _record_generated_file_attachments(
     chat download, and this feature is for generated outputs rather than a
     general workspace browser.
     """
+    _record_generated_file_attachments_for_turn(
+        workspace,
+        session_id=envelope.session_id,
+        turn_id=envelope.turn_id,
+        principal_id=principal_id,
+    )
+
+
+def _record_generated_file_attachments_for_turn(
+    workspace: str | Path, *, session_id: str, turn_id: str, principal_id: str
+) -> None:
+    """Copy this turn's newly generated files into its durable session record.
+
+    File execution happens either before a prompt reaches its final stream event
+    or later when the owner approves a parked write. Both lifecycle paths call
+    this idempotent recorder so the inspector never depends on which path
+    executed the file.
+    """
     store = SQLiteStore(workspace)
-    entries = store.list_checkpoint_capture_entries(session_id=envelope.session_id, limit=200)
+    # The approval relay executes through the approving API session, while the
+    # checkpoint retains the original conversation turn. The turn is therefore
+    # the durable join key between an approved write and its Chat/Build session.
+    entries = store.list_checkpoint_capture_entries(turn_id=turn_id, limit=200)
+    recorded_files = {
+        (str(ref["turn_id"]), str(metadata["filename"]), str(metadata["sha256"]))
+        for ref in store.list_session_attachment_refs(
+            session_id=session_id, owner_principal_id=principal_id
+        )
+        if (metadata := store.load_attachment_metadata(
+            str(ref["attachment_id"]), owner_principal_id=principal_id
+        )) is not None
+    }
     paths: set[str] = set()
     for entry in entries:
         if (
-            entry.get("turn_id") != envelope.turn_id
+            entry.get("turn_id") != turn_id
             or entry.get("capability") not in {"file_write_execution", "patch_apply_execution"}
             or bool(entry.get("existed_before"))
         ):
@@ -204,6 +235,9 @@ def _record_generated_file_attachments(
             if not source.is_file():
                 continue
             data = source.read_bytes()
+            identity = (turn_id, source.name, sha256(data).hexdigest())
+            if identity in recorded_files:
+                continue
             stored = (
                 store_image(store, filename=source.name, media_type=media_type, data=data, owner_principal_id=principal_id)
                 if media_type.startswith("image/")
@@ -212,11 +246,12 @@ def _record_generated_file_attachments(
         except (AttachmentValidationError, FilesystemSafetyError, OSError):
             continue
         store.save_session_attachment_ref(
-            session_id=envelope.session_id,
+            session_id=session_id,
             attachment_id=stored.attachment_id,
             owner_principal_id=principal_id,
-            turn_id=envelope.turn_id,
+            turn_id=turn_id,
         )
+        recorded_files.add(identity)
 
 
 def _invalid_response(exc: Exception) -> AgentResponse:

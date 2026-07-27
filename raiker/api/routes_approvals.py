@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from raiker.api.auth import AuthMiddleware
-from raiker.api.routes_prompts import _sse
+from raiker.api.routes_prompts import _record_generated_file_attachments_for_turn, _sse
 from raiker.api.schemas import ResolveApprovalRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.approvals import ApprovalInbox
@@ -166,6 +166,12 @@ async def resolve_approval(
                 ),
                 detail={"ok": False, "reason_code": execution.reason_code},
             )
+        _record_generated_file_attachments_for_turn(
+            _ws(request),
+            session_id=str(approval_row.get("session_id", "")),
+            turn_id=str(approval_row.get("turn_id", "")),
+            principal_id=session.principal_id,
+        )
         artifacts = {k: v for k, v in execution.artifacts.items() if v is not None}
         return {
             "approval_id": approval_id,

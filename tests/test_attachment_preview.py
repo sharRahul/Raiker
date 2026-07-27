@@ -16,7 +16,7 @@ import base64
 import io
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -25,6 +25,8 @@ from raiker.api.app import create_app
 from raiker.api.routes_prompts import _record_generated_file_attachments
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.contracts.ids import utc_now
+from raiker.contracts.models import PromptEnvelope
 from raiker.runtime.attachment_preview import (
     KIND_IMAGE,
     KIND_MARKDOWN,
@@ -43,7 +45,6 @@ from raiker.runtime.attachments import (
     store_image,
 )
 from raiker.storage.sqlite import SQLiteStore
-from raiker.contracts.ids import utc_now
 from tests.test_document_attachments import DOCX_BYTES, PDF_BYTES, make_docx
 
 OWNER_PRINCIPAL = "principal_owner"
@@ -645,7 +646,10 @@ class TestPromptRecordsReferences:
 
         _record_generated_file_attachments(
             workspace,
-            SimpleNamespace(session_id=SESSION_ID, turn_id="turn_generated"),
+            cast(
+                PromptEnvelope,
+                SimpleNamespace(session_id=SESSION_ID, turn_id="turn_generated"),
+            ),
             OWNER_PRINCIPAL,
         )
 

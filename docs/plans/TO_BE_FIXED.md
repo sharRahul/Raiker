@@ -40,7 +40,10 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-17 | High | MCP | Fixed (was BUG-12) |
 | FIXED-18 | Low | Permissions | Fixed (was BUG-13) |
 | FIXED-19 | Medium | Chat / file output | Fixed (found while fixing BUG-13) |
-| BUG-14 | Low | Chat / cost presentation tests | Open (found while fixing BUG-13) |
+| FIXED-20 | High | Chat / Build file retention | Fixed (found while fixing BUG-14) |
+| FIXED-21 | Low | CI quality gates | Fixed (found while verifying BUG-14) |
+| FIXED-22 | Low | Chat / Build file retention | Fixed (found while fixing BUG-14) |
+| BUG-14 | Low | Chat / cost presentation tests | Fixed (found while fixing BUG-13) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (20 items) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (18 items) |
 
@@ -1098,17 +1101,94 @@ chat refreshes its file chips after the final event; selecting a chip opens the
 existing read-only right-hand inspector. This is limited to new supported
 document/image types and never turns the workspace into a general file browser.
 
+**Post-release correction.** The initial recorder only ran when a prompt stream
+finished. Approved writes execute after that event, under the approving API
+session, so their otherwise valid file could be omitted from the conversation.
+FIXED-20 closes that lifecycle gap.
+
+---
+
+## FIXED-20 — Approved Chat and Build files could be lost from their session
+
+**Status: fixed in this change.**
+
+**Observed.** A Chat or Build turn can propose a new file, pause for the
+owner's approval, then write it successfully. The workspace file existed, but
+reloading the conversation showed no file chip and the inspector could not
+recover it. That broke the requirement that an agent-created artifact remains
+part of the session until the owner deletes it.
+
+**Root cause.** The generated-file recorder ran only at a prompt stream's final
+event. Approval resolution is later and runs with the approving API session,
+not the originating conversation session. The checkpoint capture preserves the
+original turn id, but the recorder queried it by the wrong session id and found
+no file to store.
+
+**Fix applied.** The attachment recorder now has a turn-scoped entry point and
+approval resolution calls it immediately after a successful file write. Capture
+lookup uses the original turn id, the stable link across the approval relay,
+then copies supported new documents and images into the owner-scoped attachment
+store and records their original session and turn. The final-stream path remains
+as an idempotent safety net. No automatic deletion path was added: stored
+artifacts remain until the owner explicitly deletes them.
+
+**Covered by.**
+`tests/test_approval_execution_wiring.py::TestApprovedWriteExecutes::test_new_file_is_copied_into_the_session_after_approval`
+approves a new Markdown file and asserts that a fresh session-file listing
+contains its stored record, name, type, and originating turn.
+
+---
+
+## FIXED-22 — Repeated file recording could duplicate a session artifact
+
+**Status: fixed in this change.**
+
+**Observed.** An approved write is recorded when it executes and may be seen
+again by the prompt's final stream event. The recorder created a fresh
+attachment for each pass, so one generated file could appear as duplicate chips
+in its session.
+
+**Fix applied.** The recorder now identifies an already-recorded artifact by
+its originating turn, filename, and content checksum before storing it. The
+approval and final-stream lifecycle paths can both run without changing the
+session's one-file record. This preserves the owner-only deletion model; it
+does not remove existing artifacts automatically.
+
+**Covered by.**
+`tests/test_approval_execution_wiring.py::TestApprovedWriteExecutes::test_new_file_is_copied_into_the_session_after_approval`
+records the same approval turn twice and asserts the session still contains one
+file.
+
+---
+
+## FIXED-21 — CI validation had stale import and typing debt
+
+**Status: fixed in this change.**
+
+**Observed.** The final CI-equivalent checks did not start clean: Ruff reported
+unsorted imports in the generated-file route and attachment-preview test, while
+mypy rejected the preview test's deliberately minimal envelope fixture.
+
+**Fix applied.** Imports now follow the repository's Ruff ordering. The preview
+test explicitly casts its two-field fixture to the envelope type expected by
+the existing helper, documenting that the test supplies only the fields its
+runtime path reads. Ruff and mypy now complete without findings.
+
 ---
 
 ## BUG-14 — The cost-popover test asserts a different currency label than the UI
+
+**Status: fixed in this change.**
 
 **Observed.** `apps/web/src/lib/components/ContextMeterPopover.test.ts` expects
 `$0.0030`, while the rendered component displays `US$0.0030`. The full web test
 run therefore has one failure even though the focused BUG-13/FIXED-19 tests,
 type check, lint, and build pass.
 
-**Proposed fix.** Decide whether the product’s currency convention is `$` or
-`US$`, then make the component and its test use that one value consistently.
+**Fix applied.** Currency remains locale-aware. The component test now passes
+`en-GB` explicitly and asserts the rendered `US$` label; the formatter's
+separate `en-US` tests retain the `$` convention. The test no longer depends on
+the runner's locale.
 
 ---
 
@@ -1373,15 +1453,17 @@ and step 2 is most of it.
 **C4. File inspector — done for attachments and generated files.** FIXED-10 shipped Tasks 1–2 of
 `docs/superpowers/plans/2026-07-26-chat-file-inspector.md`: chips are buttons and
 open a session-authorized, view-only pane, reusing the sanitising renderer from
-FIXED-06 for the Markdown case. FIXED-19 records a supported, newly generated
-file against its exact session and turn so it uses that same pane. **Remaining
+FIXED-06 for the Markdown case. FIXED-19 and FIXED-20 record a supported,
+newly generated file against its exact session and turn so it uses that same
+pane. **Remaining
 work:** an assistant that reads a document should also be able to show *the
 passage it used*.
 
 **C5. Chat file output — done.** FIXED-19 keeps per-response copy but removes
 per-chat Markdown download and browser print/Save as PDF. Generated artifacts
 and stored attachments use the right-hand inspector rather than a general
-download surface.
+download surface; FIXED-20/FIXED-22 preserve approved artifacts once without
+automatic deletion.
 
 **C6. No citations on tool-derived answers.** When an answer comes from an
 email, a calendar entry or an attached document, the transcript does not say

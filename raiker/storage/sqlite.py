@@ -3134,6 +3134,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         self,
         *,
         session_id: str | None = None,
+        turn_id: str | None = None,
         action_id: str | None = None,
         created_after: str | None = None,
         limit: int = 200,
@@ -3143,6 +3144,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if session_id is not None:
             clauses.append("session_id = ?")
             params.append(session_id)
+        if turn_id is not None:
+            clauses.append("turn_id = ?")
+            params.append(turn_id)
         if action_id is not None:
             clauses.append("action_id = ?")
             params.append(action_id)

@@ -19,9 +19,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
+from raiker.api.routes_prompts import _record_generated_file_attachments_for_turn
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.models import ToolAction
+from raiker.runtime.attachment_preview import AttachmentPreviewService
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -106,6 +108,36 @@ class TestApprovedWriteExecutes:
         }
         assert (workspace / "docs" / "report.md").read_text(encoding="utf-8") == "# Q3\n"
         assert SQLiteStore(workspace).load_approval("appr_1")["status"] == "executed"  # type: ignore[index]
+
+    def test_new_file_is_copied_into_the_session_after_approval(
+        self, workspace: Path, client: TestClient, headers: dict[str, str]
+    ) -> None:
+        _pending(workspace, arguments={"path": "docs/report.md", "text": "# Q3\n"})
+
+        assert _resolve(client, headers, "appr_1").status_code == 200
+
+        files = AttachmentPreviewService(SQLiteStore(workspace)).list_session_files(
+            "sess_a", "principal_owner"
+        )
+        assert len(files) == 1
+        assert files[0]["turn_id"] == "turn_a"
+        assert files[0]["filename"] == "report.md"
+        assert files[0]["media_type"] == "text/markdown"
+
+        # The final stream event may reach the recorder after an approved
+        # write. Re-running it must retain the same session file, not add a
+        # duplicate chip for the same generated artifact.
+        _record_generated_file_attachments_for_turn(
+            workspace,
+            session_id="sess_a",
+            turn_id="turn_a",
+            principal_id="principal_owner",
+        )
+        assert len(
+            AttachmentPreviewService(SQLiteStore(workspace)).list_session_files(
+                "sess_a", "principal_owner"
+            )
+        ) == 1
 
     def test_apply_patch_is_relayed_through_its_own_capability(
         self, workspace: Path, client: TestClient, headers: dict[str, str]

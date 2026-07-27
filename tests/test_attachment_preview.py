@@ -25,6 +25,7 @@ from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.runtime.attachment_preview import (
+    KIND_IMAGE,
     KIND_MARKDOWN,
     KIND_PDF,
     KIND_TABLE,
@@ -38,6 +39,7 @@ from raiker.runtime.attachments import (
     PDF_MEDIA_TYPE,
     XLSX_MEDIA_TYPE,
     store_document,
+    store_image,
 )
 from raiker.storage.sqlite import SQLiteStore
 from tests.test_document_attachments import DOCX_BYTES, PDF_BYTES, make_docx
@@ -46,6 +48,12 @@ OWNER_PRINCIPAL = "principal_owner"
 SESSION_ID = "sess_preview"
 
 MD_SOURCE = "# Title\n\n<script>alert(1)</script>\n\nSome **markdown** body.\n"
+
+# A real 1x1 PNG: the image validator sniffs magic bytes, so a placeholder
+# string would be rejected before any preview is built.
+PNG_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+)
 
 
 def make_xlsx(rows: list[list[str]], *, shared: bool = True) -> bytes:
@@ -122,6 +130,28 @@ def _attach(
 ) -> str:
     """Store a document and bind it to a session, as a prompt turn would."""
     stored = store_document(
+        store, filename=filename, media_type=media_type, data=data, owner_principal_id=owner
+    )
+    store.save_session_attachment_ref(
+        session_id=session_id,
+        attachment_id=stored.attachment_id,
+        owner_principal_id=owner,
+        turn_id="turn_1",
+    )
+    return stored.attachment_id
+
+
+def _attach_image(
+    store: SQLiteStore,
+    *,
+    filename: str = "shot.png",
+    media_type: str = "image/png",
+    data: bytes = PNG_BYTES,
+    session_id: str = SESSION_ID,
+    owner: str = OWNER_PRINCIPAL,
+) -> str:
+    """Store an image and bind it to a session, as a prompt turn would."""
+    stored = store_image(
         store, filename=filename, media_type=media_type, data=data, owner_principal_id=owner
     )
     store.save_session_attachment_ref(
@@ -280,23 +310,60 @@ class TestPreviewRepresentations:
         assert preview.text == ""
         assert "data" not in preview.to_dict()
 
-    def test_image_is_not_previewable(self, store: SQLiteStore) -> None:
+    def test_image_preview_names_a_session_scoped_url(self, store: SQLiteStore) -> None:
+        attachment_id = _attach_image(store)
+        preview = AttachmentPreviewService(store).get(SESSION_ID, attachment_id, OWNER_PRINCIPAL)
+        assert preview is not None
+        assert preview.kind == KIND_IMAGE
+        assert preview.image_url == (
+            f"/api/sessions/{SESSION_ID}/attachments/{attachment_id}/preview/image"
+        )
+        # The picture rides its own byte route; the JSON carries no pixels.
+        assert preview.text == ""
+        assert "data" not in preview.to_dict()
+
+    def test_an_image_whose_bytes_do_not_match_its_type_is_unavailable(
+        self, store: SQLiteStore
+    ) -> None:
+        # Stored straight to the database, bypassing upload validation: a file
+        # claiming to be a PNG must not be handed to an <img> on that word.
         store.save_attachment(
-            attachment_id="att_img",
+            attachment_id="att_fake_png",
             kind="image",
             filename="shot.png",
             media_type="image/png",
             sha256="x",
-            data=b"\x89PNG\r\n\x1a\n",
+            data=b"GIF89a not really a png",
             owner_principal_id=OWNER_PRINCIPAL,
         )
         store.save_session_attachment_ref(
             session_id=SESSION_ID,
-            attachment_id="att_img",
+            attachment_id="att_fake_png",
             owner_principal_id=OWNER_PRINCIPAL,
             turn_id="turn_1",
         )
-        preview = AttachmentPreviewService(store).get(SESSION_ID, "att_img", OWNER_PRINCIPAL)
+        preview = AttachmentPreviewService(store).get(SESSION_ID, "att_fake_png", OWNER_PRINCIPAL)
+        assert preview is not None
+        assert preview.kind == KIND_UNAVAILABLE
+        assert preview.unavailable_reason == "content_does_not_match_media_type"
+
+    def test_an_unknown_type_is_still_unsupported(self, store: SQLiteStore) -> None:
+        store.save_attachment(
+            attachment_id="att_zip",
+            kind="document",
+            filename="archive.zip",
+            media_type="application/zip",
+            sha256="x",
+            data=b"PK\x03\x04",
+            owner_principal_id=OWNER_PRINCIPAL,
+        )
+        store.save_session_attachment_ref(
+            session_id=SESSION_ID,
+            attachment_id="att_zip",
+            owner_principal_id=OWNER_PRINCIPAL,
+            turn_id="turn_1",
+        )
+        preview = AttachmentPreviewService(store).get(SESSION_ID, "att_zip", OWNER_PRINCIPAL)
         assert preview is not None
         assert preview.kind == KIND_UNAVAILABLE
         assert preview.unavailable_reason == "unsupported_for_preview"
@@ -380,6 +447,76 @@ class TestPdfPreviewRoute:
         assert disposition.count('"') == 2
         assert disposition.count(";") == 1
         assert disposition.startswith('inline; filename="')
+
+
+# ── the image byte route ────────────────────────────────────────────────────
+
+
+class TestImagePreviewRoute:
+    def _image_url(self, attachment_id: str, session_id: str = SESSION_ID) -> str:
+        return _preview_url(attachment_id, session_id) + "/image"
+
+    def test_image_is_served_inline_with_its_validated_content_type(
+        self, client: TestClient, store: SQLiteStore, owner_token: str
+    ) -> None:
+        attachment_id = _attach_image(store)
+        resp = client.get(self._image_url(attachment_id), headers=_auth(owner_token))
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("image/png")
+        assert resp.headers["x-content-type-options"] == "nosniff"
+        assert resp.headers["content-disposition"].startswith("inline;")
+        assert resp.headers["cache-control"] == "no-store"
+        assert resp.content == PNG_BYTES
+
+    def test_image_route_refuses_another_account(
+        self, client: TestClient, store: SQLiteStore, workspace: Path, seed_account: Any
+    ) -> None:
+        attachment_id = _attach_image(store)
+        _, other_token = seed_account(workspace, "bob")
+        assert client.get(self._image_url(attachment_id), headers=_auth(other_token)).status_code == 404
+
+    def test_image_route_refuses_another_conversation(
+        self, client: TestClient, store: SQLiteStore, owner_token: str
+    ) -> None:
+        attachment_id = _attach_image(store)
+        resp = client.get(
+            self._image_url(attachment_id, session_id="sess_other"), headers=_auth(owner_token)
+        )
+        assert resp.status_code == 404
+
+    def test_image_route_refuses_a_document(
+        self, client: TestClient, store: SQLiteStore, owner_token: str
+    ) -> None:
+        # The routes are not interchangeable: a PDF is never served as an image
+        # (nor an image as a PDF), so the pinned content type cannot be chosen
+        # by picking a URL.
+        attachment_id = _attach(
+            store, filename="doc.pdf", media_type=PDF_MEDIA_TYPE, data=PDF_BYTES
+        )
+        assert client.get(self._image_url(attachment_id), headers=_auth(owner_token)).status_code == 404
+        image_id = _attach_image(store)
+        pdf_route = _preview_url(image_id) + "/pdf"
+        assert client.get(pdf_route, headers=_auth(owner_token)).status_code == 404
+
+    def test_image_route_refuses_bytes_that_do_not_match_the_type(
+        self, client: TestClient, store: SQLiteStore, owner_token: str
+    ) -> None:
+        store.save_attachment(
+            attachment_id="att_fake",
+            kind="image",
+            filename="shot.png",
+            media_type="image/png",
+            sha256="x",
+            data=b"GIF89a not really a png",
+            owner_principal_id=OWNER_PRINCIPAL,
+        )
+        store.save_session_attachment_ref(
+            session_id=SESSION_ID,
+            attachment_id="att_fake",
+            owner_principal_id=OWNER_PRINCIPAL,
+            turn_id="turn_1",
+        )
+        assert client.get(self._image_url("att_fake"), headers=_auth(owner_token)).status_code == 404
 
 
 # ── the JSON preview route + session file list ──────────────────────────────

@@ -56,11 +56,18 @@ closes it and returns focus to the chip.
 | `docx` | The document's extracted text |
 | `xlsx` | The first sheet's cell values as a table |
 | `pdf` | The PDF itself, in your browser's viewer |
+| `png`, `jpeg`, `webp`, `gif` | The picture, fitted to the pane |
 
 The pane is read-only: there is no edit, upload, or download control, and long
 files say so rather than pretending to show everything. A preview is scoped to
 the conversation the file was attached to — the same file id opened from another
-chat, or by another account, is a 404. Images are not previewable yet.
+chat, or by another account, is a 404.
+
+PDFs and images are the only previews served as raw bytes, and both are checked
+again on the way out: the response carries the content type the bytes were just
+re-validated against, with `nosniff`, so a file can only ever be interpreted as
+what it actually is. A picture whose contents do not match its type is not
+displayed at all — the pane says so instead.
 
 Chips survive a reload: resuming a conversation restores them, and they open the
 same previews.

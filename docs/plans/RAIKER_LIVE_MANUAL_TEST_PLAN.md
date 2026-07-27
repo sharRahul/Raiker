@@ -188,7 +188,7 @@ the **Build** composer (`93-build-context-cost-popover.png`).
 |---|---|---|
 | `+` → Attach | Image… (`png/jpeg/webp/gif`) and Document… (`txt/md/csv/pdf/docx/xlsx`) | ✅ `72-` |
 | Document upload | `POST /api/attachments` 200, chip renders, content reaches the model | ✅ `76-`, `77-` |
-| Attachment chip | Clicking it opens a view-only preview pane; `Esc`/**Close file preview** dismisses it; a `.md` file's raw HTML shows as text, an `.xlsx` shows its first sheet, a PDF opens in the browser viewer | ✅ FIXED-10 |
+| Attachment chip | Clicking it opens a view-only preview pane; `Esc`/**Close file preview** dismisses it; a `.md` file's raw HTML shows as text, an `.xlsx` shows its first sheet, a PDF opens in the browser viewer, an uploaded image displays fitted to the pane | ✅ FIXED-10 |
 | Voice input | Present and labelled "(coming soon)" | ✅ honest |
 | Planning | auto / Always plan / Never plan | ✅ |
 | Model | lists only configured profiles; no free-text model id | ✅ matches spec |

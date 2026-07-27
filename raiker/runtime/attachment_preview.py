@@ -16,9 +16,13 @@ file inspector, and it is deliberately the narrowest one that works:
   and .xlsx are parsed with stdlib zip+XML into bounded text and cell values;
   nothing in a document is evaluated, and macro-enabled package types are off
   the upload allowlist to begin with.
-* **PDFs stay bytes.** There is no server-side rasteriser: the preview names a
-  same-origin, session-authorized URL and the browser's own viewer displays it,
-  served with an explicit PDF content type, ``nosniff`` and inline disposition.
+* **PDFs and images stay bytes.** There is no server-side rasteriser or
+  re-encoder: the preview names a same-origin, session-authorized URL and the
+  browser displays it — its own viewer for a PDF, an ``<img>`` for a picture.
+  Both are served with the *validated* content type, ``nosniff`` and inline
+  disposition, so bytes can never be interpreted as anything but what they were
+  checked to be. The image allowlist is raster-only (PNG/JPEG/WebP/GIF); SVG is
+  not an accepted upload, so no previewable image can carry script at all.
 * **Everything else fails visibly.** An unsupported type, a record that no
   longer passes validation, or a parse error becomes an ``unavailable`` preview
   carrying a stable reason — never a blank pane and never a partial render.
@@ -31,6 +35,7 @@ from typing import Any
 
 from raiker.runtime.attachments import (
     DOCX_MEDIA_TYPE,
+    IMAGE_MEDIA_TYPES,
     PDF_MEDIA_TYPE,
     TEXT_DOCUMENT_MEDIA_TYPES,
     XLSX_MEDIA_TYPE,
@@ -38,6 +43,7 @@ from raiker.runtime.attachments import (
     extract_document_text,
     extract_xlsx_rows,
     validate_document,
+    validate_image,
 )
 from raiker.storage.sqlite import SQLiteStore
 
@@ -55,6 +61,7 @@ KIND_TEXT = "text"
 KIND_MARKDOWN = "markdown"
 KIND_TABLE = "table"
 KIND_PDF = "pdf"
+KIND_IMAGE = "image"
 KIND_UNAVAILABLE = "unavailable"
 
 
@@ -72,6 +79,7 @@ class AttachmentPreview:
     rows: tuple[tuple[str, ...], ...] = ()
     truncated: bool = False
     pdf_url: str | None = None
+    image_url: str | None = None
     unavailable_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -86,18 +94,28 @@ class AttachmentPreview:
             "rows": [list(row) for row in self.rows],
             "truncated": self.truncated,
             "pdf_url": self.pdf_url,
+            "image_url": self.image_url,
             "unavailable_reason": self.unavailable_reason,
         }
 
 
-def pdf_preview_url(session_id: str, attachment_id: str) -> str:
-    """The same-origin, session-authorized URL a PDF preview is served from."""
+def _bytes_preview_url(session_id: str, attachment_id: str, suffix: str) -> str:
     from urllib.parse import quote
 
     return (
         f"/api/sessions/{quote(session_id, safe='')}"
-        f"/attachments/{quote(attachment_id, safe='')}/preview/pdf"
+        f"/attachments/{quote(attachment_id, safe='')}/preview/{suffix}"
     )
+
+
+def pdf_preview_url(session_id: str, attachment_id: str) -> str:
+    """The same-origin, session-authorized URL a PDF preview is served from."""
+    return _bytes_preview_url(session_id, attachment_id, "pdf")
+
+
+def image_preview_url(session_id: str, attachment_id: str) -> str:
+    """The same-origin, session-authorized URL an image preview is served from."""
+    return _bytes_preview_url(session_id, attachment_id, "image")
 
 
 class AttachmentPreviewService:
@@ -138,15 +156,51 @@ class AttachmentPreviewService:
         rides along because the route needs it for the inline disposition and a
         second load would re-read the whole blob.
         """
-        record = self.authorized_record(session_id, attachment_id, owner_id)
-        if record is None or str(record.get("media_type", "")) != PDF_MEDIA_TYPE:
+        served = self.served_bytes(session_id, attachment_id, owner_id)
+        if served is None or served[1] != PDF_MEDIA_TYPE:
             return None
+        return served[0], served[2]
+
+    def image_bytes(
+        self, session_id: str, attachment_id: str, owner_id: str
+    ) -> tuple[str, str, bytes] | None:
+        """Return ``(filename, media_type, bytes)`` for one authorized image.
+
+        The media type comes back with the bytes because the route must pin it
+        on the response: the picture is served as exactly the type its magic
+        bytes were just checked against, never as a type the client guessed.
+        """
+        served = self.served_bytes(session_id, attachment_id, owner_id)
+        if served is None or served[1] not in IMAGE_MEDIA_TYPES:
+            return None
+        return served
+
+    def served_bytes(
+        self, session_id: str, attachment_id: str, owner_id: str
+    ) -> tuple[str, str, bytes] | None:
+        """Authorize and re-validate one attachment's raw bytes for display.
+
+        Validation runs again on the way out (magic bytes for an image, a
+        parseable non-encrypted document for a PDF), so a record that predates
+        or bypassed upload validation is never streamed to a browser.
+        """
+        record = self.authorized_record(session_id, attachment_id, owner_id)
+        if record is None:
+            return None
+        media_type = str(record.get("media_type", ""))
         data = bytes(record.get("data", b""))
         try:
-            validate_document(PDF_MEDIA_TYPE, data)
+            if media_type in IMAGE_MEDIA_TYPES:
+                validate_image(media_type, data)
+            elif media_type == PDF_MEDIA_TYPE:
+                validate_document(PDF_MEDIA_TYPE, data)
+            else:
+                # Nothing else is ever served as raw bytes; text formats reach
+                # the client inside the JSON preview, bounded and inert.
+                return None
         except AttachmentValidationError:
             return None
-        return str(record.get("filename", "")), data
+        return str(record.get("filename", "")), media_type, data
 
     def list_session_files(self, session_id: str, owner_id: str) -> list[dict[str, Any]]:
         """Metadata for every attachment referenced by one session (no bytes).
@@ -193,6 +247,7 @@ class AttachmentPreviewService:
             rows: tuple[tuple[str, ...], ...] = (),
             truncated: bool = False,
             pdf_url: str | None = None,
+            image_url: str | None = None,
             unavailable_reason: str | None = None,
         ) -> AttachmentPreview:
             return AttachmentPreview(
@@ -206,11 +261,21 @@ class AttachmentPreviewService:
                 rows=rows,
                 truncated=truncated,
                 pdf_url=pdf_url,
+                image_url=image_url,
                 unavailable_reason=unavailable_reason,
             )
 
         if not is_previewable(media_type):
             return build(KIND_UNAVAILABLE, unavailable_reason="unsupported_for_preview")
+        if media_type in IMAGE_MEDIA_TYPES:
+            # Re-validated here as well as on the byte route, so an unreadable
+            # record reports itself in the pane instead of rendering as a broken
+            # image icon with no explanation.
+            try:
+                validate_image(media_type, data)
+            except AttachmentValidationError as exc:
+                return build(KIND_UNAVAILABLE, unavailable_reason=exc.reason)
+            return build(KIND_IMAGE, image_url=image_preview_url(session_id, attachment_id))
         try:
             validate_document(media_type, data)
         except AttachmentValidationError as exc:
@@ -247,7 +312,9 @@ class AttachmentPreviewService:
 
 
 def is_previewable(media_type: str) -> bool:
-    """True for the document types the inspector knows how to show safely."""
+    """True for the file types the inspector knows how to show safely."""
     return media_type in (
-        set(TEXT_DOCUMENT_MEDIA_TYPES) | {PDF_MEDIA_TYPE, DOCX_MEDIA_TYPE, XLSX_MEDIA_TYPE}
+        set(TEXT_DOCUMENT_MEDIA_TYPES)
+        | {PDF_MEDIA_TYPE, DOCX_MEDIA_TYPE, XLSX_MEDIA_TYPE}
+        | set(IMAGE_MEDIA_TYPES)
     )

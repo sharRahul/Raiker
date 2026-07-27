@@ -447,11 +447,12 @@ export const api = {
     request<AttachmentPreview>(
       `/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/preview`,
     ),
-  // PDFs are displayed by the browser's own viewer. The bytes are fetched with
-  // the in-memory bearer token (an <object> tag cannot send one) and handed to
-  // the viewer as a same-origin blob URL; the caller revokes it on close.
-  attachmentPreviewPdfUrl: async (pdfPath: string): Promise<string> => {
-    const blob = await requestBlob(pdfPath);
+  // PDFs and images are displayed by the browser itself. Their bytes are
+  // fetched with the in-memory bearer token (an <object> or <img> tag cannot
+  // send one) and handed over as a same-origin blob URL; the caller revokes it
+  // when the pane closes.
+  attachmentPreviewObjectUrl: async (bytesPath: string): Promise<string> => {
+    const blob = await requestBlob(bytesPath);
     return URL.createObjectURL(blob);
   },
   events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>

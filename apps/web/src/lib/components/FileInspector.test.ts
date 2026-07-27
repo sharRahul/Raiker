@@ -21,6 +21,7 @@ function preview(overrides: Partial<AttachmentPreview> = {}): AttachmentPreview 
     rows: [],
     truncated: false,
     pdf_url: null,
+    image_url: null,
     unavailable_reason: null,
     ...overrides,
   };
@@ -117,7 +118,7 @@ describe("FileInspector", () => {
         pdf_url: "/api/sessions/sess_1/attachments/att_1/preview/pdf",
       }),
       filename: "doc.pdf",
-      pdfObjectUrl: "blob:doc",
+      objectUrl: "blob:doc",
       onclose: () => {},
     });
     const object = document.querySelector("object");
@@ -129,16 +130,33 @@ describe("FileInspector", () => {
   it("states why an unsupported file cannot be shown, keeping the reason code", async () => {
     open({
       preview: preview({
-        filename: "shot.png",
-        media_type: "image/png",
+        filename: "archive.zip",
+        media_type: "application/zip",
         kind: "unavailable",
         text: "",
         unavailable_reason: "unsupported_for_preview",
       }),
-      filename: "shot.png",
+      filename: "archive.zip",
     });
     expect(await screen.findByText(/cannot preview this kind of file/i)).toBeInTheDocument();
     expect(screen.getByText("unsupported_for_preview")).toBeInTheDocument();
+  });
+
+  it("refuses to display a picture whose bytes do not match its type", async () => {
+    // The server sends this rather than image bytes; the pane must explain it
+    // instead of rendering a broken-image icon.
+    open({
+      preview: preview({
+        filename: "shot.png",
+        media_type: "image/png",
+        kind: "unavailable",
+        text: "",
+        unavailable_reason: "content_does_not_match_media_type",
+      }),
+      filename: "shot.png",
+    });
+    expect(await screen.findByText(/contents do not match the type/i)).toBeInTheDocument();
+    expect(document.querySelector("img")).toBeNull();
   });
 
   it("falls back to a plain statement for an unknown reason code", async () => {
@@ -166,6 +184,26 @@ describe("FileInspector", () => {
   it("says when only the beginning of a file is shown", async () => {
     open({ preview: preview({ truncated: true }) });
     expect(await screen.findByText(/beginning of this file only/i)).toBeInTheDocument();
+  });
+
+  it("shows an image once its blob URL is ready, described by its filename", async () => {
+    const imagePreview = preview({
+      filename: "shot.png",
+      media_type: "image/png",
+      kind: "image",
+      text: "",
+      image_url: "/api/sessions/sess_1/attachments/att_1/preview/image",
+    });
+    const { rerender } = open({ preview: imagePreview, filename: "shot.png" });
+    expect(await screen.findByRole("status")).toHaveTextContent(/loading the image/i);
+    await rerender({
+      preview: imagePreview,
+      filename: "shot.png",
+      objectUrl: "blob:shot",
+      onclose: () => {},
+    });
+    const image = await screen.findByRole("img", { name: "shot.png" });
+    expect(image).toHaveAttribute("src", "blob:shot");
   });
 
   it("offers no upload, download, or mutation control", async () => {

@@ -271,22 +271,22 @@
   let preview = $state<AttachmentPreview | null>(null);
   let previewLoading = $state(false);
   let previewError = $state<string | null>(null);
-  // Object URL for a PDF preview: the browser's viewer cannot send the bearer
-  // token, so the bytes are fetched here and handed over as a blob. Revoked on
-  // close and whenever another file is opened — a stale handle keeps the whole
-  // document alive in memory.
-  let pdfObjectUrl = $state<string | null>(null);
+  // Object URL for a preview served as bytes (a PDF or an image): neither an
+  // <object> nor an <img> can send the bearer token, so the bytes are fetched
+  // here and handed over as a blob. Revoked on close and whenever another file
+  // is opened — a stale handle keeps the whole file alive in memory.
+  let objectUrl = $state<string | null>(null);
 
-  function releasePdfObjectUrl() {
-    if (pdfObjectUrl === null) return;
-    URL.revokeObjectURL?.(pdfObjectUrl);
-    pdfObjectUrl = null;
+  function releaseObjectUrl() {
+    if (objectUrl === null) return;
+    URL.revokeObjectURL?.(objectUrl);
+    objectUrl = null;
   }
 
   async function openInspector(attachmentId: string, filename: string) {
     if (sessionId === null) return;
     const openedSession = sessionId;
-    releasePdfObjectUrl();
+    releaseObjectUrl();
     inspecting = { attachmentId, filename };
     preview = null;
     previewError = null;
@@ -297,10 +297,13 @@
       // rather than overwriting the file the user is now looking at.
       if (inspecting?.attachmentId !== attachmentId) return;
       preview = result;
-      if (result.kind === "pdf" && result.pdf_url !== null) {
-        const url = await api.attachmentPreviewPdfUrl(result.pdf_url);
+      // PDFs and images are the two kinds whose content is bytes rather than
+      // JSON; everything else is already in the preview.
+      const bytesPath = result.pdf_url ?? result.image_url;
+      if (bytesPath !== null) {
+        const url = await api.attachmentPreviewObjectUrl(bytesPath);
         if (inspecting?.attachmentId === attachmentId) {
-          pdfObjectUrl = url;
+          objectUrl = url;
         } else {
           URL.revokeObjectURL?.(url);
         }
@@ -317,7 +320,7 @@
   }
 
   function closeInspector() {
-    releasePdfObjectUrl();
+    releaseObjectUrl();
     inspecting = null;
     preview = null;
     previewError = null;
@@ -945,7 +948,7 @@
     filename={inspecting.filename}
     loading={previewLoading}
     error={previewError}
-    pdfObjectUrl={pdfObjectUrl}
+    objectUrl={objectUrl}
     onclose={closeInspector}
   />
 {/if}

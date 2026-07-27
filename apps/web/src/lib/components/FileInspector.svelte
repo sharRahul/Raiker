@@ -9,10 +9,11 @@
    * Nothing here executes document content. Markdown goes through the shared
    * escape-first renderer (`Markdown.svelte`), which turns `<script>` in a file
    * into visible characters rather than a tag; plain text and spreadsheet cells
-   * are interpolated as text, so Svelte escapes them; a PDF is handed to the
-   * browser's own viewer as a same-origin blob URL fetched with the session
-   * token. An unsupported or unreadable file states that in words instead of
-   * showing an empty pane.
+   * are interpolated as text, so Svelte escapes them; a PDF or an image is
+   * handed to the browser as a same-origin blob URL fetched with the session
+   * token — never a remote URL, and never bytes the server has not just
+   * re-validated. An unsupported or unreadable file states that in words
+   * instead of showing an empty pane.
    *
    * Landmark, not modal: it is a `complementary` region so the transcript stays
    * reachable behind it. Escape closes it and focus returns to the chip that
@@ -28,14 +29,15 @@
     filename,
     loading = false,
     error = null,
-    pdfObjectUrl = null,
+    objectUrl = null,
     onclose,
   }: {
     preview: AttachmentPreview | null;
     filename: string;
     loading?: boolean;
     error?: string | null;
-    pdfObjectUrl?: string | null;
+    /** Blob URL for the bytes of a PDF or image preview; null until fetched. */
+    objectUrl?: string | null;
     onclose: () => void;
   } = $props();
 
@@ -129,12 +131,20 @@
         </table>
       </div>
     {:else if preview.kind === "pdf"}
-      {#if pdfObjectUrl !== null}
-        <object class="pdf-frame" data={pdfObjectUrl} type="application/pdf" aria-label={`${preview.filename} (PDF)`}>
+      {#if objectUrl !== null}
+        <object class="pdf-frame" data={objectUrl} type="application/pdf" aria-label={`${preview.filename} (PDF)`}>
           <p class="muted">This browser cannot display the PDF inline.</p>
         </object>
       {:else}
         <p class="muted" role="status">Loading the PDF…</p>
+      {/if}
+    {:else if preview.kind === "image"}
+      {#if objectUrl !== null}
+        <!-- The alt text is the filename: this is the picture the owner
+             attached, so naming it is the honest description available. -->
+        <img class="image-frame" src={objectUrl} alt={preview.filename} />
+      {:else}
+        <p class="muted" role="status">Loading the image…</p>
       {/if}
     {/if}
 
@@ -221,6 +231,20 @@
   tr:first-child td {
     font-weight: 600;
     background: var(--neutral-soft);
+  }
+  /* Fit the pane in both directions rather than overflowing it: a photo is
+     usually far larger than the column it is being read in. */
+  .image-frame {
+    display: block;
+    max-width: 100%;
+    max-height: min(70vh, 40rem);
+    height: auto;
+    margin: 0 auto;
+    border-radius: var(--r-md);
+    /* A chequerboard behind transparency, so a transparent PNG reads as
+       transparent instead of blending into the pane. */
+    background:
+      repeating-conic-gradient(var(--neutral-soft) 0% 25%, transparent 0% 50%) 50% / 16px 16px;
   }
   .pdf-frame {
     width: 100%;

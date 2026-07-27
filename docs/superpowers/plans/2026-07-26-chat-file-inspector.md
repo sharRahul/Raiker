@@ -24,9 +24,19 @@ by the conversation that carried it.
 **What was built:** `raiker/runtime/attachment_preview.py`
 (`AttachmentPreviewService`), a `session_attachment_refs` migration written by
 the prompt route after ownership validation, `GET
-/api/sessions/{id}/attachments/{id}/preview` (+ `/preview/pdf` for inline
-bytes), `.xlsx` on the document allowlist with a bounded stdlib zip+XML parser,
-and `apps/web/src/lib/components/FileInspector.svelte` wired into `ChatView`.
+/api/sessions/{id}/attachments/{id}/preview` (+ `/preview/pdf` and
+`/preview/image` for inline bytes), `.xlsx` on the document allowlist with a
+bounded stdlib zip+XML parser, and
+`apps/web/src/lib/components/FileInspector.svelte` wired into `ChatView`.
+
+**Scope note.** The plan's goal names PDF, Markdown, XLSX and DOCX. Uploaded
+**images** are previewable too: an attachment chip is a chip whichever kind it
+names, and a picture that opened nothing was the same defect BUG-07 describes.
+They are served from `/preview/image` under the same authorization and the same
+re-validation — the magic-byte sniff runs again and the response pins the
+content type it just checked, with `nosniff`. The image allowlist is raster-only
+(PNG/JPEG/WebP/GIF); SVG is not an accepted upload, so no previewable image can
+carry script.
 
 **Three deliberate deviations from the plan as written:**
 
@@ -38,10 +48,11 @@ and `apps/web/src/lib/components/FileInspector.svelte` wired into `ChatView`.
    markup; returning text means there is none. `<script>` in an uploaded file
    renders as visible characters — asserted in
    `tests/test_attachment_preview.py` and `FileInspector.test.ts`.
-2. **PDFs are fetched, not linked.** `pdf_url` is a same-origin authorized path
-   as specified, but the browser cannot attach the in-memory bearer token to an
-   `<object data=…>`, so the client fetches the bytes with the token and hands
-   the viewer a blob URL, revoking it on close.
+2. **Byte previews are fetched, not linked.** `pdf_url` (and `image_url`) are
+   same-origin authorized paths as specified, but the browser cannot attach the
+   in-memory bearer token to an `<object data=…>` or an `<img src=…>`, so the
+   client fetches the bytes with the token and hands the browser a blob URL,
+   revoking it on close.
 3. **One route the plan did not list:** `GET /api/sessions/{id}/attachments`
    (metadata only). A transcript persists prompt text, not the files that rode
    with each turn, so without it a reloaded conversation showed no chips at all
@@ -160,9 +171,9 @@ git add apps/web/src/lib/components/FileInspector.svelte apps/web/src/lib/compon
 git commit -m "feat(chat): preview session files in an inspector"
 ```
 
-**Result.** 13 `FileInspector` tests and 5 `ChatView` tests. Verified in the
+**Result.** 14 `FileInspector` tests and 6 `ChatView` tests. Verified in the
 built app under Chromium: the chip is a button, the pane opens beside the
 transcript at 1440px and as a sheet at 420px (no horizontal overflow either
-way), Markdown/`.xlsx`/PDF all render, an uploaded `<script>` stays visible text
-and never executes, and resuming the conversation restores the chips and reopens
-the same previews.
+way), Markdown/`.xlsx`/PDF/PNG all render, an uploaded `<script>` stays visible
+text and never executes, and resuming the conversation restores the chips and
+reopens the same previews.

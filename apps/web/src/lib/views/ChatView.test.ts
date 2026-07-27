@@ -790,6 +790,7 @@ const XLSX_PREVIEW = {
   ],
   truncated: false,
   pdf_url: null,
+  image_url: null,
   unavailable_reason: null,
 };
 
@@ -875,6 +876,48 @@ describe("ChatView file inspector", () => {
     // Closing releases the blob rather than leaving the document in memory.
     await fireEvent.click(screen.getByRole("button", { name: /close file preview/i }));
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview");
+  });
+
+  it("shows an attached image in the pane", async () => {
+    const createObjectURL = vi.fn(() => "blob:shot");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
+    stubFetch({
+      ...SESSION_ROUTES,
+      "GET /api/sessions/sess_1/attachments": {
+        session_id: "sess_1",
+        files: [
+          {
+            attachment_id: "att_1",
+            turn_id: "turn_1",
+            kind: "image",
+            filename: "shot.png",
+            media_type: "image/png",
+            byte_size: 1024,
+            previewable: true,
+          },
+        ],
+      },
+      [PREVIEW_ROUTE]: {
+        ...XLSX_PREVIEW,
+        filename: "shot.png",
+        media_type: "image/png",
+        kind: "image",
+        rows: [],
+        image_url: "/api/sessions/sess_1/attachments/att_1/preview/image",
+      },
+      "GET /api/sessions/sess_1/attachments/att_1/preview/image": {},
+    });
+
+    render(ChatView, { props: { sessionId: "sess_1" } });
+    await fireEvent.click(await screen.findByRole("button", { name: /shot\.png/i }));
+    await screen.findByRole("complementary", { name: /file preview/i });
+    const image = await screen.findByRole("img", { name: "shot.png" });
+    await waitFor(() => expect(image).toHaveAttribute("src", "blob:shot"));
+    // The bytes ride an authorized fetch, not a bare src on the API path.
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    await fireEvent.click(screen.getByRole("button", { name: /close file preview/i }));
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:shot");
   });
 
   it("leaves a workspace-path chip inert — there are no stored bytes to show", async () => {

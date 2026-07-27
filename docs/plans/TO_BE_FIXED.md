@@ -664,9 +664,12 @@ would confirm the id exists.
 
 **Then the representations, all inert.** `GET
 /api/sessions/{id}/attachments/{id}/preview` returns bounded text for
-plain-text and `.docx`, cell values for `.xlsx`, and for a PDF a same-origin
-authorized URL served by `/preview/pdf` with an explicit PDF content type,
-`nosniff`, and inline disposition. Markdown comes back as **source text**: the
+plain-text and `.docx`, cell values for `.xlsx`, and for a PDF or an image a
+same-origin authorized URL served by `/preview/pdf` or `/preview/image`. Both
+byte routes re-validate before serving (pypdf for a PDF, the magic-byte sniff
+for a picture) and pin the content type they just checked, with `nosniff` and
+inline disposition — so bytes can never be interpreted as something else, and a
+file whose contents do not match its declared type is not served at all. Markdown comes back as **source text**: the
 server renders no HTML at all, and the client's existing escape-first renderer
 turns `<script>` in an uploaded file into visible characters. An unsupported
 type, a record that no longer validates, or a parse error becomes an
@@ -690,10 +693,18 @@ same genre of over-redaction as FIXED-02 and FIXED-07.
 every slash-separated segment is under the threshold; a credential embedded in a
 path is still its own over-length segment and still redacts.
 
-**Deliberately not done.** Images are still not previewable — the plan scopes
-the inspector to PDF/Markdown/XLSX/DOCX, and an image preview is a different
-control (zoom, dimensions) rather than a reading pane. They report
-`unsupported_for_preview` honestly instead of opening an empty box.
+**Images included.** The plan's goal names PDF/Markdown/XLSX/DOCX, but a chip
+is a chip whichever kind it names: an attached picture that opened nothing was
+the same defect. Images render in the pane, fitted to it, with a chequerboard
+behind transparency. The allowlist is raster-only (PNG/JPEG/WebP/GIF) — SVG is
+not an accepted upload, so no previewable image can carry script, and there is
+no server-side decode or re-encode anywhere in the path. Anything genuinely
+outside the previewable set still reports `unsupported_for_preview` honestly
+instead of opening an empty box.
+
+**Deliberately not done.** No zoom, rotate, or pan control on an image, and no
+"jump to the passage the model used" in a document. Both are features on top of
+this endpoint rather than parts of the defect.
 
 Covered by `tests/test_attachment_preview.py`,
 `tests/test_document_attachments.py`, `tests/test_over_broad_redaction.py`,

@@ -58,13 +58,14 @@ carry script.
    with each turn, so without it a reloaded conversation showed no chips at all
    and the inspector was unreachable for every past chat.
 
-**One defect fixed outside these files.** The response-redaction layer's
-high-entropy fallback treated the joined path in `pdf_url` as one opaque token
-and returned `[REDACTED_SECRET]`, so the viewer had nothing to point at.
-`raiker/context/redaction.py` now spares a run that starts `api/` *and* whose
-every slash-separated segment is under the entropy threshold — a key embedded in
-a path is still its own over-length segment and still redacts
-(`tests/test_over_broad_redaction.py`).
+**One defect fixed outside these files.** The response-redaction layer returned
+`pdf_url` as `[REDACTED_SECRET]`, so the viewer had nothing to point at. It was
+not about this feature: the high-entropy fallback was destroying every
+server-issued locator, including `events_path`, `checkpoint_path` and
+`root_subpath`. Redaction now takes the field's *key* as the signal — the same
+mechanism FIXED-02 used for token counts — and only locator-named fields get a
+fallback that spares slash-segmented runs. Written up as FIXED-11 in
+`docs/plans/TO_BE_FIXED.md`; covered by `tests/test_over_broad_redaction.py`.
 
 ---
 

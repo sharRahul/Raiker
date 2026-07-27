@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Ten are marked **FIXED** and were resolved on this
+and the proposed fix. Eleven are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -31,6 +31,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-08 | **Critical** | Approvals / file output | Fixed (was BUG-06) |
 | FIXED-09 | **Critical** | Build / Chat agent loop | Fixed (was GAP-BUILD B2) |
 | FIXED-10 | Medium | Chat / attachments | Fixed (was BUG-07) |
+| FIXED-11 | High | API redaction | Fixed (found while fixing BUG-07) |
 | BUG-08 | Medium | Export | Open (not specified) |
 | BUG-09 | Medium | Tasks | Open |
 | BUG-10 | Low | Chat / Tasks | Open |
@@ -685,13 +686,10 @@ Escape closes it and focus returns to the chip. Chips also survive a reload:
 conversation redraws them, which a transcript alone cannot do because it
 persists prompt text and not the files that rode with it.
 
-**One defect found on the way.** The response-redaction layer's high-entropy
-fallback saw the joined path in `pdf_url` as one opaque token and replaced it
-with `[REDACTED_SECRET]`, so the browser had no URL for its PDF viewer — the
-same genre of over-redaction as FIXED-02 and FIXED-07.
-`raiker/context/redaction.py` now spares a run that starts `api/` **and** whose
-every slash-separated segment is under the threshold; a credential embedded in a
-path is still its own over-length segment and still redacts.
+**One defect found on the way.** The response-redaction layer replaced
+`pdf_url` with `[REDACTED_SECRET]`, so the browser had no URL for its PDF
+viewer. That turned out not to be about this feature at all — see **FIXED-11**,
+which covers it and the three other locator fields it was silently destroying.
 
 **Images included.** The plan's goal names PDF/Markdown/XLSX/DOCX, but a chip
 is a chip whichever kind it names: an attached picture that opened nothing was
@@ -710,6 +708,66 @@ Covered by `tests/test_attachment_preview.py`,
 `tests/test_document_attachments.py`, `tests/test_over_broad_redaction.py`,
 `apps/web/src/lib/components/FileInspector.test.ts`, and the file-inspector
 cases in `apps/web/src/lib/views/ChatView.test.ts`.
+
+---
+
+## FIXED-11 — Redaction destroyed every server-issued path and URL
+
+**Status: fixed in this change.** Found while fixing BUG-07; not caused by it.
+
+**Observed.** The file inspector's PDF pane was blank. `GET
+…/attachments/{id}/preview` returned:
+
+> `"pdf_url": "/[REDACTED_SECRET]"`
+
+so the browser had nothing to point its viewer at. Chasing it showed the field
+was not special:
+
+| Field | What the client received |
+|---|---|
+| `pdf_url` | `/[REDACTED_SECRET]` |
+| `events_path` | `/home/user/.[REDACTED_SECRET].jsonl` |
+| `checkpoint_path` | `.[REDACTED_SECRET].json` |
+| `root_subpath` | `[REDACTED_SECRET]` |
+
+**Root cause.** `raiker/context/redaction.py` ends with a high-entropy fallback,
+`\b[A-Za-z0-9+/_\-]{40,}\b`, for long opaque strings. `/` is in that character
+class, so a path matches as *one token* purely because its segments were joined:
+`sessions/sess_…/attachments/att_…/preview/pdf` carries no 40-character run of
+entropy anywhere, but the whole thing is 100+ characters. Every locator the API
+emits was long enough to trip it. This is the third instance of the same family
+— FIXED-02 (token *counts* read as credentials) and FIXED-07 (prose read as
+credentials) — and it has the same shape: a rule that is right for opaque values
+applied to a value that is not opaque.
+
+**Fix applied.** The field's **key** decides, exactly as it does for token counts
+in FIXED-02: `raiker/api/redaction.py` marks values under `*_url`, `*_uri`,
+`*_path`, `*_subpath` (and their plurals) as locators, and only those are scanned
+with a fallback that spares a run whose *every* slash-separated segment is itself
+under the entropy threshold. Nothing else changes:
+
+* A credential embedded in a path is its own over-length segment and still
+  redacts (`…/f/AAAABBBB…44 chars` → `[REDACTED_SECRET]`).
+* Every specific shape — `sk-…`, `ghp_…`, `Bearer …`, `token=…`, PEM blocks,
+  emails — is matched *before* the fallback and applies to locators unchanged.
+* A key that names a credential still wins: `secret_url` is discarded whole.
+* Free-form text is untouched and keeps the strict scan. A path quoted inside an
+  assistant reply is still scanned as prose, because there the string is
+  untrusted model output rather than something the server issued.
+
+`assert_no_secrets_in_body` mirrors the same rule, so the guard still proves
+exactly what the middleware emits.
+
+**Why not a value-shape rule.** The first attempt spared any run starting
+`api/`. It fixed the one symptom and left `events_path`, `checkpoint_path` and
+`root_subpath` broken — and it relaxed the rule for *all* strings, including
+model output. Keying on the field name is both narrower (prose is unaffected)
+and complete (every locator field is covered). A purely shape-based rule was
+rejected outright: a base64 secret containing `/` would split into two
+under-threshold halves and slip through.
+
+Covered by `tests/test_over_broad_redaction.py::TestServerIssuedLocatorsSurvive`
+and verified over real HTTP through the full middleware stack.
 
 ---
 

@@ -54,6 +54,30 @@ function finalResponse(message: string): AgentResponse {
 }
 
 describe("ChatView streaming transcript", () => {
+  it("copies a response and offers Markdown and print exports after a turn", async () => {
+    stubFetch(MODELS_ROUTE);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const print = vi.fn();
+    vi.stubGlobal("print", print);
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("**Done**") } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "Make it so" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Copy response" }));
+    expect(writeText).toHaveBeenCalledWith("**Done**");
+    expect(screen.getByRole("button", { name: "Export as Markdown" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Print / Save as PDF" }));
+    expect(print).toHaveBeenCalledOnce();
+  });
+
   it("renders streamed lifecycle events and settles on the final response", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockImplementation(

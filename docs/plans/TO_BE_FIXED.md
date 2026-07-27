@@ -32,7 +32,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-09 | **Critical** | Build / Chat agent loop | Fixed (was GAP-BUILD B2) |
 | FIXED-10 | Medium | Chat / attachments | Fixed (was BUG-07) |
 | FIXED-11 | High | API redaction | Fixed (found while fixing BUG-07) |
-| BUG-08 | Medium | Export | Open (not specified) |
+| FIXED-12 | Medium | Export | Fixed (was BUG-08) |
 | BUG-09 | Medium | Tasks | Open |
 | BUG-10 | Low | Chat / Tasks | Open |
 | BUG-11 | Medium | Permissions | Open |
@@ -771,16 +771,33 @@ and verified over real HTTP through the full middleware stack.
 
 ---
 
-## BUG-08 — No export path at all (no PDF, no download, no print)
+## FIXED-12 — Chat export path *(was BUG-08)*
+
+**Status: fixed in this change.**
 
 **Observed.** Swept every `button`/`a` in the app for `pdf|export|download|save
 as|print`. The only match anywhere is Memory's JSON import/export. There is no
 way to get a chat, a document, or a generated artifact out of Raiker as a file.
 
-**Proposed fix.** Smallest useful version: a per-message "Copy" and a per-chat
-"Export as Markdown". "One-click Markdown → PDF" now needs only a print
-stylesheet — the rendering half is done (FIXED-06); browser print-to-PDF over
-the rendered transcript is the cheapest honest implementation.
+**Fix applied.** Every completed Raiker message has a **Copy response** action.
+Once a transcript exists, its chat-level toolbar offers **Export as Markdown**
+and **Print / Save as PDF**. Markdown export preserves prompt/response order and
+the response's original Markdown in a dated, local `.md` download. Print uses
+the browser's native print dialog (and therefore its Save as PDF destination)
+with navigation, composer, file inspector, and interactive controls removed by
+a print stylesheet. It makes no server request and exports no hidden governance
+metadata.
+
+The serializer and filename are covered by `apps/web/src/lib/chatExport.test.ts`;
+the rendered controls, clipboard payload, and print invocation are covered by
+`apps/web/src/lib/views/ChatView.test.ts`. A live Chromium run verified the
+downloaded file contents, clipboard text, print media layout, zero horizontal
+overflow, and zero console errors. The disposable live-test screenshot is not
+retained in the repository.
+
+**Scope kept honest.** This is chat transcript export, not an arbitrary artifact
+or attachment download system. The latter remains outside this smallest useful
+fix and must retain the existing session-authorized file boundary if added.
 
 ---
 
@@ -1126,9 +1143,9 @@ document should also be able to show *the passage it used*, and a file Raiker
 itself writes is not yet an inspectable chip — both build on the same preview
 endpoint.
 
-**C5. No export.** See BUG-08 — no download, print, or PDF anywhere. FIXED-06
-removed the blocker on the rendering side; a print stylesheet plus a per-chat
-"Export as Markdown" and a per-message copy is now a small change.
+**C5. Chat export — done.** FIXED-12 provides per-response copy, a per-chat
+Markdown download, and browser print/Save as PDF over the rendered transcript.
+Generated artifacts and attachments do not yet have a general download surface.
 
 **C6. No citations on tool-derived answers.** When an answer comes from an
 email, a calendar entry or an attached document, the transcript does not say

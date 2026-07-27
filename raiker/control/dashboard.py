@@ -38,7 +38,12 @@ from raiker.security.monitoring import SecurityMonitor
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
 from raiker.tasks.scheduler import RECURRING_INTERVALS
-from raiker.tools.filesystem import FilesystemSafetyError, proposed_write_snapshot
+from raiker.tools.filesystem import (
+    FilesystemSafetyError,
+    proposed_edit_snapshot,
+    proposed_patch_snapshot,
+    proposed_write_snapshot,
+)
 
 # Capability states that mean the gate is off / fail-closed.
 _DISABLED_STATES = {"disabled", "planned"}
@@ -849,7 +854,7 @@ class DashboardService:
             raise ValueError("brain_source_outside_workspace")
         if not path.exists():
             raise ValueError("brain_source_not_found")
-        return str(path.relative_to(root)), path
+        return path.relative_to(root).as_posix(), path
 
     def add_brain_source(self, raw_path: str, *, owner_principal_id: str) -> dict[str, Any]:
         relative_path, _path = self._workspace_source(raw_path)
@@ -3302,7 +3307,7 @@ class DashboardService:
         self, tool_name: str, args: dict[str, Any]
     ) -> tuple[str | None, str | None, str]:
         """Return (diff, path, preview_kind). File mutations get a unified diff; never executes."""
-        if tool_name in {"write_file", "edit_file"}:
+        if tool_name == "write_file":
             try:
                 snapshot = proposed_write_snapshot(
                     self.workspace_root,
@@ -3323,9 +3328,53 @@ class DashboardService:
                 )
             )
             return diff, path, "file_diff"
+        if tool_name == "edit_file":
+            try:
+                snapshot = proposed_edit_snapshot(
+                    self.workspace_root,
+                    str(args.get("path", ".")),
+                    str(args.get("old_text", "")),
+                    str(args.get("new_text", "")),
+                )
+            except FilesystemSafetyError:
+                return None, str(args.get("path", "")), "arguments"
+            if snapshot["status"] == "failed":
+                return None, str(args.get("path", "")), "arguments"
+            before = snapshot.get("before_snapshot") or ""
+            after = str(snapshot.get("proposed_text", ""))
+            path = str(snapshot.get("path", args.get("path", "")))
+            diff = "".join(
+                difflib.unified_diff(
+                    redact_secret_like_text(before).splitlines(keepends=True),
+                    redact_secret_like_text(after).splitlines(keepends=True),
+                    fromfile=f"a/{path}",
+                    tofile=f"b/{path}",
+                )
+            )
+            return diff, path, "file_diff"
         if tool_name == "apply_patch":
-            patch = redact_secret_like_text(str(args.get("patch", "")))
-            return patch, str(args.get("path", "")) or None, "patch"
+            try:
+                snapshot = proposed_patch_snapshot(
+                    self.workspace_root,
+                    str(args.get("path", ".")),
+                    str(args.get("patch", "")),
+                )
+            except FilesystemSafetyError:
+                return None, str(args.get("path", "")), "arguments"
+            if snapshot["status"] == "failed":
+                return None, str(args.get("path", "")), "arguments"
+            before = snapshot.get("before_snapshot") or ""
+            after = str(snapshot.get("proposed_text", ""))
+            path = str(snapshot.get("path", args.get("path", "")))
+            diff = "".join(
+                difflib.unified_diff(
+                    redact_secret_like_text(before).splitlines(keepends=True),
+                    redact_secret_like_text(after).splitlines(keepends=True),
+                    fromfile=f"a/{path}",
+                    tofile=f"b/{path}",
+                )
+            )
+            return diff, path, "file_diff"
         return None, None, "arguments"
 
     @staticmethod

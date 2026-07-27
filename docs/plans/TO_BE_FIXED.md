@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Seventeen are marked **FIXED** and were resolved on this
+and the proposed fix. Twenty-five are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -43,8 +43,11 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-20 | High | Chat / Build file retention | Fixed (found while fixing BUG-14) |
 | FIXED-21 | Low | CI quality gates | Fixed (found while verifying BUG-14) |
 | FIXED-22 | Low | Chat / Build file retention | Fixed (found while fixing BUG-14) |
+| FIXED-23 | High | Build / patch application | Fixed (was GAP-BUILD B3) |
+| FIXED-24 | Low | Documentation / known limits | Fixed (found while verifying FIXED-23) |
+| FIXED-25 | Low | Build / cross-platform paths | Fixed (found while verifying FIXED-23) |
 | BUG-14 | Low | Chat / cost presentation tests | Fixed (found while fixing BUG-13) |
-| GAP-BUILD | — | Build — coding-agent parity | Analysis (20 items) |
+| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B3 closed; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (18 items) |
 
 ---
@@ -1192,6 +1195,88 @@ the runner's locale.
 
 ---
 
+## FIXED-23 — Build's edit and patch tools overwrote whole files *(was GAP-BUILD B3)*
+
+**Status: fixed in this change.**
+
+**Observed.** `edit_file` forwarded its replacement text to a whole-file writer,
+and `apply_patch` accepted a `patch` proposal but the executor wrote a separate
+`new_text` field over the complete target. A one-line Build change therefore
+required reproducing the full file; an old or ambiguous target could silently
+delete unrelated content.
+
+**Root cause.** The proposal, preview, and execution contracts had drifted:
+the model validator and broker spoke in terms of a patch, while the executor
+implemented overwrite semantics. No shared candidate calculation connected the
+owner-reviewed diff to the bytes written at approval time.
+
+**Fix applied.** `raiker/tools/filesystem.py` now calculates each candidate
+before mutation. `edit_file` requires `{path, old_text, new_text}` and replaces
+only one exact match. `apply_patch` requires `{path, patch}` and parses one
+unified diff for the named workspace-relative text file. Every hunk's context
+and removed lines must match exactly once in the accumulating candidate; a
+missing or ambiguous match returns `hunk_context_mismatch` or
+`hunk_context_not_unique` plus `rejected_hunks`, with no write. All hunks must
+match before the file changes.
+
+The broker, approval detail, and executor use those same candidate helpers, so
+the detail renders the calculated diff the approval will execute. The existing
+writable-workspace guard, `.raiker` / `.git` refusal, re-governance, audit, and
+pre-image checkpoint all remain in force.
+
+**Verified.** `tests/test_filesystem_tools.py` covers one exact replacement,
+zero/multiple-match refusal, matching and ambiguous hunk contexts, and a second
+failed hunk leaving the first hunk unapplied. The broker, approval API, and
+relay suites cover the new tool contracts, calculated preview, and both
+approved execution paths. Live Chromium verification on 2026-07-27 reviewed
+and approved an exact edit (`old` → `edited`) then a unified patch
+(`edited` → `patched`) on the same file. Each approval displayed the calculated
+diff and **Approve and execute once**, reported a checkpointed execution, and
+wrote only the intended line. Browser console: 0 errors. Evidence:
+`screenshots/working/98-FIXED-23-b3-edit-ready.png` through
+`101-FIXED-23-b3-patch-executed.png`.
+
+**Deliberate remaining scope.** Patches remain single-file and existing-file
+only. Fuzzy context-offset matching, empty-context insertion hunks, file
+create/delete headers, multi-file diffs, and no-newline markers are rejected;
+they are not silently approximated or partially applied.
+
+---
+
+## FIXED-24 — README known limits described already-shipped behaviour as missing
+
+**Status: fixed in this change.**
+
+**Observed.** During B3 verification, `README.md` still said Markdown rendering,
+agent-reachable MCP tools, and the view-only file inspector were unshipped,
+although FIXED-06, FIXED-10, FIXED-17, and the live manual plan document each
+proved otherwise.
+
+**Fix applied.** The known-limits list now names only current limitations,
+including B3's intentionally strict patch scope. Documentation no longer sends
+an owner away from behaviour the running product already provides.
+
+---
+
+## FIXED-25 — Local repository references used host-native separators
+
+**Status: fixed in this change.**
+
+**Observed.** On Windows, connecting `projects/my-app` through Build returned
+and stored `projects\\my-app`, although the API contract and all browser-facing
+workspace coordinates use slash-delimited paths. The full Python suite exposed
+this through `tests/test_build_workspace.py`.
+
+**Root cause.** `DashboardService._workspace_source` converted a relative
+`Path` with `str(...)`, which serialises using the host platform's separator.
+
+**Fix applied.** The workspace boundary now uses `Path.as_posix()` before the
+value enters repository records, audit events, or API responses. Filesystem
+resolution remains native-path safe; only the public, persisted coordinate is
+normalised.
+
+---
+
 ## GAP-BUILD — What Build needs to stand against a class-leading coding agent
 
 **Status: analysis, not a defect.** Nothing below is broken; this is the
@@ -1210,9 +1295,10 @@ refused by the policy engine). The governance, audit and checkpoint story is
 
 The gap is that **Build cannot close a loop.** Everything below follows from
 that, and the order is the order they should be done in — each tier is worthless
-without the one above it. B1 (FIXED-08) and B2 (FIXED-09) have since been closed:
+without the one above it. B1 (FIXED-08), B2 (FIXED-09), and B3 (FIXED-23) have
+since been closed:
 an approved file change is really written, and the turn continues through the
-approval instead of ending at it. B3 is what now costs the most.
+approval instead of ending at it; Build can now make a narrow, hunk-level edit.
 
 ### Tier 0 — the blocking three (without these, nothing else matters)
 
@@ -1233,15 +1319,19 @@ parks its working state against the approval and picks the same turn up on
 resolution, with the real result (or an honest refusal) appended as the tool
 result. Build no longer stops dead at its first write.
 
-**B3. Real patch application.** `edit_file_content` is literally
-`return write_file_content(...)`, and `apply_patch_content` writes `new_text`
-over the whole file (`raiker/tools/filesystem.py`). Despite the names, there is
-no hunk-level editing: the model must reproduce an entire file to change one
-line, which is slow, expensive, and the dominant source of accidental deletion
-in long files. **Work:** a `str_replace`-style tool (old string + new string +
-uniqueness check, failing closed on an ambiguous match) and a true unified-diff
-applier with context matching and a rejected-hunk report. Both are already
-covered by the existing approval preview, which renders a diff.
+**B3. Real patch application.** Done — see FIXED-23. `edit_file` now replaces
+`old_text` only when it occurs exactly once, and `apply_patch` calculates a
+one-file unified-diff candidate from exact hunk context before the approval is
+displayed or an execution is allowed. A missing, ambiguous, or stale match
+fails closed with a machine-readable error; rejected patch hunks are named and
+no partial candidate is written.
+
+**Deliberate remaining scope.** This is strict context anchoring, not fuzzy
+patching: no multi-file or create/delete patches, no context-offset guessing,
+no empty-context insertion hunk, and no `\\ No newline at end of file` marker.
+Those inputs are rejected rather than guessed. They are not needed for B3's
+safe hunk-level editing goal; a later expansion must keep the same all-or-
+nothing and approval-preview invariants.
 
 ### Tier 1 — loop mechanics
 
@@ -1364,10 +1454,10 @@ autonomous without the host as the blast radius.
 
 ### Suggested order
 
-B1 → B2 → B3 make Build an agent. **B1 (FIXED-08) and B2 (FIXED-09) have both
-landed**, so an approved change is really made and the turn continues through it;
-**B3 is now the blocking item** — until hunk-level editing exists, every change
-costs a whole-file rewrite. B4–B6 make it efficient. B13–B16 make the result
+B1 → B2 → B3 make Build an agent. **All three are now landed**: an approved
+change is really made, the turn continues through it, and B3 uses strict,
+hunk-level editing instead of a whole-file rewrite. B4–B6 make the loop
+efficient. B13–B16 make the result
 reviewable. Everything else is depth. B20 is a *policy* decision before it is an
 engineering one and belongs to the owner, not to an implementer.
 

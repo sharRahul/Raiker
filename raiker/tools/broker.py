@@ -28,6 +28,8 @@ from raiker.tools.filesystem import (
     FilesystemSafetyError,
     diff_files,
     list_directory,
+    proposed_edit_snapshot,
+    proposed_patch_snapshot,
     proposed_write_snapshot,
     read_file,
     stat_path,
@@ -147,14 +149,15 @@ class ToolBroker:
             "write_file": lambda args: proposed_write_snapshot(
                 self.workspace_root, str(args.get("path", ".")), str(args.get("text", ""))
             ),
-            "edit_file": lambda args: proposed_write_snapshot(
-                self.workspace_root, str(args.get("path", ".")), str(args.get("text", ""))
+            "edit_file": lambda args: proposed_edit_snapshot(
+                self.workspace_root,
+                str(args.get("path", ".")),
+                str(args.get("old_text", "")),
+                str(args.get("new_text", "")),
             ),
-            "apply_patch": lambda args: {
-                "status": "proposal",
-                "patch": str(args.get("patch", "")),
-                "requires_approval": True,
-            },
+            "apply_patch": lambda args: proposed_patch_snapshot(
+                self.workspace_root, str(args.get("path", ".")), str(args.get("patch", ""))
+            ),
             "memory_search": lambda args: memory_search(
                 self.workspace_root,
                 str(args.get("query", "")),
@@ -369,7 +372,7 @@ class ToolBroker:
             )
 
     def _approval_preview(self, action: ToolAction) -> dict[str, Any] | None:
-        if action.tool_name in {"write_file", "edit_file"}:
+        if action.tool_name == "write_file":
             try:
                 return proposed_write_snapshot(
                     self.workspace_root,
@@ -378,12 +381,25 @@ class ToolBroker:
                 )
             except FilesystemSafetyError as exc:
                 return {"status": "failed", "error": {"type": str(exc)}}
+        if action.tool_name == "edit_file":
+            try:
+                return proposed_edit_snapshot(
+                    self.workspace_root,
+                    str(action.arguments.get("path", ".")),
+                    str(action.arguments.get("old_text", "")),
+                    str(action.arguments.get("new_text", "")),
+                )
+            except FilesystemSafetyError as exc:
+                return {"status": "failed", "error": {"type": str(exc)}}
         if action.tool_name == "apply_patch":
-            return {
-                "status": "proposal",
-                "patch": str(action.arguments.get("patch", "")),
-                "requires_approval": True,
-            }
+            try:
+                return proposed_patch_snapshot(
+                    self.workspace_root,
+                    str(action.arguments.get("path", ".")),
+                    str(action.arguments.get("patch", "")),
+                )
+            except FilesystemSafetyError as exc:
+                return {"status": "failed", "error": {"type": str(exc)}}
         return None
 
     def _expected_effect(self, action: ToolAction, connector_write: bool) -> str:

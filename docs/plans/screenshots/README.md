@@ -3,7 +3,8 @@
 Browser screenshots captured while executing
 [the live manual test plan](../RAIKER_LIVE_MANUAL_TEST_PLAN.md) on
 **2026-07-26** against a running `raiker-web` (Chromium, hosted Anthropic
-`claude-haiku-4-5-20251001`).
+`claude-haiku-4-5-20251001`), plus the focused B3 approval run on **2026-07-27**
+against a disposable local workspace.
 
 One exception, marked where it appears:
 `working/83-FIXED-06-chat-markdown-rendered.png` is a Chromium render of the
@@ -43,6 +44,7 @@ turn — it was captured in an environment with no provider credential.
 | `72`–`77` | Attachments and project creation |
 | `80`–`83` | Verified fixes from the first round |
 | `90`–`93` | Context and API-cost panel in Chat and Build; Models provider count and spend bars |
+| `98`–`101` | FIXED-23: reviewed and executed exact edit plus unified patch |
 
 No screenshot contains a credential: keys were entered into `type="password"`
 fields and the response-redaction layer never returns a stored value.

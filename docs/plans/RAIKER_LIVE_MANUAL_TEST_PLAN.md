@@ -224,12 +224,21 @@ Unsupported files are not exposed as generic workspace downloads. FIXED-19.
 | 6.1 | Ask Chat to `write_file` a report | Reply "Your approval is needed to continue" + Review approval link | ✅ `30-` |
 | 6.2 | Approvals → Pending | Row: Write file / File writes / high / pending | ✅ `31-` |
 | 6.3 | **Review** | Detail with the proposed unified diff, capability, risk, session link, expiry | ✅ `32-` |
-| 6.4 | **Approve (record only)** | "Recorded: approved. The action was NOT executed (metadata-only)." `executes_action: false` | ✅ `33-` |
-| 6.5 | Check the filesystem | `report.md` **does not exist** | ✅ matches the documented model |
-| 6.6 | Filters Pending / Approved / Denied, sort by risk / recency | All work | ✅ |
+| 6.4 | **Approve and execute once** with relay and target gates enabled | Execution result names the file; the pre-image is checkpointed | ✅ FIXED-08 |
+| 6.5 | Check the filesystem | `report.md` exists with the reviewed contents | ✅ FIXED-08 |
+| 6.6 | Filters Pending / Approved / Executed / Denied, sort by risk / recency | All work | ✅ FIXED-08 |
+| 6.7 | Review and approve a unique `edit_file`, then an `apply_patch` unified diff | Each detail shows the calculated diff; each action changes only its matched line | ✅ FIXED-23 (`98`–`101`) |
 
-Metadata-only resolution is the documented safety model, but it means the app
-cannot currently produce a file on disk from Chat. See BUG-06.
+`edit_file` fails closed when `old_text` is absent or repeated. `apply_patch`
+fails closed on malformed, mismatched, or ambiguous hunk context and reports
+the rejected hunk without partially writing the file. Its current scope is one
+existing text file per action; multi-file/create/delete/fuzzy patches are not
+accepted.
+
+Metadata-only resolution remains the safety model for shell, network, process,
+and every non-file capability. Approved local file mutations are the deliberate
+exception: they execute once through the governed relay, with a fresh gate,
+policy, posture, and checkpoint check. See FIXED-08 and FIXED-23.
 
 ---
 

@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import pytest
+
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import ClientMetadata, ToolAction
 from raiker.events.writer import EventLogWriter
 from raiker.models.contracts import ToolCallProposal
-from raiker.models.tool_call_validation import default_tool_specs, validate_tool_call
+from raiker.models.tool_call_validation import (
+    ToolCallRejected,
+    default_tool_specs,
+    validate_tool_call,
+)
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
@@ -151,3 +157,38 @@ def test_a_write_into_the_governance_directory_fails_instead_of_being_proposed(t
     preview = result.output["proposal_preview"]  # type: ignore[index]
     assert preview == {"status": "failed", "error": {"type": "protected_workspace_path"}}
     assert not (tmp_path / ".raiker" / "hooks.json").exists()
+
+
+def test_edit_file_requires_exact_old_text_and_previews_its_candidate(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    (tmp_path / "note.txt").write_text("old\n", encoding="utf-8")
+    broker = _broker(tmp_path)
+
+    action = validate_tool_call(
+        ToolCallProposal(
+            call_id="call_edit",
+            tool_name="edit_file",
+            arguments={"path": "note.txt", "old_text": "old\n", "new_text": "new\n"},
+        )
+    )
+    result, decision = broker.execute(
+        action,
+        session_id=new_id("sess_"),
+        turn_id=new_id("turn_"),
+    )
+
+    assert decision.decision == "needs_approval"
+    preview = result.output["proposal_preview"]  # type: ignore[index]
+    assert preview["before_snapshot"] == "old\n"
+    assert preview["proposed_text"] == "new\n"
+    assert (tmp_path / "note.txt").read_text(encoding="utf-8") == "old\n"
+
+
+def test_edit_file_validation_requires_old_text() -> None:
+    with pytest.raises(ToolCallRejected, match="missing_argument:old_text"):
+        validate_tool_call(
+            ToolCallProposal(
+                call_id="call_missing_old",
+                tool_name="edit_file",
+                arguments={"path": "note.txt", "new_text": "new\n"},
+            )
+        )

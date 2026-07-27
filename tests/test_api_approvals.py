@@ -91,6 +91,24 @@ class TestApprovalsRead:
         assert body["executes_on_approval"] is True
         assert "performs the change" in body["metadata_only_notice"]
 
+    def test_patch_detail_shows_the_calculated_file_diff(self, workspace: Path, client: TestClient) -> None:
+        (workspace / "notes.txt").write_text("old\n", encoding="utf-8")
+        _pending_approval(
+            workspace,
+            tool_name="apply_patch",
+            arguments={
+                "path": "notes.txt",
+                "patch": "--- a/notes.txt\n+++ b/notes.txt\n@@ -1 +1 @@\n-old\n+new\n",
+            },
+        )
+        token = _token(client)
+
+        body = client.get("/api/approvals/appr_1", headers=_headers(token)).json()
+
+        assert body["preview_kind"] == "file_diff"
+        assert "-old" in body["diff"]
+        assert "+new" in body["diff"]
+
     def test_detail_says_metadata_only_when_the_capability_cannot_execute(
         self, workspace: Path, client: TestClient
     ) -> None:

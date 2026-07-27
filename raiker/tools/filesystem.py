@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import re
 from pathlib import Path
 from typing import Any
 
@@ -232,16 +233,194 @@ def write_file_content(workspace_root: str | Path, path: str | Path, text: str) 
     }
 
 
-def edit_file_content(workspace_root: str | Path, path: str | Path, text: str) -> dict[str, Any]:
-    return write_file_content(workspace_root, path, text)
+def _failure(error_type: str, **details: Any) -> dict[str, Any]:
+    rejected_hunks = details.pop("rejected_hunks", None)
+    result: dict[str, Any] = {
+        "status": "failed",
+        "error": {"type": error_type, **details},
+    }
+    if rejected_hunks is not None:
+        result["rejected_hunks"] = rejected_hunks
+    return result
 
 
-def apply_patch_content(workspace_root: str | Path, path: str | Path, new_text: str) -> dict[str, Any]:
+def _existing_text_target(
+    workspace_root: str | Path, path: str | Path
+) -> tuple[Path, str] | dict[str, Any]:
     resolved = resolve_writable_workspace_path(workspace_root, path)
-    resolved.parent.mkdir(parents=True, exist_ok=True)
-    resolved.write_text(new_text, encoding="utf-8")
+    if not resolved.exists() or not resolved.is_file():
+        return _failure("not_found")
+    if not is_text_file(resolved):
+        return _failure("binary_file")
+    try:
+        return resolved, resolved.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return _failure("binary_file")
+    except OSError as exc:
+        return _failure("read_failed", message=str(exc))
+
+
+def _relative_path(workspace_root: str | Path, resolved: Path) -> str:
+    return str(resolved.relative_to(Path(workspace_root).resolve()))
+
+
+def _unique_match(text: str, old_text: str) -> int | dict[str, Any]:
+    if not old_text:
+        return _failure("old_text_empty")
+    first = text.find(old_text)
+    if first < 0:
+        return _failure("old_text_not_found")
+    if text.find(old_text, first + 1) >= 0:
+        return _failure("old_text_not_unique")
+    return first
+
+
+def _replace_candidate(
+    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str
+) -> tuple[Path, str, str] | dict[str, Any]:
+    target = _existing_text_target(workspace_root, path)
+    if isinstance(target, dict):
+        return target
+    resolved, before = target
+    match = _unique_match(before, old_text)
+    if isinstance(match, dict):
+        return match
+    return resolved, before, before[:match] + new_text + before[match + len(old_text):]
+
+
+_HUNK_HEADER = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$")
+
+
+def _normalized_patch_path(value: str) -> str:
+    path = value.split("\t", 1)[0].strip().replace("\\", "/")
+    if path.startswith(("a/", "b/")):
+        return path[2:]
+    return path
+
+
+def _parse_unified_patch(patch: str, expected_path: str) -> list[tuple[list[str], list[str]]] | dict[str, Any]:
+    lines = patch.splitlines(keepends=True)
+    if len(lines) < 3 or not lines[0].startswith("--- ") or not lines[1].startswith("+++ "):
+        return _failure("malformed_patch", message="expected unified diff file headers")
+    old_path = _normalized_patch_path(lines[0][4:])
+    new_path = _normalized_patch_path(lines[1][4:])
+    if old_path != expected_path or new_path != expected_path:
+        return _failure("patch_path_mismatch", old_path=old_path, new_path=new_path)
+
+    hunks: list[tuple[list[str], list[str]]] = []
+    index = 2
+    while index < len(lines):
+        header = lines[index].rstrip("\r\n")
+        match = _HUNK_HEADER.match(header)
+        if match is None:
+            return _failure("malformed_patch", message=f"invalid hunk header at line {index + 1}")
+        old_count = int(match.group(2) or "1")
+        new_count = int(match.group(4) or "1")
+        index += 1
+        old_lines: list[str] = []
+        new_lines: list[str] = []
+        while index < len(lines) and not lines[index].startswith("@@ "):
+            line = lines[index]
+            if line.startswith(("--- ", "+++ ")):
+                return _failure("malformed_patch", message="multiple file targets are not supported")
+            if not line or line[0] not in {" ", "+", "-"}:
+                return _failure("malformed_patch", message=f"invalid hunk line at line {index + 1}")
+            if line[0] in {" ", "-"}:
+                old_lines.append(line[1:])
+            if line[0] in {" ", "+"}:
+                new_lines.append(line[1:])
+            index += 1
+        if len(old_lines) != old_count or len(new_lines) != new_count or not old_lines:
+            return _failure("malformed_patch", message="invalid hunk line counts or empty context")
+        hunks.append((old_lines, new_lines))
+    return hunks or _failure("malformed_patch", message="patch contains no hunks")
+
+
+def _matching_starts(lines: list[str], needle: list[str]) -> list[int]:
+    width = len(needle)
+    return [index for index in range(len(lines) - width + 1) if lines[index:index + width] == needle]
+
+
+def _patch_candidate(
+    workspace_root: str | Path, path: str | Path, patch: str
+) -> tuple[Path, str, str] | dict[str, Any]:
+    target = _existing_text_target(workspace_root, path)
+    if isinstance(target, dict):
+        return target
+    resolved, before = target
+    expected_path = _relative_path(workspace_root, resolved).replace("\\", "/")
+    hunks = _parse_unified_patch(patch, expected_path)
+    if isinstance(hunks, dict):
+        return hunks
+
+    candidate = before.splitlines(keepends=True)
+    for hunk_number, (old_lines, new_lines) in enumerate(hunks, start=1):
+        starts = _matching_starts(candidate, old_lines)
+        if not starts:
+            return _failure("hunk_context_mismatch", rejected_hunks=[hunk_number])
+        if len(starts) > 1:
+            return _failure("hunk_context_not_unique", rejected_hunks=[hunk_number])
+        start = starts[0]
+        candidate[start:start + len(old_lines)] = new_lines
+    return resolved, before, "".join(candidate)
+
+
+def _proposal_from_candidate(
+    workspace_root: str | Path, candidate: tuple[Path, str, str] | dict[str, Any]
+) -> dict[str, Any]:
+    if isinstance(candidate, dict):
+        return candidate
+    resolved, before, proposed_text = candidate
+    return {
+        "status": "proposal",
+        "path": _relative_path(workspace_root, resolved),
+        "before_snapshot": before,
+        "proposed_text": proposed_text,
+        "requires_approval": True,
+    }
+
+
+def proposed_edit_snapshot(
+    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str
+) -> dict[str, Any]:
+    return _proposal_from_candidate(
+        workspace_root, _replace_candidate(workspace_root, path, old_text, new_text)
+    )
+
+
+def proposed_patch_snapshot(
+    workspace_root: str | Path, path: str | Path, patch: str
+) -> dict[str, Any]:
+    return _proposal_from_candidate(workspace_root, _patch_candidate(workspace_root, path, patch))
+
+
+def _write_candidate(
+    workspace_root: str | Path, candidate: tuple[Path, str, str] | dict[str, Any]
+) -> dict[str, Any]:
+    if isinstance(candidate, dict):
+        return candidate
+    resolved, _before, proposed_text = candidate
+    resolved.write_text(proposed_text, encoding="utf-8")
     return {
         "status": "success",
-        "path": str(resolved.relative_to(Path(workspace_root).resolve())),
+        "path": _relative_path(workspace_root, resolved),
         "size_bytes": resolved.stat().st_size,
     }
+
+
+def replace_text_content(
+    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str
+) -> dict[str, Any]:
+    return _write_candidate(
+        workspace_root, _replace_candidate(workspace_root, path, old_text, new_text)
+    )
+
+
+def edit_file_content(
+    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str
+) -> dict[str, Any]:
+    return replace_text_content(workspace_root, path, old_text, new_text)
+
+
+def apply_patch_content(workspace_root: str | Path, path: str | Path, patch: str) -> dict[str, Any]:
+    return _write_candidate(workspace_root, _patch_candidate(workspace_root, path, patch))

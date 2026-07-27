@@ -262,7 +262,10 @@ def test_relay_dispatches_apply_patch(tmp_path: Path) -> None:
         approval_id="appr_1",
         action_id="act_1",
         tool_name="apply_patch",
-        arguments={"path": "poem.txt", "new_text": "roses are red\n"},
+        arguments={
+            "path": "poem.txt",
+            "patch": "--- a/poem.txt\n+++ b/poem.txt\n@@ -1 +1 @@\n-roses\n+roses are red\n",
+        },
     )
 
     relay = ApprovalExecutionRelay(ws, store)

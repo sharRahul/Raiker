@@ -148,7 +148,9 @@ def test_capture_via_apply_patch(tmp_path: Path) -> None:
             path="poem.txt",
             text="",
             action_type="apply_patch",
-            extra={"new_text": "roses are red\n"},
+            extra={
+                "patch": "--- a/poem.txt\n+++ b/poem.txt\n@@ -1 +1 @@\n-roses\n+roses are red\n"
+            },
         ),
         _human(store),
     )

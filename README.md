@@ -122,12 +122,8 @@ plus drawer to 1023 px, and the full sidebar at 1024 px and above.
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-07-26:
+Raiker's documentation does not run ahead of its code. As of 2026-07-27:
 
-- **Markdown is not rendered in Chat**, and there is no export, download, or PDF
-  control anywhere.
-- **MCP servers cannot be used by the agent** — create, connect, and monitor all
-  work; their tools are not offered to the model in Chat.
 - **Approved shell, network, and process actions still do not run** — approval
   resolution executes file changes only. This is deliberate, not an oversight:
   a file write is local, checkpointed, and reversible, and the other three are
@@ -135,8 +131,11 @@ Raiker's documentation does not run ahead of its code. As of 2026-07-26:
   "approved, but not executed" result the agent can react to.
 - **A model proposing several tool calls at once gets one of them.** The
   orchestrator takes the first and drops the rest without telling the model.
-- Automatic context compaction at 90 %, weekly quota display, and the view-only
-  file inspector are specified but not shipped.
+- **Build patching is intentionally strict.** Exact edits require exactly one
+  `old_text` match; unified patches are one existing text file, all hunks must
+  match, and multi-file/create-delete/fuzzy/partial patches are rejected.
+- Automatic context compaction at 90 % and weekly quota display are specified
+  but not shipped. The view-only file inspector is shipped.
 - **Shipped list prices are unverified defaults.** `config/model-profiles.json`
   seeds prices only for the models whose published rate is recorded there, each
   stamped with an `as_of` date. Check them against your provider's current

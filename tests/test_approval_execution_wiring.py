@@ -146,13 +146,32 @@ class TestApprovedWriteExecutes:
         _pending(
             workspace,
             tool_name="apply_patch",
-            arguments={"path": "src.txt", "new_text": "new\n"},
+            arguments={
+                "path": "src.txt",
+                "patch": "--- a/src.txt\n+++ b/src.txt\n@@ -1 +1 @@\n-old\n+new\n",
+            },
         )
         resp = _resolve(client, headers, "appr_1")
 
         assert resp.status_code == 200, resp.text
         assert resp.json()["execution"]["capability"] == "patch_apply_execution"
         assert (workspace / "src.txt").read_text(encoding="utf-8") == "new\n"
+
+    def test_edit_file_replaces_only_the_approved_unique_text(
+        self, workspace: Path, client: TestClient, headers: dict[str, str]
+    ) -> None:
+        (workspace / "src.txt").write_text("before\nold\nafter\n", encoding="utf-8")
+        _pending(
+            workspace,
+            tool_name="edit_file",
+            arguments={"path": "src.txt", "old_text": "old\n", "new_text": "new\n"},
+        )
+
+        resp = _resolve(client, headers, "appr_1")
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["execution"]["capability"] == "file_write_execution"
+        assert (workspace / "src.txt").read_text(encoding="utf-8") == "before\nnew\nafter\n"
 
     def test_the_previous_contents_are_checkpointed_before_the_overwrite(
         self, workspace: Path, client: TestClient, headers: dict[str, str]

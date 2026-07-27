@@ -69,8 +69,8 @@ _REQUIRED_ARGS: dict[str, tuple[str, ...]] = {
     "git_diff": (),
     "git_log": (),
     "write_file": ("path", "text"),
-    "edit_file": ("path", "text"),
-    "apply_patch": ("patch",),
+    "edit_file": ("path", "old_text", "new_text"),
+    "apply_patch": ("path", "patch"),
     "shell": ("command",),
     "consult_advisor": ("question",),
     "github_read": ("resource", "repo", "number"),
@@ -96,8 +96,8 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
     "git_diff": "Show git diff for the workspace.",
     "git_log": "Show recent git log entries.",
     "write_file": "Propose writing a file (approval required).",
-    "edit_file": "Propose editing a file (approval required).",
-    "apply_patch": "Propose applying a patch (approval required).",
+    "edit_file": "Propose one exact, unique text replacement in a file (approval required).",
+    "apply_patch": "Propose applying one context-anchored unified diff to a file (approval required).",
     "shell": "Propose running a shell command (approval required).",
     "consult_advisor": (
         "Ask the owner-configured advisor model one question. Only available when the "

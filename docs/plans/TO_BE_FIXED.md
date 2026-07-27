@@ -47,7 +47,8 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-24 | Low | Documentation / known limits | Fixed (found while verifying FIXED-23) |
 | FIXED-25 | Low | Build / cross-platform paths | Fixed (found while verifying FIXED-23) |
 | BUG-14 | Low | Chat / cost presentation tests | Fixed (found while fixing BUG-13) |
-| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B3 closed; 17 items remain) |
+| BUG-15 | Low | CI / action runtime | Open (found while verifying FIXED-23) |
+| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B3 closed; 18 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (18 items) |
 
 ---
@@ -1274,6 +1275,21 @@ this through `tests/test_build_workspace.py`.
 value enters repository records, audit events, or API responses. Filesystem
 resolution remains native-path safe; only the public, persisted coordinate is
 normalised.
+
+---
+
+## BUG-15 — GitHub Actions still declare the deprecated Node 20 runtime
+
+**Status: open.**
+
+**Observed.** The successful GitHub CI run for FIXED-23 reported that
+`actions/checkout@v4` and `actions/setup-python@v5` target Node 20, which
+GitHub now forces to Node 24. The workflow passed, but future runner behaviour
+is relying on a compatibility override rather than its declared runtime.
+
+**Needed.** Review the repository action pins and update them to versions whose
+declared Node runtime is supported by GitHub Actions. Re-run CI and retain the
+workflow evidence after the warning is gone.
 
 ---
 

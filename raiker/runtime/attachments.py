@@ -7,14 +7,17 @@ Uploaded bytes are untrusted data. Everything here fails closed:
   media type. Stored content is delivered to a model exclusively as an image
   block on a vision-capable profile; the bytes never enter text context or event
   payloads.
-* **Documents** (plain text / markdown / csv, PDF, and Word .docx) are stored
-  only when their media type is on the document allowlist, their size is under
-  the cap, and their bytes pass a type-specific sniff — clean UTF-8 (no NUL) for
-  text, a ``%PDF-`` header that pypdf can parse and is not encrypted for PDF, a
-  well-formed OOXML zip for .docx. Extraction is local-only (a decode for text,
-  pypdf for PDF, stdlib zip+XML for .docx); no document bytes ever leave the
-  box. The bounded extracted text becomes an ``untrusted_external`` context item
-  during a later prompt turn; it is data, never instructions.
+* **Documents** (plain text / markdown / csv, PDF, Word .docx and Excel .xlsx)
+  are stored only when their media type is on the document allowlist, their size
+  is under the cap, and their bytes pass a type-specific sniff — clean UTF-8 (no
+  NUL) for text, a ``%PDF-`` header that pypdf can parse and is not encrypted
+  for PDF, a well-formed OOXML zip for .docx/.xlsx. Extraction is local-only (a
+  decode for text, pypdf for PDF, stdlib zip+XML for the Office formats); no
+  document bytes ever leave the box, and nothing in a document is executed — an
+  .xlsx yields its cached cell values, never an evaluated formula, and the
+  macro-enabled package types are off the allowlist entirely. The bounded
+  extracted text becomes an ``untrusted_external`` context item during a later
+  prompt turn; it is data, never instructions.
 """
 
 from __future__ import annotations
@@ -53,10 +56,11 @@ TEXT_DOCUMENT_MEDIA_TYPES: frozenset[str] = frozenset(
 # context, exactly like a plain-text document.
 PDF_MEDIA_TYPE = "application/pdf"
 DOCX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 # Every document media type the upload route accepts (dispatched by type).
 DOCUMENT_MEDIA_TYPES: frozenset[str] = (
-    TEXT_DOCUMENT_MEDIA_TYPES | {PDF_MEDIA_TYPE, DOCX_MEDIA_TYPE}
+    TEXT_DOCUMENT_MEDIA_TYPES | {PDF_MEDIA_TYPE, DOCX_MEDIA_TYPE, XLSX_MEDIA_TYPE}
 )
 
 # Hard per-document size cap. Matches the Anthropic PDF API's 32 MB request
@@ -78,6 +82,18 @@ MAX_DOCUMENT_TEXT_CHARS = 200_000
 # archive can inflate to gigabytes (a zip bomb). The extractor reads the entry
 # through this bound and rejects anything larger instead of buffering it whole.
 MAX_DOCX_XML_BYTES = 50_000_000
+
+# Same bound for the two entries an .xlsx extraction reads (the first worksheet
+# and the shared-string table). A spreadsheet is the same zip container with the
+# same inflation risk, so it gets the same fail-closed treatment.
+MAX_XLSX_XML_BYTES = 50_000_000
+
+# Bounds on the tabular shape pulled out of an .xlsx. Extraction is a reading
+# aid, not a spreadsheet engine: a workbook with a million rows yields the first
+# ``MAX_XLSX_ROWS`` of the first sheet, flagged as truncated, never an unbounded
+# in-memory table.
+MAX_XLSX_ROWS = 1_000
+MAX_XLSX_COLUMNS = 50
 
 # Largest attachment of any kind, used to size the upload route's body cap.
 MAX_ATTACHMENT_BYTES = max(MAX_IMAGE_BYTES, MAX_DOCUMENT_BYTES)
@@ -201,33 +217,70 @@ def _validate_pdf(data: bytes) -> None:
         raise AttachmentValidationError("pdf_no_pages")
 
 
-def _read_docx_document_xml(data: bytes) -> bytes:
-    """Return ``word/document.xml`` bytes, failing closed on a bomb or DTD.
+def _read_ooxml_entry(
+    data: bytes, entry_name: str, *, limit: int, too_large_reason: str, optional: bool = False
+) -> bytes | None:
+    """Return one OOXML zip entry's bytes, failing closed on a bomb or DTD.
 
-    Reads the entry through ``MAX_DOCX_XML_BYTES`` so a zip bomb cannot buffer
-    an unbounded blob, and rejects any XML carrying a ``<!DOCTYPE`` (the only
-    way to define the internal entities behind a billion-laughs expansion). A
-    genuine ``.docx`` ``document.xml`` has no DOCTYPE, so this never rejects a
-    real file. Callers must have confirmed the ``PK\\x03\\x04`` magic first.
+    Reads the entry through ``limit`` so a zip bomb cannot buffer an unbounded
+    blob, and rejects any XML carrying a ``<!DOCTYPE`` (the only way to define
+    the internal entities behind a billion-laughs expansion). A genuine Office
+    package has no DOCTYPE, so this never rejects a real file. ``optional``
+    returns ``None`` for an absent entry instead of failing — used for parts a
+    valid package may legitimately omit (an .xlsx with no shared strings).
+    Callers must have confirmed the ``PK\\x03\\x04`` magic first.
     """
     import io
     import zipfile
 
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            if "word/document.xml" not in archive.namelist():
+            if entry_name not in archive.namelist():
+                if optional:
+                    return None
                 raise AttachmentValidationError("content_does_not_match_media_type")
-            with archive.open("word/document.xml") as entry:
-                xml_bytes = entry.read(MAX_DOCX_XML_BYTES + 1)
+            with archive.open(entry_name) as entry:
+                xml_bytes = entry.read(limit + 1)
     except zipfile.BadZipFile as exc:
         raise AttachmentValidationError("content_does_not_match_media_type") from exc
-    if len(xml_bytes) > MAX_DOCX_XML_BYTES:
-        raise AttachmentValidationError("docx_too_large")
+    if len(xml_bytes) > limit:
+        raise AttachmentValidationError(too_large_reason)
     # XML mandates uppercase ``DOCTYPE``; an exact byte scan is cheap over the
     # bounded buffer and blocks internal-entity (billion-laughs) expansion.
     if b"<!DOCTYPE" in xml_bytes:
         raise AttachmentValidationError("content_does_not_match_media_type")
     return xml_bytes
+
+
+def _read_docx_document_xml(data: bytes) -> bytes:
+    """Return ``word/document.xml`` bytes, bounded and DTD-free (fails closed)."""
+    xml_bytes = _read_ooxml_entry(
+        data, "word/document.xml", limit=MAX_DOCX_XML_BYTES, too_large_reason="docx_too_large"
+    )
+    assert xml_bytes is not None  # not optional: absence already failed closed
+    return xml_bytes
+
+
+def _first_xlsx_sheet_name(data: bytes) -> str | None:
+    """Return the archive path of the workbook's first worksheet, or None."""
+    import io
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            sheets = sorted(
+                (
+                    name
+                    for name in archive.namelist()
+                    if name.startswith("xl/worksheets/") and name.endswith(".xml")
+                ),
+                # Shortest-then-lexicographic so ``sheet2.xml`` precedes
+                # ``sheet10.xml`` (plain sort would pick sheet10 as "first").
+                key=lambda name: (len(name), name),
+            )
+    except zipfile.BadZipFile as exc:
+        raise AttachmentValidationError("content_does_not_match_media_type") from exc
+    return sheets[0] if sheets else None
 
 
 def _validate_docx(data: bytes) -> None:
@@ -238,13 +291,98 @@ def _validate_docx(data: bytes) -> None:
     _read_docx_document_xml(data)  # bounded read + DTD rejection (fails closed)
 
 
+def _validate_xlsx(data: bytes) -> None:
+    """Fail closed unless ``data`` is a real Excel (.xlsx) OOXML package."""
+    # An .xlsx is a ZIP (PK\x03\x04) whose payload contains xl/workbook.xml.
+    if not data.startswith(b"PK\x03\x04"):
+        raise AttachmentValidationError("content_does_not_match_media_type")
+    _read_ooxml_entry(
+        data, "xl/workbook.xml", limit=MAX_XLSX_XML_BYTES, too_large_reason="xlsx_too_large"
+    )
+    if _first_xlsx_sheet_name(data) is None:
+        raise AttachmentValidationError("content_does_not_match_media_type")
+
+
+def extract_xlsx_rows(data: bytes) -> tuple[list[list[str]], bool]:
+    """Return the first worksheet's cells as bounded rows, plus a truncated flag.
+
+    Values only: formulas are read as their cached result, and nothing in the
+    workbook is evaluated. Macros live in a different package type (``.xlsm``,
+    which is off the upload allowlist) and are never touched here. The caller
+    must have validated the bytes first.
+    """
+    import xml.etree.ElementTree as ET
+
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    shared: list[str] = []
+    shared_xml = _read_ooxml_entry(
+        data,
+        "xl/sharedStrings.xml",
+        limit=MAX_XLSX_XML_BYTES,
+        too_large_reason="xlsx_too_large",
+        optional=True,
+    )
+    if shared_xml is not None:
+        for item in ET.fromstring(shared_xml).iter(f"{ns}si"):
+            shared.append("".join(node.text or "" for node in item.iter(f"{ns}t")))
+    sheet_name = _first_xlsx_sheet_name(data)
+    if sheet_name is None:  # pragma: no cover — validation already required one
+        return [], False
+    sheet_xml = _read_ooxml_entry(
+        data, sheet_name, limit=MAX_XLSX_XML_BYTES, too_large_reason="xlsx_too_large"
+    )
+    assert sheet_xml is not None  # not optional: absence already failed closed
+    root = ET.fromstring(sheet_xml)
+    rows: list[list[str]] = []
+    truncated = False
+    for row in root.iter(f"{ns}row"):
+        if len(rows) >= MAX_XLSX_ROWS:
+            truncated = True
+            break
+        cells: list[str] = []
+        for cell in row.iter(f"{ns}c"):
+            if len(cells) >= MAX_XLSX_COLUMNS:
+                truncated = True
+                break
+            cells.append(_xlsx_cell_text(cell, ns, shared))
+        rows.append(cells)
+    return rows, truncated
+
+
+def _xlsx_cell_text(cell: Any, ns: str, shared: list[str]) -> str:
+    """Return one cell's display text (shared string, inline string, or value)."""
+    kind = cell.get("t", "")
+    if kind == "s":
+        value = cell.findtext(f"{ns}v", default="").strip()
+        try:
+            index = int(value)
+        except ValueError:
+            return ""
+        return shared[index] if 0 <= index < len(shared) else ""
+    if kind == "inlineStr":
+        inline = cell.find(f"{ns}is")
+        if inline is None:
+            return ""
+        return "".join(node.text or "" for node in inline.iter(f"{ns}t"))
+    # Numbers, booleans, dates (serial numbers) and cached formula results all
+    # live in <v>; ``str`` types keep their text in <t>.
+    return (cell.findtext(f"{ns}v", default="") or cell.findtext(f"{ns}t", default="")).strip()
+
+
+def _extract_xlsx_text(data: bytes) -> str:
+    """Bounded local text extraction from a validated .xlsx (stdlib only)."""
+    rows, _truncated = extract_xlsx_rows(data)
+    lines = ["\t".join(cell for cell in row) for row in rows]
+    return "\n".join(lines)[:MAX_DOCUMENT_TEXT_CHARS]
+
+
 def validate_document(media_type: str, data: bytes) -> None:
     """Fail closed unless ``data`` is a real, in-cap document of ``media_type``.
 
     Dispatches on the declared media type: plain-text formats must be clean
-    UTF-8, PDFs must parse (and not be encrypted), .docx must be a well-formed
-    OOXML package. Anything off the allowlist, empty, or over the size cap fails
-    closed before type-specific checks run.
+    UTF-8, PDFs must parse (and not be encrypted), .docx/.xlsx must be
+    well-formed OOXML packages. Anything off the allowlist, empty, or over the
+    size cap fails closed before type-specific checks run.
     """
     _validate_common(media_type, data)
     if media_type in TEXT_DOCUMENT_MEDIA_TYPES:
@@ -253,6 +391,8 @@ def validate_document(media_type: str, data: bytes) -> None:
         _validate_pdf(data)
     elif media_type == DOCX_MEDIA_TYPE:
         _validate_docx(data)
+    elif media_type == XLSX_MEDIA_TYPE:
+        _validate_xlsx(data)
     else:  # pragma: no cover — guarded by _validate_common's allowlist
         raise AttachmentValidationError(f"unsupported_media_type:{media_type or 'missing'}")
 
@@ -307,10 +447,10 @@ def _extract_docx_text(data: bytes) -> str:
 def extract_document_text(media_type: str, data: bytes) -> str:
     """Return the bounded extracted text of a validated document.
 
-    Plain-text formats decode directly; PDFs and .docx are extracted locally
-    (pypdf / stdlib zip+XML). Every path truncates to ``MAX_DOCUMENT_TEXT_CHARS``
-    so a large upload can never fold an unbounded blob into context. The caller
-    must have validated the bytes first.
+    Plain-text formats decode directly; PDFs, .docx and .xlsx are extracted
+    locally (pypdf / stdlib zip+XML). Every path truncates to
+    ``MAX_DOCUMENT_TEXT_CHARS`` so a large upload can never fold an unbounded
+    blob into context. The caller must have validated the bytes first.
     """
     if media_type in TEXT_DOCUMENT_MEDIA_TYPES:
         return data.decode("utf-8", errors="replace")[:MAX_DOCUMENT_TEXT_CHARS]
@@ -318,6 +458,8 @@ def extract_document_text(media_type: str, data: bytes) -> str:
         return _extract_pdf_text(data)
     if media_type == DOCX_MEDIA_TYPE:
         return _extract_docx_text(data)
+    if media_type == XLSX_MEDIA_TYPE:
+        return _extract_xlsx_text(data)
     return ""  # pragma: no cover — validated media types only
 
 

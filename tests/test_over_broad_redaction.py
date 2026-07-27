@@ -137,3 +137,94 @@ class TestRedactTextStillMatchesKnownShapes:
 
     def test_trailing_sentence_punctuation_is_kept_outside_the_mask(self) -> None:
         assert redact_text("the password is hunter2xyz.")[0] == "the [REDACTED_SECRET]."
+
+
+class TestServerIssuedLocatorsSurvive:
+    """BUG-07 — server-issued locators came back as ``[REDACTED_SECRET]``.
+
+    The high-entropy fallback matches any 40+ character run of URL/base64
+    characters, and ``/`` is one of them, so a path tripped it purely because
+    its segments were joined. The file inspector's ``pdf_url`` was where this
+    was noticed, but it was never only that field: ``events_path``,
+    ``checkpoint_path`` and ``root_subpath`` were being destroyed too, leaving
+    the client with nothing to fetch, open, or link to.
+
+    The field's *key* is the signal — the same mechanism FIXED-02 used for token
+    counts. Locator-named fields get a fallback that spares a run whose every
+    slash-separated segment is under the threshold; nothing else changes, and
+    free-form text keeps the strict scan.
+    """
+
+    PDF_URL = (
+        "/api/sessions/sess_10ba5586e6d74065847e7b219ee215b0"
+        "/attachments/att_3f21c0d94b6e4d1fa0b7c2e58d9a4413/preview/pdf"
+    )
+    EVENTS_PATH = (
+        "/home/user/.raiker/instances/work/events"
+        "/sess_10ba5586e6d74065847e7b219ee215b0/turn_3f21c0d94b6e.jsonl"
+    )
+
+    def test_every_locator_field_survives_response_redaction(self) -> None:
+        body = {
+            "pdf_url": self.PDF_URL,
+            "image_url": self.PDF_URL.replace("/pdf", "/image"),
+            "events_path": self.EVENTS_PATH,
+            "checkpoint_path": ".raiker/checkpoints/sess_10ba5586e6d74065847e7b219ee215b0/c.json",
+            "root_subpath": "projects/quarterly-review-2026/workspace/drafts/current",
+        }
+        assert redact_response_body(body) == body
+
+    def test_a_list_of_locators_survives(self) -> None:
+        body = {"attachment_urls": [self.PDF_URL, self.EVENTS_PATH]}
+        assert redact_response_body(body) == body
+
+    def test_a_nested_locator_survives(self) -> None:
+        body = {"response": {"events_path": self.EVENTS_PATH}}
+        assert redact_response_body(body) == body
+
+    def test_the_same_string_in_free_form_text_is_still_scanned_strictly(self) -> None:
+        # Only a locator *field* gets the relaxed fallback. A path quoted inside
+        # an assistant reply is untrusted text and keeps the strict rule.
+        assert redact_response_body({"answer": self.PDF_URL}) != {"answer": self.PDF_URL}
+        assert redact_text(self.PDF_URL)[1] is True
+
+    def test_a_key_embedded_in_a_locator_is_still_redacted(self) -> None:
+        # The exemption is per segment, so a credential riding in a URL is its
+        # own over-length segment and still fails closed.
+        body = {"download_url": "https://x.test/f/AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKK"}
+        redacted = redact_response_body(body)
+        assert redacted != body
+        assert "AAAABBBB" not in redacted["download_url"]
+
+    def test_a_credential_query_parameter_is_still_redacted(self) -> None:
+        body = {"callback_url": "https://x.test/cb?token=AAAABBBBCCCCDDDDEEEE"}
+        redacted = redact_response_body(body)
+        assert "AAAABBBB" not in redacted["callback_url"]
+
+    def test_a_bearer_token_in_a_locator_is_still_redacted(self) -> None:
+        body = {"api_url": "https://x.test/h/Bearer abcdefghijklmnopqrst"}
+        assert "abcdefghijklmnopqrst" not in redact_response_body(body)["api_url"]
+
+    def test_a_secret_named_key_still_wins_over_the_locator_rule(self) -> None:
+        # ``_is_secret_key`` runs first: a field naming a credential is dropped
+        # whole even when it also looks like a locator.
+        assert redact_response_body({"secret_url": "https://x.test/anything"}) == {
+            "secret_url": "***REDACTED***"
+        }
+
+    def test_an_opaque_token_with_slashes_is_still_redacted_in_a_locator(self) -> None:
+        # Base64 secrets contain slashes. Under a locator key the segments are
+        # what count, and a real secret keeps its entropy in one of them.
+        body = {"asset_url": "aGVsbG8vd29ybGQvc2VjcmV0dG9rZW5sb25nZXJzdGlsbGhlcmVub3c="}
+        assert redact_response_body(body) != body
+
+    def test_a_credential_bearing_uri_is_still_redacted(self) -> None:
+        # The one ``*_uri`` field the API emits is the TOTP provisioning URI,
+        # whose query string carries the enrolment secret. Its route is
+        # redaction-exempt, but the locator rule must not be what protects it:
+        # the ``secret=`` pattern runs first and is unaffected.
+        uri = "otpauth://totp/Raiker:owner?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+        assert "JBSWY3DP" not in redact_response_body({"provisioning_uri": uri})["provisioning_uri"]
+
+    def test_the_guard_accepts_what_the_middleware_emits_for_locators(self) -> None:
+        assert_no_secrets_in_body(redact_response_body({"pdf_url": self.PDF_URL}))

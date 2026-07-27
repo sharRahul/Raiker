@@ -30,7 +30,8 @@ This plan covers the whole shipped web surface, derived from
 The two specs carry implementation notes stating that the file inspector,
 automatic 90 % compaction, provider usage/cost data, and the natural-language
 task/project flow are **specified but not shipped**. This plan verifies that
-claim rather than assuming it.
+claim rather than assuming it. (The file inspector has since shipped —
+FIXED-10; §5.6 now tests a working pane rather than its absence.)
 
 ---
 
@@ -185,9 +186,9 @@ the **Build** composer (`93-build-context-cost-popover.png`).
 
 | Control | Behaviour | Result |
 |---|---|---|
-| `+` → Attach | Image… (`png/jpeg/webp/gif`) and Document… (`txt/md/csv/pdf/docx`) | ✅ `72-` |
+| `+` → Attach | Image… (`png/jpeg/webp/gif`) and Document… (`txt/md/csv/pdf/docx/xlsx`) | ✅ `72-` |
 | Document upload | `POST /api/attachments` 200, chip renders, content reaches the model | ✅ `76-`, `77-` |
-| Attachment chip | **Not clickable** — no file inspector (spec says unimplemented) | ❌ BUG-07 |
+| Attachment chip | Clicking it opens a view-only preview pane; `Esc`/**Close file preview** dismisses it; a `.md` file's raw HTML shows as text, an `.xlsx` shows its first sheet, a PDF opens in the browser viewer, an uploaded image displays fitted to the pane | ✅ FIXED-10 |
 | Voice input | Present and labelled "(coming soon)" | ✅ honest |
 | Planning | auto / Always plan / Never plan | ✅ |
 | Model | lists only configured profiles; no free-text model id | ✅ matches spec |
@@ -361,7 +362,7 @@ from the session `⋯` menu. `73-`, `74-`.
 | Do conversations remember context? | **Yes** (was broken; FIXED-04) — prior completed turns are replayed, bounded by the model's window; other chats are never mixed in |
 | Can you see how many tokens remain? | **Yes** (was `0 / NaN (NaN%)`; FIXED-02) — provider-reported usage against a provider-reported capacity |
 | Can you see what a chat has cost? | **Yes** — per-chat and provider all-time, in Chat and Build, for API-key providers only |
-| Can you generate a markdown file and view it in the sidebar? | **No** — approval is metadata-only so no file is written (BUG-06), and there is no file inspector (BUG-07) |
+| Can you generate a markdown file and view it in the sidebar? | **Partly** — approving a file change now writes the file (FIXED-08), and an *attached* file opens in the inspector (FIXED-10); a file Raiker itself creates is not yet an inspectable chip |
 | Can you convert markdown to PDF in one click? | **No** — markdown now renders (FIXED-06), but no export or print control exists (BUG-08) |
 | Do the different task types work? | **Yes** — all four create, schedule, and run |
 | Can you set an API key from the web app? | **Yes** — Connect, paste, done. No gate, allowlist, or vault-key setup first (FIXED-05) |

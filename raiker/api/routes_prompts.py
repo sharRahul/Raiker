@@ -117,6 +117,32 @@ def _build_envelope(body: PromptRequest, principal_id: str = "local_user") -> Pr
     )
 
 
+def _record_attachment_refs(
+    workspace: str | Path, envelope: PromptEnvelope, principal_id: str
+) -> None:
+    """Bind this turn's uploaded attachments to its session (BUG-07).
+
+    The reference is what later authorizes the file inspector to show the file
+    back, so it is written only for attachments this principal actually owns —
+    an id naming someone else's upload stores nothing and previews nothing. The
+    turn itself is unaffected either way; context gathering does its own
+    owner-scoped lookup.
+    """
+    store = SQLiteStore(workspace)
+    for entry in envelope.prompt.attachments:
+        attachment_id = str(entry.get("attachment_id", "")).strip()
+        if not attachment_id:
+            continue
+        if store.load_attachment_metadata(attachment_id, owner_principal_id=principal_id) is None:
+            continue
+        store.save_session_attachment_ref(
+            session_id=envelope.session_id,
+            attachment_id=attachment_id,
+            owner_principal_id=principal_id,
+            turn_id=envelope.turn_id,
+        )
+
+
 def _invalid_response(exc: Exception) -> AgentResponse:
     return AgentResponse(
         request_id="req_invalid",
@@ -142,6 +168,7 @@ async def submit_prompt(
         envelope = _build_envelope(body, session.principal_id)
     except ContractValidationError as exc:
         return _invalid_response(exc).to_dict()
+    _record_attachment_refs(_ws(request), envelope, session.principal_id)
     gateway = AgentGateway(_ws(request), principal_id=session.principal_id)
     response = await gateway.submit_prompt_async(envelope)
     return response.to_dict()
@@ -181,6 +208,7 @@ async def stream_prompt(
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
+    _record_attachment_refs(_ws(request), envelope, session.principal_id)
     gateway = AgentGateway(_ws(request), principal_id=session.principal_id)
 
     async def gen() -> AsyncIterator[str]:

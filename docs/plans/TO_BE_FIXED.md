@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Nine are marked **FIXED** and were resolved on this
+and the proposed fix. Eleven are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -30,7 +30,8 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-07 | High | API redaction | Fixed (was BUG-04) |
 | FIXED-08 | **Critical** | Approvals / file output | Fixed (was BUG-06) |
 | FIXED-09 | **Critical** | Build / Chat agent loop | Fixed (was GAP-BUILD B2) |
-| BUG-07 | Medium | Chat | Open (specified, unimplemented) |
+| FIXED-10 | Medium | Chat / attachments | Fixed (was BUG-07) |
+| FIXED-11 | High | API redaction | Fixed (found while fixing BUG-07) |
 | BUG-08 | Medium | Export | Open (not specified) |
 | BUG-09 | Medium | Tasks | Open |
 | BUG-10 | Low | Chat / Tasks | Open |
@@ -636,16 +637,137 @@ resumed turn proposes one call at a time.
 
 ---
 
-## BUG-07 — No file inspector; attachment chips are not interactive
+## FIXED-10 — No file inspector; attachment chips were not interactive
 
-**Observed.** An uploaded `sample.md` renders as a chip inside the user bubble.
-It is not a `button`, has no `role`, and clicking it does nothing. There is no
-right-side pane and no overlay.
+**Status: fixed in this change.** (Was BUG-07.)
 
-**Assessment.** Matches the implementation note in
+**Observed.** An uploaded `sample.md` rendered as a chip inside the user bubble.
+It was not a `button`, had no `role`, and clicking it did nothing. There was no
+right-side pane and no overlay. Matched the implementation note then standing in
 `docs/superpowers/plans/2026-07-26-chat-file-inspector.md`: *"This feature is
-specified but not implemented."* Tracked here so the gap is visible from the
-product side. The plan's Tasks 1–2 are the fix.
+specified but not implemented."*
+
+**Why it needed more than an `onclick`.** The bytes were in the governed
+attachment store, but nothing in the system could answer *"may this conversation
+show this file?"* An attachment is owned by a principal — that is not the same
+claim as belonging to a chat, and reusing ownership alone would have let any
+attachment id be previewed from any conversation.
+
+**Fix applied — the authorization first.** A new `session_attachment_refs`
+migration records `(session, attachment, owner, turn)`, written by the prompt
+route *after* it has confirmed both the session and the attachment belong to the
+caller (`raiker/api/routes_prompts.py::_record_attachment_refs`). An id naming
+someone else's upload stores nothing. `AttachmentPreviewService`
+(`raiker/runtime/attachment_preview.py`) reads nothing without a matching row
+*and* an owner-scoped load of the attachment itself, so an unknown id, another
+account's file, and a file from another chat are all a 404 — never a 403, which
+would confirm the id exists.
+
+**Then the representations, all inert.** `GET
+/api/sessions/{id}/attachments/{id}/preview` returns bounded text for
+plain-text and `.docx`, cell values for `.xlsx`, and for a PDF or an image a
+same-origin authorized URL served by `/preview/pdf` or `/preview/image`. Both
+byte routes re-validate before serving (pypdf for a PDF, the magic-byte sniff
+for a picture) and pin the content type they just checked, with `nosniff` and
+inline disposition — so bytes can never be interpreted as something else, and a
+file whose contents do not match its declared type is not served at all. Markdown comes back as **source text**: the
+server renders no HTML at all, and the client's existing escape-first renderer
+turns `<script>` in an uploaded file into visible characters. An unsupported
+type, a record that no longer validates, or a parse error becomes an
+`unavailable` preview carrying its reason, never a blank pane. `.xlsx` joined
+the upload allowlist with the same fail-closed treatment as `.docx` (magic
+bytes, DOCTYPE rejection, bounded decompression, row/column caps).
+
+**And the UI.** `apps/web/src/lib/components/FileInspector.svelte` is a
+`complementary` landmark — a right-side pane on a wide window, a dismissible
+sheet below the split breakpoint — with no upload, edit, or download control.
+Escape closes it and focus returns to the chip. Chips also survive a reload:
+`GET /api/sessions/{id}/attachments` returns per-turn metadata so a resumed
+conversation redraws them, which a transcript alone cannot do because it
+persists prompt text and not the files that rode with it.
+
+**One defect found on the way.** The response-redaction layer replaced
+`pdf_url` with `[REDACTED_SECRET]`, so the browser had no URL for its PDF
+viewer. That turned out not to be about this feature at all — see **FIXED-11**,
+which covers it and the three other locator fields it was silently destroying.
+
+**Images included.** The plan's goal names PDF/Markdown/XLSX/DOCX, but a chip
+is a chip whichever kind it names: an attached picture that opened nothing was
+the same defect. Images render in the pane, fitted to it, with a chequerboard
+behind transparency. The allowlist is raster-only (PNG/JPEG/WebP/GIF) — SVG is
+not an accepted upload, so no previewable image can carry script, and there is
+no server-side decode or re-encode anywhere in the path. Anything genuinely
+outside the previewable set still reports `unsupported_for_preview` honestly
+instead of opening an empty box.
+
+**Deliberately not done.** No zoom, rotate, or pan control on an image, and no
+"jump to the passage the model used" in a document. Both are features on top of
+this endpoint rather than parts of the defect.
+
+Covered by `tests/test_attachment_preview.py`,
+`tests/test_document_attachments.py`, `tests/test_over_broad_redaction.py`,
+`apps/web/src/lib/components/FileInspector.test.ts`, and the file-inspector
+cases in `apps/web/src/lib/views/ChatView.test.ts`.
+
+---
+
+## FIXED-11 — Redaction destroyed every server-issued path and URL
+
+**Status: fixed in this change.** Found while fixing BUG-07; not caused by it.
+
+**Observed.** The file inspector's PDF pane was blank. `GET
+…/attachments/{id}/preview` returned:
+
+> `"pdf_url": "/[REDACTED_SECRET]"`
+
+so the browser had nothing to point its viewer at. Chasing it showed the field
+was not special:
+
+| Field | What the client received |
+|---|---|
+| `pdf_url` | `/[REDACTED_SECRET]` |
+| `events_path` | `/home/user/.[REDACTED_SECRET].jsonl` |
+| `checkpoint_path` | `.[REDACTED_SECRET].json` |
+| `root_subpath` | `[REDACTED_SECRET]` |
+
+**Root cause.** `raiker/context/redaction.py` ends with a high-entropy fallback,
+`\b[A-Za-z0-9+/_\-]{40,}\b`, for long opaque strings. `/` is in that character
+class, so a path matches as *one token* purely because its segments were joined:
+`sessions/sess_…/attachments/att_…/preview/pdf` carries no 40-character run of
+entropy anywhere, but the whole thing is 100+ characters. Every locator the API
+emits was long enough to trip it. This is the third instance of the same family
+— FIXED-02 (token *counts* read as credentials) and FIXED-07 (prose read as
+credentials) — and it has the same shape: a rule that is right for opaque values
+applied to a value that is not opaque.
+
+**Fix applied.** The field's **key** decides, exactly as it does for token counts
+in FIXED-02: `raiker/api/redaction.py` marks values under `*_url`, `*_uri`,
+`*_path`, `*_subpath` (and their plurals) as locators, and only those are scanned
+with a fallback that spares a run whose *every* slash-separated segment is itself
+under the entropy threshold. Nothing else changes:
+
+* A credential embedded in a path is its own over-length segment and still
+  redacts (`…/f/AAAABBBB…44 chars` → `[REDACTED_SECRET]`).
+* Every specific shape — `sk-…`, `ghp_…`, `Bearer …`, `token=…`, PEM blocks,
+  emails — is matched *before* the fallback and applies to locators unchanged.
+* A key that names a credential still wins: `secret_url` is discarded whole.
+* Free-form text is untouched and keeps the strict scan. A path quoted inside an
+  assistant reply is still scanned as prose, because there the string is
+  untrusted model output rather than something the server issued.
+
+`assert_no_secrets_in_body` mirrors the same rule, so the guard still proves
+exactly what the middleware emits.
+
+**Why not a value-shape rule.** The first attempt spared any run starting
+`api/`. It fixed the one symptom and left `events_path`, `checkpoint_path` and
+`root_subpath` broken — and it relaxed the rule for *all* strings, including
+model output. Keying on the field name is both narrower (prose is unaffected)
+and complete (every locator field is covered). A purely shape-based rule was
+rejected outright: a base64 secret containing `/` would split into two
+under-threshold halves and slip through.
+
+Covered by `tests/test_over_broad_redaction.py::TestServerIssuedLocatorsSurvive`
+and verified over real HTTP through the full middleware stack.
 
 ---
 
@@ -996,11 +1118,13 @@ and step 2 is most of it.
 
 ### Tier 1 — working with the owner's material
 
-**C4. No file inspector.** See BUG-07: attachment chips are inert `span`s. An
-assistant that reads documents must be able to show the owner what it read, with
-the passage it used. **Work:** the plan in
-`docs/superpowers/plans/2026-07-26-chat-file-inspector.md`, Tasks 1–2, reusing
-the sanitising renderer shipped in FIXED-06 for the Markdown case.
+**C4. File inspector — done for attachments.** FIXED-10 shipped Tasks 1–2 of
+`docs/superpowers/plans/2026-07-26-chat-file-inspector.md`: chips are buttons and
+open a session-authorized, view-only pane, reusing the sanitising renderer from
+FIXED-06 for the Markdown case. **Remaining work:** an assistant that reads a
+document should also be able to show *the passage it used*, and a file Raiker
+itself writes is not yet an inspectable chip — both build on the same preview
+endpoint.
 
 **C5. No export.** See BUG-08 — no download, print, or PDF anywhere. FIXED-06
 removed the blocker on the rendering side; a print stylesheet plus a per-chat

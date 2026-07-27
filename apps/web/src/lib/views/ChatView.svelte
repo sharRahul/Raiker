@@ -1,13 +1,21 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import Icon from "../components/Icon.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
   import Markdown from "../components/Markdown.svelte";
+  import FileInspector from "../components/FileInspector.svelte";
   import PermissionModeControl from "../components/PermissionModeControl.svelte";
   import { api, ApiError, streamPrompt } from "../api";
-  import type { AgentResponse, ContextUsage, ModelProfile, SessionDetail, StreamEvent } from "../apiTypes";
+  import type {
+    AgentResponse,
+    AttachmentPreview,
+    ContextUsage,
+    ModelProfile,
+    SessionDetail,
+    StreamEvent,
+  } from "../apiTypes";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, providerName } from "../format";
   import { reactionForResponse, thinkingSteps } from "../chatPresentation";
@@ -62,8 +70,15 @@
   }
   $effect(() => {
     if (continuedSessionId === null) return;
-    sessionId = continuedSessionId;
-    void loadHistory(continuedSessionId);
+    const id = continuedSessionId;
+    // Only the prop may retrigger this. `loadHistory` reads component state
+    // before its first await (it closes an open file preview), and a tracked
+    // read there would make every later change to that state reload the whole
+    // conversation — which reads as the transcript flickering back to the top.
+    untrack(() => {
+      sessionId = id;
+      void loadHistory(id);
+    });
   });
   let nextId = 1;
 
@@ -94,18 +109,21 @@
   const MAX_IMAGE_BYTES = 5_000_000;
   // Documents: extracted text is folded into context as bounded, untrusted data
   // (validated fail-closed server-side: allowlist, 32 MB cap, per-type sniff —
-  // UTF-8 for text, %PDF- for PDF, OOXML zip for .docx; PDF/.docx are extracted
-  // locally, no bytes leave the box).
+  // UTF-8 for text, %PDF- for PDF, OOXML zip for .docx/.xlsx; PDF and the
+  // Office formats are extracted locally, no bytes leave the box).
   const DOCX_MEDIA_TYPE =
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  const XLSX_MEDIA_TYPE =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
   const DOCUMENT_MEDIA_TYPES = [
     "text/plain",
     "text/markdown",
     "text/csv",
     "application/pdf",
     DOCX_MEDIA_TYPE,
+    XLSX_MEDIA_TYPE,
   ];
-  const DOCUMENT_EXTENSIONS = [".txt", ".md", ".markdown", ".csv", ".pdf", ".docx"];
+  const DOCUMENT_EXTENSIONS = [".txt", ".md", ".markdown", ".csv", ".pdf", ".docx", ".xlsx"];
   const MAX_DOCUMENT_BYTES = 32_000_000;
   let attachments = $state<ComposerAttachment[]>([]);
   let attachInput = $state("");
@@ -191,6 +209,7 @@
     if (lower.endsWith(".txt")) return "text/plain";
     if (lower.endsWith(".pdf")) return "application/pdf";
     if (lower.endsWith(".docx")) return DOCX_MEDIA_TYPE;
+    if (lower.endsWith(".xlsx")) return XLSX_MEDIA_TYPE;
     return null;
   }
 
@@ -202,7 +221,8 @@
     attachError = null;
     const mediaType = documentMediaType(file);
     if (mediaType === null) {
-      attachError = "Only plain-text, Markdown, CSV, PDF, or Word (.docx) documents can be attached.";
+      attachError =
+        "Only plain-text, Markdown, CSV, PDF, Word (.docx), or Excel (.xlsx) documents can be attached.";
       return;
     }
     if (file.size > MAX_DOCUMENT_BYTES) {
@@ -240,6 +260,71 @@
     } finally {
       uploading = false;
     }
+  }
+
+  // ── File inspector (BUG-07) ───────────────────────────────────────────────
+  // An attachment chip opens a view-only preview of the file it names. Nothing
+  // is fetched until the chip is clicked, the preview is authorized by the
+  // conversation that carried the file (a chip from another chat previews
+  // nothing), and the pane offers no upload, edit, or download control.
+  let inspecting = $state<{ attachmentId: string; filename: string } | null>(null);
+  let preview = $state<AttachmentPreview | null>(null);
+  let previewLoading = $state(false);
+  let previewError = $state<string | null>(null);
+  // Object URL for a preview served as bytes (a PDF or an image): neither an
+  // <object> nor an <img> can send the bearer token, so the bytes are fetched
+  // here and handed over as a blob. Revoked on close and whenever another file
+  // is opened — a stale handle keeps the whole file alive in memory.
+  let objectUrl = $state<string | null>(null);
+
+  function releaseObjectUrl() {
+    if (objectUrl === null) return;
+    URL.revokeObjectURL?.(objectUrl);
+    objectUrl = null;
+  }
+
+  async function openInspector(attachmentId: string, filename: string) {
+    if (sessionId === null) return;
+    const openedSession = sessionId;
+    releaseObjectUrl();
+    inspecting = { attachmentId, filename };
+    preview = null;
+    previewError = null;
+    previewLoading = true;
+    try {
+      const result = await api.attachmentPreview(openedSession, attachmentId);
+      // A second chip clicked while this was in flight wins; drop the late one
+      // rather than overwriting the file the user is now looking at.
+      if (inspecting?.attachmentId !== attachmentId) return;
+      preview = result;
+      // PDFs and images are the two kinds whose content is bytes rather than
+      // JSON; everything else is already in the preview.
+      const bytesPath = result.pdf_url ?? result.image_url;
+      if (bytesPath !== null) {
+        const url = await api.attachmentPreviewObjectUrl(bytesPath);
+        if (inspecting?.attachmentId === attachmentId) {
+          objectUrl = url;
+        } else {
+          URL.revokeObjectURL?.(url);
+        }
+      }
+    } catch (e) {
+      if (inspecting?.attachmentId !== attachmentId) return;
+      previewError =
+        e instanceof ApiError && e.status === 404
+          ? "This file is no longer available in this conversation."
+          : "Could not open this file.";
+    } finally {
+      if (inspecting?.attachmentId === attachmentId) previewLoading = false;
+    }
+  }
+
+  function closeInspector() {
+    releaseObjectUrl();
+    inspecting = null;
+    preview = null;
+    previewError = null;
+    previewLoading = false;
   }
 
   // Chips show only the file/folder name; the full workspace path stays in the
@@ -286,10 +371,12 @@
 
   async function loadHistory(id: string) {
     historyLoading = true;
+    closeInspector();
     try {
       const detail = await api.session(id);
       turns = detail.turns.map((t) => restoredTurn(t, id));
       nextId = turns.length + 1;
+      await restoreAttachmentChips(id);
       void scrollToEnd();
     } catch (e) {
       historyError =
@@ -297,6 +384,36 @@
     } finally {
       historyLoading = false;
     }
+  }
+
+  // A transcript persists prompt text, not the files that rode with it, so a
+  // reloaded chat asks the server which attachments belong to which turn and
+  // redraws the chips. Metadata only — no file content is fetched until a chip
+  // is actually clicked.
+  async function restoreAttachmentChips(id: string) {
+    let files;
+    try {
+      files = (await api.sessionAttachments(id)).files;
+    } catch {
+      // Chips are a convenience; losing them must not cost the transcript.
+      return;
+    }
+    const byTurn = new Map<string, ComposerAttachment[]>();
+    for (const file of files) {
+      const chips = byTurn.get(file.turn_id) ?? [];
+      chips.push({
+        kind: file.kind === "image" ? "image" : "document",
+        label: file.filename,
+        detail: `${file.filename} (${file.media_type}, ${file.byte_size} bytes)`,
+        attachmentId: file.attachment_id,
+      });
+      byTurn.set(file.turn_id, chips);
+    }
+    if (byTurn.size === 0) return;
+    turns = turns.map((turn) => {
+      const chips = byTurn.get(turn.response?.turn_id ?? "");
+      return chips === undefined ? turn : { ...turn, attachments: chips };
+    });
   }
 
   function restoredTurn(t: SessionDetail["turns"][number], sessionId: string): ChatTurn {
@@ -429,6 +546,10 @@
   }
 </script>
 
+<!-- Split shell: the conversation, plus the file inspector when one is open.
+     The chat column keeps its own indentation so opening a file stays a
+     wrapper, not a reflow of the whole transcript's markup. -->
+<div class="chat-layout" class:with-inspector={inspecting !== null}>
 <div class="chat">
   <div class="thread" bind:this={scrollEl}>
     {#if historyError !== null}
@@ -456,10 +577,26 @@
           {#if turn.attachments.length > 0}
             <p class="turn-attachments">
               {#each turn.attachments as a, i (a.attachmentId ?? a.path ?? i)}
-                <span class="attach-chip" title={a.detail}>
-                  <Icon name="file" size={13} />
-                  {a.label}
-                </span>
+                {#if a.attachmentId !== undefined && sessionId !== null}
+                  <!-- Uploaded files open in the inspector. A workspace-path
+                       chip has no stored bytes to show, so it stays inert
+                       rather than pretending to be clickable. -->
+                  <button
+                    type="button"
+                    class="attach-chip attach-chip-button"
+                    title={a.detail}
+                    aria-expanded={inspecting?.attachmentId === a.attachmentId}
+                    onclick={() => void openInspector(a.attachmentId as string, a.label)}
+                  >
+                    <Icon name="file" size={13} />
+                    {a.label}
+                  </button>
+                {:else}
+                  <span class="attach-chip" title={a.detail}>
+                    <Icon name="file" size={13} />
+                    {a.label}
+                  </span>
+                {/if}
               {/each}
             </p>
           {/if}
@@ -693,7 +830,7 @@
           <label
             class="btn btn-sm"
             for="document-upload-input"
-            title="Upload a document (plain text/Markdown/CSV/PDF/Word .docx, 32 MB max). Its extracted text is added to context as untrusted data."
+            title="Upload a document (plain text/Markdown/CSV/PDF/Word .docx/Excel .xlsx, 32 MB max). Its extracted text is added to context as untrusted data."
           >
             {uploading ? "Uploading…" : "Document…"}
           </label>
@@ -805,6 +942,18 @@
   </form>
 </div>
 
+{#if inspecting !== null}
+  <FileInspector
+    preview={preview}
+    filename={inspecting.filename}
+    loading={previewLoading}
+    error={previewError}
+    objectUrl={objectUrl}
+    onclose={closeInspector}
+  />
+{/if}
+</div>
+
 <style>
   /* A chat column is as tall as the room the shell gives it — not as tall as
      its transcript. `height: 100%` cannot express that here (the page wrapper
@@ -820,7 +969,31 @@
     min-height: 24rem;
     max-width: 52rem;
     margin: 0 auto;
+    /* The conversation column must be allowed to shrink inside the grid, or an
+       open inspector pushes the composer off the right edge instead of
+       narrowing the transcript. */
+    min-width: 0;
   }
+  /* One column until a file is open; a split view once one is. The inspector
+     column is a fixed readable width so the transcript keeps the remainder,
+     and it collapses back the moment the pane closes. */
+  .chat-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: stretch;
+  }
+  @media (min-width: 64rem) {
+    .chat-layout.with-inspector {
+      grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+    }
+    .chat-layout.with-inspector .chat {
+      margin: 0;
+      max-width: none;
+    }
+  }
+  /* Below the split breakpoint the inspector is a sheet over the conversation
+     (see FileInspector.svelte), so the grid stays single-column. */
   .thread {
     flex: 1;
     /* Without this the thread refuses to shrink below its content and never
@@ -1146,6 +1319,17 @@
     background: var(--neutral-soft);
     color: var(--text-2);
     padding: 0.1rem 0.5rem;
+  }
+  /* A chip that opens the inspector is a real button: it looks identical to the
+     inert one, but it is focusable, keyboard-operable, and says so on hover. */
+  .attach-chip-button {
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .attach-chip-button:hover,
+  .attach-chip-button:focus-visible {
+    border-color: var(--border-strong);
+    color: var(--text-1);
   }
   .attach-remove {
     border: none;

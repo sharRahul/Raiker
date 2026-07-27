@@ -5,11 +5,18 @@ fail-closed validation. The declared media type selects the validator:
 
 * **Images** (png/jpeg/webp/gif) — allowlist, 5 MB cap, magic-byte sniff. They
   reach a model solely as an image block on a vision-capable profile.
-* **Documents** (plain text / markdown / csv) — allowlist, 2 MB cap, UTF-8/NUL
-  sniff. Their extracted text reaches a model as bounded, untrusted context.
+* **Documents** (plain text / markdown / csv, PDF, Word .docx, Excel .xlsx) —
+  allowlist, 32 MB cap, per-type sniff. Their locally extracted text reaches a
+  model as bounded, untrusted context; the bytes never leave the box.
 
 The response is metadata only — the stored bytes are never echoed back and are
 never logged.
+
+The session-scoped preview routes at the bottom of this module are the read
+side (BUG-07): they show an already-uploaded file back to the person who
+attached it, and only inside the conversation it was attached to. See
+``raiker/runtime/attachment_preview.py`` for the authorization rule and the
+safe representations.
 """
 
 from __future__ import annotations
@@ -17,12 +24,14 @@ from __future__ import annotations
 import base64
 import binascii
 from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import UploadAttachmentRequest
 from raiker.api.sessions import ApiSession
+from raiker.runtime.attachment_preview import AttachmentPreviewService
 from raiker.runtime.attachments import (
     DOCUMENT_MEDIA_TYPES,
     IMAGE_MEDIA_TYPES,
@@ -103,3 +112,126 @@ def upload_attachment(
         "byte_size": stored.byte_size,
         "sha256": stored.sha256,
     }
+
+
+# ── Session-scoped file previews (BUG-07: the chat file inspector) ──────────
+#
+# Every one of these routes answers 404 for anything the caller may not see —
+# an unknown id, another account's attachment, or a file that belongs to a
+# different conversation. A 403 would confirm the id exists; 404 says nothing.
+
+
+def _preview_service(request: Request) -> AttachmentPreviewService:
+    return AttachmentPreviewService(SQLiteStore(_ws(request)))
+
+
+def _not_found(reason_code: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={"ok": False, "reason_code": reason_code},
+    )
+
+
+@router.get("/api/sessions/{session_id}/attachments")
+def list_session_attachments(
+    session_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, object]:
+    """Metadata for the files this conversation carries. No bytes, no content.
+
+    A reloaded chat restores prompt text but not the files that rode with each
+    turn; this is how the transcript redraws its attachment chips.
+    """
+    files = _preview_service(request).list_session_files(session_id, auth_data[0].principal_id)
+    return {"session_id": session_id, "files": files}
+
+
+@router.get("/api/sessions/{session_id}/attachments/{attachment_id}/preview")
+def get_attachment_preview(
+    session_id: str,
+    attachment_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """One file's safe, view-only preview.
+
+    Bounded text or table rows inline; for a PDF or an image, the same-origin
+    URL its bytes are served from. Never the bytes themselves.
+    """
+    preview = _preview_service(request).get(session_id, attachment_id, auth_data[0].principal_id)
+    if preview is None:
+        raise _not_found("attachment_preview_not_found")
+    return preview.to_dict()
+
+
+def _inline_filename(filename: str) -> str:
+    """An ASCII, quote-free filename safe to place in a Content-Disposition.
+
+    The stored name is user data. Anything that could close the quoted string or
+    inject a header parameter is dropped rather than escaped, and an empty
+    result falls back to a fixed name.
+    """
+    cleaned = "".join(
+        char for char in filename if char.isascii() and char.isprintable() and char not in '"\\;'
+    ).strip()
+    return cleaned[:100] or "attachment"
+
+
+@router.get("/api/sessions/{session_id}/attachments/{attachment_id}/preview/pdf")
+def get_attachment_preview_pdf(
+    session_id: str,
+    attachment_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> Response:
+    """Serve one authorized PDF inline for the browser's own viewer."""
+    document = _preview_service(request).pdf_document(
+        session_id, attachment_id, auth_data[0].principal_id
+    )
+    if document is None:
+        raise _not_found("attachment_preview_not_found")
+    filename, data = document
+    return _inline_bytes(data, "application/pdf", filename)
+
+
+@router.get("/api/sessions/{session_id}/attachments/{attachment_id}/preview/image")
+def get_attachment_preview_image(
+    session_id: str,
+    attachment_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> Response:
+    """Serve one authorized image inline for an ``<img>`` in the inspector.
+
+    The content type is the one the bytes were just re-validated against (the
+    magic-byte sniff in ``validate_image``), pinned with ``nosniff`` — so a file
+    can only ever be interpreted as the raster format it actually is. SVG is not
+    an accepted upload, so nothing served here can carry script.
+    """
+    image = _preview_service(request).image_bytes(
+        session_id, attachment_id, auth_data[0].principal_id
+    )
+    if image is None:
+        raise _not_found("attachment_preview_not_found")
+    filename, media_type, data = image
+    return _inline_bytes(data, media_type, filename)
+
+
+def _inline_bytes(data: bytes, media_type: str, filename: str) -> Response:
+    """One authorized file, served for display and nothing else.
+
+    Read-only: an explicit content type with ``nosniff`` so the bytes can never
+    be interpreted as something else, an inline disposition so the browser
+    displays rather than downloads, and ``no-store`` so a session-scoped file
+    does not linger in a shared cache.
+    """
+    return Response(
+        content=data,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{_inline_filename(filename)}"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store",
+        },
+    )

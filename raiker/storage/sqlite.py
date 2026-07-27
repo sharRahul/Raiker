@@ -232,6 +232,8 @@ from raiker.storage.migrations import (
     REMINDERS_SQL,
     SESSION_ARCHIVE_MIGRATION_ID,
     SESSION_ARCHIVE_SQL,
+    SESSION_ATTACHMENT_REFS_MIGRATION_ID,
+    SESSION_ATTACHMENT_REFS_SQL,
     SESSION_TAGS_MIGRATION_ID,
     SESSION_TAGS_SQL,
     STANDING_GRANTS_MIGRATION_ID,
@@ -695,6 +697,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 SUSPENDED_TURNS_MIGRATION_ID, SUSPENDED_TURNS_SQL, connection
+            )
+            self._apply_migration(
+                SESSION_ATTACHMENT_REFS_MIGRATION_ID, SESSION_ATTACHMENT_REFS_SQL, connection
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -5086,6 +5091,64 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (attachment_id, *([owner_principal_id] if scoped else [])),
             ).fetchone()
         return dict(row) if row is not None else None
+
+    # ── Session attachment references (BUG-07: the file inspector's grant) ──
+
+    def save_session_attachment_ref(
+        self, *, session_id: str, attachment_id: str, owner_principal_id: str, turn_id: str
+    ) -> None:
+        """Record that one attachment was carried by one session's prompt turn.
+
+        The caller must already have confirmed that both the session and the
+        attachment belong to ``owner_principal_id`` — this layer only writes the
+        reference the preview route later requires.
+        """
+        if not (session_id and attachment_id and owner_principal_id):
+            return
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO session_attachment_refs
+                (session_id, attachment_id, owner_principal_id, turn_id, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (session_id, attachment_id, owner_principal_id, turn_id, utc_now()),
+            )
+
+    def session_attachment_ref_exists(
+        self, *, session_id: str, attachment_id: str, owner_principal_id: str
+    ) -> bool:
+        """True only when this owner attached this file to this conversation."""
+        # Every predicate is required: an empty owner, session, or attachment id
+        # matches nothing rather than widening the query (fail closed).
+        if not (session_id and attachment_id and owner_principal_id):
+            return False
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT 1 FROM session_attachment_refs
+                WHERE session_id = ? AND attachment_id = ? AND owner_principal_id = ?
+                """,
+                (session_id, attachment_id, owner_principal_id),
+            ).fetchone()
+        return row is not None
+
+    def list_session_attachment_refs(
+        self, *, session_id: str, owner_principal_id: str
+    ) -> list[dict[str, Any]]:
+        """Return this owner's attachment references for one session, oldest first."""
+        if not (session_id and owner_principal_id):
+            return []
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT attachment_id, turn_id, created_at FROM session_attachment_refs
+                WHERE session_id = ? AND owner_principal_id = ?
+                ORDER BY created_at, rowid
+                """,
+                (session_id, owner_principal_id),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     # ── Phase 10: Runtime Authority (Principals + Risk Acceptance) ──
 

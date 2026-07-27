@@ -710,6 +710,44 @@ export interface UploadedAttachment {
   sha256: string;
 }
 
+// GET /api/sessions/{id}/attachments/{id}/preview — raiker/runtime/attachment_preview.py
+// AttachmentPreview.to_dict(). View-only and inert: `text` is source text (the
+// client's escape-first renderer turns Markdown into markup, never the server),
+// `rows` are spreadsheet cell values, and `pdf_url` / `image_url` are
+// same-origin authorized paths fetched with the session bearer token — never an
+// external URL, and never the bytes themselves.
+export interface AttachmentPreview {
+  attachment_id: string;
+  session_id: string;
+  filename: string;
+  media_type: string;
+  kind: "text" | "markdown" | "table" | "pdf" | "image" | "unavailable";
+  byte_size: number;
+  text: string;
+  rows: string[][];
+  truncated: boolean;
+  pdf_url: string | null;
+  image_url: string | null;
+  unavailable_reason: string | null;
+}
+
+// GET /api/sessions/{id}/attachments — metadata only, so a reloaded chat can
+// redraw the attachment chips its transcript does not persist.
+export interface SessionAttachment {
+  attachment_id: string;
+  turn_id: string;
+  kind: string;
+  filename: string;
+  media_type: string;
+  byte_size: number;
+  previewable: boolean;
+}
+
+export interface SessionAttachmentsView {
+  session_id: string;
+  files: SessionAttachment[];
+}
+
 export interface InterruptRequestBody {
   session_id: string;
   task_id?: string;

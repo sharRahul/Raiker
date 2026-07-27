@@ -11,7 +11,7 @@ event traces deliberately stay out of the transcript — they live in **Sessions
 | Control | What it does |
 |---|---|
 | **+ → Image…** | Upload `png`, `jpeg`, `webp`, `gif` for vision-capable models |
-| **+ → Document…** | Upload `txt`, `md`, `csv`, `pdf`, `docx`; text is extracted server-side |
+| **+ → Document…** | Upload `txt`, `md`, `csv`, `pdf`, `docx`, `xlsx`; text is extracted server-side |
 | **New chat** | Start a fresh conversation. Disabled while the current chat is still empty. |
 | **Planning** | `auto`, `Always plan`, `Never plan` |
 | **Model** | Only *configured* profiles. No free-text model ids. |
@@ -41,6 +41,41 @@ contact rather than silently dropped.
 
 Attachment content never enters the durable event log — only the id, media type,
 size, and hash.
+
+### Looking at a file again
+
+An uploaded file's chip in the transcript is a button. Clicking it opens a
+**view-only file preview** beside the conversation — a right-side pane on a wide
+window, a dismissible sheet on a narrow one. `Esc` or **Close file preview**
+closes it and returns focus to the chip.
+
+| File | What the preview shows |
+|---|---|
+| `md` | Rendered Markdown (raw HTML in the file is shown as text, never executed) |
+| `txt`, `csv` | The text as written |
+| `docx` | The document's extracted text |
+| `xlsx` | The first sheet's cell values as a table |
+| `pdf` | The PDF itself, in your browser's viewer |
+| `png`, `jpeg`, `webp`, `gif` | The picture, fitted to the pane |
+
+The pane is read-only: there is no edit, upload, or download control, and long
+files say so rather than pretending to show everything. A preview is scoped to
+the conversation the file was attached to — the same file id opened from another
+chat, or by another account, is a 404.
+
+PDFs and images are the only previews served as raw bytes, and both are checked
+again on the way out: the response carries the content type the bytes were just
+re-validated against, with `nosniff`, so a file can only ever be interpreted as
+what it actually is. A picture whose contents do not match its type is not
+displayed at all — the pane says so instead.
+
+Chips survive a reload: resuming a conversation restores them, and they open the
+same previews.
+
+Preview text goes through the same response redaction as everything else the API
+returns, so a credential-shaped string inside a file shows as
+`[REDACTED_SECRET]` in the pane. The stored file is untouched — only the view is
+masked.
 
 ## Approvals
 

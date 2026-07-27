@@ -16,11 +16,37 @@ REDACTED_PRIVATE_KEY = "[REDACTED_PRIVATE_KEY]"
 _SNAKE_IDENTIFIER = re.compile(r"[a-z]+(?:_[a-z]+)+")
 
 
+def _is_segmented_path(token: str) -> bool:
+    """True for a run that is only long because its *segments* were joined.
+
+    ``sessions/sess_…/attachments/att_…/preview/pdf`` and
+    ``home/user/.raiker/events/sess_…/turn_….jsonl`` are not opaque blobs: no
+    part of either carries 40 characters of entropy, and the run reached the
+    fallback only because slashes joined them. A credential is the opposite —
+    its entropy lives in one unbroken segment — so a key embedded in a path
+    (``v1/keys/<44 chars>``) still fails this test and is still redacted.
+
+    This is deliberately *not* applied to free-form text. It is offered only for
+    values the API says are locators (see ``raiker/api/redaction.py``), because
+    a base64 secret containing a slash could otherwise split into two
+    under-threshold halves and slip through.
+    """
+    return "/" in token and all(len(part) < 40 for part in token.split("/"))
+
+
 def _redact_high_entropy(match: re.Match[str]) -> str:
     token = match.group(0)
     if _SNAKE_IDENTIFIER.fullmatch(token):
         return token
     return REDACTED_SECRET
+
+
+def _redact_high_entropy_in_locator(match: re.Match[str]) -> str:
+    """The fallback as applied to a value the caller has declared a locator."""
+    token = match.group(0)
+    if _is_segmented_path(token):
+        return token
+    return _redact_high_entropy(match)
 
 
 def _redact_spoken_credential(match: re.Match[str]) -> str:
@@ -90,17 +116,31 @@ _PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], .
     (re.compile(r"\b[A-Za-z0-9+/_\-]{40,}\b"), _redact_high_entropy),
 )
 
+# The same rules with a path-aware fallback, used only for values whose *key*
+# declares them a locator. Every specific credential shape above still applies:
+# a ``token=…`` query parameter or a ``Bearer …`` string inside a URL is matched
+# before the fallback is ever reached.
+_LOCATOR_PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], ...] = (
+    _PATTERNS[:-1] + ((_PATTERNS[-1][0], _redact_high_entropy_in_locator),)
+)
 
-def redact_text(text: str) -> tuple[str, bool]:
+
+def redact_text(text: str, *, locator_value: bool = False) -> tuple[str, bool]:
     """Mask obvious secrets/tokens/emails/private keys in ``text``.
 
     Returns ``(redacted_text, changed)``. Deterministic and total: it never raises on
     unusual input and never removes the whole item, it only substitutes sensitive spans.
+
+    ``locator_value`` says the caller knows this string is a URL or filesystem
+    path — a fact only the caller has, from the field's key. It relaxes the
+    high-entropy fallback for slash-segmented runs *and nothing else*; every
+    credential shape is still matched. Default off, so free-form text (model
+    output, chat titles, document excerpts) keeps the strict scan.
     """
 
     if not isinstance(text, str):
         text = str(text)
     redacted = text
-    for pattern, replacement in _PATTERNS:
+    for pattern, replacement in _LOCATOR_PATTERNS if locator_value else _PATTERNS:
         redacted = pattern.sub(replacement, redacted)
     return redacted, redacted != text

@@ -4,10 +4,13 @@ import pytest
 
 from raiker.tools.filesystem import (
     FilesystemSafetyError,
+    apply_patch_content,
     glob_paths,
     grep_files,
     list_directory,
+    proposed_write_snapshot,
     read_file,
+    write_file_content,
 )
 
 
@@ -36,3 +39,32 @@ def test_glob_and_grep_bounded(tmp_path) -> None:  # type: ignore[no-untyped-def
     result = grep_files(tmp_path, "needle", ".", max_results=3)
     assert len(result["matches"]) == 3
     assert result["truncated"] is True
+
+
+def test_writes_are_refused_inside_the_governance_directories(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """BUG-06 — workspace confinement is not enough once a write really runs.
+
+    `.raiker/` holds the encrypted store, the audit log, the vault key and the
+    hook definitions (which run commands); `.git/` holds hooks that run on the
+    next commit. Both sit *inside* the workspace, so `resolve_workspace_path`
+    would happily hand them over. Reads stay unaffected.
+    """
+    for protected in (".raiker/hooks.json", ".git/hooks/pre-commit", ".raiker"):
+        with pytest.raises(FilesystemSafetyError, match="protected_workspace_path"):
+            write_file_content(tmp_path, protected, "owned")
+        with pytest.raises(FilesystemSafetyError, match="protected_workspace_path"):
+            apply_patch_content(tmp_path, protected, "owned")
+        # Refused at proposal time too, so no un-executable approval is parked.
+        with pytest.raises(FilesystemSafetyError, match="protected_workspace_path"):
+            proposed_write_snapshot(tmp_path, protected, "owned")
+        assert not (tmp_path / protected).is_file()
+
+    # A merely similar name is not protected — the guard matches path segments.
+    assert write_file_content(tmp_path, ".raikerish/notes.md", "ok")["status"] == "success"
+    assert write_file_content(tmp_path, "docs/.raiker.md", "ok")["status"] == "success"
+
+
+def test_reading_the_governance_directory_is_still_allowed(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    (tmp_path / ".raiker").mkdir()
+    (tmp_path / ".raiker" / "notes.txt").write_text("readable", encoding="utf-8")
+    assert read_file(tmp_path, ".raiker/notes.txt")["text"] == "readable"

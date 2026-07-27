@@ -10,6 +10,7 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import ResolveApprovalRequest, serialize_dto
 from raiker.api.sessions import ApiSession
 from raiker.approvals import ApprovalInbox
+from raiker.approvals.execution import ApprovalExecutionBridge
 from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.events.writer import EventLogWriter
@@ -26,6 +27,15 @@ _RESOLVE_ERRORS = {
     "approval_already_resolved": status.HTTP_409_CONFLICT,
     "approval_payload_tampered": status.HTTP_409_CONFLICT,
     "approval_expired": status.HTTP_409_CONFLICT,
+}
+
+# The relay reports the same refusals by reason code rather than by exception, so
+# an execution that is turned away maps to the identical status the metadata-only
+# path would have returned. Anything else is a conflict carrying its reason code.
+_EXECUTION_ERRORS = {
+    **_RESOLVE_ERRORS,
+    "critical_approval_requires_lifecycle": status.HTTP_400_BAD_REQUEST,
+    "posture_degraded:session_revoked": status.HTTP_403_FORBIDDEN,
 }
 
 
@@ -81,7 +91,7 @@ async def resolve_approval(
     request: Request,
     _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    session, _principal = _auth_data
+    session, principal = _auth_data
     store = SQLiteStore(_ws(request))
     inbox = ApprovalInbox(store, EventLogWriter(store))
     user_id = store.principal_user_id(session.principal_id)
@@ -99,8 +109,48 @@ async def resolve_approval(
     # the synthetic "connector_store" session id, which has no sessions row to
     # scope by. Everything else is owned via its session's user.
     owner_user_id = None if pending_intent_row is not None else user_id
-    if store.load_approval(approval_id, user_id=owner_user_id) is None:
+    approval_row = store.load_approval(approval_id, user_id=owner_user_id)
+    if approval_row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"ok": False, "reason_code": "approval_not_found"})
+
+    # BUG-06 — an approved file mutation is actually performed. The relay needs
+    # the approval still `pending` (it claims it atomically), so this runs
+    # *before* the metadata-only inbox would resolve it. Everything the inbox
+    # checks — critical lifecycle, TTL, payload hash, single resolution — the
+    # relay re-checks itself, and it adds the posture check and a fresh gate +
+    # policy review of the target at execution time.
+    bridge = ApprovalExecutionBridge(store, EventLogWriter(store))
+    if (
+        body.approve
+        and pending_intent_row is None
+        and bridge.executes_on_resolution(
+            str(approval_row.get("tool_name", "")),
+            session.principal_id,
+            critical=bool(approval_row.get("critical")),
+        )
+    ):
+        execution = bridge.execute(
+            approval_row, principal, session_id=session.session_id, reason=body.reason
+        )
+        if not execution.ok:
+            raise HTTPException(
+                status_code=_EXECUTION_ERRORS.get(
+                    execution.reason_code or "", status.HTTP_409_CONFLICT
+                ),
+                detail={"ok": False, "reason_code": execution.reason_code},
+            )
+        return {
+            "approval_id": approval_id,
+            "action_id": str(approval_row.get("action_id", "")),
+            "status": execution.status,
+            "executes_action": True,
+            "reason": body.reason,
+            "execution": {
+                "capability": execution.capability,
+                "path": execution.artifacts.get("path"),
+            },
+        }
+
     try:
         resolution = inbox.resolve(
             approval_id,

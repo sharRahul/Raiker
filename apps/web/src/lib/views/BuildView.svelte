@@ -362,13 +362,17 @@
     approvalBusy = approval.approval_id;
     approvalNotice = null;
     try {
-      await api.resolveApproval(approval.approval_id, {
+      const result = await api.resolveApproval(approval.approval_id, {
         approve,
         reason: approve ? "accepted in the Build workspace" : "rejected in the Build workspace",
       });
-      approvalNotice = approve
-        ? "Decision recorded. Raiker re-governs the action before anything runs."
-        : "Rejection recorded.";
+      approvalNotice = !approve
+        ? "Rejection recorded."
+        : result.executes_action
+          ? result.execution?.path
+            ? `Applied once — wrote ${result.execution.path}. The previous contents were checkpointed.`
+            : "Applied once, under a fresh capability, policy and posture check."
+          : "Decision recorded. Raiker re-governs the action before anything runs.";
       await loadApprovals();
     } catch (error) {
       approvalNotice =
@@ -519,8 +523,8 @@
         <section class="decisions" aria-labelledby="build-decisions">
           <h2 id="build-decisions">Waiting on you</h2>
           <p class="decisions-lead">
-            Accepting records your decision. Raiker re-governs the action before anything runs — a recorded decision is
-            never treated as permission it already had.
+            Raiker re-governs every accepted action before it runs — a recorded decision is never treated as permission
+            it already had. Each decision below reports afterwards whether it was applied or only recorded.
           </p>
           {#each approvals as approval (approval.approval_id)}
             <div class="decision">

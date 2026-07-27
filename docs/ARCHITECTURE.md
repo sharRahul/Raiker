@@ -27,7 +27,7 @@ gate per action are enforced.
 | Terminal and web dashboard | Implemented local clients; no direct authority |
 | Local model profiles | Supported through governed provider contracts |
 | Integrated executors | Governed per capability and decision mode |
-| Approval resolution | Metadata-only unless a separately governed relay executes a supported action |
+| Approval resolution | Executes an approved file mutation through the governed relay (re-governed at execution time, checkpointed); metadata-only for every other capability |
 | Remote/cloud and sensitive domains | Disabled and fail-closed |
 
 Owner bootstrap creates a persisted principal and a human `runtime_gate_manager`.
@@ -39,4 +39,4 @@ commands and local API.
 See [implementation status](IMPLEMENTATION_STATUS.md) for the current capability
 ledger and [security architecture](SECURITY_ARCHITECTURE.md) for trust boundaries.
 
-Approval resolution is metadata-only. Strict non-allow blocking, role revoke governed, and capability gate per action are enforced. sessions: deferred; no `/sessions` command is currently implemented.
+Approval resolution executes an approved local file mutation through the governed relay and is metadata-only for every other capability. Strict non-allow blocking, role revoke governed, and capability gate per action are enforced. sessions: deferred; no `/sessions` command is currently implemented.

@@ -93,7 +93,10 @@ def test_architecture_and_security_docs_state_current_truth() -> None:
     assert "Current Backend Capability Matrix" in architecture
     assert "gateway finalisation events" in architecture
     assert "no `/sessions` command is currently implemented" in architecture
-    assert "approval resolution is metadata-only" in security.lower()
+    # BUG-06 — resolution executes a file mutation and nothing else. The security
+    # doc must state *both* halves of that boundary, not just one of them.
+    assert "approval resolution executes exactly one narrow class of action" in security.lower()
+    assert "remains metadata-only: it records the decision and executes nothing" in security.lower()
     assert "remote execution | disabled/fail-closed" in security.lower()
     assert "plugin runtime slices" in security.lower()
 
@@ -102,7 +105,8 @@ def test_catalog_marks_memory_and_approval_semantics_precisely() -> None:
     catalog = Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
     assert "implemented_approval_required" in catalog
     assert "metadata_only" in catalog
-    assert "Does not execute approved action." in catalog
+    assert "executed once through the governed approval execution relay" in catalog
+    assert "metadata-only for every other capability" in catalog
 
 
 def test_truthfulness_validator_detects_known_overclaim_patterns() -> None:
@@ -110,7 +114,24 @@ def test_truthfulness_validator_detects_known_overclaim_patterns() -> None:
 
     errors = validator._validate_snippet(  # type: ignore[attr-defined]
         "docs/SECURITY_ARCHITECTURE.md",
-        "Approval resolution executes actions. no-executor domains work. plugin execution enabled.",
+        "Approval resolution executes any approved action. no-executor domains work. plugin execution enabled.",
     )
     joined = "\n".join(errors).lower()
     assert "forbidden overclaim" in joined
+
+
+def test_truthfulness_validator_still_requires_the_execution_boundary_to_be_stated() -> None:
+    """Naming what executes is not enough — the doc must bound it.
+
+    BUG-06 narrowed the overclaim ban from "approval resolution executes" to the
+    unbounded forms. This asserts the narrowing did not open a hole: a doc that
+    mentions approval resolution without saying what stays metadata-only is
+    still rejected.
+    """
+    from scripts import validate_repo_truthfulness as validator
+
+    errors = validator._validate_snippet(  # type: ignore[attr-defined]
+        "docs/SECURITY_ARCHITECTURE.md",
+        "Approval resolution executes an approved local file mutation. fail-closed elsewhere. metadata-only preview.",
+    )
+    assert any("execution-boundary" in error for error in errors)

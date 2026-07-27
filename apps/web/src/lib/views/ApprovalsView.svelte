@@ -13,7 +13,10 @@
 
   let { sessionId = null }: { sessionId?: string | null } = $props();
 
-  const FILTERS = ["pending", "approved", "denied"] as const;
+  // `executed` is the terminal status of an approval the execution relay
+  // actually carried out, so it needs its own tab — otherwise the file writes
+  // the owner approved would vanish from every filter.
+  const FILTERS = ["pending", "approved", "executed", "denied"] as const;
   const RISK_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
   let filter = $state<(typeof FILTERS)[number]>("pending");
@@ -83,7 +86,9 @@
       notice = {
         kind: "ok",
         text: result.executes_action
-          ? `Executed once: ${result.status}.`
+          ? result.execution?.path
+            ? `Executed once — wrote ${result.execution.path}. The previous contents were checkpointed.`
+            : `Executed once: ${result.status}.`
           : `Recorded: ${result.status}. The action was NOT executed (metadata-only).`,
       };
       selected = null;
@@ -156,8 +161,9 @@
 
 <div class="head-row">
   <p class="page-lead">
-    Actions the agent proposed that need a human decision. Most approvals
-    <strong>record your decision only</strong>; any server-confirmed execution is stated explicitly.
+    Actions the agent proposed that need a human decision. Each one states whether approving
+    <strong>performs it</strong> or only <strong>records your decision</strong> — the server
+    decides which, from the capability gates you control.
   </p>
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh approvals">
     <Icon name="refresh" size={15} />
@@ -312,8 +318,10 @@
         </button>
         <button type="button" class="btn btn-primary" onclick={() => resolve(true)} disabled={busy}>
           {busy
-            ? "Recording…"
-            : selected.approval.tool_name === "connector_write"
+            ? selected.executes_on_approval
+              ? "Executing…"
+              : "Recording…"
+            : selected.executes_on_approval
               ? "Approve and execute once"
               : "Approve (record only)"}
         </button>

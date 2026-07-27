@@ -774,6 +774,11 @@ class ApprovalDetailView:
     metadata_only_notice: str = (
         "Approval resolution is metadata-only. Recording a decision does NOT execute the action."
     )
+    # Server-computed: does pressing Approve actually perform this action? True
+    # for a connector write intent and — once the relay and the target capability
+    # are both enabled — for a file mutation. The owner is told which of the two
+    # kinds of decision they are making before they make it.
+    executes_on_approval: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -783,6 +788,7 @@ class ApprovalDetailView:
             "diff_path": self.diff_path,
             "preview_kind": self.preview_kind,
             "metadata_only_notice": self.metadata_only_notice,
+            "executes_on_approval": self.executes_on_approval,
         }
 
 
@@ -2321,7 +2327,7 @@ class DashboardService:
         )
         if row is None:
             return None
-        return self._approval_detail(row)
+        return self._approval_detail(row, principal_id=principal_id)
 
     # ── Models / diagnostics ────────────────────────────────────────────
     def get_models(self, acting_principal_id: str | None = None) -> ModelsView:
@@ -3198,7 +3204,11 @@ class DashboardService:
             critical=bool(row.get("critical")),
         )
 
-    def _approval_detail(self, row: dict[str, Any]) -> ApprovalDetailView:
+    def _approval_detail(
+        self, row: dict[str, Any], *, principal_id: str | None = None
+    ) -> ApprovalDetailView:
+        from raiker.approvals.execution import ApprovalExecutionBridge
+
         view = self._approval_view(row)
         try:
             raw_args = json.loads(str(row.get("arguments_json", "{}")))
@@ -3206,17 +3216,36 @@ class DashboardService:
             raw_args = {}
         arguments = self._redact_arguments(raw_args)
         diff, diff_path, kind = self._build_preview(view.tool_name, raw_args)
+        connector_write = view.tool_name == "connector_write"
+        # BUG-06 — the notice is derived from what the server will actually do,
+        # not from a constant. A file mutation executes only when the relay and
+        # the target capability are both enabled; either gate being off returns
+        # this approval to metadata-only, and the notice says so.
+        relays = ApprovalExecutionBridge(self.store).executes_on_resolution(
+            view.tool_name, principal_id, critical=view.critical
+        )
+        if connector_write:
+            notice = "Approving this connector write executes this exact action once."
+        elif relays:
+            notice = (
+                "Approving this performs the change shown above, once, in your "
+                "workspace — under a fresh capability, policy and posture check. "
+                "The previous file contents are checkpointed first, so it can be "
+                "rewound."
+            )
+        else:
+            notice = (
+                "Approval resolution is metadata-only. Recording a decision does "
+                "NOT execute the action."
+            )
         return ApprovalDetailView(
             approval=view,
             arguments=arguments,
             diff=diff,
             diff_path=diff_path,
             preview_kind=kind,
-            metadata_only_notice=(
-                "Approving this connector write executes this exact action once."
-                if view.tool_name == "connector_write"
-                else "Approval resolution is metadata-only. Recording a decision does NOT execute the action."
-            ),
+            metadata_only_notice=notice,
+            executes_on_approval=connector_write or relays,
         )
 
     @classmethod

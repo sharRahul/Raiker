@@ -59,7 +59,10 @@ APPROVAL_VIEW = {
     "turn_id", "created_at", "age_seconds", "requires_approval", "expires_at", "is_expired",
     "executes_action", "critical",
 }
-APPROVAL_DETAIL = {"approval", "arguments", "diff", "diff_path", "preview_kind", "metadata_only_notice"}
+APPROVAL_DETAIL = {
+    "approval", "arguments", "diff", "diff_path", "preview_kind", "metadata_only_notice",
+    "executes_on_approval",
+}
 AGENT_RESPONSE = {
     "request_id", "session_id", "turn_id", "status", "message", "events_path", "checkpoint_path",
     "approval", "last_event_id",

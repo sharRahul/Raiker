@@ -25,10 +25,13 @@ export function approvalBadge(status: string): BadgeVariant {
     case "pending":
       return "needs-approval";
     case "approved":
+    case "executed":
       return "done";
     case "denied":
     case "expired":
       return "stopped";
+    case "execution_failed":
+      return "blocked";
     default:
       return "idle";
   }

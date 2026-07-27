@@ -52,9 +52,16 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "role_create": "role_mutation",
     "role_grant": "role_mutation",
     "role_revoke": "role_mutation",
+    # The relay is a governed capability in its own right, so name it here too:
+    # without a mapping, `check_capability_gate` finds no gate for it and the
+    # owner's off switch would silently not apply to the one executor that turns
+    # an approval into a real mutation.
+    "approval_execution_relay": "approval_execution_relay",
     "write_file": "file_write_execution",
     "edit_file": "file_write_execution",
+    "file_write_execution": "file_write_execution",
     "apply_patch": "patch_apply_execution",
+    "patch_apply_execution": "patch_apply_execution",
     "memory_write": "memory_write_execution",
     "memory_forget": "memory_forget_execution",
     "checkpoint_restore": "checkpoint_restore_execution",

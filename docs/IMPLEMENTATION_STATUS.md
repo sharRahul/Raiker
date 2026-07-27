@@ -20,10 +20,11 @@
 | `test_only` | Reserved for offline test support |
 | `disabled_deferred` | No usable executor; fails closed |
 
-Approval resolution is `metadata_only`. CLI durable memory mutation is
-`implemented_approval_required`.
-
-Approval resolution is metadata-only. CLI durable memory mutation is `implemented_approval_required`.
+Approval resolution is `metadata_only` for every capability except an approved
+local **file mutation** (`file_write_execution`, `patch_apply_execution`), which
+is executed once through the governed approval execution relay — re-governed at
+execution time and checkpointed so it stays reversible.
+CLI durable memory mutation is `implemented_approval_required`.
 
 Integrated real executors (including graph indexing, semantic/vector runtimes, plugin execution slices, channel runtime, container, scheduled routines, model-provider runtime, and local email/calendar/reminder stores) are `implemented_policy_gated`/governed per action; remote/cloud command execution and sensitive finance/investment/medical/pregnancy/CCTV/home-security/hardware domains remain `disabled_deferred` and fail closed.
 
@@ -67,7 +68,7 @@ Phase 3 is complete for the following metadata and readiness slices. Phase 4 rem
 | Slice | Current meaning |
 |---|---|
 | Phase 3 Slice K | Semantic-memory readiness is metadata-only: `semantic_memory_readiness_metadata_only: True`; `semantic_memory_ready_for_writes: False`. |
-| Slice L | Approval preview persistence is metadata-only; it records an inspectable preview and does not execute an approved action. |
+| Slice L | Approval preview persistence is metadata-only; it records an inspectable preview and executes nothing. Its `approval_execution_enabled` / `approval_relay_runtime_enabled` flags scope to **this preview-persistence surface** (durable approval queues, workers, schedulers, watchers, daemons — all still deferred). They are not a statement about the Approvals inbox, where an approved file mutation is executed once through the governed relay. |
 | Slice M | Storage cleanup reports readiness and produces cleanup previews. Cleanup execution remains governed and fail-closed where no executor is available. |
 | Slice N | Plugin server startup readiness reports plugin capability and blockers; plugins do not become an authority bypass. |
 | Slice O | External channels and notifications expose metadata readiness only; runtime dispatch events are introduced only with a governed executor. |

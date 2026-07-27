@@ -13,7 +13,7 @@ REQUIRED_DOCS = [
 REQUIRED_MARKERS = {
     Path("docs/IMPLEMENTATION_STATUS.md"): [
         "Canonical Backend Capability Statuses",
-        "Approval resolution is `metadata_only`",
+        "Approval resolution is `metadata_only` for every capability except",
         "CLI durable memory mutation is `implemented_approval_required`",
         "Integrated real executors (including graph indexing, semantic/vector runtimes, plugin execution slices, channel runtime, container, scheduled routines, model-provider runtime, and local email/calendar/reminder stores) are `implemented_policy_gated`/governed per action; remote/cloud command execution and sensitive finance/investment/medical/pregnancy/CCTV/home-security/hardware domains remain `disabled_deferred` and fail closed.",
         "Phase 4 memory MVP is implemented",
@@ -21,7 +21,9 @@ REQUIRED_MARKERS = {
     Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"): [
         "implemented_approval_required",
         "metadata_only",
-        "Does not execute approved action.",
+        # BUG-06: resolution executes a file mutation through the relay and
+        # nothing else. The catalogue must keep saying which half is which.
+        "executed once through the governed approval execution relay",
     ],
     Path("docs/EVENT_CATALOG.md"): [
         "approval_denied",
@@ -30,7 +32,7 @@ REQUIRED_MARKERS = {
         "tool_failed",
     ],
     Path("docs/SECURITY_ARCHITECTURE.md"): [
-        "approval resolution is metadata-only",
+        "Approval resolution executes exactly one narrow class of action",
         "remote execution | disabled/fail-closed",
         "cloud execution | disabled/fail-closed",
     ],

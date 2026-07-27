@@ -23,8 +23,10 @@ silent bypass.
   model, plugin, or connector has a bypass lane.
 - The local owner controls roles, gates, modes, approvals, recovery, and scope.
   AI principals cannot grant, elevate, or retain authority for themselves.
-- A recorded approval is metadata-only. Any execution is independently
-  governed and rechecked at the execution boundary.
+- A recorded approval is never itself the authority to act. Any execution it
+  leads to is independently governed and rechecked at the execution boundary —
+  gate, decision mode, policy, and posture — and is confined to the narrow set of
+  local, reversible, checkpointed capabilities the relay is wired for.
 - Evidence is redacted and metadata-oriented; credentials and secret-like
   durable-memory content are denied before persistence.
 - Unsupported, remote, cloud, and sensitive domains remain disabled and

@@ -26,6 +26,7 @@ const DETAIL = {
   preview_kind: "file_diff",
   metadata_only_notice:
     "Approval resolution is metadata-only. Recording a decision does NOT execute the action.",
+  executes_on_approval: false,
 };
 
 const EXPIRED = {
@@ -152,6 +153,75 @@ describe("ApprovalsView", () => {
     ).not.toBeInTheDocument();
   });
 
+  // BUG-06 — a file write the owner approves is really performed. The view must
+  // label the button and report the outcome from what the *server* says it will
+  // do, never from a hardcoded assumption about metadata-only resolution.
+  it("offers to execute, and names the written file, when the server says approving performs the write", async () => {
+    stubFetch({
+      "GET /api/approvals": [PENDING],
+      "GET /api/approvals/appr_1": {
+        ...DETAIL,
+        executes_on_approval: true,
+        metadata_only_notice:
+          "Approving this performs the change shown above, once, in your workspace.",
+      },
+      "POST /api/approvals/appr_1/resolve": {
+        approval_id: "appr_1",
+        action_id: "act_1",
+        status: "executed",
+        executes_action: true,
+        reason: "approved via web UI",
+        execution: { capability: "file_write_execution", path: "notes.txt" },
+      },
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    expect(
+      await screen.findByText(/approving this performs the change shown above/i),
+    ).toBeInTheDocument();
+    await fireEvent.click(await screen.findByRole("button", { name: /approve and execute once/i }));
+
+    expect(await screen.findByText(/executed once — wrote notes\.txt/i)).toBeInTheDocument();
+  });
+
+  it("keeps the record-only label and message when the server says the capability is gated off", async () => {
+    stubFetch({
+      "GET /api/approvals": [PENDING],
+      "GET /api/approvals/appr_1": DETAIL,
+      "POST /api/approvals/appr_1/resolve": {
+        approval_id: "appr_1",
+        action_id: "act_1",
+        status: "approved",
+        executes_action: false,
+        reason: "approved via web UI",
+      },
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /approve \(record only\)/i }));
+
+    expect(await screen.findByText(/was NOT executed \(metadata-only\)/i)).toBeInTheDocument();
+  });
+
+  it("keeps executed approvals reachable through their own filter tab", async () => {
+    // `executed` is the terminal status the relay writes, so without this tab
+    // every approval the owner actually carried out would vanish from the queue.
+    const executed = { ...PENDING, approval_id: "appr_done", status: "executed", requires_approval: false };
+    const fetchMock = stubFetch({ "GET /api/approvals": [executed] });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("tab", { name: /executed/i }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some((call) => String(call[0]).includes("status_filter=executed")),
+      ).toBe(true);
+    });
+    expect(await screen.findByRole("button", { name: /review/i })).toBeInTheDocument();
+  });
+
   it("reports the connector-write exception after server-confirmed execution", async () => {
     const connectorApproval = {
       ...PENDING,
@@ -168,6 +238,7 @@ describe("ApprovalsView", () => {
         diff: null,
         diff_path: null,
         metadata_only_notice: "Approving this connector write executes this exact action once.",
+        executes_on_approval: true,
       },
       "POST /api/approvals/appr_connector/resolve": {
         approval_id: "appr_connector",

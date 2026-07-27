@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Seven are marked **FIXED** and were resolved on this
+and the proposed fix. Eight are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -28,7 +28,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-05 | High | Models / policy | Fixed |
 | FIXED-06 | High | Chat / Build rendering | Fixed (was BUG-03) |
 | FIXED-07 | High | API redaction | Fixed (was BUG-04) |
-| BUG-06 | Medium | Approvals | Open (by design — needs a decision) |
+| FIXED-08 | **Critical** | Approvals / file output | Fixed (was BUG-06) |
 | BUG-07 | Medium | Chat | Open (specified, unimplemented) |
 | BUG-08 | Medium | Export | Open (not specified) |
 | BUG-09 | Medium | Tasks | Open |
@@ -431,7 +431,9 @@ to close it.
 
 ---
 
-## BUG-06 — Nothing in the app can actually write a file
+## FIXED-08 — Nothing in the app could actually write a file *(was BUG-06)*
+
+**Status: fixed in this change.**
 
 **Observed.** Chat proposes `write_file` → Approvals shows the exact diff →
 **Approve (record only)** returns `executes_action: false` and the response says
@@ -439,15 +441,119 @@ to close it.
 never created. Enabling `approval_execution_relay` did not change this.
 `not-working/BUG-06-approval-never-executes.png`.
 
-**Assessment.** This is the documented model
-(`README.md`: "Approval resolution is metadata only by default"), so it is
-honest — but it means "generate a markdown file and view it" is not achievable
-today, and Build's premise ("every file write, patch, and command becomes a
-decision you accept or reject") cannot complete its loop.
+**Root cause.** Not a missing executor — a missing wire. Everything needed
+already existed and was already tested: `FileWriteExecutor` /
+`PatchApplyExecutor` do the write, and `ApprovalExecutionRelay`
+(`raiker/runtime/executors/tier1_approval.py`) implements the hard part
+correctly — TTL, argument-hash TOCTOU check, posture check, atomic
+`pending → executing → executed` claim, and re-routing the target through
+`RuntimeAuthority` so it re-passes its own gate, decision mode and policy review
+at execution time. `POST /api/approvals/{id}/resolve` simply never called it. It
+called `ApprovalInbox.resolve`, which records a decision and returns.
 
-**Needs a decision.** Either wire the approval-execution relay through to real
-execution for `file_write_execution` in `local_single_user_runtime`, or state
-plainly in Chat/Build that accepted proposals are recorded, not performed.
+Two smaller things made "enabling the relay" appear not to work, and both are
+now fixed: `approval_execution_relay` was **absent from `CAPABILITY_GATE_MAP`**,
+so `check_capability_gate` found no gate for it and the relay's own gate was
+never actually consulted by `route_action`; and there was no path from the API
+to the relay at all.
+
+**Decision taken.** The first of the two options this entry offered: wire the
+relay through for file mutations, rather than restate the limitation in the UI.
+It follows the `connector_write` precedent already in the codebase — a
+model-proposed connector mutation is parked and genuinely executed on approval
+(`raiker/api/routes_approvals.py`) — and it is the one change B1 and C1 both
+depend on.
+
+**Fix applied.** New `raiker/approvals/execution.py`. When the owner approves a
+**pending, non-critical** approval whose capability is `file_write_execution` or
+`patch_apply_execution`, the resolution is handed to the relay through
+`RuntimeAuthority.route_action`, so the documented "governed entry only"
+property holds unchanged. It runs *before* the metadata-only inbox would resolve
+the approval, because the relay claims a `pending` row atomically — that claim
+is the single-execution primitive.
+
+Kept deliberately narrow:
+
+- **Two capabilities, named explicitly.** `EXECUTABLE_ON_APPROVAL` is a
+  two-member frozenset. `shell`, `process` and `network` still record a decision
+  and execute nothing — a file write is local, checkpointed and reversible, and
+  those three are not. Widening the set is an edit to that frozenset, guarded by
+  a regression test.
+- **Both gates still decide.** The relay's own capability and the target's are
+  each consulted; either being off returns resolution to exactly the previous
+  metadata-only behaviour. Revocation still wins absolutely.
+- **Critical is untouched.** A critical approval never takes this path; it keeps
+  the human-only, step-up-verified lifecycle in `resolve_critical_approval`.
+- **Reversible.** `route_action` snapshots the file's pre-image into the
+  checkpoint blob store before the executor runs, so an approved overwrite can
+  be rewound. Approve is not a one-way door.
+
+**Raised by this change, and closed here.** Once an approved write really
+executes, confinement to the workspace stops being sufficient: the workspace
+*contains* `.raiker/` — the encrypted store, the audit log, the vault key, the
+hook definitions (which run commands) and the MCP server scripts — and `.git/`,
+whose hooks run on the next commit. A model-proposed write to any of those was
+inside `resolve_workspace_path`'s boundary. New
+`resolve_writable_workspace_path` refuses both trees, applied at proposal time
+(so no un-executable approval is parked) and at the executor, which is the
+authoritative boundary. Reads are unaffected. HANDOFF reserves hard prevention
+for a last resort; the agent rewriting the machinery that records and constrains
+it is that case.
+
+**Honest surfaces, in both configurations.** The server computes
+`executes_on_approval` and the Approvals detail states which kind of decision
+this is *before* the owner presses anything; the button reads **Approve and
+execute once** or **Approve (record only)** accordingly, and the result names
+the file written. `ToolBroker`'s `expected_effect` — which previously told the
+model "metadata-only … does not execute the action" for every non-connector tool
+— is now derived from the same check, and Chat/Build render it. An `executed`
+filter tab was added, or every approval the owner actually carried out would
+have vanished from the queue.
+
+**Verified.** `tests/test_approval_execution_wiring.py` (16 tests): an approved
+write reaching disk with the response naming it; `apply_patch` through its own
+capability; the pre-image checkpoint; the audit trail carrying
+`approval_received` + `approval_executed` + `action_executed`; both gates
+returning resolution to metadata-only; critical refused with
+`critical_approval_requires_lifecycle`; tampered payload and expired approval
+refused with nothing written; `.raiker/`, `.git/` and outside-workspace paths
+refused; a failed execution left terminal so it can never be silently re-run;
+and a replay of an executed approval returning 409. Plus filesystem-guard tests,
+broker `expected_effect` tests, a rewritten
+`tests/test_security_regression_ui.py::TestApprovalExecutionIsNarrow` that fails
+if a Tier-2 approval ever starts executing, and three new `ApprovalsView` tests.
+
+**Verified live** against the running app on a bare workspace, reproducing this
+entry's own scenario: approval detail reports `executes_on_approval: true` with
+the performs-the-change notice, `POST …/resolve` returns
+`{"status": "executed", "executes_action": true, "execution": {"capability":
+"file_write_execution", "path": "quarterly-report.md"}}`, the file exists on disk
+with the exact proposed contents, the approval is reachable under the new
+**executed** tab, and the audit log carries `approval_received`,
+`approval_executed`, `action_executed` and `checkpoint_captured`.
+
+**Documentation guards moved with the code, not after it.** The repo's
+"documentation never runs ahead of code" validators encoded the old rule as
+required wording (`"approval resolution is metadata-only"`) and a forbidden
+overclaim (`"approval resolution executes"`). Both were **narrowed rather than
+removed**: the required wording is now a set of phrasings that state the
+*boundary* — what executes and that everything else does not — and the forbidden
+overclaims are the unbounded forms (`"approval resolution executes any"`,
+`"… every"`, `"… the approved action"`). A new test asserts the narrowing left no
+hole: a doc that names what executes without bounding it is still rejected.
+
+**Still not done, deliberately.** The turn does not resume after the approval
+(B2) — the owner must re-prompt for the agent to continue. That is the next
+change, and it is what converts a proposer into an agent. `shell` stays
+record-only; it belongs with B5's owner-defined command allowlist, not with the
+file relay.
+
+The **terminal client's `/approve` is also unchanged** and stays metadata-only
+for every capability. It resolves without an authenticated API session, and the
+relay's posture control (A4 — deny when the approving session was revoked) has
+nothing to check there, so wiring it needs a local-principal decision of its own
+rather than a copy of this one. Both CLI messages now name the divergence
+instead of leaving it to be discovered.
 
 ---
 
@@ -571,38 +677,28 @@ refused by the policy engine). The governance, audit and checkpoint story is
 
 The gap is that **Build cannot close a loop.** Everything below follows from
 that, and the order is the order they should be done in — each tier is worthless
-without the one above it.
+without the one above it. B1 has since been closed (FIXED-08): an approved file
+change is now really written. B2 is what still stops the loop.
 
 ### Tier 0 — the blocking three (without these, nothing else matters)
 
-**B1. An approved action must actually execute.** *(depends on BUG-06)*
-Today `write_file`, `edit_file`, `apply_patch` and `shell` are all
-`("high", True)` in `raiker/models/tool_call_validation.py`, and approval
-resolution is metadata-only, so no file is ever written and no command ever
-runs. `ApprovalExecutionRelay`
-(`raiker/runtime/executors/tier1_approval.py`) already implements the hard part
-correctly — TTL check, argument-hash TOCTOU check, posture check, atomic
-`pending → executing → executed` transition, and re-routing through
-`RuntimeAuthority` so the target re-passes its own gate and policy review at
-execution time. **Work:** wire the Approvals resolution path to invoke the relay
-for `file_write_execution` and `patch_apply_execution` when the owner has
-enabled it, and surface the executed/refused outcome in the transcript. Until
-this lands, Build is a proposal generator.
+**B1. An approved action must actually execute.** ✅ **Done — see FIXED-08.**
+The Approvals resolution path now invokes `ApprovalExecutionRelay` for
+`file_write_execution` and `patch_apply_execution`, so an approved file change
+is genuinely written, re-governed at execution time, and checkpointed first.
+Build is no longer a proposal generator for file work.
 
-**There is already a working precedent in the codebase.** A model-proposed
-`connector_write` is parked as a `connector_write_intents` row and, on approval,
-is genuinely executed by `ConnectorInvoker.invoke`
-(`raiker/api/routes_approvals.py`), returning `executes_action: true`. File
-writes take the other branch and report *"Approval resolution is metadata-only
-and does not execute the action"* (`raiker/tools/broker.py`). So the question is
-not whether the architecture can execute an approved action — it demonstrably
-can, through the audited path — but whether the owner wants that door open for
-the filesystem and the shell as well.
+**What is left of B1:** `shell` is still metadata-only on resolution, and that
+is deliberate — a command is neither local-only nor reversible, so it belongs
+with B5 (a narrow, owner-defined command allowlist under its own capability)
+rather than with the file relay. And the executed/refused outcome is surfaced in
+the Approvals inbox and the Build decisions rail, but is **not yet threaded back
+into the transcript as a tool result** — that is B2's job, below.
 
-**B2. The turn must resume after an approval.** The loop `break`s on
-`needs_approval` (`raiker/runtime/orchestrator.py`) and the turn returns. Even
-once B1 lands, the agent stops dead at its first write and the user must
-re-prompt to continue — which discards the model's working state and re-pays for
+**B2. The turn must resume after an approval.** *(now the blocking one)* The
+loop `break`s on `needs_approval` (`raiker/runtime/orchestrator.py`) and the turn
+returns. With B1 landed the write really happens, but the agent still stops dead
+at it and the user must re-prompt to continue — which discards the model's working state and re-pays for
 the context. **Work:** persist the suspended loop state against the approval id,
 and on resolution resume the same turn with the tool result appended (approved →
 the real result; rejected → a refusal the model can react to). This is the
@@ -740,9 +836,11 @@ autonomous without the host as the blast radius.
 
 ### Suggested order
 
-B1 → B2 → B3 make Build an agent. B4–B6 make it efficient. B13–B16 make the
-result reviewable. Everything else is depth. B1 and B20 are both *policy*
-decisions before they are engineering ones and belong to the owner, not to an
+B1 → B2 → B3 make Build an agent. **B1 has landed (FIXED-08), so B2 is now the
+blocking item** — until the turn resumes after an approval, an approved write
+still costs a re-prompt and the model's working state. B4–B6 make it efficient.
+B13–B16 make the result reviewable. Everything else is depth. B20 is a *policy*
+decision before it is an engineering one and belongs to the owner, not to an
 implementer.
 
 ---
@@ -767,14 +865,13 @@ cannot act on the tools it can read, and it cannot remember across the work.
 
 ### Tier 0 — the blocking three
 
-**C1. It cannot produce a file.** *(depends on BUG-06)* Every route to a durable
-artifact runs through `write_file`, which is approval-gated and — unlike
-`connector_write`, see C2 — metadata-only on resolution, so "draft the report and
-save it" cannot complete. The assistant can compose a
-document in the transcript and nothing more. **Work:** as B1 — wire approval
-resolution to `ApprovalExecutionRelay` for file writes — then add first-class
-document output (Markdown now; DOCX/XLSX/PDF generation behind a capability),
-written into the session's workspace and listed in the chat.
+**C1. It can now produce a file, but not yet a *document*.** ✅ **Half done —
+see FIXED-08.** "Draft the report and save it" completes: `write_file` is
+approval-gated and, on approval, genuinely written. **Work remaining:**
+first-class document output — Markdown now, DOCX/XLSX/PDF generation behind a
+capability — written into the session's workspace and listed in the chat, so the
+artifact is a visible result rather than a path the owner has to go and find.
+C4 (the file inspector) is the surface that makes it visible.
 
 **C2. Acting in the owner's tools works, but only through one narrow door.**
 This is the one place the approval loop is already closed end to end, and it
@@ -901,7 +998,8 @@ threads a routine is advancing.
 
 ### Suggested order
 
-C1 and C2 make Chat capable of work; C3 makes it feel like it knows the owner;
+C1 and C2 make Chat capable of work — C1's blocking half has landed (FIXED-08),
+leaving document output; C3 makes it feel like it knows the owner;
 C10/C11 make it present when the owner is not watching. C4–C6 and C13–C15 are
 the daily-use polish that determines whether any of it gets used. C2, C3(3),
 C10 and C12 are owner policy decisions before they are implementation tasks.

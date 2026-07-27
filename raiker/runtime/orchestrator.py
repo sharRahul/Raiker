@@ -682,6 +682,12 @@ class RuntimeOrchestrator:
                 )
                 self._state(machine, envelope, "RESPONDING")
                 status = "needs_approval"
+                # `expected_effect` is the broker's own statement of what
+                # approving will do — metadata-only for most tools, a real,
+                # single write for a file mutation once the execution relay is
+                # enabled (BUG-06). Carried through so the transcript never has
+                # to guess.
+                proposal_output = tool_result.output or {}
                 approval = {
                     "action_id": action.action_id,
                     "tool_name": action.tool_name,
@@ -689,6 +695,7 @@ class RuntimeOrchestrator:
                     "risk_level": "high",
                     "reasons": decision.reasons,
                     "message": "Approval required. The action was not executed.",
+                    "expected_effect": str(proposal_output.get("expected_effect", "")),
                 }
                 message = "Approval required for local action. No command was executed."
                 break

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from raiker.runtime.executors.base import ExecutionResult
-from raiker.tools.filesystem import resolve_workspace_path
+from raiker.tools.filesystem import resolve_writable_workspace_path
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -27,7 +27,7 @@ class FileWriteExecutor:
                 summary="File write denied: no path provided.",
             )
         try:
-            resolved = resolve_workspace_path(self._workspace_root, path)
+            resolved = resolve_writable_workspace_path(self._workspace_root, path)
             resolved.parent.mkdir(parents=True, exist_ok=True)
             resolved.write_text(text, encoding="utf-8")
             rel = str(resolved.relative_to(self._workspace_root))
@@ -60,7 +60,7 @@ class PatchApplyExecutor:
                 summary="Patch apply denied: no path provided.",
             )
         try:
-            resolved = resolve_workspace_path(self._workspace_root, path)
+            resolved = resolve_writable_workspace_path(self._workspace_root, path)
             resolved.parent.mkdir(parents=True, exist_ok=True)
             resolved.write_text(new_text, encoding="utf-8")
             rel = str(resolved.relative_to(self._workspace_root))

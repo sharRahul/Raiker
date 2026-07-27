@@ -107,3 +107,47 @@ def test_broker_memory_write_denies_secret_without_approval_record(tmp_path) -> 
     assert decision.decision == "deny"
     assert result.status == "denied"
     assert store.list_approvals(status="pending") == []
+
+
+def test_write_file_proposal_states_that_approving_writes_the_file(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """BUG-06 — the proposal must not promise metadata-only once it is not true.
+
+    The broker used to tell the model and the transcript "Approval resolution is
+    metadata-only and does not execute the action" for every non-connector tool.
+    With approval resolution wired to the execution relay that sentence became a
+    lie for file mutations, so it is now derived from the same check the resolve
+    endpoint makes.
+    """
+    broker = _broker(tmp_path)
+    result, decision = broker.execute(
+        ToolAction(new_id("act_"), "write_file", {"path": "notes.md", "text": "hi"}, "high", True),
+        session_id=new_id("sess_"),
+        turn_id=new_id("turn_"),
+    )
+    assert decision.decision == "needs_approval"
+    assert result.status == "approval_required"
+    assert result.output["expected_effect"] == (  # type: ignore[index]
+        "Approving writes this exact change to notes.md, once."
+    )
+
+
+def test_shell_proposal_still_states_metadata_only(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    broker = _broker(tmp_path)
+    result, _decision = broker.execute(
+        ToolAction(new_id("act_"), "shell", {"command": "ls"}, "high", True),
+        session_id=new_id("sess_"),
+        turn_id=new_id("turn_"),
+    )
+    assert "metadata-only" in result.output["expected_effect"]  # type: ignore[index]
+
+
+def test_a_write_into_the_governance_directory_fails_instead_of_being_proposed(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    broker = _broker(tmp_path)
+    result, _decision = broker.execute(
+        ToolAction(new_id("act_"), "write_file", {"path": ".raiker/hooks.json", "text": "{}"}, "high", True),
+        session_id=new_id("sess_"),
+        turn_id=new_id("turn_"),
+    )
+    preview = result.output["proposal_preview"]  # type: ignore[index]
+    assert preview == {"status": "failed", "error": {"type": "protected_workspace_path"}}
+    assert not (tmp_path / ".raiker" / "hooks.json").exists()

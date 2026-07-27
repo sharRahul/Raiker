@@ -3,8 +3,9 @@
 These tests are guards: each one MUST fail if the corresponding governance property is
 weakened. They exercise the same governed API the web UI uses, asserting the UI cannot bypass
 policy / RuntimeAuthority, that disabled/deferred and sensitive-domain capabilities stay
-un-enableable, that approval resolution is metadata-only (never executes), and that STOP/interrupts
-remain human-only safe-boundary operations.
+un-enableable, that approval resolution executes only the one narrow, checkpointed class of action
+it is wired for (and records a decision for everything else), and that STOP/interrupts remain
+human-only safe-boundary operations.
 """
 
 from __future__ import annotations
@@ -77,13 +78,20 @@ def _activate(client: TestClient, headers: dict[str, str]) -> None:
     )
 
 
-def _seed_pending_write_approval(workspace: Path) -> str:
+def _seed_pending_write_approval(
+    workspace: Path,
+    *,
+    tool_name: str = "write_file",
+    arguments: dict[str, object] | None = None,
+) -> str:
     store = SQLiteStore(workspace)
     store.create_session("sess_r", str(workspace))
     action = ToolAction(
         action_id="act_r",
-        tool_name="write_file",
-        arguments={"path": "should_not_exist.txt", "text": "must not be written"},
+        tool_name=tool_name,
+        arguments=arguments
+        if arguments is not None
+        else {"path": "should_not_exist.txt", "text": "must not be written"},
         risk_level="high",
         requires_approval=True,
     )
@@ -134,10 +142,17 @@ class TestDeferredCapsNotEnableable:
         assert resp.json()["detail"]["reason_code"].startswith("activation_blocked:no_executor")
 
 
-# 3. Approval resolution is metadata-only — it records a decision and never executes.
-class TestApprovalMetadataOnly:
-    def test_approve_does_not_execute_the_action(self, workspace: Path, client: TestClient) -> None:
-        approval_id = _seed_pending_write_approval(workspace)
+# 3. Approval resolution executes exactly one narrow class of action — a local,
+#    checkpointed file mutation (BUG-06) — and records a decision for everything
+#    else. Both halves are guards: the executing half must stay bounded to the
+#    relayed capabilities, and the recording half must never start executing.
+class TestApprovalExecutionIsNarrow:
+    def test_approving_a_tier2_action_still_only_records_a_decision(
+        self, workspace: Path, client: TestClient
+    ) -> None:
+        approval_id = _seed_pending_write_approval(
+            workspace, tool_name="shell", arguments={"command": "touch should_not_exist.txt"}
+        )
         resp = client.post(
             f"/api/approvals/{approval_id}/resolve",
             json={"approve": True, "reason": "ok"},
@@ -145,7 +160,7 @@ class TestApprovalMetadataOnly:
         )
         assert resp.status_code == 200
         assert resp.json()["executes_action"] is False
-        # The proposed file must NOT have been written by resolving the approval.
+        # Nothing ran: shell is deliberately outside the relayed capability set.
         assert not (workspace / "should_not_exist.txt").exists()
         store = SQLiteStore(workspace)
         viewer = EventViewer(store)
@@ -159,6 +174,48 @@ class TestApprovalMetadataOnly:
         assert payload is not None
         # The durable event itself records that no action was executed.
         assert payload["payload"]["executes_action"] is False
+
+    def test_approving_a_file_write_executes_it_once_and_says_so(
+        self, workspace: Path, client: TestClient
+    ) -> None:
+        approval_id = _seed_pending_write_approval(
+            workspace, arguments={"path": "report.md", "text": "# Report\n"}
+        )
+        headers = _owner(workspace)
+        resp = client.post(
+            f"/api/approvals/{approval_id}/resolve",
+            json={"approve": True, "reason": "ok"},
+            headers=headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["executes_action"] is True
+        assert (workspace / "report.md").read_text(encoding="utf-8") == "# Report\n"
+
+        # Single execution: the approval is terminal, so a replay cannot re-run it.
+        replay = client.post(
+            f"/api/approvals/{approval_id}/resolve",
+            json={"approve": True, "reason": "again"},
+            headers=headers,
+        )
+        assert replay.status_code == 409
+        assert replay.json()["detail"]["reason_code"] == "approval_already_resolved"
+
+    def test_an_approved_write_cannot_reach_the_governance_directory(
+        self, workspace: Path, client: TestClient
+    ) -> None:
+        # `.raiker/` holds the encrypted store, the audit log, the vault key and
+        # the hook definitions. Workspace confinement alone would allow this.
+        approval_id = _seed_pending_write_approval(
+            workspace, arguments={"path": ".raiker/hooks.json", "text": "{}"}
+        )
+        resp = client.post(
+            f"/api/approvals/{approval_id}/resolve",
+            json={"approve": True, "reason": "ok"},
+            headers=_owner(workspace),
+        )
+        assert resp.status_code == 409
+        assert "protected_workspace_path" in resp.json()["detail"]["reason_code"]
+        assert not (workspace / ".raiker" / "hooks.json").exists()
 
 
 # 4. Sensitive personal/physical domains stay blocked/deferred.

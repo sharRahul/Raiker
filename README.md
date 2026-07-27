@@ -9,7 +9,7 @@ Raiker is a local-first AI-agent runtime. Every model interaction and tool
 action passes through policy, capability gates, approvals, and audit records, so
 local automation stays under your control.
 
-The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-web`, the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approval resolution is metadata-only, durable memory mutation is broker-governed, and strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
+The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-web`, the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed; every other approval records a decision only. Durable memory mutation is broker-governed, and strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
 
 ## Quick start
 
@@ -69,9 +69,17 @@ a reason, a confirmation token, and a threat-model acknowledgement — all recor
 against your principal. Owner **recovery** is governed and audited.
 
 A human `runtime_gate_manager` alone may change runtime modes and capability
-gates. Approval resolution is **metadata only by default**: recording a decision
-does not execute the action. The separately governed approval execution relay
-never turns ordinary approval resolution into implicit execution.
+gates.
+
+Approving does one of two things, and the approval detail says which **before**
+you decide. A proposed **file change** is performed once, through the governed
+approval execution relay — re-governed at execution time, with the previous
+contents checkpointed so it can be rewound, and never into `.raiker/` or
+`.git/`. **Everything else** — shell, network, process — records your decision
+and executes nothing. Disabling either the `approval_execution_relay` or
+`file_write_execution` capability returns file approvals to record-only, and a
+critical approval always uses the human-only, step-up-verified lifecycle
+instead.
 
 Deferred dangerous domains — remote and cloud execution, finance, medical,
 pregnancy, CCTV, home security, and hardware actions — have no governed executor
@@ -120,8 +128,10 @@ Raiker's documentation does not run ahead of its code. As of 2026-07-26:
   control anywhere.
 - **MCP servers cannot be used by the agent** — create, connect, and monitor all
   work; their tools are not offered to the model in Chat.
-- **Approved file writes do not create files**, because approval is
-  metadata-only.
+- **Approved shell, network, and process actions still do not run** — approval
+  resolution executes file changes only. This is deliberate, not an oversight:
+  a file write is local, checkpointed, and reversible, and the other three are
+  not.
 - Automatic context compaction at 90 %, weekly quota display, and the view-only
   file inspector are specified but not shipped.
 - **Shipped list prices are unverified defaults.** `config/model-profiles.json`

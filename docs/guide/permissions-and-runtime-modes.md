@@ -121,8 +121,23 @@ There is no unrestricted mode, by design.
 
 ## What "approved" means
 
-Approval resolution is **metadata-only by default**: recording a decision does
-*not* execute the action. The approval detail says so, and the response carries
-`executes_action: false`. Turning an approval into an execution is a separately
-governed capability (`approval_execution_relay`) — see
-[To be fixed](../plans/TO_BE_FIXED.md) BUG-06 for the current limits.
+Approving does one of two things, and the approval detail tells you which
+**before** you decide — it is computed by the server from your own capability
+gates, not assumed:
+
+- **Approve and execute once.** A proposed file change (`write_file`,
+  `edit_file`, `apply_patch`) is carried out, once, when both the
+  `approval_execution_relay` capability and the target's own capability
+  (`file_write_execution` / `patch_apply_execution`) are enabled — which is the
+  default for an integrated Tier-1 capability. The change is re-governed at
+  execution time (gate, decision mode, policy review, and a posture check on your
+  session), the previous file contents are checkpointed first so it can be
+  rewound, and the response carries `executes_action: true`. Writes into
+  `.raiker/` or `.git/` are refused outright.
+- **Approve (record only).** Everything else — shell, network, process, and any
+  capability outside that pair — records your decision and executes nothing. The
+  response carries `executes_action: false`.
+
+Disabling either capability in Permissions returns file approvals to
+record-only, and the detail view says so. A **critical** approval never takes
+either path: it uses the human-only, step-up-verified critical lifecycle.

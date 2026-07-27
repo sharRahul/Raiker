@@ -86,6 +86,20 @@ class TestApprovalsRead:
         assert body["preview_kind"] == "file_diff"
         assert body["diff"] is not None
         assert "hello" in body["diff"]
+        # BUG-06: a file write executes on approval when both gates are open, and
+        # the notice says exactly that rather than a hardcoded metadata-only line.
+        assert body["executes_on_approval"] is True
+        assert "performs the change" in body["metadata_only_notice"]
+
+    def test_detail_says_metadata_only_when_the_capability_cannot_execute(
+        self, workspace: Path, client: TestClient
+    ) -> None:
+        # `shell` is deliberately outside the relayed set, so approving it still
+        # only records a decision — and the detail view still says so.
+        _pending_approval(workspace, tool_name="shell", arguments={"command": "ls"})
+        token = _token(client)
+        body = client.get("/api/approvals/appr_1", headers=_headers(token)).json()
+        assert body["executes_on_approval"] is False
         assert "NOT execute" in body["metadata_only_notice"]
 
     def test_list_exposes_server_calculated_expiry_state(self, workspace: Path, client: TestClient) -> None:
@@ -128,8 +142,10 @@ class TestApprovalsRead:
 
 
 class TestApprovalsResolve:
-    def test_approve_records_metadata_only(self, workspace: Path, client: TestClient) -> None:
-        _pending_approval(workspace)
+    def test_approve_records_metadata_only_for_a_non_relayed_capability(
+        self, workspace: Path, client: TestClient
+    ) -> None:
+        _pending_approval(workspace, tool_name="shell", arguments={"command": "ls"})
         token = _token(client)
         resp = client.post(
             "/api/approvals/appr_1/resolve",

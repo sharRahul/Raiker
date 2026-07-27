@@ -22,7 +22,7 @@ turn — it was captured in an environment with no provider credential.
 | `BUG-01-context-window-NaN.png` | Context popover read `0 / NaN (NaN%)` — **fixed**, see `80-FIXED-…` and `81-FIXED-…` in `working/` |
 | `BUG-02-no-conversation-memory.png` | The model denies having seen the previous turn in the same chat |
 | `BUG-03-chat-markdown-not-rendered.png` | Headings, tables, and fenced code render as raw text — **fixed**, see `83-FIXED-…` in `working/` |
-| `BUG-04-response-text-over-redacted.png` | Prose containing "secret" replaced with `***REDACTED***`; chat title became `***REDACTED***` |
+| `BUG-04-response-text-over-redacted.png` | Prose containing "secret" replaced with `***REDACTED***`; chat title became `***REDACTED***` — **fixed**, see `TO_BE_FIXED.md` FIXED-07 |
 | `BUG-05-model-connect-raw-reason-code.png` | Connect failed with a bare reason code — **fixed**, see `82-FIXED-…` in `working/` |
 | `BUG-06-approval-never-executes.png` | Approving a file write records the decision but writes no file |
 

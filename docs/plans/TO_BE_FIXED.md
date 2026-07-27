@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Six are marked **FIXED** and were resolved on this
+and the proposed fix. Seven are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -27,7 +27,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-04 | **Critical** | Chat orchestration | Fixed (was BUG-02) |
 | FIXED-05 | High | Models / policy | Fixed |
 | FIXED-06 | High | Chat / Build rendering | Fixed (was BUG-03) |
-| BUG-04 | High | API redaction | Open |
+| FIXED-07 | High | API redaction | Fixed (was BUG-04) |
 | BUG-06 | Medium | Approvals | Open (by design — needs a decision) |
 | BUG-07 | Medium | Chat | Open (specified, unimplemented) |
 | BUG-08 | Medium | Export | Open (not specified) |
@@ -366,7 +366,9 @@ side: there is real HTML to print. The control itself is still missing.
 
 ---
 
-## BUG-04 — Over-broad redaction destroys legitimate assistant text and chat titles
+## FIXED-07 — Over-broad redaction destroyed legitimate assistant text and chat titles *(was BUG-04)*
+
+**Status: fixed in this change.**
 
 **Observed.** Attached `sample.md` containing "The secret project code is
 ORCHID-9" and asked what the code was. The reply rendered as:
@@ -379,19 +381,53 @@ and the conversation's title in **RECENT CHATS** became literally
 `***REDACTED***`. `not-working/BUG-04-response-text-over-redacted.png`.
 
 **Root cause.** `raiker/api/redaction.py::_redact_value`, string branch: after
-`redact_text` finds no actual secret pattern, it *still* replaces the **entire
-string** if it merely contains the substring `secret`, `token`, `password`,
-`bearer`, or `authorization`. Ordinary English prose is destroyed.
+`redact_text` found no actual secret pattern, it *still* replaced the **entire
+string** if it merely contained the substring `secret`, `token`, `password`,
+`bearer`, or `authorization`. Ordinary English prose was destroyed.
 
-**Why this is not fixed here.** The heuristic is a deliberate belt-and-braces
-defence and weakening it is a security decision, not a bug fix. It needs an owner
-call, so it is written up rather than changed.
+Both symptoms come from that one line. The streamed reply is redacted per chunk
+in `routes_prompts.py::_sse`, so each `text_delta` carrying the word was swapped
+for `***REDACTED***` while its neighbours survived — which is why the sentence
+came back with a hole punched through the middle rather than blanked. The title
+is derived from the first prompt in `SQLiteStore.insert_turn` and stored
+unredacted; the question itself contained "secret", so the whole title was
+replaced on the way out to **RECENT CHATS**.
 
-**Proposed fix (for review).** Restrict the substring heuristic to values found
-**under a secret-like key**, and rely on `redact_text`'s pattern matching (which
-recognises real credential shapes) for free-form text. Optionally redact only the
-matched span rather than the whole string. Add tests proving `sk-ant-…` in prose
-is still caught while "the secret project code is ORCHID-9" survives.
+**Fix applied.** A value's **key** is a reliable signal that it holds a
+credential; a value's **words** are not. `_redact_value` therefore keeps
+discarding whole any value under a secret-like key, and now scrubs free-form
+strings by credential *shape* only — `redact_text` matches `sk-…`, `ghp_…`,
+`github_pat_…`, `AKIA…`, `Bearer …`, `token=…`, PEM blocks, emails, card/ID
+numbers, and high-entropy runs, substituting **only the matched span**. Prose
+survives, and every redaction stays visible in place as a `[REDACTED_*]` marker,
+so nothing is silently lost. `assert_no_secrets_in_body` was relaxed in exactly
+the same way, so the test guard proves what the middleware actually emits.
+
+To cover what the keyword sweep used to catch in ordinary sentences,
+`raiker/context/redaction.py` gains one pattern for credentials disclosed in
+prose — "the password is hunter2". The credential word must sit *immediately*
+before the copula, so "the secret **project code** is ORCHID-9" never matches,
+and a callable replacement spares plain short English words so "the secret is
+out" survives too.
+
+One follow-on effect, and it is wanted: `credential_env` and the MCP `auth_ref`
+now return the env-var **name** (`RAIKER_GITHUB_TOKEN`) instead of
+`***REDACTED***`. The name is remediation guidance printed throughout these
+docs; the value it points at is read from the process environment and never
+enters a response. Covered by `tests/test_over_broad_redaction.py`.
+
+**Deliberately not changed.** The identical keyword sweep in
+`raiker/events/export.py::_redact_string_value` still guards **audit exports**.
+An export leaves the machine in bulk and is read by tooling, not by a person
+mid-conversation, so over-redaction there costs little and belt-and-braces is
+worth keeping. The asymmetry is asserted by a test so it cannot drift by
+accident.
+
+**Residual risk.** A credential can still ride out inside free-form text if it
+has an unrecognised shape *and* an unrecognised separator — "my token — abc123".
+That was already true of any secret that did not happen to sit next to one of
+the five keywords; the pattern set in `raiker/context/redaction.py` is the place
+to close it.
 
 ---
 

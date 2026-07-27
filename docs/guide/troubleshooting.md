@@ -51,7 +51,7 @@ in the process environment.
 | "No model is selected yet, so the runtime will refuse the turn" | Choose a profile in Models, or the Chat model selector |
 | Raiker forgets what you said one message ago | **Fixed.** Prior completed turns of the session are replayed to the model, bounded by the model's context window. A turn with no reply is skipped, and other chats are never mixed in. |
 | Reply shows `# heading` and `\|table\|` as raw text | **Known defect BUG-03** — markdown is not rendered |
-| Part of a reply reads `***REDACTED***` | **Known defect BUG-04** — over-broad redaction can wipe prose containing "secret", "token", or "password" |
+| Part of a reply reads `[REDACTED_TOKEN]` or `[REDACTED_EMAIL]` | Working as intended — the response layer masks the matched span of anything credential-shaped. Prose that merely *mentions* a secret is left alone (**fixed**, FIXED-07). |
 | "Context capacity is not configured for this model" | That profile has no documented context window. Honest, not an error. |
 | An approved file write produced no file | By design — approval is metadata-only (`executes_action: false`). See BUG-06. |
 | `provider_connection_failed` | The provider was unreachable — check network, endpoint, and the fallback sequence |

@@ -208,8 +208,14 @@ DOM check that read `h1: 0, table: 0, pre: 0, code: 0, ul: 0` now returns
 `working/83-FIXED-06-chat-markdown-rendered.png` (was
 `not-working/BUG-03-chat-markdown-not-rendered.png`).
 
-**Export: still missing.** ❌ There is **no export / download / PDF / print
-control anywhere in the app**. BUG-08.
+**Export: fixed.** ✅ After a completed turn, **Copy response** writes exactly
+the rendered answer's source Markdown to the clipboard. **Export as Markdown**
+downloads a dated `.md` transcript with alternating `## You` / `## Raiker`
+sections. **Print / Save as PDF** opens Chromium's native print flow; print
+media retains the transcript and removes the app navigation, composer, preview,
+and action controls. The live check also confirmed zero horizontal overflow,
+the expected download contents, and zero browser console errors. FIXED-12. The
+disposable screenshot from this verification is intentionally not retained.
 
 ---
 

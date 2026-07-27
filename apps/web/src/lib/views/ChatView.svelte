@@ -19,6 +19,7 @@
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, providerName } from "../format";
   import { reactionForResponse, thinkingSteps } from "../chatPresentation";
+  import { chatAsMarkdown, markdownFilename } from "../chatExport";
 
   // One composer attachment chip: a workspace path, an image, or a text
   // document already uploaded into the governed attachment store (referenced by
@@ -47,6 +48,7 @@
   let promptText = $state("");
   let userName = $state("there");
   let turns = $state<ChatTurn[]>([]);
+  let copyNotice = $state<string | null>(null);
   let streaming = $state(false);
   // Reuse one session across turns so the governed conversation stays continuous.
   let sessionId = $state<string | null>(null);
@@ -544,6 +546,21 @@
     turns = [];
     sessionId = null;
   }
+
+  function exportTurns() {
+    const markdown = chatAsMarkdown(turns.map((turn) => ({ prompt: turn.prompt, answer: answerText(turn) })));
+    const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = markdownFilename();
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function copyAnswer(turn: ChatTurn) {
+    await navigator.clipboard.writeText(answerText(turn));
+    copyNotice = `Copied Raiker response ${turn.id}`;
+  }
 </script>
 
 <!-- Split shell: the conversation, plus the file inspector when one is open.
@@ -551,6 +568,13 @@
      wrapper, not a reflow of the whole transcript's markup. -->
 <div class="chat-layout" class:with-inspector={inspecting !== null}>
 <div class="chat">
+  {#if turns.length > 0}
+    <div class="export-bar" aria-label="Chat export actions">
+      <button type="button" class="btn btn-soft btn-sm" onclick={exportTurns}>Export as Markdown</button>
+      <button type="button" class="btn btn-soft btn-sm" onclick={() => window.print()}>Print / Save as PDF</button>
+      {#if copyNotice}<span class="sr-only" aria-live="polite">{copyNotice}</span>{/if}
+    </div>
+  {/if}
   <div class="thread" bind:this={scrollEl}>
     {#if historyError !== null}
       <p class="error-line" role="alert">{historyError}</p>
@@ -715,6 +739,9 @@
             <div class="message-bubble message-bubble-raiker">
               <Markdown text={answer} />
             </div>
+            {#if !turn.streaming}
+              <button type="button" class="copy-message" onclick={() => void copyAnswer(turn)}>Copy response</button>
+            {/if}
           {:else if !turn.streaming && turn.error === null && turn.response !== null}
             <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">(No answer text was returned.)</p></div>
           {/if}
@@ -1004,6 +1031,34 @@
     flex-direction: column;
     gap: var(--space-4);
     padding-bottom: var(--space-4);
+  }
+  .export-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: flex-end;
+    padding-bottom: var(--space-3);
+  }
+  .copy-message {
+    background: transparent;
+    border: 0;
+    color: var(--text-3);
+    cursor: pointer;
+    font: inherit;
+    font-size: .75rem;
+    padding: .3rem .2rem;
+  }
+  .copy-message:hover { color: var(--text-1); }
+
+  @media print {
+    :global(.sidebar), :global(.topbar), :global(.skip-link), .composer, .export-bar,
+    .copy-message, :global(.file-inspector) { display: none !important; }
+    :global(.app-shell), :global(.app-main), :global(.content), :global(.responsive-page),
+    .chat-layout, .chat { display: block !important; height: auto !important; max-width: none !important; }
+    .thread { display: block; overflow: visible; }
+    .turn { break-inside: avoid; margin-bottom: 1.5rem; }
+    .message-group { max-width: none; }
+    .message-bubble { box-shadow: none; border: 1px solid #bbb; }
   }
   .turn {
     display: flex;

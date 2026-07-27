@@ -216,6 +216,74 @@ export function explainCapability(gate: CapabilityGate): CapabilityExplanation {
   };
 }
 
+// ── Why a runtime-gated surface is blocked (BUG-11) ─────────────────────────
+//
+// A surface that needs `runtime_enabled` has three distinct ways of being shut,
+// and they need three different actions from the owner. Saying "disabled —
+// enable it in Capabilities" for all of them sends the owner to a page where
+// the capability already reads as enabled, and following that advice changes
+// nothing. `enabled_runtime` additionally requires a runtime-enablement mode
+// (Settings → Runtime mode), which is where the second case actually resolves.
+
+export type RuntimeBlockKind = "none" | "not_available" | "gate_off" | "below_runtime";
+
+export interface RuntimeBlock {
+  kind: RuntimeBlockKind;
+  /** What is true right now, in plain English. */
+  reason: string;
+  /** The one action that actually unblocks it (empty when nothing will). */
+  action: string;
+  /** Where that action lives, or null when there is nowhere to go. */
+  href: string | null;
+  linkLabel: string | null;
+}
+
+/**
+ * Why a `runtime_enabled` consumer is blocked, and what would unblock it.
+ *
+ * A missing gate is treated as off rather than open: a surface must never claim
+ * to be usable because its gate could not be read.
+ */
+export function runtimeBlock(gate: CapabilityGate | undefined, label: string): RuntimeBlock {
+  if (gate?.runtime_enabled) {
+    return { kind: "none", reason: "", action: "", href: null, linkLabel: null };
+  }
+  if (gate === undefined) {
+    return {
+      kind: "gate_off",
+      reason: `${label} is not enabled in this runtime.`,
+      action: "Open Permissions to review the capability.",
+      href: "#/capabilities",
+      linkLabel: "Open Permissions",
+    };
+  }
+  if (isDeferred(gate)) {
+    return {
+      kind: "not_available",
+      reason: `${label} has no executor in this runtime, so it cannot be enabled here.`,
+      action: "",
+      href: null,
+      linkLabel: null,
+    };
+  }
+  if (ENABLED_STATES.has(gate.state)) {
+    return {
+      kind: "below_runtime",
+      reason: `${label} is enabled, but only at “${humanize(gate.state)}” — this surface needs runtime level.`,
+      action: "Activate a runtime-enablement mode, then set the capability to “enabled runtime”.",
+      href: "#/settings",
+      linkLabel: "Settings → Runtime mode",
+    };
+  }
+  return {
+    kind: "gate_off",
+    reason: `${label} is turned off.`,
+    action: "Turn it on in Permissions. Reaching runtime level also needs a runtime mode active.",
+    href: "#/capabilities",
+    linkLabel: "Open Permissions",
+  };
+}
+
 // ── Decision modes (per-capability policy for AI-proposed actions) ──────────
 
 export type DecisionMode = "ask" | "allow" | "auto" | "deny";

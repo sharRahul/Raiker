@@ -175,6 +175,10 @@ EVENT_TYPES = {
     "task_cancelled",
     "task_completed",
     "task_failed",
+    # A run stopped at an approval boundary. Distinct from `task_failed`: the
+    # work did not go wrong, it is waiting for the owner's decision, and the
+    # payload always states which one and why (BUG-09).
+    "task_blocked",
     "side_question_received",
     "side_question_answered",
     "interrupt_received",

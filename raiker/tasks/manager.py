@@ -6,6 +6,18 @@ from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.storage.sqlite import SQLiteStore
 
+# What a task's outcome says when the run that ended it left no words of its own.
+# A terminal task must always carry a reason: an empty summary is what made a
+# failed background run unreadable in the UI and the audit log (BUG-09).
+NO_STATED_FAILURE_REASON = "The run ended without a stated reason."
+NO_STATED_APPROVAL_REASON = "The run is waiting for your approval to continue."
+NO_STATED_CANCEL_REASON = "The run was stopped without a stated reason."
+
+
+def _stated(reason: str | None, fallback: str) -> str:
+    """The reason to record — never blank, never a lie about what happened."""
+    return (reason or "").strip() or fallback
+
 
 class TaskManager:
     def __init__(self, store: SQLiteStore, writer: EventLogWriter) -> None:
@@ -104,7 +116,8 @@ class TaskManager:
         return task
 
     def fail_task(self, task_id: str, reason: str) -> TaskRecord | None:
-        self.store.fail_task(task_id, reason)
+        stated = _stated(reason, NO_STATED_FAILURE_REASON)
+        self.store.fail_task(task_id, stated)
         task = self.get_task(task_id)
         if task is not None:
             event = make_event(
@@ -112,13 +125,34 @@ class TaskManager:
                 turn_id=task.parent_turn_id,
                 event_type="task_failed",
                 actor="task_manager",
-                payload={"task_id": task_id, "reason": reason},
+                payload={"task_id": task_id, "reason": stated},
+            )
+            self.writer.append(event)
+        return task
+
+    def block_task_on_approval(self, task_id: str, reason: str) -> TaskRecord | None:
+        """Park a task that stopped at an approval boundary.
+
+        The run neither finished nor failed; it is waiting for a decision, and
+        both the task card and the audit log say so.
+        """
+        stated = _stated(reason, NO_STATED_APPROVAL_REASON)
+        self.store.block_task_on_approval(task_id, stated)
+        task = self.get_task(task_id)
+        if task is not None:
+            event = make_event(
+                session_id=task.session_id,
+                turn_id=task.parent_turn_id,
+                event_type="task_blocked",
+                actor="task_manager",
+                payload={"task_id": task_id, "reason": stated, "status": task.status},
             )
             self.writer.append(event)
         return task
 
     def cancel_task(self, task_id: str, reason: str) -> TaskRecord | None:
-        self.store.cancel_task(task_id, reason)
+        stated = _stated(reason, NO_STATED_CANCEL_REASON)
+        self.store.cancel_task(task_id, stated)
         task = self.get_task(task_id)
         if task is not None:
             event = make_event(
@@ -126,7 +160,7 @@ class TaskManager:
                 turn_id=task.parent_turn_id,
                 event_type="task_cancelled",
                 actor="task_manager",
-                payload={"task_id": task_id, "reason": reason},
+                payload={"task_id": task_id, "reason": stated},
             )
             self.writer.append(event)
         return task

@@ -34,12 +34,12 @@ keyboard navigation.
 | Chat | Streaming governed turns (SSE), per-prompt options (provider + model picked from the provider's live catalogue, planning, tool budget), workspace path attachments (bounded, untrusted-labelled, workspace-scoped fail-closed), inline needs-approval hand-off |
 | Build | Coding workspace: Plan/Edit/Auto composer modes backed by per-capability decision modes (`deny`/`ask`/`auto`) plus the per-turn planning option, repository references (workspace-contained folder, or a GitHub `owner/repo` coordinate read through the governed connector), inline accept/reject for pending changes, a collapsible background-work rail, scheduled agents, and filing the chat into a project |
 | Approvals | Pending/approved/denied inbox, redacted diff/argument previews, metadata-only resolution |
-| Tasks | Active tasks with progress + safe-boundary stop, task history |
+| Tasks | Active tasks with progress + safe-boundary stop, runs parked on an approval shown as blocked (not failed) with the reason and a link to the decision, and a finished list that states how each run ended |
 | Sessions | Session browser → turns → per-turn governed events |
 | Capabilities | All capability gates (per phase), friendly labels, gate enable/disable with step-up (reason, Tier-2 confirmation token, threat ack), per-capability decision modes (`ask`/`allow`/`auto`/`deny`) |
 | Models | Model profiles with provider + model selection (each provider's model catalogue fetched on demand, gate-manager only writes), advisor-model picker for local-model turns, hosted/private gate + egress allowlist posture (no keys, no allowlist values) |
 | Connections | Service catalogue with a governed **Connect via MCP** flow for a local starter or a remote HTTP endpoint; remote authentication stores only a token environment-variable reference |
-| MCP Servers | Owner-scoped local and remote MCP profiles, with discovered tools, redacted recent-session telemetry, open findings, notifications, and pause/resume controls |
+| MCP Servers | Owner-scoped local and remote MCP profiles, with discovered tools, redacted recent-session telemetry, open findings, notifications, and pause/resume controls. A connected, uncontained server's tools are offered to the model as `mcp__<server>__<tool>` once the owner raises the `mcp_connector_runtime` decision mode above the default `ask` |
 | Checkpoints | Rewind metadata per session (restore flags are metadata only) |
 | Audit log | The append-only event record with session/type filters |
 | Diagnostics | Readiness checks, configuration gaps, counts, config-derived provider status |

@@ -334,6 +334,7 @@ class McpConnectorExecutor:
         *,
         http_fn: HttpFn | None = None,
         monitor: McpSessionMonitor | None = None,
+        content_sink: Callable[[str], None] | None = None,
     ) -> None:
         self._ws = Path(workspace_root).resolve()
         self._store = store
@@ -342,6 +343,12 @@ class McpConnectorExecutor:
         # Every governed session hands redacted telemetry to the monitor, which
         # records a session-log row and raises redacted findings on anomalies.
         self._monitor = monitor or McpSessionMonitor(store)
+        # BUG-12 — a tool result the *calling model* is meant to read goes to
+        # this in-process sink and nowhere else. Artifacts, the audit event, and
+        # the session log keep carrying metadata only, exactly as before: the
+        # content never becomes a stored record. Unset (the default) preserves
+        # the original behaviour, where the content is dropped entirely.
+        self._content_sink = content_sink
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         principal_id = principal.principal_id if principal is not None else action.principal_id
@@ -473,7 +480,10 @@ class McpConnectorExecutor:
             # Classify the argument/result *shape* transiently — only the label
             # crosses into the monitor; the raw value is dropped here.
             arg_label = shape_sensitivity(_safe_json(ctx.tool_arguments))
-            result_label = shape_sensitivity(_call_result_text(responses))
+            text = _call_result_text(responses)
+            result_label = shape_sensitivity(text)
+            if self._content_sink is not None:
+                self._content_sink(text)
             self._observe(
                 self._build_telemetry(
                     action, principal_id, ctx, outcome="ok",
@@ -763,7 +773,9 @@ class McpConnectorExecutor:
             if existing is not None:
                 self._store.update_mcp_server_runtime(
                     str(existing["server_id"]), principal_id,
-                    status="connected", tools=tools or [], last_connected_at=utc_now(),
+                    # `tools=None` (a tools/call session) leaves the stored list
+                    # alone; only an enumerating session rewrites it.
+                    status="connected", tools=tools, last_connected_at=utc_now(),
                 )
                 return
             fallback = (
@@ -860,8 +872,13 @@ def _safe_json(value: Any) -> str:
 
 
 def _call_result_text(responses: dict[Any, dict[str, Any]]) -> str:
-    """Concatenate a tools/call result's text blocks for *transient* shape
-    classification only. Never stored or returned to the caller."""
+    """Concatenate a tools/call result's text blocks.
+
+    Used for transient shape classification, and — when the caller supplied a
+    ``content_sink`` — handed to that caller so a model can read what the tool
+    it called returned (BUG-12). It is never stored: artifacts, the audit event,
+    and the session log keep carrying counts and labels only.
+    """
     call = responses.get(3)
     if not isinstance(call, dict):
         return ""

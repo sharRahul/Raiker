@@ -25,6 +25,7 @@
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
   import { providerName, relativeTime } from "../format";
+  import { isActiveTask } from "../statusMaps";
 
   let sessions = $state<SessionSummary[] | null>(null);
   let tasks = $state<TaskView[] | null>(null);
@@ -38,7 +39,7 @@
   let handedOff = $state(false);
 
   const activeTasks = $derived(
-    (tasks ?? []).filter((task) => ["queued", "running", "paused"].includes(task.status)),
+    (tasks ?? []).filter((task) => isActiveTask(task.status)),
   );
   const activeProject = $derived(
     projects?.projects.find((project) => project.project_id === projects?.active_project_id) ?? null,
@@ -57,7 +58,9 @@
     unavailable = false;
     try {
       [sessions, tasks, approvals, projects] = await Promise.all([
-        api.sessions(),
+        // Conversations only — "Resume a conversation" must not offer the
+        // server-owned session a task run executes in (BUG-10).
+        api.sessions(undefined, false, "chat"),
         api.tasks(),
         api.approvals(),
         api.projects(),
@@ -221,7 +224,7 @@
           label="Active work"
           value={activeTasks.length}
           detail={activeTasks.length === 0
-            ? "Nothing is queued, running, or paused."
+            ? "Nothing is queued, running, paused, or waiting for approval."
             : "You can stop any of these at a safe boundary."}
           icon="tasks"
           href="#/observe?tab=work"

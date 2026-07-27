@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvalBadge, responseBadge, taskBadge } from "./statusMaps";
+import { approvalBadge, responseBadge, taskBadge, taskStatusLabel } from "./statusMaps";
 
 describe("status → badge maps", () => {
   it("maps task statuses", () => {
@@ -8,6 +8,15 @@ describe("status → badge maps", () => {
     expect(taskBadge("completed")).toBe("done");
     expect(taskBadge("cancelled")).toBe("stopped");
     expect(taskBadge("mystery")).toBe("idle");
+    // A run parked on a decision has not failed; it must not wear a stopped badge.
+    expect(taskBadge("waiting_for_approval")).toBe("needs-approval");
+  });
+
+  it("reads task statuses as English and never hides an unknown one", () => {
+    expect(taskStatusLabel("waiting_for_approval")).toBe("waiting for approval");
+    expect(taskStatusLabel("cancelling")).toBe("stopping");
+    expect(taskStatusLabel("running")).toBe("running");
+    expect(taskStatusLabel("mystery")).toBe("mystery");
   });
 
   it("maps approval statuses", () => {

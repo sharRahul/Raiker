@@ -5,6 +5,7 @@ from typing import Any
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import ToolAction
 from raiker.models.contracts import ToolCallProposal, ToolSpec
+from raiker.tools.mcp_tools import parse_mcp_tool_name
 
 # Tool -> (risk_level, requires_approval). Read-only tools are medium/no-approval;
 # anything that mutates the workspace or runs a command is high/approval. The policy
@@ -45,6 +46,15 @@ _TOOL_RISK: dict[str, tuple[str, bool]] = {
 }
 
 _MODEL_EXPOSED_TOOLS = frozenset(_TOOL_RISK)
+
+# A projected MCP tool (``mcp__<server>__<tool>``) is not in the static set: the
+# tools a turn may call depend on which servers the owner connected (BUG-12).
+# Validation therefore checks the *shape* and stays store-free; whether that
+# server and tool actually exist is answered at execution, where the capability
+# gate, the decision mode, containment, and the advertised tool list all apply.
+# Reaching a registered server runs code Raiker does not own, so a call carries
+# the same risk band as a connector read: `ask`/`auto` withhold it by default.
+_MCP_TOOL_RISK: tuple[str, bool] = ("medium", False)
 
 # Minimal required string arguments per tool. Presence + type only; path safety and
 # permission are enforced later by the filesystem layer and policy engine.
@@ -173,11 +183,25 @@ def validate_tool_call(proposal: ToolCallProposal) -> ToolAction:
     """
 
     tool_name = proposal.tool_name
-    if tool_name not in _MODEL_EXPOSED_TOOLS:
+    mcp_tool = parse_mcp_tool_name(tool_name)
+    if mcp_tool is None and tool_name not in _MODEL_EXPOSED_TOOLS:
         raise ToolCallRejected(f"unknown_tool:{tool_name}", tool_name=tool_name)
     arguments: dict[str, Any] = proposal.arguments
     if not isinstance(arguments, dict):
         raise ToolCallRejected("arguments_not_object", tool_name=tool_name)
+    if mcp_tool is not None:
+        nested = arguments.get("arguments", {})
+        if not isinstance(nested, dict):
+            raise ToolCallRejected("arguments_not_object", tool_name=tool_name)
+        risk_level, requires_approval = _MCP_TOOL_RISK
+        return ToolAction(
+            action_id=new_id("act_"),
+            tool_name=tool_name,
+            arguments=arguments,
+            risk_level=risk_level,
+            requires_approval=requires_approval,
+            proposed_by="model",
+        )
     for required in _REQUIRED_ARGS[tool_name]:
         value = arguments.get(required)
         if not isinstance(value, str) or value == "":

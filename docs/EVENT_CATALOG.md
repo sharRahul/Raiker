@@ -18,6 +18,12 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 | `tool_failed` | A governed executor failed safely |
 | `code_repo_connected` | A repository reference was added to the Build workspace (workspace-relative subpath, or a GitHub `owner/repo` coordinate) |
 | `code_repo_disconnected` | A repository reference was removed; the folder and the remote are untouched |
+| `task_created` | A task or schedule was queued (title, objective, and status only) |
+| `task_progress` | A running task reported a step and a percentage |
+| `task_blocked` | A run stopped at an approval boundary — unfinished, not failed; the payload always states the reason |
+| `task_completed` | A task finished; the payload carries its summary |
+| `task_failed` | A task ended in failure; the payload always states a reason, substituting a stated one when the run left none |
+| `task_cancelled` | A task was stopped at a safe boundary, with the reason it was stopped |
 | `checkpoint_created` | The gateway recorded a turn checkpoint |
 | `turn_closed` | The gateway finalised a turn |
 | `phase3.external_channels_notifications.readiness.metadata_defined` | External-channel readiness metadata was defined; runtime dispatch events are introduced only with a governed executor |

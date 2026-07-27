@@ -75,7 +75,13 @@
       case "not_enabled_for_session":
         return "Connected, but not enabled for this session.";
       case "capability_gate_closed":
-        return "Its capability gate is closed, so the runtime refuses every call.";
+        return "Its capability gate is turned off, so the runtime refuses every call. Turn it on in Permissions.";
+      // BUG-11 — enabled is not the same as enabled at runtime level, and the
+      // two need different actions from the owner.
+      case "capability_below_runtime_level":
+        return "Its capability is enabled, but below runtime level. Activate a runtime mode in Settings → Runtime mode, then set it to “enabled runtime”.";
+      case "capability_decision_mode_deny":
+        return "Its decision mode is set to Deny, so every proposed call is refused. Change the mode in Permissions.";
       case "egress_host_not_allowlisted":
         return "Its host is not on the connector egress allowlist.";
       case "connection_killed":

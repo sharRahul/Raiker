@@ -77,8 +77,8 @@ The sidebar groups every destination:
 
 The top bar carries the notification bell, the theme toggle
 (system → light → dark), and the **STOP** switch, which requests cancellation of
-every queued, running, or paused task at the next safe boundary. It is governed
-and audited — not a force-kill.
+every task that is queued, running, paused, or waiting for your approval, at the
+next safe boundary. It is governed and audited — not a force-kill.
 
 The layout adapts live: a bottom bar plus drawer below 640 px, a menu trigger
 plus drawer from 640–1023 px, and the full sidebar at 1024 px and wider.

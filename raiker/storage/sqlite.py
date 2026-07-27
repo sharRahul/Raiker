@@ -234,6 +234,8 @@ from raiker.storage.migrations import (
     SESSION_ARCHIVE_SQL,
     SESSION_ATTACHMENT_REFS_MIGRATION_ID,
     SESSION_ATTACHMENT_REFS_SQL,
+    SESSION_ORIGIN_MIGRATION_ID,
+    SESSION_ORIGIN_SQL,
     SESSION_TAGS_MIGRATION_ID,
     SESSION_TAGS_SQL,
     STANDING_GRANTS_MIGRATION_ID,
@@ -701,6 +703,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 SESSION_ATTACHMENT_REFS_MIGRATION_ID, SESSION_ATTACHMENT_REFS_SQL, connection
             )
+            self._apply_migration(SESSION_ORIGIN_MIGRATION_ID, SESSION_ORIGIN_SQL, connection)
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -1406,19 +1409,43 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return {str(row["name"]) for row in rows}
 
-    def create_session(self, session_id: str, project_root: str, title: str | None = None, user_id: str | None = None) -> None:
+    def create_session(
+        self,
+        session_id: str,
+        project_root: str,
+        title: str | None = None,
+        user_id: str | None = None,
+        origin: str = "chat",
+    ) -> None:
         now = utc_now()
         # New sessions are stamped with the active project (if any) so project
         # scoping needs no caller changes — an organizing label, not authority.
         project_id = self.get_active_project(user_id)
+        # `origin` records where the session came from ("chat" for a typed
+        # conversation, "task" for the server-owned session a task runs in). A
+        # provenance label only: it grants nothing and hides nothing, it just
+        # lets a "recent conversations" list mean conversations (BUG-10).
         with self.connect() as connection:
             connection.execute(
                 """
                 INSERT OR IGNORE INTO sessions
-                (session_id, project_root, created_at, updated_at, status, title, user_id, project_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (session_id, project_root, created_at, updated_at, status, title, user_id, project_id, origin)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (session_id, project_root, now, now, "open", title, user_id, project_id),
+                (session_id, project_root, now, now, "open", title, user_id, project_id, origin),
+            )
+
+    def set_session_origin(self, session_id: str, origin: str) -> None:
+        """Stamp an existing session's provenance.
+
+        ``create_session`` is an INSERT OR IGNORE, so a session that predates the
+        origin column (or this caller) keeps the default 'chat'. Task creation
+        calls this so an Inbox created before the fix stops reading as a
+        conversation. Provenance only — no gate, policy, or visibility changes.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE sessions SET origin = ? WHERE session_id = ?", (origin, session_id)
             )
 
     # ── Projects (web-app task 5: named organizing scopes, governance-neutral) ──
@@ -1571,10 +1598,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         project_id: str | None = None,
         user_id: str | None = None,
         include_archived: bool = False,
+        origin: str | None = None,
     ) -> list[dict[str, Any]]:
         query = "SELECT * FROM sessions"
         params: list[Any] = []
         conditions: list[str] = []
+        if origin is not None:
+            # Provenance filter (BUG-10): "chat" is the owner's conversations.
+            # Legacy rows written before the column existed default to 'chat'.
+            conditions.append("origin = ?")
+            params.append(origin)
         if not include_archived:
             # Default listing surfaces active sessions only; archived rows stay
             # retrievable by an explicit ``include_archived`` request.
@@ -1693,18 +1726,28 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         discovered tool names, and last-connected time — without touching its
         identity/transport/endpoint columns (so a re-test never wipes a stored
         remote endpoint or auth reference). Returns False if the row is missing
-        or owned by another principal."""
+        or owned by another principal.
+
+        ``tools=None`` means "this operation discovered nothing", not "this
+        server has no tools": a `tools/call` session never enumerates, so it
+        leaves the stored list alone. Overwriting it emptied the profile after
+        every call — visible as `TOOLS (0)` on a connected server, and fatal to
+        the projected tool set, which is built from exactly that list (BUG-12).
+        """
         tool_list = list(tools) if tools is not None else None
         with self.connect() as connection:
             cursor = connection.execute(
                 """UPDATE mcp_servers
-                   SET status = ?, last_connected_at = ?, tools = ?, tool_count = ?
+                   SET status = ?,
+                       last_connected_at = ?,
+                       tools = COALESCE(?, tools),
+                       tool_count = COALESCE(?, tool_count)
                    WHERE server_id = ? AND principal_id = ?""",
                 (
                     status,
                     last_connected_at,
                     json.dumps(tool_list) if tool_list is not None else None,
-                    len(tool_list) if tool_list is not None else 0,
+                    len(tool_list) if tool_list is not None else None,
                     server_id,
                     principal_id,
                 ),
@@ -3283,6 +3326,20 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def cancel_task(self, task_id: str, reason: str) -> None:
         now = utc_now()
         self._update_task(task_id, status="cancelled", completed_at=now, summary=reason)
+
+    def block_task_on_approval(self, task_id: str, reason: str) -> None:
+        """A run reached an approval boundary: blocked, not finished.
+
+        No ``completed_at`` is stamped — the work is unfinished and the owner's
+        decision is what moves it. Recording it as `failed` (BUG-09) told the
+        owner the run had gone wrong when nothing had.
+        """
+        self._update_task(
+            task_id,
+            status="waiting_for_approval",
+            current_step="Waiting for your approval",
+            summary=reason,
+        )
 
     def list_event_index(
         self,

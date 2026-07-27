@@ -48,7 +48,9 @@
   let promptText = $state("");
   let userName = $state("there");
   let turns = $state<ChatTurn[]>([]);
-  let copyNotice = $state<string | null>(null);
+  // What the last export action did. Shown, not only announced: a copy or a
+  // download that reports nothing leaves the owner guessing whether it worked.
+  let exportNotice = $state<string | null>(null);
   let streaming = $state(false);
   // Reuse one session across turns so the governed conversation stays continuous.
   let sessionId = $state<string | null>(null);
@@ -553,13 +555,27 @@
     const link = document.createElement("a");
     link.href = url;
     link.download = markdownFilename();
+    // The anchor is attached before it is clicked and the object URL is released
+    // only after the click has been dispatched: a detached anchor, or a URL
+    // revoked in the same tick, is a download some browsers silently drop.
+    link.hidden = true;
+    document.body.append(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    exportNotice = `Downloaded ${link.download}`;
   }
 
   async function copyAnswer(turn: ChatTurn) {
-    await navigator.clipboard.writeText(answerText(turn));
-    copyNotice = `Copied Raiker response ${turn.id}`;
+    // The clipboard is not always available (an insecure origin, or a denied
+    // permission). Say so rather than failing silently — a copy button that
+    // does nothing and reports nothing is worse than no copy button.
+    try {
+      await navigator.clipboard.writeText(answerText(turn));
+      exportNotice = "Response copied.";
+    } catch {
+      exportNotice = "Could not copy — your browser blocked clipboard access.";
+    }
   }
 </script>
 
@@ -572,7 +588,7 @@
     <div class="export-bar" aria-label="Chat export actions">
       <button type="button" class="btn btn-soft btn-sm" onclick={exportTurns}>Export as Markdown</button>
       <button type="button" class="btn btn-soft btn-sm" onclick={() => window.print()}>Print / Save as PDF</button>
-      {#if copyNotice}<span class="sr-only" aria-live="polite">{copyNotice}</span>{/if}
+      {#if exportNotice}<span class="export-notice" role="status" aria-live="polite">{exportNotice}</span>{/if}
     </div>
   {/if}
   <div class="thread" bind:this={scrollEl}>
@@ -1033,11 +1049,18 @@
     padding-bottom: var(--space-4);
   }
   .export-bar {
+    align-items: center;
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
     justify-content: flex-end;
     padding-bottom: var(--space-3);
+  }
+  .export-notice {
+    color: var(--text-2);
+    font-size: .78rem;
+    order: -1;
+    margin-right: auto;
   }
   .copy-message {
     background: transparent;

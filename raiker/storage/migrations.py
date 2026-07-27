@@ -1998,3 +1998,20 @@ CREATE TABLE IF NOT EXISTS session_attachment_refs (
 CREATE INDEX IF NOT EXISTS idx_session_attachment_refs_owner
   ON session_attachment_refs(owner_principal_id, session_id, created_at);
 """
+
+
+# BUG-10 — where a session came from.
+#
+# Every chat turn and every task run stores a session, and until now they were
+# indistinguishable: the server-owned Inbox session a scheduled task runs in
+# appeared in the sidebar's RECENT CHATS beside real conversations. Origin is a
+# provenance label — it grants nothing, hides nothing, and changes no gate or
+# policy. Task-origin sessions stay fully readable in Sessions and reachable
+# from Tasks; they are only excluded from the "recent conversations" list, which
+# is a list of conversations the owner actually had.
+SESSION_ORIGIN_MIGRATION_ID = "RAIKER-1022-session-origin"
+SESSION_ORIGIN_SQL = """
+ALTER TABLE sessions ADD COLUMN origin TEXT NOT NULL DEFAULT 'chat';
+CREATE INDEX IF NOT EXISTS idx_sessions_owner_origin_updated
+  ON sessions(user_id, origin, updated_at DESC);
+"""

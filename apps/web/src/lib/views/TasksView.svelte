@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
@@ -6,7 +7,7 @@
   import { api, ApiError } from "../api";
   import type { ApprovalView, TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
-  import { taskBadge } from "../statusMaps";
+  import { ACTIVE_TASK_STATES, taskBadge, taskStatusLabel } from "../statusMaps";
 
   let { projectId = null, sessionId = null }: { projectId?: string | null; sessionId?: string | null } = $props();
   let tasks = $state<TaskView[] | null>(null);
@@ -33,10 +34,21 @@
     return approvals.filter((approval) => approval.session_id === task.session_id);
   }
 
-  const active = $derived((tasks ?? []).filter((task) => ["queued", "running", "paused"].includes(task.status)));
+  // Unfinished work, including a run parked on a decision: it has not failed and
+  // it has not finished, so it belongs in the open list where it can be reviewed
+  // or stopped.
+  const active = $derived((tasks ?? []).filter((task) => ACTIVE_TASK_STATES.includes(task.status)));
   const scheduled = $derived(active.filter((task) => task.scheduled_at));
-  const history = $derived((tasks ?? []).filter((task) => !["queued", "running", "paused"].includes(task.status)));
+  const history = $derived((tasks ?? []).filter((task) => !ACTIVE_TASK_STATES.includes(task.status)));
   const rows = $derived(flatten(active));
+
+  // A finished or blocked run always states why. The backend refuses to record a
+  // terminal task without a reason (BUG-09); this is the line that shows it, so
+  // "failed" is never the whole story the owner gets.
+  function outcome(task: TaskView): string | null {
+    if (["queued", "running", "paused"].includes(task.status)) return null;
+    return task.summary?.trim() || "No reason was recorded for this outcome.";
+  }
 
   function flatten(items: TaskView[]): Array<{ task: TaskView; depth: number }> {
     const ids = new Set(items.map((task) => task.task_id));
@@ -103,6 +115,14 @@
   }
 
   $effect(() => { void projectId; void sessionId; void load(); });
+
+  // Tasks run outside this page: a queued run is claimed, works, and finishes
+  // while the list sits still. Without this the page kept showing "queued" long
+  // after the run had ended (BUG-09), and only a manual Refresh disagreed.
+  onMount(() => {
+    const timer = window.setInterval(() => void load(), 15_000);
+    return () => window.clearInterval(timer);
+  });
 </script>
 
 <section class="tasks">
@@ -123,11 +143,11 @@
   {:else}
     <div class="summary"><span><strong>{active.length}</strong> open</span><span><strong>{scheduled.length}</strong> scheduled</span><span><strong>{history.length}</strong> finished</span></div>
     {#if rows.length === 0}<div class="card"><EmptyState icon="tasks" title="No work queued" body="Create a task for immediate work, or schedule a routine for later." /></div>
-    {:else}<section class="work-list" aria-labelledby="open-work"><h3 id="open-work">Open work</h3>{#each rows as row (row.task.task_id)}<article class="card task" style={`--depth:${row.depth}`}><div class="task-main"><div class="task-title"><span class="branch" aria-hidden="true">{row.depth > 0 ? "↳" : ""}</span><div><h4>{row.task.title}</h4><p>{row.task.objective || "No additional instructions."}</p></div></div><Badge variant={taskBadge(row.task.status)} label={row.task.status} /></div>{#if blockedBy(row.task).length > 0}<p class="blocked" role="status"><Icon name="approvals" size={14} /> Waiting on {blockedBy(row.task).length === 1 ? "a decision" : `${blockedBy(row.task).length} decisions`} before this can continue. <a href={`#/approvals?session=${encodeURIComponent(row.task.session_id)}`}>Review {blockedBy(row.task).length === 1 ? "it" : "them"}</a></p>{/if}{#if row.task.current_step}<p class="step">Now: {row.task.current_step}</p>{/if}{#if row.task.progress_percent !== null}<div class="progress" role="progressbar" aria-valuenow={row.task.progress_percent} aria-valuemin="0" aria-valuemax="100"><div style={`width:${row.task.progress_percent}%`}></div></div>{/if}<footer><span title={row.task.scheduled_at ?? row.task.updated_at}>{scheduleLabel(row.task)} · updated {relativeTime(row.task.updated_at)}</span>{#if ["queued", "running", "paused"].includes(row.task.status)}<button type="button" class="btn btn-danger btn-sm" onclick={() => stopTask(row.task)} disabled={busyTask === row.task.task_id}>{busyTask === row.task.task_id ? "Stopping…" : "Stop"}</button>{/if}</footer></article>{/each}</section>{/if}
-    {#if history.length > 0}<section class="history"><h3>Completed work</h3>{#each history as task (task.task_id)}<div class="history-row"><span>{task.title}</span><Badge variant={taskBadge(task.status)} label={task.status} /><span>{relativeTime(task.updated_at)}</span></div>{/each}</section>{/if}
+    {:else}<section class="work-list" aria-labelledby="open-work"><h3 id="open-work">Open work</h3>{#each rows as row (row.task.task_id)}<article class="card task" style={`--depth:${row.depth}`}><div class="task-main"><div class="task-title"><span class="branch" aria-hidden="true">{row.depth > 0 ? "↳" : ""}</span><div><h4>{row.task.title}</h4><p>{row.task.objective || "No additional instructions."}</p></div></div><Badge variant={taskBadge(row.task.status)} label={taskStatusLabel(row.task.status)} /></div>{#if blockedBy(row.task).length > 0}<p class="blocked" role="status"><Icon name="approvals" size={14} /> Waiting on {blockedBy(row.task).length === 1 ? "a decision" : `${blockedBy(row.task).length} decisions`} before this can continue. <a href={`#/approvals?session=${encodeURIComponent(row.task.session_id)}`}>Review {blockedBy(row.task).length === 1 ? "it" : "them"}</a></p>{:else if outcome(row.task)}<p class="outcome" role="status">{outcome(row.task)}</p>{/if}{#if row.task.current_step}<p class="step">Now: {row.task.current_step}</p>{/if}{#if row.task.progress_percent !== null}<div class="progress" role="progressbar" aria-valuenow={row.task.progress_percent} aria-valuemin="0" aria-valuemax="100"><div style={`width:${row.task.progress_percent}%`}></div></div>{/if}<footer><span title={row.task.scheduled_at ?? row.task.updated_at}>{scheduleLabel(row.task)} · updated {relativeTime(row.task.updated_at)}</span>{#if ACTIVE_TASK_STATES.includes(row.task.status)}<button type="button" class="btn btn-danger btn-sm" onclick={() => stopTask(row.task)} disabled={busyTask === row.task.task_id}>{busyTask === row.task.task_id ? "Stopping…" : "Stop"}</button>{/if}</footer></article>{/each}</section>{/if}
+    {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><span class="history-title">{task.title}</span><p class="outcome">{outcome(task)}</p></div><Badge variant={taskBadge(task.status)} label={taskStatusLabel(task.status)} /><span>{relativeTime(task.updated_at)}</span></div>{/each}</section>{/if}
   {/if}
 </section>
 
 <style>
-  .tasks{max-width:64rem}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.tasks header .page-lead{margin:0;max-width:60ch}.composer p,.task p{color:var(--text-2);font-size:.85rem;margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3)}.composer label{color:var(--text-2);display:grid;font-size:.8rem;gap:.35rem}.composer .field-error{color:var(--danger);font-size:.8rem;margin:calc(var(--space-3) * -.5) 0 0}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:.85rem}.summary strong{color:var(--text-1);font-size:1.1rem}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:.96rem}.step{color:var(--accent)!important}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:.76rem;margin-top:.8rem}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:.8rem}.notice{color:var(--success);margin:var(--space-3) 0}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
+  .tasks{max-width:64rem}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.tasks header .page-lead{margin:0;max-width:60ch}.composer p,.task p{color:var(--text-2);font-size:.85rem;margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3)}.composer label{color:var(--text-2);display:grid;font-size:.8rem;gap:.35rem}.composer .field-error{color:var(--danger);font-size:.8rem;margin:calc(var(--space-3) * -.5) 0 0}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:.85rem}.summary strong{color:var(--text-1);font-size:1.1rem}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:.96rem}.step{color:var(--accent)!important}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:.76rem;margin-top:.8rem}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:.8rem}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1)}.outcome{color:var(--text-2);font-size:.82rem;margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
 </style>

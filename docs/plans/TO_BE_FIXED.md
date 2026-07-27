@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Eleven are marked **FIXED** and were resolved on this
+and the proposed fix. Seventeen are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -33,10 +33,11 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-10 | Medium | Chat / attachments | Fixed (was BUG-07) |
 | FIXED-11 | High | API redaction | Fixed (found while fixing BUG-07) |
 | FIXED-12 | Medium | Export | Fixed (was BUG-08) |
-| BUG-09 | Medium | Tasks | Open |
-| BUG-10 | Low | Chat / Tasks | Open |
-| BUG-11 | Medium | Permissions | Open |
-| BUG-12 | High | MCP | Open (specified, unimplemented) |
+| FIXED-13 | Medium | Tasks | Fixed (was BUG-09) |
+| FIXED-14 | High | API redaction | Fixed (found while fixing BUG-09) |
+| FIXED-15 | Low | Chat / Tasks | Fixed (was BUG-10) |
+| FIXED-16 | Medium | Permissions | Fixed (was BUG-11) |
+| FIXED-17 | High | MCP | Fixed (was BUG-12) |
 | BUG-13 | Low | Permissions | Open |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (20 items) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (18 items) |
@@ -789,11 +790,26 @@ a print stylesheet. It makes no server request and exports no hidden governance
 metadata.
 
 The serializer and filename are covered by `apps/web/src/lib/chatExport.test.ts`;
-the rendered controls, clipboard payload, and print invocation are covered by
-`apps/web/src/lib/views/ChatView.test.ts`. A live Chromium run verified the
-downloaded file contents, clipboard text, print media layout, zero horizontal
-overflow, and zero console errors. The disposable live-test screenshot is not
-retained in the repository.
+the rendered controls, clipboard payload, download, and print invocation are
+covered by `apps/web/src/lib/views/ChatView.test.ts`. A live Chromium run
+verified the downloaded file contents, clipboard text, print media layout, zero
+horizontal overflow, and zero console errors. The disposable live-test
+screenshot is not retained in the repository.
+
+**Follow-ups applied while verifying this entry.** Three gaps between what the
+controls did and what they reported:
+
+* **Copy failed silently.** `navigator.clipboard.writeText` was awaited with no
+  `catch`, so an insecure origin or a denied permission produced an unhandled
+  rejection and no message at all. It is now caught and reported.
+* **A successful copy was invisible.** The only confirmation was an `sr-only`
+  live region, so a sighted owner clicking **Copy response** saw nothing happen.
+  The notice is now visible ("Response copied.", "Downloaded raiker-chat-….md")
+  and still announced.
+* **The download raced its own object URL.** The anchor was never attached to the
+  document and `URL.revokeObjectURL` ran in the same tick as `click()` — a
+  download some browsers drop. The anchor is now attached, clicked, removed, and
+  the URL released afterwards.
 
 **Scope kept honest.** This is chat transcript export, not an arbitrary artifact
 or attachment download system. The latter remains outside this smallest useful
@@ -801,31 +817,154 @@ fix and must retain the existing session-authorized file boundary if added.
 
 ---
 
-## BUG-09 — A background-agent run reported `Task failed` with no user-facing reason
+## FIXED-13 — A background-agent run reported `Task failed` with no user-facing reason *(was BUG-09)*
+
+**Status: fixed in this change.**
 
 **Observed.** The "Manual test Background agent" task produced a real response
 and a checkpoint, then the audit log recorded `Task failed` (`task_manager`).
 Tasks still showed the task as `queued`; nothing in the UI said what failed or
 why.
 
-**Proposed fix.** Surface the task's terminal reason on the task card and in
-Observability → Work in action. A run that produced a completed response should
-not be able to end `failed` with an empty summary.
+**Root cause.** Three separate defects stacked into one unreadable outcome.
+
+1. `raiker/tasks/scheduler.py` treated **every** non-`completed` turn status as a
+   failure. A governed turn ends on one of four statuses, and two of them are not
+   failures: `needs_approval` means the run reached an approval boundary and
+   stopped there — exactly what a governed run is supposed to do — and `denied`
+   means policy refused one action. A run parked on the owner's own decision was
+   recorded as `failed`.
+2. The reason was whatever the turn's message happened to be, truncated to 500
+   characters and never checked. An empty message produced a `task_failed` event
+   with `reason: ""` and a task row whose `summary` was blank.
+3. Nothing rendered the reason even when one existed. `TasksView` showed a status
+   badge, the objective, and a timestamp; the finished list showed title, badge,
+   time. Work in action filtered tasks down to `queued`/`running`/`paused`, so a
+   finished run vanished from the page rather than reporting how it ended, and a
+   task's `detail` was its `current_step` — the step the run last reached, not
+   what ended it.
+
+The `queued` reading was the same page never refreshing: the list loaded on mount
+and on a project change only, while the run was claimed, executed, and closed by
+the resident scheduler outside it.
+
+**Fix applied.**
+
+*A run's outcome is classified, not assumed.* `run_outcome()` maps each terminal
+turn status onto a task status and a stated summary: `completed` → `completed`,
+`needs_approval` → `waiting_for_approval` (a contract status that existed and was
+never used), `denied`/`failed` → `failed`. An unrecognised status fails closed
+**and** names itself rather than recording a state the owner cannot account for.
+
+*A terminal task always carries a reason.* `TaskManager.fail_task` and
+`cancel_task` substitute a stated reason when the caller passes a blank one, so
+neither the audit event nor the card can end up empty. `block_task_on_approval`
+parks a blocked run without stamping `completed_at` — the work is unfinished —
+and emits the new `task_blocked` event, which is distinct from `task_failed`
+precisely because nothing went wrong. A recurring cadence keeps its slot whatever
+one cycle did, so a cycle that did not complete now says so in the summary
+instead of reading like a success.
+
+*The reason is visible in both surfaces.* Tasks shows the outcome line on the
+card and in the (now correctly named) **Finished work** list, reads
+`waiting for approval` as English rather than a snake_case identifier, keeps a
+blocked run in the open list where it can be reviewed or stopped, and refreshes
+on a 15-second interval so a run that ends elsewhere stops reading as `queued`.
+Work in action keeps blocked runs among live work, adds **How the last runs
+ended**, and reports a terminal task's outcome instead of its stale step.
+"Stop everything" reaches a blocked task too (`_ACTIVE_TASK_STATES`).
+
+Covered by `tests/test_task_scheduler.py`, `tests/test_phase_2_task_manager.py`,
+`tests/test_api_dashboard.py`, `apps/web/src/lib/statusMaps.test.ts`,
+`apps/web/src/lib/views/TasksView.test.ts`, and
+`apps/web/src/lib/views/WorkInActionView.test.ts`.
+
+**Deliberately not done.** Resolving the approval that blocks a scheduled run
+still does not resume that run: the resume relay (FIXED-09) is driven by the
+client that submitted the turn, and a scheduler-launched turn has no client
+watching it. The task stays `waiting_for_approval` with its reason on the card
+and can be stopped from there. Auto-resuming scheduled work after an approval is
+a feature on top of this defect, not part of it.
 
 ---
 
-## BUG-10 — Task runs pollute RECENT CHATS
+## FIXED-14 — Redaction destroyed every server-issued record id
+
+**Status: fixed in this change.** Found while verifying FIXED-13 against a live
+`raiker-web`; not caused by it.
+
+**Observed.** With the task fixes in place, `GET /api/tasks` returned:
+
+> `"session_id": "[REDACTED_SECRET]"`
+
+for every task, and `GET /api/sessions` did the same for the Inbox session. The
+task cards rendered correctly, but every control that carries the id was broken:
+**Stop** posted `session_id: "[REDACTED_SECRET]"` (`interrupt_target_not_found`),
+the blocked-task pointer linked to `#/approvals?session=[REDACTED_SECRET]`, the
+session was unopenable from Sessions, and the approval match — `task.session_id
+=== approval.session_id` — compared one redaction marker against another.
+
+**Root cause.** The fourth instance of the family behind FIXED-02, FIXED-07 and
+FIXED-11: the high-entropy fallback matching a value that is long without being
+opaque. A server-issued id is long because its *prefixes* were joined —
+`sess_inbox_principal_user_<16 hex>` is 42 characters and carries no 40-character
+run of entropy anywhere. Short ids (`sess_<16 hex>`, 21 characters) stayed under
+the threshold, which is why this only appeared for accounts created through
+registration: their principal id is what makes the Inbox session id long enough,
+and the Inbox session is where every task lives.
+
+**Fix applied.** The field's **key** decides, exactly as it does for locators in
+FIXED-11. `raiker/api/redaction.py` marks values under `*_id`/`*_ids` as record
+identifiers, and only those get a fallback that spares a token matching the
+server-issued id shape — lowercase, underscore-joined, alphanumeric segments.
+Nothing else changes:
+
+* The exemption is a *shape*, not a blanket pass for `*_id`. A mixed-case token,
+  base64 with padding, or a dash-separated opaque value under an id key still
+  redacts.
+* A key that names a credential still wins: `token_id` is discarded whole.
+* Free-form text is untouched and keeps the strict scan, so the same string
+  quoted in an assistant reply is still scanned as prose.
+
+`assert_no_secrets_in_body` mirrors the rule, so the guard still proves exactly
+what the middleware emits. Covered by
+`tests/test_over_broad_redaction.py::TestServerIssuedIdentifiersSurvive` and
+verified over real HTTP against a running `raiker-web`.
+
+---
+
+## FIXED-15 — Task runs polluted RECENT CHATS *(was BUG-10)*
+
+**Status: fixed in this change.**
 
 **Observed.** After creating tasks, an entry titled **Inbox** appeared in the
 sidebar's RECENT CHATS beside real conversations, and task-run sessions appear in
 Sessions with the task's prompt as the title.
 
-**Proposed fix.** Tag task-created sessions with their origin and exclude them
-from the RECENT CHATS list (they remain reachable from Tasks and Sessions).
+**Root cause.** A task runs as a real governed turn, and a governed turn needs a
+session, so `create_task` creates a server-owned `sess_inbox_<principal>` row.
+Nothing recorded that this session came from anywhere different, so every list
+of sessions — the sidebar's recent chats, and the Workbench's "Resume a
+conversation" — treated it as a conversation the owner had.
+
+**Fix applied.** Sessions carry an `origin` column: `chat` for a conversation
+the owner typed, `task` for the session a task run executes in. It is
+provenance and nothing else — it grants nothing, hides nothing, and changes no
+gate, policy, or ownership. `GET /api/sessions?origin=chat` narrows the list,
+and the two surfaces that mean *conversations* ask for that; Sessions still
+lists everything, and a task session stays reachable from Tasks.
+
+Creating a task also re-stamps an Inbox that predates the column, so a workspace
+that already had one stops reading as a chat rather than needing a reset.
+
+Covered by `tests/test_session_origin.py` and the sidebar case in
+`apps/web/src/lib/components/Sidebar.test.ts`.
 
 ---
 
-## BUG-11 — A surface blocked by runtime mode does not say so
+## FIXED-16 — A surface blocked by runtime mode did not say so *(was BUG-11)*
+
+**Status: fixed in this change.**
 
 **Observed.** With `mcp_builder_runtime` and `mcp_connector_runtime` set to
 `enabled_policy_gated`, the MCP tab still said *"The MCP builder and connector
@@ -835,33 +974,98 @@ servers."* — but they **were** enabled in Capabilities. The real blocker was t
 mode (Settings → Runtime mode). Following the message's own advice does not
 resolve it.
 
-**Proposed fix.** When a gate is enabled but not at `enabled_runtime`, say so:
-*"Enabled, but not at runtime level — activate a runtime mode in Settings →
-Runtime mode."* with a link. Applies to every `runtime_enabled` consumer, not
-just MCP.
+**Root cause.** Every consumer read one boolean, `runtime_enabled`, and rendered
+one sentence for everything it could mean. A `runtime_enabled` surface is shut
+in four distinguishable ways, and they need different actions: the capability
+has no executor in this runtime (nothing to do), the gate is off (turn it on),
+the gate is on but below runtime level (activate a runtime mode), or the
+decision mode is `deny` (change the mode). Collapsing them sent the owner to a
+page where the capability already read as enabled.
+
+**Fix applied.** `runtimeBlock(gate, label)` in
+`apps/web/src/lib/capabilityModel.ts` classifies the four cases and returns the
+reason, the one action that resolves it, and where that action lives. A gate
+that could not be read is treated as shut, never as open. MCP renders one notice
+per blocked capability from it.
+
+The same distinction is now made server-side for the Extensions hub, where a
+connector below runtime level reported `capability_gate_closed` ("its capability
+gate is closed") with the identical problem: `_connector_block_reason` returns
+`capability_below_runtime_level` and `capability_decision_mode_deny` as separate
+reasons, and each has its own copy.
+
+Covered by the `runtimeBlock` cases in
+`apps/web/src/lib/capabilityModel.test.ts`, the blocked-banner cases in
+`apps/web/src/lib/views/McpView.test.ts`, and
+`tests/test_api_web_read_models.py::TestBlockedReasonNamesTheRealBlocker`.
 
 ---
 
-## BUG-12 — MCP servers cannot be used by the agent
+## FIXED-17 — MCP servers could not be used by the agent *(was BUG-12)*
+
+**Status: fixed in this change.**
 
 **Observed.** Created and connected a governed local MCP server from the Sample
 echo template; **Test** reported `connected · 2 tool(s)` (`echo`,
-`workspace_ping`) and recorded a monitored session. The model can never call
-them: `raiker/models/tool_call_validation.py::_MODEL_EXPOSED_TOOLS` is a fixed
-frozenset, and there is no `mcp` reference anywhere in
+`workspace_ping`) and recorded a monitored session. The model could never call
+them: `raiker/models/tool_call_validation.py::_MODEL_EXPOSED_TOOLS` was a fixed
+frozenset, and there was no `mcp` reference anywhere in
 `raiker/runtime/orchestrator.py`, `raiker/tools/broker.py`, or
-`tool_call_validation.py`.
+`tool_call_validation.py`. MCP was a management/monitoring surface only, while
+a user who follows the UI to connect a server reasonably expects its tools in
+Chat.
 
-**Impact.** MCP is a management/monitoring surface only. A user who follows the
-UI to connect a server reasonably expects its tools in Chat.
+**Fix applied.** Each tool a connected server advertised becomes one
+model-callable tool named `mcp__<server>__<tool>`
+(`raiker/tools/mcp_tools.py`). Four seams:
 
-**Proposed fix.** Project the tools of connected, non-contained MCP servers into
-the per-turn tool specification with a namespaced id (`mcp__<server>__<tool>`),
-route execution through `ToolBroker` so the existing policy, approval, and audit
-path applies unchanged, and treat every result as untrusted data — the same
-framing the GitHub/Gmail connectors already use.
+* **Discovery** — the orchestrator recomputes the turn's tool specification, so
+  a server connected, paused, or killed between turns is reflected immediately.
+  Fail-closed: a disabled `mcp_connector_runtime` gate, a server that never
+  completed a handshake, and a contained connection all contribute nothing, so
+  the model is never offered a tool the runtime would refuse.
+* **Validation** — `validate_tool_call` recognises a projected tool by *shape*
+  and stays store-free. Whether that server and tool exist is answered at
+  execution, with a stated reason.
+* **Governance** — execution goes through `ToolBroker` unchanged (hooks, the
+  policy engine, the approval flow, the audit events, the stored tool-action
+  record). On top of that the tool enforces the capability gate, the decision
+  mode (**default `ask` withholds**, exactly like the GitHub/Gmail connectors —
+  reaching a registered server runs code Raiker does not own), containment, and
+  the server's own advertised tool list. The session monitor still records
+  redacted telemetry and can still trip an anomaly rule.
+* **Results** — the tool's text reaches the calling model framed as untrusted
+  data, never instructions, and reaches nothing else. The executor takes an
+  in-process `content_sink`; artifacts, the `action_executed` event, the broker
+  events, and the session log keep carrying counts and labels only. Broker
+  events also drop the *argument values* (they are opaque values composed for
+  an outside program, not governance-relevant identifiers like a repo and
+  number), and the result is bounded to 20 000 characters.
 
----
+Two deliberate narrowings. A server whose own name contains the `__` separator
+is not projected at all, because `mcp__a__b__c` would otherwise be ambiguous
+between two servers; and the policy layer treats a projected call as
+read-shaped (like `connector_read`), because what actually governs it is
+enforced inside the tool.
+
+Covered by `tests/test_mcp_agent_tools.py` (30 cases: naming, validation,
+fail-closed discovery, every decision mode, an end-to-end call against the real
+echo template, and the audit-trail exclusions).
+
+**Found while verifying this live: calling a tool erased the server's tool
+list.** `_record_connection` refreshes a profile's runtime fields after every
+session, and a `tools/call` session passed `tools or []` — an empty list, not
+"nothing discovered". The connected server then read `TOOLS (0)` in the UI, and
+the projection, which is built from exactly that list, went silent from the
+second turn onward. `update_mcp_server_runtime` now treats `tools=None` as "this
+operation enumerated nothing" and leaves the stored list alone (`COALESCE`);
+only an enumerating session rewrites it. The defect predates this change — any
+`mcp_call_tool` emptied the profile — but the projection is what made it fatal
+rather than cosmetic.
+
+**Threat model updated.** `docs/threat-models/mcp-connector.md` no longer claims
+tool output is redacted in every direction — it now states exactly where the
+content goes and where it does not.
 
 ## BUG-13 — "Confirmation token" is unexplained in the step-up dialog
 

@@ -261,3 +261,50 @@ def response_text(body: object) -> str:
 def _one_second_after(timestamp: str) -> str:
     moment = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     return (moment + timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# BUG-11 — "the gate is closed" was told to owners whose gate was already open.
+#
+# A surface that needs `runtime_enabled` has three distinct ways of being shut,
+# and each needs a different action. Naming them apart is the whole fix: an
+# owner who has enabled a capability to `enabled_policy_gated` and is told to
+# "enable it in Capabilities" follows that advice and nothing changes, because
+# what they actually need is a runtime-enablement mode.
+class TestBlockedReasonNamesTheRealBlocker:
+    def _reason(self, **overrides: object) -> str | None:
+        from raiker.control.web_read_models import _connector_block_reason
+
+        base: dict[str, object] = {
+            "installed": True,
+            "connected": True,
+            "enabled": True,
+            "auth_status": "connected",
+            "gate_open": False,
+            "egress_ok": True,
+            "gate_state": "disabled",
+            "decision_mode": "ask",
+        }
+        base.update(overrides)
+        return _connector_block_reason(**base)  # type: ignore[arg-type]
+
+    def test_an_off_gate_still_says_the_gate_is_off(self) -> None:
+        assert self._reason(gate_state="disabled") == "capability_gate_closed"
+
+    def test_an_enabled_but_below_runtime_gate_says_so(self) -> None:
+        assert self._reason(gate_state="enabled_policy_gated") == "capability_below_runtime_level"
+        assert self._reason(gate_state="enabled_read_only") == "capability_below_runtime_level"
+
+    def test_a_deny_decision_mode_is_named_as_itself(self) -> None:
+        assert (
+            self._reason(gate_state="enabled_runtime", decision_mode="deny")
+            == "capability_decision_mode_deny"
+        )
+
+    def test_an_open_gate_is_not_blocked_by_the_gate(self) -> None:
+        assert self._reason(gate_open=True, gate_state="enabled_runtime") is None
+
+    def test_earlier_unmet_conditions_still_win(self) -> None:
+        # Order matters: an owner cannot act on a gate before the connector is
+        # installed and authenticated.
+        assert self._reason(installed=False) == "not_installed"
+        assert self._reason(connected=False, auth_status="not_connected") == "account_not_connected"

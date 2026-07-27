@@ -13,6 +13,7 @@ from raiker.contracts.ids import utc_now
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tasks.manager import TaskManager
 
 PROTECTED_GET_ROUTES = [
     "/api/sessions",
@@ -257,6 +258,34 @@ class TestReads:
         # A queued schedule is visible, but its edge must not animate as though
         # execution has already started.
         assert tracks_edge["is_active"] is False
+
+    # BUG-09 — the live view showed a finished task's last *step*, which is not
+    # what ended it. A terminal task reports its outcome, and a failure that
+    # arrived without words still reports the reason the manager recorded.
+    def test_brain_reports_a_finished_tasks_outcome_not_its_last_step(
+        self, bootstrapped_workspace: Path, client: TestClient
+    ) -> None:
+        token = _token(client)
+        created = client.post(
+            "/api/tasks",
+            headers=_auth_headers(token),
+            json={"title": "File the report", "description": "File it."},
+        )
+        assert created.status_code == 201, created.text
+        task_id = created.json()["task_id"]
+
+        store = SQLiteStore(bootstrapped_workspace)
+        manager = TaskManager(store, EventLogWriter(store))
+        manager.update_progress(task_id, current_step="Drafting", progress_percent=40)
+        manager.fail_task(task_id, reason="")
+
+        body = client.get("/api/brain", headers=_auth_headers(token)).json()
+        node = next(node for node in body["nodes"] if node["node_id"] == f"task:{task_id}")
+        assert node["status"] == "failed"
+        assert node["detail"] == "The run ended without a stated reason."
+        # A run that has already ended keeps its `scheduled_at`, but it is not
+        # waiting for a slot any more and must not be listed as pending work.
+        assert not any(n["node_id"] == f"schedule:{task_id}" for n in body["nodes"])
 
     def test_brain_source_is_explicit_and_workspace_contained(
         self, bootstrapped_workspace: Path, client: TestClient

@@ -270,6 +270,8 @@ class WebReadModels:
                         auth_status=auth_status,
                         gate_open=gate_open,
                         egress_ok=egress_ok,
+                        gate_state=gate.gate_state if gate else None,
+                        decision_mode=gate.decision_mode if gate else None,
                     ),
                     detail=definition.description,
                     capability=gate.capability if gate else None,
@@ -302,10 +304,15 @@ class WebReadModels:
                     blocked_reason=_connector_block_reason(
                         installed=True,
                         connected=gate.credential_configured,
-                        enabled=gate.capability_enabled,
+                        # A governed connector with no catalog entry has no
+                        # per-session installation to enable, so the gate — not a
+                        # session switch — is what can block it.
+                        enabled=True,
                         auth_status="connected" if gate.credential_configured else "not_connected",
                         gate_open=gate_open,
                         egress_ok=gate.egress_allowed,
+                        gate_state=gate.gate_state,
+                        decision_mode=gate.decision_mode,
                     ),
                     detail=f"Actions: {', '.join(gate.actions) or 'none registered'}",
                     capability=gate.capability,
@@ -548,6 +555,15 @@ class WebReadModels:
         return redacted
 
 
+# Gate states that are "on" but below the runtime level a governed call needs.
+# A surface blocked here is *not* blocked by an off switch: the owner has
+# already enabled the capability, and turning it on again — which is what
+# "the gate is closed" tells them to do — changes nothing. Reaching
+# `enabled_runtime` additionally requires an active runtime-enablement mode
+# (Settings → Runtime mode). BUG-11.
+_ENABLED_BELOW_RUNTIME_STATES = frozenset({"enabled_read_only", "enabled_policy_gated"})
+
+
 def _connector_block_reason(
     *,
     installed: bool,
@@ -556,6 +572,8 @@ def _connector_block_reason(
     auth_status: str,
     gate_open: bool,
     egress_ok: bool,
+    gate_state: str | None = None,
+    decision_mode: str | None = None,
 ) -> str | None:
     """Name the first unmet condition, in the order the owner must fix them."""
     if not installed:
@@ -567,6 +585,10 @@ def _connector_block_reason(
     if not enabled:
         return "not_enabled_for_session"
     if not gate_open:
+        if decision_mode == "deny":
+            return "capability_decision_mode_deny"
+        if (gate_state or "") in _ENABLED_BELOW_RUNTIME_STATES:
+            return "capability_below_runtime_level"
         return "capability_gate_closed"
     if not egress_ok:
         return "egress_host_not_allowlisted"

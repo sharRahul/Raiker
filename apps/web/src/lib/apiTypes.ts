@@ -524,6 +524,10 @@ export interface SessionSummary {
   // events, checkpoints, or permissions.
   archived: boolean;
   archived_at: string | null;
+  // Where the session came from: "chat" for a conversation the owner typed,
+  // "task" for the server-owned session a task run executes in. Provenance
+  // only — a task session stays readable in Sessions and from Tasks.
+  origin?: string;
 }
 
 export interface TurnSummary {

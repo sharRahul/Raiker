@@ -5,7 +5,10 @@
   import { api, ApiError } from "../api";
   import type { BrainNode, BrainView } from "../apiTypes";
 
-  const ACTIVE = new Set(["queued", "running", "paused"]);
+  const ACTIVE = new Set(["queued", "running", "paused", "waiting_for_approval"]);
+  // A run that ended is still the thing the owner most needs to read, because
+  // the reason it ended lives nowhere else on this page (BUG-09).
+  const FINISHED = new Set(["completed", "failed", "cancelled"]);
   let brain = $state<BrainView | null>(null);
   let loadError = $state<string | null>(null);
   let refreshing = $state(false);
@@ -31,6 +34,7 @@
   const nodes = $derived(brain?.nodes ?? []);
   const agents = $derived(nodes.filter((node) => node.node_type === "agent"));
   const tasks = $derived(nodes.filter((node) => node.node_type === "task" && ACTIVE.has(node.status)));
+  const finished = $derived(nodes.filter((node) => node.node_type === "task" && FINISHED.has(node.status)).slice(0, 10));
   const schedules = $derived(nodes.filter((node) => node.node_type === "schedule"));
 
   // Cartoon character state derives from the agent's runtime status.
@@ -67,6 +71,8 @@
       case "queued": return "Queued";
       case "paused": return "Paused";
       case "waiting": return "Waiting";
+      case "waiting_for_approval": return "Waiting for approval";
+      case "cancelled": return "Stopped";
       case "completed": return "Done";
       case "failed": return "Failed";
       case "active": return "Active";
@@ -142,7 +148,18 @@
             </li>
           {/each}
         </ul>
-      {:else}<p class="empty">No active, queued, or paused tasks are stored right now.</p>{/if}
+      {:else}<p class="empty">No task is queued, running, paused, or waiting for approval right now.</p>{/if}
+
+      {#if finished.length}
+        <h3 class="finished-head">How the last runs ended</h3>
+        <ul class="finished">
+          {#each finished as task (task.node_id)}
+            <li>
+              <div><h4>{task.label}</h4><p>{statusLabel(task.status)} · {task.detail ?? "No reason was recorded for this outcome."}</p></div>
+            </li>
+          {/each}
+        </ul>
+      {/if}
     </section>
 
     <section class="card schedules">
@@ -223,6 +240,12 @@
   .crate { position:relative; display:grid; grid-template-columns:1fr; gap:8px; padding:12px 14px; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); box-shadow:var(--shadow-1); animation:crate-glide 0.6s var(--ease) both; }
   .crate-body h3 { margin:0; font-size:0.88rem; } .crate-body p { margin:3px 0 0; color:var(--text-2); font-size:0.8rem; }
   .progress { height:6px; overflow:hidden; border-radius:4px; background:var(--sunken); } .progress div { height:100%; background:var(--accent); transition:width 400ms var(--ease); }
+  .finished-head { margin:var(--space-4) 0 8px; font-size:0.86rem; color:var(--text-2); }
+  .finished { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+  .finished li { padding:8px 0; border-bottom:1px solid var(--border); }
+  .finished li:last-child { border:0; }
+  .finished h4 { margin:0; font-size:0.84rem; } .finished p { margin:2px 0 0; color:var(--text-2); font-size:0.78rem; }
+
   .waitlist { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
   .waitlist li { display:flex; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid var(--border); }
   .waitlist li:last-child { border:0; }

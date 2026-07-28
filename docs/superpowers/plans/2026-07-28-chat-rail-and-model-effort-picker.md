@@ -97,6 +97,6 @@ Run: `npm.cmd --prefix apps/web run test; npm.cmd --prefix apps/web run check; n
 
 - [ ] **Step 3: Start an isolated loopback `raiker-web` process with process-scoped provider credentials**
 
-- [ ] **Step 4: Use Playwright to select an Ollama model and, where available, effort; then run an Anthropic end-to-end turn**
+- [ ] **Step 4: Use Playwright to select Ollama, Anthropic, and OpenRouter models; exercise an effort picker only where that exact model advertises it, and run one authenticated end-to-end turn per reachable provider**
 
 - [ ] **Step 5: Capture screenshots and browser console evidence; do not write secrets to artifacts**

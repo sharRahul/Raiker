@@ -127,6 +127,11 @@ class SettingsRequest(BaseModel):
     settings: dict[str, Any]
 
 
+class ComposerApprovalModeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    approval_mode: str
+
+
 class TaskCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str

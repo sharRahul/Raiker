@@ -35,6 +35,24 @@ def test_invalid_planning_mode_rejected() -> None:
         PromptOptions(planning_mode="guess")
 
 
+@pytest.mark.parametrize("approval_mode", ["manual", "auto", "skip"])
+def test_canonical_approval_modes_are_retained(approval_mode: str) -> None:
+    assert PromptOptions(approval_mode=approval_mode).approval_mode == approval_mode
+
+
+@pytest.mark.parametrize(
+    ("legacy_mode", "canonical_mode"),
+    [("interactive", "manual"), ("allow_safe_only", "auto"), ("deny_risky", "manual")],
+)
+def test_legacy_approval_modes_are_normalized(legacy_mode: str, canonical_mode: str) -> None:
+    assert PromptOptions(approval_mode=legacy_mode).approval_mode == canonical_mode
+
+
+def test_unknown_approval_mode_rejected() -> None:
+    with pytest.raises(ContractValidationError, match="invalid_approval_mode:unbounded"):
+        PromptOptions(approval_mode="unbounded")
+
+
 def test_agent_event_requires_timestamp() -> None:
     with pytest.raises(ContractValidationError):
         AgentEvent(

@@ -28,7 +28,12 @@ CLIENT_TYPES = {
     "test_harness",
 }
 PLANNING_MODES = {"auto", "always", "never_safe_only"}
-APPROVAL_MODES = {"interactive", "deny_risky", "allow_safe_only"}
+APPROVAL_MODES = {"manual", "auto", "skip"}
+_LEGACY_APPROVAL_MODE_ALIASES = {
+    "interactive": "manual",
+    "allow_safe_only": "auto",
+    "deny_risky": "manual",
+}
 # Effectively unbounded: a turn ends when the model finishes or the provider's
 # context/token budget runs out, not because of this counter. It exists only as
 # a hard runaway-loop fail-safe; callers may still pass a lower explicit bound.
@@ -356,6 +361,12 @@ def _one_of(value: str, allowed: set[str], field_name: str) -> None:
         raise ContractValidationError(f"invalid_{field_name}:{value}")
 
 
+def normalize_approval_mode(value: str) -> str:
+    normalized = _LEGACY_APPROVAL_MODE_ALIASES.get(value, value)
+    _one_of(normalized, APPROVAL_MODES, "approval_mode")
+    return normalized
+
+
 def _schema(value: str) -> None:
     if value != SCHEMA_VERSION:
         raise ContractValidationError(f"unsupported_schema_version:{value}")
@@ -397,7 +408,7 @@ class PromptPayload:
 @dataclass(frozen=True)
 class PromptOptions:
     planning_mode: str = "auto"
-    approval_mode: str = "interactive"
+    approval_mode: str = "manual"
     # Empty means "the operator's selected model" (persisted via /model use);
     # an explicit profile id binds this turn only. Never defaults to a test provider.
     model_profile: str = ""
@@ -410,7 +421,7 @@ class PromptOptions:
 
     def __post_init__(self) -> None:
         _one_of(self.planning_mode, PLANNING_MODES, "planning_mode")
-        _one_of(self.approval_mode, APPROVAL_MODES, "approval_mode")
+        object.__setattr__(self, "approval_mode", normalize_approval_mode(self.approval_mode))
         if self.max_tool_calls < 0:
             raise ContractValidationError("invalid_max_tool_calls")
 

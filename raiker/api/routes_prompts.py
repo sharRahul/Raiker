@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.redaction import redact_response_body
+from raiker.api.routes_settings import load_composer_approval_mode
 from raiker.api.schemas import InterruptRequest, PromptRequest
 from raiker.api.sessions import ApiSession
 from raiker.contracts.ids import new_id
@@ -103,10 +104,16 @@ def _validated_attachments(raw: list[dict[str, Any]] | None) -> list[dict[str, A
     return cleaned
 
 
-def _build_envelope(body: PromptRequest, principal_id: str = "local_user") -> PromptEnvelope:
+def _build_envelope(
+    body: PromptRequest, principal_id: str = "local_user", workspace: str | Path | None = None
+) -> PromptEnvelope:
     options = PromptOptions(
         planning_mode=body.planning_mode or "auto",
-        approval_mode=body.approval_mode or "interactive",
+        approval_mode=(
+            body.approval_mode
+            if body.approval_mode is not None
+            else load_composer_approval_mode(workspace, principal_id) if workspace is not None else "manual"
+        ),
         model_profile=body.model_profile or "",
         model=body.model or "",
         max_tool_calls=(
@@ -276,7 +283,7 @@ async def submit_prompt(
         if existing is not None and existing.get("user_id") != principal.delegated_by_user_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
     try:
-        envelope = _build_envelope(body, session.principal_id)
+        envelope = _build_envelope(body, session.principal_id, _ws(request))
     except ContractValidationError as exc:
         return _invalid_response(exc).to_dict()
     _record_attachment_refs(_ws(request), envelope, session.principal_id)
@@ -311,7 +318,7 @@ async def stream_prompt(
         if existing is not None and existing.get("user_id") != principal.delegated_by_user_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
     try:
-        envelope = _build_envelope(body, session.principal_id)
+        envelope = _build_envelope(body, session.principal_id, _ws(request))
     except ContractValidationError as exc:
         final = _invalid_response(exc)
 

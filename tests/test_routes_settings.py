@@ -49,3 +49,63 @@ def test_settings_isolated_per_account(client: TestClient, tmp_path: Path, seed_
 
 def test_settings_requires_auth(client: TestClient) -> None:
     assert client.get("/api/settings").status_code == 401
+
+
+def test_composer_approval_mode_defaults_to_manual(client: TestClient) -> None:
+    token = _token(client, "alice")
+
+    response = client.get("/api/settings/composer-approval-mode", headers=_h(token))
+
+    assert response.status_code == 200
+    assert response.json() == {"approval_mode": "manual"}
+
+
+def test_composer_approval_mode_normalizes_and_preserves_unrelated_settings(client: TestClient) -> None:
+    token = _token(client, "alice")
+    client.put(
+        "/api/settings",
+        json={"settings": {"personalisation": {"theme": "dark"}, "other": True}},
+        headers=_h(token),
+    )
+
+    response = client.put(
+        "/api/settings/composer-approval-mode",
+        json={"approval_mode": "allow_safe_only"},
+        headers=_h(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"approval_mode": "auto"}
+    settings = client.get("/api/settings", headers=_h(token)).json()["settings"]
+    assert settings == {
+        "personalisation": {"theme": "dark"},
+        "other": True,
+        "composer": {"approval_mode": "auto"},
+    }
+
+
+def test_composer_approval_mode_isolated_per_account(client: TestClient, tmp_path: Path, seed_account) -> None:  # type: ignore[no-untyped-def]
+    token_alice = _token(client, "alice")
+    _, token_bob = seed_account(tmp_path, "bob")
+    client.put(
+        "/api/settings/composer-approval-mode",
+        json={"approval_mode": "skip"},
+        headers=_h(token_alice),
+    )
+
+    response = client.get("/api/settings/composer-approval-mode", headers=_h(token_bob))
+
+    assert response.status_code == 200
+    assert response.json() == {"approval_mode": "manual"}
+
+
+def test_composer_approval_mode_rejects_unknown_value(client: TestClient) -> None:
+    token = _token(client, "alice")
+
+    response = client.put(
+        "/api/settings/composer-approval-mode",
+        json={"approval_mode": "unbounded"},
+        headers=_h(token),
+    )
+
+    assert response.status_code == 422

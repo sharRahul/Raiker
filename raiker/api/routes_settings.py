@@ -12,11 +12,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
-from raiker.api.schemas import SettingsRequest
+from raiker.api.schemas import ComposerApprovalModeRequest, SettingsRequest
 from raiker.auth.accounts import AccountService
+from raiker.contracts.models import ContractValidationError, normalize_approval_mode
 from raiker.auth.vault_key_file import vault_status
 from raiker.contracts.ids import utc_now
 from raiker.storage.sqlite import SQLiteStore
@@ -37,6 +38,19 @@ def _load(ws: str | Path, principal_id: str) -> dict[str, Any]:
         return parsed if isinstance(parsed, dict) else {}
     except (ValueError, TypeError):
         return {}
+
+
+def load_composer_approval_mode(ws: str | Path, principal_id: str) -> str:
+    composer = _load(ws, principal_id).get("composer")
+    if not isinstance(composer, dict):
+        return "manual"
+    approval_mode = composer.get("approval_mode")
+    if not isinstance(approval_mode, str):
+        return "manual"
+    try:
+        return normalize_approval_mode(approval_mode)
+    except ContractValidationError:
+        return "manual"
 
 
 @router.get("/api/settings")
@@ -61,3 +75,30 @@ async def put_settings(body: SettingsRequest, request: Request) -> dict[str, Any
         principal.principal_id, json.dumps(body.settings), utc_now()
     )
     return {"settings": body.settings}
+
+
+@router.get("/api/settings/composer-approval-mode")
+async def get_composer_approval_mode(request: Request) -> dict[str, str]:
+    _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    return {"approval_mode": load_composer_approval_mode(_ws(request), principal.principal_id)}
+
+
+@router.put("/api/settings/composer-approval-mode")
+async def put_composer_approval_mode(
+    body: ComposerApprovalModeRequest, request: Request
+) -> dict[str, str]:
+    _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    try:
+        approval_mode = normalize_approval_mode(body.approval_mode)
+    except ContractValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from None
+
+    ws = _ws(request)
+    settings = _load(ws, principal.principal_id)
+    composer = settings.get("composer")
+    if not isinstance(composer, dict):
+        composer = {}
+        settings["composer"] = composer
+    composer["approval_mode"] = approval_mode
+    SQLiteStore(ws).put_user_settings(principal.principal_id, json.dumps(settings), utc_now())
+    return {"approval_mode": approval_mode}

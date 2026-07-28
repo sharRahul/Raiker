@@ -6,9 +6,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
+from raiker.api.routes_prompts import _build_envelope
+from raiker.api.schemas import PromptRequest
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import utc_now
+from raiker.contracts.models import AgentResponse, PromptEnvelope
+from raiker.contracts.streaming import FINAL, StreamEvent
 from raiker.events.writer import EventLogWriter
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
@@ -37,9 +41,61 @@ def _headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def test_prompt_without_approval_mode_uses_account_preference(workspace: Path) -> None:
+    SQLiteStore(workspace).put_user_settings(
+        "principal_owner", '{"composer":{"approval_mode":"auto"}}', utc_now()
+    )
+
+    envelope = _build_envelope(PromptRequest(text="hello"), "principal_owner", workspace)
+
+    assert envelope.options.approval_mode == "auto"
+
+
+def test_prompt_without_approval_mode_defaults_to_manual(workspace: Path) -> None:
+    envelope = _build_envelope(PromptRequest(text="hello"), "principal_owner", workspace)
+
+    assert envelope.options.approval_mode == "manual"
+
+
 class TestPrompts:
     def test_requires_auth(self, client: TestClient) -> None:
         assert client.post("/api/prompts", json={"text": "hi"}).status_code == 401
+
+    def test_prompt_routes_use_account_approval_mode_when_omitted(
+        self, workspace: Path, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        SQLiteStore(workspace).put_user_settings(
+            "principal_owner", '{"composer":{"approval_mode":"auto"}}', utc_now()
+        )
+        captured: list[PromptEnvelope] = []
+
+        def response_for(envelope: PromptEnvelope) -> AgentResponse:
+            return AgentResponse(
+                request_id=envelope.request_id,
+                session_id=envelope.session_id,
+                turn_id=envelope.turn_id,
+                status="completed",
+                message="stubbed",
+            )
+
+        async def submit_stub(_gateway, envelope: PromptEnvelope) -> AgentResponse:  # type: ignore[no-untyped-def]
+            captured.append(envelope)
+            return response_for(envelope)
+
+        async def stream_stub(_gateway, envelope: PromptEnvelope):  # type: ignore[no-untyped-def]
+            captured.append(envelope)
+            yield StreamEvent(kind=FINAL, response=response_for(envelope))
+
+        monkeypatch.setattr("raiker.api.routes_prompts.AgentGateway.submit_prompt_async", submit_stub)
+        monkeypatch.setattr("raiker.api.routes_prompts.AgentGateway.astream_prompt", stream_stub)
+        token = _token(client)
+
+        prompt = client.post("/api/prompts", json={"text": "hello"}, headers=_headers(token))
+        stream = client.post("/api/prompts/stream", json={"text": "hello"}, headers=_headers(token))
+
+        assert prompt.status_code == 200
+        assert stream.status_code == 200
+        assert [envelope.options.approval_mode for envelope in captured] == ["auto", "auto"]
 
     def test_prompt_runs_a_governed_turn(self, workspace: Path, client: TestClient) -> None:
         token = _token(client)

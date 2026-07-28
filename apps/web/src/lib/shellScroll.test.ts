@@ -19,10 +19,15 @@ const chat = read("lib", "views", "ChatView.svelte");
 const build = read("lib", "views", "BuildView.svelte");
 
 /** The declarations inside one CSS rule, whitespace-normalised. */
-function rule(css: string, selector: string): string {
-  const start = css.indexOf(`${selector} {`);
+function rule(css: string, selector: string, requiredDeclaration?: string): string {
+  let start = css.indexOf(`${selector} {`);
+  while (start > -1) {
+    const declarations = css.slice(start, css.indexOf("}", start)).replace(/\s+/g, " ");
+    if (requiredDeclaration === undefined || declarations.includes(requiredDeclaration)) return declarations;
+    start = css.indexOf(`${selector} {`, start + selector.length);
+  }
   expect(start, `missing rule: ${selector}`).toBeGreaterThan(-1);
-  return css.slice(start, css.indexOf("}", start)).replace(/\s+/g, " ");
+  return "";
 }
 
 describe("app shell scroll containment", () => {
@@ -78,7 +83,7 @@ describe("conversation columns keep their composer on screen", () => {
     });
 
     it(`${name} scrolls the transcript inside itself`, () => {
-      const scroller = rule(css, scrollerSelector);
+      const scroller = rule(css, scrollerSelector, "overflow-y: auto;");
       expect(scroller).toMatch(/overflow-y: auto;/);
       expect(scroller).toMatch(/min-height: 0;/);
     });

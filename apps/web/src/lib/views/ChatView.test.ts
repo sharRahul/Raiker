@@ -364,12 +364,13 @@ describe("ChatView streaming transcript", () => {
     });
 
     render(ChatView);
-    const providerSelect = screen.getByLabelText("Model") as HTMLSelectElement;
+    const picker = await screen.findByRole("button", { name: "Model for this turn: Gemma 4:31B Cloud" });
     // The default option must name the actual persisted selection, not just
     // say "Selected model" — the user has to see what will serve the turn.
-    await waitFor(() => expect(providerSelect.options[0].textContent).toContain("Ollama"));
-    expect(providerSelect.options[0].textContent).toContain("gemma4:31b-cloud");
-    expect(providerSelect.options).toHaveLength(1);
+    expect(picker).toHaveTextContent("Gemma 4:31B Cloud");
+    expect(picker).not.toHaveTextContent("Ollama");
+    await fireEvent.click(picker);
+    expect(screen.getAllByRole("img", { name: "Ollama logo" })).toHaveLength(2);
   });
 
   it("attaches workspace paths and sends them with the prompt", async () => {

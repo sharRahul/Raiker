@@ -19,6 +19,12 @@ RuntimeAuthority, and append-only audit log as the terminal client.
   `deferred`, `fails closed`); unknown backend codes and capabilities are surfaced raw, never
   hidden; the UI adds no authority of its own.
 
+### Composer model picker
+
+Chat and Build share a compact model picker: a provider mark, a concise model
+label (for example, `Haiku 4.5` or `Gemma 4:31B Cloud`), and the model's effort
+control. Provider and model identifiers remain unchanged at the API boundary.
+
 ## Shared shell
 
 `ResponsivePage` wraps authenticated route content while preserving the existing

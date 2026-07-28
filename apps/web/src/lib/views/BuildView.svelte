@@ -18,6 +18,7 @@
   import { onMount, tick } from "svelte";
   import Badge from "../components/Badge.svelte";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
+  import ModelPicker from "../components/ModelPicker.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
@@ -692,7 +693,9 @@
           </div>
 
           <div class="bar-right">
+            <ModelPicker bind:value={modelProfile} {profiles} {selectedProfile} disabled={streaming} />
             <select
+              hidden
               class="bar-select"
               bind:value={modelProfile}
               disabled={streaming}

@@ -88,7 +88,11 @@ describe("ChatView composer parity", () => {
     await waitFor(() =>
       expect(screen.getByLabelText("Model for this turn")).toHaveTextContent("Anthropic · claude-sonnet"),
     );
-    expect(within(screen.getByLabelText("Model for this turn")).getAllByRole("option")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Model for this turn: Claude Sonnet" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Model for this turn: Claude Sonnet" }));
+    expect(screen.getByRole("menu", { name: "Models" })).toBeInTheDocument();
+    expect(screen.getAllByRole("img", { name: "Anthropic logo" })).toHaveLength(2);
+    expect(screen.getByRole("menuitemradio", { name: /Claude Sonnet/ })).toBeInTheDocument();
     const effort = screen.getByLabelText("Thinking effort");
     expect(within(effort).getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Thinking: default",

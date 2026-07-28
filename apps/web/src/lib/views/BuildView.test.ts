@@ -237,6 +237,7 @@ describe("Build model picker", () => {
     await waitFor(() =>
       expect(screen.getByLabelText("Model for this turn")).toHaveTextContent("OpenRouter · reasoning-model"),
     );
+    expect(screen.getByRole("button", { name: "Model for this turn: Reasoning Model" })).toBeInTheDocument();
     const effort = screen.getByLabelText("Thinking effort");
     expect(within(effort).getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Thinking: default",

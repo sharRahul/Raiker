@@ -7,6 +7,7 @@
   import Markdown from "../components/Markdown.svelte";
   import FileInspector from "../components/FileInspector.svelte";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
+  import ModelPicker from "../components/ModelPicker.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import { api, ApiError, streamPrompt } from "../api";
   import type {
@@ -995,7 +996,9 @@
           </select>
 
           <label class="sr-only" for="chat-model-profile">Model</label>
+          <ModelPicker bind:value={modelProfile} {profiles} {selectedProfile} disabled={streaming} />
           <select
+            hidden
             id="chat-model-profile"
             class="bar-select"
             bind:value={modelProfile}

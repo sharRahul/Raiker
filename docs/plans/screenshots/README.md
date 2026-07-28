@@ -45,6 +45,11 @@ turn — it was captured in an environment with no provider credential.
 | `80`–`83` | Verified fixes from the first round |
 | `90`–`93` | Context and API-cost panel in Chat and Build; Models provider count and spend bars |
 | `98`–`101` | FIXED-23: reviewed and executed exact edit plus unified patch |
+| `102`–`104` | Focused re-check: Ollama `gemma4:31b-cloud` approved write and reloaded session-file chip |
 
 No screenshot contains a credential: keys were entered into `type="password"`
 fields and the response-redaction layer never returns a stored value.
+
+`106-live-chat-model-picker.png` and `107-live-build-model-picker.png` record
+the Playwright visual check for the shared provider-mark model menu, concise
+model labels, and the per-model effort control.

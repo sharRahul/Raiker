@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Twenty-five are marked **FIXED** and were resolved on this
+and the proposed fix. Twenty-six are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -46,9 +46,10 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-23 | High | Build / patch application | Fixed (was GAP-BUILD B3) |
 | FIXED-24 | Low | Documentation / known limits | Fixed (found while verifying FIXED-23) |
 | FIXED-25 | Low | Build / cross-platform paths | Fixed (found while verifying FIXED-23) |
-| BUG-14 | Low | Chat / cost presentation tests | Fixed (found while fixing BUG-13) |
-| BUG-15 | Low | CI / action runtime | Open (found while verifying FIXED-23) |
-| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B3 closed; 18 items remain) |
+| FIXED-26 | Low | Chat / cost presentation tests | Fixed (was BUG-14) |
+| BUG-15 | Low | CI / action runtime | In verification |
+| BUG-16 | Low | Web test runtime | Open (found while validating BUG-15) |
+| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B3 core complete; B3 expansion deferred; 18 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (18 items) |
 
 ---
@@ -1180,7 +1181,7 @@ runtime path reads. Ruff and mypy now complete without findings.
 
 ---
 
-## BUG-14 — The cost-popover test asserts a different currency label than the UI
+## FIXED-26 — The cost-popover test asserts a different currency label than the UI *(was BUG-14)*
 
 **Status: fixed in this change.**
 
@@ -1189,10 +1190,21 @@ runtime path reads. Ruff and mypy now complete without findings.
 run therefore has one failure even though the focused BUG-13/FIXED-19 tests,
 type check, lint, and build pass.
 
+**Reproduction.** Run `npm --prefix apps/web run test --
+ContextMeterPopover.test.ts` on a runner whose default locale does not render
+USD as a bare dollar sign.
+
+**Root cause.** The component receives a locale from its caller, but this test
+relied on the test runner's implicit locale. Its expected label therefore did
+not describe the UI invocation it was meant to cover.
+
 **Fix applied.** Currency remains locale-aware. The component test now passes
 `en-GB` explicitly and asserts the rendered `US$` label; the formatter's
 separate `en-US` tests retain the `$` convention. The test no longer depends on
 the runner's locale.
+
+**Verification.** `npm.cmd --prefix apps/web run test --
+ContextMeterPopover.test.ts` passed all 7 tests on 2026-07-28.
 
 ---
 
@@ -1237,10 +1249,12 @@ wrote only the intended line. Browser console: 0 errors. Evidence:
 `screenshots/working/98-FIXED-23-b3-edit-ready.png` through
 `101-FIXED-23-b3-patch-executed.png`.
 
-**Deliberate remaining scope.** Patches remain single-file and existing-file
-only. Fuzzy context-offset matching, empty-context insertion hunks, file
-create/delete headers, multi-file diffs, and no-newline markers are rejected;
-they are not silently approximated or partially applied.
+**Deliberate remaining scope — not completed; deliberately deferred.** Patches
+remain single-file and existing-file only. Fuzzy context-offset matching,
+empty-context insertion hunks, file create/delete headers, multi-file diffs,
+and no-newline markers are rejected; they are not silently approximated or
+partially applied. These expansion cases are outside B3's completed acceptance
+scope and require a separate approved implementation.
 
 ---
 
@@ -1280,16 +1294,54 @@ normalised.
 
 ## BUG-15 — GitHub Actions still declare the deprecated Node 20 runtime
 
-**Status: open.**
+**Status: implementation complete; GitHub Actions verification pending.**
 
 **Observed.** The successful GitHub CI run for FIXED-23 reported that
 `actions/checkout@v4` and `actions/setup-python@v5` target Node 20, which
 GitHub now forces to Node 24. The workflow passed, but future runner behaviour
 is relying on a compatibility override rather than its declared runtime.
 
-**Needed.** Review the repository action pins and update them to versions whose
-declared Node runtime is supported by GitHub Actions. Re-run CI and retain the
-workflow evidence after the warning is gone.
+**Root cause.** The action pins predate the upstream releases that changed the
+actions' JavaScript runtime to Node 24. SHA pinning preserved supply-chain
+immutability but also preserved the obsolete runtime declaration.
+
+**Fix applied.** Every workflow now uses immutable, upstream release commits
+whose declared runtime is Node 24: `actions/checkout` v5.0.1,
+`actions/setup-python` v6.2.0, and `actions/setup-node` v5.0.0. This includes
+the licensing workflow, which was already SHA-pinned but still pointed at
+Node-20-era releases. The web test matrix remains Node 20 and Node 22; that is
+the application runtime under test, not the JavaScript runtime that executes an
+action.
+
+**Local verification.** A repository-wide workflow scan finds no Node-20-era
+action pins. **Remote confirmation is not yet complete:** GitHub Actions must
+execute the post-push workflows successfully before this entry is moved to a
+`FIXED-*` record and carries remote-run evidence.
+
+---
+
+## BUG-16 — Web validation emits repeated Node localStorage warnings
+
+**Status: open.** Found while validating BUG-15; it is unrelated to the
+workflow action upgrade.
+
+**Observed.** `npm --prefix apps/web run test` passes all 443 tests and the
+subsequent production build succeeds, but Node 25.6.1 prints repeated warnings:
+`--localstorage-file was provided without a valid path`. The warning repeats
+for the Vitest worker processes, making an otherwise green local validation log
+noisy.
+
+**Root cause.** `apps/web/src/test-setup.ts` already documents the Node-25
+localStorage runtime change and provides a browser-safe fallback for jsdom, but
+the warning is emitted by Node before that setup runs. `NODE_OPTIONS` is unset,
+so the exact child-process flag source needs isolating in Vitest/jsdom or the
+surrounding Node 25 test-runtime integration.
+
+**Needed.** Reproduce with a minimal Vitest/jsdom worker, identify which layer
+supplies the invalid flag, then upgrade or configure that layer so the web test
+run is warning-free without weakening the existing Storage fallback. The CI
+matrix remains Node 20/22, so this is developer-environment test quality debt,
+not a failing GitHub workflow.
 
 ---
 
@@ -1311,8 +1363,8 @@ refused by the policy engine). The governance, audit and checkpoint story is
 
 The gap is that **Build cannot close a loop.** Everything below follows from
 that, and the order is the order they should be done in — each tier is worthless
-without the one above it. B1 (FIXED-08), B2 (FIXED-09), and B3 (FIXED-23) have
-since been closed:
+without the one above it. B1 (FIXED-08), B2 (FIXED-09), and B3's defined core
+scope (FIXED-23) have since been completed:
 an approved file change is really written, and the turn continues through the
 approval instead of ending at it; Build can now make a narrow, hunk-level edit.
 
@@ -1335,19 +1387,20 @@ parks its working state against the approval and picks the same turn up on
 resolution, with the real result (or an honest refusal) appended as the tool
 result. Build no longer stops dead at its first write.
 
-**B3. Real patch application.** Done — see FIXED-23. `edit_file` now replaces
+**B3. Real patch application.** ✅ **Complete for its defined strict,
+single-file scope — see FIXED-23.** `edit_file` now replaces
 `old_text` only when it occurs exactly once, and `apply_patch` calculates a
 one-file unified-diff candidate from exact hunk context before the approval is
 displayed or an execution is allowed. A missing, ambiguous, or stale match
 fails closed with a machine-readable error; rejected patch hunks are named and
 no partial candidate is written.
 
-**Deliberate remaining scope.** This is strict context anchoring, not fuzzy
-patching: no multi-file or create/delete patches, no context-offset guessing,
-no empty-context insertion hunk, and no `\\ No newline at end of file` marker.
-Those inputs are rejected rather than guessed. They are not needed for B3's
-safe hunk-level editing goal; a later expansion must keep the same all-or-
-nothing and approval-preview invariants.
+**B3 expansion scope — not completed; deliberately deferred.** This is strict
+context anchoring, not fuzzy patching: no multi-file or create/delete patches,
+no context-offset guessing, no empty-context insertion hunk, and no
+`\\ No newline at end of file` marker. Those inputs are rejected rather than
+guessed. They are not needed for B3's safe hunk-level editing goal; a later
+expansion must keep the same all-or-nothing and approval-preview invariants.
 
 ### Tier 1 — loop mechanics
 
@@ -1470,10 +1523,11 @@ autonomous without the host as the blast radius.
 
 ### Suggested order
 
-B1 → B2 → B3 make Build an agent. **All three are now landed**: an approved
-change is really made, the turn continues through it, and B3 uses strict,
-hunk-level editing instead of a whole-file rewrite. B4–B6 make the loop
-efficient. B13–B16 make the result
+B1 → B2 → B3 make Build an agent. **B1, B2, and B3's defined core scope are
+now landed**: an approved change is really made, the turn continues through
+it, and B3 uses strict, hunk-level editing instead of a whole-file rewrite.
+B3's broader patch-format expansion remains deliberately deferred. B4–B6 make
+the loop efficient. B13–B16 make the result
 reviewable. Everything else is depth. B20 is a *policy* decision before it is an
 engineering one and belongs to the owner, not to an implementer.
 

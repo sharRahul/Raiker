@@ -2,7 +2,9 @@
 
 > A repeatable, click-by-click plan a person can follow against a **running**
 > Raiker instance, plus the recorded result of the round executed on
-> **2026-07-26** against hosted Anthropic (`claude-haiku-4-5-20251001`).
+> **2026-07-26** against hosted Anthropic (`claude-haiku-4-5-20251001`), with
+> focused file-retention re-verification on **2026-07-28** using local Ollama
+> (`gemma4:31b-cloud`).
 >
 > Every step below was executed in a real Chromium session against
 > `raiker-web` serving the built SPA. Screenshots are in
@@ -224,16 +226,24 @@ Unsupported files are not exposed as generic workspace downloads. FIXED-19.
 | 6.1 | Ask Chat to `write_file` a report | Reply "Your approval is needed to continue" + Review approval link | ✅ `30-` |
 | 6.2 | Approvals → Pending | Row: Write file / File writes / high / pending | ✅ `31-` |
 | 6.3 | **Review** | Detail with the proposed unified diff, capability, risk, session link, expiry | ✅ `32-` |
-| 6.4 | **Approve and execute once** with relay and target gates enabled | Execution result names the file; the pre-image is checkpointed | ✅ FIXED-08 |
+| 6.4 | **Approve and execute once** with relay and target gates enabled | Execution result names the file; the pre-image is checkpointed | ✅ FIXED-08; re-verified `live-retention.md` with Ollama `gemma4:31b-cloud` on 2026-07-28 (`102`–`104`) |
 | 6.5 | Check the filesystem | `report.md` exists with the reviewed contents | ✅ FIXED-08 |
 | 6.6 | Filters Pending / Approved / Executed / Denied, sort by risk / recency | All work | ✅ FIXED-08 |
 | 6.7 | Review and approve a unique `edit_file`, then an `apply_patch` unified diff | Each detail shows the calculated diff; each action changes only its matched line | ✅ FIXED-23 (`98`–`101`) |
+
+The 2026-07-28 focused re-check used a disposable workspace and a fresh owner
+account. Ollama `gemma4:31b-cloud` proposed one new Markdown file;
+**Approve and execute once** reported a checkpointed write. Opening the same
+session again rendered the durable `live-retention.md` chip. Browser console:
+0 errors. Evidence: `working/102-live-retention-pending.png` through
+`working/104-live-retention-reloaded-session.png`.
 
 `edit_file` fails closed when `old_text` is absent or repeated. `apply_patch`
 fails closed on malformed, mismatched, or ambiguous hunk context and reports
 the rejected hunk without partially writing the file. Its current scope is one
 existing text file per action; multi-file/create/delete/fuzzy patches are not
-accepted.
+accepted. **B3's defined strict, single-file scope is complete (FIXED-23); its
+broader patch-format expansion is not completed and is deliberately deferred.**
 
 Metadata-only resolution remains the safety model for shell, network, process,
 and every non-file capability. Approved local file mutations are the deliberate

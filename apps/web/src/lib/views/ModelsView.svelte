@@ -47,6 +47,11 @@
   let selecting = $state(false);
   let selectError = $state<string | null>(null);
 
+  function normalizePickerList(list: ProviderModelList): ProviderModelList {
+    if (list.status !== "available") return list;
+    return { ...list, models: [...new Set(list.models)] };
+  }
+
   // ── Sign-in / connection modal ─────────────────────────────────────
   // Hosted and Advanced providers present their connection as a focused
   // sign-in dialog instead of an inline form: a provider-branded card with an
@@ -133,7 +138,7 @@
     selectError = null;
     pickerLoading = true;
     try {
-      pickerList = await api.providerModels(profileId);
+      pickerList = normalizePickerList(await api.providerModels(profileId));
     } catch {
       pickerList = null; // manual entry still works
     } finally {

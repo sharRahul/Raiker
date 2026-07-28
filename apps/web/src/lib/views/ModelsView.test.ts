@@ -218,6 +218,29 @@ describe("ModelsView fallback sequence", () => {
     });
   });
 
+  it("renders a provider catalogue with duplicate model ids once", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({ profile_id: "openrouter-policy-gated", provider: "openrouter", model: "<model>", off_machine: true }),
+        ],
+      }),
+      "GET /api/models/openrouter-policy-gated/provider-models": {
+        profile_id: "openrouter-policy-gated",
+        provider: "openrouter",
+        status: "available",
+        reason_code: null,
+        models: ["openai/gpt-4o-mini", "openai/gpt-4o-mini", "meta-llama/llama-3.1-8b-instruct"],
+      },
+    });
+    render(ModelsView);
+    const chooseModel = await screen.findByRole("button", { name: /choose model/i });
+    await fireEvent.click(chooseModel);
+    const select = await screen.findByLabelText("Available models") as HTMLSelectElement;
+    expect(Array.from(select.options).filter((option) => option.value === "openai/gpt-4o-mini")).toHaveLength(1);
+    expect(select.textContent).toContain("meta-llama/llama-3.1-8b-instruct");
+  });
+
   it("falls back to manual model entry when the provider list is unavailable", async () => {
     stubFetch({
       "GET /api/models": models({

@@ -24,12 +24,14 @@ describe("BuildView mode tooltip", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
     await fireEvent.mouseEnter(help);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/every file write/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/plan produces a structured plan with no file changes/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/edit applies precise, context-anchored changes/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/auto plans, then executes eligible changes with background monitoring/i);
 
     await fireEvent.mouseLeave(help);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
     await fireEvent.focus(help);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/every file write/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/plan produces a structured plan with no file changes/i);
   });
 });

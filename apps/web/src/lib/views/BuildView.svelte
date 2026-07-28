@@ -116,6 +116,8 @@
   let modeError = $state<string | null>(null);
   let modeTooltipOpen = $state(false);
   const modeSpec = $derived(buildMode(mode));
+  const modeTooltip =
+    "Plan produces a structured plan with no file changes. Edit applies precise, context-anchored changes. Auto plans, then executes eligible changes with background monitoring.";
 
   // ── Repository ───────────────────────────────────────────────────────
   let repos = $state<CodeReposView | null>(null);
@@ -658,7 +660,7 @@
             <Icon name="info" size={14} />
           </button>
           {#if modeTooltipOpen}
-            <span id="build-mode-tooltip" class="mode-tooltip" role="tooltip">{modeSpec.detail}</span>
+            <span id="build-mode-tooltip" class="mode-tooltip" role="tooltip">{modeTooltip}</span>
           {/if}
 
           <div class="composer-governance">

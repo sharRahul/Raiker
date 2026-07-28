@@ -13,9 +13,9 @@ The composer owns an account-scoped approval policy with three values:
 
 | UI label | Stored value | Behaviour |
 |---|---|---|
-| **Manually approve** | `manual` | Stop before every governed tool action and show an inline approval request. |
-| **Automatically approve** | `auto` | Run eligible non-critical actions immediately and report progress inline. |
-| **Skip all approvals** | `skip` | Run eligible non-critical actions immediately without generating an approval preview. |
+| **Manually approve** | `manual` | Stop before every governed tool action. Generate the ordinary preview when the action supports one, then wait for an inline user decision before execution. |
+| **Automatically approve** | `auto` | Run eligible non-critical actions immediately. Preserve the normal action lifecycle, status indicators, and generated preview evidence, but do not pause for a user decision. |
+| **Skip all approvals** | `skip` | Run eligible non-critical actions immediately and omit preview generation as well as the user-decision pause. |
 
 The selected value is read when either composer opens, persisted for the
 account, included in each prompt envelope, and retained with a suspended turn
@@ -30,10 +30,10 @@ critical hold cannot be converted into execution by the composer.
 The runtime applies the policy where it has enough information to decide: after
 a tool call has been validated and policy-reviewed, before it is executed or
 parked for a user decision. `manual` turns otherwise executable governed calls
-into an approval request. `auto` and `skip` execute a normal user-approval
-request only when the action is eligible; the former emits the ordinary status
-and preview evidence, while the latter omits the preview. Existing policy and
-hook decisions remain authoritative.
+into an approval request and pauses. `auto` bypasses that pause but keeps the
+ordinary lifecycle/status events and generates a file or command preview where
+the tool supports one. `skip` bypasses both the pause and preview generation.
+Existing policy and hook decisions remain authoritative.
 
 ## Composer interface
 

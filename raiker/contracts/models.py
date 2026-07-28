@@ -422,11 +422,18 @@ class PromptOptions:
     # with model_profile; provider policy (gates, egress, keys) is still enforced
     # downstream, so naming a model never grants access to its provider.
     model: str = ""
+    # Per-turn only; exact support is resolved against the chosen provider/model
+    # by the runtime and never mutates the persisted model selection.
+    reasoning_effort: str | None = None
     max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS
 
     def __post_init__(self) -> None:
         _one_of(self.planning_mode, PLANNING_MODES, "planning_mode")
         object.__setattr__(self, "approval_mode", normalize_approval_mode(self.approval_mode))
+        if self.reasoning_effort is not None and (
+            not isinstance(self.reasoning_effort, str) or not self.reasoning_effort
+        ):
+            raise ContractValidationError("invalid_reasoning_effort")
         if self.max_tool_calls < 0:
             raise ContractValidationError("invalid_max_tool_calls")
 

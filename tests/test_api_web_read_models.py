@@ -120,6 +120,21 @@ class TestExtensionsOverview:
         assert_no_secrets_in_body(client.get("/api/extensions", headers=_headers(client)).json())
 
 
+class TestModelReasoningMetadata:
+    def test_models_expose_only_provider_declared_reasoning_effort_capabilities(
+        self, client: TestClient
+    ) -> None:
+        response = client.get("/api/models", headers=_headers(client))
+
+        assert response.status_code == 200
+        profile = next(
+            item for item in response.json()["profiles"] if item["profile_id"] == "openai-hosted"
+        )
+        assert profile["supports_reasoning"] is True
+        assert profile["supports_reasoning_effort"] is True
+        assert profile["reasoning_effort_values"] == ["low", "medium", "high"]
+
+
 class TestCheckpointRestorePlan:
     def _seed_checkpoint(self, workspace: Path) -> str:
         """A checkpoint, then a captured post-checkpoint write to one file.

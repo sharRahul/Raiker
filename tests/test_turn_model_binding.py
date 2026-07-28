@@ -6,8 +6,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raiker.contracts.models import PromptOptions
+import asyncio
+import json
+
+import pytest
+
+from raiker.contracts.models import ClientMetadata, PromptEnvelope, PromptOptions, PromptPayload, UserMetadata
 from raiker.gateway.agent_gateway import AgentGateway
+from raiker.models.contracts import ModelMessage, ModelResponse, ReasoningOptions
+from raiker.models.exceptions import ProviderPolicyError
+from raiker.runtime.turn_suspension import serialize_messages
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 
 
@@ -31,6 +39,9 @@ class TestPromptOptionsDefault:
 
     def test_per_turn_model_defaults_to_profile_model(self) -> None:
         assert PromptOptions().model == ""
+
+    def test_reasoning_effort_defaults_to_absent(self) -> None:
+        assert PromptOptions().reasoning_effort is None
 
 
 class TestResolveProfileForTurn:
@@ -154,3 +165,138 @@ class TestOrchestratorTurnProvider:
         assert runtime._turn_provider(envelope("missing-profile")) == runtime.default_provider
         # No explicit choice: the operator's selection binds the turn.
         assert runtime._turn_provider(envelope("")) == runtime.default_provider
+
+
+class TestTurnReasoningEffort:
+    def _envelope(self, *, profile: str, model: str, effort: str | None) -> PromptEnvelope:
+        return PromptEnvelope(
+            request_id="req_effort",
+            session_id="sess_effort",
+            turn_id="turn_effort",
+            client=ClientMetadata(type="rest", name="test", version="0"),
+            user=UserMetadata(),
+            prompt=PromptPayload(text="hi"),
+            options=PromptOptions(model_profile=profile, model=model, reasoning_effort=effort),
+        )
+
+    def test_rejects_effort_for_profile_that_does_not_declare_it(self, tmp_path: Path) -> None:
+        runtime = _gateway(tmp_path).runtime
+
+        with pytest.raises(ProviderPolicyError, match="reasoning_effort_not_supported"):
+            runtime._turn_reasoning(  # noqa: SLF001
+                self._envelope(profile="ollama-local-openai-compatible", model="qwen2.5", effort="high"),
+                "ollama",
+                "qwen2.5",
+            )
+
+    def test_rejects_undeclared_reasoning_effort_value(self, tmp_path: Path) -> None:
+        runtime = _gateway(tmp_path).runtime
+
+        with pytest.raises(ProviderPolicyError, match="reasoning_effort_not_allowed"):
+            runtime._turn_reasoning(  # noqa: SLF001
+                self._envelope(profile="openai-hosted", model="gpt-4o", effort="extreme"),
+                "openai",
+                "gpt-4o",
+            )
+
+    def test_valid_effort_reaches_router_for_that_turn(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        runtime = _gateway(tmp_path).runtime
+        seen: list[ReasoningOptions | None] = []
+
+        async def chat_stub(*_args: object, reasoning: ReasoningOptions | None = None, **_kwargs: object) -> ModelResponse:
+            seen.append(reasoning)
+            return ModelResponse(text="ok", finish_reason="stop")
+
+        monkeypatch.setattr(runtime.model_router, "achat", chat_stub)
+
+        response = asyncio.run(
+            runtime._acall_model(  # noqa: SLF001
+                self._envelope(profile="openai-hosted", model="gpt-4o", effort="high"),
+                [ModelMessage(role="user", content="hi")],
+            )
+        )
+
+        assert response.text == "ok"
+        assert seen == [ReasoningOptions(enabled=True, effort="high")]
+
+    def test_absent_effort_keeps_legacy_router_call_shape(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        runtime = _gateway(tmp_path).runtime
+
+        async def legacy_chat(
+            _provider: str,
+            _model: str,
+            _messages: list[ModelMessage],
+            _tools: object,
+        ) -> ModelResponse:
+            return ModelResponse(text="legacy router called", finish_reason="stop")
+
+        monkeypatch.setattr(runtime.model_router, "achat", legacy_chat)
+
+        response = asyncio.run(
+            runtime._acall_model(  # noqa: SLF001
+                self._envelope(profile="openai-hosted", model="gpt-4o", effort=None),
+                [ModelMessage(role="user", content="hi")],
+            )
+        )
+
+        assert response.text == "legacy router called"
+
+    def test_unresolved_explicit_profile_with_effort_never_falls_back_to_a_provider(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        runtime = _gateway(tmp_path).runtime
+        called = False
+
+        async def chat_stub(*_args: object, **_kwargs: object) -> ModelResponse:
+            nonlocal called
+            called = True
+            return ModelResponse(text="must not run", finish_reason="stop")
+
+        monkeypatch.setattr(runtime.model_router, "achat", chat_stub)
+
+        with pytest.raises(ProviderPolicyError, match="reasoning_effort_profile_unresolved"):
+            asyncio.run(
+                runtime._acall_model(  # noqa: SLF001
+                    self._envelope(profile="missing-profile", model="missing-model", effort="high"),
+                    [ModelMessage(role="user", content="hi")],
+                )
+            )
+        assert called is False
+
+    def test_manual_approval_resume_preserves_reasoning_effort(self, tmp_path: Path) -> None:
+        gateway = _gateway(tmp_path)
+        approval_id = "appr_effort"
+        gateway.store.insert_suspended_turn(
+            {
+                "approval_id": approval_id,
+                "session_id": "sess_effort",
+                "turn_id": "turn_effort",
+                "request_id": "req_effort",
+                "principal_id": gateway.tool_broker.principal_id,
+                "action_id": "act_effort",
+                "tool_name": "write_file",
+                "call_id": "call_effort",
+                "prompt_text": "write the file",
+                "messages_json": serialize_messages([ModelMessage(role="user", content="write the file")]),
+                "options_json": json.dumps(
+                    {
+                        "planning_mode": "auto",
+                        "approval_mode": "manual",
+                        "model_profile": "openai-hosted",
+                        "model": "gpt-4o",
+                        "reasoning_effort": "high",
+                        "max_tool_calls": 10,
+                    }
+                ),
+                "client_json": json.dumps({"type": "web_ui", "name": "test", "version": "1"}),
+                "tool_calls_made": 1,
+            }
+        )
+        assert gateway.store.record_suspended_turn_outcome(approval_id, json.dumps({"status": "success"}))
+
+        restored, _messages, _calls = gateway._restore_suspended_turn(approval_id)  # noqa: SLF001
+
+        assert restored.options.approval_mode == "manual"
+        assert restored.options.reasoning_effort == "high"

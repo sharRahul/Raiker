@@ -425,6 +425,11 @@ class AgentGateway:
                 approval_mode=str(options_raw.get("approval_mode", "interactive")),
                 model_profile=str(options_raw.get("model_profile", "")),
                 model=str(options_raw.get("model", "")),
+                reasoning_effort=(
+                    str(options_raw["reasoning_effort"])
+                    if isinstance(options_raw.get("reasoning_effort"), str)
+                    else None
+                ),
                 max_tool_calls=int(options_raw.get("max_tool_calls", DEFAULT_MAX_TOOL_CALLS)),
             ),
         )

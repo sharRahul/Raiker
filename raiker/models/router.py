@@ -84,6 +84,7 @@ class ModelRouter:
         tools: Sequence[ToolSpec] | None,
         *,
         stream: bool,
+        reasoning: ReasoningOptions | None = None,
         response_schema: dict[str, object] | None = None,
         response_schema_name: str = "raiker_response",
     ) -> ModelRequest:
@@ -97,7 +98,7 @@ class ModelRouter:
             max_tokens=int(profile.raw.get("max_tokens", 1024)),
             stream=stream,
             tool_call_mode=str(profile.raw.get("tool_call_mode", "text_json")),
-            reasoning=self.reasoning,
+            reasoning=reasoning if reasoning is not None else self.reasoning,
             cache_ttl=_cache_ttl(profile),
             response_schema=response_schema,
             response_schema_name=response_schema_name,
@@ -110,6 +111,7 @@ class ModelRouter:
         messages: Sequence[ModelMessage],
         tools: Sequence[ToolSpec] | None = None,
         *,
+        reasoning: ReasoningOptions | None = None,
         response_schema: dict[str, object] | None = None,
         response_schema_name: str = "raiker_response",
     ) -> ModelResponse:
@@ -122,6 +124,7 @@ class ModelRouter:
             messages,
             tools,
             stream=False,
+            reasoning=reasoning,
             response_schema=response_schema,
             response_schema_name=response_schema_name,
         )
@@ -137,6 +140,7 @@ class ModelRouter:
         messages: Sequence[ModelMessage],
         tools: Sequence[ToolSpec] | None = None,
         *,
+        reasoning: ReasoningOptions | None = None,
         response_schema: dict[str, object] | None = None,
         response_schema_name: str = "raiker_response",
     ) -> AsyncIterator[ModelStreamEvent]:
@@ -149,6 +153,7 @@ class ModelRouter:
             messages,
             tools,
             stream=True,
+            reasoning=reasoning,
             response_schema=response_schema,
             response_schema_name=response_schema_name,
         )

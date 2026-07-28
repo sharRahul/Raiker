@@ -388,6 +388,9 @@ class PromptRequest:
     # Optional concrete model for the chosen profile (per-turn only; provider
     # policy is still enforced downstream).
     model: str | None = None
+    # Per-turn only; the runtime validates it against the selected model's
+    # declared capabilities and does not persist it as a global selection.
+    reasoning_effort: str | None = None
     max_tool_calls: int | None = None
     # Optional attachments for this prompt:
     #   {"type": "path", "path": "<workspace-relative path>"} — resolved through

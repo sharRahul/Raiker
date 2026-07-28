@@ -116,6 +116,7 @@ def _build_envelope(
         ),
         model_profile=body.model_profile or "",
         model=body.model or "",
+        reasoning_effort=body.reasoning_effort,
         max_tool_calls=(
             body.max_tool_calls if body.max_tool_calls is not None else DEFAULT_MAX_TOOL_CALLS
         ),

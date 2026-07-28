@@ -15,6 +15,7 @@ from raiker.models.contracts import (
     ModelImage,
     ModelMessage,
     ModelResponse,
+    ReasoningOptions,
     ToolCallProposal,
     ToolSpec,
     summarize_model_usage,
@@ -22,8 +23,10 @@ from raiker.models.contracts import (
 from raiker.models.exceptions import (
     UNCLASSIFIED_PROVIDER_ERROR,
     ModelProviderError,
+    ProviderPolicyError,
     provider_error_code,
 )
+from raiker.models.factory import capabilities_from_profile
 from raiker.models.router import ModelRouter
 from raiker.models.tool_call_validation import (
     ToolCallRejected,
@@ -136,6 +139,7 @@ class RuntimeOrchestrator:
                     "approval_mode": envelope.options.approval_mode,
                     "model_profile": envelope.options.model_profile,
                     "model": envelope.options.model,
+                    "reasoning_effort": envelope.options.reasoning_effort,
                     "max_tool_calls": envelope.options.max_tool_calls,
                 }),
                 "client_json": json.dumps({
@@ -294,6 +298,11 @@ class RuntimeOrchestrator:
                 "model_provider_rejected_by_policy",
                 {"profile_id": requested, "reason": "profile_not_resolved_for_turn"},
             )
+            # An effort is meaningful only for the operator's explicit model
+            # choice. Do not fall back to another provider and accidentally
+            # execute with that provider's capability declaration.
+            if envelope.options.reasoning_effort is not None:
+                raise ProviderPolicyError("reasoning_effort_profile_unresolved")
         return self.default_provider
 
     def _provider_chain(self, envelope: PromptEnvelope) -> list[tuple[str, str]]:
@@ -307,6 +316,28 @@ class RuntimeOrchestrator:
                 if candidate not in chain:
                     chain.append(candidate)
         return chain
+
+    def _turn_reasoning(
+        self, envelope: PromptEnvelope, provider: str, model: str
+    ) -> ReasoningOptions | None:
+        """Validate effort from the exact resolved provider/model capability.
+
+        Absent effort remains absent. Unsupported, unknown, or undeclared effort
+        fails closed; this never substitutes a value or changes model selection.
+        """
+        effort = envelope.options.reasoning_effort
+        if effort is None:
+            return None
+        try:
+            profile = self.model_router.registry.resolve(provider, model)
+        except Exception as exc:  # noqa: BLE001
+            raise ProviderPolicyError("reasoning_effort_profile_unresolved") from exc
+        capabilities = capabilities_from_profile(profile)
+        if not capabilities.supports_reasoning or not capabilities.supports_reasoning_effort:
+            raise ProviderPolicyError("reasoning_effort_not_supported")
+        if effort not in capabilities.reasoning_effort_values:
+            raise ProviderPolicyError("reasoning_effort_not_allowed")
+        return ReasoningOptions(enabled=True, effort=effort)
 
     def _image_attachments(self, envelope: PromptEnvelope) -> tuple[ModelImage, ...]:
         import base64
@@ -397,9 +428,15 @@ class RuntimeOrchestrator:
                 {"provider": provider, "model": model, "message_count": len(messages)},
             )
             try:
-                response = await self.model_router.achat(
-                    provider, model, messages, self._turn_tool_specs()
-                )
+                reasoning = self._turn_reasoning(envelope, provider, model)
+                if reasoning is None:
+                    response = await self.model_router.achat(
+                        provider, model, messages, self._turn_tool_specs()
+                    )
+                else:
+                    response = await self.model_router.achat(
+                        provider, model, messages, self._turn_tool_specs(), reasoning=reasoning
+                    )
             except ModelProviderError as exc:
                 last_error_code = provider_error_code(exc)
                 self._event(
@@ -507,9 +544,15 @@ class RuntimeOrchestrator:
             usage: dict[str, object] | None = None
             output_committed = False
             try:
-                async for provider_event in self.model_router.astream(
-                    provider, model, messages, self._turn_tool_specs()
-                ):
+                reasoning = self._turn_reasoning(envelope, provider, model)
+                stream = (
+                    self.model_router.astream(
+                        provider, model, messages, self._turn_tool_specs(), reasoning=reasoning
+                    )
+                    if reasoning is not None
+                    else self.model_router.astream(provider, model, messages, self._turn_tool_specs())
+                )
+                async for provider_event in stream:
                     if provider_event.text_delta:
                         output_committed = True
                         text_parts.append(provider_event.text_delta)

@@ -57,6 +57,22 @@ def test_prompt_without_approval_mode_defaults_to_manual(workspace: Path) -> Non
     assert envelope.options.approval_mode == "manual"
 
 
+def test_prompt_preserves_optional_reasoning_effort_for_the_turn(workspace: Path) -> None:
+    envelope = _build_envelope(
+        PromptRequest(text="hello", model_profile="openai-hosted", model="gpt-4o", reasoning_effort="high"),
+        "principal_owner",
+        workspace,
+    )
+
+    assert envelope.options.reasoning_effort == "high"
+
+
+def test_prompt_without_reasoning_effort_remains_backward_compatible(workspace: Path) -> None:
+    envelope = _build_envelope(PromptRequest(text="hello"), "principal_owner", workspace)
+
+    assert envelope.options.reasoning_effort is None
+
+
 class TestPrompts:
     def test_requires_auth(self, client: TestClient) -> None:
         assert client.post("/api/prompts", json={"text": "hi"}).status_code == 401

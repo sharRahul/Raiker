@@ -558,6 +558,11 @@ class ModelProfileView:
     # Where the active model's price came from: "owner" | "provider" | "config".
     price_source: str | None = None
     price_as_of: str | None = None
+    # Provider-declared capability facts. The UI never infers them from a
+    # model name or fabricates effort values.
+    supports_reasoning: bool = False
+    supports_reasoning_effort: bool = False
+    reasoning_effort_values: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -2464,6 +2469,11 @@ class DashboardService:
                 ).context_window_source,
                 configured=(
                     (override if override and p.profile_id == current else p.model) != "<model>"
+                ),
+                supports_reasoning=bool(p.raw.get("supports_reasoning", False)),
+                supports_reasoning_effort=bool(p.raw.get("supports_reasoning_effort", False)),
+                reasoning_effort_values=tuple(
+                    str(value) for value in p.raw.get("reasoning_effort_values", [])
                 ),
                 **_usage_fields(p),
             )

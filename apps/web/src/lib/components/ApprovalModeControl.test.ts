@@ -29,6 +29,7 @@ describe("ApprovalModeControl", () => {
     expect(await screen.findByRole("button", { name: /automatically approve/i })).toBeInTheDocument();
     await openMenu();
     expect(screen.getByRole("menuitemradio", { name: /automatically approve/i })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("menuitemradio", { name: "Skip all approvals" })).toBeInTheDocument();
     expect(screen.getAllByRole("img", { name: "Selected approval mode" })).toHaveLength(1);
   });
 
@@ -65,7 +66,7 @@ describe("ApprovalModeControl", () => {
     render(ApprovalModeControl);
 
     await openMenu();
-    await fireEvent.click(screen.getByRole("menuitemradio", { name: /skip/i }));
+    await fireEvent.click(screen.getByRole("menuitemradio", { name: "Skip all approvals" }));
 
     await vi.waitFor(() => expect(save).toHaveBeenCalledWith("skip"));
     expect(screen.queryByRole("menu", { name: /approval mode/i })).not.toBeInTheDocument();

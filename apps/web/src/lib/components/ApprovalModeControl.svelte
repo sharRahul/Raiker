@@ -82,7 +82,7 @@
           onclick={() => void select(option.mode)}
         >
           <Icon name={option.icon} size={16} />
-          <span>{option.label}</span>
+          <span>{option.mode === "skip" ? "Skip all approvals" : option.label}</span>
           {#if mode === option.mode}<Icon name="check" size={16} label="Selected approval mode" />{/if}
         </button>
       {/each}

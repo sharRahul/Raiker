@@ -16,6 +16,15 @@ task scheduler, and projects — into one place. Every claim the page makes abou
 what the agent may do is a claim the runtime will keep, because the page sets the
 runtime's own controls rather than describing an intention.
 
+The shared composer also has an **approval policy** pill: **Manually approve**,
+**Automatically approve**, or **Skip all approvals**. This is deliberately a
+different control from Plan/Edit/Auto: the runtime modes choose the planning and
+decision-mode posture for a coding turn, while the approval policy chooses
+whether an otherwise eligible action waits for a user interaction. In particular,
+Skip omits only that interaction and generated preview; it never bypasses
+project/path confinement, hunk/context validation, rollback, managed policy,
+sandbox or security boundaries, restricted command policy, or critical holds.
+
 ## The three modes
 
 The composer's mode picker is the centre of the page. Each mode is a concrete
@@ -29,6 +38,10 @@ turn acts through (`file_write_execution`, `patch_apply_execution`,
 | **Plan** | `deny` | `always` | Research and propose only. A write proposed anyway is blocked by the runtime, not by prompt wording. |
 | **Edit** | `ask` | default | Every file write, patch, and command becomes a pending approval you accept or reject. |
 | **Auto** | `auto` | default | Only low-risk actions run unprompted; medium and high still ask, and critical always requires a human. |
+
+Mode help is available on hover and keyboard focus, rather than occupying
+permanent composer space. This keeps the explanation accessible without
+competing with the project scope, approval policy, model, and action controls.
 
 Notes that keep the mapping honest:
 
@@ -92,6 +105,9 @@ the remote. Both transitions append `code_repo_connected` /
 
 The right rail shows what is running and is collapsible, because background work
 is context for the conversation beside it rather than a separate destination.
+The same inline panel appears in Chat. Approval-blocked items expose a direct
+**Review approval** action so the user can move from status to the relevant
+approval without hunting through a separate view.
 
 The **Agents** tab schedules standing work — "keep improving the landing page",
 "watch the test suite", "surprise me by building a small app". A scheduled agent

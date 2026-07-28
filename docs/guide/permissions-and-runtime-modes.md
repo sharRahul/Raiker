@@ -119,6 +119,35 @@ There is no unrestricted mode, by design.
 
 ---
 
+## Composer approval policy
+
+The **approval** pill in the Chat and Build composers is a per-account shared
+composer preference that persists across sessions and both surfaces. It decides
+how the agent presents actions that are already otherwise eligible to run. It is
+separate from the runtime mode, capability gate, and per-capability decision mode
+above: those controls decide
+whether an action may run at all; the composer policy decides whether the user
+is paused for an ordinary eligible action.
+
+| Policy | Behaviour |
+|---|---|
+| **Manually approve** | Pauses for user approval before each otherwise eligible governed action. |
+| **Automatically approve** | Runs an otherwise eligible action without a user pause, while keeping normal status and preview/evidence visible. |
+| **Skip all approvals** | Runs an otherwise eligible action without a UI confirmation or generated preview. |
+
+**Skip all approvals is not an unrestricted mode.** It skips only the user
+prompt and preview step. The runtime still enforces project/path confinement,
+hunk and context validation, atomic rollback for a failed patch, managed policy,
+security and sandbox boundaries, restricted-command policy, and critical holds.
+An action rejected by any of those protections remains rejected; Raiker does
+not guess a malformed edit or force an action through.
+
+The selected policy is remembered for later composer sessions. It does not
+change the standing capability configuration in **Permissions**, nor does it
+raise the ceiling set by **Settings → General → Runtime mode**.
+
+---
+
 ## What "approved" means
 
 Approving does one of two things, and the approval detail tells you which

@@ -16,9 +16,23 @@ event traces deliberately stay out of the transcript — they live in **Sessions
 | **Planning** | `auto`, `Always plan`, `Never plan` |
 | **Model** | Only *configured* profiles. No free-text model ids. |
 | **Context** | Opens a read-only popover. It never compacts the conversation. |
-| **Permissions** | Ask / Approve safe actions / Custom permissions… |
+| **Project or folder** | Organises the chat and supplies bounded project context. It does not grant filesystem or tool access. |
+| **Approval** | **Manually approve**, **Automatically approve**, or **Skip all approvals** for otherwise eligible governed actions. |
 
 `Enter` sends, `Shift+Enter` adds a line.
+
+The approval setting controls the interaction, not the runtime's protections:
+
+- **Manually approve** pauses before every otherwise eligible governed action.
+- **Automatically approve** proceeds without a user pause and retains normal
+  status plus preview/evidence.
+- **Skip all approvals** proceeds without the user prompt or generated preview,
+  but still enforces project/path confinement, edit hunk/context validation,
+  atomic rollback, managed policy, sandbox and security boundaries, restricted
+  command policy, and critical holds.
+
+The selected policy is shared with Build and is remembered for the next
+composer session. It is not the same as Build's Plan/Edit/Auto runtime modes.
 
 ## Your conversations
 
@@ -84,9 +98,18 @@ continue"* with a **Review approval** link. **Approvals** shows the proposal —
 for a file write, the exact unified diff — with the capability, risk, session,
 and expiry.
 
-Approving **records your decision; it does not run the action**
-(`executes_action: false`). Filters (Pending / Approved / Denied) and sorting
-(highest risk / newest) are on the same page.
+Approving resumes the waiting turn. Where the governed action is eligible for
+execution, Raiker re-checks its runtime protections and executes it once; other
+approvals are record-only and show `executes_action: false`. Filters (Pending /
+Approved / Denied) and sorting (highest risk / newest) are on the same page.
+
+## Background work
+
+Chat shows the same inline **Background Work** panel as Build. It keeps active
+agent operations, background tasks, and approval-blocked work beside the
+conversation so you do not need to change surfaces to discover why work paused.
+An approval-blocked item includes **Review approval**, which opens the relevant
+approval for that task.
 
 ## Conversation memory
 

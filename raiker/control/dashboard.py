@@ -2726,11 +2726,19 @@ class DashboardService:
         **and** a credential authenticates it.
         """
         raw = getattr(profile, "raw", {}) or {}
-        off_machine = str(raw.get("endpoint_kind", "")) in {"remote_hosted", "private_network"}
-        if not off_machine and getattr(profile, "local_only", False):
+        endpoint_kind = str(raw.get("endpoint_kind", ""))
+        off_machine = endpoint_kind in {"remote_hosted", "private_network"}
+        # The shipped profiles do not persist this runtime classification. Their
+        # policy metadata is still authoritative: a non-local provider that
+        # requires network access is off-machine even before its first request.
+        if not off_machine:
+            off_machine = bool(getattr(profile, "requires_network", raw.get("requires_network", False))) and not bool(
+                getattr(profile, "local_only", raw.get("local_only", False))
+            )
+        if not off_machine:
             return False
         keyed = bool(raw.get("requires_api_key")) or bool(raw.get("api_key_env"))
-        return off_machine and keyed
+        return keyed
 
     def _resolve_facts(self, profile: Any, model: str, principal_id: str | None) -> Any:
         """Merge owner override, cached provider report, and shipped config."""

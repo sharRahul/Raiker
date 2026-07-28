@@ -4,12 +4,14 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
+  import ProviderLogo from "../components/ProviderLogo.svelte";
   import { api, ApiError } from "../api";
   import type { ModelProfile, ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
   import { humanize, providerName } from "../format";
   import { formatCost, sourceNote, spendShares } from "../contextPresentation";
   import { providerErrorGuidance, type ProviderErrorGuidance } from "../providerErrors";
+  import { modelName } from "../modelPresentation";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
   // so a selection here is reflected there without a full page reload.
@@ -450,14 +452,14 @@
           <div class="local-list">
             {#each sectionProfiles as p (p.profile_id)}
               <div class="local-row" class:selected={p.selected} class:picker-open={pickerFor === p.profile_id}>
-                <span class="row-logo" aria-hidden="true">{providerName(p.provider).slice(0, 1)}</span>
+                <span class="row-logo"><ProviderLogo provider={p.provider} size={28} /></span>
                 <div class="row-main">
                   <div class="row-title">
                     <h3>{providerName(p.provider)}</h3>
                     {#if p.selected}<Badge variant="active" label="selected" />{/if}
                   </div>
                   <p class="row-model">
-                    {#if p.model === "<model>"}<span class="model-unpinned">model chosen at selection</span>{:else}<code>{p.model}</code>{/if}
+                    {#if p.model === "<model>"}<span class="model-unpinned">model chosen at selection</span>{:else}<code>{modelName(p.model)}</code>{/if}
                   </p>
                   <p class="row-help">{providerHelp(p)}</p>
                   <div class="chips">
@@ -513,13 +515,13 @@
               {@const b = brand(p.provider)}
               <article class="provider-card" class:selected={p.selected} class:connected={p.connection_configured}>
                 <div class="pc-head">
-                  <span class="pc-logo" style={`--brand:${b.tint}`}>{providerName(p.provider).slice(0, 1)}</span>
+                  <span class="pc-logo"><ProviderLogo provider={p.provider} size={34} /></span>
                   <div class="pc-title"><h3>{providerName(p.provider)}</h3>
                     {#if p.selected}<Badge variant="active" label="selected" />{/if}
                   </div>
                 </div>
                 <p class="pc-model">
-                  {#if p.model === "<model>"}<span class="model-unpinned">no model pinned</span>{:else}<code>{p.model}</code>{/if}
+                  {#if p.model === "<model>"}<span class="model-unpinned">no model pinned</span>{:else}<code>{modelName(p.model)}</code>{/if}
                 </p>
                 <p class="pc-status">
                   {#if p.connection_configured}
@@ -651,7 +653,7 @@
       <select bind:value={addChoice} aria-label="Add a fallback backend">
         <option value="">Add a backend…</option>
         {#each addable as p (p.profile_id)}
-          <option value={p.profile_id}>{providerName(p.provider)}{p.model !== "<model>" ? ` (${p.model})` : " (no model)"}</option>
+          <option value={p.profile_id}>{providerName(p.provider)}{p.model !== "<model>" ? ` (${modelName(p.model)})` : " (no model)"}</option>
         {/each}
       </select>
       <button type="button" class="btn btn-sm" onclick={add} disabled={addChoice === ""}>Add</button>
@@ -683,7 +685,7 @@
       <select bind:value={advisorChoice} aria-label="Advisor model profile">
         <option value="">No advisor</option>
         {#each advisorCandidates as p (p.profile_id)}
-          <option value={p.profile_id}>{providerName(p.provider)} — {p.model}</option>
+          <option value={p.profile_id}>{providerName(p.provider)} — {modelName(p.model)}</option>
         {/each}
       </select>
       <button type="button" class="btn btn-primary btn-sm" onclick={saveAdvisor} disabled={!advisorDirty || advisorSaving}>
@@ -718,9 +720,9 @@
     <div class="details-dialog card" role="dialog" aria-modal="true" aria-labelledby="model-details-title" tabindex="-1">
       <button class="close" aria-label="Close model details" onclick={() => detailsFor = null}>×</button>
       <p class="eyebrow">Model details</p>
-      <h2 id="model-details-title">{providerName(detailsFor.provider)}</h2>
+      <div class="details-heading"><ProviderLogo provider={detailsFor.provider} size={28} /><h2 id="model-details-title">{providerName(detailsFor.provider)}</h2></div>
       <dl class="details-grid">
-        <div><dt>Selected model</dt><dd><code>{detailsFor.selected ? detailsFor.model : "Not selected"}</code></dd></div>
+        <div><dt>Selected model</dt><dd><code>{detailsFor.selected ? modelName(detailsFor.model) : "Not selected"}</code></dd></div>
         <div><dt>Connection</dt><dd>{detailsFor.connection_configured ? "Encrypted instance connection saved" : "Not configured"}</dd></div>
         <div><dt>Context capacity</dt><dd>Not reported by this provider. Raiker will show a percentage once the selected model exposes a context window.</dd></div>
         <div><dt>Current context usage</dt><dd>No provider context telemetry has been received for this model yet.</dd></div>
@@ -737,7 +739,7 @@
   <div class="signin-overlay" role="presentation" onclick={(event) => event.target === event.currentTarget && closeSignIn()}>
     <div class="signin-dialog" role="dialog" aria-modal="true" aria-labelledby="signin-title" tabindex="-1" style={`--brand:${b.tint}`}>
       <button class="close" aria-label="Close" onclick={closeSignIn}>×</button>
-      <div class="signin-logo" aria-hidden="true">{providerName(signInProfile.provider).slice(0, 1)}</div>
+      <div class="signin-logo"><ProviderLogo provider={signInProfile.provider} size={44} /></div>
       <h2 id="signin-title">{b.headline}</h2>
       <p class="signin-hint">{b.hint}</p>
 
@@ -816,7 +818,7 @@
   .local-row { display:flex; gap:0.85rem; align-items:flex-start; padding:0.75rem 0.9rem; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); flex-wrap:wrap; }
   .local-row.selected { border-color:var(--accent-border); box-shadow:0 0 0 1px var(--accent-border); }
   .local-row.picker-open { border-color:var(--accent-border); }
-  .row-logo { flex:0 0 auto; width:2rem; height:2rem; border-radius:0.6rem; background:var(--accent-soft); border:1px solid var(--accent-border); color:var(--accent); display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:0.9rem; }
+  .row-logo { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; }
   .row-main { flex:1; min-width:0; }
   .row-title { display:flex; align-items:center; gap:0.5rem; }
   .row-title h3 { margin:0; font-size:0.98rem; }
@@ -830,7 +832,7 @@
   .provider-card.selected { border-color:var(--accent-border); box-shadow:0 0 0 1px var(--accent-border), var(--shadow-1); }
   .provider-card.connected { border-color:var(--ok-border); }
   .pc-head { display:flex; align-items:center; gap:0.6rem; }
-  .pc-logo { width:2.4rem; height:2.4rem; border-radius:0.7rem; background:color-mix(in srgb, var(--brand) 16%, var(--surface)); border:1px solid color-mix(in srgb, var(--brand) 45%, var(--border)); color:var(--brand); display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:1.05rem; }
+  .pc-logo { min-width:2.4rem; height:2.4rem; display:inline-flex; align-items:center; justify-content:center; }
   .pc-title { display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap; }
   .pc-title h3 { margin:0; font-size:1rem; }
   .pc-model { margin:0; color:var(--text-2); font-size:0.84rem; overflow-wrap:anywhere; }
@@ -860,7 +862,7 @@
   .signin-overlay { align-items:center; background:color-mix(in srgb, #000 55%, transparent); display:flex; inset:0; justify-content:center; padding:var(--space-4); position:fixed; z-index:40; }
   .signin-dialog { position:relative; width:min(100%, 26rem); background:var(--surface); border:1px solid var(--border-strong); border-top:4px solid var(--brand); border-radius:var(--r-lg); box-shadow:var(--shadow-2); padding:1.6rem 1.5rem 1.3rem; display:flex; flex-direction:column; gap:0.65rem; }
   .signin-dialog .close { position:absolute; top:0.6rem; right:0.7rem; background:transparent; border:0; color:var(--text-2); cursor:pointer; font-size:1.6rem; line-height:1; }
-  .signin-logo { width:3rem; height:3rem; border-radius:0.8rem; background:color-mix(in srgb, var(--brand) 16%, var(--surface)); border:1px solid color-mix(in srgb, var(--brand) 45%, var(--border)); color:var(--brand); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.4rem; margin:0 auto 0.1rem; }
+  .signin-logo { min-height:3rem; display:flex; align-items:center; justify-content:center; margin:0 auto 0.1rem; }
   .signin-dialog h2 { margin:0; text-align:center; font-size:1.15rem; }
   .signin-hint { margin:0; color:var(--text-3); font-size:0.8rem; line-height:1.4; text-align:center; }
   .sso-btn { display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.55rem 1rem; border-radius:var(--r-sm); background:var(--brand); color:#fff; font-weight:600; font-size:0.86rem; text-decoration:none; border:1px solid var(--brand); transition:opacity 120ms var(--ease); margin:0.3rem 0 0.1rem; }
@@ -887,7 +889,8 @@
   /* ── Details modal ── */
   .details-overlay { align-items:center; background:color-mix(in srgb, #000 45%, transparent); display:flex; inset:0; justify-content:center; padding:var(--space-4); position:fixed; z-index:30; }
   .details-dialog { max-width:42rem; position:relative; width:min(100%, 42rem); }
-  .details-dialog h2 { margin-top:0; }
+  .details-heading { display:flex; align-items:center; gap:0.65rem; margin-bottom:0.9rem; }
+  .details-dialog h2 { margin:0; }
   .close { background:transparent; border:0; color:var(--text-2); cursor:pointer; font-size:1.6rem; line-height:1; position:absolute; right:0.75rem; top:0.65rem; }
   .details-grid { display:grid; gap:0.85rem; margin:var(--space-4) 0 0; }
   .details-grid div { border-top:1px solid var(--border); padding-top:0.65rem; }

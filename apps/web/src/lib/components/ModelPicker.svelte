@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ModelProfile } from "../apiTypes";
+  import { providerName } from "../format";
   import { modelName } from "../modelPresentation";
   import ProviderLogo from "./ProviderLogo.svelte";
   import Icon from "./Icon.svelte";
@@ -18,6 +19,13 @@
 
   let open = $state(false);
   const choices = $derived(selectedProfile === null ? profiles : [selectedProfile, ...profiles.filter((profile) => profile.profile_id !== selectedProfile.profile_id)]);
+  const providerGroups = $derived.by(() => {
+    const groups = new Map<string, ModelProfile[]>();
+    for (const profile of choices) {
+      groups.set(profile.provider, [...(groups.get(profile.provider) ?? []), profile]);
+    }
+    return [...groups].map(([provider, profiles]) => ({ provider, profiles }));
+  });
   const active = $derived(profiles.find((profile) => profile.profile_id === value) ?? selectedProfile);
   const label = $derived(active ? modelName(active.model) : "Not selected");
 
@@ -50,19 +58,27 @@
 
   {#if open}
     <div class="model-menu" role="menu" aria-label="Models" tabindex="-1" onkeydown={closeOnEscape}>
-      {#each choices as profile (profile.profile_id)}
-        <button
-          type="button"
-          class="model-choice"
-          role="menuitemradio"
-          aria-checked={active?.profile_id === profile.profile_id}
-          disabled={disabled}
-          onclick={() => select(profile.profile_id)}
-        >
-          <ProviderLogo provider={profile.provider} />
-          <span>{modelName(profile.model)}</span>
-          {#if active?.profile_id === profile.profile_id}<Icon name="check" size={15} label="Selected model" />{/if}
-        </button>
+      {#each providerGroups as group (group.provider)}
+        <div class="model-provider-group" role="group" aria-label={`${providerName(group.provider)} models`}>
+          <div class="model-provider-header">
+            <ProviderLogo provider={group.provider} />
+            <span>{providerName(group.provider)}</span>
+          </div>
+          {#each group.profiles as profile (profile.profile_id)}
+            <button
+              type="button"
+              class="model-choice"
+              role="menuitemradio"
+              aria-checked={active?.profile_id === profile.profile_id}
+              disabled={disabled}
+              onclick={() => select(profile.profile_id)}
+            >
+              <ProviderLogo provider={profile.provider} />
+              <span>{modelName(profile.model)}</span>
+              {#if active?.profile_id === profile.profile_id}<Icon name="check" size={15} label="Selected model" />{/if}
+            </button>
+          {/each}
+        </div>
       {/each}
     </div>
   {/if}
@@ -77,7 +93,10 @@
   .model-trigger span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .model-trigger :global(svg) { margin-left: auto; }
   .model-menu { position: absolute; z-index: 4; right: 0; bottom: calc(100% + .38rem); width: max-content; min-width: 12rem; max-width: min(20rem, calc(100vw - 2rem)); padding: .26rem; border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-2); }
-  .model-choice { width: 100%; display: grid; grid-template-columns: 1.15rem minmax(0, 1fr) 1rem; align-items: center; gap: .5rem; padding: .42rem .48rem; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2); text-align: left; cursor: pointer; }
+  .model-provider-group + .model-provider-group { margin-top: .28rem; padding-top: .28rem; border-top: 1px solid var(--border); }
+  .model-provider-header { display: flex; align-items: center; gap: .5rem; padding: .3rem .48rem .24rem; color: var(--text-1); font-size: .72rem; font-weight: 800; letter-spacing: .03em; }
+  .model-provider-header :global(.provider-logo) { width: 1.05rem; height: 1.05rem; flex-basis: 1.05rem; }
+  .model-choice { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) 1rem; align-items: center; gap: .5rem; padding: .42rem .48rem; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2); text-align: left; cursor: pointer; }
   .model-choice:hover:not(:disabled), .model-choice[aria-checked="true"] { background: var(--accent-soft); color: var(--text-1); }
   .model-choice:disabled { cursor: wait; }
   .model-choice > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

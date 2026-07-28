@@ -9,9 +9,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from raiker.control.dashboard import DashboardService
 from raiker.models.pricing import (
     ModelFacts,
     ModelPrice,
@@ -117,6 +119,27 @@ class TestPriceResolution:
 
 
 class TestCost:
+    def test_remote_keyed_profile_is_billable_without_a_cached_endpoint_kind(self) -> None:
+        # Shipped profiles classify their endpoint at connection time. The
+        # dashboard must still distinguish a remote API-key provider from a
+        # local runtime before that transient field is present.
+        profile = SimpleNamespace(
+            raw={"requires_api_key": True, "api_key_env": "ANTHROPIC_API_KEY"},
+            local_only=False,
+            requires_network=True,
+        )
+
+        assert DashboardService._profile_is_billable(profile)
+
+    def test_local_runtime_with_a_token_stays_non_billable(self) -> None:
+        profile = SimpleNamespace(
+            raw={"api_key_env": "LM_API_TOKEN"},
+            local_only=True,
+            requires_network=False,
+        )
+
+        assert not DashboardService._profile_is_billable(profile)
+
     def test_cost_uses_the_per_million_convention(self) -> None:
         price = price_from_config(CONFIG_PRICING, "claude-haiku-4-5-20251001")
         assert price is not None

@@ -64,6 +64,28 @@ describe("ModelsView state grammar", () => {
     expect(alert).toHaveTextContent(/couldn't load models/i);
     expect(alert).toHaveTextContent(/unavailable \(404\)/i);
   });
+
+  it("does not describe an API-key provider as having no API cost", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "anthropic-hosted",
+            provider: "anthropic",
+            local_only: false,
+            requires_network: true,
+            endpoint_kind: "remote_hosted",
+            off_machine: true,
+            billable: true,
+          }),
+        ],
+      }),
+    });
+    render(ModelsView);
+
+    expect(await screen.findByText("Not used yet")).toBeTruthy();
+    expect(screen.queryByText("No API cost — runs on this machine")).toBeNull();
+  });
 });
 
 describe("ModelsView fallback sequence", () => {

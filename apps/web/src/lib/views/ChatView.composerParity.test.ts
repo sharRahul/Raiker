@@ -91,7 +91,8 @@ describe("ChatView composer parity", () => {
     expect(screen.getByRole("button", { name: "Model for this turn: Claude Sonnet" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Model for this turn: Claude Sonnet" }));
     expect(screen.getByRole("menu", { name: "Models" })).toBeInTheDocument();
-    expect(screen.getAllByRole("img", { name: "Anthropic logo" })).toHaveLength(2);
+    // Trigger, provider header, and model row all identify Anthropic.
+    expect(screen.getAllByRole("img", { name: "Anthropic logo" })).toHaveLength(3);
     expect(screen.getByRole("menuitemradio", { name: /Claude Sonnet/ })).toBeInTheDocument();
     const effort = screen.getByLabelText("Thinking effort");
     expect(within(effort).getAllByRole("option").map((option) => option.textContent)).toEqual([

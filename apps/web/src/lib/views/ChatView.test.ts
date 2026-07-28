@@ -370,7 +370,8 @@ describe("ChatView streaming transcript", () => {
     expect(picker).toHaveTextContent("Gemma 4:31B Cloud");
     expect(picker).not.toHaveTextContent("Ollama");
     await fireEvent.click(picker);
-    expect(screen.getAllByRole("img", { name: "Ollama logo" })).toHaveLength(2);
+    // Trigger, provider header, and model row all identify Ollama.
+    expect(screen.getAllByRole("img", { name: "Ollama logo" })).toHaveLength(3);
   });
 
   it("attaches workspace paths and sends them with the prompt", async () => {

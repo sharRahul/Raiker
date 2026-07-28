@@ -22,9 +22,13 @@ RuntimeAuthority, and append-only audit log as the terminal client.
 ### Composer model picker
 
 Chat and Build share a compact model picker: a provider mark for every
-configured provider, a concise model label (for example, `Haiku 4.5`,
-`Gemma 4:31B Cloud`, or `Gemini 2.5 Pro`), and the model's effort control.
+configured provider, a provider header followed by that provider's concise
+model labels (for example, `Haiku 4.5`, `Gemma 4:31B Cloud`, or `Gemini 2.5
+Pro`), and the model's effort control.
 Provider and model identifiers remain unchanged at the API boundary.
+The picker and Models page use the published provider assets recorded in
+[`public/provider-logos/`](public/provider-logos/); assets subject to a
+provider's brand terms remain governed by those terms.
 
 ## Shared shell
 

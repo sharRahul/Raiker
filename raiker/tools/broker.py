@@ -498,6 +498,191 @@ class ToolBroker:
             timestamp=utc_now(),
         )
 
+    @staticmethod
+    def _is_ordinary_approval_decision(action: ToolAction, decision: PolicyDecision) -> bool:
+        """Whether a composer mode may replace this *UI* approval pause.
+
+        This deliberately recognises only the exact ordinary Action-Bound
+        approval pair emitted by :class:`PolicyEngine`. Hook requests, managed
+        policy, unknown reasons, and every deny stay outside this narrow path.
+        Critical actions are also excluded before the runtime authority is ever
+        asked to execute them.
+        """
+        if decision.decision != "needs_approval" or action.risk_level == "critical":
+            return False
+        from raiker.runtime.authority.critical import classify_critical
+
+        return (
+            classify_critical(action.tool_name, action.tool_name, action.arguments) is None
+            and decision.reasons
+            == [
+                f"{action.tool_name}_requires_approval",
+                "phase2_action_bound_approval_required",
+            ]
+        )
+
+    def _approval_mode_principal(self):
+        """Return the human owner represented by the composer setting.
+
+        Selecting Auto or Skip is an explicit, persisted owner decision. It is
+        therefore represented as human pre-authorisation at the governed
+        executor boundary, rather than by weakening an AI principal or a gate.
+        An unrecognised stored non-human principal fails closed to the normal
+        approval workflow.
+        """
+        from raiker.runtime.authority.models import Principal, PrincipalType
+
+        if self.store is None:
+            return None
+        raw = self.store.get_principal(self.principal_id)
+        if raw is not None:
+            principal = Principal(**raw)
+            return principal if principal.principal_type == PrincipalType.HUMAN else None
+        return Principal(
+            principal_id=self.principal_id,
+            principal_type=PrincipalType.HUMAN,
+            display_name="Local approval owner",
+        )
+
+    def _execute_preapproved_action(
+        self,
+        action: ToolAction,
+        decision: PolicyDecision,
+        *,
+        approval_mode: str,
+        session_id: str,
+        turn_id: str | None,
+        client: ClientMetadata | None,
+        sanitized_action: ToolAction,
+        now: str,
+    ) -> tuple[ToolResult, PolicyDecision] | None:
+        """Execute an ordinary action through the full runtime authority.
+
+        No UI approval record is created, but the action still crosses all
+        capability gates, critical classification, policy review, checkpoints,
+        path/hunk validation, and executor transaction boundaries. Returning
+        ``None`` intentionally falls back to the normal paused workflow.
+        """
+        if approval_mode not in {"auto", "skip"} or not self._is_ordinary_approval_decision(action, decision):
+            return None
+        principal = self._approval_mode_principal()
+        if principal is None or self.store is None:
+            return None
+
+        preview = self._approval_preview(action) if approval_mode == "auto" else None
+        self._event(
+            session_id=session_id,
+            turn_id=turn_id,
+            event_type="tool_started",
+            actor="tool_broker",
+            payload={"action_id": action.action_id, "tool_name": action.tool_name},
+            client=client,
+        )
+        from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
+        from raiker.runtime.executors import build_default_executor_registry
+
+        authority = RuntimeAuthority(
+            self.store,
+            self.writer or EventLogWriter(self.store),
+            executor_registry=build_default_executor_registry(self.workspace_root, self.store),
+        )
+        governed = GovernedAction(
+            action_id=action.action_id,
+            principal_id=principal.principal_id,
+            action_type=action.tool_name,
+            tool_or_service_name=action.tool_name,
+            arguments=action.arguments,
+            risk_level=action.risk_level,
+            session_id=session_id,
+            turn_id=turn_id,
+        )
+        governed_result = authority.route_action(governed, principal)
+        if governed_result.decision != "allow" or governed_result.error is not None:
+            blocked_decision = PolicyDecision(
+                decision_id=new_id("pol_"),
+                action_id=action.action_id,
+                decision="deny",
+                reasons=["runtime_protection_preserved", governed_result.message or "execution_denied"],
+                requires_user_approval=False,
+                risk_level="blocked",
+                timestamp=utc_now(),
+            )
+            failed = ToolResult(
+                action_id=action.action_id,
+                tool_name=action.tool_name,
+                status="denied",
+                output=None,
+                error={"type": "runtime_execution_denied", "reason": governed_result.message},
+                started_at=now,
+                completed_at=utc_now(),
+            )
+            if self.store is not None:
+                self.store.insert_tool_action(sanitized_action, session_id, turn_id, "denied")
+                self.store.insert_policy_decision(blocked_decision)
+            self._event(
+                session_id=session_id,
+                turn_id=turn_id,
+                event_type="tool_failed",
+                actor="tool_broker",
+                payload=self._event_safe_result_payload(failed),
+                client=client,
+            )
+            return failed, blocked_decision
+
+        executed_decision = PolicyDecision(
+            decision_id=new_id("pol_"),
+            action_id=action.action_id,
+            decision="allow",
+            reasons=[*decision.reasons, f"approval_mode:{approval_mode}"],
+            requires_user_approval=False,
+            risk_level=decision.risk_level,
+            timestamp=utc_now(),
+        )
+        result = ToolResult(
+            action_id=action.action_id,
+            tool_name=action.tool_name,
+            status="success",
+            output={"status": "success", "executed": True, "approval_mode": approval_mode},
+            error=None,
+            started_at=now,
+            completed_at=utc_now(),
+        )
+        if self.store is not None:
+            self.store.insert_tool_action(sanitized_action, session_id, turn_id, result.status)
+            self.store.insert_policy_decision(executed_decision)
+        event_type = "approval_auto_executed" if approval_mode == "auto" else "approval_preview_skipped"
+        self._event(
+            session_id=session_id,
+            turn_id=turn_id,
+            event_type=event_type,
+            actor="tool_broker",
+            payload={
+                "action_id": action.action_id,
+                "tool_name": action.tool_name,
+                "approval_mode": approval_mode,
+                "policy_reasons": decision.reasons,
+                **({"proposal_preview": preview} if approval_mode == "auto" else {}),
+            },
+            client=client,
+        )
+        self._event(
+            session_id=session_id,
+            turn_id=turn_id,
+            event_type="tool_completed",
+            actor="tool_broker",
+            payload=self._event_safe_result_payload(result),
+            client=client,
+        )
+        self._notify_hook(
+            "PostToolUse",
+            action,
+            session_id=session_id,
+            turn_id=turn_id,
+            client=client,
+            context={"status": result.status, "approval_mode": approval_mode},
+        )
+        return result, executed_decision
+
     def execute(
         self,
         action: ToolAction,
@@ -505,6 +690,7 @@ class ToolBroker:
         session_id: str,
         turn_id: str | None,
         client: ClientMetadata | None = None,
+        approval_mode: str = "manual",
     ) -> tuple[ToolResult, PolicyDecision]:
         sanitized_action = ToolAction(
             action_id=action.action_id,
@@ -584,6 +770,18 @@ class ToolBroker:
                 decision,
             )
         if decision.decision == "needs_approval":
+            preapproved = self._execute_preapproved_action(
+                action,
+                decision,
+                approval_mode=approval_mode,
+                session_id=session_id,
+                turn_id=turn_id,
+                client=client,
+                sanitized_action=sanitized_action,
+                now=now,
+            )
+            if preapproved is not None:
+                return preapproved
             approval_id = new_id("appr_")
             proposal_preview = self._approval_preview(action)
             connector_write = action.tool_name == "connector_write"

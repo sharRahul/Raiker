@@ -5,6 +5,7 @@ import pytest
 from raiker.cli.commands import build_prompt_envelope
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import (
+    EVENT_TYPES,
     AgentEvent,
     ClientMetadata,
     ContractValidationError,
@@ -64,6 +65,10 @@ def test_agent_event_requires_timestamp() -> None:
             actor="test",
             payload={},
         )
+
+
+def test_approval_policy_audit_events_are_registered() -> None:
+    assert {"approval_auto_executed", "approval_preview_skipped"} <= EVENT_TYPES
 
 
 def test_ids_and_timestamps() -> None:

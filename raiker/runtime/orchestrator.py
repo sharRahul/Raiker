@@ -819,6 +819,7 @@ class RuntimeOrchestrator:
                 session_id=envelope.session_id,
                 turn_id=envelope.turn_id,
                 client=envelope.client,
+                approval_mode=envelope.options.approval_mode,
             )
             last_action, last_result = action, tool_result
             if decision.decision == "needs_approval":

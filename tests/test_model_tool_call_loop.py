@@ -69,7 +69,9 @@ def _orchestrator(tmp_path: Path, router: FakeRouter) -> RuntimeOrchestrator:
     )
 
 
-def _envelope(prompt: str, *, max_tool_calls: int = 10) -> PromptEnvelope:
+def _envelope(
+    prompt: str, *, max_tool_calls: int = 10, approval_mode: str = "manual"
+) -> PromptEnvelope:
     return PromptEnvelope(
         request_id=new_id("req_"),
         session_id=new_id("sess_"),
@@ -77,7 +79,7 @@ def _envelope(prompt: str, *, max_tool_calls: int = 10) -> PromptEnvelope:
         client=ClientMetadata(type="test_harness", name="tests", version="0.0.0"),
         user=UserMetadata(),
         prompt=PromptPayload(text=prompt),
-        options=PromptOptions(max_tool_calls=max_tool_calls),
+        options=PromptOptions(max_tool_calls=max_tool_calls, approval_mode=approval_mode),
     )
 
 
@@ -86,8 +88,25 @@ def _events(orchestrator: RuntimeOrchestrator, session_id: str) -> list[str]:
     return [json.loads(line)["event_type"] for line in path.read_text(encoding="utf-8").splitlines()]
 
 
+def _event_record(orchestrator: RuntimeOrchestrator, session_id: str, event_type: str) -> dict[str, object]:
+    path = orchestrator.writer.path_for_session(session_id)
+    return next(
+        record
+        for record in (json.loads(line) for line in path.read_text(encoding="utf-8").splitlines())
+        if record["event_type"] == event_type
+    )
+
+
 def _list_dir_call() -> ToolCallProposal:
     return ToolCallProposal(call_id="call_ls", tool_name="list_directory", arguments={"path": "."})
+
+
+def _write_call() -> ToolCallProposal:
+    return ToolCallProposal(
+        call_id="call_write",
+        tool_name="write_file",
+        arguments={"path": "report.md", "text": "# Report\n"},
+    )
 
 
 def test_model_drives_a_tool_call_then_responds(tmp_path: Path) -> None:
@@ -224,7 +243,49 @@ def test_model_proposed_shell_requires_approval(tmp_path: Path) -> None:
     assert "tool_started" not in events
 
 
-def test_outside_workspace_read_is_denied(tmp_path: Path) -> None:
+def test_auto_approval_executes_an_ordinary_file_write_with_preview_evidence(tmp_path: Path) -> None:
+    router = FakeRouter(
+        [
+            ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls"),
+            ModelResponse(text="Done.", finish_reason="stop"),
+        ]
+    )
+    orchestrator = _orchestrator(tmp_path, router)
+    envelope = _envelope("write the report", approval_mode="auto")
+
+    response = orchestrator.handle(envelope)
+
+    assert response.status == "completed"
+    assert (tmp_path / "report.md").read_text(encoding="utf-8") == "# Report\n"
+    events = _events(orchestrator, envelope.session_id)
+    assert "approval_requested" not in events
+    assert "approval_auto_executed" in events
+    auto_event = _event_record(orchestrator, envelope.session_id, "approval_auto_executed")
+    assert auto_event["payload"]["proposal_preview"]["status"] == "proposal"  # type: ignore[index]
+
+
+def test_skip_approval_executes_an_ordinary_file_write_without_preview(tmp_path: Path) -> None:
+    router = FakeRouter(
+        [
+            ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls"),
+            ModelResponse(text="Done.", finish_reason="stop"),
+        ]
+    )
+    orchestrator = _orchestrator(tmp_path, router)
+    envelope = _envelope("write the report", approval_mode="skip")
+
+    response = orchestrator.handle(envelope)
+
+    assert response.status == "completed"
+    assert (tmp_path / "report.md").read_text(encoding="utf-8") == "# Report\n"
+    events = _events(orchestrator, envelope.session_id)
+    assert "approval_requested" not in events
+    assert "approval_preview_skipped" in events
+    skip_event = _event_record(orchestrator, envelope.session_id, "approval_preview_skipped")
+    assert "proposal_preview" not in skip_event["payload"]  # type: ignore[operator]
+
+
+def test_outside_workspace_read_is_denied_even_when_approvals_are_skipped(tmp_path: Path) -> None:
     router = FakeRouter(
         [
             ModelResponse(
@@ -235,7 +296,7 @@ def test_outside_workspace_read_is_denied(tmp_path: Path) -> None:
         ]
     )
     orchestrator = _orchestrator(tmp_path, router)
-    envelope = _envelope("read outside")
+    envelope = _envelope("read outside", approval_mode="skip")
     response = orchestrator.handle(envelope)
     events = _events(orchestrator, envelope.session_id)
     assert response.status == "denied"

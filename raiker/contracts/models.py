@@ -70,6 +70,11 @@ EVENT_TYPES = {
     "approval_requested",
     "approval_received",
     "approval_denied",
+    # Composer-selected unattended approval policies. These attest that an
+    # otherwise ordinary, governed action was executed under the owner's
+    # persisted setting; they do not relax runtime gates or critical holds.
+    "approval_auto_executed",
+    "approval_preview_skipped",
     # Approval execution relay (Workstream A). `approval_executed` records that a
     # previously human-approved action was re-governed and run through its own
     # capability's executor, carrying a metadata-only posture snapshot (A4).

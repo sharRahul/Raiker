@@ -10,6 +10,7 @@ import type {
   CapabilityGate,
   ContextUsage,
   Checkpoint,
+  ComposerApprovalModeSettings,
   CodeReposView,
   CredentialLifecycle,
   ConnectionsView,
@@ -50,6 +51,7 @@ import type {
   TurnDetail,
   UploadedAttachment,
 } from "./apiTypes";
+import type { ApprovalMode } from "./approvalMode";
 
 // Bearer token held in memory only — never localStorage/sessionStorage (security requirement).
 let token: string | null = null;
@@ -239,6 +241,13 @@ export interface SettingsView {
 export const api = {
   // ── Local-account settings, vault key, MFA status ──
   settings: () => request<SettingsView>("/api/settings"),
+  composerApprovalMode: () => request<ComposerApprovalModeSettings>("/api/settings/composer-approval-mode"),
+  setComposerApprovalMode: (mode: ApprovalMode) =>
+    request<ComposerApprovalModeSettings>("/api/settings/composer-approval-mode", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approval_mode: mode }),
+    }),
   putSettings: (settings: Record<string, unknown>) =>
     request<{ settings: Record<string, unknown> }>("/api/settings", {
       method: "PUT",

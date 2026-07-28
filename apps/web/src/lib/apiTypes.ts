@@ -1,3 +1,5 @@
+import type { ApprovalMode } from "./approvalMode";
+
 // Response shapes from the governed read API (see raiker/control/dashboard.py and
 // raiker/control/dtos.py). These mirror the backend DTOs; the backend remains the source of truth.
 // tests/test_api_contract_schemas.py guards the backend against dropping keys the UI reads.
@@ -21,6 +23,10 @@ export interface CapabilityGate {
   requires_threat_model_ack?: boolean;
   requires_human_confirmation?: boolean;
   threat_model_ack_recorded?: boolean;
+}
+
+export interface ComposerApprovalModeSettings {
+  approval_mode: ApprovalMode;
 }
 
 export interface RuntimeMode {

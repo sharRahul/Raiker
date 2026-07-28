@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch } from "../test-helpers";
@@ -42,15 +42,95 @@ function routes() {
   };
 }
 
+const REASONING_PROFILE = {
+  profile_id: "anthropic-claude",
+  provider: "anthropic",
+  model: "claude-sonnet",
+  selected: true,
+  configured: true,
+  supports_reasoning: true,
+  supports_reasoning_effort: true,
+  reasoning_effort_values: ["low", "high"],
+};
+
+const NON_REASONING_PROFILE = {
+  profile_id: "ollama-gemma",
+  provider: "ollama",
+  model: "gemma4:31b-cloud",
+  selected: true,
+  configured: true,
+  supports_reasoning: false,
+  supports_reasoning_effort: false,
+  reasoning_effort_values: [],
+};
+
 describe("ChatView composer parity", () => {
-  it("renders the inline work panel and approval pill beside the project picker", async () => {
+  it("renders its background-work rail beside the chat column, not below the composer", async () => {
     stubFetch(routes());
     render(ChatView, { projects });
 
-    expect(await screen.findByRole("complementary", { name: "Background work" })).toBeInTheDocument();
+    const rail = await screen.findByRole("complementary", { name: "Background work" });
+    expect(rail.closest(".rail-slot")).toBeInTheDocument();
+    expect(rail.closest(".chat")).toBeNull();
+    expect(rail.closest(".chat-layout")).toHaveClass("with-rail");
     expect(screen.getByLabelText("Project for this chat")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /approval mode/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Context window" })).toBeInTheDocument();
+  });
+
+  it("uses the persisted selected model and exposes only its supported thinking efforts", async () => {
+    stubFetch({
+      ...routes(),
+      "GET /api/models": { profiles: [REASONING_PROFILE], chat_profiles: [REASONING_PROFILE] },
+    });
+    render(ChatView, { projects });
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Model for this turn")).toHaveTextContent("Anthropic · claude-sonnet"),
+    );
+    expect(within(screen.getByLabelText("Model for this turn")).getAllByRole("option")).toHaveLength(1);
+    const effort = screen.getByLabelText("Thinking effort");
+    expect(within(effort).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Thinking: default",
+      "low",
+      "high",
+    ]);
+  });
+
+  it("shows Not selected and omits effort from the prompt when no supported model is active", async () => {
+    stubFetch({
+      ...routes(),
+      "GET /api/models": { profiles: [], chat_profiles: [] },
+    });
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: null });
+    });
+    render(ChatView, { projects });
+
+    await waitFor(() => expect(screen.getByLabelText("Model for this turn")).toHaveTextContent("Not selected"));
+    expect(screen.queryByLabelText("Thinking effort")).not.toBeInTheDocument();
+    await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Hello" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
+    expect(streamPromptMock.mock.calls[0][0]).not.toHaveProperty("reasoning_effort");
+  });
+
+  it("sends an effort only for the active exact supported profile", async () => {
+    stubFetch({
+      ...routes(),
+      "GET /api/models": { profiles: [REASONING_PROFILE, NON_REASONING_PROFILE], chat_profiles: [REASONING_PROFILE, NON_REASONING_PROFILE] },
+    });
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: null });
+    });
+    render(ChatView, { projects });
+
+    await waitFor(() => expect(screen.getByLabelText("Thinking effort")).toBeInTheDocument());
+    await fireEvent.change(screen.getByLabelText("Thinking effort"), { target: { value: "high" } });
+    await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Reason" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ reasoning_effort: "high" });
   });
 
   it("files the selected project after the first response creates the session", async () => {

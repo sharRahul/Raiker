@@ -365,11 +365,11 @@ describe("ChatView streaming transcript", () => {
 
     render(ChatView);
     const providerSelect = screen.getByLabelText("Model") as HTMLSelectElement;
-    await waitFor(() => expect(providerSelect.options.length).toBeGreaterThan(1));
     // The default option must name the actual persisted selection, not just
     // say "Selected model" — the user has to see what will serve the turn.
-    expect(providerSelect.options[0].textContent).toContain("Ollama");
+    await waitFor(() => expect(providerSelect.options[0].textContent).toContain("Ollama"));
     expect(providerSelect.options[0].textContent).toContain("gemma4:31b-cloud");
+    expect(providerSelect.options).toHaveLength(1);
   });
 
   it("attaches workspace paths and sends them with the prompt", async () => {

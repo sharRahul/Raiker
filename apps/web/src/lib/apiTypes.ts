@@ -189,6 +189,12 @@ export interface ModelProfile {
   configured?: boolean;
   /** Only API-key providers can accrue an API bill; local runtimes cannot. */
   billable?: boolean;
+  /** Whether this exact provider/model profile supports a reasoning mode. */
+  supports_reasoning?: boolean;
+  /** Whether this exact profile accepts one of `reasoning_effort_values`. */
+  supports_reasoning_effort?: boolean;
+  /** Backend-advertised effort values; never inferred by the client. */
+  reasoning_effort_values?: string[];
   models_used?: number;
   turns_used?: number;
   total_tokens?: number;
@@ -704,6 +710,7 @@ export interface PromptRequestBody {
   approval_mode?: string;
   model_profile?: string;
   model?: string;
+  reasoning_effort?: string;
   max_tool_calls?: number;
   attachments?: PromptAttachment[];
 }

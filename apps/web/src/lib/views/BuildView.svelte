@@ -144,9 +144,15 @@
 
   let profiles = $state<ModelProfile[]>([]);
   let modelProfile = $state("");
+  let reasoningEffort = $state("");
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
   const activeProfile = $derived(
     profiles.find((profile) => profile.profile_id === modelProfile) ?? selectedProfile,
+  );
+  const reasoningEfforts = $derived(
+    activeProfile?.supports_reasoning === true && activeProfile.supports_reasoning_effort === true
+      ? (activeProfile.reasoning_effort_values ?? [])
+      : [],
   );
 
   onMount(() => {
@@ -261,6 +267,7 @@
           text: sent,
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
+          ...(reasoningEfforts.includes(reasoningEffort) ? { reasoning_effort: reasoningEffort } : {}),
           planning_mode: buildMode(sentMode).planningMode ?? undefined,
           // A local repository rides the turn as a real workspace-path
           // attachment, resolved and bounded server-side like any other.
@@ -690,18 +697,35 @@
               bind:value={modelProfile}
               disabled={streaming}
               aria-label="Model for this turn"
+              onchange={() => {
+                if (!reasoningEfforts.includes(reasoningEffort)) reasoningEffort = "";
+              }}
             >
               <option value="">
                 {selectedProfile !== null
                   ? `${providerName(selectedProfile.provider)} · ${selectedProfile.model}`
-                  : "Selected model"}
+                  : "Not selected"}
               </option>
-              {#each profiles as profile (profile.profile_id)}
+              {#each profiles.filter((profile) => profile.profile_id !== selectedProfile?.profile_id) as profile (profile.profile_id)}
                 <option value={profile.profile_id}>
                   {providerName(profile.provider)} · {profile.model}
                 </option>
               {/each}
             </select>
+            {#if reasoningEfforts.length > 0}
+              <select
+                class="bar-select"
+                bind:value={reasoningEffort}
+                disabled={streaming}
+                aria-label="Thinking effort"
+                title="Thinking effort for this model"
+              >
+                <option value="">Thinking: default</option>
+                {#each reasoningEfforts as effort (effort)}
+                  <option value={effort}>{effort}</option>
+                {/each}
+              </select>
+            {/if}
 
             <div class="context-wrap">
               <button

@@ -103,6 +103,7 @@
   // applies its own defaults, exactly as if the option was never sent. They
   // live as compact controls at the bottom of the composer card.
   let modelProfile = $state("");
+  let reasoningEffort = $state("");
   let planningMode = $state("");
   let profiles = $state<ModelProfile[]>([]);
 
@@ -110,6 +111,11 @@
   // option names it so the user can see what will actually serve the turn.
   const selectedProfile = $derived(profiles.find((p) => p.selected) ?? null);
   const activeProfile = $derived(profiles.find((p) => p.profile_id === modelProfile) ?? selectedProfile);
+  const reasoningEfforts = $derived(
+    activeProfile?.supports_reasoning === true && activeProfile.supports_reasoning_effort === true
+      ? (activeProfile.reasoning_effort_values ?? [])
+      : [],
+  );
   let contextOpen = $state(false);
   // The backend will replace this conservative presentation estimate with
   // provider-reported usage when available. It is intentionally labeled.
@@ -506,6 +512,7 @@
           text,
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
+          ...(reasoningEfforts.includes(reasoningEffort) ? { reasoning_effort: reasoningEffort } : {}),
           attachments:
             sentAttachments.length > 0
               ? sentAttachments.map((a) =>
@@ -617,7 +624,7 @@
 <!-- Split shell: the conversation, plus the file inspector when one is open.
      The chat column keeps its own indentation so opening a file stays a
      wrapper, not a reflow of the whole transcript's markup. -->
-<div class="chat-layout" class:with-inspector={inspecting !== null}>
+<div class="chat-layout" class:with-inspector={inspecting !== null} class:with-rail={backgroundWorkOpen}>
 <div class="chat">
   {#if exportNotice}<span class="export-notice" role="status" aria-live="polite">{exportNotice}</span>{/if}
   <div class="thread" bind:this={scrollEl}>
@@ -987,22 +994,42 @@
             <option value="never_safe_only">Never plan</option>
           </select>
 
+          <label class="sr-only" for="chat-model-profile">Model</label>
           <select
+            id="chat-model-profile"
             class="bar-select"
             bind:value={modelProfile}
             disabled={streaming}
-            aria-label="Model"
+            aria-label="Model for this turn"
             title="Configured model for this turn"
+            onchange={() => {
+              if (!reasoningEfforts.includes(reasoningEffort)) reasoningEffort = "";
+            }}
           >
             <option value="">
               {selectedProfile !== null
                 ? `${providerName(selectedProfile.provider)} · ${selectedProfile.model}`
-                : "Selected model"}
+                : "Not selected"}
             </option>
-            {#each profiles as p (p.profile_id)}
+            {#each profiles.filter((p) => p.profile_id !== selectedProfile?.profile_id) as p (p.profile_id)}
               <option value={p.profile_id}>{providerName(p.provider)} · {p.model}</option>
             {/each}
           </select>
+
+          {#if reasoningEfforts.length > 0}
+            <select
+              class="bar-select"
+              bind:value={reasoningEffort}
+              disabled={streaming}
+              aria-label="Thinking effort"
+              title="Thinking effort for this model"
+            >
+              <option value="">Thinking: default</option>
+              {#each reasoningEfforts as effort (effort)}
+                <option value={effort}>{effort}</option>
+              {/each}
+            </select>
+          {/if}
 
           <div class="context-control">
             <button
@@ -1038,16 +1065,16 @@
     </div>
   </form>
   {#if projectNotice}<p class="project-notice" role="status">{projectNotice}</p>{/if}
+</div>
   {#if backgroundWorkOpen}
-    <section id="chat-background-work" class="chat-background-work" aria-label="Background work">
+    <div id="chat-background-work" class="rail-slot">
       <BuildSidePanel
         projectId={projectId || projects?.active_project_id || null}
         {projects}
         onclose={() => (backgroundWorkOpen = false)}
       />
-    </section>
+    </div>
   {/if}
-</div>
 
 {#if inspecting !== null}
   <FileInspector
@@ -1081,9 +1108,9 @@
        narrowing the transcript. */
     min-width: 0;
   }
-  /* One column until a file is open; a split view once one is. The inspector
-     column is a fixed readable width so the transcript keeps the remainder,
-     and it collapses back the moment the pane closes. */
+  /* Chat owns the same local two-column work layout as Build: transcript and
+     composer on the left, background work on the right. The inspector is a
+     third desktop column only while a file is open. */
   .chat-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -1091,12 +1118,45 @@
     align-items: stretch;
   }
   @media (min-width: 64rem) {
+    .chat-layout.with-rail {
+      grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    }
     .chat-layout.with-inspector {
       grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
     }
-    .chat-layout.with-inspector .chat {
+    .chat-layout.with-rail.with-inspector {
+      grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem) minmax(20rem, 26rem);
+    }
+    .chat-layout.with-inspector .chat,
+    .chat-layout.with-rail .chat {
       margin: 0;
       max-width: none;
+    }
+  }
+  .rail-slot {
+    min-height: 0;
+    display: flex;
+  }
+  .rail-slot > :global(*) {
+    flex: 1;
+    min-height: 0;
+  }
+  @media (max-width: 63.9rem) {
+    .chat-layout,
+    .chat-layout.with-rail,
+    .chat-layout.with-inspector,
+    .chat-layout.with-rail.with-inspector {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .chat {
+      height: auto;
+      min-height: 0;
+    }
+    .thread {
+      overflow-y: visible;
+    }
+    .rail-slot {
+      max-height: 32rem;
     }
   }
   /* Below the split breakpoint the inspector is a sheet over the conversation
@@ -1324,14 +1384,6 @@
     margin: var(--space-2) 0 0;
     color: var(--text-3);
     font-size: .75rem;
-  }
-  .chat-background-work {
-    margin-top: var(--space-3);
-    max-height: 19rem;
-    min-height: 0;
-  }
-  .chat-background-work :global(.rail) {
-    height: 100%;
   }
   /* One clean card: prompt on top, "+" and the per-turn controls at the bottom. */
   .composer-card {

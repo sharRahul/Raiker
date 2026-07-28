@@ -36,6 +36,17 @@ const MODELS = {
   no_silent_hosted_fallback: true,
 };
 
+const REASONING_PROFILE = {
+  profile_id: "openrouter-reasoning",
+  provider: "openrouter",
+  model: "reasoning-model",
+  selected: true,
+  configured: true,
+  supports_reasoning: true,
+  supports_reasoning_effort: true,
+  reasoning_effort_values: ["medium", "high"],
+};
+
 const WRITE_CAPABILITIES = [
   "file_write_execution",
   "patch_apply_execution",
@@ -212,6 +223,40 @@ describe("Build composer modes", () => {
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
     expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ planning_mode: "always" });
+  });
+});
+
+describe("Build model picker", () => {
+  it("shows the selected model and sends only an advertised thinking effort", async () => {
+    stubFetch(baseRoutes({
+      "GET /api/models": { ...MODELS, profiles: [REASONING_PROFILE], chat_profiles: [REASONING_PROFILE] },
+    }));
+    respondWith("Done.");
+    render(BuildView);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Model for this turn")).toHaveTextContent("OpenRouter · reasoning-model"),
+    );
+    const effort = screen.getByLabelText("Thinking effort");
+    expect(within(effort).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Thinking: default",
+      "medium",
+      "high",
+    ]);
+    await fireEvent.change(effort, { target: { value: "high" } });
+    await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Use effort" } });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ reasoning_effort: "high" });
+  });
+
+  it("calls an unavailable choice Not selected", async () => {
+    stubFetch(baseRoutes());
+    render(BuildView);
+
+    expect(await screen.findByLabelText("Model for this turn")).toHaveTextContent("Not selected");
+    expect(screen.queryByLabelText("Thinking effort")).not.toBeInTheDocument();
   });
 });
 

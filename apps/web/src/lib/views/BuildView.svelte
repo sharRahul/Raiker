@@ -17,6 +17,7 @@
    */
   import { onMount, tick } from "svelte";
   import Badge from "../components/Badge.svelte";
+  import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
@@ -113,6 +114,7 @@
   let posture = $state<"loading" | "matched" | "mixed" | "unreadable">("loading");
   let modeBusy = $state(false);
   let modeError = $state<string | null>(null);
+  let modeTooltipOpen = $state(false);
   const modeSpec = $derived(buildMode(mode));
 
   // ── Repository ───────────────────────────────────────────────────────
@@ -454,22 +456,6 @@
       </div>
 
       <div class="header-actions">
-        {#if projects && projects.projects.length > 0}
-          <label class="project-picker">
-            <span class="sr-only">Project for this chat</span>
-            <select
-              class="bar-select"
-              value={projectId}
-              aria-label="Project for this chat"
-              onchange={(event) => void onProjectPicked((event.currentTarget as HTMLSelectElement).value)}
-            >
-              <option value="">No project</option>
-              {#each projects.projects as project (project.project_id)}
-                <option value={project.project_id}>{project.name}</option>
-              {/each}
-            </select>
-          </label>
-        {/if}
         <button
           type="button"
           class="btn btn-ghost btn-sm"
@@ -627,7 +613,6 @@
           disabled={streaming}
         ></textarea>
 
-        <p class="mode-detail">{modeSpec.detail}</p>
         {#if modeError !== null}<p class="error" role="alert">{modeError}</p>{/if}
         {#if modeError === null}
           {#if appliedMode !== null && appliedMode !== mode}
@@ -659,6 +644,42 @@
                 {option.label}
               </button>
             {/each}
+          </div>
+          <button
+            type="button"
+            class="mode-help"
+            aria-label="About Plan, Edit, and Auto modes"
+            aria-describedby="build-mode-tooltip"
+            onmouseenter={() => (modeTooltipOpen = true)}
+            onmouseleave={() => (modeTooltipOpen = false)}
+            onfocus={() => (modeTooltipOpen = true)}
+            onblur={() => (modeTooltipOpen = false)}
+          >
+            <Icon name="info" size={14} />
+          </button>
+          {#if modeTooltipOpen}
+            <span id="build-mode-tooltip" class="mode-tooltip" role="tooltip">{modeSpec.detail}</span>
+          {/if}
+
+          <div class="composer-governance">
+            {#if projects && projects.projects.length > 0}
+              <label class="project-picker">
+                <Icon name="folder" size={14} />
+                <span class="sr-only">Project for this chat</span>
+                <select
+                  class="bar-select"
+                  value={projectId}
+                  aria-label="Project for this chat"
+                  onchange={(event) => void onProjectPicked((event.currentTarget as HTMLSelectElement).value)}
+                >
+                  <option value="">Project or folder</option>
+                  {#each projects.projects as project (project.project_id)}
+                    <option value={project.project_id}>{project.name}</option>
+                  {/each}
+                </select>
+              </label>
+            {/if}
+            <ApprovalModeControl />
           </div>
 
           <div class="bar-right">
@@ -718,7 +739,7 @@
   {#if railOpen}
     <div id="build-rail" class="rail-slot">
       <BuildSidePanel
-        projectId={projects?.active_project_id ?? null}
+        projectId={projectId || projects?.active_project_id || null}
         {projects}
         onclose={() => (railOpen = false)}
       />
@@ -804,8 +825,12 @@
     gap: 0.35rem;
     flex-wrap: wrap;
   }
-  .project-picker {
+  .project-picker,
+  .composer-governance {
     display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
   }
 
   .thread {
@@ -1010,11 +1035,36 @@
   .composer-card textarea::placeholder {
     color: var(--text-3);
   }
-  .mode-detail {
-    margin: 0;
-    font-size: 0.76rem;
+  .mode-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    padding: 0;
+    border: 1px solid var(--neutral-border);
+    border-radius: 50%;
+    background: var(--surface);
     color: var(--text-2);
-    line-height: 1.5;
+    cursor: help;
+  }
+  .mode-help:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+  .mode-tooltip {
+    position: absolute;
+    z-index: 2;
+    max-width: min(22rem, calc(100vw - 3rem));
+    margin-top: 3.4rem;
+    padding: .45rem .6rem;
+    border: 1px solid var(--neutral-border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    box-shadow: var(--shadow-2);
+    color: var(--text-2);
+    font-size: .76rem;
+    line-height: 1.45;
   }
   .line-notice {
     margin: 0;
@@ -1034,6 +1084,7 @@
     border-top: 1px solid var(--border);
     padding-top: 0.5rem;
     flex-wrap: wrap;
+    position: relative;
   }
   .mode-picker {
     display: inline-flex;
@@ -1073,6 +1124,7 @@
     gap: 0.35rem;
     flex-wrap: wrap;
     justify-content: flex-end;
+    min-width: 0;
   }
   /* Same setting pill as the Chat composer, so the two conversation surfaces
      present their per-turn controls identically. */
@@ -1087,6 +1139,7 @@
     border-radius: var(--r-pill);
     max-width: 11rem;
     text-overflow: ellipsis;
+    min-width: 0;
   }
   .bar-select:hover:not(:disabled) {
     border-color: var(--accent-border);

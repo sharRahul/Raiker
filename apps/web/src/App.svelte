@@ -146,7 +146,11 @@
       <ResponsivePage>
         {#if chatVisited}
           <div hidden={current !== "new-chat"}>
-            <ChatView sessionId={continuedSessionId} />
+            <ChatView
+              sessionId={continuedSessionId}
+              {projects}
+              onProjectsChanged={refreshProjects}
+            />
           </div>
         {/if}
         {#if buildVisited}

@@ -6,13 +6,15 @@
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
   import Markdown from "../components/Markdown.svelte";
   import FileInspector from "../components/FileInspector.svelte";
-  import PermissionModeControl from "../components/PermissionModeControl.svelte";
+  import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
+  import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import { api, ApiError, streamPrompt } from "../api";
   import type {
     AgentResponse,
     AttachmentPreview,
     ContextUsage,
     ModelProfile,
+    ProjectsList,
     SessionDetail,
     StreamEvent,
   } from "../apiTypes";
@@ -43,7 +45,15 @@
     error: string | null;
   }
 
-  let { sessionId: continuedSessionId = null }: { sessionId?: string | null } = $props();
+  let {
+    sessionId: continuedSessionId = null,
+    projects = null,
+    onProjectsChanged,
+  }: {
+    sessionId?: string | null;
+    projects?: ProjectsList | null;
+    onProjectsChanged?: () => void;
+  } = $props();
   let promptText = $state("");
   let userName = $state("there");
   let turns = $state<ChatTurn[]>([]);
@@ -57,6 +67,10 @@
   // popover is opened at least once; the meter falls back to the labelled local
   // estimate until the server has something real to report.
   let contextUsage = $state<ContextUsage | null>(null);
+  let projectId = $state("");
+  let pendingProjectId: string | null = null;
+  let projectNotice = $state<string | null>(null);
+  let backgroundWorkOpen = $state(true);
 
   async function refreshContextUsage() {
     if (sessionId === null) {
@@ -508,6 +522,7 @@
           if (event.kind === "final" && event.response !== null) {
             turn.response = event.response;
             sessionId = event.response.session_id;
+            void applyPendingProject();
             // A file written by this turn is stored as a session-authorized
             // attachment before the final SSE event reaches us. Refreshing the
             // chips here makes the generated file immediately openable in the
@@ -551,6 +566,39 @@
     if (streaming) return;
     turns = [];
     sessionId = null;
+  }
+
+  async function onProjectPicked(value: string) {
+    projectId = value;
+    projectNotice = null;
+    const target = value === "" ? null : value;
+    if (sessionId === null) {
+      pendingProjectId = target;
+      projectNotice = target === null ? "This chat will stay outside every project." : "This chat will be filed there as soon as it starts.";
+      return;
+    }
+    await moveSession(target);
+  }
+
+  async function applyPendingProject() {
+    if (sessionId === null || pendingProjectId === null) return;
+    const target = pendingProjectId;
+    pendingProjectId = null;
+    await moveSession(target);
+  }
+
+  async function moveSession(target: string | null) {
+    if (sessionId === null) return;
+    try {
+      await api.setSessionProject(sessionId, target);
+      projectNotice =
+        target === null
+          ? "Moved out of every project."
+          : `Filed under ${projects?.projects.find((project) => project.project_id === target)?.name ?? "the project"}.`;
+      onProjectsChanged?.();
+    } catch (error) {
+      projectNotice = error instanceof ApiError ? `Could not move this chat (${error.status}).` : "Could not move this chat.";
+    }
   }
 
   async function copyAnswer(turn: ChatTurn) {
@@ -897,6 +945,33 @@
           >
             New chat
           </button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            aria-expanded={backgroundWorkOpen}
+            aria-controls="chat-background-work"
+            onclick={() => (backgroundWorkOpen = !backgroundWorkOpen)}
+          >
+            Background work
+          </button>
+          {#if projects && projects.projects.length > 0}
+            <label class="composer-scope">
+              <span class="sr-only">Project for this chat</span>
+              <Icon name="folder" size={14} />
+              <select
+                class="bar-select"
+                value={projectId}
+                aria-label="Project for this chat"
+                onchange={(event) => void onProjectPicked((event.currentTarget as HTMLSelectElement).value)}
+              >
+                <option value="">Project or folder</option>
+                {#each projects.projects as project (project.project_id)}
+                  <option value={project.project_id}>{project.name}</option>
+                {/each}
+              </select>
+            </label>
+          {/if}
+          <ApprovalModeControl />
         </div>
 
         <div class="bar-right">
@@ -949,8 +1024,6 @@
             {/if}
           </div>
 
-          <PermissionModeControl />
-
           <button
             type="submit"
             class="btn btn-primary send"
@@ -964,6 +1037,16 @@
       </div>
     </div>
   </form>
+  {#if projectNotice}<p class="project-notice" role="status">{projectNotice}</p>{/if}
+  {#if backgroundWorkOpen}
+    <section id="chat-background-work" class="chat-background-work" aria-label="Background work">
+      <BuildSidePanel
+        projectId={projectId || projects?.active_project_id || null}
+        {projects}
+        onclose={() => (backgroundWorkOpen = false)}
+      />
+    </section>
+  {/if}
 </div>
 
 {#if inspecting !== null}
@@ -1237,6 +1320,19 @@
     padding-top: var(--space-3);
     background: var(--bg);
   }
+  .project-notice {
+    margin: var(--space-2) 0 0;
+    color: var(--text-3);
+    font-size: .75rem;
+  }
+  .chat-background-work {
+    margin-top: var(--space-3);
+    max-height: 19rem;
+    min-height: 0;
+  }
+  .chat-background-work :global(.rail) {
+    height: 100%;
+  }
   /* One clean card: prompt on top, "+" and the per-turn controls at the bottom. */
   .composer-card {
     border: 1px solid var(--border);
@@ -1279,6 +1375,14 @@
     display: flex;
     align-items: center;
     gap: 0.3rem;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .composer-scope {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    min-width: 0;
   }
   .round-btn {
     width: 1.9rem;
@@ -1328,6 +1432,7 @@
     width: auto;
     max-width: 11rem;
     text-overflow: ellipsis;
+    min-width: 0;
   }
   .bar-select:hover:not(:disabled) {
     border-color: var(--accent-border);

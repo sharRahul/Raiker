@@ -172,14 +172,17 @@
   {#if tab === "running"}
     <div id="build-panel-running" role="tabpanel" aria-labelledby="build-tab-running" class="panel">
       {#if loadError}
-        <PageState state="error" title="Couldn't read background work" detail={loadError} />
+        <section class="load-error" role="status">
+          <strong>Couldn't read background work</strong>
+          <span>{loadError}</span>
+        </section>
       {:else if tasks === null}
         <PageState state="loading" title="Loading background work…" />
       {:else if running.length === 0}
         <EmptyState
           icon="clock"
           title="Nothing running"
-          body="Schedule an agent and its cycles will appear here while you keep working."
+          body="Schedule an agent and its cycles will appear here beside the conversation."
         />
       {:else}
         {#if standing.length > 0}
@@ -210,6 +213,11 @@
               {/if}
               <footer>
                 <span>{scheduleLine(task)} · {relativeTime(task.updated_at)}</span>
+                {#if task.status === "waiting_for_approval"}
+                  <a class="btn btn-primary btn-sm" href={`#/approvals?session=${encodeURIComponent(task.session_id)}`}>
+                    Review approval
+                  </a>
+                {/if}
                 <button
                   type="button"
                   class="btn btn-ghost btn-sm"
@@ -412,6 +420,17 @@
     font-size: 0.78rem;
     color: var(--accent);
   }
+  .load-error {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    border: 1px solid var(--danger-border);
+    border-radius: var(--r-md);
+    background: var(--danger-soft);
+    color: var(--text-2);
+    font-size: 0.78rem;
+  }
+  .load-error strong { color: var(--danger); }
   .task-list,
   .recent ul {
     list-style: none;

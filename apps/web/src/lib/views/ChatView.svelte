@@ -4,6 +4,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
+  import ContextRing from "../components/ContextRing.svelte";
   import Markdown from "../components/Markdown.svelte";
   import FileInspector from "../components/FileInspector.svelte";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
@@ -14,14 +15,14 @@
     AgentResponse,
     AttachmentPreview,
     ContextUsage,
-    ModelProfile,
     ProjectsList,
     SessionDetail,
     StreamEvent,
   } from "../apiTypes";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
-  import { humanize, providerName } from "../format";
+  import { humanize } from "../format";
   import { reactionForResponse, thinkingSteps } from "../chatPresentation";
+  import { chatProfiles, refreshModels } from "../models.svelte";
 
   // One composer attachment chip: a workspace path, an image, or a text
   // document already uploaded into the governed attachment store (referenced by
@@ -71,7 +72,7 @@
   let projectId = $state("");
   let pendingProjectId: string | null = null;
   let projectNotice = $state<string | null>(null);
-  let backgroundWorkOpen = $state(true);
+  let backgroundWorkOpen = $state(false);
 
   async function refreshContextUsage() {
     if (sessionId === null) {
@@ -105,8 +106,9 @@
   // live as compact controls at the bottom of the composer card.
   let modelProfile = $state("");
   let reasoningEffort = $state("");
-  let planningMode = $state("");
-  let profiles = $state<ModelProfile[]>([]);
+  // One reactive view of the shared model store; refreshes live when the
+  // Models page connects a provider or selects a model, without a remount.
+  const profiles = $derived(chatProfiles());
 
   // The persisted selection (Models view / /model use). The default provider
   // option names it so the user can see what will actually serve the turn.
@@ -118,6 +120,7 @@
       : [],
   );
   let contextOpen = $state(false);
+  let contextControlEl: HTMLDivElement | undefined = $state();
   // The backend will replace this conservative presentation estimate with
   // provider-reported usage when available. It is intentionally labeled.
   const estimatedContextTokens = $derived(
@@ -359,9 +362,10 @@
   }
 
   let scrollEl: HTMLDivElement | undefined = $state();
+  let composerCardEl: HTMLDivElement | undefined = $state();
 
   onMount(() => {
-    void loadProfiles();
+    void refreshModels();
     void api.settings().then((view) => { userName = view.status.username || "there"; }).catch(() => {});
     // The Workbench composer hands its text to this mounted chat rather than
     // sending a prompt of its own. There is one governed send path, and it is
@@ -462,17 +466,6 @@
     };
   }
 
-  async function loadProfiles() {
-    try {
-      const models = await api.models();
-      // Chat is intentionally limited to concrete configured profiles. Older
-      // servers fall back to their profile list, filtering the same fact.
-      profiles = models.chat_profiles ?? models.profiles.filter((profile) => profile.configured);
-    } catch {
-      // The options panel simply omits the model list; prompting still works.
-    }
-  }
-
   function currentPhase(turn: ChatTurn): PhaseId | null {
     const rows = groupPhases(turn.events);
     return rows.length > 0 ? rows[rows.length - 1].phase : null;
@@ -524,7 +517,6 @@
                       : { type: "path" as const, path: a.path ?? "" },
                 )
               : undefined,
-          planning_mode: planningMode || undefined,
         },
         (event) => {
           if (event.kind === "final" && event.response !== null) {
@@ -576,6 +568,15 @@
     sessionId = null;
   }
 
+  function onWindowClick(event: MouseEvent) {
+    if (contextOpen && contextControlEl && !contextControlEl.contains(event.target as Node)) {
+      contextOpen = false;
+    }
+    if (showAttach && composerCardEl && !composerCardEl.contains(event.target as Node)) {
+      showAttach = false;
+    }
+  }
+
   async function onProjectPicked(value: string) {
     projectId = value;
     projectNotice = null;
@@ -622,11 +623,36 @@
   }
 </script>
 
+<svelte:window onclick={onWindowClick} />
+
 <!-- Split shell: the conversation, plus the file inspector when one is open.
      The chat column keeps its own indentation so opening a file stays a
      wrapper, not a reflow of the whole transcript's markup. -->
 <div class="chat-layout" class:with-inspector={inspecting !== null} class:with-rail={backgroundWorkOpen}>
 <div class="chat">
+  <header class="chat-header">
+    <div class="header-actions">
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm"
+        onclick={newConversation}
+        disabled={streaming || turns.length === 0}
+      >
+        New chat
+      </button>
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm rail-toggle"
+        onclick={() => (backgroundWorkOpen = !backgroundWorkOpen)}
+        aria-expanded={backgroundWorkOpen}
+        aria-controls="chat-background-work"
+        aria-label="Background work"
+        title="Background work"
+      >
+        <Icon name="panel" size={15} />
+      </button>
+    </div>
+  </header>
   {#if exportNotice}<span class="export-notice" role="status" aria-live="polite">{exportNotice}</span>{/if}
   <div class="thread" bind:this={scrollEl}>
     {#if historyError !== null}
@@ -826,7 +852,7 @@
       void submit();
     }}
   >
-    <div class="composer-card">
+    <div class="composer-card" bind:this={composerCardEl}>
       {#if attachments.length > 0}
         <div class="attach-chips">
           {#each attachments as a, i (a.attachmentId ?? a.path ?? i)}
@@ -847,16 +873,35 @@
       {/if}
 
       <label for="prompt-input" class="sr-only">Prompt</label>
-      <textarea
-        id="prompt-input"
-        class="prompt-input"
-        bind:value={promptText}
-        onkeydown={onKeydown}
-        rows="2"
-        placeholder="How can I help you today?"
-        title="Enter to send, Shift+Enter for a new line"
-        disabled={streaming}
-      ></textarea>
+      <div class="composer-upper">
+        <textarea
+          id="prompt-input"
+          class="prompt-input"
+          bind:value={promptText}
+          onkeydown={onKeydown}
+          rows="2"
+          placeholder="How can I help you today?"
+          title="Enter to send, Shift+Enter for a new line"
+          disabled={streaming}
+        ></textarea>
+        <div class="upper-controls">
+          <ModelPicker bind:value={modelProfile} {profiles} {selectedProfile} disabled={streaming} />
+          {#if reasoningEfforts.length > 0}
+            <select
+              class="bar-select"
+              bind:value={reasoningEffort}
+              disabled={streaming}
+              aria-label="Thinking effort"
+              title="Thinking effort for this model"
+            >
+              <option value="">Thinking: default</option>
+              {#each reasoningEfforts as effort (effort)}
+                <option value={effort}>{effort}</option>
+              {/each}
+            </select>
+          {/if}
+        </div>
+      </div>
 
       {#if showAttach}
         <div class="attach-popover">
@@ -921,9 +966,6 @@
       {/if}
 
       <div class="composer-bar">
-        <!-- Left: what you do to the conversation. Right: how the next turn
-             runs, then the send action. Grouping them keeps the bar from
-             reading as one undifferentiated run of words. -->
         <div class="bar-left">
           <button
             type="button"
@@ -935,32 +977,6 @@
             disabled={streaming}
           >
             +
-          </button>
-          <button
-            type="button"
-            class="round-btn"
-            disabled
-            aria-label="Voice input (coming soon)"
-            title="Voice input — planned: local transcription via whisper.cpp; not wired up yet"
-          >
-            <Icon name="mic" size={15} />
-          </button>
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            onclick={newConversation}
-            disabled={streaming || turns.length === 0}
-          >
-            New chat
-          </button>
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            aria-expanded={backgroundWorkOpen}
-            aria-controls="chat-background-work"
-            onclick={() => (backgroundWorkOpen = !backgroundWorkOpen)}
-          >
-            Background work
           </button>
           {#if projects && projects.projects.length > 0}
             <label class="composer-scope">
@@ -983,66 +999,20 @@
         </div>
 
         <div class="bar-right">
-          <select
-            class="bar-select"
-            bind:value={planningMode}
-            disabled={streaming}
-            aria-label="Planning"
-            title="Planning mode for this turn"
-          >
-            <option value="">Planning: auto</option>
-            <option value="always">Always plan</option>
-            <option value="never_safe_only">Never plan</option>
-          </select>
-
-          <label class="sr-only" for="chat-model-profile">Model</label>
-          <ModelPicker bind:value={modelProfile} {profiles} {selectedProfile} disabled={streaming} />
-          <select
-            hidden
-            id="chat-model-profile"
-            class="bar-select"
-            bind:value={modelProfile}
-            disabled={streaming}
-            aria-label="Model for this turn"
-            title="Configured model for this turn"
-            onchange={() => {
-              if (!reasoningEfforts.includes(reasoningEffort)) reasoningEffort = "";
-            }}
-          >
-            <option value="">
-              {selectedProfile !== null
-                ? `${providerName(selectedProfile.provider)} · ${selectedProfile.model}`
-                : "Not selected"}
-            </option>
-            {#each profiles.filter((p) => p.profile_id !== selectedProfile?.profile_id) as p (p.profile_id)}
-              <option value={p.profile_id}>{providerName(p.provider)} · {p.model}</option>
-            {/each}
-          </select>
-
-          {#if reasoningEfforts.length > 0}
-            <select
-              class="bar-select"
-              bind:value={reasoningEffort}
-              disabled={streaming}
-              aria-label="Thinking effort"
-              title="Thinking effort for this model"
-            >
-              <option value="">Thinking: default</option>
-              {#each reasoningEfforts as effort (effort)}
-                <option value={effort}>{effort}</option>
-              {/each}
-            </select>
-          {/if}
-
-          <div class="context-control">
+          <div class="context-control" bind:this={contextControlEl}>
             <button
               type="button"
-              class="bar-select context-trigger"
+              class="context-trigger"
               aria-label="Context window"
               aria-expanded={contextOpen}
+              title="Context window"
               onclick={() => { contextOpen = !contextOpen; if (contextOpen) void refreshContextUsage(); }}
             >
-              Context
+              <ContextRing
+                usedTokens={estimatedContextTokens}
+                contextWindowTokens={activeProfile?.context_window_tokens ?? null}
+                usage={contextUsage}
+              />
             </button>
             {#if contextOpen}
               <ContextMeterPopover
@@ -1104,12 +1074,26 @@
     flex-direction: column;
     height: var(--content-h);
     min-height: 24rem;
-    max-width: 52rem;
-    margin: 0 auto;
     /* The conversation column must be allowed to shrink inside the grid, or an
        open inspector pushes the composer off the right edge instead of
        narrowing the transcript. */
     min-width: 0;
+  }
+  /* Same header pattern as Build: a thin bar above the transcript that holds
+     the background-work rail toggle, so the control lives in the same place on
+     both conversation surfaces rather than buried in the composer. */
+  .chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
   }
   /* Chat owns the same local two-column work layout as Build: transcript and
      composer on the left, background work on the right. The inspector is a
@@ -1122,16 +1106,15 @@
   }
   @media (min-width: 64rem) {
     .chat-layout.with-rail {
-      grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+      grid-template-columns: minmax(0, 1fr) 21rem;
     }
     .chat-layout.with-inspector {
       grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
     }
     .chat-layout.with-rail.with-inspector {
-      grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem) minmax(20rem, 26rem);
+      grid-template-columns: minmax(0, 1fr) 21rem minmax(20rem, 26rem);
     }
-    .chat-layout.with-inspector .chat,
-    .chat-layout.with-rail .chat {
+    .chat-layout.with-inspector .chat {
       margin: 0;
       max-width: none;
     }
@@ -1160,6 +1143,26 @@
     }
     .rail-slot {
       max-height: 32rem;
+    }
+    .composer-upper {
+      flex-direction: column;
+    }
+    .upper-controls {
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+  }
+  /* On narrow screens the model picker wraps under the textarea even when the
+     page layout hasn't hit the split-view breakpoint yet. */
+  @media (max-width: 30rem) {
+    .composer-upper {
+      flex-direction: column;
+    }
+    .upper-controls {
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: wrap;
     }
   }
   /* Below the split breakpoint the inspector is a sheet over the conversation
@@ -1404,6 +1407,25 @@
   .composer-card:focus-within {
     border-color: var(--accent-border);
   }
+  /* Upper area: textarea on the left, model + effort on the right. The
+     controls column stays top-aligned so it doesn't drift as the textarea
+     grows. Below the split-view breakpoint the column wraps under the
+     textarea rather than squeezing it. */
+  .composer-upper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .composer-upper .prompt-input {
+    flex: 1;
+    min-width: 0;
+  }
+  .upper-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+  }
   .prompt-input {
     width: 100%;
     border: none;
@@ -1564,7 +1586,21 @@
     min-width: 6.5rem;
   }
   .context-control { position: relative; }
-  .context-trigger { cursor: pointer; }
+  .context-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    padding: 0;
+    border: 1px solid var(--neutral-border);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .context-trigger:hover { border-color: var(--accent-border); color: var(--accent); }
+  .context-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
   @media (max-width: 720px) {
     .message-group {
       max-width: 88%;

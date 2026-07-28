@@ -235,7 +235,7 @@ describe("Build model picker", () => {
     render(BuildView);
 
     await waitFor(() =>
-      expect(screen.getByLabelText("Model for this turn")).toHaveTextContent("OpenRouter · reasoning-model"),
+      expect(screen.getByRole("button", { name: "Model for this turn: Reasoning Model" })).toBeInTheDocument(),
     );
     expect(screen.getByRole("button", { name: "Model for this turn: Reasoning Model" })).toBeInTheDocument();
     const effort = screen.getByLabelText("Thinking effort");
@@ -256,7 +256,7 @@ describe("Build model picker", () => {
     stubFetch(baseRoutes());
     render(BuildView);
 
-    expect(await screen.findByLabelText("Model for this turn")).toHaveTextContent("Not selected");
+    expect(await screen.findByRole("button", { name: "Model for this turn: Not selected" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Thinking effort")).not.toBeInTheDocument();
   });
 });
@@ -395,6 +395,8 @@ describe("Build background work rail", () => {
     );
     render(BuildView);
 
+    // The rail is collapsed by default; open it to view running work.
+    await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
     const rail = await screen.findByRole("complementary", { name: "Background work" });
     expect(await within(rail).findByText("Keep improving the site")).toBeInTheDocument();
     expect(within(rail).getByText(/Keeps going until stopped/)).toBeInTheDocument();
@@ -413,6 +415,8 @@ describe("Build background work rail", () => {
     });
     render(BuildView);
 
+    // The rail is collapsed by default; open it to reach the agent form.
+    await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
     const rail = await screen.findByRole("complementary", { name: "Background work" });
     await fireEvent.click(within(rail).getByRole("tab", { name: "Agents" }));
     await fireEvent.click(within(rail).getByRole("button", { name: /surprise me by building a small app/i }));

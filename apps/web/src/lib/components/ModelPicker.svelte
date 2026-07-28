@@ -18,6 +18,7 @@
   } = $props();
 
   let open = $state(false);
+  let rootEl: HTMLDivElement | undefined = $state();
   const choices = $derived(selectedProfile === null ? profiles : [selectedProfile, ...profiles.filter((profile) => profile.profile_id !== selectedProfile.profile_id)]);
   const providerGroups = $derived.by(() => {
     const groups = new Map<string, ModelProfile[]>();
@@ -37,9 +38,15 @@
   function closeOnEscape(event: KeyboardEvent) {
     if (event.key === "Escape") open = false;
   }
+
+  function onWindowClick(event: MouseEvent) {
+    if (open && rootEl && !rootEl.contains(event.target as Node)) open = false;
+  }
 </script>
 
-<div class="model-picker">
+<svelte:window onclick={onWindowClick} />
+
+<div class="model-picker" bind:this={rootEl}>
   <button
     type="button"
     class="model-trigger"

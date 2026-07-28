@@ -273,12 +273,14 @@ describe("ChatView streaming transcript", () => {
     );
 
     render(ChatView);
-    const modelSelect = screen.getByLabelText("Model") as HTMLSelectElement;
-    await waitFor(() => expect(modelSelect.options.length).toBeGreaterThan(1));
-    expect(modelSelect.textContent).toContain("Ollama · qwen2.5");
-    await fireEvent.change(modelSelect, {
-      target: { value: "ollama-local-openai-compatible" },
-    });
+    // Wait for the model picker to load, then select the Ollama profile
+    // through the picker menu (the hidden select mirror is gone).
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Model for this turn/ })).toBeInTheDocument(),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: /Model for this turn/ }));
+    const modelChoice = await screen.findByRole("menuitemradio", { name: /qwen/i });
+    await fireEvent.click(modelChoice);
 
     const box = screen.getByRole("textbox", { name: /prompt/i });
     await fireEvent.input(box, { target: { value: "hi" } });
@@ -288,33 +290,6 @@ describe("ChatView streaming transcript", () => {
     const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
     expect(body.model_profile).toBe("ollama-local-openai-compatible");
     expect(body.model).toBeUndefined();
-  });
-
-  it("sends the server's safe-only planning mode when Never plan is selected", async () => {
-    stubFetch(MODELS_ROUTE);
-    streamPromptMock.mockImplementation(
-      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
-        onEvent({
-          kind: "final",
-          text: "",
-          event_type: "",
-          payload: {},
-          response: finalResponse("OK"),
-        } as StreamEvent);
-      },
-    );
-
-    render(ChatView);
-    await fireEvent.change(screen.getByLabelText("Planning"), {
-      target: { value: "never_safe_only" },
-    });
-    const box = screen.getByRole("textbox", { name: /prompt/i });
-    await fireEvent.input(box, { target: { value: "hi" } });
-    await fireEvent.keyDown(box, { key: "Enter" });
-
-    await waitFor(() => expect(streamPromptMock).toHaveBeenCalledOnce());
-    const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
-    expect(body.planning_mode).toBe("never_safe_only");
   });
 
   it("names the persisted selection in the configured model dropdown", async () => {

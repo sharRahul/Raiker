@@ -69,6 +69,9 @@ describe("ChatView composer parity", () => {
     stubFetch(routes());
     render(ChatView, { projects });
 
+    // The rail is collapsed by default; opening it places the panel beside the
+    // chat column rather than below the composer.
+    await fireEvent.click(await screen.findByRole("button", { name: "Background work" }));
     const rail = await screen.findByRole("complementary", { name: "Background work" });
     expect(rail.closest(".rail-slot")).toBeInTheDocument();
     expect(rail.closest(".chat")).toBeNull();
@@ -86,7 +89,7 @@ describe("ChatView composer parity", () => {
     render(ChatView, { projects });
 
     await waitFor(() =>
-      expect(screen.getByLabelText("Model for this turn")).toHaveTextContent("Anthropic · claude-sonnet"),
+      expect(screen.getByRole("button", { name: "Model for this turn: Claude Sonnet" })).toBeInTheDocument(),
     );
     expect(screen.getByRole("button", { name: "Model for this turn: Claude Sonnet" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Model for this turn: Claude Sonnet" }));
@@ -112,7 +115,7 @@ describe("ChatView composer parity", () => {
     });
     render(ChatView, { projects });
 
-    await waitFor(() => expect(screen.getByLabelText("Model for this turn")).toHaveTextContent("Not selected"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Model for this turn: Not selected" })).toBeInTheDocument());
     expect(screen.queryByLabelText("Thinking effort")).not.toBeInTheDocument();
     await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Hello" } });
     await fireEvent.click(screen.getByRole("button", { name: "Send" }));

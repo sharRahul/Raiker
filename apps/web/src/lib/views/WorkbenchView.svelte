@@ -16,7 +16,6 @@
   import { api } from "../api";
   import type {
     ApprovalView,
-    ModelProfile,
     ProjectsList,
     SessionSummary,
     TaskView,
@@ -26,13 +25,16 @@
   import StatTile from "../components/StatTile.svelte";
   import { providerName, relativeTime } from "../format";
   import { isActiveTask } from "../statusMaps";
+  import { allProfiles, refreshModels } from "../models.svelte";
 
   let sessions = $state<SessionSummary[] | null>(null);
   let tasks = $state<TaskView[] | null>(null);
   let approvals = $state<ApprovalView[] | null>(null);
   let projects = $state<ProjectsList | null>(null);
-  let profiles = $state<ModelProfile[]>([]);
   let unavailable = $state(false);
+  // One reactive view of the shared model store; refreshes live when the
+  // Models page connects a provider or selects a model, without a remount.
+  const profiles = $derived(allProfiles());
 
   let draft = $state("");
   let continueSession = $state("");
@@ -68,13 +70,9 @@
     } catch {
       unavailable = true;
     }
-    try {
-      profiles = (await api.models()).profiles;
-    } catch {
-      // The model summary is supplementary: without it the composer still says
-      // what it does not know, rather than implying a model is ready.
-      profiles = [];
-    }
+    // The model summary is supplementary: a failure leaves the previous
+    // snapshot in place rather than implying a model is ready when it is not.
+    void refreshModels();
   }
 
   function startWork(event: SubmitEvent) {

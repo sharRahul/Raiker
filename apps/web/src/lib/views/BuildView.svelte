@@ -23,6 +23,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
+  import ContextRing from "../components/ContextRing.svelte";
   import Markdown from "../components/Markdown.svelte";
   import RepoConnector from "../components/RepoConnector.svelte";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
@@ -32,7 +33,6 @@
     CodeRepo,
     CodeReposView,
     ContextUsage,
-    ModelProfile,
     ProjectsList,
     StreamEvent,
   } from "../apiTypes";
@@ -46,10 +46,11 @@
     repoPreamble,
     type BuildMode,
   } from "../buildModes";
-  import { humanize, providerName, relativeTime } from "../format";
+  import { humanize, relativeTime } from "../format";
   import { approvalBadge } from "../statusMaps";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
   import { thinkingSteps } from "../chatPresentation";
+  import { chatProfiles, refreshModels } from "../models.svelte";
 
   let {
     projects = null,
@@ -73,6 +74,7 @@
   // Build runs the same governed turns as Chat against the same providers, so
   // it gets the same read-only context and spend panel rather than a variant.
   let contextOpen = $state(false);
+  let contextControlEl: HTMLDivElement | undefined = $state();
   let contextUsage = $state<ContextUsage | null>(null);
   // Roughly four characters per token — a deliberately coarse local fallback,
   // always labelled as an estimate, used only until the server reports real
@@ -128,7 +130,7 @@
   );
 
   // ── Side rail ────────────────────────────────────────────────────────
-  let railOpen = $state(true);
+  let railOpen = $state(false);
 
   // ── Project assignment ───────────────────────────────────────────────
   // A chat can be filed into a project before it exists as a session. The
@@ -143,9 +145,11 @@
   let approvalBusy = $state<string | null>(null);
   let approvalNotice = $state<string | null>(null);
 
-  let profiles = $state<ModelProfile[]>([]);
   let modelProfile = $state("");
   let reasoningEffort = $state("");
+  // One reactive view of the shared model store; refreshes live when the
+  // Models page connects a provider or selects a model, without a remount.
+  const profiles = $derived(chatProfiles());
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
   const activeProfile = $derived(
     profiles.find((profile) => profile.profile_id === modelProfile) ?? selectedProfile,
@@ -158,7 +162,7 @@
 
   onMount(() => {
     void loadRepos();
-    void loadProfiles();
+    void refreshModels();
     void syncModeFromRuntime();
   });
 
@@ -168,15 +172,6 @@
     } catch {
       // The workspace still works without a repository; the panel says so.
       repos = null;
-    }
-  }
-
-  async function loadProfiles() {
-    try {
-      const models = await api.models();
-      profiles = models.chat_profiles ?? models.profiles.filter((profile) => profile.configured);
-    } catch {
-      // Prompting still works with the server's own default profile.
     }
   }
 
@@ -444,7 +439,15 @@
     const streamed = collectText(turn.events);
     return streamed.trim() !== "" ? streamed : (turn.response?.message ?? "");
   }
+
+  function onWindowClick(event: MouseEvent) {
+    if (contextOpen && contextControlEl && !contextControlEl.contains(event.target as Node)) {
+      contextOpen = false;
+    }
+  }
 </script>
+
+<svelte:window onclick={onWindowClick} />
 
 <div class="build" class:with-rail={railOpen}>
   <div class="main">
@@ -610,18 +613,37 @@
     >
       <div class="composer-card">
         <label for="build-prompt" class="sr-only">Describe the change</label>
-        <textarea
-          id="build-prompt"
-          bind:this={promptEl}
-          bind:value={promptText}
-          onkeydown={onKeydown}
-          rows="3"
-          placeholder={activeRepo === null
-            ? "Describe what you want built…"
-            : `Describe the change in ${activeRepo.label}…`}
-          title="Enter to send, Shift+Enter for a new line, Shift+Tab to change mode"
-          disabled={streaming}
-        ></textarea>
+        <div class="composer-upper">
+          <textarea
+            id="build-prompt"
+            bind:this={promptEl}
+            bind:value={promptText}
+            onkeydown={onKeydown}
+            rows="3"
+            placeholder={activeRepo === null
+              ? "Describe what you want built…"
+              : `Describe the change in ${activeRepo.label}…`}
+            title="Enter to send, Shift+Enter for a new line, Shift+Tab to change mode"
+            disabled={streaming}
+          ></textarea>
+          <div class="upper-controls">
+            <ModelPicker bind:value={modelProfile} {profiles} {selectedProfile} disabled={streaming} />
+            {#if reasoningEfforts.length > 0}
+              <select
+                class="bar-select"
+                bind:value={reasoningEffort}
+                disabled={streaming}
+                aria-label="Thinking effort"
+                title="Thinking effort for this model"
+              >
+                <option value="">Thinking: default</option>
+                {#each reasoningEfforts as effort (effort)}
+                  <option value={effort}>{effort}</option>
+                {/each}
+              </select>
+            {/if}
+          </div>
+        </div>
 
         {#if modeError !== null}<p class="error" role="alert">{modeError}</p>{/if}
         {#if modeError === null}
@@ -641,37 +663,36 @@
         {/if}
 
         <div class="composer-bar">
-          <div class="mode-picker" role="group" aria-label="How much Raiker may do">
-            {#each BUILD_MODES as option (option.id)}
-              <button
-                type="button"
-                class="mode-option"
-                aria-pressed={mode === option.id}
-                disabled={modeBusy || streaming}
-                title={option.summary}
-                onclick={() => setMode(option.id)}
-              >
-                {option.label}
-              </button>
-            {/each}
-          </div>
-          <button
-            type="button"
-            class="mode-help"
-            aria-label="About Plan, Edit, and Auto modes"
-            aria-describedby="build-mode-tooltip"
-            onmouseenter={() => (modeTooltipOpen = true)}
-            onmouseleave={() => (modeTooltipOpen = false)}
-            onfocus={() => (modeTooltipOpen = true)}
-            onblur={() => (modeTooltipOpen = false)}
-          >
-            <Icon name="info" size={14} />
-          </button>
-          {#if modeTooltipOpen}
-            <span id="build-mode-tooltip" class="mode-tooltip" role="tooltip">{modeTooltip}</span>
-          {/if}
-
-          <div class="composer-governance">
+          <div class="bar-left">
+            <div class="mode-picker" role="group" aria-label="How much Raiker may do">
+              {#each BUILD_MODES as option (option.id)}
+                <button
+                  type="button"
+                  class="mode-option"
+                  aria-pressed={mode === option.id}
+                  disabled={modeBusy || streaming}
+                  title={option.summary}
+                  onclick={() => setMode(option.id)}
+                >
+                  {option.label}
+                </button>
+              {/each}
+            </div>
+            <button
+              type="button"
+              class="mode-help"
+              aria-label="About Plan, Edit, and Auto modes"
+              aria-describedby="build-mode-tooltip"
+              onmouseenter={() => (modeTooltipOpen = true)}
+              onmouseleave={() => (modeTooltipOpen = false)}
+              onfocus={() => (modeTooltipOpen = true)}
+              onblur={() => (modeTooltipOpen = false)}
+            >
+              <Icon name="info" size={14} />
+            </button>
+            {#if modeTooltipOpen}
+              <span id="build-mode-tooltip" class="mode-tooltip" role="tooltip">{modeTooltip}</span>
+            {/if}
             {#if projects && projects.projects.length > 0}
               <label class="project-picker">
                 <Icon name="folder" size={14} />
@@ -693,52 +714,20 @@
           </div>
 
           <div class="bar-right">
-            <ModelPicker bind:value={modelProfile} {profiles} {selectedProfile} disabled={streaming} />
-            <select
-              hidden
-              class="bar-select"
-              bind:value={modelProfile}
-              disabled={streaming}
-              aria-label="Model for this turn"
-              onchange={() => {
-                if (!reasoningEfforts.includes(reasoningEffort)) reasoningEffort = "";
-              }}
-            >
-              <option value="">
-                {selectedProfile !== null
-                  ? `${providerName(selectedProfile.provider)} · ${selectedProfile.model}`
-                  : "Not selected"}
-              </option>
-              {#each profiles.filter((profile) => profile.profile_id !== selectedProfile?.profile_id) as profile (profile.profile_id)}
-                <option value={profile.profile_id}>
-                  {providerName(profile.provider)} · {profile.model}
-                </option>
-              {/each}
-            </select>
-            {#if reasoningEfforts.length > 0}
-              <select
-                class="bar-select"
-                bind:value={reasoningEffort}
-                disabled={streaming}
-                aria-label="Thinking effort"
-                title="Thinking effort for this model"
-              >
-                <option value="">Thinking: default</option>
-                {#each reasoningEfforts as effort (effort)}
-                  <option value={effort}>{effort}</option>
-                {/each}
-              </select>
-            {/if}
-
-            <div class="context-wrap">
+            <div class="context-wrap" bind:this={contextControlEl}>
               <button
                 type="button"
-                class="bar-select context-trigger"
+                class="context-trigger"
                 aria-label="Context window"
                 aria-expanded={contextOpen}
+                title="Context window"
                 onclick={() => { contextOpen = !contextOpen; if (contextOpen) void refreshContextUsage(); }}
               >
-                Context
+                <ContextRing
+                  usedTokens={estimatedContextTokens}
+                  contextWindowTokens={activeProfile?.context_window_tokens ?? null}
+                  usage={contextUsage}
+                />
               </button>
               {#if contextOpen}
                 <ContextMeterPopover
@@ -854,13 +843,13 @@
     gap: 0.35rem;
     flex-wrap: wrap;
   }
-  .project-picker,
-  .composer-governance {
+  .project-picker {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
     min-width: 0;
   }
+
 
   .thread {
     flex: 1;
@@ -1050,6 +1039,24 @@
   .composer-card:focus-within {
     border-color: var(--accent-border);
   }
+  /* Upper area: textarea on the left, model + effort on the right. Same
+     layout as the Chat composer so both surfaces present model selection
+     identically. */
+  .composer-upper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .composer-upper textarea {
+    flex: 1;
+    min-width: 0;
+  }
+  .upper-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+  }
   .composer-card textarea {
     width: 100%;
     border: none;
@@ -1114,6 +1121,13 @@
     padding-top: 0.5rem;
     flex-wrap: wrap;
     position: relative;
+  }
+  .bar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    min-width: 0;
   }
   .mode-picker {
     display: inline-flex;
@@ -1183,6 +1197,22 @@
   .send {
     min-width: 6.5rem;
   }
+  .context-wrap { position: relative; }
+  .context-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    padding: 0;
+    border: 1px solid var(--neutral-border);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .context-trigger:hover { border-color: var(--accent-border); color: var(--accent); }
+  .context-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
   .shortcut-hint {
     margin: 0;
     text-align: right;
@@ -1206,6 +1236,24 @@
     }
     .rail-slot {
       max-height: 32rem;
+    }
+    .composer-upper {
+      flex-direction: column;
+    }
+    .upper-controls {
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+  }
+  @media (max-width: 30rem) {
+    .composer-upper {
+      flex-direction: column;
+    }
+    .upper-controls {
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: wrap;
     }
   }
 </style>

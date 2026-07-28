@@ -12,6 +12,7 @@
   import { formatCost, sourceNote, spendShares } from "../contextPresentation";
   import { providerErrorGuidance, type ProviderErrorGuidance } from "../providerErrors";
   import { modelName } from "../modelPresentation";
+  import { setModels } from "../models.svelte";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
   // so a selection here is reflected there without a full page reload.
@@ -31,6 +32,11 @@
     loadError = null;
     try {
       models = await api.models();
+      // Mirror the fresh snapshot into the shared store so every mounted
+      // composer (Chat, Build) updates its model picker without a reload —
+      // connecting a provider, selecting a model, or reordering the fallback
+      // all flow through here.
+      setModels(models);
       sequence = [...models.fallback_sequence];
       advisorChoice = models.advisor_profile_id ?? "";
     } catch (e) {

@@ -10,6 +10,7 @@
   let busy = $state(false);
   let error = $state<string | null>(null);
   let selectionVersion = 0;
+  let rootEl: HTMLDivElement | undefined = $state();
 
   onMount(async () => {
     const initialSelectionVersion = selectionVersion;
@@ -52,9 +53,15 @@
   function closeOnEscape(event: KeyboardEvent) {
     if (event.key === "Escape") open = false;
   }
+
+  function onWindowClick(event: MouseEvent) {
+    if (open && rootEl && !rootEl.contains(event.target as Node)) open = false;
+  }
 </script>
 
-<div class="approval-mode-control">
+<svelte:window onclick={onWindowClick} />
+
+<div class="approval-mode-control" bind:this={rootEl}>
   <button
     type="button"
     class="approval-trigger"

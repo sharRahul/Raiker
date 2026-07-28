@@ -17,9 +17,9 @@ from fastapi import APIRouter, HTTPException, Request, status
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import ComposerApprovalModeRequest, SettingsRequest
 from raiker.auth.accounts import AccountService
-from raiker.contracts.models import ContractValidationError, normalize_approval_mode
 from raiker.auth.vault_key_file import vault_status
 from raiker.contracts.ids import utc_now
+from raiker.contracts.models import ContractValidationError, normalize_approval_mode
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()

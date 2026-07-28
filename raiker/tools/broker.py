@@ -4,7 +4,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
@@ -43,6 +43,9 @@ from raiker.tools.memory_tools import (
 )
 from raiker.tools.search import glob, grep
 from raiker.tools.vector_tools import vector_get
+
+if TYPE_CHECKING:
+    from raiker.runtime.authority.models import Principal
 
 
 @dataclass(frozen=True)
@@ -521,7 +524,7 @@ class ToolBroker:
             ]
         )
 
-    def _approval_mode_principal(self):
+    def _approval_mode_principal(self) -> Principal | None:
         """Return the human owner represented by the composer setting.
 
         Selecting Auto or Skip is an explicit, persisted owner decision. It is

@@ -4,19 +4,24 @@ selection, and nothing ever silently defaults to a test provider."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import asyncio
 import json
+from pathlib import Path
 
 import pytest
 
-from raiker.contracts.models import ClientMetadata, PromptEnvelope, PromptOptions, PromptPayload, UserMetadata
+from raiker.contracts.models import (
+    ClientMetadata,
+    PromptEnvelope,
+    PromptOptions,
+    PromptPayload,
+    UserMetadata,
+)
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.models.contracts import ModelMessage, ModelResponse, ReasoningOptions
 from raiker.models.exceptions import ProviderPolicyError
-from raiker.runtime.turn_suspension import serialize_messages
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
+from raiker.runtime.turn_suspension import serialize_messages
 
 
 def _gateway(tmp_path: Path) -> AgentGateway:

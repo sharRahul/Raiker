@@ -1384,13 +1384,18 @@ single-path contract would make rollback evidence incomplete.
 application process could report it missing or fail to decrypt it unless the
 vault-key environment variable was injected again.
 
-**Root cause.** `create_app` said it restored the workspace vault key at boot
-but called only `ensure_app_key`; `load_vault_key_into_env` was never invoked.
-The key file was durable while the new process did not restore it.
+**Root cause.** Investigation found no browser-storage dependency: provider
+connections are principal-scoped in SQLite and `effective_vault_key()` reads the
+workspace key file directly on every decrypt. Loading that file into a global
+process environment would be both unnecessary and unsafe across workspaces.
+The missing protection was restart-level regression coverage, which allowed UI
+symptoms to be mistaken for deliberate secret loss.
 
-**Fix applied.** App creation loads the workspace vault key before provider
-reads. Secrets remain encrypted server-side and never enter browser storage.
-Explicit vault-key removal still removes access as designed.
+**Fix applied.** A restart regression now locks the actual persistence contract:
+save an encrypted connection, clear process environment, create a new app on
+the same workspace, and decrypt from the workspace key file. Secrets remain
+server-side and never enter browser storage. Explicit vault-key removal still
+removes access as designed.
 
 **Verification.** A regression saves a connection, clears the process
 environment, creates a new app on the same workspace, and confirms that

@@ -1035,6 +1035,7 @@
           </button>
         </div>
       </div>
+      <p class="shortcut-hint">Enter sends · Shift+Enter adds a line</p>
     </div>
   </form>
   {#if projectNotice}<p class="project-notice" role="status">{projectNotice}</p>{/if}
@@ -1390,6 +1391,13 @@
     margin: var(--space-2) 0 0;
     color: var(--text-3);
     font-size: .75rem;
+  }
+  .shortcut-hint {
+    color: var(--text-3);
+    font-size: 0.72rem;
+    line-height: 1.35;
+    margin: 0;
+    text-align: right;
   }
   /* One clean card: prompt on top, "+" and the per-turn controls at the bottom. */
   .composer-card {

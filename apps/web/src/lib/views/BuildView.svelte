@@ -619,7 +619,7 @@
             bind:this={promptEl}
             bind:value={promptText}
             onkeydown={onKeydown}
-            rows="3"
+            rows="2"
             placeholder={activeRepo === null
               ? "Describe what you want built…"
               : `Describe the change in ${activeRepo.label}…`}
@@ -749,8 +749,8 @@
             </button>
           </div>
         </div>
+        <p class="shortcut-hint">Shift+Tab changes mode · Enter sends · Shift+Enter adds a line</p>
       </div>
-      <p class="shortcut-hint">Shift+Tab changes mode · Enter sends · Shift+Enter adds a line</p>
     </form>
   </div>
 
@@ -1031,10 +1031,10 @@
     border-radius: var(--r-lg);
     background: var(--surface);
     box-shadow: var(--shadow-1);
-    padding: 0.75rem 0.85rem 0.6rem;
+    padding: 0.75rem 0.85rem;
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.5rem;
   }
   .composer-card:focus-within {
     border-color: var(--accent-border);
@@ -1066,7 +1066,7 @@
     color: var(--text-1);
     font: inherit;
     font-size: 0.95rem;
-    min-height: 3.2rem;
+    min-height: 2.6rem;
   }
   .composer-card textarea::placeholder {
     color: var(--text-3);
@@ -1218,6 +1218,7 @@
     text-align: right;
     font-size: 0.72rem;
     color: var(--text-3);
+    line-height: 1.35;
   }
 
   /* Below the split-view breakpoint the rail stacks under the composer. Pinning

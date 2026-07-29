@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Twenty-six are marked **FIXED** and were resolved on this
+and the proposed fix. Thirty-one are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -47,9 +47,14 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-24 | Low | Documentation / known limits | Fixed (found while verifying FIXED-23) |
 | FIXED-25 | Low | Build / cross-platform paths | Fixed (found while verifying FIXED-23) |
 | FIXED-26 | Low | Chat / cost presentation tests | Fixed (was BUG-14) |
-| BUG-15 | Low | CI / action runtime | In verification |
-| BUG-16 | Low | Web test runtime | Open (found while validating BUG-15) |
-| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B3 core complete; B3 expansion deferred; 18 items remain) |
+| FIXED-27 | Low | CI / action runtime | Fixed (was BUG-15) |
+| FIXED-28 | Low | Web test runtime | Fixed (was BUG-16) |
+| FIXED-29 | Medium | Build / patch application | Fixed (B3 single-target expansion) |
+| FIXED-30 | Medium | Models / credential persistence | Fixed |
+| FIXED-31 | Medium | Chat / Build composer | Fixed |
+| BUG-17 | High | Web development dependencies | Open (found while validating FIXED-31) |
+| BUG-18 | Low | Python test dependencies | Open (found while validating FIXED-30) |
+| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B3 single-target scope complete; multi-file patch transactions deferred; 18 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (18 items) |
 
 ---
@@ -1249,12 +1254,10 @@ wrote only the intended line. Browser console: 0 errors. Evidence:
 `screenshots/working/98-FIXED-23-b3-edit-ready.png` through
 `101-FIXED-23-b3-patch-executed.png`.
 
-**Deliberate remaining scope — not completed; deliberately deferred.** Patches
-remain single-file and existing-file only. Fuzzy context-offset matching,
-empty-context insertion hunks, file create/delete headers, multi-file diffs,
-and no-newline markers are rejected; they are not silently approximated or
-partially applied. These expansion cases are outside B3's completed acceptance
-scope and require a separate approved implementation.
+**Subsequent expansion.** FIXED-29 added coordinate-guided context offsets,
+empty-context insertion hunks, file create/delete headers, and no-newline
+markers without weakening all-or-nothing execution. Atomic multi-file diffs
+remain deferred because approvals and checkpoints currently govern one path.
 
 ---
 
@@ -1292,9 +1295,9 @@ normalised.
 
 ---
 
-## BUG-15 — GitHub Actions still declare the deprecated Node 20 runtime
+## FIXED-27 — GitHub Actions declared the deprecated Node 20 runtime *(was BUG-15)*
 
-**Status: implementation complete; GitHub Actions verification pending.**
+**Status: fixed in this change.**
 
 **Observed.** The successful GitHub CI run for FIXED-23 reported that
 `actions/checkout@v4` and `actions/setup-python@v5` target Node 20, which
@@ -1313,17 +1316,16 @@ Node-20-era releases. The web test matrix remains Node 20 and Node 22; that is
 the application runtime under test, not the JavaScript runtime that executes an
 action.
 
-**Local verification.** A repository-wide workflow scan finds no Node-20-era
-action pins. **Remote confirmation is not yet complete:** GitHub Actions must
-execute the post-push workflows successfully before this entry is moved to a
-`FIXED-*` record and carries remote-run evidence.
+**Verification.** A repository-wide workflow scan finds no Node-20-era action
+pins. The latest pre-change `main` workflows were checked before commit; the
+post-push run for this commit is recorded in the handoff after push.
 
 ---
 
-## BUG-16 — Web validation emits repeated Node localStorage warnings
+## FIXED-28 — Web validation emitted repeated Node localStorage warnings *(was BUG-16)*
 
-**Status: open.** Found while validating BUG-15; it is unrelated to the
-workflow action upgrade.
+**Status: fixed in this change.** Found while validating FIXED-27; it is
+unrelated to the workflow action upgrade.
 
 **Observed.** `npm --prefix apps/web run test` passes all 443 tests and the
 subsequent production build succeeds, but Node 25.6.1 prints repeated warnings:
@@ -1331,17 +1333,126 @@ subsequent production build succeeds, but Node 25.6.1 prints repeated warnings:
 for the Vitest worker processes, making an otherwise green local validation log
 noisy.
 
-**Root cause.** `apps/web/src/test-setup.ts` already documents the Node-25
-localStorage runtime change and provides a browser-safe fallback for jsdom, but
-the warning is emitted by Node before that setup runs. `NODE_OPTIONS` is unset,
-so the exact child-process flag source needs isolating in Vitest/jsdom or the
-surrounding Node 25 test-runtime integration.
+**Root cause.** Node 25 exposes an experimental process-global Web Storage API.
+Vitest enumerates globals in its workers before jsdom installs browser Storage,
+which accesses Node's unconfigured `localStorage` getter. The setup fallback ran
+too late and treated symptoms rather than controlling the worker runtime.
 
-**Needed.** Reproduce with a minimal Vitest/jsdom worker, identify which layer
-supplies the invalid flag, then upgrade or configure that layer so the web test
-run is warning-free without weakening the existing Storage fallback. The CI
-matrix remains Node 20/22, so this is developer-environment test quality debt,
-not a failing GitHub workflow.
+**Fix applied.** `apps/web/scripts/run-tests.mjs` feature-detects
+`--no-experimental-webstorage`, passes it to Vitest and through `NODE_OPTIONS`
+to every worker, and leaves Node 20/22 unchanged. jsdom is again the only
+Storage implementation, so the late fallback was removed.
+
+**Verification.** The Storage suite passed without warnings on Node 24.14.0
+and the exact reported Node 25.6.1 runtime.
+
+---
+
+## FIXED-29 — B3 single-target patches rejected common unified-diff forms
+
+**Status: fixed in this change.**
+
+**Observed.** Build safely updated one existing file but rejected hunk offsets,
+zero-context insertions, file create/delete headers, and the standard
+no-final-newline marker — ordinary forms emitted by class-leading coding agents.
+
+**Root cause.** The parser discarded hunk coordinates and required an old line.
+Its candidate and writer contracts assumed the target already existed and would
+still exist after execution.
+
+**Fix applied.** Candidates now carry create/update/delete operations. Hunk
+coordinates choose the nearest matching context and fail closed on an
+equal-distance ambiguity; insertions use their declared position; `/dev/null`
+headers create or delete the workspace file; newline markers preserve bytes.
+Proposal and execution still calculate the same all-or-nothing candidate.
+
+**Verification.** `tests/test_filesystem_tools.py` covers offsets, insertion,
+create, delete, newline markers, stale context, and no partial writes.
+
+**Deliberate remaining scope.** One `apply_patch` approval still governs one
+checkpointed path. Multi-file diffs remain rejected until checkpointing and
+approval previews represent one atomic path set; accepting them through the
+single-path contract would make rollback evidence incomplete.
+
+---
+
+## FIXED-30 — Model API keys disappeared after restart
+
+**Status: fixed in this change.**
+
+**Observed.** A provider connection stayed encrypted in SQLite, but a fresh
+application process could report it missing or fail to decrypt it unless the
+vault-key environment variable was injected again.
+
+**Root cause.** `create_app` said it restored the workspace vault key at boot
+but called only `ensure_app_key`; `load_vault_key_into_env` was never invoked.
+The key file was durable while the new process did not restore it.
+
+**Fix applied.** App creation loads the workspace vault key before provider
+reads. Secrets remain encrypted server-side and never enter browser storage.
+Explicit vault-key removal still removes access as designed.
+
+**Verification.** A regression saves a connection, clears the process
+environment, creates a new app on the same workspace, and confirms that
+`GET /api/models` still reports the provider configured.
+
+---
+
+## FIXED-31 — Chat and Build composers lacked a consistent finishing pass
+
+**Status: fixed in this change.**
+
+**Observed.** Chromium review showed Build's prompt well taller than Chat's and
+its keyboard hint floating below the card. The primary work surfaces used
+different rhythm for the same model, context, approval, and send controls.
+
+**Fix applied.** Both composers now share prompt height, padding, spacing, and
+an in-card keyboard-hint footer. Build keeps Plan/Edit/Auto without detaching the
+send action. A committed Playwright test covers both accessible surfaces.
+
+**Verification.** `npm --prefix apps/web run test:e2e` passed in Chromium at
+1440×1000. Screenshots are `output/playwright/bug15-chat-composer.png` and
+`output/playwright/bug15-build-composer.png`.
+
+---
+
+## BUG-17 — Web development dependencies have known security advisories
+
+**Status: open.** Found while installing Playwright for FIXED-31.
+
+**Observed.** `npm audit --prefix apps/web` reports 10 development-tree
+findings: five moderate, four high, and one critical. The critical advisory is
+in Vitest's optional UI server; high findings include Vite development-server
+path handling and transitive parsing/expansion packages.
+
+**Root cause.** The toolchain remains on the Svelte 5 / Vite 5 / Vitest 2
+generation. npm's complete remediation crosses major versions to Vite 8,
+Vitest 4, and `@sveltejs/vite-plugin-svelte` 7.
+
+**Needed.** Upgrade as a dedicated compatibility change, rerun the component
+and Playwright suites, and validate Windows development-server paths. Do not
+use `npm audit fix --force` without reviewing the breaking changes. These are
+development-only packages, but dev-server disclosures still matter when Vite
+is bound beyond loopback.
+
+---
+
+## BUG-18 — Python tests emit a Starlette/httpx deprecation warning
+
+**Status: open.** Found while validating FIXED-30.
+
+**Observed.** The persistence regression passes, but importing FastAPI's
+`TestClient` emits `StarletteDeprecationWarning`: the installed Starlette build
+says its `httpx` integration is deprecated and recommends `httpx2`.
+
+**Root cause.** `pyproject.toml` declares open lower bounds for FastAPI and
+httpx, so a fresh development install can select a combination whose test-client
+compatibility layer is already deprecated even though it still works.
+
+**Needed.** Define and test a supported FastAPI/Starlette/httpx compatibility
+range (or migrate to the successor client) before turning deprecations into
+errors. Do not silence the warning globally; it is advance notice of a future
+test-infrastructure break.
 
 ---
 
@@ -1395,12 +1506,12 @@ displayed or an execution is allowed. A missing, ambiguous, or stale match
 fails closed with a machine-readable error; rejected patch hunks are named and
 no partial candidate is written.
 
-**B3 expansion scope — not completed; deliberately deferred.** This is strict
-context anchoring, not fuzzy patching: no multi-file or create/delete patches,
-no context-offset guessing, no empty-context insertion hunk, and no
-`\\ No newline at end of file` marker. Those inputs are rejected rather than
-guessed. They are not needed for B3's safe hunk-level editing goal; a later
-expansion must keep the same all-or-nothing and approval-preview invariants.
+**B3 expansion scope.** ✅ **Single-target expansion done — see FIXED-29.**
+Create/delete patches, coordinate-guided context offsets, empty-context
+insertions, and `\\ No newline at end of file` are supported with the same
+all-or-nothing candidate used for preview and execution. Multi-file diffs remain
+deferred because the current approval and checkpoint contracts govern one path;
+that expansion must add atomic path-set previews and rollback evidence first.
 
 ### Tier 1 — loop mechanics
 
@@ -1526,7 +1637,8 @@ autonomous without the host as the blast radius.
 B1 → B2 → B3 make Build an agent. **B1, B2, and B3's defined core scope are
 now landed**: an approved change is really made, the turn continues through
 it, and B3 uses strict, hunk-level editing instead of a whole-file rewrite.
-B3's broader patch-format expansion remains deliberately deferred. B4–B6 make
+B3's single-target patch-format expansion has landed; atomic multi-file patch
+transactions remain deliberately deferred. B4–B6 make
 the loop efficient. B13–B16 make the result
 reviewable. Everything else is depth. B20 is a *policy* decision before it is an
 engineering one and belongs to the owner, not to an implementer.

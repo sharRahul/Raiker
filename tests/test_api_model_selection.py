@@ -21,8 +21,9 @@ from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
-from raiker.auth.vault_key_file import write_vault_key
+from raiker.auth.vault_key_file import VAULT_KEY_ENV, ensure_vault_key, write_vault_key
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.models.connections import get_model_connection, put_model_connection
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -208,3 +209,29 @@ def test_model_connection_is_encrypted_and_principal_scoped(
             ("principal_owner", "model:generic-openai-compatible"),
         ).fetchone()
     assert row is not None and b"instance-secret" not in bytes(row["encrypted_payload"])
+
+
+def test_model_connection_survives_application_restart(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The generated vault key must be restored before the first model read."""
+    monkeypatch.delenv(VAULT_KEY_ENV, raising=False)
+    ensure_vault_key(workspace)
+    put_model_connection(
+        SQLiteStore(workspace),
+        "principal_owner",
+        "generic-openai-compatible",
+        {"endpoint": "http://127.0.0.1:9000/v1", "api_key": "restart-secret"},
+    )
+
+    # A real restart begins with a fresh process environment. Simulate that
+    # boundary while retaining the workspace database and generated key file.
+    monkeypatch.delenv(VAULT_KEY_ENV, raising=False)
+    create_app(workspace)
+    restored = get_model_connection(
+        SQLiteStore(workspace), "principal_owner", "generic-openai-compatible"
+    )
+    assert restored == {
+        "api_key": "restart-secret",
+        "endpoint": "http://127.0.0.1:9000/v1",
+    }

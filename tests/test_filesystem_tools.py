@@ -112,7 +112,7 @@ def test_unified_patch_applies_a_unique_context_anchored_hunk(tmp_path) -> None:
     assert target.read_text(encoding="utf-8") == "heading\none\nchanged\nthree\n"
 
 
-def test_unified_patch_rejects_unmatched_or_ambiguous_context_without_writing(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_unified_patch_uses_hunk_location_to_resolve_repeated_context(tmp_path) -> None:  # type: ignore[no-untyped-def]
     target = tmp_path / "note.txt"
     target.write_text("one\ntwo\nthree\none\ntwo\nthree\n", encoding="utf-8")
     patch = (
@@ -127,9 +127,8 @@ def test_unified_patch_rejects_unmatched_or_ambiguous_context_without_writing(tm
 
     result = apply_patch_content(tmp_path, "note.txt", patch)
 
-    assert result["error"]["type"] == "hunk_context_not_unique"
-    assert result["rejected_hunks"] == [1]
-    assert target.read_text(encoding="utf-8") == "one\ntwo\nthree\none\ntwo\nthree\n"
+    assert result["status"] == "success"
+    assert target.read_text(encoding="utf-8") == "one\nchanged\nthree\none\ntwo\nthree\n"
 
 
 def test_unified_patch_rejects_a_later_hunk_without_partially_writing(tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -153,3 +152,36 @@ def test_unified_patch_rejects_a_later_hunk_without_partially_writing(tmp_path) 
     assert result["error"]["type"] == "hunk_context_mismatch"
     assert result["rejected_hunks"] == [2]
     assert target.read_text(encoding="utf-8") == "one\ntwo\nthree\nfour\n"
+
+
+def test_unified_patch_supports_context_offset_and_empty_insertion(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    target = tmp_path / "note.txt"
+    target.write_text("preface\none\ntwo\n", encoding="utf-8")
+    patch = (
+        "--- a/note.txt\n+++ b/note.txt\n"
+        "@@ -1,2 +1,2 @@\n one\n-two\n+changed\n"
+        "@@ -4,0 +4,1 @@\n+tail\n"
+    )
+
+    result = apply_patch_content(tmp_path, "note.txt", patch)
+
+    assert result["status"] == "success"
+    assert target.read_text(encoding="utf-8") == "preface\none\nchanged\ntail\n"
+
+
+def test_unified_patch_supports_create_delete_and_no_newline_marker(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    create = (
+        "--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1,1 @@\n+without newline\n"
+        "\\ No newline at end of file\n"
+    )
+    created = apply_patch_content(tmp_path, "new.txt", create)
+    assert created["operation"] == "create"
+    assert (tmp_path / "new.txt").read_text(encoding="utf-8") == "without newline"
+
+    delete = (
+        "--- a/new.txt\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-without newline\n"
+        "\\ No newline at end of file\n"
+    )
+    deleted = apply_patch_content(tmp_path, "new.txt", delete)
+    assert deleted["operation"] == "delete"
+    assert not (tmp_path / "new.txt").exists()

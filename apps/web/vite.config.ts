@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 
 export default defineConfig(({ mode }) => ({
   plugins: [svelte({ hot: false })],
@@ -18,5 +19,6 @@ export default defineConfig(({ mode }) => ({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test-setup.ts"],
+    exclude: [...configDefaults.exclude, "e2e/**"],
   },
 }));

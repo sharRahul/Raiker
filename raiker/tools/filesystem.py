@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -291,6 +292,21 @@ def _replace_candidate(
 _HUNK_HEADER = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$")
 
 
+@dataclass(frozen=True)
+class _PatchHunk:
+    old_start: int
+    old_lines: list[str]
+    new_lines: list[str]
+
+
+@dataclass(frozen=True)
+class _PatchCandidate:
+    path: Path
+    before: str
+    proposed_text: str
+    operation: str = "update"
+
+
 def _normalized_patch_path(value: str) -> str:
     path = value.split("\t", 1)[0].strip().replace("\\", "/")
     if path.startswith(("a/", "b/")):
@@ -298,22 +314,27 @@ def _normalized_patch_path(value: str) -> str:
     return path
 
 
-def _parse_unified_patch(patch: str, expected_path: str) -> list[tuple[list[str], list[str]]] | dict[str, Any]:
+def _parse_unified_patch(
+    patch: str, expected_path: str
+) -> tuple[str, list[_PatchHunk]] | dict[str, Any]:
     lines = patch.splitlines(keepends=True)
     if len(lines) < 3 or not lines[0].startswith("--- ") or not lines[1].startswith("+++ "):
         return _failure("malformed_patch", message="expected unified diff file headers")
     old_path = _normalized_patch_path(lines[0][4:])
     new_path = _normalized_patch_path(lines[1][4:])
-    if old_path != expected_path or new_path != expected_path:
+    operation = "create" if old_path == "/dev/null" else "delete" if new_path == "/dev/null" else "update"
+    target_path = new_path if operation == "create" else old_path
+    if target_path != expected_path or (operation == "update" and new_path != expected_path):
         return _failure("patch_path_mismatch", old_path=old_path, new_path=new_path)
 
-    hunks: list[tuple[list[str], list[str]]] = []
+    hunks: list[_PatchHunk] = []
     index = 2
     while index < len(lines):
         header = lines[index].rstrip("\r\n")
         match = _HUNK_HEADER.match(header)
         if match is None:
             return _failure("malformed_patch", message=f"invalid hunk header at line {index + 1}")
+        old_start = int(match.group(1))
         old_count = int(match.group(2) or "1")
         new_count = int(match.group(4) or "1")
         index += 1
@@ -323,6 +344,12 @@ def _parse_unified_patch(patch: str, expected_path: str) -> list[tuple[list[str]
             line = lines[index]
             if line.startswith(("--- ", "+++ ")):
                 return _failure("malformed_patch", message="multiple file targets are not supported")
+            if line.startswith("\\ No newline at end of file"):
+                target = old_lines if index > 0 and lines[index - 1].startswith("-") else new_lines
+                if target:
+                    target[-1] = target[-1].rstrip("\r\n")
+                index += 1
+                continue
             if not line or line[0] not in {" ", "+", "-"}:
                 return _failure("malformed_patch", message=f"invalid hunk line at line {index + 1}")
             if line[0] in {" ", "-"}:
@@ -330,10 +357,10 @@ def _parse_unified_patch(patch: str, expected_path: str) -> list[tuple[list[str]
             if line[0] in {" ", "+"}:
                 new_lines.append(line[1:])
             index += 1
-        if len(old_lines) != old_count or len(new_lines) != new_count or not old_lines:
-            return _failure("malformed_patch", message="invalid hunk line counts or empty context")
-        hunks.append((old_lines, new_lines))
-    return hunks or _failure("malformed_patch", message="patch contains no hunks")
+        if len(old_lines) != old_count or len(new_lines) != new_count:
+            return _failure("malformed_patch", message="invalid hunk line counts")
+        hunks.append(_PatchHunk(old_start=old_start, old_lines=old_lines, new_lines=new_lines))
+    return (operation, hunks) if hunks else _failure("malformed_patch", message="patch contains no hunks")
 
 
 def _matching_starts(lines: list[str], needle: list[str]) -> list[int]:
@@ -341,41 +368,64 @@ def _matching_starts(lines: list[str], needle: list[str]) -> list[int]:
     return [index for index in range(len(lines) - width + 1) if lines[index:index + width] == needle]
 
 
-def _patch_candidate(
-    workspace_root: str | Path, path: str | Path, patch: str
-) -> tuple[Path, str, str] | dict[str, Any]:
-    target = _existing_text_target(workspace_root, path)
-    if isinstance(target, dict):
-        return target
-    resolved, before = target
+def _patch_candidate(workspace_root: str | Path, path: str | Path, patch: str) -> _PatchCandidate | dict[str, Any]:
+    resolved = resolve_writable_workspace_path(workspace_root, path)
     expected_path = _relative_path(workspace_root, resolved).replace("\\", "/")
-    hunks = _parse_unified_patch(patch, expected_path)
-    if isinstance(hunks, dict):
-        return hunks
+    parsed = _parse_unified_patch(patch, expected_path)
+    if isinstance(parsed, dict):
+        return parsed
+    operation, hunks = parsed
+    if operation == "create":
+        if resolved.exists():
+            return _failure("target_exists")
+        before = ""
+    else:
+        target = _existing_text_target(workspace_root, path)
+        if isinstance(target, dict):
+            return target
+        resolved, before = target
 
     candidate = before.splitlines(keepends=True)
-    for hunk_number, (old_lines, new_lines) in enumerate(hunks, start=1):
-        starts = _matching_starts(candidate, old_lines)
-        if not starts:
-            return _failure("hunk_context_mismatch", rejected_hunks=[hunk_number])
-        if len(starts) > 1:
-            return _failure("hunk_context_not_unique", rejected_hunks=[hunk_number])
-        start = starts[0]
-        candidate[start:start + len(old_lines)] = new_lines
-    return resolved, before, "".join(candidate)
+    offset = 0
+    for hunk_number, hunk in enumerate(hunks, start=1):
+        expected = max(0, hunk.old_start - 1 + offset)
+        if not hunk.old_lines:
+            start = min(expected, len(candidate))
+        else:
+            starts = _matching_starts(candidate, hunk.old_lines)
+            if not starts:
+                return _failure("hunk_context_mismatch", rejected_hunks=[hunk_number])
+            distances = [(abs(item - expected), item) for item in starts]
+            nearest = min(distance for distance, _item in distances)
+            nearest_starts = [item for distance, item in distances if distance == nearest]
+            if len(nearest_starts) > 1:
+                return _failure("hunk_context_not_unique", rejected_hunks=[hunk_number])
+            start = nearest_starts[0]
+        candidate[start:start + len(hunk.old_lines)] = hunk.new_lines
+        offset += len(hunk.new_lines) - len(hunk.old_lines)
+    proposed = "".join(candidate)
+    if operation == "delete" and proposed:
+        return _failure("delete_patch_not_empty")
+    return _PatchCandidate(resolved, before, proposed, operation)
 
 
 def _proposal_from_candidate(
-    workspace_root: str | Path, candidate: tuple[Path, str, str] | dict[str, Any]
+    workspace_root: str | Path, candidate: tuple[Path, str, str] | _PatchCandidate | dict[str, Any]
 ) -> dict[str, Any]:
     if isinstance(candidate, dict):
         return candidate
-    resolved, before, proposed_text = candidate
+    if isinstance(candidate, _PatchCandidate):
+        resolved, before, proposed_text = candidate.path, candidate.before, candidate.proposed_text
+        operation = candidate.operation
+    else:
+        resolved, before, proposed_text = candidate
+        operation = "update"
     return {
         "status": "proposal",
         "path": _relative_path(workspace_root, resolved),
         "before_snapshot": before,
         "proposed_text": proposed_text,
+        "operation": operation,
         "requires_approval": True,
     }
 
@@ -395,16 +445,27 @@ def proposed_patch_snapshot(
 
 
 def _write_candidate(
-    workspace_root: str | Path, candidate: tuple[Path, str, str] | dict[str, Any]
+    workspace_root: str | Path, candidate: tuple[Path, str, str] | _PatchCandidate | dict[str, Any]
 ) -> dict[str, Any]:
     if isinstance(candidate, dict):
         return candidate
-    resolved, _before, proposed_text = candidate
-    resolved.write_text(proposed_text, encoding="utf-8")
+    if isinstance(candidate, _PatchCandidate):
+        resolved, proposed_text, operation = candidate.path, candidate.proposed_text, candidate.operation
+    else:
+        resolved, _before, proposed_text = candidate
+        operation = "update"
+    if operation == "delete":
+        resolved.unlink()
+        size_bytes = 0
+    else:
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        resolved.write_text(proposed_text, encoding="utf-8")
+        size_bytes = resolved.stat().st_size
     return {
         "status": "success",
         "path": _relative_path(workspace_root, resolved),
-        "size_bytes": resolved.stat().st_size,
+        "size_bytes": size_bytes,
+        "operation": operation,
     }
 
 

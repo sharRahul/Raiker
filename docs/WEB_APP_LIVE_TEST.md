@@ -202,6 +202,22 @@ gatherer → orchestrator → provider request) with no fabrication.
 | "Development preview" pill removed from the top bar | ✅ |
 | Browser console errors | ✅ 0 |
 
+## Result — 2026-07-29 (Chat / Build composer and persistence regression)
+
+| Check | Result |
+|---|---|
+| Production web build | ✅ Vite build completed (242 modules) |
+| Playwright Chat composer at 1440×1000 | ✅ prompt, model, effort, approval, context, and send controls visible |
+| Playwright Build composer at 1440×1000 | ✅ repository, Plan/Edit/Auto, model, approval, context, and send controls visible |
+| Keyboard guidance | ✅ inside both composer cards; Build and Chat share vertical rhythm |
+| API-key restart regression | ✅ vault key restored from the workspace key file before model reads |
+| Node 25.6.1 Storage warning | ✅ focused test passes with no warning |
+
+Evidence: `output/playwright/bug15-chat-composer.png` and
+`output/playwright/bug15-build-composer.png`. The Playwright test serves the
+production bundle and mocks only authenticated API data, so it exercises the
+real compiled Svelte UI without requiring live provider credentials.
+
 ## Repeatable procedure
 
 1. **Bootstrap + enable the backend's gate** (human owner). For a hosted

@@ -215,7 +215,10 @@ def create_app(
     # and load the connector vault key-file into the environment when the env var
     # is unset. The vault key remains fail-closed if neither is present.
     from raiker.auth.app_key import ensure_app_key
+    from raiker.auth.vault_key_file import load_vault_key_into_env
+
     ensure_app_key(app.state.workspace_root)
+    load_vault_key_into_env(app.state.workspace_root)
     if executor_registry is not None:
         app.state.executor_registry = executor_registry
     app.add_middleware(RedactionMiddleware)

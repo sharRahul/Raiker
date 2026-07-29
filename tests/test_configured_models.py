@@ -1,7 +1,9 @@
+from pathlib import Path
+
 from raiker.storage.sqlite import SQLiteStore
 
 
-def test_configured_models_keep_multiple_models_and_providers(tmp_path) -> None:
+def test_configured_models_keep_multiple_models_and_providers(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     store.bootstrap()
 
@@ -19,7 +21,7 @@ def test_configured_models_keep_multiple_models_and_providers(tmp_path) -> None:
     assert store.list_configured_models("owner-b") == []
 
 
-def test_saving_the_same_configured_model_is_idempotent(tmp_path) -> None:
+def test_saving_the_same_configured_model_is_idempotent(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     store.bootstrap()
 

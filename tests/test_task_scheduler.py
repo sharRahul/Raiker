@@ -4,6 +4,8 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.events.writer import EventLogWriter
 from raiker.storage.sqlite import SQLiteStore
@@ -50,8 +52,8 @@ def test_due_task_runs_as_its_owner(tmp_path: Path, monkeypatch) -> None:  # typ
 
 
 def test_immediate_task_uses_its_pair_while_schedule_uses_global(
-    tmp_path: Path, monkeypatch
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
     store = SQLiteStore(tmp_path)
     session_id = "sess_inbox_principal_owner"

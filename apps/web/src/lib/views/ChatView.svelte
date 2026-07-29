@@ -540,6 +540,9 @@
             void restoreAttachmentChips(event.response.session_id);
             if (contextOpen) void refreshContextUsage();
             window.dispatchEvent(new Event("raiker:chats-changed"));
+          } else if (event.kind === "error") {
+            turn.error = event.text || "An error occurred.";
+            turn.events = [...turn.events, event];
           } else {
             turn.events = [...turn.events, event];
           }

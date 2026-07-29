@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
-from raiker.auth.vault_key_file import VAULT_KEY_ENV, ensure_vault_key, write_vault_key
+from raiker.auth.vault_key_file import VAULT_KEY_ENV, write_vault_key
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.models.connections import get_model_connection, put_model_connection
 from raiker.storage.sqlite import SQLiteStore
@@ -216,7 +216,7 @@ def test_model_connection_survives_application_restart(
 ) -> None:
     """The generated vault key must be restored before the first model read."""
     monkeypatch.delenv(VAULT_KEY_ENV, raising=False)
-    ensure_vault_key(workspace)
+    write_vault_key(workspace, Fernet.generate_key().decode("ascii"))
     put_model_connection(
         SQLiteStore(workspace),
         "principal_owner",

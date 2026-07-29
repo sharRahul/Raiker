@@ -94,10 +94,10 @@ zero-trust verification is applied at every authority boundary.
 | Group | Destinations |
 |---|---|
 | Home | **Workbench** — resume work, see what needs attention |
-| Work | **Chat**, **Build**, **Search Chat**, **Tasks**, **Projects**, **Sessions** |
-| Knowledge | **Memory**, **Brain** |
+| Work | **Chat**, **Build**, **Search Chat**, **Tasks**, **Projects** |
+| Knowledge | **Memory**, **Knowledge Map** |
 | Control | **Approvals**, **Permissions**, **Models**, **Extensions** |
-| Observe | **Observability** — readiness, audit log, checkpoints, live work, notifications |
+| Observe | **Observability** — readiness, audit log, checkpoints, live work, notifications, sessions |
 | Utilities | **Settings** |
 
 Highlights, each verified against a live instance:

@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Forty-two are marked **FIXED** and were resolved on this
+and the proposed fix. Forty-six are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -63,6 +63,11 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-40 | High | Chat / document output | Fixed (was C1) |
 | FIXED-41 | High | Chat / connector execution | Fixed (C2 multiple-call expansion) |
 | FIXED-42 | High | Chat / cross-work recall | Fixed (was C3) |
+| FIXED-43 | High | Chat / document output | Fixed (C1 format expansion) |
+| FIXED-44 | High | Build / command feedback | Fixed except host network containment (B5) |
+| FIXED-45 | Medium | Chat / file inspector and output | Fixed (C4/C5 validation and presentation) |
+| FIXED-46 | Medium | Workbench | Fixed (activity-aware dashboard redesign) |
+| BUG-20 | High | Build / command containment | Open |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -1559,6 +1564,83 @@ approval path before execution.
 
 ---
 
+## FIXED-43 — Chat creates first-class DOCX, XLSX, PDF, and Markdown artifacts *(C1)*
+
+**Status: fixed in this change.**
+
+**Fix applied.** The model-visible `create_document` contract now creates
+macro-free DOCX and XLSX packages, a bounded PDF, or UTF-8 Markdown locally and
+atomically without a file-creation approval prompt. Each successful artifact is
+stored once and bound to the trusted active session and exact turn as
+`source=generated`; neither identity can be supplied by the model. Unsupported
+extensions fail closed. Regression coverage creates every supported format,
+checks the no-approval policy decision, and verifies the persisted turn binding.
+
+---
+
+## FIXED-44 — Sessions can grant a bounded command feedback channel *(B5)*
+
+**Status: fixed in this change except for BUG-20.**
+
+**Fix applied.** An authenticated owner can create, replace, expire, or revoke
+one command-prefix allowlist for one session. `run_command` uses the workspace
+as its cwd, executes without a shell, requires an exact active session/principal
+grant, applies a wall-clock limit and a bounded output limit, and returns exit
+code, stdout, stderr, byte counts, and truncation to the agent. Results are
+content-free in the event log while normal broker events retain the command
+action and outcome. A missing or non-matching grant fails closed and names the
+existing approval-gated `shell` tool as the fallback.
+
+---
+
+## FIXED-45 — Generated files have a response-linked preview surface *(C4/C5)*
+
+**Status: fixed in this change; passage highlighting remains tracked below.**
+
+**Validation and fix applied.** Uploaded and generated references are now
+distinguished in persistence. Uploaded chips remain buttons in the user turn;
+generated artifacts render as prominent cards in the producing assistant turn
+with name, type, readiness, creation time, description, and a **Preview
+document** button. Both open the existing right-hand, view-only inspector.
+Backend coverage verifies account and session authorization, missing and
+unsupported states, inert Markdown source for the sanitising renderer, DOCX
+text extraction, XLSX table extraction, PDF rendering, exact turn persistence,
+and retained stored bytes. Per-response copy remains; chat download, browser
+print/Save as PDF actions, and a general artifact download surface remain absent.
+
+---
+
+## FIXED-46 — Workbench is activity-aware and action-oriented
+
+**Status: fixed in this change.**
+
+**Fix applied.** A new account sees “Welcome to your Work Dashboard” and clear
+new-chat, project, task, and scheduling actions instead of a false resumption
+prompt. Resume copy and conversation rows appear only when named chat activity
+exists. Pending approvals, active work, runtime issues, and the runtime record
+remain visible as scan-friendly status cards. The responsive browser test and
+[`screenshots/working/workbench-dashboard-redesign.png`](screenshots/working/workbench-dashboard-redesign.png)
+cover the empty-account state.
+
+---
+
+## BUG-20 — Owner-granted host commands do not have kernel-enforced network isolation
+
+**Status: open; found while completing B5.**
+
+**Observed.** The session grant, executable allowlist, cwd, timeout, output cap,
+expiry, and revocation are enforced, but this host cannot create an unprivileged
+network namespace (`unshare -n` is denied) and no shipped container executor is
+available. A granted interpreter or package-manager command could therefore use
+the host network.
+
+**Required fix.** Route `run_command` through the container executor from B20,
+with networking disabled at the runtime boundary, before describing B5 as fully
+network-isolated. Until then owners should grant only narrow test/lint prefixes
+they trust; non-granted commands still require per-call approval.
+
+---
+
 ## GAP-BUILD — What Build needs to stand against a class-leading coding agent
 
 **Status: analysis, not a defect.** Nothing below is broken; this is the
@@ -1625,13 +1707,12 @@ batch. Mutations remain serial and stop at the first approval or policy
 boundary. Budget- or boundary-deferred calls emit `model_tool_calls_dropped`
 with proposed/accepted/dropped counts, so no call disappears without evidence.
 
-**B5. No test/command feedback channel.** The only way to run anything is
-`shell`, which is approval-gated per call, so "run the tests" costs a round trip
-through a human on every iteration. **Work:** a standing, per-session grant for
-a *narrow* command allowlist the owner defines per repository (e.g. `pytest`,
-`npm test`, `ruff`) with the workspace as cwd, no network, and a wall-clock
-cap — governed by a new capability so it is opt-in, revocable, and logged, and
-falling back to per-call approval for anything outside the list.
+**B5. Test/command feedback channel.** ⚠️ **Implemented with one containment
+gap — see FIXED-44 and BUG-20.** A standing, expiring, revocable per-session
+command-prefix grant now returns bounded stdout/stderr and exit status with the
+workspace as cwd and a wall-clock cap. Anything outside the grant falls back to
+the approval-gated shell path. Host network isolation still requires B20's
+container executor and is not claimed.
 
 **B6. No task/plan state across the loop.** Nothing tracks what the agent
 intends to do next, so a long change has no visible spine and no recovery point
@@ -1766,12 +1847,11 @@ cannot act on the tools it can read, and it cannot remember across the work.
 
 ### Tier 0 — the blocking three
 
-**C1. First-class document output.** ✅ **Done for Markdown — see FIXED-40.**
-`create_document` is a model-visible, approval-gated contract restricted to
-`.md`/`.markdown`. Approval reuses the governed file relay and the completed
-document is copied into the owner-scoped attachment store, bound to its exact
-session/turn, and shown by the existing Chat inspector. Binary DOCX/XLSX/PDF
-generation remains capability-gated future breadth rather than being claimed.
+**C1. First-class document output.** ✅ **Done — see FIXED-40 and FIXED-43.**
+`create_document` creates Markdown, DOCX, XLSX, and PDF artifacts locally
+without a file-creation approval prompt. The completed document is preserved in
+the owner-scoped attachment store, bound to its exact trusted session/turn, and
+shown by the existing Chat inspector.
 
 **C2. Acting in the owner's tools.** ✅ **Complete for repeated manifest-driven
 execution — see FIXED-37 and FIXED-41.**
@@ -1810,15 +1890,17 @@ remembering.
 open a session-authorized, view-only pane, reusing the sanitising renderer from
 FIXED-06 for the Markdown case. FIXED-19 and FIXED-20 record a supported,
 newly generated file against its exact session and turn so it uses that same
-pane. **Remaining
-work:** an assistant that reads a document should also be able to show *the
-passage it used*.
+pane. FIXED-45 revalidated uploaded and newly generated files across supported,
+unsupported, unavailable, cross-account, and cross-session cases. **Remaining
+work:** an assistant that reads a document should also be able to show and
+highlight *the passage it used*.
 
 **C5. Chat file output — done.** FIXED-19 keeps per-response copy but removes
 per-chat Markdown download and browser print/Save as PDF. Generated artifacts
 and stored attachments use the right-hand inspector rather than a general
-download surface; FIXED-20/FIXED-22 preserve approved artifacts once without
-automatic deletion.
+download surface; FIXED-20/FIXED-22 preserve artifacts once without automatic
+deletion. FIXED-45 adds the response-linked generated-document card and explicit
+preview action.
 
 **C6. No citations on tool-derived answers.** When an answer comes from an
 email, a calendar entry or an attached document, the transcript does not say

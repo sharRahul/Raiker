@@ -74,6 +74,13 @@ class RegisterRequest(BaseModel):
     password: str
 
 
+class SessionCommandGrantRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    commands: list[list[str]]
+    timeout_seconds: int = 120
+    ttl_minutes: int = 120
+
+
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     username: str

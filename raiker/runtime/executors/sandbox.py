@@ -56,6 +56,8 @@ def run_command(
         "returncode": proc.returncode,
         "stdout_bytes": stdout_len,
         "stderr_bytes": stderr_len,
+        "stdout": proc.stdout[:max_output_bytes].decode("utf-8", errors="replace"),
+        "stderr": proc.stderr[:max_output_bytes].decode("utf-8", errors="replace"),
         "truncated": stdout_len > max_output_bytes or stderr_len > max_output_bytes,
     }
 

@@ -54,6 +54,7 @@ class ToolExecutionContext:
 
     session_id: str
     principal_id: str
+    turn_id: str
 
 # Tools whose arguments/results are scrubbed to metadata before entering event
 # payloads or the stored tool-action record. The advisor question/answer flow
@@ -82,7 +83,10 @@ def _drops_argument_values(tool_name: str) -> bool:
 # identifiers and are kept verbatim (redacted) for the audit trail; only the
 # fetched *content* is dropped from events.
 _CONTENT_RESULT_TOOLS = frozenset(
-    {"consult_advisor", "github_read", "gmail_read", "gcal_read", "slack_read", "connector_read"}
+    {
+        "consult_advisor", "github_read", "gmail_read", "gcal_read", "slack_read",
+        "connector_read", "run_command",
+    }
 )
 _CONTENT_RESULT_FIELDS = ("answer", "content")
 
@@ -150,9 +154,6 @@ class ToolBroker:
                 self.workspace_root, "log", ["--oneline", "-n", str(args.get("limit", 10))]
             ),
             "write_file": lambda args: proposed_write_snapshot(
-                self.workspace_root, str(args.get("path", ".")), str(args.get("text", ""))
-            ),
-            "create_document": lambda args: proposed_write_snapshot(
                 self.workspace_root, str(args.get("path", ".")), str(args.get("text", ""))
             ),
             "edit_file": lambda args: proposed_edit_snapshot(
@@ -237,7 +238,71 @@ class ToolBroker:
         ] = {
             "create_task": self._create_task,
             "assign_session_project": self._assign_session_project,
+            "create_document": self._create_document,
+            "run_command": self._run_command,
         }
+
+    def _run_command(
+        self, args: dict[str, Any], context: ToolExecutionContext
+    ) -> dict[str, Any]:
+        import shlex
+
+        from raiker.runtime.executors.sandbox import (
+            ALLOWED_SHELL_COMMANDS,
+            SandboxError,
+            run_command,
+        )
+
+        if self.store is None:
+            return {"status": "denied", "error": {"type": "command_grant_required"}}
+        grant = self.store.load_session_command_grant(
+            session_id=context.session_id, principal_id=context.principal_id
+        )
+        if grant is None:
+            return {
+                "status": "denied",
+                "error": {"type": "command_grant_required", "fallback_tool": "shell"},
+            }
+        try:
+            command = shlex.split(str(args.get("command", "")), posix=True)
+        except ValueError:
+            return {"status": "denied", "error": {"type": "invalid_command"}}
+        prefixes = grant.get("commands", [])
+        authorised = any(
+            command[: len(prefix)] == prefix
+            for prefix in prefixes
+            if isinstance(prefix, list) and prefix
+        )
+        if not authorised:
+            return {
+                "status": "denied",
+                "error": {"type": "command_not_authorised", "fallback_tool": "shell"},
+            }
+        try:
+            result = run_command(
+                command,
+                timeout=float(grant["timeout_seconds"]),
+                max_output_bytes=100_000,
+                allowlist=ALLOWED_SHELL_COMMANDS,
+                cwd=self.workspace_root,
+            )
+        except SandboxError as exc:
+            return {"status": "failed", "error": {"type": str(exc)}}
+        return {"status": "success", **result}
+
+    def _create_document(
+        self, args: dict[str, Any], context: ToolExecutionContext
+    ) -> dict[str, Any]:
+        from raiker.runtime.document_generation import generate_document
+
+        if self.store is None:
+            return {"status": "failed", "error": {"type": "document_store_unavailable"}}
+        return generate_document(
+            self.workspace_root, self.store,
+            path=str(args.get("path", "")), text=str(args.get("text", "")),
+            session_id=context.session_id, turn_id=context.turn_id,
+            principal_id=context.principal_id,
+        )
 
     def _mcp_call(self, action: ToolAction) -> dict[str, Any]:
         """Run one projected MCP tool call (BUG-12).
@@ -965,7 +1030,10 @@ class ToolBroker:
                 if context_executor is not None:
                     raw = context_executor(
                         action.arguments,
-                        ToolExecutionContext(session_id=session_id, principal_id=self.principal_id),
+                        ToolExecutionContext(
+                            session_id=session_id, principal_id=self.principal_id,
+                            turn_id=turn_id or "",
+                        ),
                     )
                 else:
                     assert executor is not None

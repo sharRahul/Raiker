@@ -227,6 +227,8 @@ class AttachmentPreviewService:
                     "media_type": str(metadata.get("media_type", "")),
                     "byte_size": int(metadata.get("byte_size", 0) or 0),
                     "previewable": is_previewable(str(metadata.get("media_type", ""))),
+                    "source": str(ref.get("source", "uploaded")),
+                    "created_at": str(metadata.get("created_at", ref.get("created_at", ""))),
                 }
             )
         return files

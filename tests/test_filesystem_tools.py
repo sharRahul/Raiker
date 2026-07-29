@@ -8,6 +8,7 @@ from raiker.tools.filesystem import (
     glob_paths,
     grep_files,
     list_directory,
+    proposed_patch_snapshot,
     proposed_write_snapshot,
     read_file,
     replace_text_content,
@@ -201,6 +202,25 @@ def test_unified_patch_updates_multiple_files_as_one_change_set(tmp_path) -> Non
     assert result["paths"] == ["one.txt", "two.txt"]
     assert (tmp_path / "one.txt").read_text(encoding="utf-8") == "ONE\n"
     assert (tmp_path / "two.txt").read_text(encoding="utf-8") == "TWO\n"
+
+
+def test_three_file_patch_preview_binds_every_path_and_exact_content(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    for name in ("one", "two", "three"):
+        (tmp_path / f"{name}.txt").write_text(f"{name}\n", encoding="utf-8")
+    patch = "".join(
+        f"--- a/{name}.txt\n+++ b/{name}.txt\n@@ -1 +1 @@\n-{name}\n+{name.upper()}\n"
+        for name in ("one", "two", "three")
+    )
+
+    proposal = proposed_patch_snapshot(tmp_path, None, patch)
+
+    assert proposal["paths"] == ["one.txt", "two.txt", "three.txt"]
+    assert [change["before_snapshot"] for change in proposal["changes"]] == [
+        "one\n", "two\n", "three\n"
+    ]
+    assert [change["proposed_text"] for change in proposal["changes"]] == [
+        "ONE\n", "TWO\n", "THREE\n"
+    ]
 
 
 def test_unified_patch_rejects_multi_file_change_before_any_write(tmp_path) -> None:  # type: ignore[no-untyped-def]

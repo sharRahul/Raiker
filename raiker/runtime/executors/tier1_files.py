@@ -22,7 +22,8 @@ class FileWriteExecutor:
         self._workspace_root = Path(workspace_root).resolve()
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        path = str(action.arguments.get("path", ""))
+        path_value = action.arguments.get("path")
+        path = str(path_value) if path_value else None
         if not path:
             return ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
@@ -75,7 +76,8 @@ class PatchApplyExecutor:
         self._workspace_root = Path(workspace_root).resolve()
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        path = str(action.arguments.get("path", ""))
+        path_value = action.arguments.get("path")
+        path = str(path_value) if path_value else None
         try:
             result = apply_patch_content(
                 self._workspace_root, path, str(action.arguments.get("patch", ""))

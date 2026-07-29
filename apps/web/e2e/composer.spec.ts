@@ -80,3 +80,19 @@ test("Settings and Models present focused, human-readable controls", async ({ pa
   await expect(page.getByRole("combobox", { name: "Available models" })).toBeVisible();
   await page.screenshot({ path: "../../output/playwright/models-redesign.png", fullPage: true });
 });
+
+test("new-account Workbench is welcoming and action oriented", async ({ page }) => {
+  await page.goto("http://raiker.test/#/workbench");
+  await expect(page.getByRole("heading", { name: "Welcome to your Work Dashboard" })).toBeVisible();
+  await expect(page.getByText("Pick up where you left off", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Start a new chat/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Create a project/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Create a task/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Schedule a task/ })).toBeVisible();
+  await expect(page.getByText("Resume a conversation", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Runtime issues", { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: "../../docs/plans/screenshots/working/workbench-dashboard-redesign.png",
+    fullPage: true,
+  });
+});

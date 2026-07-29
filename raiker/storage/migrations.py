@@ -1999,6 +1999,25 @@ CREATE INDEX IF NOT EXISTS idx_session_attachment_refs_owner
   ON session_attachment_refs(owner_principal_id, session_id, created_at);
 """
 
+SESSION_ATTACHMENT_SOURCE_MIGRATION_ID = "RAIKER-2028-session-attachment-source"
+SESSION_ATTACHMENT_SOURCE_SQL = """
+ALTER TABLE session_attachment_refs ADD COLUMN source TEXT NOT NULL DEFAULT 'uploaded';
+"""
+
+SESSION_COMMAND_GRANTS_MIGRATION_ID = "RAIKER-2029-session-command-grants"
+SESSION_COMMAND_GRANTS_SQL = """
+CREATE TABLE IF NOT EXISTS session_command_grants (
+  session_id TEXT NOT NULL,
+  principal_id TEXT NOT NULL,
+  commands_json TEXT NOT NULL,
+  timeout_seconds INTEGER NOT NULL,
+  expires_at TEXT NOT NULL,
+  revoked INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (session_id, principal_id)
+);
+"""
+
 
 # BUG-10 — where a session came from.
 #

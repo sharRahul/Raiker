@@ -38,6 +38,8 @@ class StaticPolicyConfig:
                 # owner credential + egress allowlist + manifest-driven
                 # operation allowlist); the proposal is read-shaped.
                 "connector_read",
+                "create_document",
+                "run_command",
                 "user_create",
                 "user_deactivate",
                 "role_create",
@@ -50,7 +52,7 @@ class StaticPolicyConfig:
     )
     approval_required_actions: frozenset[str] = field(
         default_factory=lambda: frozenset({
-            "shell", "write_file", "create_document", "edit_file", "apply_patch",
+            "shell", "write_file", "edit_file", "apply_patch",
             "memory_write", "memory_forget",
             # Checkpoint restore (Workstream B / B2) is itself a workspace
             # mutation — approval-required, routed through its own governed gate.
@@ -85,7 +87,6 @@ class StaticPolicyConfig:
         default_factory=lambda: frozenset(
             {
                 "write_file",
-                "create_document",
                 "edit_file",
                 "delete_file",
                 "network_request",

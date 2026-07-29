@@ -16,6 +16,7 @@
   import { api } from "../api";
   import type {
     ApprovalView,
+    Diagnostics,
     ProjectsList,
     SessionSummary,
     TaskView,
@@ -31,6 +32,7 @@
   let tasks = $state<TaskView[] | null>(null);
   let approvals = $state<ApprovalView[] | null>(null);
   let projects = $state<ProjectsList | null>(null);
+  let diagnostics = $state<Diagnostics | null>(null);
   let unavailable = $state(false);
   // One reactive view of the shared model store; refreshes live when the
   // Models page connects a provider or selects a model, without a remount.
@@ -48,6 +50,12 @@
   );
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
   const named = $derived((sessions ?? []).filter((s) => (s.title ?? "").trim() !== ""));
+  const hasActivity = $derived(named.length > 0 || (tasks ?? []).length > 0 || (projects?.projects ?? []).length > 0);
+  const runtimeIssues = $derived(
+    diagnostics === null
+      ? 0
+      : diagnostics.missing_config.length + (diagnostics.production_ready_local_single_user_runtime ? 0 : 1),
+  );
   const egressNote = $derived(
     selectedProfile === null
       ? "No model is selected yet, so the runtime will refuse the turn until you choose one."
@@ -59,13 +67,14 @@
   async function load() {
     unavailable = false;
     try {
-      [sessions, tasks, approvals, projects] = await Promise.all([
+      [sessions, tasks, approvals, projects, diagnostics] = await Promise.all([
         // Conversations only — "Resume a conversation" must not offer the
         // server-owned session a task run executes in (BUG-10).
         api.sessions(undefined, false, "chat"),
         api.tasks(),
         api.approvals(),
         api.projects(),
+        api.diagnostics(),
       ]);
     } catch {
       unavailable = true;
@@ -103,11 +112,10 @@
   <div class="intro">
     <div>
       <p class="eyebrow">Workbench</p>
-      <h2 id="workbench-title">Pick up where your work left off.</h2>
-      <p class="lead">
-        Every prompt, task, and decision stays scoped to the active project and is decided by the
-        server, not this page.
-      </p>
+      <h2 id="workbench-title">{hasActivity ? "Pick up where you left off" : "Welcome to your Work Dashboard"}</h2>
+      <p class="lead">{hasActivity
+        ? "Continue a conversation, start something new, or review what needs your attention."
+        : "Start a conversation, organise your work, and track tasks and approvals from one place."}</p>
     </div>
     <button class="btn btn-ghost btn-sm" type="button" onclick={load}>
       <Icon name="refresh" size={15} /> Refresh
@@ -116,6 +124,13 @@
 
   <div class="columns">
     <div class="main-column">
+      <nav class="action-grid" aria-label="Quick actions">
+        <a class="action-card primary-action" href="#/new-chat"><Icon name="chat" size={20} /><span><strong>Start a new chat</strong><small>Ask, draft, or work with a file</small></span><Icon name="chevron-right" size={16} /></a>
+        <a class="action-card" href="#/projects"><Icon name="projects" size={20} /><span><strong>Create a project</strong><small>Group conversations, files, and instructions</small></span><Icon name="chevron-right" size={16} /></a>
+        <a class="action-card" href="#/tasks"><Icon name="tasks" size={20} /><span><strong>Create a task</strong><small>Capture work for Raiker or yourself</small></span><Icon name="chevron-right" size={16} /></a>
+        <a class="action-card" href="#/tasks"><Icon name="clock" size={20} /><span><strong>Schedule a task</strong><small>Run once or on a recurring cadence</small></span><Icon name="chevron-right" size={16} /></a>
+      </nav>
+
       <form class="composer card" onsubmit={startWork}>
         <label class="composer-label" for="workbench-prompt">What would you like to do?</label>
         <textarea
@@ -168,6 +183,7 @@
         {/if}
       </form>
 
+      {#if named.length > 0}
       <section class="resumes card" aria-labelledby="resume-h">
         <div class="card-head">
           <h3 id="resume-h">Resume a conversation</h3>
@@ -175,8 +191,6 @@
         </div>
         {#if sessions === null}
           <PageState state="loading" title="Loading your conversations…" />
-        {:else if named.length === 0}
-          <p class="quiet">No saved conversations yet. Start with a focused request above.</p>
         {:else}
           <ul>
             {#each named.slice(0, 5) as session (session.session_id)}
@@ -193,6 +207,7 @@
           </ul>
         {/if}
       </section>
+      {/if}
     </div>
 
     <aside class="side-column" aria-label="Live status">
@@ -217,6 +232,15 @@
           icon="approvals"
           href="#/approvals"
           linkLabel="Review approvals"
+        />
+        <StatTile
+          label="Runtime issues"
+          value={runtimeIssues}
+          detail={runtimeIssues === 0 ? "No readiness issue needs attention." : "Review configuration and readiness evidence before critical work."}
+          tone={runtimeIssues > 0 ? "warn" : "neutral"}
+          icon="diagnostics"
+          href="#/observe?tab=diagnostics"
+          linkLabel="View and flag runtime issues"
         />
         <StatTile
           label="Active work"
@@ -262,6 +286,18 @@
   }
   .main-column { display: grid; gap: var(--space-4); min-width: 0; }
   .side-column { display: grid; gap: var(--space-3); }
+  .action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+  .action-card {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+    gap: var(--space-3); padding: var(--space-4); color: var(--text-1);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+    box-shadow: var(--shadow-1); text-decoration: none; transition: transform 120ms ease, border-color 120ms ease;
+  }
+  .action-card:hover { transform: translateY(-1px); border-color: var(--accent-border); }
+  .action-card > :first-child { color: var(--accent); }
+  .action-card span { display: grid; gap: 0.15rem; }
+  .action-card small { color: var(--text-3); line-height: 1.35; }
+  .primary-action { background: linear-gradient(135deg, var(--accent-soft), var(--surface)); border-color: var(--accent-border); }
   .composer { display: grid; gap: var(--space-3); padding: var(--space-5); border-radius: var(--r-lg); }
   .composer-label { font-size: 1rem; font-weight: 700; }
   .prompt { min-height: 6rem; font-size: 0.95rem; }
@@ -298,11 +334,11 @@
   .resumes ul { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
   .resumes li { border-top: 1px solid var(--border); display: grid; gap: 0.15rem; padding: var(--space-3) 0; }
   .resumes li span { font-size: 0.78rem; color: var(--text-3); }
-  .quiet { color: var(--text-3); margin: var(--space-2) 0 0; }
   @media (max-width: 63.9rem) {
     .columns { grid-template-columns: 1fr; }
   }
   @media (max-width: 40rem) {
     .intro { flex-direction: column; }
+    .action-grid { grid-template-columns: 1fr; }
   }
 </style>

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from raiker.contracts.ids import new_id
@@ -61,6 +63,74 @@ def test_broker_shell_returns_approval_required(tmp_path) -> None:  # type: igno
     )
     assert decision.decision == "needs_approval"
     assert result.status == "approval_required"
+
+
+@pytest.mark.parametrize(
+    ("suffix", "text"),
+    [("md", "# Report"), ("docx", "Report\nComplete"), ("xlsx", "Name,Status\nC1,Ready"), ("pdf", "Report\nComplete")],
+)
+def test_create_document_generates_and_attaches_without_approval(
+    tmp_path: Path, suffix: str, text: str
+) -> None:  # type: ignore[no-untyped-def]
+    broker = _broker(tmp_path)
+    session_id = new_id("sess_")
+    turn_id = new_id("turn_")
+    action = validate_tool_call(
+        ToolCallProposal(
+            call_id="call_document",
+            tool_name="create_document",
+            arguments={"path": f"artifacts/report.{suffix}", "text": text},
+        )
+    )
+    result, decision = broker.execute(action, session_id=session_id, turn_id=turn_id)
+
+    assert decision.decision == "allow"
+    assert decision.requires_user_approval is False
+    assert result.status == "success"
+    assert (tmp_path / "artifacts" / f"report.{suffix}").is_file()
+    refs = broker.store.list_session_attachment_refs(  # type: ignore[union-attr]
+        session_id=session_id, owner_principal_id="local_user"
+    )
+    assert refs == [
+        {
+            "attachment_id": result.output["attachment_id"],  # type: ignore[index]
+            "turn_id": turn_id,
+            "created_at": refs[0]["created_at"],
+            "source": "generated",
+        }
+    ]
+
+
+def test_run_command_returns_feedback_only_for_exact_active_session_grant(tmp_path: Path) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    broker = _broker(tmp_path)
+    session_id = new_id("sess_")
+    broker.store.put_session_command_grant(  # type: ignore[union-attr]
+        session_id=session_id,
+        principal_id="local_user",
+        commands=[["python", "-c"]],
+        timeout_seconds=5,
+        expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+    )
+    allowed = validate_tool_call(
+        ToolCallProposal(
+            call_id="call_command",
+            tool_name="run_command",
+            arguments={"command": "python -c 'print(42)'"},
+        )
+    )
+    result, decision = broker.execute(allowed, session_id=session_id, turn_id=new_id("turn_"))
+    assert decision.decision == "allow"
+    assert result.status == "success"
+    assert result.output["stdout"] == "42\n"  # type: ignore[index]
+    assert result.output["returncode"] == 0  # type: ignore[index]
+
+    denied, _ = broker.execute(
+        allowed, session_id=new_id("sess_"), turn_id=new_id("turn_")
+    )
+    assert denied.status == "denied"
+    assert denied.error == {"type": "command_grant_required", "fallback_tool": "shell"}
 
 
 def test_chat_task_tools_accept_no_model_supplied_session_id() -> None:  # type: ignore[no-untyped-def]

@@ -20,7 +20,7 @@
     StreamEvent,
   } from "../apiTypes";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
-  import { humanize } from "../format";
+  import { humanize, relativeTime } from "../format";
   import { reactionForResponse, thinkingSteps } from "../chatPresentation";
   import { chatProfiles, refreshModels } from "../models.svelte";
 
@@ -35,6 +35,8 @@
     detail: string;
     path?: string;
     attachmentId?: string;
+    source?: "uploaded" | "generated";
+    createdAt?: string;
   }
 
   interface ChatTurn {
@@ -434,6 +436,8 @@
         label: file.filename,
         detail: `${file.filename} (${file.media_type}, ${file.byte_size} bytes)`,
         attachmentId: file.attachment_id,
+        source: file.source,
+        createdAt: file.created_at,
       });
       byTurn.set(file.turn_id, chips);
     }
@@ -673,13 +677,15 @@
       {@const answer = answerText(turn)}
       {@const thinking = thinkingSteps(turn.events)}
       {@const reaction = reactionForResponse(answer)}
+      {@const uploadedAttachments = turn.attachments.filter((a) => a.source !== "generated")}
+      {@const generatedFiles = turn.attachments.filter((a) => a.source === "generated")}
       <div class="turn">
         <div class="message-group message-group-user">
           <div class="message-bubble message-bubble-user">
           <p class="bubble-text">{turn.prompt}</p>
-          {#if turn.attachments.length > 0}
+          {#if uploadedAttachments.length > 0}
             <p class="turn-attachments">
-              {#each turn.attachments as a, i (a.attachmentId ?? a.path ?? i)}
+              {#each uploadedAttachments as a, i (a.attachmentId ?? a.path ?? i)}
                 {#if a.attachmentId !== undefined && sessionId !== null}
                   <!-- Uploaded files open in the inspector. A workspace-path
                        chip has no stored bytes to show, so it stays inert
@@ -823,6 +829,37 @@
             {/if}
           {:else if !turn.streaming && turn.error === null && turn.response !== null}
             <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">(No answer text was returned.)</p></div>
+          {/if}
+
+          {#if generatedFiles.length > 0}
+            <section class="artifact-stack" aria-label="Generated documents">
+              {#each generatedFiles as file (file.attachmentId)}
+                <article class="artifact-card" data-status={file.attachmentId ? "ready" : "unavailable"}>
+                  <div class="artifact-icon" aria-hidden="true"><Icon name="file" size={20} /></div>
+                  <div class="artifact-copy">
+                    <div class="artifact-heading">
+                      <strong>{file.label}</strong>
+                      <span class="artifact-status">{file.attachmentId ? "Ready" : "Unavailable"}</span>
+                    </div>
+                    <p>Generated document from this response, preserved in this conversation.</p>
+                    <p class="artifact-meta">
+                      {file.label.split(".").pop()?.toUpperCase() ?? "Document"}
+                      {#if file.createdAt} · Created {relativeTime(file.createdAt)}{/if}
+                    </p>
+                  </div>
+                  {#if file.attachmentId !== undefined && sessionId !== null}
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm artifact-preview"
+                      aria-expanded={inspecting?.attachmentId === file.attachmentId}
+                      onclick={() => void openInspector(file.attachmentId as string, file.label)}
+                    >Preview document</button>
+                  {:else}
+                    <span class="artifact-unavailable">Preview unavailable</span>
+                  {/if}
+                </article>
+              {/each}
+            </section>
           {/if}
 
           {#if turn.error !== null}
@@ -1197,6 +1234,36 @@
     padding: .3rem .2rem;
   }
   .copy-message:hover { color: var(--text-1); }
+  .artifact-stack { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+  .artifact-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--r-lg);
+    background: linear-gradient(135deg, var(--surface), var(--accent-soft));
+    box-shadow: var(--shadow-1);
+  }
+  .artifact-icon {
+    display: grid; place-items: center; width: 2.5rem; height: 2.5rem;
+    border-radius: var(--r-md); color: var(--accent); background: var(--surface);
+  }
+  .artifact-copy { min-width: 0; }
+  .artifact-copy p { margin: 0.15rem 0 0; color: var(--text-2); font-size: 0.8rem; }
+  .artifact-heading { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .artifact-heading strong { overflow-wrap: anywhere; }
+  .artifact-status {
+    border-radius: 999px; padding: 0.1rem 0.45rem; color: var(--ok);
+    background: var(--ok-soft); font-size: 0.7rem; font-weight: 700;
+  }
+  .artifact-meta { color: var(--text-3) !important; font-size: 0.72rem !important; }
+  .artifact-unavailable { color: var(--text-3); font-size: 0.78rem; }
+  @media (max-width: 40rem) {
+    .artifact-card { grid-template-columns: auto minmax(0, 1fr); }
+    .artifact-preview, .artifact-unavailable { grid-column: 1 / -1; justify-self: stretch; text-align: center; }
+  }
 
   @media print {
     :global(.sidebar), :global(.topbar), :global(.skip-link), .composer,

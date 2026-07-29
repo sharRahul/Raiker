@@ -163,7 +163,13 @@ class PolicyEngine:
                 decision_id=new_id("pol_"),
                 action_id=action.action_id,
                 decision="allow",
-                reasons=["workspace_read_allowed"],
+                reasons=[
+                    "governed_document_creation_allowed"
+                    if action.tool_name == "create_document"
+                    else "session_command_grant_required"
+                    if action.tool_name == "run_command"
+                    else "workspace_read_allowed"
+                ],
                 requires_user_approval=False,
                 policy_version=self.config.policy_version,
                 risk_level=action.risk_level,

@@ -765,6 +765,8 @@ export interface SessionAttachment {
   media_type: string;
   byte_size: number;
   previewable: boolean;
+  source: "uploaded" | "generated";
+  created_at: string;
 }
 
 export interface SessionAttachmentsView {

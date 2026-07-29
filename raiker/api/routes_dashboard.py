@@ -26,6 +26,7 @@ from raiker.api.schemas import (
     SaveProjectContextRequest,
     SelectCodeRepoRequest,
     SelectProjectRequest,
+    SessionCommandGrantRequest,
     SetModelAdvisorRequest,
     SetModelFallbackRequest,
     SetModelSelectionRequest,
@@ -57,6 +58,67 @@ def _service(request: Request) -> DashboardService:
 def _auth(request: Request) -> tuple[ApiSession, Principal]:
     ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
     return AuthMiddleware(ws).authenticate(request)
+
+
+@router.put("/api/sessions/{session_id}/command-grant")
+def put_session_command_grant(
+    session_id: str,
+    body: SessionCommandGrantRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, object]:
+    """Owner-defined, expiry-bound command prefixes for one conversation."""
+    from datetime import UTC, datetime, timedelta
+
+    session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)
+    row = store.load_session(session_id)
+    user_id = store.principal_user_id(session.principal_id)
+    if row is None or row.get("user_id") not in {None, user_id}:
+        raise HTTPException(status_code=404, detail="Unknown session")
+    commands = [
+        [str(part) for part in command]
+        for command in body.commands[:20]
+        if command and len(command) <= 20 and all(str(part).strip() for part in command)
+    ]
+    if (
+        not commands
+        or body.timeout_seconds not in range(1, 601)
+        or body.ttl_minutes not in range(1, 1441)
+    ):
+        raise HTTPException(status_code=400, detail={"reason_code": "invalid_command_grant"})
+    expires_at = (datetime.now(UTC) + timedelta(minutes=body.ttl_minutes)).isoformat()
+    store.put_session_command_grant(
+        session_id=session_id,
+        principal_id=session.principal_id,
+        commands=commands,
+        timeout_seconds=body.timeout_seconds,
+        expires_at=expires_at,
+    )
+    return {
+        "session_id": session_id,
+        "commands": commands,
+        "expires_at": expires_at,
+        "revocable": True,
+    }
+
+
+@router.delete("/api/sessions/{session_id}/command-grant")
+def revoke_session_command_grant(
+    session_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, object]:
+    session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)
+    row = store.load_session(session_id)
+    user_id = store.principal_user_id(session.principal_id)
+    if row is None or row.get("user_id") not in {None, user_id}:
+        raise HTTPException(status_code=404, detail="Unknown session")
+    store.revoke_session_command_grant(
+        session_id=session_id, principal_id=session.principal_id
+    )
+    return {"session_id": session_id, "revoked": True}
 
 
 # ── Auth: first-run local token mint ──────────────────────────────────────────

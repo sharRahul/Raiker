@@ -44,6 +44,7 @@ from raiker.runtime.attachments import (
     store_document,
     store_image,
 )
+from raiker.runtime.document_generation import generate_document
 from raiker.storage.sqlite import SQLiteStore
 from tests.test_document_attachments import DOCX_BYTES, PDF_BYTES, make_docx
 
@@ -231,6 +232,36 @@ class TestPreviewAuthorization:
 
 
 class TestPreviewRepresentations:
+    @pytest.mark.parametrize(
+        ("filename", "text", "kind"),
+        [
+            ("generated.md", "# Safe\n<script>alert(1)</script>", KIND_MARKDOWN),
+            ("generated.docx", "Generated report", KIND_TEXT),
+            ("generated.xlsx", "Name,Status\nC1,Ready", KIND_TABLE),
+            ("generated.pdf", "Generated report", KIND_PDF),
+        ],
+    )
+    def test_newly_generated_documents_render_through_the_authorized_inspector(
+        self, workspace: Path, store: SQLiteStore, filename: str, text: str, kind: str
+    ) -> None:
+        result = generate_document(
+            workspace,
+            store,
+            path=f"artifacts/{filename}",
+            text=text,
+            session_id=SESSION_ID,
+            turn_id="turn_generated",
+            principal_id=OWNER_PRINCIPAL,
+        )
+        attachment_id = str(result["attachment_id"])
+        preview = AttachmentPreviewService(store).get(
+            SESSION_ID, attachment_id, OWNER_PRINCIPAL
+        )
+        assert preview is not None
+        assert preview.kind == kind
+        assert AttachmentPreviewService(store).get(
+            "sess_wrong", attachment_id, OWNER_PRINCIPAL
+        ) is None
     def test_markdown_preview_carries_source_text_and_no_html(
         self, store: SQLiteStore
     ) -> None:

@@ -234,6 +234,10 @@ from raiker.storage.migrations import (
     SESSION_ARCHIVE_SQL,
     SESSION_ATTACHMENT_REFS_MIGRATION_ID,
     SESSION_ATTACHMENT_REFS_SQL,
+    SESSION_ATTACHMENT_SOURCE_MIGRATION_ID,
+    SESSION_ATTACHMENT_SOURCE_SQL,
+    SESSION_COMMAND_GRANTS_MIGRATION_ID,
+    SESSION_COMMAND_GRANTS_SQL,
     SESSION_ORIGIN_MIGRATION_ID,
     SESSION_ORIGIN_SQL,
     SESSION_TAGS_MIGRATION_ID,
@@ -702,6 +706,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 SESSION_ATTACHMENT_REFS_MIGRATION_ID, SESSION_ATTACHMENT_REFS_SQL, connection
+            )
+            self._apply_migration(
+                SESSION_ATTACHMENT_SOURCE_MIGRATION_ID,
+                SESSION_ATTACHMENT_SOURCE_SQL,
+                connection,
+            )
+            self._apply_migration(
+                SESSION_COMMAND_GRANTS_MIGRATION_ID,
+                SESSION_COMMAND_GRANTS_SQL,
+                connection,
             )
             self._apply_migration(SESSION_ORIGIN_MIGRATION_ID, SESSION_ORIGIN_SQL, connection)
             self._rebuild_memory_fts(connection)
@@ -5156,7 +5170,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     # ── Session attachment references (BUG-07: the file inspector's grant) ──
 
     def save_session_attachment_ref(
-        self, *, session_id: str, attachment_id: str, owner_principal_id: str, turn_id: str
+        self, *, session_id: str, attachment_id: str, owner_principal_id: str,
+        turn_id: str, source: str = "uploaded",
     ) -> None:
         """Record that one attachment was carried by one session's prompt turn.
 
@@ -5170,10 +5185,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR IGNORE INTO session_attachment_refs
-                (session_id, attachment_id, owner_principal_id, turn_id, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                (session_id, attachment_id, owner_principal_id, turn_id, created_at, source)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (session_id, attachment_id, owner_principal_id, turn_id, utc_now()),
+                (session_id, attachment_id, owner_principal_id, turn_id, utc_now(), source),
             )
 
     def session_attachment_ref_exists(
@@ -5203,13 +5218,51 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             rows = connection.execute(
                 """
-                SELECT attachment_id, turn_id, created_at FROM session_attachment_refs
+                SELECT attachment_id, turn_id, created_at, source FROM session_attachment_refs
                 WHERE session_id = ? AND owner_principal_id = ?
                 ORDER BY created_at, rowid
                 """,
                 (session_id, owner_principal_id),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def put_session_command_grant(
+        self, *, session_id: str, principal_id: str, commands: list[list[str]],
+        timeout_seconds: int, expires_at: str,
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO session_command_grants
+                   (session_id, principal_id, commands_json, timeout_seconds, expires_at, revoked, created_at)
+                   VALUES (?, ?, ?, ?, ?, 0, ?)
+                   ON CONFLICT(session_id, principal_id) DO UPDATE SET
+                   commands_json=excluded.commands_json,
+                   timeout_seconds=excluded.timeout_seconds,
+                   expires_at=excluded.expires_at, revoked=0, created_at=excluded.created_at""",
+                (session_id, principal_id, json.dumps(commands), timeout_seconds, expires_at, utc_now()),
+            )
+
+    def load_session_command_grant(
+        self, *, session_id: str, principal_id: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM session_command_grants
+                   WHERE session_id=? AND principal_id=? AND revoked=0 AND expires_at>?""",
+                (session_id, principal_id, utc_now()),
+            ).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        result["commands"] = json.loads(str(result.pop("commands_json")))
+        return result
+
+    def revoke_session_command_grant(self, *, session_id: str, principal_id: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE session_command_grants SET revoked=1 WHERE session_id=? AND principal_id=?",
+                (session_id, principal_id),
+            )
 
     # ── Phase 10: Runtime Authority (Principals + Risk Acceptance) ──
 

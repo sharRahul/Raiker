@@ -30,11 +30,11 @@ test("live Memory, Knowledge Map, and context usage review", async ({ page }) =>
 
   await page.route("**/api/sessions/*/context-usage", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
-      session_id: "sess_live", profile_id: "hosted", provider: "Anthropic", model: "claude-opus-5",
-      used_tokens: 86, context_window_tokens: 1_000_000, context_window_source: "provider",
-      usage_source: "provider", billable: true, session_cost: null, provider_total_cost: null,
-      currency: "USD", price_source: null, price_as_of: null, session_turns: 1,
-      session_input_tokens: 72, session_output_tokens: 14,
+      session_id: "sess_live", profile_id: "ollama-local-openai-compatible", provider: "Ollama", model: "qwen2.5:7b",
+      used_tokens: 8_240, context_window_tokens: 32_768, context_window_source: "provider",
+      usage_source: "provider", billable: false, session_cost: null, provider_total_cost: null,
+      currency: null, price_source: null, price_as_of: null, session_turns: 1,
+      session_input_tokens: 8_100, session_output_tokens: 140,
     }) });
   });
   await page.route("**/api/sessions/sess_live", async (route) => {
@@ -55,8 +55,11 @@ test("live Memory, Knowledge Map, and context usage review", async ({ page }) =>
   // clean live workspace; context usage remains independently testable.
   await page.goto("http://127.0.0.1:8765/#/new-chat?session=sess_live");
   await page.getByRole("button", { name: "Context window" }).click();
-  await expect(page.getByText("86 tokens used")).toBeVisible();
-  await expect(page.getByText("<0.01%")).toBeVisible();
-  await expect(page.getByText("999,914 tokens remaining")).toBeVisible();
-  await page.screenshot({ path: "../../docs/plans/screenshots/working/context-window-redesign-live.png", fullPage: true });
+  await expect(page.getByText("8,240 tokens used")).toBeVisible();
+  await expect(page.getByText("25.15%")).toBeVisible();
+  await expect(page.getByText("24,528 tokens remaining")).toBeVisible();
+  await expect(page.getByText(/Reported by Ollama/)).toBeVisible();
+  await expect(page.getByText(/Capacity reported by runtime/)).toBeVisible();
+  await expect(page.getByText(/no API cost/i)).toBeVisible();
+  await page.screenshot({ path: "../../docs/plans/screenshots/working/local-context-window-live.png", fullPage: true });
 });

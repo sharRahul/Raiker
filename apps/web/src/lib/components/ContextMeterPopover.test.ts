@@ -32,6 +32,7 @@ describe("ContextMeterPopover", () => {
     expect(screen.getByText("2,900 tokens used")).toBeInTheDocument();
     expect(screen.getByText("1.45%")).toBeInTheDocument();
     expect(screen.getByText(/Reported by anthropic/)).toBeInTheDocument();
+    expect(screen.getByText(/Capacity reported by runtime/)).toBeInTheDocument();
     expect(screen.queryByText(/Estimated from this chat/)).not.toBeInTheDocument();
   });
 
@@ -54,11 +55,20 @@ describe("ContextMeterPopover", () => {
     expect(screen.getByText(/Estimated from this chat/)).toBeInTheDocument();
   });
 
+  it("labels a configured capacity separately from provider pricing", () => {
+    render(ContextMeterPopover, {
+      usage: usage({ context_window_source: "config" }),
+    });
+    expect(screen.getByText(/Capacity configured in Raiker/)).toBeInTheDocument();
+  });
+
   it("says no API cost for a provider that runs on this machine", () => {
     render(ContextMeterPopover, {
       usage: usage({ billable: false, provider: "llama.cpp", session_cost: null, provider_total_cost: null }),
     });
     expect(screen.getByText(/no API cost/i)).toBeInTheDocument();
+    expect(screen.getByText(/Reported by llama\.cpp/)).toBeInTheDocument();
+    expect(screen.getByText(/Capacity reported by runtime/)).toBeInTheDocument();
     expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
   });
 

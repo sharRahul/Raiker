@@ -132,5 +132,72 @@ def test_streaming_embeddings_and_models() -> None:
         run(no_embed.embed(EmbeddingRequest("p", "llama.cpp", "m", "text")))
 
 
+@pytest.mark.parametrize(
+    ("provider", "native_path", "native_body", "expected"),
+    [
+        ("llama.cpp", "/props", {"default_generation_settings": {"n_ctx": 32768}}, 32768),
+        (
+            "lm-studio",
+            "/api/v1/models",
+            {"models": [{"model_key": "local-model", "loaded_instances": [{"config": {"context_length": 65536}}]}]},
+            65536,
+        ),
+    ],
+)
+def test_local_runtime_catalogue_enriches_context_capacity(
+    provider: str, native_path: str, native_body: dict[str, Any], expected: int
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": "local-model"}]})
+        if request.url.path == native_path:
+            return httpx.Response(200, json=native_body)
+        return httpx.Response(404)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    runtime = AsyncOpenAICompatibleProvider(
+        "p", provider, "local-model", "http://127.0.0.1:1234/v1", ModelCapabilities(), client=client
+    )
+    assert run(runtime.list_models())[0].metadata["context_length"] == expected
+    run(client.aclose())
+
+
+def test_ollama_prefers_running_context_and_falls_back_to_model_metadata() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": "running"}, {"id": "stored"}]})
+        if request.url.path == "/api/ps":
+            return httpx.Response(200, json={"models": [{"name": "running", "context_length": 16384}]})
+        if request.url.path == "/api/show":
+            assert json.loads(request.content)["model"] == "stored"
+            return httpx.Response(200, json={"model_info": {"qwen2.context_length": 32768}})
+        return httpx.Response(404)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    runtime = AsyncOpenAICompatibleProvider(
+        "p", "ollama", "running", "http://127.0.0.1:11434/v1", ModelCapabilities(), client=client
+    )
+    models = run(runtime.list_models())
+    assert {model.id: model.metadata["context_length"] for model in models} == {
+        "running": 16384,
+        "stored": 32768,
+    }
+    run(client.aclose())
+
+
+def test_local_context_discovery_failure_does_not_hide_models() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": "m"}]})
+        return httpx.Response(503)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    runtime = AsyncOpenAICompatibleProvider(
+        "p", "ollama", "m", "http://127.0.0.1:11434/v1", ModelCapabilities(), client=client
+    )
+    assert run(runtime.list_models())[0].metadata == {}
+    run(client.aclose())
+
+
 async def _collect(aiter: AsyncIterator[Any]) -> list[Any]:
     return [event async for event in aiter]

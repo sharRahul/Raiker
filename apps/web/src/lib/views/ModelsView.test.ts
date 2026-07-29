@@ -50,6 +50,22 @@ function models(partial: Partial<ModelsData>): ModelsData {
 }
 
 describe("ModelsView state grammar", () => {
+  it("shows the discovered local context capacity and its source", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [profile({
+          profile_id: "raiker-local-llama-cpp",
+          selected: true,
+          context_window_tokens: 32768,
+          context_window_source: "provider",
+        })],
+      }),
+    });
+    render(ModelsView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Details" }));
+    expect(screen.getByText(/32,768 tokens · Reported by the provider runtime/)).toBeInTheDocument();
+  });
+
   it("shows a route-level loading state while model truth is fetched", async () => {
     stubFetchPending();
     render(ModelsView);

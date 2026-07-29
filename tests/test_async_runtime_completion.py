@@ -104,7 +104,11 @@ def test_async_openai_success_and_live_urls() -> None:
         models = await p.list_models()
         assert models[0].id == "m"
     asyncio.run(main())
-    assert seen == ["http://127.0.0.1:8080/v1/chat/completions", "http://127.0.0.1:8080/v1/models"]
+    assert seen == [
+        "http://127.0.0.1:8080/v1/chat/completions",
+        "http://127.0.0.1:8080/v1/models",
+        "http://127.0.0.1:8080/props",
+    ]
 
 
 def test_ollama_profile_advertises_native_tool_calls() -> None:

@@ -40,7 +40,13 @@
       ? formatContextUsage(effectiveUsed, effectiveWindow)
       : null,
   );
-  const capacityNote = $derived(sourceNote(usage?.context_window_source));
+  const capacityNote = $derived(
+    usage?.context_window_source === "provider"
+      ? "reported by runtime"
+      : usage?.context_window_source === "config"
+        ? "configured in Raiker"
+        : null,
+  );
   const exactPercent = $derived(effectiveUsed !== null && effectiveUsed !== undefined && effectiveWindow ? Math.min(100, Math.max(0, (effectiveUsed / effectiveWindow) * 100)) : null);
   const percentLabel = $derived(exactPercent === null ? null : exactPercent > 0 && exactPercent < 0.01 ? "<0.01%" : `${exactPercent.toFixed(2).replace(/\.00$/, "")}%`);
   const remaining = $derived(effectiveUsed !== null && effectiveUsed !== undefined && effectiveWindow ? Math.max(0, effectiveWindow - effectiveUsed) : null);
@@ -70,7 +76,15 @@
       <span style={`width: ${exactPercent ?? 0}%`}></span>
     </div>
     <div class="remaining"><span>{number.format(remaining ?? 0)} tokens remaining</span><span>{number.format(usage?.session_input_tokens ?? 0)} input · {number.format(usage?.session_output_tokens ?? 0)} output</span></div>
-    <p class="reported">{#if isEstimate}Estimated from this chat{:else}Reported by {usage?.provider ?? "provider"}{/if}<span class="info" title={`Usage is ${isEstimate ? "estimated from visible chat text" : "reported by the selected provider"}. Context capacity is ${capacityNote ?? "configured by Raiker"}.`} aria-label="About context usage sources">i</span></p>
+    <p class="reported">
+      {#if isEstimate}
+        Estimated from this chat
+      {:else}
+        Reported by {usage?.provider ?? "provider"}
+      {/if}
+      {#if capacityNote}<span class="capacity-source">· Capacity {capacityNote}</span>{/if}
+      <span class="info" title={`Usage is ${isEstimate ? "estimated from visible chat text" : "reported by the selected provider"}. Context capacity is ${capacityNote ?? "configured by Raiker"}.`} aria-label="About context usage sources">i</span>
+    </p>
   {:else}
     <p>Context capacity is not configured for this model.</p>
   {/if}
@@ -106,7 +120,7 @@
   .meter span { display:block; height:100%; min-width:2px; border-radius:inherit; background:var(--raiker-teal, #268d91); }
   .meter.warning span { background:var(--warning); } .meter.critical span { background:var(--danger); }
   .remaining { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin-top:.7rem; color:var(--text-2); font-size:.76rem; }
-  .reported { display:flex; align-items:center; gap:.4rem; } .info { width:1rem; height:1rem; display:inline-grid; place-items:center; border:1px solid var(--border-strong); border-radius:50%; font-size:.65rem; color:var(--text-2); cursor:help; }
+  .reported { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem; } .capacity-source { color:var(--text-2); } .info { width:1rem; height:1rem; display:inline-grid; place-items:center; border:1px solid var(--border-strong); border-radius:50%; font-size:.65rem; color:var(--text-2); cursor:help; }
   .cost { margin:1.2rem -1.5rem -1.35rem; padding:.9rem 1.5rem; border-top:1px solid var(--border); border-radius:0 0 .75rem .75rem; background:var(--sunken); }
   .cost-row { display:flex; justify-content:space-between; gap:1rem; font-size:.84rem; color:var(--text-1); }
   .cost-row + .cost-row { margin-top:.25rem; }

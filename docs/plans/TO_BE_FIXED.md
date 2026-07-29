@@ -71,6 +71,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-47 | High | Build / command containment | Fixed (was BUG-20) |
 | FIXED-48 | Medium | Settings / Workbench | Fixed (settings and dashboard refinement) |
 | FIXED-49 | Medium | Memory / Knowledge Map / context window | Fixed (visual control redesign) |
+| FIXED-50 | High | Local models / context capacity | Fixed (runtime capacity discovery) |
 | BUG-21 | Medium | Models / pricing | Open |
 | BUG-22 | Medium | Chat / export | Open |
 | BUG-23 | Low | Chat / code ergonomics | Open |
@@ -83,6 +84,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-30 | Medium | Knowledge Map / sources and scale | Open |
 | BUG-31 | High | Build / remote execution containment | Open |
 | BUG-32 | Medium | Terminal / approval execution | Open |
+| BUG-33 | Medium | Local models / capacity administration | Open |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -1714,6 +1716,42 @@ and [`screenshots/working/context-window-redesign-live.png`](screenshots/working
 
 ---
 
+## FIXED-50 — Local model context capacity is discovered from the active runtime
+
+**Status: fixed in this change; scheduled refresh and administrator overrides
+are tracked as BUG-33.**
+
+**Root cause.** Local OpenAI-compatible catalogues were treated like hosted
+catalogues and only the top-level `context_length` field was recognised. The
+shipped Ollama, LM Studio, and llama.cpp profiles do not declare one universal
+capacity because the effective value belongs to the selected model and running
+server configuration. As a result, local work often displayed **Context
+capacity is not configured** even while the runtime knew its limit.
+
+**Fix applied.** An explicit provider-catalogue refresh now performs bounded,
+best-effort reads against the same policy-checked local origin:
+
+- Ollama reads the active `context_length` from `/api/ps`, then uses `/api/show`
+  model metadata or an explicit `num_ctx` parameter for models that are not
+  loaded.
+- LM Studio reads its runtime `/api/v1/models` catalogue and recognises common
+  direct and loaded-instance context fields.
+- llama.cpp reads the server `/props` generation settings, including `n_ctx`.
+
+Positive capacities are cached against the exact owner, provider, and model;
+provider facts continue to outrank a profile's exact
+`context_window_tokens` fallback. Supplementary metadata failures never hide a
+valid model catalogue or invent a capacity. The Models details dialog shows the
+exact capacity and whether it came from the runtime or Raiker configuration.
+Chat and Build show used, available, and remaining tokens, visibly label
+**Capacity reported by runtime**, and state **Runs on this machine — no API
+cost** for local execution. Pricing remains independent from context capacity.
+
+Live browser evidence is recorded in
+[`screenshots/working/local-context-window-live.png`](screenshots/working/local-context-window-live.png).
+
+---
+
 ## BUG-21 — Provider pricing is not synchronised into a historical registry
 
 **Status: open; audited from FIXED-03.**
@@ -1933,6 +1971,31 @@ or STOP checks.
 authenticated confirmation, then shows **Executing**, bounded output/result,
 and **Continuing turn** or a precise refusal. The web Approvals history records
 the terminal principal and identical execution evidence.
+
+---
+
+## BUG-33 — Local context capacity has no scheduled refresh or administrator override UI
+
+**Status: open; found while implementing FIXED-50.**
+
+**Observed.** Runtime capacity is refreshed when an owner explicitly opens a
+provider's model catalogue. Raiker preserves an exact profile-level
+`context_window_tokens` fallback, but there is no periodic local refresh,
+freshness timestamp in Models, or governed browser workflow for setting that
+fallback when an older or custom runtime exposes no supported metadata field.
+
+**Required fix.** Add a bounded local-only refresh schedule and last-known-good
+capacity history keyed by endpoint identity, provider, model, and relevant
+runtime configuration. Add an audited administrator override with validation,
+expiry/review, and a clear precedence below a fresh active-runtime report.
+Never silently reuse one model's capacity for another model or endpoint.
+
+**UI when closed.** Models → Details shows capacity, source, endpoint identity,
+last checked, freshness, and refresh errors. Administrators can select
+**Configure fallback capacity**, enter a positive token limit with a reason,
+review the exact provider/model/endpoint scope, save or clear it, and inspect
+change history. Chat and Build visibly distinguish **reported by runtime**,
+**configured in Raiker**, **stale last-known value**, and **unavailable**.
 
 ---
 

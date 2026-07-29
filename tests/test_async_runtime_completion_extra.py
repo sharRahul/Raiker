@@ -161,7 +161,10 @@ def test_models_live_listing_and_policy_redaction(
     out = asyncio.run(render_models_async(workspace_root=tmp_path, router=router))
     assert "raiker-local-llama-cpp (selected)" in out
     assert "status: available" in out and "qwen2.5-coder" in out
-    assert seen == ["http://127.0.0.1:8080/v1/models"]
+    assert seen == [
+        "http://127.0.0.1:8080/v1/models",
+        "http://127.0.0.1:8080/props",
+    ]
 
     SQLiteStore(tmp_path).save_model_session_state(
         ModelSessionState(session_id="terminal-local", profile_id="openrouter-policy-gated")

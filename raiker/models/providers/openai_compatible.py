@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -43,6 +44,13 @@ def _join(base: str, path: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, joined, "", ""))
 
 
+def _join_origin(base: str, path: str) -> str:
+    """Join a provider-native path at the endpoint origin, outside ``/v1``."""
+    parts = urlsplit(base)
+    joined = "/" + "/".join(part for part in path.split("/") if part)
+    return urlunsplit((parts.scheme, parts.netloc, joined, "", ""))
+
+
 def _map_status(status: int, *, model: str) -> Exception:
     if status in {401, 403}:
         return ProviderAuthenticationError(f"provider_auth_failed:http_{status}")
@@ -76,8 +84,8 @@ def _model_facts_metadata(item: Mapping[str, Any]) -> dict[str, Any]:
     `raiker.models.pricing`, which owns the per-million-token convention.
     """
     metadata: dict[str, Any] = {}
-    context_length = item.get("context_length")
-    if isinstance(context_length, int) and not isinstance(context_length, bool) and context_length > 0:
+    context_length = _context_length(item)
+    if context_length is not None:
         metadata["context_length"] = context_length
     pricing = item.get("pricing")
     if isinstance(pricing, Mapping):
@@ -90,6 +98,79 @@ def _model_facts_metadata(item: Mapping[str, Any]) -> dict[str, Any]:
         if "prompt" in quoted and "completion" in quoted:
             metadata["pricing"] = quoted
     return metadata
+
+
+_CONTEXT_KEYS = (
+    "context_length",
+    "max_context_length",
+    "context_window",
+    "context_window_tokens",
+    "max_input_tokens",
+    "n_ctx",
+    "num_ctx",
+)
+
+
+def _positive_context(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int) and value > 0:
+        return value
+    if isinstance(value, str) and value.strip().isdigit():
+        parsed = int(value.strip())
+        return parsed if parsed > 0 else None
+    return None
+
+
+def _context_length(value: Any, *, depth: int = 0) -> int | None:
+    """Read common, bounded local-runtime capacity fields without guessing."""
+    if depth > 4:
+        return None
+    if isinstance(value, Mapping):
+        for key in _CONTEXT_KEYS:
+            parsed = _positive_context(value.get(key))
+            if parsed is not None:
+                return parsed
+        # Ollama exposes architecture-qualified keys such as
+        # ``llama.context_length`` in ``model_info``.
+        for key, candidate in value.items():
+            if isinstance(key, str) and key.endswith(".context_length"):
+                parsed = _positive_context(candidate)
+                if parsed is not None:
+                    return parsed
+        for key in (
+            "model_info",
+            "capabilities",
+            "config",
+            "loaded_context",
+            "loaded_instances",
+            "instances",
+            "default_generation_settings",
+        ):
+            parsed = _context_length(value.get(key), depth=depth + 1)
+            if parsed is not None:
+                return parsed
+    if isinstance(value, list):
+        for candidate in value[:100]:
+            parsed = _context_length(candidate, depth=depth + 1)
+            if parsed is not None:
+                return parsed
+    return None
+
+
+def _ollama_parameter_context(parameters: Any) -> int | None:
+    if not isinstance(parameters, str):
+        return None
+    match = re.search(r"(?m)^\s*num_ctx\s+(\d+)\s*$", parameters)
+    return _positive_context(match.group(1)) if match else None
+
+
+def _model_identifier(value: Mapping[str, Any]) -> str | None:
+    for key in ("id", "model", "name", "model_key", "key"):
+        candidate = value.get(key)
+        if isinstance(candidate, str) and candidate:
+            return candidate
+    return None
 
 
 def _raise_in_band_error(value: Any) -> None:
@@ -219,7 +300,90 @@ class AsyncOpenAICompatibleProvider:
 
     async def list_models(self) -> list[ProviderModelInfo]:
         response = await self._request("GET", self.models_path)
-        return self._parse_models(_json(response))
+        models = self._parse_models(_json(response))
+        return await self._with_local_context(models)
+
+    async def _native_request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
+        """Read optional metadata from the same local runtime origin.
+
+        These reads never introduce a new host: `_join_origin` retains the
+        already policy-checked scheme and authority and only replaces `/v1`.
+        """
+        headers = {**self._headers, **kwargs.pop("headers", {})}
+        response = await self._client.request(
+            method, _join_origin(self.endpoint, path), headers=headers, **kwargs
+        )
+        if response.status_code >= 400:
+            raise _map_status(response.status_code, model=self.model)
+        return _json(response)
+
+    async def _with_local_context(
+        self, models: list[ProviderModelInfo]
+    ) -> list[ProviderModelInfo]:
+        """Enrich local catalogues with their effective context capacity.
+
+        Provider-native metadata is supplementary: an old runtime, disabled
+        endpoint, or unexpected response leaves the ordinary model catalogue
+        usable and the capacity honestly unknown.
+        """
+        capacities: dict[str, int] = {}
+        try:
+            if self.provider == "ollama":
+                try:
+                    running = await self._native_request("GET", "/api/ps")
+                except Exception:  # noqa: BLE001 — older Ollama can still answer /api/show
+                    running = {}
+                rows = running.get("models")
+                if isinstance(rows, list):
+                    for row in rows:
+                        if not isinstance(row, Mapping):
+                            continue
+                        identifier = _model_identifier(row)
+                        capacity = _context_length(row)
+                        if identifier and capacity:
+                            capacities[identifier] = capacity
+                for model in models:
+                    if model.id in capacities:
+                        continue
+                    try:
+                        detail = await self._native_request(
+                            "POST", "/api/show", json={"model": model.id}
+                        )
+                    except Exception:  # noqa: BLE001 — one model must not fail the catalogue
+                        continue
+                    capacity = _ollama_parameter_context(detail.get("parameters")) or _context_length(detail)
+                    if capacity:
+                        capacities[model.id] = capacity
+            elif self.provider == "lm-studio":
+                catalogue = await self._native_request("GET", "/api/v1/models")
+                rows = catalogue.get("models") or catalogue.get("data")
+                if isinstance(rows, list):
+                    for row in rows:
+                        if not isinstance(row, Mapping):
+                            continue
+                        identifier = _model_identifier(row)
+                        capacity = _context_length(row)
+                        if identifier and capacity:
+                            capacities[identifier] = capacity
+            elif self.provider == "llama.cpp":
+                props = await self._native_request("GET", "/props")
+                capacity = _context_length(props)
+                if capacity:
+                    capacities.update({model.id: capacity for model in models})
+        except Exception:  # noqa: BLE001 — native discovery is best-effort
+            return models
+
+        return [
+            ProviderModelInfo(
+                id=model.id,
+                owned_by=model.owned_by,
+                metadata={
+                    **dict(model.metadata),
+                    **({"context_length": capacities[model.id]} if model.id in capacities else {}),
+                },
+            )
+            for model in models
+        ]
 
     def _parse_models(self, data: dict[str, Any]) -> list[ProviderModelInfo]:
         _raise_in_band_error(data.get("error"))

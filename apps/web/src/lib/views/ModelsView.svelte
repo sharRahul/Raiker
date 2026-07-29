@@ -81,6 +81,16 @@
 
   const signInProfile = $derived(models?.profiles.find((p) => p.profile_id === signInFor) ?? null);
 
+  function contextCapacity(profile: ModelProfile): string {
+    if (!profile.context_window_tokens) {
+      return "Not reported by this runtime. Refresh its model catalogue or configure an exact fallback before relying on a percentage.";
+    }
+    const source = profile.context_window_source === "provider"
+      ? "Reported by the provider runtime"
+      : "Configured in Raiker";
+    return `${new Intl.NumberFormat().format(profile.context_window_tokens)} tokens · ${source}`;
+  }
+
   function openSignIn(profileId: string) {
     signInFor = profileId;
     signInApiKey = "";
@@ -729,7 +739,7 @@
       <dl class="details-grid">
         <div><dt>Selected model</dt><dd><code>{detailsFor.selected ? modelName(detailsFor.model) : "Not selected"}</code></dd></div>
         <div><dt>Connection</dt><dd>{detailsFor.connection_configured ? "Encrypted instance connection saved" : "Not configured"}</dd></div>
-        <div><dt>Context capacity</dt><dd>Not reported by this provider. Raiker will show a percentage once the selected model exposes a context window.</dd></div>
+        <div><dt>Context capacity</dt><dd>{contextCapacity(detailsFor)}</dd></div>
         <div><dt>Current context usage</dt><dd>No provider context telemetry has been received for this model yet.</dd></div>
         <div><dt>Subscription / rate limits</dt><dd>Not available through this connection. Raiker only displays daily or weekly limits when an authorized provider API exposes them.</dd></div>
       </dl>

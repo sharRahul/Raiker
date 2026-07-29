@@ -289,7 +289,7 @@ describe("ChatView streaming transcript", () => {
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalledOnce());
     const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
     expect(body.model_profile).toBe("ollama-local-openai-compatible");
-    expect(body.model).toBeUndefined();
+    expect(body.model).toBe("qwen2.5");
   });
 
   it("names the persisted selection in the configured model dropdown", async () => {

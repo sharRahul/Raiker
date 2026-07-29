@@ -722,6 +722,8 @@ export const api = {
     parent_task_id?: string;
     // Create the task under a specific project. Omitted → the active project.
     project_id?: string | null;
+    model_profile?: string;
+    model?: string;
   }) => postJson<TaskView>("/api/tasks", body),
 
   // ── Prompts / interrupts ──

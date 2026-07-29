@@ -742,6 +742,8 @@ class TaskRecord:
     # Project-scoped schedules: the organizing project the task/schedule was
     # created under. None for a task created outside any project.
     project_id: str | None = None
+    model_profile: str | None = None
+    model: str | None = None
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:

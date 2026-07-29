@@ -9,17 +9,27 @@
     profiles,
     selectedProfile = null,
     value = $bindable(""),
+    profileId = $bindable(""),
+    model = $bindable(""),
     disabled = false,
   }: {
     profiles: ModelProfile[];
     selectedProfile?: ModelProfile | null;
     value?: string;
+    profileId?: string;
+    model?: string;
     disabled?: boolean;
   } = $props();
 
   let open = $state(false);
   let rootEl: HTMLDivElement | undefined = $state();
-  const choices = $derived(selectedProfile === null ? profiles : [selectedProfile, ...profiles.filter((profile) => profile.profile_id !== selectedProfile.profile_id)]);
+  const sameChoice = (left: ModelProfile, right: ModelProfile) =>
+    left.profile_id === right.profile_id && left.model === right.model;
+  const choices = $derived(
+    selectedProfile === null
+      ? profiles
+      : [selectedProfile, ...profiles.filter((profile) => !sameChoice(profile, selectedProfile))],
+  );
   const providerGroups = $derived.by(() => {
     const groups = new Map<string, ModelProfile[]>();
     for (const profile of choices) {
@@ -27,11 +37,20 @@
     }
     return [...groups].map(([provider, profiles]) => ({ provider, profiles }));
   });
-  const active = $derived(profiles.find((profile) => profile.profile_id === value) ?? selectedProfile);
+  const activeProfileId = $derived(profileId || value);
+  const active = $derived(
+    profiles.find(
+      (profile) =>
+        profile.profile_id === activeProfileId && (!model || profile.model === model),
+    ) ?? selectedProfile,
+  );
   const label = $derived(active ? modelName(active.model) : "Not selected");
 
-  function select(profileId: string) {
-    value = profileId === selectedProfile?.profile_id ? "" : profileId;
+  function select(profile: ModelProfile) {
+    const selectsDefault = selectedProfile !== null && sameChoice(profile, selectedProfile);
+    value = selectsDefault ? "" : profile.profile_id;
+    profileId = selectsDefault ? "" : profile.profile_id;
+    model = selectsDefault ? "" : profile.model;
     open = false;
   }
 
@@ -71,18 +90,18 @@
             <ProviderLogo provider={group.provider} />
             <span>{providerName(group.provider)}</span>
           </div>
-          {#each group.profiles as profile (profile.profile_id)}
+          {#each group.profiles as profile (`${profile.profile_id}\u0000${profile.model}`)}
             <button
               type="button"
               class="model-choice"
               role="menuitemradio"
-              aria-checked={active?.profile_id === profile.profile_id}
+              aria-checked={active?.profile_id === profile.profile_id && active?.model === profile.model}
               disabled={disabled}
-              onclick={() => select(profile.profile_id)}
+              onclick={() => select(profile)}
             >
               <ProviderLogo provider={profile.provider} />
               <span>{modelName(profile.model)}</span>
-              {#if active?.profile_id === profile.profile_id}<Icon name="check" size={15} label="Selected model" />{/if}
+              {#if active?.profile_id === profile.profile_id && active?.model === profile.model}<Icon name="check" size={15} label="Selected model" />{/if}
             </button>
           {/each}
         </div>

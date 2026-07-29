@@ -1076,6 +1076,8 @@ async def create_task(
             reminder_at=body.reminder_at,
             parent_task_id=body.parent_task_id,
             project_id=body.project_id,
+            model_profile=body.model_profile,
+            model=body.model,
         )
     except ValueError as exc:
         raise HTTPException(

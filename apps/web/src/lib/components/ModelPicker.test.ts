@@ -63,4 +63,22 @@ describe("ModelPicker", () => {
     expect(anthropic).toHaveTextContent("Sonnet 4.5");
     expect(screen.getByRole("group", { name: "OpenAI models" })).toHaveTextContent("GPT-4o Mini");
   });
+
+  it("distinguishes two configured models on the same provider profile", async () => {
+    const sameProvider = [
+      { ...profiles[0], profile_id: "anthropic-hosted", model: "claude-haiku-4-5-20251001" },
+      { ...profiles[1], profile_id: "anthropic-hosted", model: "claude-sonnet-4-5-20250929" },
+    ];
+    render(ModelPicker, {
+      profiles: sameProvider,
+      selectedProfile: sameProvider[0],
+      profileId: "anthropic-hosted",
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: /model for this turn/i }));
+    await fireEvent.click(screen.getByRole("menuitemradio", { name: /Sonnet 4.5/i }));
+
+    expect(screen.getByRole("button", { name: /model for this turn: Sonnet 4.5/i })).toBeInTheDocument();
+  });
 });

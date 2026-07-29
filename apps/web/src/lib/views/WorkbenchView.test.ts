@@ -6,10 +6,12 @@ import { fireEvent } from "@testing-library/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WorkbenchView from "./WorkbenchView.svelte";
 import { stubFetch, stubFetchPending } from "../test-helpers";
+import { resetModels } from "../models.svelte";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  resetModels();
 });
 
 const SESSION = {
@@ -86,7 +88,9 @@ describe("WorkbenchView", () => {
     render(WorkbenchView);
 
     await waitFor(() => expect(screen.getByText("Quarterly note")).toBeInTheDocument());
-    expect(await screen.findByRole("option", { name: /local-default — qwen2.5/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /model for this turn: qwen 2.5/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Build" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Run work" })).not.toBeInTheDocument();
   });
 
   it("labels a hosted model as leaving the machine", async () => {
@@ -100,7 +104,8 @@ describe("WorkbenchView", () => {
       }),
     );
     render(WorkbenchView);
-    await waitFor(() => expect(screen.getByRole("option", { name: /hosted/i })).toBeInTheDocument());
+    await fireEvent.click(await screen.findByRole("button", { name: /model for this turn: qwen/i }));
+    expect(screen.getByRole("group", { name: /anthropic models/i })).toBeInTheDocument();
   });
 
   it("says no model is selected instead of implying one is ready", async () => {
@@ -119,11 +124,12 @@ describe("WorkbenchView", () => {
     render(WorkbenchView);
 
     await vi.waitFor(() => expect(screen.getByLabelText(/what would you like raiker to do/i)).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("tab", { name: "Chat" }));
     await fireEvent.input(screen.getByLabelText(/what would you like raiker to do/i), {
       target: { value: "Summarise the open approvals" },
     });
-    await vi.waitFor(() => expect(screen.getByRole("button", { name: /start work/i })).toBeEnabled());
-    await fireEvent.click(screen.getByRole("button", { name: /start work/i }));
+    await vi.waitFor(() => expect(screen.getByRole("button", { name: /start conversation/i })).toBeEnabled());
+    await fireEvent.click(screen.getByRole("button", { name: /start conversation/i }));
     vi.runAllTimers();
 
     expect(composed).toHaveBeenCalledTimes(1);
@@ -143,6 +149,7 @@ describe("WorkbenchView", () => {
     const composed = vi.fn();
     window.addEventListener("raiker:compose", composed);
     render(WorkbenchView);
+    await fireEvent.click(await screen.findByRole("tab", { name: "Chat" }));
 
     // Wait for the saved conversation to become a real option — selecting a
     // value a <select> does not yet offer would silently leave it empty.
@@ -155,18 +162,54 @@ describe("WorkbenchView", () => {
     await fireEvent.input(screen.getByLabelText(/what would you like raiker to do/i), {
       target: { value: "Continue from here" },
     });
-    await fireEvent.click(screen.getByRole("button", { name: /start work/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /start conversation/i }));
     vi.runAllTimers();
 
     expect((composed.mock.calls[0][0] as CustomEvent).detail.sessionId).toBe("sess_1");
     window.removeEventListener("raiker:compose", composed);
   });
 
+  it("hands Build its own exact provider and model choice", async () => {
+    vi.useFakeTimers();
+    stubFetch(routes({
+      "GET /api/models": {
+        profiles: [LOCAL_PROFILE],
+        chat_profiles: [
+          LOCAL_PROFILE,
+          { ...LOCAL_PROFILE, profile_id: "anthropic", provider: "anthropic", model: "opus", selected: false },
+        ],
+      },
+    }));
+    const composed = vi.fn();
+    window.addEventListener("raiker:build-compose", composed);
+    render(WorkbenchView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /model for this turn: qwen/i }));
+    await fireEvent.click(screen.getByRole("menuitemradio", { name: /opus/i }));
+    await fireEvent.input(screen.getByLabelText(/what would you like raiker to do/i), { target: { value: "Build the release" } });
+    await fireEvent.click(screen.getByRole("button", { name: /start build/i }));
+    vi.runAllTimers();
+
+    expect((composed.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
+      profileId: "anthropic",
+      model: "opus",
+    });
+    window.removeEventListener("raiker:build-compose", composed);
+  });
+
+  it("keeps Schedule on the global model resolved at run time", async () => {
+    stubFetch(routes());
+    render(WorkbenchView);
+    await fireEvent.click(await screen.findByRole("tab", { name: "Schedule" }));
+    expect(screen.getByText(/global at run time/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /model for this turn/i })).not.toBeInTheDocument();
+  });
+
   it("keeps the start control disabled until something is written", async () => {
     stubFetch(routes());
     render(WorkbenchView);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /start work/i })).toBeDisabled(),
+      expect(screen.getByRole("button", { name: /start build/i })).toBeDisabled(),
     );
   });
 });

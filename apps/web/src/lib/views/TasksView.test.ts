@@ -6,6 +6,43 @@ import { stubFetch, stubFetchPending } from "../test-helpers";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("TasksView", () => {
+  it("creates an immediate task with its own configured model pair", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/tasks": [],
+      "GET /api/models": {
+        profiles: [],
+        chat_profiles: [
+          { profile_id: "anthropic", provider: "anthropic", model: "haiku", selected: true, configured: true },
+          { profile_id: "anthropic", provider: "anthropic", model: "opus", selected: false, configured: true },
+        ],
+      },
+      "POST /api/tasks": {},
+    });
+    render(TasksView);
+    await screen.findByText("No work queued");
+
+    await fireEvent.click(await screen.findByRole("button", { name: /model for this turn/i }));
+    await fireEvent.click(screen.getByRole("menuitemradio", { name: /opus/i }));
+    await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Review release" } });
+    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "Check every change." } });
+    await fireEvent.click(screen.getByRole("button", { name: "Create task" }));
+
+    const post = await waitFor(() => fetchMock.mock.calls.find(([, init]) => init?.method === "POST"));
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({
+      model_profile: "anthropic",
+      model: "opus",
+    });
+  });
+
+  it("explains that schedules resolve the global model when they run", async () => {
+    stubFetch({ "GET /api/tasks": [], "GET /api/models": { profiles: [], chat_profiles: [] } });
+    render(TasksView);
+    await screen.findByText("No work queued");
+    await fireEvent.click(screen.getByRole("button", { name: "Schedule once" }));
+    expect(screen.getByText(/uses the global model active when this run begins/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /model for this turn/i })).not.toBeInTheDocument();
+  });
+
   it("shows a route-level loading state while tasks are fetched", async () => {
     stubFetchPending();
     render(TasksView);

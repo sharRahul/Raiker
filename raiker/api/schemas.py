@@ -140,7 +140,7 @@ class ComposerApprovalModeRequest(BaseModel):
 
 
 class TaskCreateRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
     title: str
     description: str = ""
     priority: str | None = None
@@ -152,6 +152,8 @@ class TaskCreateRequest(BaseModel):
     # omitted the active project is used, so a schedule created inside a project
     # stays scoped to it.
     project_id: str | None = None
+    model_profile: str | None = None
+    model: str | None = None
 
 
 class SetModelSelectionRequest(BaseModel):

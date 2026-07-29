@@ -36,7 +36,11 @@ class TaskScheduler:
                 PromptEnvelope(
                     request_id=new_id("req_"), session_id=task.session_id, turn_id=new_id("turn_"),
                     client=ClientMetadata(type="dashboard", name="raiker-scheduler", version="1"),
-                    user=UserMetadata(id=principal_id), prompt=PromptPayload(text=prompt), options=PromptOptions(),
+                    user=UserMetadata(id=principal_id), prompt=PromptPayload(text=prompt),
+                    options=PromptOptions(
+                        model_profile=task.model_profile or "",
+                        model=task.model or "",
+                    ),
                 )
             )
             manager = TaskManager(self.store, EventLogWriter(self.store))

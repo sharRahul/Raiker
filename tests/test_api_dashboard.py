@@ -210,6 +210,8 @@ class TestReads:
         assert task["objective"] == "Prepare the release notes."
         assert task["priority"] == "high"
         assert task["scheduled_at"] == "2026-07-14T09:30:00Z"
+        assert task["model_profile"] is None
+        assert task["model"] is None
 
         listed = client.get("/api/tasks", headers=_auth_headers(token))
         assert listed.status_code == 200
@@ -229,6 +231,46 @@ class TestReads:
         assert child.status_code == 201, child.text
         assert child.json()["parent_task_id"] == task["task_id"]
         assert child.json()["recurrence"] == "daily"
+
+    def test_immediate_task_keeps_its_independent_model_choice(
+        self, client: TestClient, app: FastAPI
+    ) -> None:
+        token = _token(client)
+        SQLiteStore(app.state.workspace_root).save_configured_model(
+            "principal_owner", "ollama-local-openai-compatible", "gemma4:31b-cloud"
+        )
+
+        response = client.post(
+            "/api/tasks",
+            headers=_auth_headers(token),
+            json={
+                "title": "Build the release",
+                "description": "Prepare it.",
+                "model_profile": "ollama-local-openai-compatible",
+                "model": "gemma4:31b-cloud",
+            },
+        )
+
+        assert response.status_code == 201, response.text
+        assert response.json()["model_profile"] == "ollama-local-openai-compatible"
+        assert response.json()["model"] == "gemma4:31b-cloud"
+
+    def test_schedule_rejects_a_pinned_model(self, client: TestClient) -> None:
+        token = _token(client)
+        response = client.post(
+            "/api/tasks",
+            headers=_auth_headers(token),
+            json={
+                "title": "Daily review",
+                "description": "Review it.",
+                "scheduled_at": "2026-07-14T09:30:00Z",
+                "model_profile": "ollama-local-openai-compatible",
+                "model": "gemma4:31b-cloud",
+            },
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"]["reason_code"] == "scheduled_task_uses_global_model"
 
     def test_brain_returns_only_stored_work_relationships(self, client: TestClient) -> None:
         token = _token(client)

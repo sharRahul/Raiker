@@ -23,6 +23,7 @@
   } from "../apiTypes";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
+  import ModelPicker from "../components/ModelPicker.svelte";
   import StatTile from "../components/StatTile.svelte";
   import { relativeTime } from "../format";
   import { isActiveTask } from "../statusMaps";
@@ -41,8 +42,13 @@
   let draft = $state("");
   let continueSession = $state("");
   let handedOff = $state(false);
-  let workMode = $state<"chat" | "run" | "task" | "schedule">("run");
-  let modelChoice = $state("");
+  let workMode = $state<"chat" | "build" | "task" | "schedule">("build");
+  let chatProfile = $state("");
+  let chatModel = $state("");
+  let buildProfile = $state("");
+  let buildModel = $state("");
+  let taskProfile = $state("");
+  let taskModel = $state("");
   let updatedAt = $state<Date | null>(null);
 
   const activeTasks = $derived(
@@ -52,7 +58,15 @@
     projects?.projects.find((project) => project.project_id === projects?.active_project_id) ?? null,
   );
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
-  const effectiveModel = $derived(profiles.find((profile) => profile.profile_id === modelChoice) ?? selectedProfile);
+  const chosenProfile = $derived(
+    workMode === "chat" ? chatProfile : workMode === "build" ? buildProfile : workMode === "task" ? taskProfile : "",
+  );
+  const chosenModel = $derived(
+    workMode === "chat" ? chatModel : workMode === "build" ? buildModel : workMode === "task" ? taskModel : "",
+  );
+  const effectiveModel = $derived(
+    profiles.find((profile) => profile.profile_id === chosenProfile && profile.model === chosenModel) ?? selectedProfile,
+  );
   const named = $derived((sessions ?? []).filter((s) => (s.title ?? "").trim() !== ""));
   const hasActivity = $derived(named.length > 0 || (tasks ?? []).length > 0 || (projects?.projects ?? []).length > 0);
   const runtimeIssues = $derived(
@@ -60,7 +74,7 @@
       ? 0
       : diagnostics.missing_config.length + (diagnostics.production_ready_local_single_user_runtime ? 0 : 1),
   );
-  const primaryLabel = $derived(workMode === "chat" ? "Start conversation" : workMode === "task" ? "Create task" : workMode === "schedule" ? "Review schedule" : "Start work");
+  const primaryLabel = $derived(workMode === "chat" ? "Start conversation" : workMode === "task" ? "Create task" : workMode === "schedule" ? "Review schedule" : "Start build");
 
   async function load() {
     unavailable = false;
@@ -95,6 +109,23 @@
     if (text === "" || effectiveModel === null) return;
     if (workMode === "task" || workMode === "schedule") {
       window.location.hash = "#/tasks";
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("raiker:task-compose", {
+        detail: {
+          text,
+          cadence: workMode === "schedule" ? "once" : "now",
+          profileId: workMode === "task" ? effectiveModel.profile_id : null,
+          model: workMode === "task" ? effectiveModel.model : null,
+        },
+      })), 0);
+      return;
+    }
+    if (workMode === "build") {
+      window.location.hash = "#/build";
+      window.setTimeout(() => window.dispatchEvent(new CustomEvent("raiker:build-compose", {
+        detail: { text, profileId: effectiveModel.profile_id, model: effectiveModel.model },
+      })), 0);
+      draft = "";
+      handedOff = true;
       return;
     }
     window.location.hash = continueSession
@@ -106,7 +137,7 @@
     window.setTimeout(() => {
       window.dispatchEvent(
         new CustomEvent("raiker:compose", {
-          detail: { text, sessionId: continueSession || null },
+          detail: { text, sessionId: continueSession || null, profileId: effectiveModel.profile_id, model: effectiveModel.model },
         }),
       );
     }, 0);
@@ -134,7 +165,7 @@
         <label class="composer-label" for="workbench-prompt">What would you like Raiker to do?</label>
         <p class="composer-help">Describe an outcome, ask a question, or attach a file.</p>
         <div class="mode-tabs" role="tablist" aria-label="Work mode">
-          {#each [["chat", "Chat"], ["run", "Run work"], ["task", "Create task"], ["schedule", "Schedule"]] as option}
+          {#each [["chat", "Chat"], ["build", "Build"], ["task", "Create task"], ["schedule", "Schedule"]] as option}
             <button type="button" role="tab" aria-selected={workMode === option[0]} class:active={workMode === option[0]} onclick={() => (workMode = option[0] as typeof workMode)}>{option[1]}</button>
           {/each}
         </div>
@@ -142,12 +173,12 @@
         <div class="scope">
           <label><span class="field-label">Start as</span><select class="select" bind:value={continueSession} aria-label="Conversation to continue"><option value="">New conversation</option>{#each named.slice(0, 10) as session (session.session_id)}<option value={session.session_id}>{session.title}</option>{/each}</select></label>
           <div class="scope-fact"><span class="field-label">Project</span><p>{activeProject?.name ?? "No project"}</p></div>
-          <label><span class="field-label">Model</span><select class="select" bind:value={modelChoice} aria-label="Model"><option value="">{selectedProfile ? `Organisation default — ${selectedProfile.model}` : "Choose a model"}</option>{#each profiles as profile (profile.profile_id)}<option value={profile.profile_id}>{profile.profile_id} — {profile.model}</option>{/each}</select></label>
+          <div><span class="field-label">Model</span>{#if workMode === "chat"}<ModelPicker {profiles} {selectedProfile} bind:profileId={chatProfile} bind:model={chatModel} />{:else if workMode === "build"}<ModelPicker {profiles} {selectedProfile} bind:profileId={buildProfile} bind:model={buildModel} />{:else if workMode === "task"}<ModelPicker {profiles} {selectedProfile} bind:profileId={taskProfile} bind:model={taskModel} />{:else}<p class="global-model">Global at run time — {selectedProfile?.model ?? "not selected"}</p>{/if}</div>
         </div>
         {#if effectiveModel === null}<p class="model-error" role="alert"><strong>A model is required before work can start.</strong> <a href="#/models">Choose a model</a> or ask an administrator.</p>{/if}
         <details class="governed"><summary><Icon name="shield" size={14} /> Governed execution</summary><p>Raiker requests your approval before restricted external actions. Project boundaries and connected-tool policies still apply.</p></details>
         <div class="composer-actions"><button class="btn btn-primary" type="submit" disabled={draft.trim() === "" || effectiveModel === null}><Icon name="send" size={15} /> {primaryLabel}</button></div>
-        {#if handedOff}<p class="handoff" role="status">Sent to Chat. The conversation and its governed turn continue there.</p>{/if}
+        {#if handedOff}<p class="handoff" role="status">{workMode === "build" ? "Sent to Build. Review and start the governed build there." : "Sent to Chat. The conversation and its governed turn continue there."}</p>{/if}
       </form>
 
       <div><h3 class="block-title">Quick actions</h3><nav class="action-grid" aria-label="Quick actions">

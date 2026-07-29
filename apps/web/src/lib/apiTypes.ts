@@ -694,6 +694,8 @@ export interface TaskView {
   // under, or null when it was created outside every project.
   project_id: string | null;
   parent_task_id?: string | null;
+  model_profile?: string | null;
+  model?: string | null;
 }
 
 // POST /api/interrupts response (raiker/api/routes_prompts.py).

@@ -107,6 +107,7 @@
   // applies its own defaults, exactly as if the option was never sent. They
   // live as compact controls at the bottom of the composer card.
   let modelProfile = $state("");
+  let model = $state("");
   let reasoningEffort = $state("");
   // One reactive view of the shared model store; refreshes live when the
   // Models page connects a provider or selects a model, without a remount.
@@ -115,7 +116,9 @@
   // The persisted selection (Models view / /model use). The default provider
   // option names it so the user can see what will actually serve the turn.
   const selectedProfile = $derived(profiles.find((p) => p.selected) ?? null);
-  const activeProfile = $derived(profiles.find((p) => p.profile_id === modelProfile) ?? selectedProfile);
+  const activeProfile = $derived(
+    profiles.find((p) => p.profile_id === modelProfile && (!model || p.model === model)) ?? selectedProfile,
+  );
   const reasoningEfforts = $derived(
     activeProfile?.supports_reasoning === true && activeProfile.supports_reasoning_effort === true
       ? (activeProfile.reasoning_effort_values ?? [])
@@ -374,12 +377,14 @@
     // `submit()` below — the Workbench never talks to the API directly, so a
     // prompt started there is identical to one typed here.
     const onCompose = (event: Event) => {
-      const detail = (event as CustomEvent<{ text: string; sessionId: string | null }>).detail;
+      const detail = (event as CustomEvent<{ text: string; sessionId: string | null; profileId?: string; model?: string }>).detail;
       if (detail === undefined || detail.text.trim() === "") return;
       if (detail.sessionId !== null && detail.sessionId !== sessionId) {
         sessionId = detail.sessionId;
         void loadHistory(detail.sessionId);
       }
+      modelProfile = detail.profileId ?? "";
+      model = detail.model ?? "";
       promptText = detail.text;
       void submit();
     };
@@ -510,6 +515,7 @@
           text,
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
+          model: model || undefined,
           ...(reasoningEfforts.includes(reasoningEffort) ? { reasoning_effort: reasoningEffort } : {}),
           attachments:
             sentAttachments.length > 0
@@ -924,7 +930,7 @@
           disabled={streaming}
         ></textarea>
         <div class="upper-controls">
-          <ModelPicker bind:value={modelProfile} {profiles} {selectedProfile} disabled={streaming} />
+          <ModelPicker bind:profileId={modelProfile} bind:model {profiles} {selectedProfile} disabled={streaming} />
           {#if reasoningEfforts.length > 0}
             <select
               class="bar-select"

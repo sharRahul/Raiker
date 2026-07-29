@@ -47,6 +47,12 @@ const REASONING_PROFILE = {
   reasoning_effort_values: ["medium", "high"],
 };
 
+const ALT_REASONING_PROFILE = {
+  ...REASONING_PROFILE,
+  model: "opus-build-model",
+  selected: false,
+};
+
 const WRITE_CAPABILITIES = [
   "file_write_execution",
   "patch_apply_execution",
@@ -229,7 +235,11 @@ describe("Build composer modes", () => {
 describe("Build model picker", () => {
   it("shows the selected model and sends only an advertised thinking effort", async () => {
     stubFetch(baseRoutes({
-      "GET /api/models": { ...MODELS, profiles: [REASONING_PROFILE], chat_profiles: [REASONING_PROFILE] },
+      "GET /api/models": {
+        ...MODELS,
+        profiles: [REASONING_PROFILE],
+        chat_profiles: [REASONING_PROFILE, ALT_REASONING_PROFILE],
+      },
     }));
     respondWith("Done.");
     render(BuildView);
@@ -238,6 +248,8 @@ describe("Build model picker", () => {
       expect(screen.getByRole("button", { name: "Model for this turn: Reasoning Model" })).toBeInTheDocument(),
     );
     expect(screen.getByRole("button", { name: "Model for this turn: Reasoning Model" })).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Model for this turn: Reasoning Model" }));
+    await fireEvent.click(screen.getByRole("menuitemradio", { name: /Opus Build Model/i }));
     const effort = screen.getByLabelText("Thinking effort");
     expect(within(effort).getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Thinking: default",
@@ -249,7 +261,11 @@ describe("Build model picker", () => {
     await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
-    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ reasoning_effort: "high" });
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
+      model_profile: "openrouter-reasoning",
+      model: "opus-build-model",
+      reasoning_effort: "high",
+    });
   });
 
   it("calls an unavailable choice Not selected", async () => {

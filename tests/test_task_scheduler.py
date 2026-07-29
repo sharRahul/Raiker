@@ -49,6 +49,44 @@ def test_due_task_runs_as_its_owner(tmp_path: Path, monkeypatch) -> None:  # typ
     assert saved.summary == "Finished safely."
 
 
+def test_immediate_task_uses_its_pair_while_schedule_uses_global(
+    tmp_path: Path, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    store = SQLiteStore(tmp_path)
+    session_id = "sess_inbox_principal_owner"
+    store.create_session(session_id, str(tmp_path))
+    manager = TaskManager(store, EventLogWriter(store))
+    manager.create_task(
+        session_id=session_id,
+        title="Immediate",
+        objective="Run now",
+        scheduled_at="2020-01-01T09:00:00Z",
+        model_profile="ollama-local-openai-compatible",
+        model="gemma4:31b-cloud",
+    )
+    captured = []
+
+    async def completed(_gateway, envelope):  # type: ignore[no-untyped-def]
+        captured.append(envelope.options)
+        return SimpleNamespace(status="completed", message="Finished safely.")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.submit_prompt_async", completed)
+    assert asyncio.run(TaskScheduler(tmp_path).run_due()) == 1
+    assert captured[0].model_profile == "ollama-local-openai-compatible"
+    assert captured[0].model == "gemma4:31b-cloud"
+
+    manager.create_task(
+        session_id=session_id,
+        title="Scheduled",
+        objective="Run later",
+        scheduled_at="2020-01-02T09:00:00Z",
+    )
+    assert asyncio.run(TaskScheduler(tmp_path).run_due()) == 1
+    assert captured[1].model_profile == ""
+    assert captured[1].model == ""
+
+
 # BUG-09 — a run must never end on a state the owner cannot account for. Every
 # terminal status maps to a task status *and* a stated reason, and a turn that
 # said nothing still leaves the owner something to read.

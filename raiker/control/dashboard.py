@@ -509,6 +509,8 @@ class TaskView:
     # Project-scoped schedules: the organizing project this task was created
     # under, or None when it was created outside every project.
     project_id: str | None = None
+    model_profile: str | None = None
+    model: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -2292,6 +2294,8 @@ class DashboardService:
         reminder_at: str | None = None,
         parent_task_id: str | None = None,
         project_id: str | None = None,
+        model_profile: str | None = None,
+        model: str | None = None,
     ) -> TaskView:
         """Create a local planning task in the caller's server-owned Inbox session.
 
@@ -2302,6 +2306,20 @@ class DashboardService:
         """
         if recurrence is not None and recurrence not in TASK_RECURRENCES:
             raise ValueError(f"invalid_recurrence:{recurrence}")
+        is_schedule = scheduled_at is not None or recurrence is not None
+        if bool(model_profile) != bool(model):
+            raise ValueError("task_model_pair_required")
+        if is_schedule and model_profile:
+            raise ValueError("scheduled_task_uses_global_model")
+        if model_profile and model:
+            try:
+                profile = ModelProfileRegistry.load().resolve_profile_id(model_profile)
+            except Exception as exc:  # noqa: BLE001 - unknown choices fail closed
+                raise ValueError(f"unknown_profile:{model_profile}") from exc
+            if bool(profile.raw.get("test_only", False)):
+                raise ValueError(f"test_profile_not_allowed:{model_profile}")
+            if not self.store.is_configured_model(principal_id, model_profile, model):
+                raise ValueError("model_not_configured_for_task")
         # An unscheduled task is work requested now; the resident host claims
         # it on its next scheduler tick. Explicit times remain untouched.
         if scheduled_at is None:
@@ -2340,6 +2358,8 @@ class DashboardService:
             reminder_at=reminder_at,
             parent_task_id=parent_task_id,
             project_id=project_id,
+            model_profile=model_profile,
+            model=model,
         )
         return self._task_view(task)
 
@@ -2440,53 +2460,102 @@ class DashboardService:
                 "price_as_of": price_as_of,
             }
 
-        profiles = tuple(
-            ModelProfileView(
-                profile_id=p.profile_id,
-                provider=p.provider,
-                model=(override if override and p.profile_id == current else p.model),
-                default_state=p.default_state,
-                local_only=p.local_only,
-                requires_network=p.requires_network,
-                endpoint_kind=str(p.raw.get("endpoint_kind", "unknown")),
-                requires_egress_policy=bool(p.raw.get("requires_egress_policy", False)),
-                requires_budget_policy=bool(p.raw.get("requires_budget_policy", False)),
-                runtime_gate=self._runtime_gate_for_profile(str(p.raw.get("endpoint_kind", "unknown"))),
-                off_machine=str(p.raw.get("endpoint_kind", "unknown")) in {"remote_hosted", "private_network"},
-                selected=(p.profile_id == current),
-                connection_configured=bool(
-                    acting_principal_id
-                    and get_model_connection(self.store, acting_principal_id, p.profile_id)
-                ),
-                prompt_cache_ttl=(str(p.raw.get("prompt_cache_ttl")) if p.raw.get("prompt_cache_ttl") else None),
-                context_window_tokens=self._resolve_facts(
-                    p, (override if override and p.profile_id == current else p.model),
-                    acting_principal_id,
-                ).context_window_tokens,
-                context_window_source=self._resolve_facts(
-                    p, (override if override and p.profile_id == current else p.model),
-                    acting_principal_id,
-                ).context_window_source,
-                configured=(
-                    (override if override and p.profile_id == current else p.model) != "<model>"
-                ),
-                supports_reasoning=bool(p.raw.get("supports_reasoning", False)),
-                supports_reasoning_effort=bool(p.raw.get("supports_reasoning_effort", False)),
-                reasoning_effort_values=tuple(
-                    str(value) for value in p.raw.get("reasoning_effort_values", [])
-                ),
-                **_usage_fields(p),
-            )
+        registry_profiles = tuple(
+            p
             for p in registry.list_profiles()
-            # Test-harness profiles (mock/deterministic) are not selectable outside
-            # test mode (the provider factory fails closed), so the web surface
-            # lists working backends only.
             if not bool(p.raw.get("test_only", False))
             and not bool(p.raw.get("setup_hidden", False))
         )
+
+        def _profile_view(
+            profile: Any, effective_model: str, *, selected: bool
+        ) -> ModelProfileView:
+            facts = self._resolve_facts(profile, effective_model, acting_principal_id)
+            return ModelProfileView(
+                profile_id=profile.profile_id,
+                provider=profile.provider,
+                model=effective_model,
+                default_state=profile.default_state,
+                local_only=profile.local_only,
+                requires_network=profile.requires_network,
+                endpoint_kind=str(profile.raw.get("endpoint_kind", "unknown")),
+                requires_egress_policy=bool(profile.raw.get("requires_egress_policy", False)),
+                requires_budget_policy=bool(profile.raw.get("requires_budget_policy", False)),
+                runtime_gate=self._runtime_gate_for_profile(
+                    str(profile.raw.get("endpoint_kind", "unknown"))
+                ),
+                off_machine=str(profile.raw.get("endpoint_kind", "unknown"))
+                in {"remote_hosted", "private_network"},
+                selected=selected,
+                connection_configured=bool(
+                    acting_principal_id
+                    and get_model_connection(
+                        self.store, acting_principal_id, profile.profile_id
+                    )
+                ),
+                prompt_cache_ttl=(
+                    str(profile.raw.get("prompt_cache_ttl"))
+                    if profile.raw.get("prompt_cache_ttl")
+                    else None
+                ),
+                context_window_tokens=facts.context_window_tokens,
+                context_window_source=facts.context_window_source,
+                configured=effective_model != "<model>",
+                supports_reasoning=bool(profile.raw.get("supports_reasoning", False)),
+                supports_reasoning_effort=bool(
+                    profile.raw.get("supports_reasoning_effort", False)
+                ),
+                reasoning_effort_values=tuple(
+                    str(value)
+                    for value in profile.raw.get("reasoning_effort_values", [])
+                ),
+                **_usage_fields(profile),
+            )
+
+        profiles = tuple(
+            _profile_view(
+                profile,
+                override
+                if override and profile.profile_id == current
+                else profile.model,
+                selected=profile.profile_id == current,
+            )
+            for profile in registry_profiles
+        )
+
+        configured_pairs = (
+            self.store.list_configured_models(acting_principal_id)
+            if acting_principal_id
+            else []
+        )
+        configured_by_profile: dict[str, list[str]] = {}
+        for profile_id, configured_model in configured_pairs:
+            configured_by_profile.setdefault(profile_id, []).append(configured_model)
+        chat_profiles: list[ModelProfileView] = []
+        seen_choices: set[tuple[str, str]] = set()
+        for profile in registry_profiles:
+            choices = ([] if profile.model == "<model>" else [profile.model]) + configured_by_profile.get(
+                profile.profile_id, []
+            )
+            for configured_model in choices:
+                key = (profile.profile_id, configured_model)
+                if key in seen_choices:
+                    continue
+                seen_choices.add(key)
+                chat_profiles.append(
+                    _profile_view(
+                        profile,
+                        configured_model,
+                        selected=(
+                            profile.profile_id == current
+                            and configured_model
+                            == (override or profile.model)
+                        ),
+                    )
+                )
         return ModelsView(
             profiles=profiles,
-            chat_profiles=tuple(profile for profile in profiles if profile.configured),
+            chat_profiles=tuple(chat_profiles),
             current_profile_id=current,
             hosted_model_gate_state=hosted_gate.state if hosted_gate is not None else "unknown",
             private_network_model_gate_state=private_gate.state if private_gate is not None else "unknown",
@@ -3041,6 +3110,9 @@ class DashboardService:
                 profile_id=profile.profile_id,
                 model=(None if resolved_model == profile.model else resolved_model),
             )
+        self.store.save_configured_model(
+            principal.principal_id, profile.profile_id, resolved_model
+        )
         if self.store.get_account(principal.principal_id) is not None:
             self.store.save_principal_model_state(principal.principal_id, state)
         else:
@@ -3420,6 +3492,8 @@ class DashboardService:
             reminder_at=d.get("reminder_at"),
             parent_task_id=d.get("parent_task_id"),
             project_id=d.get("project_id"),
+            model_profile=d.get("model_profile"),
+            model=d.get("model"),
         )
 
 

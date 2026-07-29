@@ -188,6 +188,36 @@ class TestSetModelSelection:
         assert resp.status_code == 403
         assert resp.json()["detail"]["reason_code"].startswith("model_required_for_profile")
 
+    def test_all_configured_provider_model_pairs_remain_available(
+        self, client: TestClient, owner_token: str
+    ) -> None:
+        choices = [
+            ("ollama-local-openai-compatible", "qwen2.5"),
+            ("ollama-local-openai-compatible", "gemma4:31b-cloud"),
+            ("lm-studio-local-openai-compatible", "glm-5.2"),
+        ]
+        for profile_id, model in choices:
+            response = client.put(
+                "/api/model-selection",
+                json={"profile_id": profile_id, "model": model},
+                headers=_auth(owner_token),
+            )
+            assert response.status_code == 200, response.text
+
+        read = client.get("/api/models", headers=_auth(owner_token)).json()
+        available = {
+            (profile["profile_id"], profile["model"])
+            for profile in read["chat_profiles"]
+        }
+        assert set(choices).issubset(available)
+        assert len(
+            [
+                profile
+                for profile in read["chat_profiles"]
+                if profile["profile_id"] == "ollama-local-openai-compatible"
+            ]
+        ) == 2
+
 
 def test_model_connection_is_encrypted_and_principal_scoped(
     client: TestClient, workspace: Path, owner_token: str

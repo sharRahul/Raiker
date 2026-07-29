@@ -240,6 +240,10 @@ from raiker.storage.migrations import (
     SESSION_COMMAND_GRANTS_SQL,
     SESSION_ORIGIN_MIGRATION_ID,
     SESSION_ORIGIN_SQL,
+    CONFIGURED_MODELS_MIGRATION_ID,
+    CONFIGURED_MODELS_SQL,
+    TASK_MODEL_CHOICES_MIGRATION_ID,
+    TASK_MODEL_CHOICES_SQL,
     SESSION_TAGS_MIGRATION_ID,
     SESSION_TAGS_SQL,
     STANDING_GRANTS_MIGRATION_ID,
@@ -718,6 +722,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection,
             )
             self._apply_migration(SESSION_ORIGIN_MIGRATION_ID, SESSION_ORIGIN_SQL, connection)
+            self._apply_migration(
+                CONFIGURED_MODELS_MIGRATION_ID, CONFIGURED_MODELS_SQL, connection
+            )
+            self._apply_migration(
+                TASK_MODEL_CHOICES_MIGRATION_ID, TASK_MODEL_CHOICES_SQL, connection
+            )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -3235,8 +3245,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR IGNORE INTO tasks
-                (task_id, session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (task_id, session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.task_id,
@@ -3256,6 +3266,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     task.recurrence,
                     task.reminder_at,
                     task.project_id,
+                    task.model_profile,
+                    task.model,
                 ),
             )
 
@@ -5011,6 +5023,37 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             reasoning_budget_tokens=row["reasoning_budget_tokens"],
         )
 
+    def save_configured_model(self, principal_id: str, profile_id: str, model: str) -> None:
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO principal_configured_models
+                (principal_id, profile_id, model, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(principal_id, profile_id, model)
+                DO UPDATE SET updated_at = excluded.updated_at""",
+                (principal_id, profile_id, model, now, now),
+            )
+
+    def list_configured_models(self, principal_id: str) -> list[tuple[str, str]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT profile_id, model FROM principal_configured_models
+                WHERE principal_id = ?
+                ORDER BY created_at, profile_id, model""",
+                (principal_id,),
+            ).fetchall()
+        return [(str(row["profile_id"]), str(row["model"])) for row in rows]
+
+    def is_configured_model(self, principal_id: str, profile_id: str, model: str) -> bool:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT 1 FROM principal_configured_models
+                WHERE principal_id = ? AND profile_id = ? AND model = ?""",
+                (principal_id, profile_id, model),
+            ).fetchone()
+        return row is not None
+
     def save_model_fallback_sequence(self, session_id: str, profile_ids: list[str]) -> None:
         """Persist the ordered, user-owned model fallback sequence for ``session_id``.
 
@@ -5491,6 +5534,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "DELETE FROM connector_installations WHERE principal_id = ?",
                 "DELETE FROM api_sessions WHERE principal_id = ?",
                 "DELETE FROM principal_model_control WHERE principal_id = ?",
+                "DELETE FROM principal_configured_models WHERE principal_id = ?",
                 "DELETE FROM principal_model_fallback_sequence WHERE principal_id = ?",
                 "DELETE FROM principal_model_advisor WHERE principal_id = ?",
                 "DELETE FROM principal_runtime_mode_state WHERE principal_id = ?",

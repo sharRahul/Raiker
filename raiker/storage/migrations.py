@@ -2034,3 +2034,25 @@ ALTER TABLE sessions ADD COLUMN origin TEXT NOT NULL DEFAULT 'chat';
 CREATE INDEX IF NOT EXISTS idx_sessions_owner_origin_updated
   ON sessions(user_id, origin, updated_at DESC);
 """
+
+
+CONFIGURED_MODELS_MIGRATION_ID = "RAIKER-1030-configured-models"
+CONFIGURED_MODELS_SQL = """
+CREATE TABLE IF NOT EXISTS principal_configured_models (
+  principal_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  model TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, profile_id, model)
+);
+CREATE INDEX IF NOT EXISTS idx_principal_configured_models_owner
+  ON principal_configured_models(principal_id, created_at, profile_id, model);
+"""
+
+
+TASK_MODEL_CHOICES_MIGRATION_ID = "RAIKER-1031-task-model-choices"
+TASK_MODEL_CHOICES_SQL = """
+ALTER TABLE tasks ADD COLUMN model_profile TEXT;
+ALTER TABLE tasks ADD COLUMN model TEXT;
+"""

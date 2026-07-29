@@ -146,13 +146,16 @@
   let approvalNotice = $state<string | null>(null);
 
   let modelProfile = $state("");
+  let model = $state("");
   let reasoningEffort = $state("");
   // One reactive view of the shared model store; refreshes live when the
   // Models page connects a provider or selects a model, without a remount.
   const profiles = $derived(chatProfiles());
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
   const activeProfile = $derived(
-    profiles.find((profile) => profile.profile_id === modelProfile) ?? selectedProfile,
+    profiles.find(
+      (profile) => profile.profile_id === modelProfile && (!model || profile.model === model),
+    ) ?? selectedProfile,
   );
   const reasoningEfforts = $derived(
     activeProfile?.supports_reasoning === true && activeProfile.supports_reasoning_effort === true
@@ -164,6 +167,15 @@
     void loadRepos();
     void refreshModels();
     void syncModeFromRuntime();
+    const onCompose = (event: Event) => {
+      const detail = (event as CustomEvent<{ text: string; profileId?: string; model?: string }>).detail;
+      if (!detail?.text.trim()) return;
+      promptText = detail.text;
+      modelProfile = detail.profileId ?? "";
+      model = detail.model ?? "";
+    };
+    window.addEventListener("raiker:build-compose", onCompose);
+    return () => window.removeEventListener("raiker:build-compose", onCompose);
   });
 
   async function loadRepos() {
@@ -263,6 +275,7 @@
           text: sent,
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
+          model: model || undefined,
           ...(reasoningEfforts.includes(reasoningEffort) ? { reasoning_effort: reasoningEffort } : {}),
           planning_mode: buildMode(sentMode).planningMode ?? undefined,
           // A local repository rides the turn as a real workspace-path
@@ -629,7 +642,7 @@
             disabled={streaming}
           ></textarea>
           <div class="upper-controls">
-            <ModelPicker bind:value={modelProfile} {profiles} {selectedProfile} disabled={streaming} />
+            <ModelPicker bind:profileId={modelProfile} bind:model {profiles} {selectedProfile} disabled={streaming} />
             {#if reasoningEfforts.length > 0}
               <select
                 class="bar-select"

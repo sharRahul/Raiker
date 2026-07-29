@@ -4,10 +4,12 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
+  import ModelPicker from "../components/ModelPicker.svelte";
   import { api, ApiError } from "../api";
   import type { ApprovalView, TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { ACTIVE_TASK_STATES, taskBadge, taskStatusLabel } from "../statusMaps";
+  import { chatProfiles, refreshModels } from "../models.svelte";
 
   let { projectId = null, sessionId = null }: { projectId?: string | null; sessionId?: string | null } = $props();
   let tasks = $state<TaskView[] | null>(null);
@@ -21,6 +23,10 @@
   let parentTaskId = $state("");
   let cadence = $state<"now" | "once" | "daily" | "background">("now");
   let scheduledAt = $state("");
+  let modelProfile = $state("");
+  let model = $state("");
+  const profiles = $derived(chatProfiles());
+  const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
 
   // Reverse approval links. A task that is blocked should say so where you are
   // looking at the task, rather than making you go and find the queue. Matching
@@ -97,8 +103,9 @@
         ...((cadence === "once" || cadence === "daily") ? { scheduled_at: new Date(scheduledAt).toISOString() } : {}),
         ...(cadence === "daily" ? { recurrence: "daily" } : cadence === "background" ? { recurrence: "background" } : {}),
         ...(projectId ? { project_id: projectId } : {}),
+        ...(cadence === "now" && modelProfile && model ? { model_profile: modelProfile, model } : {}),
       });
-      title = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; scheduledAt = "";
+      title = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; scheduledAt = ""; modelProfile = ""; model = "";
       notice = "Saved to your work queue.";
       await load();
     } catch (error) { notice = error instanceof ApiError ? `Could not save task (${error.status}).` : "Could not save task."; }
@@ -120,8 +127,19 @@
   // while the list sits still. Without this the page kept showing "queued" long
   // after the run had ended (BUG-09), and only a manual Refresh disagreed.
   onMount(() => {
+    void refreshModels();
+    const onCompose = (event: Event) => {
+      const detail = (event as CustomEvent<{ text: string; cadence?: "now" | "once"; profileId?: string | null; model?: string | null }>).detail;
+      if (!detail?.text.trim()) return;
+      objective = detail.text;
+      title = detail.text.slice(0, 80);
+      cadence = detail.cadence ?? "now";
+      modelProfile = detail.profileId ?? "";
+      model = detail.model ?? "";
+    };
+    window.addEventListener("raiker:task-compose", onCompose);
     const timer = window.setInterval(() => void load(), 15_000);
-    return () => window.clearInterval(timer);
+    return () => { window.clearInterval(timer); window.removeEventListener("raiker:task-compose", onCompose); };
   });
 </script>
 
@@ -134,6 +152,11 @@
     <label>Instructions *<textarea class="textarea" aria-label="Instructions" aria-invalid={Boolean(title.trim() && !objective.trim())} aria-describedby={title.trim() && !objective.trim() ? "instructions-error" : undefined} bind:value={objective} required placeholder="Add the outcome, context, or constraints for this work."></textarea></label>
     {#if title.trim() && !objective.trim()}<p id="instructions-error" class="field-error" role="alert">Instructions are required.</p>{/if}
     <div class="fields"><label>Parent work<select class="select" aria-label="Parent work" bind:value={parentTaskId}><option value="">No parent — top-level work</option>{#each tasks ?? [] as task (task.task_id)}<option value={task.task_id}>{task.title}</option>{/each}</select></label><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>{#if cadence === "once" || cadence === "daily"}<label>Start time<input class="input" aria-label="Start time" type="datetime-local" bind:value={scheduledAt} required /></label>{/if}</div>
+    {#if cadence === "now"}
+      <div class="task-model"><span>Task model</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model /></div>
+    {:else}
+      <p class="schedule-model-note">Uses the global model active when this run begins.</p>
+    {/if}
     <button class="btn btn-primary" disabled={creating || !title.trim() || !objective.trim() || ((cadence === "once" || cadence === "daily") && !scheduledAt)}>{creating ? "Saving…" : cadence === "background" ? "Start background agent" : cadence === "daily" ? "Create daily routine" : cadence === "once" ? "Schedule task" : "Create task"}</button>
   </form>
 

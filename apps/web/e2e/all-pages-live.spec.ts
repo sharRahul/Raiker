@@ -27,6 +27,7 @@ const pages = [
 ] as const;
 
 test("capture every application page from a live fresh instance", async ({ page }) => {
+  test.setTimeout(120_000);
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -42,7 +43,21 @@ test("capture every application page from a live fresh instance", async ({ page 
   for (const [name, route] of pages) {
     await page.goto(`http://127.0.0.1:8765/#/${route}`);
     await expect(page.locator("main#main")).toBeVisible();
-    await page.waitForTimeout(250);
+    await page.waitForLoadState("networkidle");
+    // Several views render their shell immediately and then hydrate multiple
+    // API-backed panels. Do not capture until every visible loading label has
+    // gone; a slow or stuck panel should fail this evidence run.
+    await page.waitForFunction(
+      () =>
+        ![...document.querySelectorAll("main#main *")].some((element) => {
+          const node = element as HTMLElement;
+          const visible = node.offsetWidth > 0 || node.offsetHeight > 0;
+          return visible && /^(loading|reading|checking|verifying)\b/i.test((node.textContent ?? "").trim());
+        }),
+      undefined,
+      { timeout: 20_000 },
+    );
+    await page.waitForTimeout(1_000);
     await page.screenshot({
       path: `../../docs/plans/screenshots/pages/${name}.png`,
       fullPage: true,

@@ -102,7 +102,7 @@ def test_create_document_generates_and_attaches_without_approval(
 
 
 def test_run_command_returns_feedback_only_for_exact_active_session_grant(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from datetime import UTC, datetime, timedelta
 

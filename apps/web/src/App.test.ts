@@ -33,7 +33,6 @@ describe("App shell", () => {
       "Search Chat",
       "Approvals",
       "Tasks",
-      "Sessions",
       "Permissions",
       "Models",
       "Extensions",

@@ -17,6 +17,7 @@ SOURCE_TYPES = (
     "capability_status",
     "connector_status",
     "project_context",
+    "memory_recall",
 )
 
 # Deterministic priority order used by the gatherer when applying the budget. Higher in the
@@ -27,6 +28,7 @@ PRIORITY_ORDER = (
     # user this turn, so they outrank ambient metadata when the budget is tight.
     "attachment",
     "project_context",
+    "memory_recall",
     "workspace_summary",
     "capability_status",
     "connector_status",

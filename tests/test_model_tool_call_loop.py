@@ -136,6 +136,27 @@ def test_model_drives_a_tool_call_then_responds(tmp_path: Path) -> None:
         assert expected in events
 
 
+def test_model_executes_every_parallel_read_and_returns_every_result(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("alpha", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("beta", encoding="utf-8")
+    calls = [
+        ToolCallProposal("call_a", "read_file", {"path": "a.txt"}),
+        ToolCallProposal("call_b", "read_file", {"path": "b.txt"}),
+    ]
+    router = FakeRouter([
+        ModelResponse(text="Reading both.", tool_calls=calls, finish_reason="tool_calls"),
+        ModelResponse(text="Compared both files.", finish_reason="stop"),
+    ])
+    orchestrator = _orchestrator(tmp_path, router)
+    response = orchestrator.handle(_envelope("compare a and b"))
+    assert response.message == "Compared both files."
+    follow_up = router.seen_messages[1]
+    assistant = next(message for message in follow_up if message.role == "assistant" and message.tool_calls)
+    assert [call.call_id for call in assistant.tool_calls] == ["call_a", "call_b"]
+    assert [message.tool_call_id for message in follow_up if message.role == "tool"] == ["call_a", "call_b"]
+    assert _events(orchestrator, response.session_id).count("tool_completed") == 2
+
+
 def test_unknown_tool_call_is_rejected(tmp_path: Path) -> None:
     router = FakeRouter(
         [

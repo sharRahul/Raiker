@@ -152,6 +152,9 @@ class ToolBroker:
             "write_file": lambda args: proposed_write_snapshot(
                 self.workspace_root, str(args.get("path", ".")), str(args.get("text", ""))
             ),
+            "create_document": lambda args: proposed_write_snapshot(
+                self.workspace_root, str(args.get("path", ".")), str(args.get("text", ""))
+            ),
             "edit_file": lambda args: proposed_edit_snapshot(
                 self.workspace_root,
                 str(args.get("path", ".")),
@@ -375,7 +378,11 @@ class ToolBroker:
             )
 
     def _approval_preview(self, action: ToolAction) -> dict[str, Any] | None:
-        if action.tool_name == "write_file":
+        if action.tool_name in {"write_file", "create_document"}:
+            if action.tool_name == "create_document" and not str(
+                action.arguments.get("path", "")
+            ).lower().endswith((".md", ".markdown")):
+                return {"status": "failed", "error": {"type": "document_path_must_be_markdown"}}
             try:
                 return proposed_write_snapshot(
                     self.workspace_root,
@@ -804,7 +811,7 @@ class ToolBroker:
                     "policy_reasons": decision.reasons,
                     "expected_effect": expected_effect,
                     "state_changes": {
-                        "files": action.tool_name in {"write_file", "edit_file", "apply_patch"},
+                        "files": action.tool_name in {"write_file", "create_document", "edit_file", "apply_patch"},
                         "memory": action.tool_name in {"memory_write", "memory_forget"},
                         "network": action.tool_name in {"shell", "connector_write"},
                         "shell": action.tool_name == "shell",

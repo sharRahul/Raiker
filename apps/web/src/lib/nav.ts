@@ -14,7 +14,6 @@ export const NAV_GROUPS: NavGroup[] = [
     { id: "search-chat", label: "Search Chat", icon: "search", hint: "Search your chat history" },
     { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
     { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },
-    { id: "sessions", label: "Sessions", icon: "sessions", hint: "Past conversations and turns" },
   ] },
   { label: "Knowledge", items: [
     { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },
@@ -40,7 +39,7 @@ export const DEFAULT_ROUTE = "home";
  */
 export const HUB_TABS: Record<string, string[]> = {
   extensions: ["connectors", "mcp", "plugins", "channels"],
-  observe: ["overview", "activity", "checkpoints", "diagnostics", "work", "notifications"],
+  observe: ["overview", "sessions", "activity", "checkpoints", "diagnostics", "work", "notifications"],
 };
 
 /**
@@ -57,6 +56,7 @@ const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
   diagnostics: { route: "observe", tab: "diagnostics" },
   work: { route: "observe", tab: "work" },
   notifications: { route: "observe", tab: "notifications" },
+  sessions: { route: "observe", tab: "sessions" },
 };
 
 function rawRoute(hash: string): string {

@@ -18,14 +18,8 @@ defaults:
 
 jobs:
   web:
-    name: Node ${{ matrix.node-version }}
+    name: Node 22
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version:
-          - "20"
-          - "22"
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
@@ -34,7 +28,7 @@ jobs:
         # actions/setup-node v5.0.0 (Node 24 runtime)
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: apps/web/package-lock.json
       - name: Install dependencies

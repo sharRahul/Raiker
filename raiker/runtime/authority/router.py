@@ -58,6 +58,7 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     # an approval into a real mutation.
     "approval_execution_relay": "approval_execution_relay",
     "write_file": "file_write_execution",
+    "create_document": "file_write_execution",
     "edit_file": "file_write_execution",
     "file_write_execution": "file_write_execution",
     "apply_patch": "patch_apply_execution",

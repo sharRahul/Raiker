@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from importlib.resources import files
 from typing import Any
 from urllib.parse import quote, urlencode, urlparse
@@ -168,19 +168,46 @@ def compile_manifest(raw: dict[str, Any]) -> dict[str, Any]:
             operation_id = operation.get("operationId")
             if not isinstance(operation_id, str) or not operation_id.strip():
                 operation_id = f"{str(method).lower()}_{hashlib.sha256(path.encode()).hexdigest()[:12]}"
-            operations.append(
-                {
+            compiled_operation: dict[str, Any] = {
                     "operation_id": operation_id,
                     "method": str(method).upper(),
                     "path": path,
                     "description": str(operation.get("description") or operation.get("summary") or "")[:1000],
                     "requires_confirmation": str(method).lower() != "get",
                 }
-            )
+            compensation = operation.get("x-raiker-compensation")
+            if compensation is not None:
+                if not isinstance(compensation, dict):
+                    raise ValueError("manifest_compensation_invalid")
+                compensation_operation = compensation.get("operationId")
+                argument_map = compensation.get("argumentMap", {})
+                deadline_seconds = compensation.get("deadlineSeconds")
+                if (
+                    not isinstance(compensation_operation, str)
+                    or not compensation_operation.strip()
+                    or not isinstance(argument_map, dict)
+                    or len(argument_map) > 50
+                    or not all(isinstance(k, str) and isinstance(v, str) for k, v in argument_map.items())
+                    or not isinstance(deadline_seconds, int)
+                    or isinstance(deadline_seconds, bool)
+                    or not 1 <= deadline_seconds <= 2_592_000
+                ):
+                    raise ValueError("manifest_compensation_invalid")
+                compiled_operation["compensation"] = {
+                    "operation_id": compensation_operation,
+                    "argument_map": dict(sorted(argument_map.items())),
+                    "deadline_seconds": deadline_seconds,
+                }
+            operations.append(compiled_operation)
             if len(operations) > 500:
                 raise ValueError("manifest_operation_limit_exceeded")
     if not operations:
         raise ValueError("manifest_operations_missing")
+    operation_ids = {item["operation_id"] for item in operations}
+    for operation in operations:
+        compensation = operation.get("compensation")
+        if compensation and compensation["operation_id"] not in operation_ids:
+            raise ValueError("manifest_compensation_operation_unknown")
     return {"kind": "openapi", "version": version, "operations": operations}
 
 
@@ -312,7 +339,7 @@ class ConnectorInvoker:
         except (json.JSONDecodeError, UnicodeDecodeError):
             result = raw.decode("utf-8", errors="replace")[:20_000]
         self._finish_invocation(invocation_id, "completed")
-        return {
+        result = {
             "invocation_id": invocation_id,
             "connector_id": connector_id,
             "operation_id": operation_id,
@@ -320,6 +347,17 @@ class ConnectorInvoker:
             "status_code": response.status_code,
             "data": result,
         }
+        compensation = operation.get("compensation")
+        if isinstance(compensation, dict):
+            result["compensation"] = {
+                **compensation,
+                "available_until": (
+                    datetime.now(UTC)
+                    + timedelta(seconds=int(compensation["deadline_seconds"]))
+                ).isoformat(),
+                "source_invocation_id": invocation_id,
+            }
+        return result
 
     def _finish_invocation(self, invocation_id: str, status: str) -> None:
         with self.store.connect() as connection:
@@ -456,8 +494,6 @@ class ConnectorInvoker:
             rotated["refresh_token"] = payload["refresh_token"]
         expires_at: str | None = None
         if isinstance(payload.get("expires_in"), (int, float)):
-            from datetime import timedelta
-
             expires_at = (
                 datetime.now(UTC) + timedelta(seconds=max(0, int(payload["expires_in"])))
             ).isoformat()

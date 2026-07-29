@@ -561,19 +561,16 @@
     margin-right: auto;
   }
   .layout {
-    display: grid;
-    grid-template-columns: minmax(20rem, 5fr) minmax(20rem, 6fr);
+    display: flex;
+    flex-direction: column;
     gap: var(--space-4);
     align-items: start;
   }
-  @media (max-width: 1100px) {
-    .layout {
-      grid-template-columns: 1fr;
-    }
-  }
   .list-card {
+    width: 100%;
     padding: var(--space-2) var(--space-3);
     overflow-x: auto;
+    box-shadow: var(--shadow-sm);
   }
   .table .check-col {
     width: 2rem;
@@ -692,9 +689,14 @@
     font-size: 0.78rem;
   }
   .detail-col {
+    width: 100%;
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
+  }
+  .detail-col :global(.card) {
+    border-left: 3px solid var(--accent);
+    box-shadow: var(--shadow-sm);
   }
   .session-links {
     display: flex;

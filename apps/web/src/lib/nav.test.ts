@@ -43,7 +43,6 @@ describe("nav model", () => {
       "search-chat",
       "tasks",
       "projects",
-      "sessions",
     ]);
   });
 
@@ -51,6 +50,7 @@ describe("nav model", () => {
     expect(NAV_GROUPS[4].items.map((i) => i.id)).toEqual(["observe"]);
     expect(HUB_TABS.observe).toEqual([
       "overview",
+      "sessions",
       "activity",
       "checkpoints",
       "diagnostics",
@@ -79,7 +79,6 @@ describe("nav model", () => {
       "approvals",
       "tasks",
       "brain",
-      "sessions",
       "projects",
       "capabilities",
       "models",
@@ -101,6 +100,8 @@ describe("nav model", () => {
     expect(tabFromHash("#/work")).toBe("work");
     expect(routeFromHash("#/diagnostics?session=sess_1")).toBe("observe");
     expect(tabFromHash("#/diagnostics?session=sess_1")).toBe("diagnostics");
+    expect(routeFromHash("#/sessions?session=sess_1")).toBe("observe");
+    expect(tabFromHash("#/sessions?session=sess_1")).toBe("sessions");
     expect(routeFromHash("#/mcp")).toBe("extensions");
     expect(tabFromHash("#/mcp")).toBe("mcp");
     expect(routeFromHash("#/connections")).toBe("extensions");

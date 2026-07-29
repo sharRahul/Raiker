@@ -21,6 +21,7 @@ _TOOL_RISK: dict[str, tuple[str, bool]] = {
     "git_diff": ("medium", False),
     "git_log": ("medium", False),
     "write_file": ("high", True),
+    "create_document": ("high", True),
     "edit_file": ("high", True),
     "apply_patch": ("high", True),
     "shell": ("high", True),
@@ -39,6 +40,9 @@ _TOOL_RISK: dict[str, tuple[str, bool]] = {
     "slack_read": ("medium", False),
     "connector_read": ("medium", False),
     "connector_write": ("high", True),
+    "memory_search": ("medium", False),
+    "memory_list": ("medium", False),
+    "memory_get": ("medium", False),
     # Local planning/organisation actions are reversible but mutate owner data;
     # they retain the normal approval path.
     "create_task": ("high", True),
@@ -69,6 +73,7 @@ _REQUIRED_ARGS: dict[str, tuple[str, ...]] = {
     "git_diff": (),
     "git_log": (),
     "write_file": ("path", "text"),
+    "create_document": ("path", "text"),
     "edit_file": ("path", "old_text", "new_text"),
     "apply_patch": ("patch",),
     "shell": ("command",),
@@ -80,6 +85,9 @@ _REQUIRED_ARGS: dict[str, tuple[str, ...]] = {
     "slack_read": ("resource", "channel"),
     "connector_read": ("connector_id", "operation_id"),
     "connector_write": ("connector_id", "operation_id"),
+    "memory_search": ("query",),
+    "memory_list": (),
+    "memory_get": ("memory_id",),
     "create_task": ("title",),
     # The active session is trusted broker context, never a model argument.
     "assign_session_project": ("project_id",),
@@ -96,6 +104,10 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
     "git_diff": "Show git diff for the workspace.",
     "git_log": "Show recent git log entries.",
     "write_file": "Propose writing a file (approval required).",
+    "create_document": (
+        "Create a first-class Markdown document in the session workspace. The path must end "
+        "in .md or .markdown; approval writes it and attaches it to this chat for preview/download."
+    ),
     "edit_file": "Propose one exact, unique text replacement in a file (approval required).",
     "apply_patch": "Propose one atomic, context-anchored unified diff across one or more files (approval required once for the complete change set). An optional path may identify the first target for backward compatibility.",
     "shell": "Propose running a shell command (approval required).",
@@ -133,6 +145,9 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
         "Propose one POST, PUT, PATCH, or DELETE connector operation. Every call requires "
         "explicit user approval before the external request is sent."
     ),
+    "memory_search": "Search approved owner memory across chats and projects.",
+    "memory_list": "List approved owner memory records, optionally by scope.",
+    "memory_get": "Read one approved owner memory record by memory_id.",
     "create_task": (
         "Create a local task or reminder. Requires title; optional description, "
         "scheduled_at, reminder_at, recurrence, and project_id."
@@ -206,6 +221,10 @@ def validate_tool_call(proposal: ToolCallProposal) -> ToolAction:
         value = arguments.get(required)
         if not isinstance(value, str) or value == "":
             raise ToolCallRejected(f"missing_argument:{required}", tool_name=tool_name)
+    if tool_name == "create_document" and not str(arguments["path"]).lower().endswith(
+        (".md", ".markdown")
+    ):
+        raise ToolCallRejected("document_path_must_be_markdown", tool_name=tool_name)
     risk_level, requires_approval = _TOOL_RISK[tool_name]
     return ToolAction(
         action_id=new_id("act_"),

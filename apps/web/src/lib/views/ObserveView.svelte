@@ -13,6 +13,7 @@
   import CheckpointsView from "./CheckpointsView.svelte";
   import DiagnosticsView from "./DiagnosticsView.svelte";
   import WorkInActionView from "./WorkInActionView.svelte";
+  import SessionsView from "./SessionsView.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
@@ -58,6 +59,7 @@
       id,
       label: {
         overview: "Overview",
+        sessions: "Sessions",
         activity: "Audit log",
         checkpoints: "Checkpoints",
         diagnostics: "Diagnostics",
@@ -302,6 +304,10 @@
         {/if}
       </section>
     {/if}
+  </div>
+{:else if tab === "sessions"}
+  <div id="panel-sessions" role="tabpanel" aria-labelledby="tab-sessions">
+    <SessionsView {projectId} {sessionId} />
   </div>
 {:else if tab === "activity"}
   <div id="panel-activity" role="tabpanel" aria-labelledby="tab-activity">

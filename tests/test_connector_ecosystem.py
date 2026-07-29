@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+from typing import Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -135,6 +136,27 @@ def test_manifest_compilation_is_bounded_and_under_200ms() -> None:
     elapsed_ms = (time.perf_counter() - started) * 1000
     assert compiled["operations"][0]["requires_confirmation"] is True
     assert elapsed_ms < 200
+
+
+def test_manifest_compiles_bounded_operation_scoped_compensation() -> None:
+    raw = manifest("post")
+    paths = cast(dict[str, Any], raw["paths"])
+    paths["/items/{id}"] = {
+        "delete": {"operationId": "delete_item"}
+    }
+    operation = cast(dict[str, Any], next(iter(paths.values()))["post"])
+    operation["x-raiker-compensation"] = {
+        "operationId": "delete_item",
+        "argumentMap": {"path.id": "response.id"},
+        "deadlineSeconds": 600,
+    }
+    compiled = compile_manifest(raw)
+    created = next(item for item in compiled["operations"] if item["method"] == "POST")
+    assert created["compensation"] == {
+        "operation_id": "delete_item",
+        "argument_map": {"path.id": "response.id"},
+        "deadline_seconds": 600,
+    }
 
 
 def test_enabled_connector_is_in_model_context_without_credentials(workspace: Path) -> None:

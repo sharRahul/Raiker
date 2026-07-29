@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 
 from raiker.context.gatherer import ContextGatherer
 from raiker.context.models import ContextBundle
-from raiker.contracts.models import AgentResponse, PromptEnvelope, ToolAction, ToolResult
+from raiker.contracts.models import (
+    AgentResponse,
+    PolicyDecision,
+    PromptEnvelope,
+    ToolAction,
+    ToolResult,
+)
 from raiker.contracts.streaming import FINAL, LIFECYCLE, TEXT_DELTA, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
@@ -835,9 +842,19 @@ class RuntimeOrchestrator:
                 final_text = response.text
                 break
 
-            proposal = response.tool_calls[0]
+            proposals = list(response.tool_calls)
+            remaining_budget = max_tool_calls - tool_calls_made
+            if remaining_budget <= 0:
+                final_text = "Stopped: reached the maximum number of tool calls for this turn."
+                break
+            if len(proposals) > remaining_budget:
+                self._event(envelope, "model_tool_calls_dropped", {
+                    "proposed": len(proposals), "accepted": remaining_budget,
+                    "dropped": len(proposals) - remaining_budget, "reason": "tool_call_budget",
+                })
+                proposals = proposals[:remaining_budget]
             try:
-                action = validate_tool_call(proposal)
+                actions = [validate_tool_call(proposal) for proposal in proposals]
             except ToolCallRejected as exc:
                 self._event(
                     envelope,
@@ -852,18 +869,61 @@ class RuntimeOrchestrator:
                     "I could not run that step because the requested tool call was invalid."
                 )
                 break
-            if tool_calls_made >= max_tool_calls:
-                final_text = "Stopped: reached the maximum number of tool calls for this turn."
-                break
-
+            # B4: independent read calls are evaluated concurrently. Mutations
+            # stay serial, preserving approval ordering and single-use intent
+            # claims. The model receives one assistant message followed by one
+            # result for every call id, as provider tool protocols require.
+            read_only = all(not action.requires_approval for action in actions)
+            async def execute_one(
+                action: ToolAction, *, parallel: bool = read_only and len(actions) > 1
+            ) -> tuple[ToolResult, PolicyDecision]:
+                if parallel:
+                    return await asyncio.to_thread(
+                        self.tool_broker.execute, action,
+                        session_id=envelope.session_id, turn_id=envelope.turn_id,
+                        client=envelope.client,
+                        approval_mode=envelope.options.approval_mode,
+                    )
+                return self.tool_broker.execute(
+                    action, session_id=envelope.session_id, turn_id=envelope.turn_id,
+                    client=envelope.client,
+                    approval_mode=envelope.options.approval_mode,
+                )
+            if read_only and len(actions) > 1:
+                executions = list(
+                    await asyncio.gather(*(execute_one(action) for action in actions))
+                )
+            else:
+                executions = []
+                for action in actions:
+                    execution = await execute_one(action)
+                    executions.append(execution)
+                    if execution[1].decision != "allow":
+                        break
             self._state(machine, envelope, "POLICY_REVIEWED")
-            tool_result, decision = self.tool_broker.execute(
-                action,
-                session_id=envelope.session_id,
-                turn_id=envelope.turn_id,
-                client=envelope.client,
-                approval_mode=envelope.options.approval_mode,
-            )
+            batch_results: list[tuple[ToolCallProposal, ToolAction, ToolResult]] = []
+            action = actions[0]
+            proposal = proposals[0]
+            tool_result, decision = executions[0]
+            # Approval-bearing calls remain deliberately serial: park at the
+            # first decision boundary instead of executing later mutations.
+            for index, (candidate_action, execution) in enumerate(
+                zip(actions, executions, strict=False)
+            ):
+                candidate_result, candidate_decision = execution
+                if candidate_decision.decision != "allow":
+                    action, proposal = candidate_action, proposals[index]
+                    tool_result, decision = candidate_result, candidate_decision
+                    if index + 1 < len(actions):
+                        self._event(envelope, "model_tool_calls_dropped", {
+                            "proposed": len(actions), "accepted": index + 1,
+                            "dropped": len(actions) - index - 1,
+                            "reason": "approval_or_policy_boundary",
+                        })
+                    break
+                batch_results.append((proposals[index], candidate_action, candidate_result))
+            else:
+                decision = executions[-1][1]
             last_action, last_result = action, tool_result
             if decision.decision == "needs_approval":
                 self._state(machine, envelope, "WAITING_FOR_APPROVAL")
@@ -937,30 +997,29 @@ class RuntimeOrchestrator:
             self._state(machine, envelope, "EXECUTING")
             self._state(machine, envelope, "OBSERVING")
             self._state(machine, envelope, "VERIFYING")
-            started_action_ids.add(action.action_id)
-            self._verify_and_emit(
-                envelope,
-                action=action,
-                decision=decision,
-                result=tool_result,
-                started_action_ids=started_action_ids,
-            )
-            tool_calls_made += 1
+            for _completed_proposal, completed_action, completed_result in batch_results:
+                started_action_ids.add(completed_action.action_id)
+                self._verify_and_emit(
+                    envelope, action=completed_action, decision=decision,
+                    result=completed_result, started_action_ids=started_action_ids,
+                )
+            tool_calls_made += len(batch_results)
             messages.append(
                 ModelMessage(
                     role="assistant",
                     content=response.text,
-                    tool_calls=(proposal,),
+                    tool_calls=tuple(item[0] for item in batch_results),
                 )
             )
-            messages.append(
-                ModelMessage(
-                    role="tool",
-                    content=json.dumps(tool_result.output or tool_result.error or {}),
-                    tool_call_id=proposal.call_id,
-                    name=action.tool_name,
+            for completed_proposal, completed_action, completed_result in batch_results:
+                messages.append(
+                    ModelMessage(
+                        role="tool",
+                        content=json.dumps(completed_result.output or completed_result.error or {}),
+                        tool_call_id=completed_proposal.call_id,
+                        name=completed_action.tool_name,
+                    )
                 )
-            )
             for pending in self._drain_sink():
                 yield pending
 

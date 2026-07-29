@@ -21,8 +21,8 @@ describe("Sidebar navigation", () => {
   });
 
   it("marks the active route for assistive tech", () => {
-    render(Sidebar, { current: "sessions" });
-    const active = within(screen.getByRole("navigation", { name: "All navigation" })).getByRole("link", { name: "Sessions" });
+    render(Sidebar, { current: "observe" });
+    const active = within(screen.getByRole("navigation", { name: "All navigation" })).getByRole("link", { name: "Observability" });
     expect(active).toHaveAttribute("aria-current", "page");
   });
 

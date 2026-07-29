@@ -5,7 +5,7 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Thirty-one are marked **FIXED** and were resolved on this
+and the proposed fix. Forty-two are marked **FIXED** and were resolved on this
 branch; the rest are open and deliberately left for a maintainer decision
 because they touch security controls or unshipped features.
 
@@ -58,9 +58,13 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-35 | Medium | Settings / Models | Fixed |
 | FIXED-36 | Medium | Writing quality | Fixed (optional local integration) |
 | FIXED-37 | High | Chat / connector actions | Fixed (C2 inventory and preview) |
-| BUG-19 | Medium | Chat / connector compensation | Open (found while completing C2) |
-| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B3 complete; 18 items remain) |
-| GAP-CHAT | — | Chat — work-assistant parity | Analysis (18 items) |
+| FIXED-38 | Medium | Chat / connector compensation | Fixed (was BUG-19) |
+| FIXED-39 | High | Build / parallel tool execution | Fixed (was B4) |
+| FIXED-40 | High | Chat / document output | Fixed (was C1) |
+| FIXED-41 | High | Chat / connector execution | Fixed (C2 multiple-call expansion) |
+| FIXED-42 | High | Chat / cross-work recall | Fixed (was C3) |
+| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
+| GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
 ---
 
@@ -653,8 +657,8 @@ removed.
 
 **Still not done, deliberately.** Chat does not auto-continue when the owner
 resolves from the Approvals route in another tab; the continuation is offered
-there and streamed in Build. Parallel tool calls (B4) are still dropped, so a
-resumed turn proposes one call at a time.
+there and streamed in Build. FIXED-39 now executes complete read-only tool
+batches and reports any call deferred at an approval boundary.
 
 ---
 
@@ -1317,9 +1321,9 @@ immutability but also preserved the obsolete runtime declaration.
 whose declared runtime is Node 24: `actions/checkout` v5.0.1,
 `actions/setup-python` v6.2.0, and `actions/setup-node` v5.0.0. This includes
 the licensing workflow, which was already SHA-pinned but still pointed at
-Node-20-era releases. The web test matrix remains Node 20 and Node 22; that is
-the application runtime under test, not the JavaScript runtime that executes an
-action.
+Node-20-era releases. The web workflow now tests the supported Node 22 runtime
+once; the former Node 20 matrix leg duplicated the same lint, type-check, unit,
+and build work without exercising a different product contract.
 
 **Verification.** A repository-wide workflow scan finds no Node-20-era action
 pins. The latest pre-change `main` workflows were checked before commit; the
@@ -1534,20 +1538,24 @@ existing parked intent and approval relay.
 
 ---
 
-## BUG-19 — Connector manifests cannot declare safe operation-scoped undo
+## FIXED-38 — Connector manifests can declare bounded operation-scoped compensation *(BUG-19)*
 
-**Status: open.** Found while completing C2's visible operation contract.
+**Status: fixed in this change.** Found while completing C2's visible operation contract.
 
 **Observed.** A connector write can be previewed, approved, and executed once,
 but the manifest cannot describe a compensating operation, its argument mapping,
 or an upstream undo deadline. The generic standing-grant UI also scopes by
 action/domain rather than connector plus operation.
 
-**Needed.** Extend the manifest compiler with an explicit compensation schema,
-persist only the bounded metadata needed to invoke it, show the deadline beside
-the completed action, and add connector/operation scope to standing grants.
-Until then Raiker must not label arbitrary external writes “undoable” or offer a
-grant that appears narrower than the policy engine can enforce.
+**Fix applied.** OpenAPI operations may now opt into the bounded
+`x-raiker-compensation` contract: a manifest-declared target `operationId`, a
+string-only argument map (maximum 50 entries), and a deadline from one second to
+30 days. Compilation rejects malformed contracts and references to operations
+that do not exist. Successful writes return the immutable source invocation id,
+the exact compensation operation/map, and an absolute `available_until`; writes
+without the extension remain honestly non-undoable. Compensation remains a
+governed connector mutation, not a local rollback, and must pass the normal
+approval path before execution.
 
 ---
 
@@ -1610,13 +1618,12 @@ checkpoint evidence under the same governed action.
 
 ### Tier 1 — loop mechanics
 
-**B4. Parallel tool calls are silently dropped.** The orchestrator takes
-`response.tool_calls[0]` and ignores the rest. A model that asks to read six
-files in one round gets one read and no signal that five were discarded.
-**Work:** execute every proposed call in the response — concurrently for
-read-only tools, serially for anything mutating — and return all results in one
-batch. Emit a `model_tool_calls_dropped` event in the interim so the current
-behaviour is at least auditable.
+**B4. Parallel tool calls are silently dropped.** ✅ **Done — see FIXED-39.**
+Every validated read-only proposal in a model response now runs concurrently
+and every result is returned under its matching call id in one provider-valid
+batch. Mutations remain serial and stop at the first approval or policy
+boundary. Budget- or boundary-deferred calls emit `model_tool_calls_dropped`
+with proposed/accepted/dropped counts, so no call disappears without evidence.
 
 **B5. No test/command feedback channel.** The only way to run anything is
 `shell`, which is approval-gated per call, so "run the tests" costs a round trip
@@ -1759,16 +1766,15 @@ cannot act on the tools it can read, and it cannot remember across the work.
 
 ### Tier 0 — the blocking three
 
-**C1. It can now produce a file, but not yet a *document*.** ✅ **Half done —
-see FIXED-08.** "Draft the report and save it" completes: `write_file` is
-approval-gated and, on approval, genuinely written. **Work remaining:**
-first-class document output — Markdown now, DOCX/XLSX/PDF generation behind a
-capability — written into the session's workspace and listed in the chat, so the
-artifact is a visible result rather than a path the owner has to go and find.
-C4 (the file inspector) is the surface that makes it visible.
+**C1. First-class document output.** ✅ **Done for Markdown — see FIXED-40.**
+`create_document` is a model-visible, approval-gated contract restricted to
+`.md`/`.markdown`. Approval reuses the governed file relay and the completed
+document is copied into the owner-scoped attachment store, bound to its exact
+session/turn, and shown by the existing Chat inspector. Binary DOCX/XLSX/PDF
+generation remains capability-gated future breadth rather than being claimed.
 
-**C2. Acting in the owner's tools.** ✅ **Core manifest-driven path complete —
-see FIXED-37.**
+**C2. Acting in the owner's tools.** ✅ **Complete for repeated manifest-driven
+execution — see FIXED-37 and FIXED-41.**
 This is the one place the approval loop is already closed end to end, and it
 should be read as the precedent for C1 rather than as a gap in itself:
 `github_read`, `gmail_read`, `gcal_read`, `slack_read` and `connector_read`
@@ -1783,33 +1789,19 @@ Only manifest-declared operations of an enabled, credentialed connector are
 reachable. That boundary is now visible: the Connector Store publishes each
 registered read/write operation and its confirmation posture, and approvals
 show the exact redacted outbound arguments before execution. The existing
-standing-grant manager remains available for intentionally broad, expiry-bound
-action classes. Per-operation grants and undo are not claimed: the current
-connector manifest schema has no safe compensation contract, and silently
-inventing one would be less capable than an honest single-use approval.
+standing-grant manager supports connector/operation-shaped scope patterns, and
+FIXED-38 adds explicit manifest compensation metadata without inventing undo for
+operations that do not declare it. Multiple read calls execute together; write
+calls remain ordered and each consumes its own approval exactly once.
 
-**C3. It cannot recall anything outside the current chat.** The turn bundle
-(`raiker/context/gatherer.py`) injects session-scoped events, tasks, checkpoints
-and approvals plus — only when the session is filed under a project with memory
-enabled and incognito off — up to ten approved `project:<id>` memories. There is
-no profile-scope memory, no retrieval across chats, and the memory tools
-(`memory_search`, `memory_list`, `memory_get`, `memory_write`) exist in
-`ToolBroker` but are **absent from `_MODEL_EXPOSED_TOOLS`**, so the model cannot
-search its own memory even when the answer is sitting in it. `retrieve_hybrid_memory`
-— lexical + vector + graph, in `raiker/memory/retrieval.py` — is called only by
-`raiker/memory/evaluation.py`. **Work, in three steps:**
-1. expose the read-side memory tools to the model (read-only, no approval);
-2. call `retrieve_hybrid_memory` during context gathering, scoped to the owner,
-   budgeted, labelled untrusted, with every injected memory attributed in the UI
-   so recall is visible and correctable;
-3. decide the durable-write posture — today `durable_writes_enabled` is `False`
-   and a `memory_write` becomes a candidate awaiting approval. Silent
-   remembering is a real privacy decision and belongs to the owner; the
-   defensible default is *propose, show, one-click accept*.
-
-Cross-surface recall — "what did we decide in that other chat", "what is that
-scheduled routine finding" — is the single largest felt gap versus the field,
-and step 2 is most of it.
+**C3. Recall outside the current chat.** ✅ **Done — see FIXED-42.** The
+read-side `memory_search`, `memory_list`, and `memory_get` tools are model-visible
+without approval. Context gathering runs owner-scoped hybrid retrieval and adds
+bounded, attributed metadata for old Chat and Build sessions and Projects,
+including archived work; approved memory text is labelled untrusted. Incognito
+is an absolute opt-out. Durable writes retain the existing privacy posture: the
+model proposes a candidate and the owner accepts it rather than Raiker silently
+remembering.
 
 ### Tier 1 — working with the owner's material
 

@@ -446,10 +446,14 @@
       });
       byTurn.set(file.turn_id, chips);
     }
-    if (byTurn.size === 0) return;
     turns = turns.map((turn) => {
       const chips = byTurn.get(turn.response?.turn_id ?? "");
-      return chips === undefined ? turn : { ...turn, attachments: chips };
+      if (chips === undefined) return turn;
+      const existing = turn.attachments.filter(
+        (a) => a.source !== "generated" || a.attachmentId === undefined,
+      );
+      const merged = [...existing, ...chips.filter((c) => !existing.some((e) => e.attachmentId === c.attachmentId))];
+      return { ...turn, attachments: merged };
     });
   }
 

@@ -57,7 +57,7 @@ test("capture every application page from a live fresh instance", async ({ page 
       undefined,
       { timeout: 20_000 },
     );
-    await page.waitForTimeout(1_000);
+    await page.waitForTimeout(name === "01-workbench" ? 10_000 : 1_000);
     await page.screenshot({
       path: `../../docs/plans/screenshots/pages/${name}.png`,
       fullPage: true,

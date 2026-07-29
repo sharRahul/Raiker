@@ -72,6 +72,8 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-48 | Medium | Settings / Workbench | Fixed (settings and dashboard refinement) |
 | FIXED-49 | Medium | Memory / Knowledge Map / context window | Fixed (visual control redesign) |
 | FIXED-50 | High | Local models / context capacity | Fixed (runtime capacity discovery) |
+| FIXED-51 | High | Knowledge Map / force simulation | Fixed (found during live Playwright verification) |
+| FIXED-52 | Medium | Knowledge Map / theme integration | Fixed (found during visual review) |
 | BUG-21 | Medium | Models / pricing | Open |
 | BUG-22 | Medium | Chat / export | Open |
 | BUG-23 | Low | Chat / code ergonomics | Open |
@@ -1914,15 +1916,18 @@ and a separately confirmed **Delete permanently** where policy allows.
 
 ---
 
-## BUG-30 — Knowledge Map source review and large-graph controls are incomplete
+## BUG-30 — Knowledge Map source review and large-workspace persistence are incomplete
 
 **Status: open; found while implementing FIXED-49.**
 
-**Observed.** Server-side containment validates a typed workspace-relative
-path, but the browser has no workspace file/folder chooser or pre-index review.
-The graph also lacks relationship inspection, project/date/status filters,
-fit/zoom/reset/full-screen controls, clustering, indexed-file status, re-index,
-and advanced-record disclosure.
+**Observed.** The redesigned graph now provides force-directed placement,
+global/local scopes, depth traversal, relationship inspection, type/status
+querying, colour groups, fit/zoom/full-screen controls, and display/force/motion
+settings. Server-side containment still validates only a typed
+workspace-relative path: the browser has no file/folder chooser or pre-index
+review. View settings and pinned positions are not yet persisted per workspace,
+and project/date filtering, cluster summaries, indexed-file status, re-index,
+and advanced-record disclosure still need richer graph DTOs.
 
 **Required fix.** Add a server-backed contained source browser and review plan
 with supported/unsupported counts before indexing. Extend graph DTOs with
@@ -1931,9 +1936,47 @@ summaries; preserve selection and viewport across incremental refresh.
 
 **UI when closed.** **Add workspace source** opens Choose file/folder → review
 → Add and index. Sources show indexed counts, warnings, last indexed, Re-index,
-and Remove. Map/List share search and filters; the map adds Zoom/Fit/Reset,
-relationship labels, project clusters, and Standard/Advanced modes with full
-keyboard and screen-reader access.
+and Remove. Saved positions, zoom, groups, filters, motion, and force settings
+restore per workspace; project clusters and Standard/Advanced modes expose the
+richer records with full keyboard and screen-reader access.
+
+---
+
+## FIXED-51 — Force simulation rebuilt itself on every animation tick
+
+**Status: fixed in this change; found during live Playwright verification.**
+
+**Observed.** The first production-browser run remained on **Loading the
+knowledge graph…** after the API returned. Type-check, lint, and production
+build all passed because the defect was a reactive runtime feedback loop.
+
+**Root cause.** The Svelte effect that constructed the D3 simulation read
+`renderedNodes` to preserve positions. Every D3 tick then assigned
+`renderedNodes`, invalidated the effect, stopped the simulation, and constructed
+another simulation indefinitely.
+
+**Fix.** Node positions now live in a non-reactive keyed cache. Simulation ticks
+copy positions only into render state, so data/filter/force changes rebuild the
+simulation while ordinary ticks do not. The real FastAPI-served SPA now passes
+the Playwright route, interaction, and screenshot review.
+
+---
+
+## FIXED-52 — Knowledge Map initially bypassed Raiker's shared theme
+
+**Status: fixed in this change; found during visual review.**
+
+**Observed.** The first force-graph implementation hard-coded a dark palette
+across the whole Knowledge Map. It behaved like the requested graph view but
+did not feel like the light Raiker application shown in the baseline, and a
+single hard-coded replacement would have made the route ignore dark mode.
+
+**Fix.** The canvas, toolbar, overlays, inspector, source dialog, viewport
+controls, and settings panel now use Raiker's light visual language by default
+and explicit dark-theme overrides based on the shared design tokens. A new
+Playwright sweep visits all 23 application pages and hub tabs in both explicit
+themes, asserts different resolved token palettes, and reports zero console or
+page errors.
 
 ---
 

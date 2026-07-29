@@ -236,6 +236,25 @@ Evidence: `output/playwright/settings-redesign.png` and
 opens the real dropdown controls instead of checking only that their triggers
 exist.
 
+## Result — 2026-07-29 (Knowledge Map force-graph redesign)
+
+| Check | Result |
+|---|---|
+| Production web build | ✅ Vite build completed with bundled `d3-force` and no external assets |
+| Real force-directed layout | ✅ centre, repulsion, link, distance, collision, damping, and low-energy ambient motion |
+| Graph-first surface at 1440×1000 | ✅ Raiker light-theme full-workspace canvas; no dotted dashboard grid or graph card boundary |
+| Global/local graph interactions | ✅ global scope, node-centred local scope, relationship depth 1–3, hover neighbours, select/inspect, double-click centre, drag/pin, context menu, pan, zoom, and multi-select wiring |
+| Floating settings | ✅ filters, search-driven colour groups, display controls, five physical-force controls, and Paused / Activity only / Always alive motion modes |
+| Empty workspace guidance | ✅ instructional You → Workspace → Add first source topology replaces the single-node dead end |
+| Governed live data | ✅ served `/api/brain` records and relationships remain the only persisted graph data; instructional starter nodes are explicitly virtual |
+| Playwright live route and settings interaction | ✅ passed against the built SPA served by real FastAPI on `127.0.0.1:8765` |
+| Application-wide theme sweep | ✅ all 23 pages/hub tabs rendered in explicit light and dark themes with distinct shared token palettes and zero console/page errors |
+
+Evidence: `docs/plans/screenshots/working/knowledge-map-redesign-live.png`.
+The first browser pass exposed and then verified the FIXED-51 reactive
+simulation-loop correction; visual review then exposed and verified FIXED-52's
+shared-theme integration. Both are recorded in `docs/plans/TO_BE_FIXED.md`.
+
 ## Repeatable procedure
 
 1. **Bootstrap + enable the backend's gate** (human owner). For a hosted

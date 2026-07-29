@@ -47,6 +47,7 @@ keyboard navigation.
 | Approvals | Pending/approved/denied inbox, redacted diff/argument previews, metadata-only resolution |
 | Tasks | Active tasks with progress + safe-boundary stop, runs parked on an approval shown as blocked (not failed) with the reason and a link to the decision, and a finished list that states how each run ended |
 | Sessions | Session browser → turns → per-turn governed events |
+| Knowledge Map | Full-workspace Raiker-themed force graph over governed records; global/local scopes, relationship-depth traversal, neighbour highlighting, search-driven colour groups, node inspector, zoom/pan/pin, source action, and adjustable display, physical-force, and motion controls |
 | Capabilities | All capability gates (per phase), friendly labels, gate enable/disable with step-up (reason, Tier-2 confirmation token, threat ack), per-capability decision modes (`ask`/`allow`/`auto`/`deny`) |
 | Models | Model profiles with provider + model selection (each provider's model catalogue fetched on demand, gate-manager only writes), advisor-model picker for local-model turns, hosted/private gate + egress allowlist posture (no keys, no allowlist values) |
 | Connections | Service catalogue with a governed **Connect via MCP** flow for a local starter or a remote HTTP endpoint; remote authentication stores only a token environment-variable reference |
@@ -70,9 +71,10 @@ npm run test     # vitest
 npm run build    # production build to dist/ (served by raiker-web)
 ```
 
-Stack: Vite + Svelte 5 + TypeScript, Vitest + Testing Library for component tests; no runtime
-dependencies beyond Svelte, no external fonts/CDNs (works fully offline). The JS toolchain is
-isolated here and does not affect the Python package or its `ruff`/`mypy`/`pytest` gate.
+Stack: Vite + Svelte 5 + TypeScript, D3 Force for the Knowledge Map simulation,
+Vitest + Testing Library for component tests; no external fonts/CDNs (works fully
+offline). The JS toolchain is isolated here and does not affect the Python package
+or its `ruff`/`mypy`/`pytest` gate.
 
 The typed API client lives in `src/lib/api.ts` / `src/lib/apiTypes.ts`; the backend contract test
 `tests/test_api_contract_schemas.py` guards the response keys the client reads.

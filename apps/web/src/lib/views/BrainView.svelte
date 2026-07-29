@@ -1,383 +1,383 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, type Simulation, type SimulationNodeDatum } from "d3-force";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
-  import type { BrainNode, BrainView as BrainData } from "../apiTypes";
+  import type { BrainEdge, BrainNode, BrainView as BrainData } from "../apiTypes";
 
-  type PositionedNode = BrainNode & { x: number; y: number; phase: number };
+  type MotionMode = "paused" | "activity" | "alive";
+  type GraphNode = BrainNode & SimulationNodeDatum & { degree: number; virtual?: boolean; color?: string; pinned?: boolean };
+  type GraphLink = BrainEdge & { source: string | GraphNode; target: string | GraphNode };
+  type Group = { name: string; query: string; color: string };
 
-  // Column anchors per node type, laid out left→right across the canvas. The
-  // exact x is jittered per-node so the graph reads as an organic Obsidian-style
-  // cloud rather than a strict grid.
-  const COLUMN: Record<string, number> = {
-    user: 10,
-    session: 22,
-    folder: 34,
-    file: 46,
-    schedule: 38,
-    task: 58,
-    agent: 70,
-    approval: 80,
-    memory: 84,
-    tool: 92,
-    backup: 95,
+  const COLORS: Record<string, string> = {
+    user: "#f3f5fa", workspace: "#77d5ee", project: "#a78bfa", source: "#60a5fa",
+    folder: "#818cf8", file: "#60a5fa", session: "#58d68d", conversation: "#58d68d",
+    task: "#f5b942", memory: "#2dd4bf", tool: "#fb923c", approval: "#facc15",
+    agent: "#c084fc", schedule: "#f5b942", backup: "#60a5fa",
   };
-  const ACTIVE = new Set(["queued", "running", "paused"]);
+  const FILTER_TYPES = ["folder", "file", "session", "task", "memory", "tool"];
 
   let brain = $state<BrainData | null>(null);
   let loadError = $state<string | null>(null);
-  let selectedId = $state<string | null>(null);
   let refreshing = $state(false);
+  let updatedAt = $state<string | null>(null);
+  let selectedIds = $state<string[]>([]);
+  let hoveredId = $state<string | null>(null);
+  let centreId = $state<string | null>(null);
+  let graphMode = $state<"global" | "local">("global");
+  let depth = $state(2);
+  let search = $state("");
+  let enabledTypes = $state<Record<string, boolean>>(Object.fromEntries(FILTER_TYPES.map((type) => [type, true])));
+  let showOrphans = $state(true);
+  let showLabels = $state(true);
+  let showArrows = $state(true);
+  let showParticles = $state(true);
+  let settingsOpen = $state(false);
+  let summaryOpen = $state(false);
+  let sourceOpen = $state(false);
+  let inspectorOpen = $state(false);
   let sourcePath = $state("");
   let sourceKind = $state<"folder" | "file">("folder");
   let sourceError = $state<string | null>(null);
   let sourceBusy = $state(false);
-  let viewMode = $state<"map" | "list">("map");
-  let search = $state("");
-  let typeFilter = $state("all");
-  let animate = $state(true);
-  let updatedAt = $state<string | null>(null);
+  let motion = $state<MotionMode>("alive");
+  let centerStrength = $state(0.08);
+  let chargeStrength = $state(-220);
+  let linkStrength = $state(0.35);
+  let linkDistance = $state(85);
+  let collisionPadding = $state(8);
+  let nodeScale = $state(1);
+  let linkThickness = $state(1);
+  let labelThreshold = $state(1.15);
+  let groups = $state<Group[]>([
+    { name: "Projects", query: "type:project", color: "#a78bfa" },
+    { name: "Approved knowledge", query: "type:memory status:approved", color: "#2dd4bf" },
+  ]);
+  let newGroupOpen = $state(false);
+  let groupName = $state("");
+  let groupQuery = $state("");
+  let groupColor = $state("#ef6a78");
+  let graphElement = $state<HTMLDivElement>();
+  let simulation: Simulation<GraphNode, GraphLink> | null = null;
+  let graphWidth = $state(900);
+  let graphHeight = $state(620);
+  let renderedNodes = $state<GraphNode[]>([]);
+  let renderedLinks = $state<GraphLink[]>([]);
+  const positionCache = new Map<string, GraphNode>();
+  let transform = $state({ x: 0, y: 0, k: 1 });
+  let panning = false;
+  let panOrigin = { x: 0, y: 0, tx: 0, ty: 0 };
+  let contextMenu = $state<{ x: number; y: number; node: GraphNode } | null>(null);
 
   async function load() {
-    refreshing = true;
-    loadError = null;
+    refreshing = true; loadError = null;
     try {
       brain = await api.brain();
-      selectedId ??= brain.nodes[0]?.node_id ?? null;
       updatedAt = new Date().toISOString();
     } catch (error) {
       loadError = error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable";
-    } finally {
-      refreshing = false;
-    }
+    } finally { refreshing = false; }
   }
 
   onMount(() => {
     void load();
     const timer = window.setInterval(() => void load(), 15_000);
-    return () => window.clearInterval(timer);
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(([entry]) => {
+      graphWidth = Math.max(320, entry.contentRect.width);
+      graphHeight = Math.max(420, entry.contentRect.height);
+      simulation?.force("center", forceCenter(graphWidth / 2, graphHeight / 2).strength(centerStrength)).alpha(0.2).restart();
+    });
+    if (graphElement) resize?.observe(graphElement);
+    return () => { window.clearInterval(timer); resize?.disconnect(); simulation?.stop(); };
   });
 
-  // Deterministic pseudo-random in [0,1) from a string so node positions are
-  // stable between renders (no layout thrash) but look organic.
-  function hash(str: string): number {
-    let h = 2166136261;
-    for (let i = 0; i < str.length; i++) {
-      h ^= str.charCodeAt(i);
-      h = Math.imul(h, 16777619);
+  const rawNodes = $derived(brain?.nodes ?? []);
+  const rawEdges = $derived(brain?.edges ?? []);
+  const degrees = $derived.by(() => {
+    const values = new Map<string, number>();
+    for (const edge of rawEdges) {
+      values.set(edge.source, (values.get(edge.source) ?? 0) + 1);
+      values.set(edge.target, (values.get(edge.target) ?? 0) + 1);
     }
-    return ((h >>> 0) % 10000) / 10000;
-  }
+    return values;
+  });
+  const sourceRoots = $derived(rawNodes.filter((node) => ["file", "folder"].includes(node.node_type) && node.status === "selected"));
+  const summary = $derived([
+    ["Records", rawNodes.length], ["Relationships", rawEdges.length],
+    ["Sources", rawNodes.filter((node) => ["file", "folder"].includes(node.node_type)).length],
+    ["Approved memories", rawNodes.filter((node) => node.node_type === "memory").length],
+  ] as [string, number][]);
 
-  function positions(nodes: BrainNode[]): PositionedNode[] {
-    const totals = new Map<string, number>();
-    for (const node of nodes) totals.set(node.node_type, (totals.get(node.node_type) ?? 0) + 1);
-    const counts = new Map<string, number>();
-    return nodes.map((node) => {
-      const index = counts.get(node.node_type) ?? 0;
-      counts.set(node.node_type, index + 1);
-      const total = totals.get(node.node_type) ?? 1;
-      const baseX = COLUMN[node.node_type] ?? 50;
-      const jitterX = (hash(node.node_id) - 0.5) * 9;
-      const baseY = 10 + ((index + 1) * 80) / (total + 1);
-      const jitterY = (hash(node.node_id + "y") - 0.5) * 6;
-      return {
-        ...node,
-        x: Math.max(4, Math.min(96, baseX + jitterX)),
-        y: Math.max(6, Math.min(94, baseY + jitterY)),
-        phase: hash(node.node_id + "p") * 6.283,
-      };
+  function matchesQuery(node: BrainNode, query: string): boolean {
+    const terms = query.toLowerCase().match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
+    return terms.every((term) => {
+      const [key, rawValue] = term.split(":", 2);
+      if (!rawValue) return `${node.label} ${node.detail ?? ""}`.toLowerCase().includes(key);
+      const value = rawValue.replaceAll('"', "");
+      if (key === "type") return node.node_type.toLowerCase() === value;
+      if (key === "status" || key === "approval") return node.status.toLowerCase().includes(value);
+      return `${node.label} ${node.detail ?? ""}`.toLowerCase().includes(value);
     });
   }
 
-  const nodeTypes = $derived([...new Set((brain?.nodes ?? []).map((node) => node.node_type))]);
-  const graphNodes = $derived(positions((brain?.nodes ?? []).filter((node) => (typeFilter === "all" || node.node_type === typeFilter) && `${node.label} ${node.detail ?? ""}`.toLowerCase().includes(search.toLowerCase()))));
-  const positionsById = $derived(new Map(graphNodes.map((node) => [node.node_id, node])));
-  const graphEdges = $derived(
-    (brain?.edges ?? []).filter((edge) => positionsById.has(edge.source) && positionsById.has(edge.target)),
-  );
-  const selected = $derived(graphNodes.find((node) => node.node_id === selectedId) ?? null);
-  const tasks = $derived(graphNodes.filter((node) => node.node_type === "task"));
-  const folders = $derived(graphNodes.filter((node) => node.node_type === "folder"));
-  const files = $derived(graphNodes.filter((node) => node.node_type === "file"));
-  const memoryNodes = $derived(graphNodes.filter((node) => node.node_type === "memory"));
-  const sourceRoots = $derived(graphNodes.filter((node) => (node.node_type === "file" || node.node_type === "folder") && node.status === "selected"));
-  const flow = $derived([
-    { label: "Conversations", count: graphNodes.filter((node) => node.node_type === "session").length },
-    { label: "Tasks", count: tasks.length },
-    { label: "Sources", count: folders.length + files.length },
-    { label: "Approved memories", count: memoryNodes.length },
-    { label: "Tool executions", count: graphNodes.filter((node) => node.node_type === "tool").length },
-    { label: "Waiting for approval", count: graphNodes.filter((node) => node.node_type === "approval" || node.status === "waiting").length },
-  ]);
-
-  function edgePosition(id: string): PositionedNode | undefined {
-    return positionsById.get(id);
+  function groupColorFor(node: BrainNode): string {
+    return groups.find((group) => matchesQuery(node, group.query))?.color ?? COLORS[node.node_type] ?? "#94a3b8";
   }
 
-  // Human-readable status for the inspector panel (backend stores snake_case).
-  function statusLabel(status: string): string {
-    switch (status) {
-      case "running": return "Working";
-      case "idle": return "Idle";
-      case "queued": return "Queued";
-      case "paused": return "Paused";
-      case "waiting": return "Waiting";
-      case "completed": return "Done";
-      case "failed": return "Failed";
-      case "active": return "Active";
-      case "selected": return "Selected";
-      default: return status.charAt(0).toUpperCase() + status.slice(1);
+  const localIds = $derived.by(() => {
+    if (graphMode === "global" || !centreId) return new Set(rawNodes.map((node) => node.node_id));
+    const found = new Set([centreId]); let frontier = new Set([centreId]);
+    for (let step = 0; step < depth; step += 1) {
+      const next = new Set<string>();
+      for (const edge of rawEdges) {
+        if (frontier.has(edge.source) && !found.has(edge.target)) next.add(edge.target);
+        if (frontier.has(edge.target) && !found.has(edge.source)) next.add(edge.source);
+      }
+      next.forEach((id) => found.add(id)); frontier = next;
     }
-  }
+    return found;
+  });
 
-  // Quadratic-bezier control point for a curved edge — gives the graph the
-  // flowing, organic feel of Obsidian rather than straight rule lines.
-  function curve(ax: number, ay: number, bx: number, by: number): string {
-    const mx = (ax + bx) / 2 + (by - ay) * 0.18;
-    const my = (ay + by) / 2 - (bx - ax) * 0.18;
-    return `Q ${mx} ${my} ${bx} ${by}`;
+  const visibleData = $derived.by(() => {
+    let nodes = rawNodes.filter((node) => {
+      const typeOn = enabledTypes[node.node_type] ?? true;
+      return typeOn && localIds.has(node.node_id) && matchesQuery(node, search);
+    });
+    if (!showOrphans) nodes = nodes.filter((node) => (degrees.get(node.node_id) ?? 0) > 0);
+    let edges = rawEdges.filter((edge) => nodes.some((node) => node.node_id === edge.source) && nodes.some((node) => node.node_id === edge.target));
+    if (rawNodes.length <= 1 && search === "" && graphMode === "global") {
+      const principal = nodes[0] ?? { node_id: "starter:user", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: false };
+      nodes = [principal, { node_id: "starter:workspace", node_type: "workspace", label: "Workspace", status: "active", detail: "Your governed workspace", progress_percent: null, is_real: false }, { node_id: "starter:add", node_type: "source", label: "Add first source", status: "instruction", detail: "Instructional prompt", progress_percent: null, is_real: false }];
+      edges = [{ source: principal.node_id, target: "starter:workspace", relationship: "owns", is_active: false }, { source: "starter:workspace", target: "starter:add", relationship: "instruction", is_active: false }];
+    }
+    return { nodes, edges };
+  });
+
+  function radius(node: GraphNode): number { return Math.max(4, Math.min(20, 4 + Math.sqrt(node.degree) * 2.5)) * nodeScale; }
+  function nodeId(value: string | GraphNode): string { return typeof value === "string" ? value : value.node_id; }
+  function graphNode(value: string | GraphNode): GraphNode | null { return typeof value === "string" ? null : value; }
+  function connectedTo(id: string | null): Set<string> {
+    if (!id) return new Set();
+    const result = new Set([id]);
+    for (const edge of renderedLinks) {
+      const source = nodeId(edge.source); const target = nodeId(edge.target);
+      if (source === id) result.add(target); if (target === id) result.add(source);
+    }
+    return result;
   }
+  const highlighted = $derived(connectedTo(hoveredId ?? selectedIds[0] ?? null));
+
+  $effect(() => {
+    const data = visibleData;
+    const nodes: GraphNode[] = data.nodes.map((node) => ({
+      ...node, degree: degrees.get(node.node_id) ?? (node.node_id === "starter:workspace" ? 2 : 1),
+      color: groupColorFor(node), x: positionCache.get(node.node_id)?.x ?? graphWidth / 2 + (Math.random() - 0.5) * 80,
+      y: positionCache.get(node.node_id)?.y ?? graphHeight / 2 + (Math.random() - 0.5) * 80,
+    }));
+    const links: GraphLink[] = data.edges.map((edge) => ({ ...edge }));
+    simulation?.stop();
+    simulation = forceSimulation<GraphNode>(nodes)
+      .velocityDecay(0.32)
+      .force("center", forceCenter(graphWidth / 2, graphHeight / 2).strength(centerStrength))
+      .force("charge", forceManyBody<GraphNode>().strength(chargeStrength))
+      .force("link", forceLink<GraphNode, GraphLink>(links).id((node) => node.node_id).distance(linkDistance).strength(linkStrength))
+      .force("collision", forceCollide<GraphNode>().radius((node) => radius(node) + collisionPadding))
+      .on("tick", () => { nodes.forEach((node) => positionCache.set(node.node_id, node)); renderedNodes = [...nodes]; renderedLinks = [...links]; });
+    if (motion === "paused") simulation.stop();
+    else if (motion === "alive") simulation.alphaTarget(0.015).restart();
+    else simulation.alphaTarget(0).restart();
+    renderedNodes = nodes; renderedLinks = links;
+    const currentSimulation = simulation;
+    return () => currentSimulation.stop();
+  });
+
+  function selectNode(event: MouseEvent, node: GraphNode) {
+    event.stopPropagation(); contextMenu = null;
+    if (node.node_id === "starter:add") { sourceOpen = true; return; }
+    selectedIds = event.shiftKey ? (selectedIds.includes(node.node_id) ? selectedIds.filter((id) => id !== node.node_id) : [...selectedIds, node.node_id]) : [node.node_id];
+    inspectorOpen = true;
+  }
+  function centreNode(node: GraphNode) { centreId = node.node_id; graphMode = "local"; selectedIds = [node.node_id]; inspectorOpen = true; }
+  function dragStart(event: PointerEvent, node: GraphNode) { event.stopPropagation(); (event.currentTarget as Element).setPointerCapture(event.pointerId); node.fx = node.x; node.fy = node.y; simulation?.alphaTarget(0.1).restart(); }
+  function dragMove(event: PointerEvent, node: GraphNode) { if (!(event.currentTarget as Element).hasPointerCapture(event.pointerId)) return; node.fx = (event.offsetX - transform.x) / transform.k; node.fy = (event.offsetY - transform.y) / transform.k; }
+  function dragEnd(event: PointerEvent, node: GraphNode) { (event.currentTarget as Element).releasePointerCapture(event.pointerId); node.pinned = true; simulation?.alphaTarget(motion === "alive" ? 0.015 : 0); }
+  function unpin(node: GraphNode) { node.fx = null; node.fy = null; node.pinned = false; simulation?.alpha(0.25).restart(); contextMenu = null; }
+  function onWheel(event: WheelEvent) { event.preventDefault(); const next = Math.max(0.35, Math.min(3, transform.k * Math.exp(-event.deltaY * 0.001))); const rect = graphElement?.getBoundingClientRect(); if (!rect) return; const px = event.clientX - rect.left; const py = event.clientY - rect.top; transform = { k: next, x: px - ((px - transform.x) / transform.k) * next, y: py - ((py - transform.y) / transform.k) * next }; }
+  function panStart(event: PointerEvent) { if (event.target !== event.currentTarget && (event.target as Element).closest(".graph-stage")) return; panning = true; panOrigin = { x: event.clientX, y: event.clientY, tx: transform.x, ty: transform.y }; (event.currentTarget as Element).setPointerCapture(event.pointerId); }
+  function panMove(event: PointerEvent) { if (panning) transform = { ...transform, x: panOrigin.tx + event.clientX - panOrigin.x, y: panOrigin.ty + event.clientY - panOrigin.y }; }
+  function panEnd(event: PointerEvent) { panning = false; if ((event.currentTarget as Element).hasPointerCapture(event.pointerId)) (event.currentTarget as Element).releasePointerCapture(event.pointerId); }
+  function fitGraph() { transform = { x: 0, y: 0, k: 1 }; simulation?.alpha(0.18).restart(); }
+  async function toggleFullscreen() { if (!document.fullscreenElement) await graphElement?.requestFullscreen(); else await document.exitFullscreen(); }
 
   async function addSource() {
-    if (!sourcePath.trim()) return;
-    sourceBusy = true;
-    sourceError = null;
-    try {
-      await api.addBrainSource(sourcePath.trim());
-      sourcePath = "";
-      await load();
-    } catch (error) {
-      sourceError = error instanceof ApiError ? "Choose an existing file or folder inside this Raiker workspace." : "Could not add this source.";
-    } finally {
-      sourceBusy = false;
-    }
+    if (!sourcePath.trim()) return; sourceBusy = true; sourceError = null;
+    try { await api.addBrainSource(sourcePath.trim()); sourcePath = ""; sourceOpen = false; await load(); }
+    catch (error) { sourceError = error instanceof ApiError ? "Choose an existing file or folder inside this Raiker workspace." : "Could not add this source."; }
+    finally { sourceBusy = false; }
   }
-
-  async function removeSource(path: string) {
-    sourceError = null;
-    try {
-      await api.removeBrainSource(path);
-      await load();
-    } catch {
-      sourceError = "Could not remove this source.";
-    }
-  }
+  async function removeSource(path: string) { try { await api.removeBrainSource(path); await load(); } catch { sourceError = "Could not remove this source."; } }
+  function addGroup() { if (!groupName.trim() || !groupQuery.trim()) return; groups = [...groups, { name: groupName.trim(), query: groupQuery.trim(), color: groupColor }]; groupName = ""; groupQuery = ""; newGroupOpen = false; }
+  function statusLabel(status: string): string { return status.replaceAll("_", " ").replace(/^./, (value) => value.toUpperCase()); }
+  const selected = $derived(renderedNodes.find((node) => node.node_id === selectedIds[0]) ?? null);
+  const selectedConnections = $derived(selected ? renderedLinks.filter((edge) => nodeId(edge.source) === selected.node_id || nodeId(edge.target) === selected.node_id) : []);
 </script>
 
-<div class="head-row">
-  <div>
-    <h2>Knowledge Map</h2>
-    <p class="page-lead">Explore the governed sources and records connected to Raiker’s work.</p>
-    <p class="truth-note"><Icon name="info" size={15} /> This page does not display hidden model reasoning.</p>
-  </div>
-  <div class="refresh-state"><span>{updatedAt ? "Updated just now" : "Updating…"}</span><button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={refreshing}>
-    <Icon name="refresh" size={15} /> {refreshing ? "Refreshing…" : "Refresh"}
-  </button></div>
-</div>
-
 {#if loadError}
-  <PageState state="error" title="Couldn't load the brain graph" detail={loadError} />
+  <PageState state="error" title="Couldn't load the knowledge graph" detail={loadError} />
 {:else if brain === null}
-  <PageState state="loading" title="Loading the brain graph…" />
+  <PageState state="loading" title="Loading the knowledge graph…" />
 {:else}
-  <section class="flow card" aria-label="Workspace summary">
-    <div><h2>Workspace summary</h2><p>Stored records and current activity within this workspace.</p></div>
-    <div class="flow-list">
-      {#each flow as stage (stage.label)}
-        <span class:has-work={stage.count > 0}>{stage.label} <b>{stage.count}</b></span>
-      {/each}
-    </div>
-  </section>
+  <main class="knowledge-shell" aria-label="Knowledge Map">
+    <header class="graph-toolbar">
+      <div class="title-block"><span class="eyebrow">Workspace intelligence</span><h2>Knowledge Map</h2></div>
+      <label class="search"><Icon name="search" size={16} /><input bind:value={search} placeholder="Search records or use type:, status:…" aria-label="Search records" /></label>
+      <div class="mode-switch" role="group" aria-label="Graph scope"><button class:active={graphMode === "global"} onclick={() => graphMode = "global"}>Global</button><button class:active={graphMode === "local"} disabled={!centreId} onclick={() => graphMode = "local"}>Local</button></div>
+      <button class="icon-button" aria-label="Add workspace source" title="Add source" onclick={() => sourceOpen = true}>+</button>
+      <button class="icon-button" aria-label="Graph settings" aria-expanded={settingsOpen} onclick={() => settingsOpen = !settingsOpen}><Icon name="settings" size={17} /></button>
+      <button class="icon-button" aria-label="Enter fullscreen" onclick={toggleFullscreen}>⛶</button>
+    </header>
 
-  <section class="card sources" aria-labelledby="sources-heading">
-    <div class="source-heading"><div><h2 id="sources-heading">Workspace sources</h2><p>Files and folders made available as governed, read-only workspace context. Sources do not become approved memories automatically.</p></div><span class="boundary"><Icon name="shield" size={14} /> Workspace boundary enforced</span></div>
-    <form onsubmit={(event) => { event.preventDefault(); void addSource(); }}>
-      <div class="source-form">
-        <div class="kind-toggle" role="radiogroup" aria-label="Source kind">
-          <button type="button" class:chosen={sourceKind === "folder"} aria-pressed={sourceKind === "folder"} onclick={() => sourceKind = "folder"}><Icon name="projects" size={14} /> Folder</button>
-          <button type="button" class:chosen={sourceKind === "file"} aria-pressed={sourceKind === "file"} onclick={() => sourceKind = "file"}><Icon name="file" size={14} /> File</button>
-        </div>
-        <input class="input" bind:value={sourcePath} placeholder={sourceKind === "folder" ? "documents/research" : "notes/ideas.md"} disabled={sourceBusy} aria-label="Workspace-relative path" />
-        <button class="btn btn-primary btn-sm" disabled={sourceBusy || !sourcePath.trim()}>{sourceBusy ? "Adding…" : `Add ${sourceKind}`}</button>
-      </div>
-    </form>
-    {#if sourceError}<p class="error" role="alert">{sourceError}</p>{/if}
-    {#if sourceRoots.length}
-      <div class="source-list">{#each sourceRoots as source (source.node_id)}<span class="source-chip"><Icon name={source.node_type === "folder" ? "projects" : "file"} size={12} />{source.detail}<button type="button" aria-label={`Remove ${source.detail} from graph`} onclick={() => void removeSource(source.detail ?? "")}>×</button></span>{/each}</div>
-    {:else}
-      <div class="source-empty"><strong>No workspace sources added</strong><span>Add a file or folder already inside this workspace. Raiker validates the path before it becomes context.</span></div>
-    {/if}
-  </section>
-
-  <section class="graph-controls" aria-label="Knowledge Map controls">
-    <label class="graph-search"><Icon name="search" size={15} /><input bind:value={search} placeholder="Search records…" aria-label="Search records" /></label>
-    <select bind:value={typeFilter} aria-label="Filter by record type"><option value="all">All record types</option>{#each nodeTypes as type}<option value={type}>{type}</option>{/each}</select>
-    <div class="view-tabs" role="tablist" aria-label="Map view"><button role="tab" aria-selected={viewMode === "map"} class:chosen={viewMode === "map"} onclick={() => viewMode = "map"}>Map</button><button role="tab" aria-selected={viewMode === "list"} class:chosen={viewMode === "list"} onclick={() => viewMode = "list"}>List</button></div>
-  </section>
-
-  <div class="brain-layout">
-    <section class="card graph-card" aria-label="Knowledge Map relationship graph">
-      <div class="graph-heading"><div><h2>Workspace relationships</h2><p>Select a stored record to inspect its status and connections.</p></div><label class="animation-toggle"><input type="checkbox" bind:checked={animate} /> Animate recent activity</label></div>
-      {#if graphNodes.length === 0 && !search && typeFilter === "all"}
-        <div class="empty-graph"><Icon name="projects" size={28} /><h3>Build your workspace map</h3><p>Connections appear as you add sources, create projects, start conversations, and approve memories.</p><div><a class="btn btn-primary btn-sm" href="#sources-heading">Add a source</a><a class="btn btn-ghost btn-sm" href="#/new-chat">Start a conversation</a></div></div>
-      {:else if graphNodes.length === 0}<div class="empty-graph"><h3>No records match these filters</h3><p>Clear the search or select another record type.</p></div>
-      {:else if viewMode === "map"}
-        <div class="graph" class:paused={!animate} aria-label="Interactive workspace relationship graph">
-          <div class="graph-bg" aria-hidden="true"></div>
-          <svg class="edges" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            {#each graphEdges as edge (`${edge.source}:${edge.target}:${edge.relationship}`)}
-              {@const source = edgePosition(edge.source)}
-              {@const target = edgePosition(edge.target)}
-              {#if source && target}
-                <path class:active={edge.is_active} d={`M ${source.x} ${source.y} ${curve(source.x, source.y, target.x, target.y)}`} />
-              {/if}
-            {/each}
-          </svg>
-          {#each graphNodes as node (node.node_id)}
-            {@const isFolder = node.node_type === "folder"}
-            {@const isFile = node.node_type === "file"}
-            <button
-              type="button"
-              class="node node-{node.node_type}"
-              class:selected={node.node_id === selectedId}
-              class:active-node={ACTIVE.has(node.status)}
-              class:idle-node={node.status === "idle" || node.status === "waiting"}
-              style={`left:${node.x}%;top:${node.y}%;--phase:${node.phase}s`}
-              onclick={() => selectedId = node.node_id}
-              aria-pressed={node.node_id === selectedId}
-            >
-              {#if node.node_type === "agent"}
-                <span class="agent-face" aria-hidden="true"><i></i><i></i></span>
-              {:else if isFolder}
-                <span class="folder-mark" aria-hidden="true"></span>
-              {:else if isFile}
-                <span class="file-mark" aria-hidden="true"></span>
-              {:else}
-                <span class="node-dot" aria-hidden="true"></span>
-              {/if}
-              <span class="node-label">{node.label}</span>
-            </button>
+    <div class="graph-workspace" bind:this={graphElement} onwheel={onWheel} onpointerdown={panStart} onpointermove={panMove} onpointerup={panEnd} onclick={() => { selectedIds = []; inspectorOpen = false; contextMenu = null; }} role="application" aria-label="Interactive force-directed knowledge graph">
+      <div class="vignette"></div>
+      <svg class="graph-stage" width={graphWidth} height={graphHeight} aria-label={`${renderedNodes.length} nodes and ${renderedLinks.length} relationships`}>
+        <defs><marker id="arrow" viewBox="0 -5 10 10" refX="16" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="rgba(180,188,205,.55)" /></marker></defs>
+        <g transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
+          {#each renderedLinks as edge (`${nodeId(edge.source)}:${nodeId(edge.target)}:${edge.relationship}`)}
+            {@const source = graphNode(edge.source)}
+            {@const target = graphNode(edge.target)}
+            {#if source && target}
+              {@const active = highlighted.has(source.node_id) && highlighted.has(target.node_id)}
+              <line class:highlighted={active} class:instruction={edge.relationship === "instruction"} x1={source.x ?? 0} y1={source.y ?? 0} x2={target.x ?? 0} y2={target.y ?? 0} style={`--link-width:${linkThickness}`} marker-end={showArrows && edge.relationship !== "instruction" ? "url(#arrow)" : undefined} />
+              {#if showParticles && edge.is_active}<circle class="particle" r="2" fill={source.color}><animateMotion dur="1.8s" repeatCount="indefinite" path={`M ${source.x ?? 0} ${source.y ?? 0} L ${target.x ?? 0} ${target.y ?? 0}`} /></circle>{/if}
+            {/if}
           {/each}
-        </div>
-        <div class="legend" aria-label="Record type legend"><span><i class="dot task-dot"></i> Task</span><span><i class="dot agent-dot"></i> Agent</span><span><i class="dot memory-dot"></i> Approved memory</span><span><i class="dot folder-dot"></i> Folder source</span><span><i class="dot file-dot"></i> File source</span><span><i class="dot tool-dot"></i> Runtime record</span></div>
-      {:else}
-        <div class="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Details</th></tr></thead><tbody>{#each graphNodes as node (node.node_id)}<tr class:selected={node.node_id === selectedId}><td><button onclick={() => selectedId = node.node_id}>{node.label}</button></td><td>{node.node_type}</td><td>{statusLabel(node.status)}</td><td>{node.detail ?? "—"}</td></tr>{/each}</tbody></table></div>
-      {/if}
-    </section>
+          {#each renderedNodes as node (node.node_id)}
+            <g class="graph-node" class:dimmed={highlighted.size > 0 && !highlighted.has(node.node_id)} class:selected={selectedIds.includes(node.node_id)} class:virtual={node.node_id.startsWith("starter:")} transform={`translate(${node.x ?? 0},${node.y ?? 0})`} role="button" tabindex="0" aria-label={`${node.label}, ${node.node_type} record, ${node.degree} connections`} onpointerenter={() => hoveredId = node.node_id} onpointerleave={() => hoveredId = null} onpointerdown={(event) => dragStart(event, node)} onpointermove={(event) => dragMove(event, node)} onpointerup={(event) => dragEnd(event, node)} onclick={(event) => selectNode(event, node)} ondblclick={(event) => { event.stopPropagation(); centreNode(node); }} oncontextmenu={(event) => { event.preventDefault(); event.stopPropagation(); contextMenu = { x: event.clientX, y: event.clientY, node }; }} onkeydown={(event) => { if (event.key === "Enter") selectNode(event as unknown as MouseEvent, node); }}>
+              <circle class="halo" r={radius(node) + 7} fill={node.color} />
+              <circle class="node-circle" r={radius(node)} fill={node.color} stroke={node.status === "failed" ? "#ef4444" : node.node_type === "approval" ? "#facc15" : node.color} />
+              {#if showLabels && (transform.k >= labelThreshold || node.degree >= 4 || selectedIds.includes(node.node_id) || hoveredId === node.node_id)}<text class="node-label" y={radius(node) + 15} text-anchor="middle">{node.label}</text>{/if}
+            </g>
+          {/each}
+        </g>
+      </svg>
 
-    <aside class="inspector-panel">
-      <section class="card inspector">
-        <h2>{selected?.node_type === "user" ? "Your workspace identity" : selected?.label ?? "Selected record"}</h2>
-        {#if selected}
-          <p class="status"><span></span>{statusLabel(selected.status)}</p>
-          <p class="record-type">{selected.node_type} record</p><p class="inspector-detail">{selected.detail ?? (selected.node_type === "user" ? "Active workspace account. Connections show governed records associated with your work." : "No additional stored metadata is available.")}</p>
-          <p class="connections"><strong>{graphEdges.filter((edge) => edge.source === selected.node_id || edge.target === selected.node_id).length}</strong> connected record{graphEdges.filter((edge) => edge.source === selected.node_id || edge.target === selected.node_id).length === 1 ? "" : "s"}</p>
-          {#if selected.progress_percent !== null}
-            <div class="progress" aria-label={`${selected.label} progress`}><div style={`width:${selected.progress_percent}%`}></div></div>
-          {/if}
-        {:else}<p class="inspector-detail">Choose a record in the map or list.</p>{/if}
-      </section>
-      <section class="card memory-card">
-        <h2>Workspace content</h2>
-        <p class="muted">Sources, approved memories, and stored runtime records are separate governed record types.</p>
-        <div class="content-counts"><span><b>{folders.length + files.length}</b> Sources</span><span><b>{memoryNodes.length}</b> Approved memories</span><span><b>{graphNodes.length - folders.length - files.length - memoryNodes.length}</b> Runtime records</span></div>
-        <ul class="memory-list">
-          {#each folders as folder (folder.node_id)}<li class="kind-folder"><Icon name="projects" size={13} /> {folder.label}</li>{/each}
-          {#each files as file (file.node_id)}<li class="kind-file"><Icon name="file" size={13} /> {file.label}</li>{/each}
-          {#each memoryNodes as mem (mem.node_id)}<li class="kind-memory"><Icon name="spark" size={13} /> {mem.label}</li>{/each}
-          {#if folders.length + files.length + memoryNodes.length === 0}<li class="empty-li">Nothing recorded yet.</li>{/if}
-        </ul>
-      </section>
-    </aside>
-  </div>
+      {#if rawNodes.length <= 1 && search === ""}
+        <div class="empty-copy"><strong>Build your knowledge graph</strong><span>Add sources, complete conversations, approve memories, or create tasks. Relationships will appear automatically.</span></div>
+      {/if}
+
+      <button class="summary-pill" aria-expanded={summaryOpen} onclick={(event) => { event.stopPropagation(); summaryOpen = !summaryOpen; }}><span>{renderedNodes.length} nodes</span><i></i><span>{renderedLinks.length} relationships</span><span aria-hidden="true">{summaryOpen ? "⌃" : "⌄"}</span></button>
+      {#if summaryOpen}<section class="summary-popover" onclick={(event) => event.stopPropagation()}><h3>Workspace summary</h3>{#each summary as item}<p><span>{item[0]}</span><b>{item[1]}</b></p>{/each}<small><Icon name="shield" size={13} /> Governed workspace boundary</small></section>{/if}
+
+      <div class="viewport-controls" onclick={(event) => event.stopPropagation()}><button aria-label="Fit graph" onclick={fitGraph}>Fit</button><button aria-label="Zoom out" onclick={() => transform = { ...transform, k: Math.max(.35, transform.k - .15) }}>−</button><span>{Math.round(transform.k * 100)}%</span><button aria-label="Zoom in" onclick={() => transform = { ...transform, k: Math.min(3, transform.k + .15) }}>+</button></div>
+      <div class="graph-meta"><span class="live-dot"></span>{updatedAt ? "Live workspace graph" : "Loading"}<button onclick={(event) => { event.stopPropagation(); void load(); }} disabled={refreshing}>{refreshing ? "Updating…" : "Refresh"}</button></div>
+
+      {#if settingsOpen}
+        <aside class="settings-panel" aria-label="Graph settings" onclick={(event) => event.stopPropagation()}>
+          <div class="panel-title"><div><span>Graph settings</span><small>Personal workspace view</small></div><button aria-label="Close graph settings" onclick={() => settingsOpen = false}>×</button></div>
+          <details open><summary>Filters</summary><label class="panel-search"><Icon name="search" size={14} /><input bind:value={search} placeholder="Search records…" /></label>{#each FILTER_TYPES as type}<label class="check-row"><input type="checkbox" checked={enabledTypes[type]} onchange={(event) => enabledTypes = { ...enabledTypes, [type]: event.currentTarget.checked }} /><span>{type === "session" ? "Conversations" : type === "memory" ? "Approved memories" : type.charAt(0).toUpperCase() + type.slice(1) + "s"}</span></label>{/each}<label class="check-row"><input type="checkbox" bind:checked={showOrphans} /><span>Orphan records</span></label></details>
+          <details open><summary>Groups</summary>{#each groups as group}<div class="group-row"><i style={`background:${group.color}`}></i><span><b>{group.name}</b><small>{group.query}</small></span></div>{/each}<button class="text-action" onclick={() => newGroupOpen = !newGroupOpen}>+ New group</button>{#if newGroupOpen}<div class="group-form"><input bind:value={groupName} placeholder="Group name" /><input bind:value={groupQuery} placeholder='type:memory status:approved' /><label>Colour <input type="color" bind:value={groupColor} /></label><button onclick={addGroup}>Add group</button></div>{/if}</details>
+          <details open><summary>Display</summary><label class="check-row"><input type="checkbox" bind:checked={showArrows} /><span>Direction arrows</span></label><label class="check-row"><input type="checkbox" bind:checked={showLabels} /><span>Node labels</span></label><label class="check-row"><input type="checkbox" bind:checked={showParticles} /><span>Relationship particles</span></label><label class="range-row"><span>Text fade threshold</span><input type="range" min="0.35" max="1.5" step="0.05" bind:value={labelThreshold} /></label><label class="range-row"><span>Node size</span><input type="range" min="0.7" max="1.7" step="0.1" bind:value={nodeScale} /></label><label class="range-row"><span>Link thickness</span><input type="range" min="0.5" max="2.5" step="0.1" bind:value={linkThickness} /></label></details>
+          <details open><summary>Forces</summary><label class="range-row"><span>Centre force</span><input type="range" min="0" max="0.3" step="0.01" bind:value={centerStrength} /></label><label class="range-row"><span>Repel force</span><input type="range" min="-500" max="-40" step="10" bind:value={chargeStrength} /></label><label class="range-row"><span>Link force</span><input type="range" min="0" max="1" step="0.05" bind:value={linkStrength} /></label><label class="range-row"><span>Link distance</span><input type="range" min="30" max="220" step="5" bind:value={linkDistance} /></label><label class="range-row"><span>Collision radius</span><input type="range" min="0" max="30" step="1" bind:value={collisionPadding} /></label></details>
+          <details open><summary>Motion</summary><div class="motion-options">{#each [["paused", "Paused"], ["activity", "Activity only"], ["alive", "Always alive"]] as option}<label><input type="radio" name="motion" value={option[0]} bind:group={motion} /><span>{option[1]}</span></label>{/each}</div></details>
+        </aside>
+      {/if}
+
+      {#if inspectorOpen}
+        <aside class="inspector" aria-label="Record inspector" onclick={(event) => event.stopPropagation()}>
+          <button class="close" aria-label="Close inspector" onclick={() => inspectorOpen = false}>×</button>
+          {#if selected}<span class="record-kicker"><i style={`background:${selected.color}`}></i>{selected.node_type} record</span><h3>{selected.label}</h3><div class="status-line"><span>{statusLabel(selected.status)}</span><span>{selected.degree} connection{selected.degree === 1 ? "" : "s"}</span></div><p>{selected.detail ?? "No additional stored metadata is available."}</p><h4>Relationships</h4>{#if selectedConnections.length}{#each selectedConnections as edge}<button class="relationship" onclick={() => { const other = nodeId(edge.source) === selected.node_id ? nodeId(edge.target) : nodeId(edge.source); selectedIds = [other]; }}><span>{edge.relationship}</span><b>{renderedNodes.find((node) => node.node_id === (nodeId(edge.source) === selected.node_id ? nodeId(edge.target) : nodeId(edge.source)))?.label}</b></button>{/each}{:else}<p class="muted">No stored relationships yet.</p>{/if}<div class="inspector-actions"><button onclick={() => centreNode(selected)}>View neighbours</button>{#if selected.pinned}<button onclick={() => unpin(selected)}>Unpin position</button>{/if}</div>{:else}<p>Select a node to inspect it.</p>{/if}
+        </aside>
+      {/if}
+
+      {#if graphMode === "local"}
+        <div class="depth-control" onclick={(event) => event.stopPropagation()}><span>Relationship depth</span><input type="range" min="1" max="3" step="1" bind:value={depth} aria-label="Relationship depth" /><b>{depth}</b></div>
+      {/if}
+    </div>
+  </main>
+
+  {#if sourceOpen}<div class="modal-backdrop" role="presentation" onclick={() => sourceOpen = false}><section class="source-modal" role="dialog" aria-modal="true" aria-labelledby="source-title" onclick={(event) => event.stopPropagation()}><button class="close" aria-label="Close add source" onclick={() => sourceOpen = false}>×</button><span class="eyebrow">Workspace boundary</span><h2 id="source-title">Add workspace source</h2><p>Choose an existing file or folder inside this Raiker workspace. Sources remain governed, read-only context and do not become approved memories automatically.</p><div class="kind-toggle" role="radiogroup" aria-label="Source kind"><button class:active={sourceKind === "folder"} onclick={() => sourceKind = "folder"}>Folder</button><button class:active={sourceKind === "file"} onclick={() => sourceKind = "file"}>File</button></div><form onsubmit={(event) => { event.preventDefault(); void addSource(); }}><label>Workspace-relative path<input bind:value={sourcePath} placeholder={sourceKind === "folder" ? "documents/research" : "notes/ideas.md"} aria-label="Workspace-relative path" /></label>{#if sourceError}<p class="error" role="alert">{sourceError}</p>{/if}<button class="primary" disabled={sourceBusy || !sourcePath.trim()}>{sourceBusy ? "Adding…" : "Add and index"}</button></form>{#if sourceRoots.length}<h3>Current sources</h3>{#each sourceRoots as source}<div class="current-source"><span>{source.detail}</span><button aria-label={`Remove ${source.detail} from graph`} onclick={() => void removeSource(source.detail ?? "")}>Remove</button></div>{/each}{/if}</section></div>{/if}
+
+  {#if contextMenu}<div class="context-menu" style={`left:${contextMenu.x}px;top:${contextMenu.y}px`} role="menu"><button onclick={() => centreNode(contextMenu!.node)}>Open local graph</button><button onclick={() => { selectedIds = [contextMenu!.node.node_id]; inspectorOpen = true; contextMenu = null; }}>Trace provenance</button><button onclick={() => contextMenu!.node.pinned ? unpin(contextMenu!.node) : (contextMenu!.node.fx = contextMenu!.node.x, contextMenu!.node.fy = contextMenu!.node.y, contextMenu!.node.pinned = true, contextMenu = null)}>{contextMenu.node.pinned ? "Unpin" : "Pin"}</button><button onclick={() => centreNode(contextMenu!.node)}>View neighbours</button></div>{/if}
 {/if}
 
 <style>
-  .head-row { display:flex; justify-content:space-between; gap:var(--space-4); align-items:flex-start; margin-bottom:var(--space-4); }
-  .head-row h2 { margin:0 0 .25rem; } .refresh-state { display:flex; align-items:center; gap:var(--space-2); color:var(--text-3); font-size:.75rem; }
-  .page-lead { max-width:850px; margin:0; color:var(--text-2); }
-  .truth-note { display:flex; align-items:center; gap:6px; color:var(--text-2); font-size:0.85rem; margin:var(--space-2) 0 0; }
-  .flow { display:flex; justify-content:space-between; align-items:center; gap:var(--space-4); margin-bottom:var(--space-4); }
-  .flow h2,.graph-heading h2,.inspector h2,.sources h2,.memory-card h2 { font-size:1rem; margin:0; }
-  .flow p,.graph-heading p,.inspector p,.sources p,.memory-card p { color:var(--text-2); font-size:0.85rem; margin:4px 0 0; }
-  .flow-list { display:flex; flex-wrap:wrap; gap:8px; }
-  .flow-list span { border:1px solid var(--border); border-radius:var(--r-pill); color:var(--text-2); font-size:0.8rem; padding:5px 9px; }
-  .flow-list .has-work { border-color:var(--accent); color:var(--text-1); }
-  .flow-list b { margin-left:4px; }
-  .sources { display:grid; gap:var(--space-3); margin-bottom:var(--space-4); }
-  .source-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); } .boundary { display:flex; align-items:center; gap:.35rem; color:var(--accent); font-size:.75rem; white-space:nowrap; }
-  .source-form { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .source-form .input { flex:1; min-width:12rem; }
-  .kind-toggle { display:inline-flex; border:1px solid var(--border-strong); border-radius:var(--r-sm); overflow:hidden; }
-  .kind-toggle button { display:inline-flex; align-items:center; gap:5px; border:0; background:var(--surface); color:var(--text-2); font:inherit; font-size:0.8rem; padding:.32rem .6rem; cursor:pointer; }
-  .kind-toggle button.chosen { background:var(--accent-soft); color:var(--accent); }
-  .source-list { display:flex; gap:7px; flex-wrap:wrap; }
-  .source-chip { display:flex; align-items:center; gap:5px; border:1px solid var(--accent-border); border-radius:var(--r-pill); color:var(--text-1); background:var(--accent-soft); font-size:0.78rem; padding:4px 8px; }
-  .source-chip button { appearance:none; border:0; background:transparent; color:inherit; cursor:pointer; font-size:16px; line-height:1; }
-  .source-empty { display:grid; gap:.2rem; color:var(--text-3); font-size:0.8rem; margin:0; padding:var(--space-3); border:1px dashed var(--border); border-radius:var(--r-md); } .source-empty strong { color:var(--text-1); }
-  .graph-controls { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); margin-bottom:var(--space-3); } .graph-search { min-height:42px; display:flex; align-items:center; gap:.4rem; flex:1; min-width:14rem; padding:0 .7rem; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); } .graph-search input { border:0; outline:0; background:transparent; color:var(--text-1); width:100%; } .graph-controls select { min-height:42px; padding:0 .7rem; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); color:var(--text-1); } .view-tabs { display:flex; border:1px solid var(--border); border-radius:var(--r-md); overflow:hidden; } .view-tabs button { min-height:40px; border:0; padding:0 .8rem; background:var(--surface); color:var(--text-2); cursor:pointer; } .view-tabs button.chosen { background:var(--accent-soft); color:var(--accent); font-weight:650; }
+  :global(.content:has(.knowledge-shell)) { padding:0 !important; overflow:hidden; }
+  .knowledge-shell { height:calc(100vh - 58px); min-height:650px; display:grid; grid-template-rows:64px 1fr; background:#17181c; color:#eef0f6; }
+  .graph-toolbar { display:grid; grid-template-columns:auto minmax(220px, 620px) auto auto auto auto; gap:10px; align-items:center; padding:0 18px; border-bottom:1px solid rgba(180,188,205,.12); background:rgba(23,24,28,.96); z-index:20; }
+  .title-block { min-width:190px; } .title-block h2 { margin:1px 0 0; color:#eef0f6; font-size:1.06rem; letter-spacing:-.01em; } .eyebrow { color:#8790a6; font-size:.62rem; letter-spacing:.13em; text-transform:uppercase; }
+  .search { display:flex; align-items:center; gap:8px; height:36px; padding:0 11px; border:1px solid rgba(180,188,205,.15); border-radius:7px; background:rgba(255,255,255,.045); color:#8f98ad; } .search:focus-within { border-color:#708db8; box-shadow:0 0 0 2px rgba(112,141,184,.15); } .search input { width:100%; border:0; outline:0; background:transparent; color:#eef0f6; font:inherit; font-size:.78rem; }
+  .mode-switch { display:flex; padding:3px; border:1px solid rgba(180,188,205,.14); border-radius:7px; background:#111216; } .mode-switch button,.icon-button { border:0; color:#9ba4b8; background:transparent; cursor:pointer; } .mode-switch button { padding:6px 10px; border-radius:5px; font:inherit; font-size:.72rem; } .mode-switch button.active { background:#30333b; color:#f3f5fa; box-shadow:0 1px 3px #0008; } .mode-switch button:disabled { opacity:.38; cursor:not-allowed; }
+  .icon-button { display:grid; place-items:center; width:34px; height:34px; border:1px solid rgba(180,188,205,.13); border-radius:7px; font-size:1.25rem; } .icon-button:hover { color:white; border-color:rgba(180,188,205,.3); background:rgba(255,255,255,.05); }
+  .graph-workspace { position:relative; min-height:0; overflow:hidden; touch-action:none; cursor:grab; background:radial-gradient(circle at 50% 45%, #242834 0%, #1a1c22 38%, #141519 100%); } .graph-workspace:active { cursor:grabbing; } .graph-workspace:fullscreen { width:100vw; height:100vh; }
+  .vignette { position:absolute; inset:0; pointer-events:none; background:radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.33) 100%); z-index:1; }
+  .graph-stage { position:absolute; inset:0; z-index:2; overflow:visible; }
+  line { stroke:rgba(180,188,205,.22); stroke-width:calc(var(--link-width) * 1px); transition:opacity .15s, stroke .15s; } line.highlighted { stroke:rgba(137,180,250,.9); stroke-width:calc(var(--link-width) * 1.8px); } line.instruction { stroke-dasharray:3 7; stroke:rgba(180,188,205,.36); }
+  .particle { filter:drop-shadow(0 0 3px currentColor); opacity:.8; }
+  .graph-node { cursor:pointer; outline:none; transition:opacity .15s; } .graph-node.dimmed { opacity:.12; } .node-circle { stroke-width:1.2px; filter:drop-shadow(0 0 3px rgba(255,255,255,.12)); transition:r .15s, filter .15s, stroke-width .15s; } .halo { opacity:.06; transition:opacity .15s; } .graph-node:hover .halo,.graph-node.selected .halo { opacity:.24; } .graph-node:hover .node-circle,.graph-node.selected .node-circle { stroke:#dbeafe; stroke-width:2px; filter:drop-shadow(0 0 8px rgba(137,180,250,.72)); } .graph-node.virtual .node-circle { opacity:.8; }
+  .node-label { fill:rgba(238,240,246,.88); paint-order:stroke; stroke:#17181c; stroke-width:3px; stroke-linejoin:round; font-size:11px; font-family:var(--font-sans); pointer-events:none; }
+  .empty-copy { position:absolute; z-index:4; left:50%; top:20px; transform:translateX(-50%); display:grid; gap:4px; width:min(520px, 80%); text-align:center; pointer-events:none; } .empty-copy strong { font-size:.92rem; } .empty-copy span { color:rgba(210,215,228,.56); font-size:.75rem; line-height:1.45; }
+  .summary-pill,.viewport-controls,.graph-meta,.depth-control { position:absolute; z-index:5; display:flex; align-items:center; border:1px solid rgba(180,188,205,.14); background:rgba(20,21,25,.82); backdrop-filter:blur(14px); color:#b9c0cf; box-shadow:0 8px 24px #0005; }
+  .summary-pill { left:16px; top:16px; gap:8px; border-radius:20px; padding:7px 11px; font:inherit; font-size:.7rem; cursor:pointer; } .summary-pill i { width:3px; height:3px; border-radius:50%; background:#647089; }
+  .summary-popover { position:absolute; z-index:8; left:16px; top:56px; width:230px; padding:14px; border:1px solid rgba(180,188,205,.15); border-radius:10px; background:rgba(25,27,33,.96); box-shadow:0 16px 35px #0007; } .summary-popover h3 { margin:0 0 10px; font-size:.78rem; } .summary-popover p { display:flex; justify-content:space-between; margin:6px 0; color:#9da6b9; font-size:.72rem; } .summary-popover p b { color:#f0f2f7; } .summary-popover small { display:flex; gap:5px; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid #ffffff12; color:#6da9b8; font-size:.65rem; }
+  .viewport-controls { right:16px; bottom:16px; border-radius:8px; overflow:hidden; } .viewport-controls button { height:32px; min-width:34px; border:0; border-right:1px solid #ffffff12; background:transparent; color:#bac1cf; cursor:pointer; } .viewport-controls button:first-child { padding:0 11px; font-size:.68rem; } .viewport-controls span { min-width:46px; text-align:center; font-size:.65rem; }
+  .graph-meta { left:16px; bottom:16px; gap:7px; padding:7px 10px; border-radius:7px; font-size:.65rem; } .graph-meta button { border:0; background:transparent; color:#8ab4f8; font:inherit; cursor:pointer; } .live-dot { width:6px; height:6px; border-radius:50%; background:#58d68d; box-shadow:0 0 7px #58d68d; }
+  .depth-control { left:50%; bottom:16px; transform:translateX(-50%); gap:10px; padding:8px 12px; border-radius:8px; font-size:.68rem; } .depth-control input { width:130px; accent-color:#8ab4f8; }
+  .settings-panel,.inspector { position:absolute; z-index:10; top:14px; right:14px; bottom:58px; width:300px; overflow:auto; border:1px solid rgba(180,188,205,.16); border-radius:11px; background:rgba(24,26,32,.96); backdrop-filter:blur(18px); box-shadow:0 18px 50px #0009; cursor:default; }
+  .panel-title { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; padding:15px 16px 12px; border-bottom:1px solid #ffffff12; background:#191b20; text-transform:uppercase; letter-spacing:.1em; font-size:.68rem; } .panel-title small { display:block; margin-top:4px; color:#6f788b; text-transform:none; letter-spacing:0; } .panel-title button,.close { border:0; background:transparent; color:#8c95a7; cursor:pointer; font-size:1.3rem; }
+  details { border-bottom:1px solid #ffffff10; padding:12px 16px; } summary { color:#d9dde7; cursor:pointer; font-size:.72rem; font-weight:650; letter-spacing:.04em; } details > :not(summary) { margin-top:10px; }
+  .panel-search { display:flex; align-items:center; gap:7px; height:31px; padding:0 8px; border:1px solid #ffffff17; border-radius:6px; color:#778196; background:#121318; } .panel-search input,.group-form input { min-width:0; width:100%; border:0; outline:0; background:transparent; color:#e6e9f0; font:inherit; font-size:.7rem; }
+  .check-row,.range-row { display:flex; align-items:center; justify-content:space-between; gap:10px; color:#aab2c2; font-size:.7rem; margin:8px 0 0 !important; } .check-row { justify-content:flex-start; } input[type="checkbox"],input[type="radio"] { accent-color:#8ab4f8; } .range-row input { width:120px; accent-color:#8ab4f8; }
+  .group-row { display:flex; align-items:center; gap:8px; } .group-row i,.record-kicker i { width:8px; height:8px; flex:none; border-radius:50%; box-shadow:0 0 5px currentColor; } .group-row span { display:grid; } .group-row b { color:#bfc6d3; font-size:.69rem; } .group-row small { color:#687286; font-size:.6rem; } .text-action { border:0; padding:0; background:transparent; color:#8ab4f8; font:inherit; font-size:.68rem; cursor:pointer; }
+  .group-form { display:grid; gap:7px; padding:9px; border:1px solid #ffffff12; border-radius:6px; background:#111216; } .group-form input { padding:6px; border:1px solid #ffffff12; border-radius:4px; } .group-form label { display:flex; justify-content:space-between; align-items:center; color:#8992a5; font-size:.65rem; } .group-form label input { width:38px; padding:0; } .group-form button { border:0; border-radius:4px; padding:6px; background:#527ebc; color:white; cursor:pointer; }
+  .motion-options { display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; } .motion-options label { display:flex; align-items:center; gap:3px; color:#939caf; font-size:.62rem; }
+  .inspector { padding:18px; width:280px; bottom:14px; } .inspector .close,.source-modal .close { position:absolute; right:12px; top:9px; } .record-kicker { display:flex; align-items:center; gap:7px; color:#8892a5; text-transform:uppercase; letter-spacing:.11em; font-size:.6rem; } .inspector h3 { margin:10px 24px 4px 0; font-size:1.05rem; } .status-line { display:flex; gap:8px; color:#7f899e; font-size:.66rem; } .status-line span { padding:3px 6px; border:1px solid #ffffff12; border-radius:4px; } .inspector > p { color:#a5adbd; font-size:.73rem; line-height:1.55; } .inspector h4 { margin:20px 0 7px; color:#7f899e; text-transform:uppercase; letter-spacing:.1em; font-size:.62rem; }
+  .relationship { display:grid; width:100%; gap:2px; padding:8px 0; border:0; border-bottom:1px solid #ffffff0e; background:transparent; text-align:left; cursor:pointer; } .relationship span { color:#687286; font-size:.6rem; } .relationship b { color:#cbd1dd; font-size:.72rem; } .inspector-actions { display:grid; gap:7px; margin-top:18px; } .inspector-actions button { border:1px solid #ffffff16; border-radius:6px; padding:7px; background:#ffffff08; color:#c2c9d6; cursor:pointer; }
+  .modal-backdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; background:#08090dbb; backdrop-filter:blur(5px); } .source-modal { position:relative; width:min(480px, calc(100vw - 32px)); max-height:80vh; overflow:auto; padding:24px; border:1px solid #ffffff1c; border-radius:13px; background:#1c1e24; color:#eef0f6; box-shadow:0 25px 80px #000c; } .source-modal h2 { margin:6px 0; font-size:1.15rem; } .source-modal > p { color:#9ba4b6; font-size:.75rem; line-height:1.5; } .kind-toggle { display:flex; width:max-content; margin:15px 0; padding:3px; border:1px solid #ffffff16; border-radius:7px; } .kind-toggle button { border:0; border-radius:5px; padding:6px 14px; background:transparent; color:#929bad; cursor:pointer; } .kind-toggle button.active { background:#343842; color:white; } .source-modal form label { display:grid; gap:6px; color:#a9b0bf; font-size:.7rem; } .source-modal form input { border:1px solid #ffffff18; border-radius:6px; padding:10px; background:#111216; color:white; } .primary { width:100%; margin-top:12px; border:0; border-radius:6px; padding:9px; background:#5c87c5; color:white; cursor:pointer; } .error { color:#ff8c98 !important; } .current-source { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #ffffff0e; color:#aeb6c5; font-size:.7rem; } .current-source button { border:0; background:transparent; color:#ef7885; cursor:pointer; }
+  .context-menu { position:fixed; z-index:120; display:grid; min-width:160px; padding:5px; border:1px solid #ffffff20; border-radius:7px; background:#202229; box-shadow:0 14px 35px #000b; } .context-menu button { border:0; border-radius:4px; padding:7px 9px; background:transparent; color:#cbd1dc; text-align:left; cursor:pointer; font-size:.7rem; } .context-menu button:hover { background:#ffffff0c; }
 
-  .brain-layout { display:grid; grid-template-columns:minmax(0, 1fr) minmax(220px, 280px); gap:var(--space-4); }
-  .graph-card { min-width:0; }
-  .graph-heading { display:flex; justify-content:space-between; gap:var(--space-3); }
-  .animation-toggle { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:0.75rem; }
-  .empty-graph { display:grid; justify-items:center; gap:.5rem; padding:var(--space-8) var(--space-4); text-align:center; color:var(--text-2); font-size:0.85rem; } .empty-graph h3,.empty-graph p { margin:0; } .empty-graph div { display:flex; gap:var(--space-2); margin-top:var(--space-2); }
-  .graph { position:relative; height:520px; margin-top:var(--space-3); overflow:hidden; border:1px solid var(--border); border-radius:var(--r-md); background:radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 55%); }
-  .graph-bg { position:absolute; inset:0; background-image:radial-gradient(color-mix(in srgb, var(--text-3) 18%, transparent) 1px, transparent 1px); background-size:22px 22px; opacity:.35; animation:drift 22s linear infinite; }
-  .graph.paused .graph-bg,.graph.paused .node,.graph.paused path.active { animation:none; }
-  .edges { position:absolute; inset:0; width:100%; height:100%; }
-  path { fill:none; stroke:var(--border-strong); stroke-width:.32; vector-effect:non-scaling-stroke; opacity:.85; }
-  path.active { stroke:var(--accent); stroke-width:.5; stroke-dasharray:3 4; animation:travel 1.6s linear infinite; }
-
-  .node { position:absolute; transform:translate(-50%, -50%); display:flex; flex-direction:column; align-items:center; gap:4px; padding:0; border:0; background:transparent; color:var(--text-1); font-size:0.7rem; line-height:1.05; cursor:pointer; animation:node-float 5.2s ease-in-out infinite; animation-delay:var(--phase, 0s); }
-  .node:hover .node-label,.node.selected .node-label { color:var(--accent); font-weight:700; }
-  .node-label { max-width:96px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; color:var(--text-2); transition:color 120ms var(--ease); }
-  .node-dot,.folder-mark,.file-mark { display:block; border-radius:50%; background:var(--text-3); transition:transform 160ms var(--ease), box-shadow 160ms var(--ease); }
-  .node-dot { width:9px; height:9px; }
-  .folder-mark { width:11px; height:11px; border-radius:2px; background:#c89528; }
-  .file-mark { width:9px; height:11px; border-radius:1px; background:#4781be; }
-  .node:hover .node-dot,.node:hover .folder-mark,.node:hover .file-mark,.node.selected .node-dot,.node.selected .folder-mark,.node.selected .file-mark { transform:scale(1.45); box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
-  .node.active-node .node-dot,.node.active-node .folder-mark,.node.active-node .file-mark { animation:ping 1.7s ease-in-out infinite; }
-  .node.idle-node { opacity:.78; }
-  .node-task .node-dot { background:#7c5cff; }
-  .node-memory .node-dot { background:#d7833f; }
-  .node-tool .node-dot { background:#3c9f91; }
-  .node-approval .node-dot { background:#ce5e78; }
-  .node-schedule .node-dot { background:#c89528; }
-  .node-backup .node-dot { background:#4781be; }
-
-  .agent-face { width:18px; height:18px; border-radius:48% 48% 42% 42%; background:#e7a55f; display:flex; align-items:center; justify-content:center; gap:3px; position:relative; box-shadow:0 0 0 0 color-mix(in srgb, #e7a55f 40%, transparent); }
-  .agent-face::after { content:""; position:absolute; width:7px; height:3px; border-bottom:1px solid #523b2d; border-radius:50%; top:11px; }
-  .agent-face i { width:2px; height:2px; border-radius:50%; background:#523b2d; }
-
-  .legend { display:flex; flex-wrap:wrap; gap:12px; color:var(--text-3); font-size:0.72rem; margin-top:var(--space-3); }
-  .legend span { display:flex; align-items:center; gap:5px; }
-  .dot { width:8px; height:8px; border-radius:50%; background:var(--text-3); display:inline-block; }
-  .task-dot { background:#7c5cff; } .agent-dot { background:#e7a55f; } .memory-dot { background:#d7833f; } .tool-dot { background:#3c9f91; } .folder-dot { background:#c89528; border-radius:2px; } .file-dot { background:#4781be; border-radius:1px; }
-
-  .inspector-panel { display:grid; align-content:start; gap:var(--space-4); }
-  .status { display:flex; align-items:center; gap:6px; text-transform:capitalize; }
-  .status span { width:7px; height:7px; border-radius:50%; background:var(--accent); }
-  .inspector-detail { color:var(--text-2); font-size:0.85rem; }
-  .progress { height:6px; overflow:hidden; border-radius:4px; background:var(--sunken); margin-top:var(--space-3); }
-  .progress div { height:100%; background:var(--accent); }
-  .record-type { text-transform:capitalize; color:var(--text-3) !important; font-size:.72rem !important; } .connections { padding-top:var(--space-2); border-top:1px solid var(--border); }
-  .content-counts { display:grid; gap:.4rem; margin-top:var(--space-3); } .content-counts span { display:flex; justify-content:space-between; color:var(--text-2); font-size:.78rem; }
-  .table-wrap { overflow:auto; margin-top:var(--space-3); } table { width:100%; border-collapse:collapse; font-size:.82rem; } th,td { padding:.7rem; text-align:left; border-bottom:1px solid var(--border); } th { color:var(--text-3); font-size:.7rem; text-transform:uppercase; } td button { border:0; background:transparent; color:var(--accent); cursor:pointer; font:inherit; padding:0; } tr.selected { background:var(--accent-soft); }
-  .memory-card .muted { color:var(--text-3); font-size:0.78rem; }
-  .memory-list { list-style:none; margin:var(--space-2) 0 0; padding:0; display:grid; gap:5px; }
-  .memory-list li { display:flex; align-items:center; gap:6px; color:var(--text-1); font-size:0.82rem; }
-  .kind-folder { color:#c89528; } .kind-file { color:#4781be; } .kind-memory { color:#d7833f; }
-  .empty-li { color:var(--text-3); font-size:0.78rem; }
-  .error { color:var(--danger); }
-
-  @keyframes node-float { 0%,100% { transform:translate(-50%, -50%); } 50% { transform:translate(-50%, -54%); } }
-  @keyframes ping { 50% { transform:scale(1.5); box-shadow:0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent); } }
-  @keyframes travel { to { stroke-dashoffset:-14; } }
-  @keyframes drift { to { background-position:22px -22px; } }
-  @media (prefers-reduced-motion: reduce) { .graph-bg,.node,.node.active-node .node-dot,.node.active-node .folder-mark,.node.active-node .file-mark,path.active { animation:none !important; } }
-  @media (max-width: 900px) { .brain-layout { grid-template-columns:1fr; } .graph { height:440px; } .flow { align-items:flex-start; flex-direction:column; } }
-  @media (max-width: 600px) { .head-row { flex-direction:column; } .graph { height:380px; } .node-label { font-size:0.62rem; } }
+  /* The graph keeps the Obsidian interaction model while using Raiker's
+     calm light control-deck palette and existing surface language. */
+  .knowledge-shell { background:#f3f7f7; color:#183047; }
+  .graph-toolbar { border-color:#d8e2e4; background:rgba(250,252,252,.97); box-shadow:0 1px 4px #38556b12; }
+  .title-block h2 { color:#173047; } .eyebrow { color:#6c8192; }
+  .search { border-color:#cedadd; background:#fff; color:#718697; } .search:focus-within { border-color:#79b8b5; box-shadow:0 0 0 2px #bce3e147; } .search input { color:#173047; }
+  .mode-switch { border-color:#cfdbde; background:#edf3f3; } .mode-switch button,.icon-button { color:#5d7487; } .mode-switch button.active { background:#cce9e7; color:#0b716e; box-shadow:0 1px 3px #38556b20; }
+  .icon-button { border-color:#cfdbde; background:#fff; } .icon-button:hover { color:#087b77; border-color:#8cc5c2; background:#e9f6f5; }
+  .graph-workspace { background:radial-gradient(circle at 50% 42%, #fbfdfd 0%, #f1f6f6 48%, #e7eeee 100%); }
+  .vignette { background:radial-gradient(ellipse at center, transparent 54%, rgba(75,105,119,.1) 100%); }
+  line { stroke:rgba(76,100,116,.25); } line.highlighted { stroke:#118b87; } line.instruction { stroke:rgba(58,105,113,.42); }
+  .node-circle { filter:drop-shadow(0 0 3px rgba(53,85,100,.16)); } .graph-node:hover .node-circle,.graph-node.selected .node-circle { stroke:#087b77; filter:drop-shadow(0 0 8px rgba(17,139,135,.42)); }
+  .node-label { fill:#29465d; stroke:#f5f9f9; }
+  .empty-copy span { color:#738797; }
+  .summary-pill,.viewport-controls,.graph-meta,.depth-control { border-color:#cedbdd; background:rgba(255,255,255,.9); color:#536b7e; box-shadow:0 8px 24px #38556b1f; }
+  .summary-popover { border-color:#cfdbde; background:rgba(255,255,255,.97); box-shadow:0 16px 35px #38556b2b; } .summary-popover p { color:#6e8292; } .summary-popover p b { color:#173047; } .summary-popover small { border-color:#dce6e8; color:#15827e; }
+  .viewport-controls button { border-color:#dce5e7; color:#526b7e; } .graph-meta button { color:#087b77; } .live-dot { background:#24a97b; box-shadow:0 0 7px #61c99f; }
+  .settings-panel,.inspector { border-color:#c9d6d9; background:rgba(255,255,255,.97); box-shadow:0 18px 50px #38556b35; }
+  .panel-title { border-color:#dce5e7; background:#f8fbfb; } .panel-title small { color:#748899; } .panel-title button,.close { color:#6d8293; }
+  details { border-color:#e0e8e9; } summary { color:#29465d; }
+  .panel-search { border-color:#d2dddf; color:#718697; background:#f7fafa; } .panel-search input,.group-form input { color:#29465d; }
+  .check-row,.range-row { color:#607689; } input[type="checkbox"],input[type="radio"],.range-row input,.depth-control input { accent-color:#118b87; }
+  .group-row b { color:#3d566b; } .group-row small { color:#7b8e9e; } .text-action { color:#087b77; }
+  .group-form { border-color:#dce5e7; background:#f6f9f9; } .group-form input { border-color:#d4dfe1; } .group-form label,.motion-options label { color:#607689; }
+  .inspector .record-kicker,.status-line,.inspector h4 { color:#6e8292; } .status-line span,.relationship,.inspector-actions button { border-color:#dde6e8; } .inspector > p { color:#607689; } .relationship span { color:#778b9b; } .relationship b { color:#29465d; } .inspector-actions button { background:#f2f7f7; color:#36566b; }
+  .modal-backdrop { background:#26415052; } .source-modal { border-color:#c8d5d8; background:#fff; color:#183047; box-shadow:0 25px 80px #38556b4d; } .source-modal > p,.source-modal form label { color:#607689; } .kind-toggle { border-color:#cfdcde; } .kind-toggle button { color:#607689; } .kind-toggle button.active { background:#cce9e7; color:#0b716e; } .source-modal form input { border-color:#cad8da; background:#f8fbfb; color:#183047; } .primary { background:#178d88; } .current-source { border-color:#e0e8e9; color:#526b7e; }
+  .context-menu { border-color:#cbd8da; background:#fff; box-shadow:0 14px 35px #38556b3d; } .context-menu button { color:#36566b; } .context-menu button:hover { background:#edf6f5; }
+  :global(:root[data-theme="dark"]) .knowledge-shell { background:var(--bg); color:var(--text-1); }
+  :global(:root[data-theme="dark"]) .graph-toolbar { border-color:var(--border); background:color-mix(in srgb, var(--surface) 96%, transparent); box-shadow:var(--shadow-1); }
+  :global(:root[data-theme="dark"]) .title-block h2 { color:var(--text-1); } :global(:root[data-theme="dark"]) .eyebrow { color:var(--text-3); }
+  :global(:root[data-theme="dark"]) .search,:global(:root[data-theme="dark"]) .icon-button { border-color:var(--border-strong); background:var(--surface); color:var(--text-2); } :global(:root[data-theme="dark"]) .search input { color:var(--text-1); }
+  :global(:root[data-theme="dark"]) .mode-switch { border-color:var(--border-strong); background:var(--sunken); } :global(:root[data-theme="dark"]) .mode-switch button.active { background:var(--accent-soft); color:var(--accent-strong); }
+  :global(:root[data-theme="dark"]) .graph-workspace { background:radial-gradient(circle at 50% 45%, #18272a 0%, var(--surface) 45%, var(--bg) 100%); } :global(:root[data-theme="dark"]) .vignette { background:radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.35) 100%); }
+  :global(:root[data-theme="dark"]) line { stroke:rgba(154,167,180,.25); } :global(:root[data-theme="dark"]) line.highlighted { stroke:var(--accent); } :global(:root[data-theme="dark"]) .node-label { fill:var(--text-1); stroke:var(--surface); }
+  :global(:root[data-theme="dark"]) .empty-copy span { color:var(--text-2); }
+  :global(:root[data-theme="dark"]) .summary-pill,:global(:root[data-theme="dark"]) .viewport-controls,:global(:root[data-theme="dark"]) .graph-meta,:global(:root[data-theme="dark"]) .depth-control,:global(:root[data-theme="dark"]) .summary-popover,:global(:root[data-theme="dark"]) .settings-panel,:global(:root[data-theme="dark"]) .inspector { border-color:var(--border-strong); background:color-mix(in srgb, var(--surface) 94%, transparent); color:var(--text-2); box-shadow:var(--shadow-2); }
+  :global(:root[data-theme="dark"]) .summary-popover p { color:var(--text-2); } :global(:root[data-theme="dark"]) .summary-popover p b,:global(:root[data-theme="dark"]) summary { color:var(--text-1); }
+  :global(:root[data-theme="dark"]) .panel-title { border-color:var(--border); background:var(--raised); } :global(:root[data-theme="dark"]) details { border-color:var(--border); } :global(:root[data-theme="dark"]) .panel-search,:global(:root[data-theme="dark"]) .group-form { border-color:var(--border); background:var(--sunken); } :global(:root[data-theme="dark"]) .panel-search input,:global(:root[data-theme="dark"]) .group-form input { color:var(--text-1); }
+  :global(:root[data-theme="dark"]) .check-row,:global(:root[data-theme="dark"]) .range-row,:global(:root[data-theme="dark"]) .motion-options label,:global(:root[data-theme="dark"]) .inspector > p { color:var(--text-2); } :global(:root[data-theme="dark"]) .group-row b,:global(:root[data-theme="dark"]) .relationship b { color:var(--text-1); }
+  :global(:root[data-theme="dark"]) .source-modal { border-color:var(--border-strong); background:var(--raised); color:var(--text-1); } :global(:root[data-theme="dark"]) .source-modal > p,:global(:root[data-theme="dark"]) .source-modal form label { color:var(--text-2); } :global(:root[data-theme="dark"]) .source-modal form input { border-color:var(--border-strong); background:var(--sunken); color:var(--text-1); }
+  :global(:root[data-theme="dark"]) .context-menu { border-color:var(--border-strong); background:var(--raised); } :global(:root[data-theme="dark"]) .context-menu button { color:var(--text-1); } :global(:root[data-theme="dark"]) .context-menu button:hover { background:var(--accent-soft); }
+  @media (prefers-reduced-motion: reduce) { .particle { display:none; } }
+  @media (max-width:800px) { .graph-toolbar { grid-template-columns:1fr auto auto auto; } .search { grid-row:2; grid-column:1/-1; margin-bottom:8px; } .knowledge-shell { grid-template-rows:auto 1fr; } .title-block { min-width:0; } .mode-switch { margin-left:auto; } .settings-panel,.inspector { width:min(300px, calc(100% - 28px)); } }
 </style>

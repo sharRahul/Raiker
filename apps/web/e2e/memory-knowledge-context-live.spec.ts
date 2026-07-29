@@ -2,16 +2,18 @@ import { expect, test } from "@playwright/test";
 
 test("live Memory, Knowledge Map, and context usage review", async ({ page }) => {
   await page.goto("http://127.0.0.1:8765/#/memory");
+  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 15_000 });
   if (await page.getByLabel("Confirm password").isVisible()) {
-    await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 15_000 });
     await page.getByLabel("Username").fill("owner");
     await page.getByLabel("Password", { exact: true }).fill("Live-review-password-C1!");
     await page.getByLabel("Confirm password").fill("Live-review-password-C1!");
     await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Memory", level: 2 })).toBeVisible({ timeout: 15_000 });
   } else if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
     await page.getByLabel("Username").fill("owner");
     await page.getByLabel("Password", { exact: true }).fill("Live-review-password-C1!");
     await page.getByRole("button", { name: /Unlock Raiker/i }).click();
+    await expect(page.getByRole("heading", { name: "Memory", level: 2 })).toBeVisible({ timeout: 15_000 });
   }
 
   await page.goto("http://127.0.0.1:8765/#/memory");
@@ -23,9 +25,14 @@ test("live Memory, Knowledge Map, and context usage review", async ({ page }) =>
 
   await page.goto("http://127.0.0.1:8765/#/brain");
   await expect(page.getByRole("heading", { name: "Knowledge Map", level: 2 })).toBeVisible();
-  await expect(page.getByText(/does not display hidden model reasoning/i)).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Map" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "List" })).toBeVisible();
+  await expect(page.getByRole("application", { name: /Interactive force-directed knowledge graph/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Global" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Local" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add workspace source" })).toBeVisible();
+  await page.getByRole("button", { name: "Graph settings" }).click();
+  await expect(page.getByRole("complementary", { name: "Graph settings" })).toBeVisible();
+  await expect(page.getByText("Centre force")).toBeVisible();
+  await expect(page.getByText("Always alive")).toBeVisible();
   await page.screenshot({ path: "../../docs/plans/screenshots/working/knowledge-map-redesign-live.png", fullPage: true });
 
   await page.route("**/api/sessions/*/context-usage", async (route) => {

@@ -72,7 +72,9 @@
   const runtimeIssues = $derived(
     diagnostics === null
       ? 0
-      : diagnostics.missing_config.length + (diagnostics.production_ready_local_single_user_runtime ? 0 : 1),
+      : diagnostics.missing_config.length > 0
+        ? diagnostics.missing_config.length
+        : diagnostics.production_ready_local_single_user_runtime ? 0 : 1,
   );
   const primaryLabel = $derived(workMode === "chat" ? "Start conversation" : workMode === "task" ? "Create task" : workMode === "schedule" ? "Review schedule" : "Start build");
 

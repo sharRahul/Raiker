@@ -54,6 +54,19 @@
   let pickerChoice = $state("");
   let selecting = $state(false);
   let selectError = $state<string | null>(null);
+  const globalChoices = $derived(
+    models?.chat_profiles ?? (models?.profiles ?? []).filter((profile) => profile.configured),
+  );
+  const globalChoice = $derived.by(() => {
+    const selected = globalChoices.find((profile) => profile.selected);
+    return selected ? JSON.stringify([selected.profile_id, selected.model]) : "";
+  });
+
+  async function selectGlobal(value: string) {
+    if (!value) return;
+    const [profileId, model] = JSON.parse(value) as [string, string];
+    await select(profileId, model);
+  }
 
   function normalizePickerList(list: ProviderModelList): ProviderModelList {
     if (list.status !== "available") return list;
@@ -455,6 +468,24 @@
       </div>
     </section>
 
+    <section class="global-model-card card" aria-labelledby="global-model-title">
+      <div class="global-model-copy">
+        <p class="eyebrow">Default</p>
+        <h2 id="global-model-title">Global model</h2>
+        <p class="sub">Used whenever a surface does not choose its own model, including each scheduled run when it begins.</p>
+      </div>
+      <label class="global-model-field">
+        <span>Global model</span>
+        <small>Choose any configured provider and exact model.</small>
+        <select aria-label="Global model" value={globalChoice} onchange={(event) => void selectGlobal(event.currentTarget.value)} disabled={selecting}>
+          <option value="" disabled>Choose a global model</option>
+          {#each globalChoices as profile (`${profile.profile_id}\u0000${profile.model}`)}
+            <option value={JSON.stringify([profile.profile_id, profile.model])}>{providerName(profile.provider)} — {modelName(profile.model)}</option>
+          {/each}
+        </select>
+      </label>
+    </section>
+
     {#each sections as section}
       {@const sectionProfiles = profilesFor(section)}
       {#if sectionProfiles.length}
@@ -808,8 +839,14 @@
 
 <style>
   .head-row { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-4); }
-  .setup-overview, .section-heading { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); }
+  .setup-overview, .global-model-card, .section-heading { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); }
   .setup-overview { margin:var(--space-4) 0; }
+  .global-model-card { margin:var(--space-4) 0; }
+  .global-model-copy { max-width:40rem; }
+  .global-model-field { display:grid; gap:.3rem; min-width:min(100%, 22rem); font-weight:650; }
+  .global-model-field small { color:var(--text-2); font-weight:400; }
+  .global-model-field select { width:100%; min-height:44px; padding:0 .8rem; border:1px solid var(--border-strong); border-radius:var(--r-md); background:var(--surface); color:var(--text-1); font:inherit; }
+  .global-model-field select:focus-visible { outline:3px solid var(--focus-ring); outline-offset:2px; }
   .provider-section { margin-top:var(--space-5); }
   .section-heading { align-items:end; margin-bottom:var(--space-3); }
   .section-heading h2, .setup-overview h2 { margin:0; font-size:1.1rem; }
@@ -933,7 +970,7 @@
   .sub { color:var(--text-3); font-size:0.8rem; margin:0; }
   .error { color:var(--danger); }
   @media (max-width: 44rem) {
-    .head-row, .setup-overview, .section-heading { align-items:flex-start; flex-direction:column; }
+    .head-row, .setup-overview, .global-model-card, .section-heading { align-items:flex-start; flex-direction:column; }
     .setup-meter { text-align:left; width:100%; }
     .local-row { flex-direction:column; }
   }

@@ -69,6 +69,20 @@ function routes(overrides: Record<string, unknown> = {}) {
 }
 
 describe("WorkbenchView", () => {
+  it("counts each actionable runtime configuration gap once", async () => {
+    stubFetch(routes({
+      "GET /api/diagnostics": {
+        missing_config: ["No model profile is selected.", "No runtime mode is active."],
+        production_ready_local_single_user_runtime: false,
+      },
+    }));
+    render(WorkbenchView);
+
+    const tile = (await screen.findByText("Runtime issues")).closest("article");
+    await waitFor(() => expect(tile).toHaveTextContent("2"));
+    expect(tile).not.toHaveTextContent("3");
+  });
+
   it("shows a loading state for live status before it is known", async () => {
     stubFetchPending();
     render(WorkbenchView);

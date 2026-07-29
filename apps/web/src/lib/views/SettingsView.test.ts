@@ -99,4 +99,24 @@ describe("supported-preferences settings", () => {
       expect(screen.getByRole("button", { name: /delete my account/i })).toBeInTheDocument();
     });
   });
+
+  it("uses the General dropdown treatment in Personalisation", async () => {
+    stubApi();
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Personalisation" }));
+
+    expect(await screen.findByLabelText("Layout spacing")).toHaveClass("settings-select");
+    expect(screen.getByLabelText("Font")).toHaveClass("settings-select");
+    expect(screen.getByText(/controls the density of lists, cards, and forms/i)).toBeInTheDocument();
+  });
+
+  it("presents Display name as a structured, descriptive profile field", async () => {
+    stubApi();
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Account" }));
+
+    const input = await screen.findByLabelText("Display name");
+    expect(input).toHaveClass("settings-input");
+    expect(screen.getByText(/shown in greetings and account surfaces/i)).toBeInTheDocument();
+  });
 });

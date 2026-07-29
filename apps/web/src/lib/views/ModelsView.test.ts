@@ -50,6 +50,33 @@ function models(partial: Partial<ModelsData>): ModelsData {
 }
 
 describe("ModelsView state grammar", () => {
+  it("sets the global default from every configured provider/model pair", async () => {
+    const anthropic = profile({ profile_id: "anthropic", provider: "anthropic", model: "opus", configured: true });
+    const ollama = profile({ profile_id: "ollama", provider: "ollama", model: "gemma4:31b-cloud", configured: true, selected: true });
+    const mock = stubFetch({
+      "GET /api/models": models({
+        profiles: [anthropic, ollama],
+        chat_profiles: [anthropic, ollama],
+        current_profile_id: "ollama",
+        current_model: "gemma4:31b-cloud",
+      }),
+      "PUT /api/model-selection": { ok: true },
+    });
+    render(ModelsView);
+
+    const select = await screen.findByRole("combobox", { name: "Global model" });
+    expect(select).toHaveValue('["ollama","gemma4:31b-cloud"]');
+    await fireEvent.change(select, { target: { value: '["anthropic","opus"]' } });
+
+    await waitFor(() => expect(mock).toHaveBeenCalledWith(
+      "/api/model-selection",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ profile_id: "anthropic", model: "opus" }),
+      }),
+    ));
+  });
+
   it("shows the discovered local context capacity and its source", async () => {
     stubFetch({
       "GET /api/models": models({

@@ -8,6 +8,8 @@
   import Personalisation from "./settings/Personalisation.svelte";
   import SecurityLogin from "./settings/SecurityLogin.svelte";
   import Account from "./settings/Account.svelte";
+  import Runtime from "./settings/Runtime.svelte";
+  import Icon from "../components/Icon.svelte";
 
   let { principal = "—" }: { principal?: string } = $props();
 
@@ -15,11 +17,12 @@
   // recovery, data-export tooling, and cloud/cache controls have no backend
   // consumer, so they are not presented as settings at all.
   const SECTIONS = [
-    { id: "general", label: "General" },
-    { id: "notification", label: "Notification" },
-    { id: "personalisation", label: "Personalisation" },
-    { id: "security", label: "Security & Login" },
-    { id: "account", label: "Account" },
+    { id: "general", label: "General", icon: "settings", group: "Personal" },
+    { id: "notification", label: "Notifications", icon: "bell", group: "Personal" },
+    { id: "personalisation", label: "Personalisation", icon: "spark", group: "Personal" },
+    { id: "security", label: "Security & sign-in", icon: "lock", group: "Personal" },
+    { id: "account", label: "Account", icon: "user", group: "Personal" },
+    { id: "runtime", label: "Runtime configuration", icon: "system", group: "System" },
   ] as const;
 
   let active = $state<string>("general");
@@ -37,7 +40,8 @@
   let serverSettings: Record<string, unknown> = {};
   let saveState = $state<"idle" | "saving" | "saved" | "error">("idle");
   let saveDetail = $state<string | null>(null);
-  let queue: Promise<void> = Promise.resolve();
+  let dirty = $state(false);
+  let dirtySections = $state<string[]>([]);
 
   async function load() {
     loadError = null;
@@ -53,7 +57,9 @@
 
   function save(patch: Record<string, unknown>) {
     settings = { ...settings, ...patch };
-    queue = queue.then(() => push());
+    dirty = true;
+    if (!dirtySections.includes(active)) dirtySections = [...dirtySections, active];
+    saveState = "idle";
   }
 
   async function push() {
@@ -65,6 +71,8 @@
       saveState = "saved";
       saveDetail = null;
       applyUiPrefs(snapshot);
+      dirty = false;
+      dirtySections = [];
     } catch (e) {
       settings = { ...serverSettings };
       saveState = "error";
@@ -75,14 +83,18 @@
     }
   }
 
+  function discard() {
+    settings = { ...serverSettings };
+    dirty = false;
+    dirtySections = [];
+    saveState = "idle";
+    saveDetail = null;
+  }
+
   onMount(load);
 </script>
 
-<div class="settings-hero">
-  <p class="eyebrow">Preferences</p>
-  <h2>Make Raiker feel like yours</h2>
-  <p>Personal, notification, and security choices saved to your account.</p>
-</div>
+<header class="settings-header"><h2>Settings</h2><p>Manage your preferences, notifications, security, account, and runtime configuration.</p></header>
 
 {#if loadError}
   <PageState state="error" title="Couldn't load settings" detail={loadError} />
@@ -100,7 +112,9 @@
 
 <div class="settings-layout">
   <nav class="section-rail" aria-label="Settings sections">
+    <p class="rail-group">Personal</p>
     {#each SECTIONS as section (section.id)}
+      {#if section.group === "System" && section.id === "runtime"}<p class="rail-group system-group">System</p>{/if}
       <button
         type="button"
         class="rail-item"
@@ -108,36 +122,39 @@
         aria-current={active === section.id ? "page" : undefined}
         onclick={() => (active = section.id)}
       >
-        {section.label}
+        <Icon name={section.icon} size={17} /><span>{section.label}</span>{#if dirtySections.includes(section.id)}<span class="dirty-dot" aria-label="Unsaved changes"></span>{/if}
       </button>
     {/each}
   </nav>
 
   <div class="section-body">
     {#if active === "general"}
-      <General {settings} {save} {principal} />
+      <General {settings} {save} />
     {:else if active === "notification"}
       <Notification {settings} {save} />
     {:else if active === "personalisation"}
       <Personalisation {settings} {save} />
     {:else if active === "security"}
       <SecurityLogin />
-    {:else}
+    {:else if active === "account"}
       <Account {settings} {save} {status} />
+    {:else}
+      <Runtime {principal} />
     {/if}
   </div>
 </div>
 
+{#if dirty}
+  <div class="save-bar" role="region" aria-label="Unsaved settings changes">
+    <strong>You have unsaved changes</strong>
+    <div><button class="btn btn-ghost" type="button" onclick={discard}>Discard changes</button><button class="btn btn-primary" type="button" onclick={push}>Save changes</button></div>
+  </div>
+{/if}
+
 <style>
-  .settings-hero {
-    margin-bottom: var(--space-5);
-    padding: var(--space-5);
-    border: 1px solid var(--border);
-    border-radius: var(--r-lg);
-    background: linear-gradient(135deg, var(--accent-soft), var(--surface) 65%);
-  }
-  .settings-hero h2 { margin: .15rem 0 .35rem; font-size: clamp(1.35rem, 3vw, 2rem); }
-  .settings-hero p { margin: 0; color: var(--text-2); }
+  .settings-header { margin-bottom: var(--space-5); }
+  .settings-header h2 { margin: 0 0 .25rem; font-size: clamp(1.35rem, 3vw, 1.8rem); }
+  .settings-header p { margin: 0; color: var(--text-2); }
   .save-status {
     min-height: 0;
     margin-bottom: var(--space-3);
@@ -147,7 +164,7 @@
   }
   .settings-layout {
     display: grid;
-    grid-template-columns: 12rem minmax(0, 48rem);
+    grid-template-columns: 14rem minmax(0, 58rem);
     gap: var(--space-6);
     align-items: start;
   }
@@ -156,11 +173,12 @@
     flex-direction: column;
     gap: 2px;
     position: sticky;
-    top: 0;
+    top: var(--space-4);
   }
   .rail-item {
     text-align: left;
-    padding: var(--space-2) var(--space-3);
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .55rem;
+    min-height: 44px; padding: var(--space-2) var(--space-3);
     border: none;
     border-radius: var(--r-sm);
     background: none;
@@ -179,6 +197,11 @@
   .section-body {
     min-width: 0;
   }
+  .rail-group { margin: var(--space-2) var(--space-3); color: var(--text-3); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; }
+  .system-group { margin-top: var(--space-5); }
+  .dirty-dot { width: .45rem; height: .45rem; border-radius: 50%; background: var(--warning); }
+  .save-bar { position: sticky; bottom: var(--space-3); z-index: 5; max-width: 58rem; margin: var(--space-5) 0 0 16rem; padding: var(--space-3) var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); border: 1px solid var(--accent-border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-2); }
+  .save-bar div { display: flex; gap: var(--space-2); }
   @media (max-width: 40rem) {
     .settings-layout {
       grid-template-columns: 1fr;
@@ -188,5 +211,7 @@
       flex-wrap: wrap;
       position: static;
     }
+    .rail-group { width: 100%; }
+    .save-bar { margin-left: 0; }
   }
 </style>

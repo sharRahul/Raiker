@@ -101,9 +101,25 @@ def test_create_document_generates_and_attaches_without_approval(
     ]
 
 
-def test_run_command_returns_feedback_only_for_exact_active_session_grant(tmp_path: Path) -> None:
+def test_run_command_returns_feedback_only_for_exact_active_session_grant(
+    tmp_path: Path, monkeypatch
+) -> None:
     from datetime import UTC, datetime, timedelta
 
+    monkeypatch.setenv("RAIKER_COMMAND_SANDBOX_IMAGE", "python:3.12-alpine")
+    monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "python:3.12-alpine")
+    captured: dict = {}
+
+    def isolated_runner(command, **kwargs):  # type: ignore[no-untyped-def]
+        captured["command"] = command
+        return {
+            "returncode": 0, "stdout": "42\n", "stderr": "",
+            "stdout_bytes": 3, "stderr_bytes": 0, "truncated": False,
+        }
+
+    monkeypatch.setattr(
+        "raiker.runtime.executors.containers.run_command", isolated_runner
+    )
     broker = _broker(tmp_path)
     session_id = new_id("sess_")
     broker.store.put_session_command_grant(  # type: ignore[union-attr]
@@ -125,6 +141,8 @@ def test_run_command_returns_feedback_only_for_exact_active_session_grant(tmp_pa
     assert result.status == "success"
     assert result.output["stdout"] == "42\n"  # type: ignore[index]
     assert result.output["returncode"] == 0  # type: ignore[index]
+    assert "--network" in captured["command"]
+    assert "none" in captured["command"]
 
     denied, _ = broker.execute(
         allowed, session_id=new_id("sess_"), turn_id=new_id("turn_")

@@ -1,170 +1,88 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import StepUpDialog from "../../components/StepUpDialog.svelte";
-  import type { StepUpValues } from "../../components/StepUpDialog.svelte";
-  import { api, ApiError } from "../../api";
-  import type { RuntimeMode } from "../../apiTypes";
-  import { humanize } from "../../format";
-  import { explainReasonCode } from "../../reasonCodes";
-  import { NAV_ITEMS } from "../../nav";
-
-  let {
-    settings,
-    save,
-    principal = "—",
-  }: {
+  let { settings, save }: {
     settings: Record<string, unknown>;
     save: (p: Record<string, unknown>) => void;
-    principal?: string;
   } = $props();
 
-  const language = $derived((settings["general.language"] as string) ?? "en");
-  const region = $derived((settings["general.region"] as string) ?? "");
-  const startupRoute = $derived((settings["general.startup_route"] as string) ?? "new-chat");
-
-  // Runtime mode (ported): a governed, server-enforced control that re-confirms
-  // the human principal on every change.
-  let mode = $state<RuntimeMode | null>(null);
-  let modeChoice = $state("");
-  let loadError = $state<string | null>(null);
-  let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
-  type Pending = { kind: "activate_mode"; mode_name: string } | { kind: "disable_mode" };
-  let pending = $state<Pending | null>(null);
-  let busy = $state(false);
-  let dialogError = $state<string | null>(null);
-
-  async function load() {
-    try {
-      mode = await api.runtimeMode();
-      if (mode && modeChoice === "") modeChoice = mode.allowed_modes[0] ?? "";
-    } catch (e) {
-      loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
-    }
-  }
-
-  async function confirm(values: StepUpValues) {
-    if (pending === null) return;
-    busy = true;
-    dialogError = null;
-    try {
-      if (pending.kind === "activate_mode") {
-        await api.activateRuntimeMode(pending.mode_name, values.reason);
-        notice = { kind: "ok", text: `Activated runtime mode ${humanize(pending.mode_name)}.` };
-      } else {
-        await api.disableRuntimeMode(values.reason);
-        notice = { kind: "ok", text: "Disabled the runtime mode." };
-      }
-      pending = null;
-      await load();
-    } catch (e) {
-      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
-      dialogError = explained
-        ? `${explained.plain}${explained.remediation ? " " + explained.remediation : ""}`
-        : "The change was rejected by the runtime.";
-    } finally {
-      busy = false;
-    }
-  }
-
-  onMount(load);
+  const language = $derived((settings["general.language"] as string) ?? "en-GB");
+  const region = $derived((settings["general.region"] as string) ?? "GB");
+  const timezone = $derived((settings["general.timezone"] as string) ?? "Europe/London");
+  const startupRoute = $derived((settings["general.startup_route"] as string) ?? "workbench");
 </script>
 
-<h2>General</h2>
+<header class="section-heading">
+  <h2>General</h2>
+  <p>Choose how Raiker displays information and where your day begins.</p>
+</header>
 
-{#if notice}
-  <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
-{/if}
-
-<section class="card">
-  <h3>Regional</h3>
+<section class="settings-card" aria-labelledby="language-region">
+  <div class="card-heading">
+    <h3 id="language-region">Language and region</h3>
+    <p>These preferences control interface text, dates, times, and regional formatting.</p>
+  </div>
   <label>
-    Language
+    <span>Language</span>
+    <small>Controls the language used throughout Raiker.</small>
     <select value={language} onchange={(e) => save({ "general.language": e.currentTarget.value })}>
-      <option value="en">English</option>
-      <option value="hi">हिन्दी</option>
-      <option value="es">Español</option>
-      <option value="fr">Français</option>
-      <option value="de">Deutsch</option>
+      <option value="en-GB">English (United Kingdom)</option>
+      <option value="en-US">English (United States)</option>
+      <option value="hi-IN">हिन्दी (भारत)</option>
+      <option value="es-ES">Español (España)</option>
+      <option value="fr-FR">Français (France)</option>
+      <option value="de-DE">Deutsch (Deutschland)</option>
     </select>
   </label>
   <label>
-    Region
-    <input
-      value={region}
-      placeholder="e.g. IN, US"
-      onchange={(e) => save({ "general.region": e.currentTarget.value })}
-    />
+    <span>Country or region</span>
+    <small>Used for regional formatting. Scheduled work also uses the time zone below.</small>
+    <select value={region} onchange={(e) => save({ "general.region": e.currentTarget.value })}>
+      <option value="GB">United Kingdom</option>
+      <option value="US">United States</option>
+      <option value="IN">India</option>
+      <option value="DE">Germany</option>
+      <option value="FR">France</option>
+      <option value="ES">Spain</option>
+    </select>
   </label>
   <label>
-    Default startup view
+    <span>Time zone</span>
+    <small>Used for task schedules and activity timestamps.</small>
+    <select value={timezone} onchange={(e) => save({ "general.timezone": e.currentTarget.value })}>
+      <option value="Europe/London">Europe/London</option>
+      <option value="America/New_York">America/New_York</option>
+      <option value="America/Los_Angeles">America/Los_Angeles</option>
+      <option value="Asia/Kolkata">Asia/Kolkata</option>
+      <option value="Europe/Berlin">Europe/Berlin</option>
+      <option value="UTC">UTC</option>
+    </select>
+  </label>
+</section>
+
+<section class="settings-card" aria-labelledby="startup-behaviour">
+  <div class="card-heading">
+    <h3 id="startup-behaviour">Startup behaviour</h3>
+    <p>Choose the first page displayed when Raiker starts. Links and bookmarks are unaffected.</p>
+  </div>
+  <label>
+    <span>Default startup view</span>
     <select value={startupRoute} onchange={(e) => save({ "general.startup_route": e.currentTarget.value })}>
-      {#each NAV_ITEMS as item (item.id)}
-        <option value={item.id}>{item.label}</option>
-      {/each}
+      <option value="workbench">Workbench</option>
+      <option value="new-chat">New chat</option>
+      <option value="tasks">Tasks</option>
+      <option value="projects">Projects</option>
+      <option value="approvals">Approvals</option>
+      <option value="last-visited">Last visited page</option>
     </select>
   </label>
-  <p class="sub">Regional and startup preferences are saved to your account.</p>
 </section>
-
-<section class="card">
-  <h3>Runtime mode</h3>
-  {#if loadError}
-    <p class="error" role="alert">Unavailable: {loadError}</p>
-  {:else if mode === null}
-    <p class="sub">Loading…</p>
-  {:else}
-    <p>
-      <strong>{humanize(mode.mode_name)}</strong> · {mode.status}
-    </p>
-    <div class="controls">
-      <select bind:value={modeChoice}>
-        {#each mode.allowed_modes as m (m)}
-          <option value={m}>{humanize(m)}</option>
-        {/each}
-      </select>
-      <button type="button" class="btn btn-soft" onclick={() => (pending = { kind: "activate_mode", mode_name: modeChoice })} disabled={modeChoice === ""}>
-        Activate
-      </button>
-      <button type="button" class="btn btn-danger" onclick={() => (pending = { kind: "disable_mode" })}>
-        Disable
-      </button>
-    </div>
-  {/if}
-</section>
-
-{#if pending !== null}
-  <StepUpDialog
-    title={pending.kind === "activate_mode" ? `Activate ${humanize(pending.mode_name)}` : "Disable runtime mode"}
-    {principal}
-    requireToken={false}
-    requireThreatAck={false}
-    {busy}
-    error={dialogError}
-    onConfirm={confirm}
-    onCancel={() => {
-      pending = null;
-      dialogError = null;
-    }}
-  />
-{/if}
 
 <style>
-  label {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    max-width: 20rem;
-    margin-top: var(--space-2);
-  }
-  .controls {
-    display: flex;
-    gap: var(--space-2);
-    margin-top: var(--space-2);
-  }
-  .sub {
-    color: var(--text-2);
-  }
-  .error {
-    color: var(--danger);
-  }
+  .section-heading { margin-bottom: var(--space-4); }
+  .section-heading h2, .card-heading h3 { margin: 0; }
+  .section-heading p, .card-heading p { color: var(--text-2); margin: .3rem 0 0; }
+  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: clamp(1.25rem, 3vw, 2rem); margin-bottom: var(--space-4); }
+  label { display: grid; gap: .3rem; max-width: 34rem; margin-top: var(--space-5); font-weight: 650; }
+  label small { color: var(--text-2); font-weight: 400; }
+  select { width: 100%; min-height: 44px; padding: 0 .8rem; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); font: inherit; }
+  select:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 </style>

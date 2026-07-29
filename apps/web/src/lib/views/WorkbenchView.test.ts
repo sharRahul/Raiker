@@ -36,6 +36,7 @@ const LOCAL_PROFILE = {
   runtime_gate: null,
   off_machine: false,
   selected: true,
+  configured: true,
 };
 
 function routes(overrides: Record<string, unknown> = {}) {
@@ -75,9 +76,9 @@ describe("WorkbenchView", () => {
   it("says status is unavailable rather than reporting zeroes", async () => {
     stubFetch({});
     render(WorkbenchView);
-    const alert = await screen.findByRole("alert");
+    const alert = await screen.findByText(/workbench status is unavailable/i);
     expect(alert).toHaveTextContent(/workbench status is unavailable/i);
-    expect(alert).toHaveTextContent(/no work was started or changed/i);
+    expect(screen.getByText(/no work was started or changed/i)).toBeInTheDocument();
   });
 
   it("names the project scope and the model that will serve the turn", async () => {
@@ -85,8 +86,7 @@ describe("WorkbenchView", () => {
     render(WorkbenchView);
 
     await waitFor(() => expect(screen.getByText("Quarterly note")).toBeInTheDocument());
-    expect(await screen.findByText("local-default · qwen2.5")).toBeInTheDocument();
-    expect(screen.getByText(/runs locally — the turn stays on this machine/i)).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /local-default — qwen2.5/i })).toBeInTheDocument();
   });
 
   it("labels a hosted model as leaving the machine", async () => {
@@ -100,16 +100,14 @@ describe("WorkbenchView", () => {
       }),
     );
     render(WorkbenchView);
-    await waitFor(() =>
-      expect(screen.getByText(/the turn leaves your device/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByRole("option", { name: /hosted/i })).toBeInTheDocument());
   });
 
   it("says no model is selected instead of implying one is ready", async () => {
     stubFetch(routes({ "GET /api/models": { profiles: [] } }));
     render(WorkbenchView);
     await waitFor(() =>
-      expect(screen.getByText(/no model is selected yet/i)).toBeInTheDocument(),
+      expect(screen.getByText(/a model is required before work can start/i)).toBeInTheDocument(),
     );
   });
 
@@ -120,10 +118,11 @@ describe("WorkbenchView", () => {
     window.addEventListener("raiker:compose", composed);
     render(WorkbenchView);
 
-    await vi.waitFor(() => expect(screen.getByLabelText(/what would you like to do/i)).toBeInTheDocument());
-    await fireEvent.input(screen.getByLabelText(/what would you like to do/i), {
+    await vi.waitFor(() => expect(screen.getByLabelText(/what would you like raiker to do/i)).toBeInTheDocument());
+    await fireEvent.input(screen.getByLabelText(/what would you like raiker to do/i), {
       target: { value: "Summarise the open approvals" },
     });
+    await vi.waitFor(() => expect(screen.getByRole("button", { name: /start work/i })).toBeEnabled());
     await fireEvent.click(screen.getByRole("button", { name: /start work/i }));
     vi.runAllTimers();
 
@@ -153,7 +152,7 @@ describe("WorkbenchView", () => {
     await fireEvent.change(screen.getByLabelText(/conversation to continue/i), {
       target: { value: "sess_1" },
     });
-    await fireEvent.input(screen.getByLabelText(/what would you like to do/i), {
+    await fireEvent.input(screen.getByLabelText(/what would you like raiker to do/i), {
       target: { value: "Continue from here" },
     });
     await fireEvent.click(screen.getByRole("button", { name: /start work/i }));

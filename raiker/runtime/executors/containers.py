@@ -24,6 +24,60 @@ _MAX_TIMEOUT = 300.0
 CommandRunner = Callable[..., dict[str, Any]]
 
 
+def command_sandbox_image() -> str:
+    """Return the operator-approved image for standing command grants.
+
+    A grant is not permission to fall back to the host.  Operators must choose
+    an image already covered by the container image allowlist; an unset or
+    mismatched value therefore fails closed.
+    """
+    return os.environ.get("RAIKER_COMMAND_SANDBOX_IMAGE", "").strip()
+
+
+def run_isolated_workspace_command(
+    command: list[str],
+    *,
+    workspace_root: str | Path,
+    timeout: float,
+    max_output_bytes: int = 100_000,
+    runner: CommandRunner | None = None,
+) -> dict[str, Any]:
+    """Execute an owner-granted command behind Docker's network namespace."""
+    image = command_sandbox_image()
+    if not image:
+        raise SandboxError("command_sandbox_unconfigured")
+    if image not in container_image_allowlist():
+        raise SandboxError("command_sandbox_image_not_allowed")
+    workspace = Path(workspace_root).resolve()
+    docker_command = [
+        "docker", "run", "--rm",
+        "--network", "none",
+        "--memory", "512m",
+        "--cpus", "1",
+        "--pids-limit", "256",
+        "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges",
+        "--user", f"{os.getuid()}:{os.getgid()}",
+        "--mount", f"type=bind,src={workspace},dst=/workspace",
+        "--workdir", "/workspace",
+        image,
+        *command,
+    ]
+    command_runner = runner or run_command
+    try:
+        return command_runner(
+            docker_command,
+            timeout=timeout,
+            max_output_bytes=max_output_bytes,
+            allowlist=frozenset({"docker"}),
+            cwd=workspace,
+        )
+    except SandboxError as exc:
+        if str(exc).startswith("command_not_found"):
+            raise SandboxError("command_sandbox_runtime_unavailable") from None
+        raise
+
+
 def container_image_allowlist() -> frozenset[str]:
     raw = os.environ.get("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "")
     return frozenset(part.strip() for part in raw.split(",") if part.strip())

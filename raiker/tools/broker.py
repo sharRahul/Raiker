@@ -247,10 +247,11 @@ class ToolBroker:
     ) -> dict[str, Any]:
         import shlex
 
+        from raiker.runtime.executors.containers import run_isolated_workspace_command
         from raiker.runtime.executors.sandbox import (
             ALLOWED_SHELL_COMMANDS,
             SandboxError,
-            run_command,
+            check_command_allowlist,
         )
 
         if self.store is None:
@@ -279,12 +280,12 @@ class ToolBroker:
                 "error": {"type": "command_not_authorised", "fallback_tool": "shell"},
             }
         try:
-            result = run_command(
+            check_command_allowlist(command, ALLOWED_SHELL_COMMANDS)
+            result = run_isolated_workspace_command(
                 command,
+                workspace_root=self.workspace_root,
                 timeout=float(grant["timeout_seconds"]),
                 max_output_bytes=100_000,
-                allowlist=ALLOWED_SHELL_COMMANDS,
-                cwd=self.workspace_root,
             )
         except SandboxError as exc:
             return {"status": "failed", "error": {"type": str(exc)}}

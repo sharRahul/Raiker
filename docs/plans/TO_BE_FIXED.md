@@ -67,7 +67,8 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-44 | High | Build / command feedback | Fixed except host network containment (B5) |
 | FIXED-45 | Medium | Chat / file inspector and output | Fixed (C4/C5 validation and presentation) |
 | FIXED-46 | Medium | Workbench | Fixed (activity-aware dashboard redesign) |
-| BUG-20 | High | Build / command containment | Open |
+| FIXED-47 | High | Build / command containment | Fixed (was BUG-20) |
+| FIXED-48 | Medium | Settings / Workbench | Fixed (settings and dashboard refinement) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -1624,9 +1625,9 @@ cover the empty-account state.
 
 ---
 
-## BUG-20 — Owner-granted host commands do not have kernel-enforced network isolation
+## FIXED-47 — Owner-granted commands have kernel-enforced network isolation
 
-**Status: open; found while completing B5.**
+**Status: fixed in this change (was BUG-20).**
 
 **Observed.** The session grant, executable allowlist, cwd, timeout, output cap,
 expiry, and revocation are enforced, but this host cannot create an unprivileged
@@ -1634,10 +1635,38 @@ network namespace (`unshare -n` is denied) and no shipped container executor is
 available. A granted interpreter or package-manager command could therefore use
 the host network.
 
-**Required fix.** Route `run_command` through the container executor from B20,
-with networking disabled at the runtime boundary, before describing B5 as fully
-network-isolated. Until then owners should grant only narrow test/lint prefixes
-they trust; non-granted commands still require per-call approval.
+**Fix applied.** `run_command` now routes every owner-granted command through a
+dedicated Docker boundary with `--network none`, dropped Linux capabilities,
+`no-new-privileges`, CPU/memory/PID limits, the invoking uid/gid, and only the
+workspace bind-mounted as its working directory. Operators must set
+`RAIKER_COMMAND_SANDBOX_IMAGE` to an image also present in
+`RAIKER_CONTAINER_IMAGE_ALLOWLIST`; missing configuration, a mismatched image,
+or an unavailable Docker runtime fails closed instead of falling back to host
+execution. The original exact grant, command allowlist, expiry, timeout, and
+bounded feedback checks remain in force.
+
+---
+
+## FIXED-48 — Settings and Workbench distinguish preferences from governed work
+
+**Status: fixed in this change.**
+
+**Fix applied.** Settings now opens with a compact header, grouped icon
+navigation, full-width validated language/region/time-zone controls, explicit
+discard/save behaviour with an unsaved marker, and a separate Runtime page.
+Runtime changes use one review-and-reason workflow, expose change metadata and
+history, and place runtime shutdown in a dedicated danger zone.
+
+The Workbench now makes its governed composer the primary action, provides
+Chat/Run work/Create task/Schedule modes, exposes a real configured-model
+selector, and keeps the primary action disabled with a local remediation when
+no model is available. Returning users see activity-aware copy and a Continue
+working list; the right rail is a role-appropriate Needs your attention area,
+and refresh reports its freshness without discarding composer state.
+Live browser coverage is recorded in
+[`screenshots/working/workbench-dashboard-live.png`](screenshots/working/workbench-dashboard-live.png),
+[`screenshots/working/settings-redesign-live.png`](screenshots/working/settings-redesign-live.png),
+and [`screenshots/working/settings-runtime-live.png`](screenshots/working/settings-runtime-live.png).
 
 ---
 
@@ -1707,12 +1736,12 @@ batch. Mutations remain serial and stop at the first approval or policy
 boundary. Budget- or boundary-deferred calls emit `model_tool_calls_dropped`
 with proposed/accepted/dropped counts, so no call disappears without evidence.
 
-**B5. Test/command feedback channel.** ⚠️ **Implemented with one containment
-gap — see FIXED-44 and BUG-20.** A standing, expiring, revocable per-session
+**B5. Test/command feedback channel.** ✅ **Done — see FIXED-44 and FIXED-47.**
+A standing, expiring, revocable per-session
 command-prefix grant now returns bounded stdout/stderr and exit status with the
 workspace as cwd and a wall-clock cap. Anything outside the grant falls back to
-the approval-gated shell path. Host network isolation still requires B20's
-container executor and is not claimed.
+the approval-gated shell path. Granted commands execute in a no-network,
+resource-bounded container and never fall back to the host.
 
 **B6. No task/plan state across the loop.** Nothing tracks what the agent
 intends to do next, so a long change has no visible spine and no recovery point
@@ -1808,12 +1837,10 @@ transcript code (deliberately deferred in FIXED-06), no message edit-and-resend,
 no regenerate. Each is small; together they are most of the felt difference in
 daily use.
 
-**B20. No sandboxed execution environment.** `container_execution_enabled`,
-`remote_execution_enabled` and `cloud_execution_enabled` are all `False`, so
-even after B5 every command runs on the host.
-`docs/EXECUTION_ENVIRONMENTS_SPEC.md` specifies the alternative. **Work:**
-implement at least the container executor so Auto mode can be genuinely
-autonomous without the host as the blast radius.
+**B20. Sandboxed execution environment.** ✅ **The local container slice is
+implemented; remote and cloud execution remain separate future capabilities.**
+Owner-granted B5 commands now use the same Docker boundary principles with
+networking disabled and fail closed when its approved image is unavailable.
 
 ### Suggested order
 

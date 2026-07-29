@@ -13,7 +13,10 @@ from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES, build_default_executor_registry
-from raiker.runtime.executors.containers import ContainerExecutionExecutor
+from raiker.runtime.executors.containers import (
+    ContainerExecutionExecutor,
+    run_isolated_workspace_command,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 _CAP = "container_execution_cap"
@@ -148,3 +151,40 @@ def test_container_nonzero_exit_is_failure(tmp_path: Path, monkeypatch: pytest.M
     result = executor.execute(_fake_action("alpine", ["false"]), SimpleNamespace(principal_id="p"))  # type: ignore[arg-type]
     assert result.ok is False
     assert result.reason_code == "exit_code:2"
+
+
+def test_standing_command_grant_uses_no_network_workspace_container(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RAIKER_COMMAND_SANDBOX_IMAGE", "python:3.12-alpine")
+    monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "python:3.12-alpine")
+    captured: dict[str, Any] = {}
+
+    def fake_runner(command: list[str], **kwargs: Any) -> dict[str, Any]:
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return {"returncode": 0, "stdout": "ok\n", "stderr": ""}
+
+    result = run_isolated_workspace_command(
+        ["python", "-c", "print('ok')"],
+        workspace_root=tmp_path,
+        timeout=7,
+        runner=fake_runner,
+    )
+    command = captured["command"]
+    assert result["stdout"] == "ok\n"
+    assert command[command.index("--network") + 1] == "none"
+    assert command[command.index("--cap-drop") + 1] == "ALL"
+    assert command[command.index("--workdir") + 1] == "/workspace"
+    assert "type=bind" in command[command.index("--mount") + 1]
+    assert command[-3:] == ["python", "-c", "print('ok')"]
+
+
+def test_standing_command_grant_fails_closed_without_approved_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.runtime.executors.sandbox import SandboxError
+
+    monkeypatch.delenv("RAIKER_COMMAND_SANDBOX_IMAGE", raising=False)
+    with pytest.raises(SandboxError, match="command_sandbox_unconfigured"):
+        run_isolated_workspace_command(["python", "-V"], workspace_root=tmp_path, timeout=2)

@@ -49,9 +49,9 @@ describe("supported-preferences settings", () => {
     render(SettingsView, { props: { principal: "alice" } });
     for (const label of [
       "General",
-      "Notification",
+      "Notifications",
       "Personalisation",
-      "Security & Login",
+      "Security & sign-in",
       "Account",
     ]) {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
@@ -66,9 +66,11 @@ describe("supported-preferences settings", () => {
   it("saves a preference through the queue and confirms it", async () => {
     const { putBodies } = stubApi();
     render(SettingsView, { props: { principal: "alice" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Notification" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
     const toggle = await screen.findByLabelText(/in-app popups/i);
     await fireEvent.click(toggle);
+    expect(screen.getByText(/you have unsaved changes/i)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => expect(putBodies.length).toBe(1));
     expect((putBodies[0] as { settings: Record<string, unknown> }).settings["notification.in_app"]).toBe(false);
@@ -78,10 +80,11 @@ describe("supported-preferences settings", () => {
   it("rolls back to the last server snapshot when a save fails", async () => {
     stubApi({ failPut: true });
     render(SettingsView, { props: { principal: "alice" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Notification" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
     const toggle = await screen.findByLabelText(/in-app popups/i);
     expect((toggle as HTMLInputElement).checked).toBe(true);
     await fireEvent.click(toggle);
+    await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
     // The failed write surfaces a page-level error and the control reverts.
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/couldn't save/i));

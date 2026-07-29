@@ -67,15 +67,21 @@
   async function load() {
     unavailable = false;
     try {
-      [sessions, tasks, approvals, projects, diagnostics] = await Promise.all([
+      [sessions, tasks, approvals, projects] = await Promise.all([
         // Conversations only — "Resume a conversation" must not offer the
         // server-owned session a task run executes in (BUG-10).
         api.sessions(undefined, false, "chat"),
         api.tasks(),
         api.approvals(),
         api.projects(),
-        api.diagnostics(),
       ]);
+      try {
+        diagnostics = await api.diagnostics();
+      } catch {
+        // Readiness is supplementary; an older or temporarily unavailable
+        // diagnostics endpoint must not erase conversations and tasks.
+        diagnostics = null;
+      }
     } catch {
       unavailable = true;
     }

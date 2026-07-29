@@ -100,8 +100,9 @@ describe("ModelsView fallback sequence", () => {
       expect(screen.getByText("Model fallback sequence")).toBeTruthy(),
     );
     const list = screen.getByRole("list");
-    expect(list.textContent).toContain("anthropic-hosted");
-    expect(list.textContent).toContain("raiker-local-llama-cpp");
+    expect(list.textContent).toContain("Anthropic");
+    expect(list.textContent).toContain("llama.cpp");
+    expect(list.textContent).not.toContain("anthropic-hosted");
   });
 
   it("shows a cache chip for a profile with prompt caching enabled", async () => {
@@ -221,8 +222,8 @@ describe("ModelsView fallback sequence", () => {
     await waitFor(() => expect(screen.getByLabelText("Available models")).toBeTruthy());
 
     const select = screen.getByLabelText("Available models") as HTMLSelectElement;
-    expect(select.textContent).toContain("qwen2.5");
-    expect(select.textContent).toContain("llama3.2");
+    expect(select.textContent).toContain("Qwen 2.5");
+    expect(select.textContent).toContain("Llama 3.2");
     await fireEvent.change(select, { target: { value: "qwen2.5" } });
     await fireEvent.click(screen.getByText("Use model"));
 
@@ -260,7 +261,7 @@ describe("ModelsView fallback sequence", () => {
     await fireEvent.click(chooseModel);
     const select = await screen.findByLabelText("Available models") as HTMLSelectElement;
     expect(Array.from(select.options).filter((option) => option.value === "openai/gpt-4o-mini")).toHaveLength(1);
-    expect(select.textContent).toContain("meta-llama/llama-3.1-8b-instruct");
+    expect(select.textContent).toContain("Llama 3.1 8B Instruct");
   });
 
   it("falls back to manual model entry when the provider list is unavailable", async () => {
@@ -285,7 +286,7 @@ describe("ModelsView fallback sequence", () => {
     await waitFor(() =>
       expect(screen.getByText(/denied by provider policy/i)).toBeTruthy(),
     );
-    expect(screen.getByLabelText("Model id")).toBeTruthy();
+    expect(screen.getByLabelText("Custom model name")).toBeTruthy();
   });
 
   it("saves the advisor model via PUT /api/model-advisor", async () => {

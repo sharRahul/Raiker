@@ -20,6 +20,7 @@ from raiker.checkpoints.capture import (
     STATUS_CAPTURED,
     STATUS_OVERSIZE,
     CheckpointCaptureService,
+    PreImage,
 )
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
@@ -259,7 +260,7 @@ def test_snapshot_oversize_records_status_no_blob(tmp_path: Path) -> None:
     (ws / "big.txt").write_text("this is definitely longer than eight bytes", encoding="utf-8")
 
     pre = service.snapshot_pre_image("file_write_execution", {"path": "big.txt"})
-    assert pre is not None
+    assert isinstance(pre, PreImage)
     assert pre.status == STATUS_OVERSIZE
     assert pre.existed is True
     assert pre.data is None

@@ -52,9 +52,14 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-29 | Medium | Build / patch application | Fixed (B3 single-target expansion) |
 | FIXED-30 | Medium | Models / credential persistence | Fixed |
 | FIXED-31 | Medium | Chat / Build composer | Fixed |
-| BUG-17 | High | Web development dependencies | Open (found while validating FIXED-31) |
-| BUG-18 | Low | Python test dependencies | Open (found while validating FIXED-30) |
-| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B3 single-target scope complete; multi-file patch transactions deferred; 18 items remain) |
+| FIXED-32 | High | Web development dependencies | Fixed (was BUG-17) |
+| FIXED-33 | Low | Python test dependencies | Fixed (was BUG-18) |
+| FIXED-34 | High | Build / multi-file patch application | Fixed (B3 expansion) |
+| FIXED-35 | Medium | Settings / Models | Fixed |
+| FIXED-36 | Medium | Writing quality | Fixed (optional local integration) |
+| FIXED-37 | High | Chat / connector actions | Fixed (C2 inventory and preview) |
+| BUG-19 | Medium | Chat / connector compensation | Open (found while completing C2) |
+| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B3 complete; 18 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (18 items) |
 
 ---
@@ -1421,9 +1426,9 @@ send action. A committed Playwright test covers both accessible surfaces.
 
 ---
 
-## BUG-17 — Web development dependencies have known security advisories
+## FIXED-32 — Web development dependencies had known security advisories *(was BUG-17)*
 
-**Status: open.** Found while installing Playwright for FIXED-31.
+**Status: fixed in this change.** Found while installing Playwright for FIXED-31.
 
 **Observed.** `npm audit --prefix apps/web` reports 10 development-tree
 findings: five moderate, four high, and one critical. The critical advisory is
@@ -1434,17 +1439,19 @@ path handling and transitive parsing/expansion packages.
 generation. npm's complete remediation crosses major versions to Vite 8,
 Vitest 4, and `@sveltejs/vite-plugin-svelte` 7.
 
-**Needed.** Upgrade as a dedicated compatibility change, rerun the component
-and Playwright suites, and validate Windows development-server paths. Do not
-use `npm audit fix --force` without reviewing the breaking changes. These are
-development-only packages, but dev-server disclosures still matter when Vite
-is bound beyond loopback.
+**Fix applied.** Vite moved to 8.1, Vitest to 4.1, the Svelte Vite plugin to 7.2,
+and ESLint to 10 with the current Svelte lint plugin. The obsolete Vite HMR
+option was removed, and the lockfile was regenerated rather than force-fixed.
+
+**Verification.** `npm audit --prefix apps/web` reports zero vulnerabilities;
+Svelte check, lint, component tests, production build, and Chromium Playwright
+all pass on the upgraded toolchain.
 
 ---
 
-## BUG-18 — Python tests emit a Starlette/httpx deprecation warning
+## FIXED-33 — Python tests emitted a Starlette/httpx deprecation warning *(was BUG-18)*
 
-**Status: open.** Found while validating FIXED-30.
+**Status: fixed in this change.** Found while validating FIXED-30.
 
 **Observed.** The persistence regression passes, but importing FastAPI's
 `TestClient` emits `StarletteDeprecationWarning`: the installed Starlette build
@@ -1454,10 +1461,93 @@ says its `httpx` integration is deprecated and recommends `httpx2`.
 httpx, so a fresh development install can select a combination whose test-client
 compatibility layer is already deprecated even though it still works.
 
-**Needed.** Define and test a supported FastAPI/Starlette/httpx compatibility
-range (or migrate to the successor client) before turning deprecations into
-errors. Do not silence the warning globally; it is advance notice of a future
-test-infrastructure break.
+**Fix applied.** The development extra now installs `httpx2>=2.9`, which the
+installed Starlette uses for `TestClient`. Production `httpx` remains because
+Raiker's outbound provider and connector clients still use that API.
+
+**Verification.** The focused API, approval, checkpoint, and filesystem suites
+run without `StarletteDeprecationWarning`; no warning filter was added.
+
+---
+
+## FIXED-34 — One approval could not govern an atomic multi-file patch *(B3 expansion)*
+
+**Status: fixed in this change.**
+
+**Observed.** A Build turn could create, update, or delete one file per patch,
+but a normal agent-generated multi-file diff was rejected. Approval preview and
+checkpoint capture described only one path.
+
+**Fix applied.** `apply_patch` now accepts a unified diff containing multiple
+file sections with an optional legacy first-path argument. Every target and
+hunk is resolved before execution; duplicate targets and stale context fail the
+whole proposal. One approval displays the combined diff, execution applies one
+change set with rollback on a write failure, and every affected file receives
+its own pre-image under the same action id.
+
+**Verification.** Filesystem regressions cover two-file success and rejection
+before any write. Approval relay and checkpoint suites confirm the expanded
+contract remains reversible.
+
+---
+
+## FIXED-35 — Settings and Models exposed implementation detail and visual noise
+
+**Status: fixed in this change.**
+
+**Fix applied.** Settings now opens with a compact preference overview and a
+focused five-section rail; the redundant Storage/Vault page was removed without
+removing encrypted credential storage. Models keeps provider-backed selection
+but renders human model names instead of internal profile/model identifiers.
+
+**Verification.** Chromium screenshots are
+`output/playwright/settings-redesign.png` and
+`output/playwright/models-redesign.png` at 1440×1000.
+
+---
+
+## FIXED-36 — Composers had no Raiker-owned English checking path
+
+**Status: fixed in this change.**
+
+**Fix applied.** An optional adapter uses an operator-installed
+`language_tool_python` runtime without bundling its GPL-3.0 dependency into the
+Apache-2.0 Raiker distribution. Authenticated `POST /api/language/check` runs the
+English checker off the event loop, bounds text and execution time, returns
+offset/replacement metadata, and never persists prompt text. Chat and Build
+also enable native English spelling highlights. Instances without the optional
+Java-backed checker return an honest unavailable status instead of blocking a
+turn.
+
+---
+
+## FIXED-37 — Connector operations and outbound bodies were invisible *(C2)*
+
+**Status: fixed in this change for the manifest-driven connector path.**
+
+**Fix applied.** Connector Store responses and the management panel publish
+the registered operation inventory, including method, path, description, and
+whether confirmation is required. Connector-write approval cards now render
+the exact structured request arguments after secret-like values are redacted,
+labelled by connector and operation. Execution remains single-use through the
+existing parked intent and approval relay.
+
+---
+
+## BUG-19 — Connector manifests cannot declare safe operation-scoped undo
+
+**Status: open.** Found while completing C2's visible operation contract.
+
+**Observed.** A connector write can be previewed, approved, and executed once,
+but the manifest cannot describe a compensating operation, its argument mapping,
+or an upstream undo deadline. The generic standing-grant UI also scopes by
+action/domain rather than connector plus operation.
+
+**Needed.** Extend the manifest compiler with an explicit compensation schema,
+persist only the bounded metadata needed to invoke it, show the deadline beside
+the completed action, and add connector/operation scope to standing grants.
+Until then Raiker must not label arbitrary external writes “undoable” or offer a
+grant that appears narrower than the policy engine can enforce.
 
 ---
 
@@ -1503,20 +1593,20 @@ parks its working state against the approval and picks the same turn up on
 resolution, with the real result (or an honest refusal) appended as the tool
 result. Build no longer stops dead at its first write.
 
-**B3. Real patch application.** ✅ **Complete for its defined strict,
-single-file scope — see FIXED-23.** `edit_file` now replaces
+**B3. Real patch application.** ✅ **Complete — see FIXED-23, FIXED-29, and
+FIXED-34.** `edit_file` now replaces
 `old_text` only when it occurs exactly once, and `apply_patch` calculates a
-one-file unified-diff candidate from exact hunk context before the approval is
+unified-diff candidates from exact hunk context before the approval is
 displayed or an execution is allowed. A missing, ambiguous, or stale match
 fails closed with a machine-readable error; rejected patch hunks are named and
 no partial candidate is written.
 
-**B3 expansion scope.** ✅ **Single-target expansion done — see FIXED-29.**
+**B3 expansion scope.** ✅ **Done — see FIXED-29 and FIXED-34.**
 Create/delete patches, coordinate-guided context offsets, empty-context
 insertions, and `\\ No newline at end of file` are supported with the same
-all-or-nothing candidate used for preview and execution. Multi-file diffs remain
-deferred because the current approval and checkpoint contracts govern one path;
-that expansion must add atomic path-set previews and rollback evidence first.
+all-or-nothing candidate used for preview and execution. Multi-file diffs now
+use one combined approval, an atomic execution transaction, and per-path
+checkpoint evidence under the same governed action.
 
 ### Tier 1 — loop mechanics
 
@@ -1642,8 +1732,7 @@ autonomous without the host as the blast radius.
 B1 → B2 → B3 make Build an agent. **B1, B2, and B3's defined core scope are
 now landed**: an approved change is really made, the turn continues through
 it, and B3 uses strict, hunk-level editing instead of a whole-file rewrite.
-B3's single-target patch-format expansion has landed; atomic multi-file patch
-transactions remain deliberately deferred. B4–B6 make
+B3's multi-file patch transaction has landed. B4–B6 make
 the loop efficient. B13–B16 make the result
 reviewable. Everything else is depth. B20 is a *policy* decision before it is an
 engineering one and belongs to the owner, not to an implementer.
@@ -1678,7 +1767,8 @@ capability — written into the session's workspace and listed in the chat, so t
 artifact is a visible result rather than a path the owner has to go and find.
 C4 (the file inspector) is the surface that makes it visible.
 
-**C2. Acting in the owner's tools works, but only through one narrow door.**
+**C2. Acting in the owner's tools.** ✅ **Core manifest-driven path complete —
+see FIXED-37.**
 This is the one place the approval loop is already closed end to end, and it
 should be read as the precedent for C1 rather than as a gap in itself:
 `github_read`, `gmail_read`, `gcal_read`, `slack_read` and `connector_read`
@@ -1689,18 +1779,14 @@ resolving that approval really does call `ConnectorInvoker.invoke`, returning
 `"status": "executed", "executes_action": true`
 (`raiker/api/routes_approvals.py`). Approved connector mutations are sent.
 
-What is missing around it: **coverage and confidence.** Only
-manifest-declared operations of an enabled, credentialed connector are
-reachable, so "reply to that email", "put it on my calendar" and "post the
-summary to the channel" depend entirely on which operations each shipped
-manifest declares — and that inventory is not stated anywhere a user can see.
-There is also no pre-send preview of the exact outbound request body, no
-per-operation standing grant in the UI (`/api/standing-grants` exists as a
-route), and no undo window for operations that support one. **Work:** publish
-and complete the per-connector write-operation inventory, add the outbound
-preview to the approval card, and expose standing grants per operation so a
-routine the owner has already blessed does not stop for an approval every
-cycle.
+Only manifest-declared operations of an enabled, credentialed connector are
+reachable. That boundary is now visible: the Connector Store publishes each
+registered read/write operation and its confirmation posture, and approvals
+show the exact redacted outbound arguments before execution. The existing
+standing-grant manager remains available for intentionally broad, expiry-bound
+action classes. Per-operation grants and undo are not claimed: the current
+connector manifest schema has no safe compensation contract, and silently
+inventing one would be less capable than an honest single-use approval.
 
 **C3. It cannot recall anything outside the current chat.** The turn bundle
 (`raiker/context/gatherer.py`) injects session-scoped events, tasks, checkpoints

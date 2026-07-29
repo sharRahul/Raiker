@@ -409,6 +409,66 @@ def _patch_candidate(workspace_root: str | Path, path: str | Path, patch: str) -
     return _PatchCandidate(resolved, before, proposed, operation)
 
 
+def _split_unified_patch(patch: str) -> list[str] | dict[str, Any]:
+    """Split a git-style unified diff into file sections without interpreting hunks."""
+    lines = patch.splitlines(keepends=True)
+    starts = [
+        index for index in range(len(lines) - 1)
+        if lines[index].startswith("--- ") and lines[index + 1].startswith("+++ ")
+    ]
+    if not starts or starts[0] != 0:
+        return _failure("malformed_patch", message="expected unified diff file headers")
+    return [
+        "".join(lines[start:end])
+        for start, end in zip(starts, starts[1:] + [len(lines)], strict=True)
+    ]
+
+
+def patch_target_paths(patch: str) -> list[str]:
+    """Return normalized targets from a syntactically sectioned unified diff."""
+    sections = _split_unified_patch(patch)
+    if isinstance(sections, dict):
+        return []
+    targets: list[str] = []
+    for section in sections:
+        headers = section.splitlines()
+        old_path = _normalized_patch_path(headers[0][4:])
+        new_path = _normalized_patch_path(headers[1][4:])
+        targets.append(new_path if old_path == "/dev/null" else old_path)
+    return targets
+
+
+def _patch_candidates(
+    workspace_root: str | Path, path: str | Path | None, patch: str
+) -> list[_PatchCandidate] | dict[str, Any]:
+    expected: str | None = None
+    if path:
+        expected = _relative_path(
+            workspace_root, resolve_writable_workspace_path(workspace_root, path)
+        ).replace("\\", "/")
+    sections = _split_unified_patch(patch)
+    if isinstance(sections, dict):
+        return sections
+    candidates: list[_PatchCandidate] = []
+    seen: set[Path] = set()
+    for index, section in enumerate(sections):
+        header = section.splitlines()
+        old_path = _normalized_patch_path(header[0][4:])
+        new_path = _normalized_patch_path(header[1][4:])
+        target = new_path if old_path == "/dev/null" else old_path
+        if index == 0 and expected is not None and target != expected:
+            return _failure("patch_path_mismatch", old_path=old_path, new_path=new_path)
+        candidate = _patch_candidate(workspace_root, target, section)
+        if isinstance(candidate, dict):
+            candidate.setdefault("error", {})["path"] = target
+            return candidate
+        if candidate.path in seen:
+            return _failure("duplicate_patch_target", path=target)
+        seen.add(candidate.path)
+        candidates.append(candidate)
+    return candidates
+
+
 def _proposal_from_candidate(
     workspace_root: str | Path, candidate: tuple[Path, str, str] | _PatchCandidate | dict[str, Any]
 ) -> dict[str, Any]:
@@ -439,9 +499,28 @@ def proposed_edit_snapshot(
 
 
 def proposed_patch_snapshot(
-    workspace_root: str | Path, path: str | Path, patch: str
+    workspace_root: str | Path, path: str | Path | None, patch: str
 ) -> dict[str, Any]:
-    return _proposal_from_candidate(workspace_root, _patch_candidate(workspace_root, path, patch))
+    candidates = _patch_candidates(workspace_root, path, patch)
+    if isinstance(candidates, dict):
+        return candidates
+    changes = [
+        {
+            "path": _relative_path(workspace_root, item.path),
+            "before_snapshot": item.before,
+            "proposed_text": item.proposed_text,
+            "operation": item.operation,
+        }
+        for item in candidates
+    ]
+    first = changes[0]
+    return {
+        "status": "proposal",
+        **first,
+        "paths": [item["path"] for item in changes],
+        "changes": changes,
+        "requires_approval": True,
+    }
 
 
 def _write_candidate(
@@ -483,5 +562,44 @@ def edit_file_content(
     return replace_text_content(workspace_root, path, old_text, new_text)
 
 
-def apply_patch_content(workspace_root: str | Path, path: str | Path, patch: str) -> dict[str, Any]:
-    return _write_candidate(workspace_root, _patch_candidate(workspace_root, path, patch))
+def apply_patch_content(
+    workspace_root: str | Path, path: str | Path | None, patch: str
+) -> dict[str, Any]:
+    """Apply every file section as one transaction, rolling back on any write failure."""
+    candidates = _patch_candidates(workspace_root, path, patch)
+    if isinstance(candidates, dict):
+        return candidates
+    completed: list[_PatchCandidate] = []
+    try:
+        for candidate in candidates:
+            result = _write_candidate(workspace_root, candidate)
+            if result["status"] != "success":
+                raise OSError(str(result.get("error", {})))
+            completed.append(candidate)
+    except Exception as exc:
+        for candidate in reversed(completed):
+            if candidate.operation == "create":
+                candidate.path.unlink(missing_ok=True)
+            else:
+                candidate.path.parent.mkdir(parents=True, exist_ok=True)
+                candidate.path.write_text(candidate.before, encoding="utf-8")
+        return _failure("transaction_write_failed", message=str(exc))
+    changes = [
+        {
+            "path": _relative_path(workspace_root, item.path),
+            "size_bytes": 0 if item.operation == "delete" else item.path.stat().st_size,
+            "operation": item.operation,
+        }
+        for item in candidates
+    ]
+    return {
+        "status": "success",
+        "path": changes[0]["path"],
+        "paths": [item["path"] for item in changes],
+        "size_bytes": sum(
+            0 if item.operation == "delete" else item.path.stat().st_size
+            for item in candidates
+        ),
+        "operation": changes[0]["operation"],
+        "changes": changes,
+    }

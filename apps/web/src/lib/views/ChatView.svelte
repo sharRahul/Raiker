@@ -882,6 +882,8 @@
           rows="2"
           placeholder="How can I help you today?"
           title="Enter to send, Shift+Enter for a new line"
+          spellcheck="true"
+          lang="en-US"
           disabled={streaming}
         ></textarea>
         <div class="upper-controls">

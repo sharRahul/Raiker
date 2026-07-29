@@ -91,9 +91,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       const body = await resp.json();
       const detail = body?.detail ?? body;
       reasonCode = detail?.reason_code ?? null;
-    } catch {
-      reasonCode = null;
-    }
+    } catch { /* non-JSON error response */ }
     throw new ApiError(resp.status, reasonCode, `Request failed: ${resp.status} ${path}`);
   }
   return (await resp.json()) as T;
@@ -111,9 +109,7 @@ async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> 
       const body = await resp.json();
       const detail = body?.detail ?? body;
       reasonCode = detail?.reason_code ?? null;
-    } catch {
-      reasonCode = null;
-    }
+    } catch { /* non-JSON error response */ }
     throw new ApiError(resp.status, reasonCode, `Request failed: ${resp.status} ${path}`);
   }
   return resp.blob();
@@ -399,6 +395,12 @@ export const api = {
       `/api/connector-store/${encodeURIComponent(connectorId)}/manifest`,
       { manifest },
     ),
+  checkLanguage: (text: string) =>
+    postJson<{
+      status: "available" | "unavailable";
+      reason_code?: string;
+      matches: Array<{ offset: number; length: number; message: string; replacements: string[]; rule_id: string; category: string }>;
+    }>("/api/language/check", { text, language: "en-US" }),
   // On-demand listing of the models a provider serves (user-initiated; provider
   // policy is enforced server-side before any network contact).
   providerModels: (profileId: string) =>

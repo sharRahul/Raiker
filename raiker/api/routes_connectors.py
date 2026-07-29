@@ -84,6 +84,16 @@ async def connector_store(
                    WHERE principal_id=? AND connector_id=? ORDER BY started_at DESC LIMIT 1""",
                 (session.principal_id, definition.connector_id),
             ).fetchone()
+            manifest_row = connection.execute(
+                "SELECT manifest_json FROM connector_manifests WHERE connector_id=?",
+                (definition.connector_id,),
+            ).fetchone()
+        operations: list[dict[str, Any]] = []
+        if manifest_row:
+            try:
+                operations = compile_manifest(json.loads(manifest_row["manifest_json"]))["operations"]
+            except (ValueError, json.JSONDecodeError):
+                operations = []
         items.append(
             {
                 "connector_id": definition.connector_id,
@@ -99,6 +109,7 @@ async def connector_store(
                 "activity_status": activity["status"] if activity else "idle",
                 "active_operation": activity["operation_id"] if activity else None,
                 "last_invoked_at": activity["started_at"] if activity else None,
+                "operations": operations,
             }
         )
     return {"connectors": items, "count": len(items), "vault_configured": ConnectorVault(store).configured()}

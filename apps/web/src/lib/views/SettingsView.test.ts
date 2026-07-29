@@ -51,12 +51,12 @@ describe("supported-preferences settings", () => {
       "General",
       "Notification",
       "Personalisation",
-      "Storage",
       "Security & Login",
       "Account",
     ]) {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     }
+    expect(screen.queryByRole("button", { name: "Storage" })).not.toBeInTheDocument();
     // Unsupported surfaces are removed, not presented as settings.
     expect(screen.queryByRole("button", { name: "Voice" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Trusted Contact" })).toBeNull();

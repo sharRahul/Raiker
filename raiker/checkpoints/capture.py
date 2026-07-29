@@ -35,7 +35,11 @@ from uuid import uuid4
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.filesystem import FilesystemSafetyError, resolve_workspace_path
+from raiker.tools.filesystem import (
+    FilesystemSafetyError,
+    patch_target_paths,
+    resolve_workspace_path,
+)
 
 # 8 MiB: comfortably covers source/config/text mutations while bounding the
 # blob store's growth and the cost of reading a pre-image into memory.
@@ -78,7 +82,7 @@ class CheckpointCaptureService:
 
     def snapshot_pre_image(
         self, capability: str, arguments: dict[str, object]
-    ) -> PreImage | None:
+    ) -> PreImage | list[PreImage] | None:
         """Read the target file's current bytes *before* a mutation overwrites it.
 
         Returns ``None`` when the capability is not a file mutation, no path was
@@ -87,10 +91,15 @@ class CheckpointCaptureService:
         arg = CAPTURE_PATH_ARG.get(capability)
         if arg is None:
             return None
-        raw_path = str(arguments.get(arg, ""))
-        if not raw_path:
-            return None
-        return self.snapshot_path(raw_path, capability)
+        raw_paths = (
+            patch_target_paths(str(arguments.get("patch", "")))
+            if capability == "patch_apply_execution"
+            else [str(arguments.get(arg, ""))]
+        )
+        snapshots = [item for path in raw_paths if (item := self.snapshot_path(path, capability))]
+        if capability == "patch_apply_execution":
+            return snapshots or None
+        return snapshots[0] if snapshots else None
 
     def snapshot_path(self, raw_path: str, capability: str) -> PreImage | None:
         """Snapshot the current bytes of one workspace file (reusable primitive).

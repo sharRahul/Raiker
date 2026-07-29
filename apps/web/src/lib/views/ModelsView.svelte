@@ -493,16 +493,16 @@
                         <select class="picker-select" bind:value={pickerChoice} aria-label="Available models">
                           <option value="">Pick a model…</option>
                           {#each pickerList.models as m (m)}
-                            <option value={m}>{m}</option>
+                            <option value={m}>{modelName(m)}</option>
                           {/each}
                         </select>
                       {:else}
                         {#if pickerList !== null}
                           <p class="picker-note">{pickerNote(pickerList)}</p>
                         {:else}
-                          <p class="picker-note">Model list unavailable — type a model id.</p>
+                          <p class="picker-note">Model list unavailable — enter a custom model name.</p>
                         {/if}
-                        <input class="picker-input" type="text" placeholder="model id" bind:value={pickerChoice} aria-label="Model id" />
+                        <input class="picker-input" type="text" placeholder="Custom model name" bind:value={pickerChoice} aria-label="Custom model name" />
                       {/if}
                       <div class="picker-actions">
                         <button type="button" class="btn btn-primary btn-sm" onclick={() => void select(p.profile_id, pickerChoice)} disabled={selecting || pickerChoice.trim() === ""}>{selecting ? "Selecting…" : "Use model"}</button>
@@ -592,16 +592,16 @@
                         <select class="picker-select" bind:value={pickerChoice} aria-label="Available models">
                           <option value="">Pick a model…</option>
                           {#each pickerList.models as m (m)}
-                            <option value={m}>{m}</option>
+                            <option value={m}>{modelName(m)}</option>
                           {/each}
                         </select>
                       {:else}
                         {#if pickerList !== null}
                           <p class="picker-note">{pickerNote(pickerList)}</p>
                         {:else}
-                          <p class="picker-note">Model list unavailable — type a model id.</p>
+                          <p class="picker-note">Model list unavailable — enter a custom model name.</p>
                         {/if}
-                        <input class="picker-input" type="text" placeholder="model id" bind:value={pickerChoice} aria-label="Model id" />
+                        <input class="picker-input" type="text" placeholder="Custom model name" bind:value={pickerChoice} aria-label="Custom model name" />
                       {/if}
                       <div class="picker-actions">
                         <button type="button" class="btn btn-primary btn-sm" onclick={() => void select(p.profile_id, pickerChoice)} disabled={selecting || pickerChoice.trim() === ""}>{selecting ? "Selecting…" : "Use model"}</button>
@@ -643,7 +643,6 @@
             <span class="rank">{i + 1}</span>
             <span class="fallback-name">
               {profileLabel(id)}
-              <code class="profile-ref">{id}</code>
             </span>
             <span class="fallback-actions">
               <button type="button" class="btn btn-ghost btn-sm" onclick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
@@ -854,7 +853,6 @@
   .chip-ok { border-color:var(--ok-border); background:var(--ok-soft); color:var(--ok); }
   .chip-warn { border-color:var(--warn-border); background:var(--warn-soft); color:var(--warn); }
   .model-unpinned { color:var(--text-3); font-style:italic; }
-  .profile-ref { color:var(--text-3); }
 
   .picker { margin-top:0.55rem; border-top:1px dashed var(--border); padding-top:0.55rem; display:flex; flex-direction:column; gap:0.45rem; }
   .local-picker-inline { width:100%; margin-top:0.2rem; padding-top:0.55rem; border-top:1px dashed var(--border); }

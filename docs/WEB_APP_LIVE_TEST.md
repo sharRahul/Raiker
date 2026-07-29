@@ -218,6 +218,24 @@ Evidence: `output/playwright/bug15-chat-composer.png` and
 production bundle and mocks only authenticated API data, so it exercises the
 real compiled Svelte UI without requiring live provider credentials.
 
+## Result — 2026-07-29 (Settings / Models and expanded agent contracts)
+
+| Check | Result |
+|---|---|
+| Vite 8 / Vitest 4 dependency audit | ✅ zero npm advisories |
+| Multi-file unified patch | ✅ one preview/approval, two files changed, per-path checkpoint capture |
+| Stale second file in a patch set | ✅ whole change rejected before the first write |
+| Chat and Build model menus | ✅ menu opens and selection closes it on both pages |
+| Settings at 1440×1000 | ✅ focused five-section rail; no redundant Storage page |
+| Models at 1440×1000 | ✅ provider-backed model selector; no internal profile id visible |
+| English browser checking | ✅ `spellcheck` and `en-US` active in both composers |
+| Optional local LanguageTool adapter | ✅ authenticated, bounded, fail-soft when the operator-installed GPL/Java service is absent |
+
+Evidence: `output/playwright/settings-redesign.png` and
+`output/playwright/models-redesign.png`. The same committed Playwright suite
+opens the real dropdown controls instead of checking only that their triggers
+exist.
+
 ## Repeatable procedure
 
 1. **Bootstrap + enable the backend's gate** (human owner). For a hosted

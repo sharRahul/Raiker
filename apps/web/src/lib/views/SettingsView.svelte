@@ -6,7 +6,6 @@
   import General from "./settings/General.svelte";
   import Notification from "./settings/Notification.svelte";
   import Personalisation from "./settings/Personalisation.svelte";
-  import Storage from "./settings/Storage.svelte";
   import SecurityLogin from "./settings/SecurityLogin.svelte";
   import Account from "./settings/Account.svelte";
 
@@ -19,7 +18,6 @@
     { id: "general", label: "General" },
     { id: "notification", label: "Notification" },
     { id: "personalisation", label: "Personalisation" },
-    { id: "storage", label: "Storage" },
     { id: "security", label: "Security & Login" },
     { id: "account", label: "Account" },
   ] as const;
@@ -80,10 +78,11 @@
   onMount(load);
 </script>
 
-<p class="page-lead">
-  Your settings, saved per account. Runtime changes are re-confirmed and enforced server-side —
-  this page adds no authority of its own.
-</p>
+<div class="settings-hero">
+  <p class="eyebrow">Preferences</p>
+  <h2>Make Raiker feel like yours</h2>
+  <p>Personal, notification, and security choices saved to your account.</p>
+</div>
 
 {#if loadError}
   <PageState state="error" title="Couldn't load settings" detail={loadError} />
@@ -121,8 +120,6 @@
       <Notification {settings} {save} />
     {:else if active === "personalisation"}
       <Personalisation {settings} {save} />
-    {:else if active === "storage"}
-      <Storage />
     {:else if active === "security"}
       <SecurityLogin />
     {:else}
@@ -132,6 +129,15 @@
 </div>
 
 <style>
+  .settings-hero {
+    margin-bottom: var(--space-5);
+    padding: var(--space-5);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: linear-gradient(135deg, var(--accent-soft), var(--surface) 65%);
+  }
+  .settings-hero h2 { margin: .15rem 0 .35rem; font-size: clamp(1.35rem, 3vw, 2rem); }
+  .settings-hero p { margin: 0; color: var(--text-2); }
   .save-status {
     min-height: 0;
     margin-bottom: var(--space-3);
@@ -141,8 +147,8 @@
   }
   .settings-layout {
     display: grid;
-    grid-template-columns: 14rem 1fr;
-    gap: var(--space-5);
+    grid-template-columns: 12rem minmax(0, 48rem);
+    gap: var(--space-6);
     align-items: start;
   }
   .section-rail {

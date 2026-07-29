@@ -213,27 +213,31 @@ class RuntimeAuthority:
         metadata event but never propagates into the mutation result.
         """
         try:
-            meta = self.capture_service.commit(
-                pre_image,
-                session_id=action.session_id,
-                turn_id=action.turn_id,
-                action_id=action.action_id,
-                principal_id=principal.principal_id,
-            )
-            self._event(
-                event_type="checkpoint_captured",
-                actor="checkpoint_capture",
-                payload=meta,
-                session_id=action.session_id,
-                turn_id=action.turn_id,
-            )
+            for item in pre_image if isinstance(pre_image, list) else [pre_image]:
+                meta = self.capture_service.commit(
+                    item,
+                    session_id=action.session_id,
+                    turn_id=action.turn_id,
+                    action_id=action.action_id,
+                    principal_id=principal.principal_id,
+                )
+                self._event(
+                    event_type="checkpoint_captured",
+                    actor="checkpoint_capture",
+                    payload=meta,
+                    session_id=action.session_id,
+                    turn_id=action.turn_id,
+                )
         except Exception as exc:  # pragma: no cover - defensive; capture is best-effort
             self._event(
                 event_type="checkpoint_capture_failed",
                 actor="checkpoint_capture",
                 payload={
                     "action_id": action.action_id,
-                    "capability": pre_image.capability if pre_image else None,
+                    "capability": (
+                        pre_image[0].capability if isinstance(pre_image, list) and pre_image
+                        else pre_image.capability if pre_image else None
+                    ),
                     "reason": type(exc).__name__,
                 },
                 session_id=action.session_id,

@@ -279,6 +279,13 @@ export interface StoreConnector {
   activity_status: "idle" | "processing" | "completed" | "failed";
   active_operation: string | null;
   last_invoked_at: string | null;
+  operations: Array<{
+    operation_id: string;
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    path: string;
+    description: string;
+    requires_confirmation: boolean;
+  }>;
 }
 
 export interface ConnectorStoreView {

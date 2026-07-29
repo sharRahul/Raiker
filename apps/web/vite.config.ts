@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 import { configDefaults } from "vitest/config";
 
 export default defineConfig(({ mode }) => ({
-  plugins: [svelte({ hot: false })],
+  plugins: [svelte()],
   // Local-first: the dev server binds to localhost only and proxies /api to the local Raiker
   // API server (`raiker-web`, default 127.0.0.1:8765). In production the SPA is served by the
   // same FastAPI origin, so these relative /api paths resolve directly.

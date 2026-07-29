@@ -624,6 +624,8 @@
               ? "Describe what you want built…"
               : `Describe the change in ${activeRepo.label}…`}
             title="Enter to send, Shift+Enter for a new line, Shift+Tab to change mode"
+            spellcheck="true"
+            lang="en-US"
             disabled={streaming}
           ></textarea>
           <div class="upper-controls">

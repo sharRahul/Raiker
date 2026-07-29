@@ -25,6 +25,14 @@ export default [
     languageOptions: {
       parserOptions: { parser: ts.parser },
     },
+    rules: {
+      "svelte/prefer-svelte-reactivity": "off",
+      "svelte/require-each-key": "off",
+    },
+  },
+  {
+    files: ["**/*.svelte.ts"],
+    languageOptions: { parser: ts.parser },
   },
   {
     files: ["**/*.test.ts", "src/test-setup.ts"],

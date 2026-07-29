@@ -5,6 +5,7 @@
     "MIT-0",
     "BSD-2-Clause",
     "BSD-3-Clause",
+    "0BSD",
     "ISC",
     "BlueOak-1.0.0",
     "Python-2.0",
@@ -37,6 +38,66 @@
       "component": "pathspec",
       "license": "MPL-2.0",
       "reason": "Unmodified transitive development-only dependency of mypy; it is not included in Raiker distributions."
+    },
+    {
+      "component": "lightningcss",
+      "license": "MPL-2.0",
+      "reason": "Unmodified transitive build dependency of Vite 8/Rolldown; MPL-2.0 is file-level and no source is copied or modified by Raiker."
+    },
+    {
+      "component": "lightningcss-android-arm64",
+      "license": "MPL-2.0",
+      "reason": "Platform package for the reviewed unmodified Lightning CSS build dependency."
+    },
+    {
+      "component": "lightningcss-darwin-arm64",
+      "license": "MPL-2.0",
+      "reason": "Platform package for the reviewed unmodified Lightning CSS build dependency."
+    },
+    {
+      "component": "lightningcss-darwin-x64",
+      "license": "MPL-2.0",
+      "reason": "Platform package for the reviewed unmodified Lightning CSS build dependency."
+    },
+    {
+      "component": "lightningcss-freebsd-x64",
+      "license": "MPL-2.0",
+      "reason": "Platform package for the reviewed unmodified Lightning CSS build dependency."
+    },
+    {
+      "component": "lightningcss-linux-arm-gnueabihf",
+      "license": "MPL-2.0",
+      "reason": "Platform package for the reviewed unmodified Lightning CSS build dependency."
+    },
+    {
+      "component": "lightningcss-linux-arm64-gnu",
+      "license": "MPL-2.0",
+      "reason": "Platform package for the reviewed unmodified Lightning CSS build dependency."
+    },
+    {
+      "component": "lightningcss-linux-arm64-musl",
+      "license": "MPL-2.0",
+      "reason": "Platform package for the reviewed unmodified Lightning CSS build dependency."
+    },
+    {
+      "component": "lightningcss-linux-x64-gnu",
+      "license": "MPL-2.0",
+      "reason": "Platform package for the reviewed unmodified Lightning CSS build dependency."
+    },
+    {
+      "component": "lightningcss-linux-x64-musl",
+      "license": "MPL-2.0",
+      "reason": "Platform package for the reviewed unmodified Lightning CSS build dependency."
+    },
+    {
+      "component": "lightningcss-win32-arm64-msvc",
+      "license": "MPL-2.0",
+      "reason": "Platform package for the reviewed unmodified Lightning CSS build dependency."
+    },
+    {
+      "component": "lightningcss-win32-x64-msvc",
+      "license": "MPL-2.0",
+      "reason": "Platform package for the reviewed unmodified Lightning CSS build dependency."
     }
   ]
 }

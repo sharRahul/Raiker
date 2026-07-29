@@ -76,12 +76,6 @@ class PatchApplyExecutor:
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         path = str(action.arguments.get("path", ""))
-        if not path:
-            return ExecutionResult(
-                ok=False, capability=self.capability, action_id=action.action_id,
-                reason_code="missing_argument:path",
-                summary="Patch apply denied: no path provided.",
-            )
         try:
             result = apply_patch_content(
                 self._workspace_root, path, str(action.arguments.get("patch", ""))
@@ -96,8 +90,8 @@ class PatchApplyExecutor:
                 )
             return ExecutionResult(
                 ok=True, capability=self.capability, action_id=action.action_id,
-                summary=f"Applied patch to {result['path']} ({result['size_bytes']} bytes).",
-                artifacts={"path": result["path"], "size_bytes": result["size_bytes"]},
+                summary=f"Applied one patch transaction to {len(result['paths'])} file(s).",
+                artifacts={"path": result["path"], "paths": result["paths"], "changes": result["changes"], "size_bytes": result["size_bytes"]},
             )
         except Exception as exc:
             return ExecutionResult(

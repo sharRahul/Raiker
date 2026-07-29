@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
-import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -37,7 +37,7 @@ def client(app: FastAPI) -> TestClient:
     return TestClient(app)
 
 
-def _mint(client: TestClient) -> httpx.Response:
+def _mint(client: TestClient) -> Any:
     return client.post("/api/auth/session", json={"as_principal": None})
 
 

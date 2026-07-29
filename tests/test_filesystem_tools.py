@@ -185,3 +185,34 @@ def test_unified_patch_supports_create_delete_and_no_newline_marker(tmp_path) ->
     deleted = apply_patch_content(tmp_path, "new.txt", delete)
     assert deleted["operation"] == "delete"
     assert not (tmp_path / "new.txt").exists()
+
+
+def test_unified_patch_updates_multiple_files_as_one_change_set(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    (tmp_path / "one.txt").write_text("one\n", encoding="utf-8")
+    (tmp_path / "two.txt").write_text("two\n", encoding="utf-8")
+    patch = (
+        "--- a/one.txt\n+++ b/one.txt\n@@ -1 +1 @@\n-one\n+ONE\n"
+        "--- a/two.txt\n+++ b/two.txt\n@@ -1 +1 @@\n-two\n+TWO\n"
+    )
+
+    result = apply_patch_content(tmp_path, None, patch)
+
+    assert result["status"] == "success"
+    assert result["paths"] == ["one.txt", "two.txt"]
+    assert (tmp_path / "one.txt").read_text(encoding="utf-8") == "ONE\n"
+    assert (tmp_path / "two.txt").read_text(encoding="utf-8") == "TWO\n"
+
+
+def test_unified_patch_rejects_multi_file_change_before_any_write(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    (tmp_path / "one.txt").write_text("one\n", encoding="utf-8")
+    (tmp_path / "two.txt").write_text("two\n", encoding="utf-8")
+    patch = (
+        "--- a/one.txt\n+++ b/one.txt\n@@ -1 +1 @@\n-one\n+ONE\n"
+        "--- a/two.txt\n+++ b/two.txt\n@@ -1 +1 @@\n-stale\n+TWO\n"
+    )
+
+    result = apply_patch_content(tmp_path, None, patch)
+
+    assert result["status"] == "failed"
+    assert (tmp_path / "one.txt").read_text(encoding="utf-8") == "one\n"
+    assert (tmp_path / "two.txt").read_text(encoding="utf-8") == "two\n"

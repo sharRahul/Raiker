@@ -3374,25 +3374,29 @@ class DashboardService:
             try:
                 snapshot = proposed_patch_snapshot(
                     self.workspace_root,
-                    str(args.get("path", ".")),
+                    str(args["path"]) if args.get("path") else None,
                     str(args.get("patch", "")),
                 )
             except FilesystemSafetyError:
                 return None, str(args.get("path", "")), "arguments"
             if snapshot["status"] == "failed":
                 return None, str(args.get("path", "")), "arguments"
-            before = snapshot.get("before_snapshot") or ""
-            after = str(snapshot.get("proposed_text", ""))
-            path = str(snapshot.get("path", args.get("path", "")))
-            diff = "".join(
-                difflib.unified_diff(
-                    redact_secret_like_text(before).splitlines(keepends=True),
-                    redact_secret_like_text(after).splitlines(keepends=True),
-                    fromfile=f"a/{path}",
-                    tofile=f"b/{path}",
-                )
-            )
-            return diff, path, "file_diff"
+            changes = snapshot.get("changes") or [snapshot]
+            diffs: list[str] = []
+            for change in changes:
+                path = str(change.get("path", ""))
+                diffs.append("".join(difflib.unified_diff(
+                    redact_secret_like_text(change.get("before_snapshot") or "").splitlines(keepends=True),
+                    redact_secret_like_text(str(change.get("proposed_text", ""))).splitlines(keepends=True),
+                    fromfile=f"a/{path}", tofile=f"b/{path}",
+                )))
+            paths = [str(item.get("path", "")) for item in changes]
+            return "".join(diffs), ", ".join(paths), "file_diff"
+        if tool_name == "connector_write":
+            connector = str(args.get("connector_id", "connector"))
+            operation = str(args.get("operation_id", "operation"))
+            request_arguments = self._redact_value(args.get("arguments", {}))
+            return json.dumps(request_arguments, indent=2, sort_keys=True), f"{connector} / {operation}", "connector_request"
         return None, None, "arguments"
 
     @staticmethod

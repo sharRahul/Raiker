@@ -25,8 +25,9 @@ test.beforeEach(async ({ page }) => {
       else if (path === "/api/runtime-mode") body = { mode_name: "local_single_user_runtime", status: "active", allowed_modes: ["local_single_user_runtime"] };
       else if (path === "/api/diagnostics") body = { summary: {}, counts: {}, readiness: {}, missing_config: [], provider_health: [] };
       else if (path === "/api/projects") body = { projects: [], active_project_id: null };
-      else if (path === "/api/settings") body = { settings: {} };
+      else if (path === "/api/settings") body = { settings: {}, status: { vault: "configured", mfa_enrolled: false, username: "owner" } };
       else if (path === "/api/models") body = { profiles: [model], current_profile_id: model.profile_id, current_model: model.model, fallback_sequence: [] };
+      else if (path.endsWith("/provider-models")) body = { profile_id: model.profile_id, provider: model.provider, status: "available", reason_code: null, models: ["claude-sonnet-4-5", "claude-opus-4-1"] };
       else if (path === "/api/settings/composer-approval-mode") body = { approval_mode: "manual" };
       else if (path === "/api/code-repos") body = { repositories: [], active_repo_id: null };
       else if (path === "/api/tasks") body = [];
@@ -53,10 +54,29 @@ test("Chat and Build composers stay polished and usable", async ({ page }) => {
   const chat = page.getByLabel("Prompt");
   await expect(chat).toHaveAttribute("placeholder", "How can I help you today?");
   await expect(page.getByRole("button", { name: /Model for this turn/ })).toBeVisible();
+  await page.getByRole("button", { name: /Model for this turn/ }).click();
+  await expect(page.getByRole("menu", { name: "Models" })).toBeVisible();
+  await page.getByRole("menuitemradio", { name: /Sonnet 4\.5/i }).click();
   await page.screenshot({ path: "../../output/playwright/bug15-chat-composer.png", fullPage: true });
 
   await page.getByRole("link", { name: "Build" }).click();
   await expect(page.getByLabel("Describe the change")).toBeVisible();
   await expect(page.getByRole("group", { name: "How much Raiker may do" })).toBeVisible();
+  await page.getByRole("button", { name: /Model for this turn/ }).click();
+  await expect(page.getByRole("menu", { name: "Models" })).toBeVisible();
   await page.screenshot({ path: "../../output/playwright/bug15-build-composer.png", fullPage: true });
+});
+
+test("Settings and Models present focused, human-readable controls", async ({ page }) => {
+  await page.goto("http://raiker.test/#/settings");
+  await expect(page.getByRole("heading", { name: "Make Raiker feel like yours" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Storage" })).toHaveCount(0);
+  await page.screenshot({ path: "../../output/playwright/settings-redesign.png", fullPage: true });
+
+  await page.goto("http://raiker.test/#/models");
+  await expect(page.getByRole("heading", { name: "Choose where Raiker thinks" })).toBeVisible();
+  await expect(page.getByText("anthropic-hosted")).toHaveCount(0);
+  await page.getByRole("button", { name: /Change model/i }).first().click();
+  await expect(page.getByRole("combobox", { name: "Available models" })).toBeVisible();
+  await page.screenshot({ path: "../../output/playwright/models-redesign.png", fullPage: true });
 });

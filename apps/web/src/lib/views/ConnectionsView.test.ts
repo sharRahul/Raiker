@@ -19,6 +19,7 @@ function connector(partial: Partial<StoreConnector> = {}): StoreConnector {
     activity_status: "idle",
     active_operation: null,
     last_invoked_at: null,
+    operations: [],
     ...partial,
   };
 }

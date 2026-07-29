@@ -159,7 +159,7 @@ class ToolBroker:
                 str(args.get("new_text", "")),
             ),
             "apply_patch": lambda args: proposed_patch_snapshot(
-                self.workspace_root, str(args.get("path", ".")), str(args.get("patch", ""))
+                self.workspace_root, str(args["path"]) if args.get("path") else None, str(args.get("patch", ""))
             ),
             "memory_search": lambda args: memory_search(
                 self.workspace_root,
@@ -398,7 +398,7 @@ class ToolBroker:
             try:
                 return proposed_patch_snapshot(
                     self.workspace_root,
-                    str(action.arguments.get("path", ".")),
+                    str(action.arguments["path"]) if action.arguments.get("path") else None,
                     str(action.arguments.get("patch", "")),
                 )
             except FilesystemSafetyError as exc:

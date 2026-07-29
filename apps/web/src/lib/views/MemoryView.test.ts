@@ -56,8 +56,8 @@ describe("MemoryView", () => {
     await waitFor(() =>
       expect(screen.getByText("The user prefers tabs over spaces.")).toBeInTheDocument(),
     );
-    expect(screen.getByText("project:alpha")).toBeInTheDocument();
-    expect(screen.getByText(/sensitivity: normal/i)).toBeInTheDocument();
+    expect(screen.getByText("project:alpha scope")).toBeInTheDocument();
+    expect(screen.getByText(/normal sensitivity/i)).toBeInTheDocument();
     expect(screen.getByText(/confidence: 0.90/i)).toBeInTheDocument();
   });
 
@@ -81,8 +81,8 @@ describe("MemoryView", () => {
     });
     render(MemoryView);
 
-    await waitFor(() => expect(screen.getByRole("checkbox")).not.toBeChecked());
-    await fireEvent.click(screen.getByRole("checkbox"));
+    await waitFor(() => expect(screen.getByRole("switch", { name: /incognito session/i })).toHaveAttribute("aria-checked", "false"));
+    await fireEvent.click(screen.getByRole("switch", { name: /incognito session/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -144,7 +144,7 @@ describe("MemoryView", () => {
     );
   });
 
-  it("edits search participation expiry import and export controls", async () => {
+  it("edits a memory and keeps import and export in advanced management", async () => {
     const fetchMock = stubFetch({
       "GET /api/memory": [
         {
@@ -187,35 +187,7 @@ describe("MemoryView", () => {
       ),
     );
 
-    await fireEvent.click(screen.getByRole("checkbox", { name: /include memory in search/i }));
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/memory/mem_1/search",
-        expect.objectContaining({ method: "PUT", body: JSON.stringify({ enabled: false }) }),
-      ),
-    );
-
-    await fireEvent.input(screen.getByLabelText(/^memory expiry$/i), { target: { value: "2030-01-01T00:00" } });
-    await fireEvent.click(screen.getByRole("button", { name: /save memory expiry/i }));
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/memory/mem_1/expiry",
-        expect.objectContaining({ method: "PUT", body: JSON.stringify({ expires_at: "2030-01-01T00:00:00Z" }) }),
-      ),
-    );
-
-    await fireEvent.click(screen.getByRole("button", { name: /export memories/i }));
-    await waitFor(() =>
-      expect((screen.getByLabelText(/memory export json/i) as HTMLTextAreaElement).value).toContain("remember this"),
-    );
-
-    await fireEvent.input(screen.getByLabelText(/memory import json/i), { target: { value: '[{"text":"Imported memory"}]' } });
-    await fireEvent.click(screen.getByRole("button", { name: /import memories/i }));
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/memory/import",
-        expect.objectContaining({ method: "POST", body: JSON.stringify({ memories: [{ text: "Imported memory" }] }) }),
-      ),
-    );
+    expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/memory export json/i)).not.toBeInTheDocument();
   });
 });

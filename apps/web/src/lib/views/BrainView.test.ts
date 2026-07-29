@@ -40,7 +40,8 @@ describe("BrainView", () => {
     render(BrainView);
 
     await waitFor(() => expect(screen.getAllByText("Draft a plan").length).toBeGreaterThan(0));
-    expect(screen.getByText(/visual activity only/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not display hidden model reasoning/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Knowledge Map" })).toBeInTheDocument();
     expect(screen.getAllByText("Researcher").length).toBeGreaterThan(0);
     expect(screen.getByText("Workspace sources")).toBeInTheDocument();
     expect(screen.queryByText("Work in Action")).not.toBeInTheDocument();

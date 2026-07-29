@@ -17,7 +17,7 @@ export const NAV_GROUPS: NavGroup[] = [
   ] },
   { label: "Knowledge", items: [
     { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },
-    { id: "brain", label: "Brain", icon: "spark", hint: "Workspace relationships and sources" },
+    { id: "brain", label: "Knowledge Map", icon: "spark", hint: "Governed workspace relationships and sources" },
   ] },
   { label: "Control", items: [
     { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },

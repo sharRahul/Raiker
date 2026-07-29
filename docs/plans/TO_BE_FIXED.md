@@ -5,9 +5,10 @@ Defects and gaps found while executing
 `raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
 
 Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Forty-six are marked **FIXED** and were resolved on this
-branch; the rest are open and deliberately left for a maintainer decision
-because they touch security controls or unshipped features.
+and the proposed fix. Fixed entries remain as evidence; every deferred item
+found by the FIXED-01 through FIXED-48 audit is now an explicit BUG with a
+required user-interface outcome, so closing backend work cannot leave an
+invisible or misleading product surface.
 
 Two entries — GAP-BUILD and GAP-CHAT — are not defects. They are the itemised
 distance between what Build and Chat ship today and what each is meant to be:
@@ -69,6 +70,19 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-46 | Medium | Workbench | Fixed (activity-aware dashboard redesign) |
 | FIXED-47 | High | Build / command containment | Fixed (was BUG-20) |
 | FIXED-48 | Medium | Settings / Workbench | Fixed (settings and dashboard refinement) |
+| FIXED-49 | Medium | Memory / Knowledge Map / context window | Fixed (visual control redesign) |
+| BUG-21 | Medium | Models / pricing | Open |
+| BUG-22 | Medium | Chat / export | Open |
+| BUG-23 | Low | Chat / code ergonomics | Open |
+| BUG-24 | High | Approvals / cross-tab continuation | Open |
+| BUG-25 | High | Tasks / approval continuation | Open |
+| BUG-26 | Low | File inspector / images | Open |
+| BUG-27 | Medium | Memory / provenance | Open |
+| BUG-28 | Medium | Chat / artifact download | Open |
+| BUG-29 | High | Memory / governed lifecycle | Open |
+| BUG-30 | Medium | Knowledge Map / sources and scale | Open |
+| BUG-31 | High | Build / remote execution containment | Open |
+| BUG-32 | Medium | Terminal / approval execution | Open |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -1581,7 +1595,7 @@ checks the no-approval policy decision, and verifies the persisted turn binding.
 
 ## FIXED-44 — Sessions can grant a bounded command feedback channel *(B5)*
 
-**Status: fixed in this change except for BUG-20.**
+**Status: fixed; BUG-20 was subsequently closed by FIXED-47.**
 
 **Fix applied.** An authenticated owner can create, replace, expire, or revoke
 one command-prefix allowlist for one session. `run_command` uses the workspace
@@ -1667,6 +1681,258 @@ Live browser coverage is recorded in
 [`screenshots/working/workbench-dashboard-live.png`](screenshots/working/workbench-dashboard-live.png),
 [`screenshots/working/settings-redesign-live.png`](screenshots/working/settings-redesign-live.png),
 and [`screenshots/working/settings-runtime-live.png`](screenshots/working/settings-runtime-live.png).
+
+---
+
+## FIXED-49 — Memory, Knowledge Map, and context usage expose user controls first
+
+**Status: fixed in this change; missing lifecycle services are tracked as
+BUG-21 and BUG-27 through BUG-30.**
+
+**Fix applied.** Memory now leads with one accessible incognito switch, quiet
+approved/pending/pinned/expired counts, search and governed metadata filters,
+readable approved and pending cards, explicit forget copy, and file-based
+reviewed import/export under **Advanced memory management**. Raw JSON and
+internal identifiers no longer dominate the page.
+
+Brain is presented as **Knowledge Map** and explicitly states that it does not
+show hidden reasoning. Sources, approved memories, and runtime records are
+defined separately; the page has a workspace summary, source-boundary copy,
+search, type filtering, Map/List views, a useful empty state, an animation
+switch with reduced-motion support, a legend, and a more informative record
+inspector.
+
+The context popover makes exact tokens used, capacity, remaining tokens, and
+input/output composition primary. It uses a visible 8px severity-aware meter,
+honest sub-one-percent display, concise provider attribution with explanatory
+help, and a visually separate pricing footer with a direct **Configure →**
+action.
+Live browser evidence is recorded in
+[`screenshots/working/memory-redesign-live.png`](screenshots/working/memory-redesign-live.png),
+[`screenshots/working/knowledge-map-redesign-live.png`](screenshots/working/knowledge-map-redesign-live.png),
+and [`screenshots/working/context-window-redesign-live.png`](screenshots/working/context-window-redesign-live.png).
+
+---
+
+## BUG-21 — Provider pricing is not synchronised into a historical registry
+
+**Status: open; audited from FIXED-03.**
+
+**Observed.** Shipped prices require manual verification, provider catalogue
+facts refresh only during an interactive listing, owner price overrides have no
+Settings UI, price history is overwritten rather than retained as reproducible
+evidence, and cache-hit/cache-write pricing is not represented independently.
+
+**Required fix.** Add a validated 6–24 hour synchronisation job for providers
+that expose pricing, retain the last known good response, map exact provider
+model IDs without sibling substitution, store effective-dated input/output/
+cache-write/cache-hit rates, retain price history, and audit administrator
+overrides. Public documentation feeds need an explicit reviewed adapter rather
+than live scraping from a popover.
+
+**UI when closed.** Models → Pricing shows source, exact model ID, last refresh,
+next refresh, stale/error state, rate components, price history, and an
+administrator-only override workflow. The context popover reads the normalised
+registry and shows **Unknown** with **Configure →** when no exact rate exists.
+
+---
+
+## BUG-22 — Chat has no first-class transcript export or print workflow
+
+**Status: open; audited from FIXED-06, FIXED-12, and FIXED-45.**
+
+**Observed.** Rendered transcript HTML exists, but Chat still has no download,
+browser print/Save as PDF, or clearly scoped export action.
+
+**Required fix.** Produce an account/session-authorised export with a declared
+format, redaction policy, attachment treatment, timestamps, and audit record.
+
+**UI when closed.** The conversation menu contains **Export conversation** with
+HTML/Markdown/PDF choices, a review of included messages and files, progress,
+success/download state, and field-level errors. Browser print uses a dedicated
+print layout rather than the application chrome.
+
+---
+
+## BUG-23 — Rendered code blocks lack daily-use interaction controls
+
+**Status: open; audited from FIXED-06.**
+
+**Observed.** Safe fenced code renders, but there is no syntax highlighting,
+copy button, or language label; user-authored Markdown remains literal.
+
+**Required fix.** Add a locally shipped, allowlisted grammar path and reliable
+copy behavior without remote assets or weakening sanitisation. Decide and
+document whether user bubbles deliberately remain literal.
+
+**UI when closed.** Every assistant code block has a language label and
+keyboard-accessible **Copy code** action with copied/error announcements;
+highlighting respects both themes and high-contrast mode. User-message behavior
+is explained in product help rather than left ambiguous.
+
+---
+
+## BUG-24 — Approval resolution in another tab does not continue Chat
+
+**Status: open; audited from FIXED-09.**
+
+**Observed.** Build can stream a parked continuation and Approvals can offer a
+manual continuation, but a Chat tab does not observe a resolution completed in
+another tab.
+
+**Required fix.** Publish an authenticated, idempotent resolution event keyed
+to the parked turn and resume it exactly once, preserving the original session,
+tool-call boundary, and cancellation controls.
+
+**UI when closed.** The parked Chat turn changes from **Waiting for approval**
+to **Approved — continuing…** without reload, streams the resumed work in the
+same transcript, and offers a recoverable **Continue now** action if the live
+event channel is unavailable.
+
+---
+
+## BUG-25 — Scheduled work cannot resume after its approval is granted
+
+**Status: open; audited from FIXED-13.**
+
+**Observed.** Scheduler-launched turns remain `waiting_for_approval` because no
+client owns their continuation relay.
+
+**Required fix.** Give the scheduler an authenticated, durable, exactly-once
+resume worker that revalidates task state, approval scope, expiry, STOP state,
+and runtime policy before continuing.
+
+**UI when closed.** Task and Work in action cards show the approval, resolution,
+resume attempt, and resulting state. A granted task moves through
+**Continuing → Running/Failed/Completed**, with a reason and retry action when
+automatic continuation cannot proceed.
+
+---
+
+## BUG-26 — Image inspection has no zoom, pan, or rotation controls
+
+**Status: open; audited from FIXED-10.**
+
+**Required fix.** Add client-side, bounded image transforms that do not mutate
+the stored artifact or fetch remote content.
+
+**UI when closed.** The file inspector exposes labelled Zoom in/out, Fit,
+Rotate, and Reset controls, keyboard shortcuts, the current zoom level, and a
+reduced-motion-safe pan surface. Unsupported media retains the honest existing
+state.
+
+---
+
+## BUG-27 — Memory and file provenance cannot open the exact source passage
+
+**Status: open; audited from FIXED-10 and FIXED-45.**
+
+**Observed.** Records expose source metadata, but no endpoint resolves an
+authorised source excerpt and no inspector can highlight the passage used.
+
+**Required fix.** Persist immutable source coordinates, authorise them against
+the current account/workspace, resolve supported document offsets, and report
+deleted, changed, unsupported, or inaccessible sources honestly.
+
+**UI when closed.** Memory **View source** and generated-file provenance open
+the existing inspector at a highlighted passage with document title, source
+status, and **Open conversation/document**. Missing provenance renders an
+explicit unavailable state, never a dead action.
+
+---
+
+## BUG-28 — Generated artifacts have no general download surface
+
+**Status: open; audited from FIXED-45.**
+
+**Required fix.** Add an authorised byte-download endpoint with safe filenames,
+content disposition, retention checks, audit evidence, and no inline execution
+for active formats.
+
+**UI when closed.** Generated artifact cards and the file inspector provide a
+**Download** action with size/type, progress, completion, retention-expired,
+permission-denied, and unavailable states. Download remains distinct from
+Preview and from conversation export.
+
+---
+
+## BUG-29 — Governed memory proposals, scope changes, and history lack APIs
+
+**Status: open; found while implementing FIXED-49.**
+
+**Observed.** The Memory API can list records and mutate text/pin/search/expiry,
+but it cannot approve, edit-and-approve, reject, change scope with renewed
+consent, report last use, distinguish logical forget from permanent deletion,
+or return a complete per-memory audit history.
+
+**Required fix.** Implement exact-record proposal decisions, sensitivity and
+scope transitions, usage/review timestamps, stale/conflict checks, logical
+forget plus separately governed permanent deletion, and append-only history.
+
+**UI when closed.** Pending cards provide **View source**, **Reject**,
+**Edit and approve**, and **Approve**. Approved cards provide **Edit scope**,
+**View history**, review/expiry controls, last-used status, **Forget memory**,
+and a separately confirmed **Delete permanently** where policy allows.
+
+---
+
+## BUG-30 — Knowledge Map source review and large-graph controls are incomplete
+
+**Status: open; found while implementing FIXED-49.**
+
+**Observed.** Server-side containment validates a typed workspace-relative
+path, but the browser has no workspace file/folder chooser or pre-index review.
+The graph also lacks relationship inspection, project/date/status filters,
+fit/zoom/reset/full-screen controls, clustering, indexed-file status, re-index,
+and advanced-record disclosure.
+
+**Required fix.** Add a server-backed contained source browser and review plan
+with supported/unsupported counts before indexing. Extend graph DTOs with
+project, dates, provenance, relationship metadata, indexing state, and cluster
+summaries; preserve selection and viewport across incremental refresh.
+
+**UI when closed.** **Add workspace source** opens Choose file/folder → review
+→ Add and index. Sources show indexed counts, warnings, last indexed, Re-index,
+and Remove. Map/List share search and filters; the map adds Zoom/Fit/Reset,
+relationship labels, project clusters, and Standard/Advanced modes with full
+keyboard and screen-reader access.
+
+---
+
+## BUG-31 — Remote and cloud execution environments remain unavailable
+
+**Status: open; audited from FIXED-47 and B20.**
+
+**Observed.** Local no-network container execution is shipped, while governed
+remote and cloud executor gates remain disabled and have no executor.
+
+**Required fix.** Implement owner-selected remote/cloud isolation with scoped
+credentials, immutable environment identity, network/secret/mount policies,
+resource budgets, cancellation, artifact return, and complete audit evidence.
+
+**UI when closed.** Settings → Runtime configuration lists Local container,
+Remote, and Cloud environments with availability, health, isolation summary,
+cost/budget, last change, and role restrictions. Work composers show the
+selected environment and block start with actionable configuration guidance.
+
+---
+
+## BUG-32 — Terminal approval remains metadata-only
+
+**Status: open; audited from FIXED-08.**
+
+**Observed.** The terminal client's `/approve` can resolve metadata without an
+authenticated web session, so it cannot execute the bounded approval relay or
+resume work. Approval-gated `shell` likewise remains record-only.
+
+**Required fix.** Add authenticated terminal approval and exactly-once relay
+support without weakening session-revocation, capability, command containment,
+or STOP checks.
+
+**UI when closed.** The terminal prints an exact effect preview, requires an
+authenticated confirmation, then shows **Executing**, bounded output/result,
+and **Continuing turn** or a precise refusal. The web Approvals history records
+the terminal principal and identical execution evidence.
 
 ---
 

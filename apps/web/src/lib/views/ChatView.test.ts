@@ -630,7 +630,9 @@ describe("ChatView streaming transcript", () => {
     });
     render(ChatView);
     await fireEvent.click(screen.getByRole("button", { name: "Context window" }));
-    expect(screen.getByText("0 / 1.0M (0%)")).toBeInTheDocument();
+    expect(screen.getByText("0 tokens used")).toBeInTheDocument();
+    expect(screen.getByText("of 1,000,000 available")).toBeInTheDocument();
+    expect(screen.getByText("1,000,000 tokens remaining")).toBeInTheDocument();
     expect(screen.queryByText(/context compacted/i)).not.toBeInTheDocument();
   });
 

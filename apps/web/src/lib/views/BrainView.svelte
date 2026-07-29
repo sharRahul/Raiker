@@ -33,6 +33,11 @@
   let sourceKind = $state<"folder" | "file">("folder");
   let sourceError = $state<string | null>(null);
   let sourceBusy = $state(false);
+  let viewMode = $state<"map" | "list">("map");
+  let search = $state("");
+  let typeFilter = $state("all");
+  let animate = $state(true);
+  let updatedAt = $state<string | null>(null);
 
   async function load() {
     refreshing = true;
@@ -40,6 +45,7 @@
     try {
       brain = await api.brain();
       selectedId ??= brain.nodes[0]?.node_id ?? null;
+      updatedAt = new Date().toISOString();
     } catch (error) {
       loadError = error instanceof ApiError ? `Unavailable (${error.status})` : "Unavailable";
     } finally {
@@ -85,25 +91,25 @@
     });
   }
 
-  const graphNodes = $derived(positions(brain?.nodes ?? []));
+  const nodeTypes = $derived([...new Set((brain?.nodes ?? []).map((node) => node.node_type))]);
+  const graphNodes = $derived(positions((brain?.nodes ?? []).filter((node) => (typeFilter === "all" || node.node_type === typeFilter) && `${node.label} ${node.detail ?? ""}`.toLowerCase().includes(search.toLowerCase()))));
   const positionsById = $derived(new Map(graphNodes.map((node) => [node.node_id, node])));
   const graphEdges = $derived(
     (brain?.edges ?? []).filter((edge) => positionsById.has(edge.source) && positionsById.has(edge.target)),
   );
   const selected = $derived(graphNodes.find((node) => node.node_id === selectedId) ?? null);
   const tasks = $derived(graphNodes.filter((node) => node.node_type === "task"));
-  const waiting = $derived(graphNodes.filter((node) => node.node_type === "schedule"));
   const folders = $derived(graphNodes.filter((node) => node.node_type === "folder"));
   const files = $derived(graphNodes.filter((node) => node.node_type === "file"));
   const memoryNodes = $derived(graphNodes.filter((node) => node.node_type === "memory"));
   const sourceRoots = $derived(graphNodes.filter((node) => (node.node_type === "file" || node.node_type === "folder") && node.status === "selected"));
   const flow = $derived([
-    { label: "Planning", count: tasks.length },
-    { label: "Retrieval", count: graphNodes.filter((node) => node.node_type === "tool" && /retriev|recall|memory/i.test(node.label)).length },
-    { label: "Tools", count: graphNodes.filter((node) => node.node_type === "tool").length },
-    { label: "Memory", count: memoryNodes.length },
-    { label: "Approvals", count: graphNodes.filter((node) => node.node_type === "approval").length },
-    { label: "Waiting", count: waiting.length },
+    { label: "Conversations", count: graphNodes.filter((node) => node.node_type === "session").length },
+    { label: "Tasks", count: tasks.length },
+    { label: "Sources", count: folders.length + files.length },
+    { label: "Approved memories", count: memoryNodes.length },
+    { label: "Tool executions", count: graphNodes.filter((node) => node.node_type === "tool").length },
+    { label: "Waiting for approval", count: graphNodes.filter((node) => node.node_type === "approval" || node.status === "waiting").length },
   ]);
 
   function edgePosition(id: string): PositionedNode | undefined {
@@ -162,12 +168,13 @@
 
 <div class="head-row">
   <div>
-    <p class="page-lead">A live map of the stored runtime records behind Raiker’s work: sessions, tasks, agents, tools, approvals, memory, schedules, and backups.</p>
-    <p class="truth-note"><Icon name="activity" size={15} /> {brain?.illustrative_motion_notice ?? "Loading the governed runtime graph…"}</p>
+    <h2>Knowledge Map</h2>
+    <p class="page-lead">Explore the governed sources and records connected to Raiker’s work.</p>
+    <p class="truth-note"><Icon name="info" size={15} /> This page does not display hidden model reasoning.</p>
   </div>
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={refreshing}>
+  <div class="refresh-state"><span>{updatedAt ? "Updated just now" : "Updating…"}</span><button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={refreshing}>
     <Icon name="refresh" size={15} /> {refreshing ? "Refreshing…" : "Refresh"}
-  </button>
+  </button></div>
 </div>
 
 {#if loadError}
@@ -175,8 +182,8 @@
 {:else if brain === null}
   <PageState state="loading" title="Loading the brain graph…" />
 {:else}
-  <section class="flow card" aria-label="Brain function">
-    <div><h2>Brain Function</h2><p>Each count is a current record in this workspace.</p></div>
+  <section class="flow card" aria-label="Workspace summary">
+    <div><h2>Workspace summary</h2><p>Stored records and current activity within this workspace.</p></div>
     <div class="flow-list">
       {#each flow as stage (stage.label)}
         <span class:has-work={stage.count > 0}>{stage.label} <b>{stage.count}</b></span>
@@ -185,7 +192,7 @@
   </section>
 
   <section class="card sources" aria-labelledby="sources-heading">
-    <div><h2 id="sources-heading">Workspace sources</h2><p>Add files or folders you have deliberately placed inside this Raiker instance’s workspace. Their actual paths and children become graph nodes; nothing outside the workspace is read.</p></div>
+    <div class="source-heading"><div><h2 id="sources-heading">Workspace sources</h2><p>Files and folders made available as governed, read-only workspace context. Sources do not become approved memories automatically.</p></div><span class="boundary"><Icon name="shield" size={14} /> Workspace boundary enforced</span></div>
     <form onsubmit={(event) => { event.preventDefault(); void addSource(); }}>
       <div class="source-form">
         <div class="kind-toggle" role="radiogroup" aria-label="Source kind">
@@ -200,17 +207,24 @@
     {#if sourceRoots.length}
       <div class="source-list">{#each sourceRoots as source (source.node_id)}<span class="source-chip"><Icon name={source.node_type === "folder" ? "projects" : "file"} size={12} />{source.detail}<button type="button" aria-label={`Remove ${source.detail} from graph`} onclick={() => void removeSource(source.detail ?? "")}>×</button></span>{/each}</div>
     {:else}
-      <p class="source-empty">Nothing added to memory yet. Folders and files you add above show up here and as nodes in the graph.</p>
+      <div class="source-empty"><strong>No workspace sources added</strong><span>Add a file or folder already inside this workspace. Raiker validates the path before it becomes context.</span></div>
     {/if}
   </section>
 
+  <section class="graph-controls" aria-label="Knowledge Map controls">
+    <label class="graph-search"><Icon name="search" size={15} /><input bind:value={search} placeholder="Search records…" aria-label="Search records" /></label>
+    <select bind:value={typeFilter} aria-label="Filter by record type"><option value="all">All record types</option>{#each nodeTypes as type}<option value={type}>{type}</option>{/each}</select>
+    <div class="view-tabs" role="tablist" aria-label="Map view"><button role="tab" aria-selected={viewMode === "map"} class:chosen={viewMode === "map"} onclick={() => viewMode = "map"}>Map</button><button role="tab" aria-selected={viewMode === "list"} class:chosen={viewMode === "list"} onclick={() => viewMode = "list"}>List</button></div>
+  </section>
+
   <div class="brain-layout">
-    <section class="card graph-card" aria-label="Raiker Brain relationship graph">
-      <div class="graph-heading"><div><h2>Runtime connectivity</h2><p>Click a node to inspect its stored status.</p></div><span class="motion-key">Visual pulse</span></div>
-      {#if graphNodes.length === 0}
-        <p class="empty-graph">No sessions or work records yet. This graph only grows from stored runtime activity.</p>
-      {:else}
-        <div class="graph" aria-label="Interactive runtime relationship graph">
+    <section class="card graph-card" aria-label="Knowledge Map relationship graph">
+      <div class="graph-heading"><div><h2>Workspace relationships</h2><p>Select a stored record to inspect its status and connections.</p></div><label class="animation-toggle"><input type="checkbox" bind:checked={animate} /> Animate recent activity</label></div>
+      {#if graphNodes.length === 0 && !search && typeFilter === "all"}
+        <div class="empty-graph"><Icon name="projects" size={28} /><h3>Build your workspace map</h3><p>Connections appear as you add sources, create projects, start conversations, and approve memories.</p><div><a class="btn btn-primary btn-sm" href="#sources-heading">Add a source</a><a class="btn btn-ghost btn-sm" href="#/new-chat">Start a conversation</a></div></div>
+      {:else if graphNodes.length === 0}<div class="empty-graph"><h3>No records match these filters</h3><p>Clear the search or select another record type.</p></div>
+      {:else if viewMode === "map"}
+        <div class="graph" class:paused={!animate} aria-label="Interactive workspace relationship graph">
           <div class="graph-bg" aria-hidden="true"></div>
           <svg class="edges" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             {#each graphEdges as edge (`${edge.source}:${edge.target}:${edge.relationship}`)}
@@ -247,24 +261,28 @@
             </button>
           {/each}
         </div>
-        <div class="legend"><span><i class="dot task-dot"></i> work</span><span><i class="dot agent-dot"></i> subagent</span><span><i class="dot memory-dot"></i> memory</span><span><i class="dot folder-dot"></i> folder</span><span><i class="dot file-dot"></i> file</span><span><i class="dot tool-dot"></i> recorded tool/event</span></div>
+        <div class="legend" aria-label="Record type legend"><span><i class="dot task-dot"></i> Task</span><span><i class="dot agent-dot"></i> Agent</span><span><i class="dot memory-dot"></i> Approved memory</span><span><i class="dot folder-dot"></i> Folder source</span><span><i class="dot file-dot"></i> File source</span><span><i class="dot tool-dot"></i> Runtime record</span></div>
+      {:else}
+        <div class="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Details</th></tr></thead><tbody>{#each graphNodes as node (node.node_id)}<tr class:selected={node.node_id === selectedId}><td><button onclick={() => selectedId = node.node_id}>{node.label}</button></td><td>{node.node_type}</td><td>{statusLabel(node.status)}</td><td>{node.detail ?? "—"}</td></tr>{/each}</tbody></table></div>
       {/if}
     </section>
 
     <aside class="inspector-panel">
       <section class="card inspector">
-        <h2>{selected?.label ?? "Select a node"}</h2>
+        <h2>{selected?.node_type === "user" ? "Your workspace identity" : selected?.label ?? "Selected record"}</h2>
         {#if selected}
           <p class="status"><span></span>{statusLabel(selected.status)}</p>
-          <p class="inspector-detail">{selected.detail ?? "No additional stored metadata."}</p>
+          <p class="record-type">{selected.node_type} record</p><p class="inspector-detail">{selected.detail ?? (selected.node_type === "user" ? "Active workspace account. Connections show governed records associated with your work." : "No additional stored metadata is available.")}</p>
+          <p class="connections"><strong>{graphEdges.filter((edge) => edge.source === selected.node_id || edge.target === selected.node_id).length}</strong> connected record{graphEdges.filter((edge) => edge.source === selected.node_id || edge.target === selected.node_id).length === 1 ? "" : "s"}</p>
           {#if selected.progress_percent !== null}
             <div class="progress" aria-label={`${selected.label} progress`}><div style={`width:${selected.progress_percent}%`}></div></div>
           {/if}
-        {:else}<p class="inspector-detail">Choose a node in the graph.</p>{/if}
+        {:else}<p class="inspector-detail">Choose a record in the map or list.</p>{/if}
       </section>
       <section class="card memory-card">
-        <h2>In memory</h2>
-        <p class="muted">Folders, files, and memory records you’ve added to the graph.</p>
+        <h2>Workspace content</h2>
+        <p class="muted">Sources, approved memories, and stored runtime records are separate governed record types.</p>
+        <div class="content-counts"><span><b>{folders.length + files.length}</b> Sources</span><span><b>{memoryNodes.length}</b> Approved memories</span><span><b>{graphNodes.length - folders.length - files.length - memoryNodes.length}</b> Runtime records</span></div>
         <ul class="memory-list">
           {#each folders as folder (folder.node_id)}<li class="kind-folder"><Icon name="projects" size={13} /> {folder.label}</li>{/each}
           {#each files as file (file.node_id)}<li class="kind-file"><Icon name="file" size={13} /> {file.label}</li>{/each}
@@ -278,6 +296,7 @@
 
 <style>
   .head-row { display:flex; justify-content:space-between; gap:var(--space-4); align-items:flex-start; margin-bottom:var(--space-4); }
+  .head-row h2 { margin:0 0 .25rem; } .refresh-state { display:flex; align-items:center; gap:var(--space-2); color:var(--text-3); font-size:.75rem; }
   .page-lead { max-width:850px; margin:0; color:var(--text-2); }
   .truth-note { display:flex; align-items:center; gap:6px; color:var(--text-2); font-size:0.85rem; margin:var(--space-2) 0 0; }
   .flow { display:flex; justify-content:space-between; align-items:center; gap:var(--space-4); margin-bottom:var(--space-4); }
@@ -288,6 +307,7 @@
   .flow-list .has-work { border-color:var(--accent); color:var(--text-1); }
   .flow-list b { margin-left:4px; }
   .sources { display:grid; gap:var(--space-3); margin-bottom:var(--space-4); }
+  .source-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); } .boundary { display:flex; align-items:center; gap:.35rem; color:var(--accent); font-size:.75rem; white-space:nowrap; }
   .source-form { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .source-form .input { flex:1; min-width:12rem; }
   .kind-toggle { display:inline-flex; border:1px solid var(--border-strong); border-radius:var(--r-sm); overflow:hidden; }
@@ -296,15 +316,17 @@
   .source-list { display:flex; gap:7px; flex-wrap:wrap; }
   .source-chip { display:flex; align-items:center; gap:5px; border:1px solid var(--accent-border); border-radius:var(--r-pill); color:var(--text-1); background:var(--accent-soft); font-size:0.78rem; padding:4px 8px; }
   .source-chip button { appearance:none; border:0; background:transparent; color:inherit; cursor:pointer; font-size:16px; line-height:1; }
-  .source-empty { color:var(--text-3); font-size:0.8rem; margin:0; }
+  .source-empty { display:grid; gap:.2rem; color:var(--text-3); font-size:0.8rem; margin:0; padding:var(--space-3); border:1px dashed var(--border); border-radius:var(--r-md); } .source-empty strong { color:var(--text-1); }
+  .graph-controls { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); margin-bottom:var(--space-3); } .graph-search { min-height:42px; display:flex; align-items:center; gap:.4rem; flex:1; min-width:14rem; padding:0 .7rem; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); } .graph-search input { border:0; outline:0; background:transparent; color:var(--text-1); width:100%; } .graph-controls select { min-height:42px; padding:0 .7rem; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); color:var(--text-1); } .view-tabs { display:flex; border:1px solid var(--border); border-radius:var(--r-md); overflow:hidden; } .view-tabs button { min-height:40px; border:0; padding:0 .8rem; background:var(--surface); color:var(--text-2); cursor:pointer; } .view-tabs button.chosen { background:var(--accent-soft); color:var(--accent); font-weight:650; }
 
   .brain-layout { display:grid; grid-template-columns:minmax(0, 1fr) minmax(220px, 280px); gap:var(--space-4); }
   .graph-card { min-width:0; }
   .graph-heading { display:flex; justify-content:space-between; gap:var(--space-3); }
-  .motion-key { color:var(--text-3); font-size:0.72rem; }
-  .empty-graph { color:var(--text-2); font-size:0.85rem; }
+  .animation-toggle { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:0.75rem; }
+  .empty-graph { display:grid; justify-items:center; gap:.5rem; padding:var(--space-8) var(--space-4); text-align:center; color:var(--text-2); font-size:0.85rem; } .empty-graph h3,.empty-graph p { margin:0; } .empty-graph div { display:flex; gap:var(--space-2); margin-top:var(--space-2); }
   .graph { position:relative; height:520px; margin-top:var(--space-3); overflow:hidden; border:1px solid var(--border); border-radius:var(--r-md); background:radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 55%); }
   .graph-bg { position:absolute; inset:0; background-image:radial-gradient(color-mix(in srgb, var(--text-3) 18%, transparent) 1px, transparent 1px); background-size:22px 22px; opacity:.35; animation:drift 22s linear infinite; }
+  .graph.paused .graph-bg,.graph.paused .node,.graph.paused path.active { animation:none; }
   .edges { position:absolute; inset:0; width:100%; height:100%; }
   path { fill:none; stroke:var(--border-strong); stroke-width:.32; vector-effect:non-scaling-stroke; opacity:.85; }
   path.active { stroke:var(--accent); stroke-width:.5; stroke-dasharray:3 4; animation:travel 1.6s linear infinite; }
@@ -341,6 +363,9 @@
   .inspector-detail { color:var(--text-2); font-size:0.85rem; }
   .progress { height:6px; overflow:hidden; border-radius:4px; background:var(--sunken); margin-top:var(--space-3); }
   .progress div { height:100%; background:var(--accent); }
+  .record-type { text-transform:capitalize; color:var(--text-3) !important; font-size:.72rem !important; } .connections { padding-top:var(--space-2); border-top:1px solid var(--border); }
+  .content-counts { display:grid; gap:.4rem; margin-top:var(--space-3); } .content-counts span { display:flex; justify-content:space-between; color:var(--text-2); font-size:.78rem; }
+  .table-wrap { overflow:auto; margin-top:var(--space-3); } table { width:100%; border-collapse:collapse; font-size:.82rem; } th,td { padding:.7rem; text-align:left; border-bottom:1px solid var(--border); } th { color:var(--text-3); font-size:.7rem; text-transform:uppercase; } td button { border:0; background:transparent; color:var(--accent); cursor:pointer; font:inherit; padding:0; } tr.selected { background:var(--accent-soft); }
   .memory-card .muted { color:var(--text-3); font-size:0.78rem; }
   .memory-list { list-style:none; margin:var(--space-2) 0 0; padding:0; display:grid; gap:5px; }
   .memory-list li { display:flex; align-items:center; gap:6px; color:var(--text-1); font-size:0.82rem; }
@@ -352,6 +377,7 @@
   @keyframes ping { 50% { transform:scale(1.5); box-shadow:0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent); } }
   @keyframes travel { to { stroke-dashoffset:-14; } }
   @keyframes drift { to { background-position:22px -22px; } }
+  @media (prefers-reduced-motion: reduce) { .graph-bg,.node,.node.active-node .node-dot,.node.active-node .folder-mark,.node.active-node .file-mark,path.active { animation:none !important; } }
   @media (max-width: 900px) { .brain-layout { grid-template-columns:1fr; } .graph { height:440px; } .flow { align-items:flex-start; flex-direction:column; } }
   @media (max-width: 600px) { .head-row { flex-direction:column; } .graph { height:380px; } .node-label { font-size:0.62rem; } }
 </style>

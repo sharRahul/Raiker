@@ -29,8 +29,9 @@ function usage(overrides: Partial<ContextUsage> = {}): ContextUsage {
 describe("ContextMeterPopover", () => {
   it("prefers provider-reported usage over the browser's estimate", () => {
     render(ContextMeterPopover, { usedTokens: 99, contextWindowTokens: 1000, estimated: true, usage: usage() });
-    expect(screen.getByText("2.9K / 200.0K (1%)")).toBeInTheDocument();
-    expect(screen.getByText(/Provider-reported usage/)).toBeInTheDocument();
+    expect(screen.getByText("2,900 tokens used")).toBeInTheDocument();
+    expect(screen.getByText("1.45%")).toBeInTheDocument();
+    expect(screen.getByText(/Reported by anthropic/)).toBeInTheDocument();
     expect(screen.queryByText(/Estimated from this chat/)).not.toBeInTheDocument();
   });
 
@@ -48,7 +49,8 @@ describe("ContextMeterPopover", () => {
       estimated: true,
       usage: usage({ usage_source: "unavailable", used_tokens: null, session_turns: 0, session_cost: null, provider_total_cost: null }),
     });
-    expect(screen.getByText("400 / 200.0K (0%)")).toBeInTheDocument();
+    expect(screen.getByText("400 tokens used")).toBeInTheDocument();
+    expect(screen.getByText("0.20%")).toBeInTheDocument();
     expect(screen.getByText(/Estimated from this chat/)).toBeInTheDocument();
   });
 
@@ -66,7 +68,7 @@ describe("ContextMeterPopover", () => {
       usage: usage({ session_cost: null, provider_total_cost: null, price_source: null, price_as_of: null }),
     });
     expect(screen.getByText(/No price is configured/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Set one in Models/ })).toHaveAttribute("href", "#/models");
+    expect(screen.getByRole("link", { name: /Configure/ })).toHaveAttribute("href", "#/models");
     expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
   });
 

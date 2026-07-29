@@ -27,6 +27,7 @@ export type IconName =
   | "search"
   | "refresh"
   | "lock"
+  | "license"
   | "warning"
   | "hand"
   | "fast-forward"
@@ -104,6 +105,7 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   search: ["M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Z", "M15.5 15.5 21 21"],
   refresh: ["M20 8a8 8 0 1 0 1 6", "M21 3v5h-5"],
   lock: ["M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z", "M8.5 11V8a3.5 3.5 0 0 1 7 0v3"],
+  license: ["M12 3v18", "M5 6h14", "M7.5 6 4 13h7L7.5 6Z", "M16.5 6 13 13h7l-3.5-7Z", "M8 21h8"],
   warning: ["M12 4 2.8 20h18.4L12 4Z", "M12 10v4.5", "M12 17.5v.5"],
   hand: [
     "M7.5 12V6.5a1.5 1.5 0 0 1 3 0V11",

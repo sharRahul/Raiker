@@ -250,6 +250,10 @@
     <Icon name="lock" size={13} />
     Local &amp; loopback-only
   </p>
+  <p class="license-note">
+    <Icon name="license" size={13} />
+    Apache License, Version 2.0
+  </p>
 </nav>
 
 <nav class="phone-nav" aria-label="Primary">
@@ -361,8 +365,8 @@
     color: var(--accent);
     font-weight: 650;
   }
-  .local-note {
-    margin-top: auto;
+  .local-note,
+  .license-note {
     display: flex;
     align-items: center;
     gap: 0.4rem;
@@ -370,6 +374,8 @@
     color: var(--text-3);
     padding: 0 0.55rem;
   }
+  .local-note { margin: auto 0 0; }
+  .license-note { margin: -0.65rem 0 0; }
   .recent { border-top: 1px solid var(--border); margin: var(--space-3) 0 0.45rem; padding: var(--space-3) 0.55rem 0; position: relative; }
   .recent-label { color: var(--text-3); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em; margin: 0 0 0.35rem; text-transform: uppercase; }
   .recent-row { position: relative; }

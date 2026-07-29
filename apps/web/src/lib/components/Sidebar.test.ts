@@ -26,6 +26,13 @@ describe("Sidebar navigation", () => {
     expect(active).toHaveAttribute("aria-current", "page");
   });
 
+  it("shows the runtime scope and project license in the footer", () => {
+    render(Sidebar, { current: "new-chat" });
+    const nav = screen.getByRole("navigation", { name: "All navigation" });
+    expect(within(nav).getByText("Local & loopback-only")).toBeInTheDocument();
+    expect(within(nav).getByText("Apache License, Version 2.0")).toBeInTheDocument();
+  });
+
   it("opens More navigation and closes it with Escape", async () => {
     render(Sidebar, { current: "new-chat" });
     const more = screen.getByRole("button", { name: "More navigation" });

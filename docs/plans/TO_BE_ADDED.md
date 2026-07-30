@@ -214,5 +214,39 @@ Implementing this final phase creates the ultimate secure agent environment:
 
 With this final layer, you are no longer just building a coding assistant. You are building an impenetrable, self-correcting, AI operating system right on your home computer.
 
+We have designed an incredibly complex, highly fortified cage (Firecracker micro-VMs, microkernels, policy-as-code) and filled it with brilliant internal debate engines. However, we forgot to establish who exactly is speaking and where the data came from.
+
+In security engineering, this missing fundamental layer is known as Privilege Mirroring and the Lack of Agent Identity Lineage. If you build all those advanced sandboxes into Raiker but do not fix how identity is handled, the entire system collapses under two massive architectural vulnerabilities: 
+
+------------------------------
+## 1. The Vulnerability: "Privilege Mirroring"
+Right now, if you use your ChatGPT subscription via OAuth to connect Raiker, the agent executes tasks using your access permissions. The downstream sandbox sees a request to write a file or query an endpoint and assumes: "This request came from the owner, so it is safe to execute." 
+
+* The Exploit: An indirect prompt injection (e.g., a hidden malicious code block inside a GitHub repository the agent is reading) tricks the model. The model then issues a command to delete a file.
+* The Flaw: Because the agent is completely "mirroring" your identity, the system executes the command without hesitation. The cage is useless because the guard thinks you told it to unlock the door.
+
+## 2. The Solution: Cryptographic Agent Attestation (SPIFFE/SPIRE)
+To fix this fundamental flaw, you must give the AI agent its own distinct, lower-privileged Cryptographic Persona that is entirely separate from your human identity. 
+
+* The Upgrade: Integrate an open-source identity framework like SPIFFE/SPIRE into Raiker’s backend. Every time Raiker spawns an agent thread, that thread is assigned a short-lived, cryptographically signed cryptographic token (a SPIFFE ID).
+* The Edge: When the agent attempts to run a tool, the sandbox checks the identity token. The sandbox recognizes: "This is a machine agent, not the human owner." Even if the agent tries to present your OAuth token to execute a root-level system change, the platform rejects it because the machine identity does not carry human-level system execution rights.
+
+------------------------------
+## 3. The Vulnerability: The Missing Lineage Chain
+When an agent creates three sub-agents (e.g., a Writer, a Tester, and a Refactorer) to handle a massive code change, the final file write arrives at your local repository as a flat operation. You have no way of knowing which sub-agent actually generated that specific block of text, or what data input triggered that choice.
+
+* The Exploit: A sub-agent reads a contaminated stack-overflow post, gets poisoned, and inserts a backdoor into your repository. The master orchestrator misses it because it only looks at the final output. 
+
+## 4. The Solution: Bounded Transaction Lineage & The Hardware Kill-Switch
+You must build Data Lineage Tracking natively into Raiker’s runtime gate architecture.
+
+* The Upgrade: Every single API call, file read, and token generation must append an immutable cryptographic signature tracing back through the entire parent execution tree.
+* The Edge: If a file write is proposed, Raiker can trace the request all the way back up the chain: Human User -> Master Agent -> Tester Agent -> Malicious Web Scraping Input. The moment the lineage tracking hits an untrusted data source, it acts as an automatic hardware kill switch, freezing the entire execution branch before it can touch your repository.
+
+------------------------------
+## The Fundamental Realization
+Without Identity and Lineage, security is just an illusion. A sandbox is only as strong as its ability to verify exactly who is requesting an action.
+By adding a SPIFFE-based identity provider to separate human rights from agent rights, you fix the core structural flaw that leaves other AI agent project exposed to indirect privilege exploitation.
+
 
 

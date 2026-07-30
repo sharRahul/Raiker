@@ -1,12 +1,15 @@
-To upgrade Raiker so it matches the capabilities of Hermes Agent (autonomous self-improvement, advanced coding routines) and OpenClaw (mass multi-platform reach, omni-channel integration)—without violating Raiker's zero-trust security architecture—you must adhere to a strict rule: * Autonomy cannot equal privilege escalation.* [1, 2, 3, 4, 5] 
+## To upgrade Raiker so it has capabilities of autonomous self-improvement, advanced coding routines and mass multi-platform reach, omni-channel integration—without violating Raiker's zero-trust security architecture—you must adhere to a strict rule: * Autonomy cannot equal privilege escalation.* [1, 2, 3, 4, 5] 
+
 The following blueprint details how to implement these missing capabilities by building security sandboxes natively into Raiker's existing Python/TypeScript stack:
+
 ------------------------------
-## Phase 1: Solving the Execution Paralysis (OpenClaw Parity)
-Right now, Raiker explicitly blocks shell, network, and process execution. To safely allow arbitrary command and tool execution like OpenClaw without risking your home system, you must replace Raiker's "record-only" mode with an isolated micro-container execution backend. [5, 6] 
+
+## Phase 1: Solving the Execution Paralysis 
+Right now, Raiker explicitly blocks shell, network, and process execution. To safely allow arbitrary command and tool execution in other AI Agents without risking your home system, you must replace Raiker's "record-only" mode with an isolated micro-container execution backend. [5, 6] 
 ## Implementation Strategy:
 
 * 
-* The Blueprint: Adopt Hermes' approach of container hardening. Instead of running tools directly on your host machine, modify Raiker's backend orchestration (raiker/) to dynamically spin up lightweight, ephemeral Docker or Podman containers for tool calls. [5] 
+* The Blueprint: Adopt approach of container hardening. Instead of running tools directly on your host machine, modify Raiker's backend orchestration (raiker/) to dynamically spin up lightweight, ephemeral Docker or Podman containers for tool calls. [5] 
 * Zero-Trust Hardening:
 * Mount the target repository as a read-only volume, except for a specific workspace subdirectory where file writes are permitted.
    * Completely drop all Linux capabilities (--cap-drop=ALL) and strictly enforce a non-root container user (--user 1000:1000).
@@ -14,8 +17,8 @@ Right now, Raiker explicitly blocks shell, network, and process execution. To sa
 * 
 
 ------------------------------
-## Phase 2: Self-Improving Codebases & Skills (Hermes Parity)
-Hermes excels because it can evaluate its own performance against log traces and dynamically generate its own procedural library files (SKILL.md) so it doesn't repeat past mistakes. OpenClaw does this via a risky public marketplace (ClawHub) that suffers from supply chain malware injection. [2, 7, 8, 9] 
+## Phase 2: Self-Improving Codebases & Skills
+Raiker should evaluate its own performance against log traces and dynamically generate its own procedural library files (SKILL.md) so it doesn't repeat past mistakes. In other AI Agents does this via a risky public marketplace (ClawHub) that suffers from supply chain malware injection. [2, 7, 8, 9] 
 ## Implementation Strategy:
 To give Raiker self-improvement while protecting against prompt injection or malicious skills: [9, 10] 
 
@@ -36,12 +39,12 @@ Currently, if a powerful model suggests multiple tool calls at once, Raiker drop
 * 
 
 ------------------------------
-## Phase 4: External Reach & Multi-Channel Bots (OpenClaw Parity)
-OpenClaw can easily connect to tools like WhatsApp, Telegram, or Discord, allowing you to trigger workflows from your phone. However, Raiker is deeply hardcoded to run strictly on a local network (127.0.0.1:8765). Moving Raiker to a public server introduces immense network exposure. [4, 6, 10, 11] 
+## Phase 4: External Reach & Multi-Channel Bots
+Raiker should easily connect to tools like WhatsApp, Telegram, or Discord, allowing you to trigger workflows from your phone. However, Raiker is deeply hardcoded to run strictly on a local network (127.0.0.1:8765). Moving Raiker to a public server introduces immense network exposure. [4, 6, 10, 11] 
 ## Implementation Strategy:
 
 * 
-* The Inverted Gateway Protocol: Rather than using open reverse proxies (which caused massive security failures in OpenClaw), build a local polling daemon inside Raiker.
+* The Inverted Gateway Protocol: Rather than using open reverse proxies (which caused massive security failures in other AI Agents), build a local polling daemon inside Raiker.
 * Secure Webhook Polling: Create a lightweight, isolated bot script that communicates with the Telegram or Discord API via long-polling, or establish a secure, authenticated WebSocket connection to an external platform.
 * Strict Access Control: The daemon pulls user messages down to your local machine, maps incoming platform User IDs to specific Acting-Principals defined in Raiker's local database, and forces all remote commands through the same strict Capability Gates and automated policies that protect the local terminal interface. [11] 
 * 
@@ -52,7 +55,7 @@ OpenClaw can easily connect to tools like WhatsApp, Telegram, or Discord, allowi
 def execute_agent_tool_securely(command, workspace_path):
     client = docker.from_env()
     
-    # Enforcing strict Hermes-style container sandboxing rules
+    # Enforcing strict container sandboxing rules
     container = client.containers.run(
         image="python:3.11-slim",
         command=command,
@@ -74,18 +77,19 @@ def execute_agent_tool_securely(command, workspace_path):
         raise RuntimeError("Zero-Trust Boundary Triggered: Execution Timeout exceeded.")
 
 We must solve the fundamental flaw plaguing the entire 2026 AI agent ecosystem: Reasoning Drift and State Vulnerability. When a highly advanced model runs a multi-hour project, it eventually hallucinates its context, loses track of its security posture, or leaks unencrypted credentials from memory. [1, 2] 
-To advance Raiker beyond Hermes and OpenClaw while elevating its zero-trust design, you need to implement four bleeding-edge architectural upgrades:
-------------------------------
-## 1. Deterministic State Replays (Beyond Hermes' Log Traces)
-Hermes remembers its historical attempts via a persistent text file or database, but it cannot prove why a choice was made, making it prone to repeating logic errors over long horizons. [1, 3, 4, 5] 
+
+To advance Raiker while elevating its zero-trust design, you need to implement four bleeding-edge architectural upgrades:
+
+## 1. Deterministic State Replays (Beyond Log Traces)
+Raiker should remembers its historical attempts via a persistent text file or database, but it cannot prove why a choice was made, making it prone to repeating logic errors over long horizons. [1, 3, 4, 5] 
 
 * 
 * The Upgrade: Implement an Event-Sourced Deterministic Replay Kernel inside Raiker. Instead of treating your audit log as static text, build it as a sequence of immutable, cryptographically signed state mutations. [6] 
 * The Capability: If an agent breaks a build or fails a task, Raiker can deterministically "rewind" the agent's memory, workspace state, and tool environment back to point X. You can audit exactly which token generation or file change triggered the failure and force the agent down a different reasoning path. [1, 6] 
 * 
 
-## 2. Multi-Model Context & Cost Optimization (Beyond OpenClaw’s Static Routes)
-OpenClaw routes basic tools to cheap models and complex loops to premium ones to save money, but it treats security the exact same way across all models. [7] 
+## 2. Multi-Model Context & Cost Optimization (Beyond Static Routes)
+Raiker should routes basic tools to cheap models and complex loops to premium ones to save money, but it treats security the exact same way across all models. [7] 
 
 * 
 * The Upgrade: Implement Context-Compaction Tiering with Model Asymmetry. Route structural planning and task-state fidelity tracking through a highly secure, deterministic local model (like a specialized Llama 3 variant) that runs strictly on your machine. [7, 8] 
@@ -93,7 +97,7 @@ OpenClaw routes basic tools to cheap models and complex loops to premium ones to
 * 
 
 ## 3. Active Credential Filtering & Dynamic Token Cloaking
-The greatest vulnerability in OpenClaw and Hermes is that when they scan your file structure, they can read active .env files, SSH keys, or cloud platform tokens, exposing them to prompt injection risks. [9] 
+The greatest vulnerability in other AI Agents is that when they scan your file structure, they can read active .env files, SSH keys, or cloud platform tokens, exposing them to prompt injection risks. [9] 
 
 * 
 * The Upgrade: Build a Zero-Knowledge Credential Vault and an inline AST (Abstract Syntax Tree) sanitization layer into Raiker's standard file-reading capabilities.
@@ -115,10 +119,10 @@ If you fork Raiker today, here is the chronological engineering path to build an
 [Current Raiker]
        │
        ▼
- 1. Containerized Execution Backend ──► (Achieves OpenClaw execution parity safely)
+ 1. Containerized Execution Backend ──► (Achieves execution parity safely)
        │
        ▼
- 2. Self-Evolutionary Skill Engine  ──► (Achieves Hermes self-improvement parity)
+ 2. Self-Evolutionary Skill Engine  ──► (Achieves self-improvement parity)
        │
        ▼
  3. Policy-as-Code YAML Guards      ──► (Automates safe decision modes)
@@ -128,7 +132,7 @@ If you fork Raiker today, here is the chronological engineering path to build an
 
 By completing this pipeline, you transform Raiker into a platform that doesn't just block dangerous operations—it orchestrates complex, high-velocity developer workflows inside a provably secure, self-healing runtime framework. [1, 6]  
 
-To elevate Raiker into a tier entirely beyond OpenClaw, Hermes Agent, and standard industry frameworks, you must transition from fixing software vulnerabilities to mastering proactive, hardware-anchored architectural immunity.
+To elevate Raiker into a tier entirely beyond other AI Agents, and standard industry frameworks, you must transition from fixing software vulnerabilities to mastering proactive, hardware-anchored architectural immunity.
 If you want Raiker to completely dominate the secure development landscape, you should integrate the following five bleeding-edge, enterprise-grade paradigms into its architecture:
 ------------------------------
 ## 1. Hardware Root of Trust via Confidential Computing
@@ -136,15 +140,15 @@ Currently, if your local operating system is compromised, an attacker can access
 
 * 
 * The Upgrade: Migrate Raiker’s core Python daemon to run inside a hardware-enforced Trusted Execution Environment (TEE) using Confidential Computing technologies (such as AMD SEV-SNP or Intel TDX). [1, 2] 
-* The Beyond-Hermes Edge: By isolating Raiker in a cryptographic hardware enclave, your data remains fully encrypted in memory. Even if a bad actor gains full administrator/root privileges on your home host machine, they are physically barred by the CPU from scraping the agent's internal reasoning loop, secrets vault, or active session tokens. [1] 
+* The Beyond-AI Agent Edge: By isolating Raiker in a cryptographic hardware enclave, your data remains fully encrypted in memory. Even if a bad actor gains full administrator/root privileges on your home host machine, they are physically barred by the CPU from scraping the agent's internal reasoning loop, secrets vault, or active session tokens. [1] 
 * 
 
 ## 2. Supply Chain "Kill Switch" & Model Context Protocol (MCP) Sandboxing
-OpenClaw depends heavily on its external marketplace (ClawHub) for third-party tools, leaving users vulnerable to Agentic Supply Chain Poisoning (e.g., extensions that look legitimate but secretly hide prompt injections in their metadata). [3, 4] 
+Other AI Agents depends heavily on its external marketplace (like ClawHub) for third-party tools, leaving users vulnerable to Agentic Supply Chain Poisoning (e.g., extensions that look legitimate but secretly hide prompt injections in their metadata). [3, 4] 
 
 * 
 * The Upgrade: Implement an Inline MCP Static & Dynamic Analysis Gateway. Every time an external extension or tool is called by Raiker, it must first run through a localized Static Application Security Testing (SAST) module to parse for suspicious code or structural manipulation before execution. [5, 6] 
-* The Beyond-Hermes Edge: Implement a rigid, circuit-breaking supply chain kill switch. If an extension attempts a runtime behavior that deviates from its pre-declared manifest signature (like trying to read file paths outside its scoped workspace), Raiker immediately terminates the entire execution thread and freezes the extension. [3] 
+* The Beyond-AI Agent Edge: Implement a rigid, circuit-breaking supply chain kill switch. If an extension attempts a runtime behavior that deviates from its pre-declared manifest signature (like trying to read file paths outside its scoped workspace), Raiker immediately terminates the entire execution thread and freezes the extension. [3] 
 * 
 
 ## 3. Biometric Dual-Authorization Step-Up (The Human Gate Guard)
@@ -152,7 +156,7 @@ Raiker's current security relies on you manually typing a short string into the 
 
 * 
 * The Upgrade: Transition the Runtime Gate Manager from a text-based phrase input to a cryptographically secure WebAuthn passkey or biometric factor (such as Apple TouchID, Windows Hello, or a hardware YubiKey).
-* The Beyond-Hermes Edge: High-risk actions—like altering policy rules or approving broad system execution loops—will require hardware-backed biometric verification from you. This creates an un-bypassable cryptographic link confirming that a living human owner consciously authorized the precise block of terminal instructions proposed by the AI.
+* The Beyond-current Edge: High-risk actions—like altering policy rules or approving broad system execution loops—will require hardware-backed biometric verification from you. This creates an un-bypassable cryptographic link confirming that a living human owner consciously authorized the precise block of terminal instructions proposed by the AI.
 * 
 
 ## 4. Adversarial Intent Modeling (The "Safety Critic" Loop)
@@ -160,7 +164,7 @@ Most agents trust the model's intent explicitly until a downstream rule blocks i
 
 * 
 * The Upgrade: Embed an internal, asynchronous Safety Critic natively into Raiker's orchestration middleware. This relies on running a hyper-focused, low-latency semantic guardrail model (like a specialized local Llama-Guard instance) in parallel with the main agent thread.
-* The Beyond-Hermes Edge: The Critic’s sole job is to continually perform real-time threat modeling (evaluating inputs/outputs against patterns like memory poisoning or feedback loop attacks). If the main agent begins translating commands that resemble a privilege escalation vector, the Critic flags the intent drift and pauses the execution queue before the tool is ever called. [7] 
+* The Beyond-AI Agent Edge: The Critic’s sole job is to continually perform real-time threat modeling (evaluating inputs/outputs against patterns like memory poisoning or feedback loop attacks). If the main agent begins translating commands that resemble a privilege escalation vector, the Critic flags the intent drift and pauses the execution queue before the tool is ever called. [7] 
 * 
 
 ## 5. Multi-Agent Relationship-Based Access Control (ReBAC)
@@ -168,7 +172,7 @@ As you expand Raiker to handle automated pipelines, you will inevitably spawn su
 
 * 
 * The Upgrade: Deploy a fine-grained, relationship-based access control engine (using open-source architectures like OpenFGA) directly into Raiker's workspace broker.
-* The Beyond-Hermes Edge: You can declare strict inter-agent trust boundaries. For example, the Tester-Agent can be granted a relationship to read files generated by the Editor-Agent, but is strictly forbidden from initiating network requests, while the Editor-Agent has zero rights to execute shell commands. This implements a strict architectural principle of least privilege, blocking a single compromised sub-agent from taking down your entire automation workflow. [9] 
+* The Beyond-AI Agent Edge: You can declare strict inter-agent trust boundaries. For example, the Tester-Agent can be granted a relationship to read files generated by the Editor-Agent, but is strictly forbidden from initiating network requests, while the Editor-Agent has zero rights to execute shell commands. This implements a strict architectural principle of least privilege, blocking a single compromised sub-agent from taking down your entire automation workflow. [9] 
 * 
 
 ------------------------------
@@ -179,8 +183,10 @@ By compounding these upgrades onto your local Raiker fork, your security profile
 [ Base Raiker ]        ──► Static Trust (Blocks execution, forces manual human clicks)
 [ Ultimate Raiker ]    ──► Hardware & Continuous Behavioral Attestation (Never assumes trust, always verifies)
 
-To truly push Raiker beyond any theoretical limit and turn it into the absolute apex of secure automation, we must move past just protecting your computer. We have to treat the AI agent as a hostile software runtime that is actively trying to break out of its cage, while simultaneously optimizing it to think with human-level complexity.
+## To truly push Raiker beyond any theoretical limit and turn it into the absolute apex of secure automation, we must move past just protecting the computer. We have to treat the AI agent as a hostile software runtime that is actively trying to break out of its cage, while simultaneously optimizing it to think with human-level complexity.
+
 To achieve this, the final four radical architectural upgrades you can implement focus on neuromorphic reasoning and hyper-isolated kernels:
+
 ------------------------------
 ## 1. Ephemeral Micro-VMs with Microkernel Virtualization (Beyond Docker Sandboxing)
 While container platforms like Docker provide great isolation, they share the host computer's operating system kernel. If a malicious prompt injection tricks the AI into exploiting a hidden Linux kernel vulnerability (a container breakout), it can take full control of your actual computer.

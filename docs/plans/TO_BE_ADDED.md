@@ -101,7 +101,7 @@ Raiker's current security setup relies on interactive user prompts or manual cli
 
 ------------------------------
 ## Step-by-Step Evolution Roadmap
-If you fork Raiker today, here is the chronological engineering path to build an absolute powerhouse:
+If you upgrade Raiker today, here is the chronological engineering path to build an absolute powerhouse:
 
 [Current Raiker]
        │
@@ -156,7 +156,7 @@ As you expand Raiker to handle automated pipelines, you will inevitably spawn su
 
 ------------------------------
 ## The Ultimate Architecture Matrix
-By compounding these upgrades onto your local Raiker fork, your security profile evolves dramatically:
+By compounding these upgrades onto your local Raiker, your security profile evolves dramatically:
 
 [ Traditional Agents ] ──► Perimeter Trust (If it gets past the prompt, it runs wild)
 [ Base Raiker ]        ──► Static Trust (Blocks execution, forces manual human clicks)

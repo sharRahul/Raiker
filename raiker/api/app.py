@@ -62,6 +62,27 @@ def _is_project_export_request(scope: Scope, path: str) -> bool:
     )
 
 
+def _is_session_export_request(scope: Scope, path: str) -> bool:
+    """BUG-22 — a rendered transcript is a document, not a JSON body.
+
+    It is exempted from the buffering redactor for the same reason the project
+    export is: HTML, Markdown and PDF are not JSON, so passing them through the
+    JSON redactor achieves nothing and only risks mangling bytes. The transcript
+    is redacted at the point it is *built* instead
+    (``raiker.sessions.transcript``), which is stricter — the redaction is
+    applied to message text before any rendering, and the manifest route states
+    the policy to the owner before the file exists.
+    """
+    parts = path.split("/")
+    return (
+        scope.get("method") == "POST"
+        and len(parts) == 5
+        and parts[1:3] == ["api", "sessions"]
+        and bool(parts[3])
+        and parts[4] == "export"
+    )
+
+
 class RedactionMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -79,6 +100,7 @@ class RedactionMiddleware:
             not path.startswith("/api")
             or path in _REDACTION_EXEMPT_PATHS
             or _is_project_export_request(scope, path)
+            or _is_session_export_request(scope, path)
         ):
             await self.app(scope, receive, send)
             return

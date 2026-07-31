@@ -38,12 +38,21 @@ describe("markdown — block structure", () => {
     expect(renderMarkdown("a | b | c")).toBe("<p>a | b | c</p>");
   });
 
-  it("renders a fenced code block and labels its language", () => {
+  it("renders a fenced code block with its language label and copy action", () => {
     const html = renderMarkdown("```python\nprint('hi')\n```");
-    expect(html).toBe(
-      '<div class="md-code"><span class="md-code-lang">python</span>' +
-        '<pre><code class="language-python">print(&#39;hi&#39;)</code></pre></div>',
-    );
+    expect(html).toContain('<div class="md-code" data-lang="python">');
+    expect(html).toContain('<span class="md-code-lang">Python</span>');
+    expect(html).toContain('<button type="button" class="md-copy" data-md-copy aria-label="Copy code">Copy code</button>');
+    expect(html).toContain('<code class="language-python">');
+    // The source is still escaped, token by token.
+    expect(html).toContain("&#39;hi&#39;");
+    expect(html).not.toContain("<script");
+  });
+
+  it("labels an unhighlighted block Code rather than dropping the header (BUG-23)", () => {
+    const html = renderMarkdown("```\nplain\n```");
+    expect(html).toContain('<span class="md-code-lang">Code</span>');
+    expect(html).toContain("data-md-copy");
   });
 
   it("does not apply inline markup inside a code block", () => {

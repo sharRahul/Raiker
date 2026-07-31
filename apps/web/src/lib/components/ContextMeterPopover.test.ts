@@ -77,9 +77,45 @@ describe("ContextMeterPopover", () => {
     render(ContextMeterPopover, {
       usage: usage({ session_cost: null, provider_total_cost: null, price_source: null, price_as_of: null }),
     });
-    expect(screen.getByText(/No price is configured/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Configure/ })).toHaveAttribute("href", "#/models");
+    expect(screen.getByText(/No rate is recorded/)).toBeInTheDocument();
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Configure/ })).toHaveAttribute(
+      "href",
+      "#/models?tab=pricing",
+    );
     expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
+  });
+
+  it("says Unknown before the first turn on a billable, unpriced model (BUG-21)", () => {
+    // The old rule only spoke up after a turn had run, so a fresh conversation
+    // on an unpriced model showed nothing — which reads as "free".
+    render(ContextMeterPopover, {
+      usage: usage({
+        session_turns: 0,
+        session_cost: null,
+        provider_total_cost: null,
+        price_source: null,
+        price_unknown: true,
+      }),
+    });
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Configure/ })).toBeInTheDocument();
+  });
+
+  it("lists each rate component the registry holds, and omits the ones it does not", () => {
+    render(ContextMeterPopover, {
+      usage: usage({
+        price_input_per_mtok: "1.00",
+        price_output_per_mtok: "5.00",
+        price_cache_read_per_mtok: "0.10",
+        price_effective_from: "2026-07-01T00:00:00Z",
+      }),
+    });
+    expect(screen.getByText("Input")).toBeInTheDocument();
+    expect(screen.getByText("Cache read")).toBeInTheDocument();
+    // No cache-write rate was published, so none is shown — never inferred.
+    expect(screen.queryByText("Cache write")).not.toBeInTheDocument();
+    expect(screen.getByText(/effective 2026-07-01/)).toBeInTheDocument();
   });
 
   it("reports an unknown capacity instead of dividing by it", () => {

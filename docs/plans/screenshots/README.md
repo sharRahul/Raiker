@@ -53,3 +53,21 @@ fields and the response-redaction layer never returns a stored value.
 `106-live-chat-model-picker.png` and `107-live-build-model-picker.png` record
 the Playwright visual check for the shared provider-mark model menu, concise
 model labels, and the per-model effort control.
+
+`120`–`127` are the live evidence for FIXED-53 through FIXED-56, captured on
+**2026-07-31** by
+[`apps/web/e2e/chat-build-composer-bugs-live.spec.ts`](../../../apps/web/e2e/chat-build-composer-bugs-live.spec.ts)
+against a real `raiker-web` on `127.0.0.1:8765` — the actual FastAPI runtime
+serving the built SPA, not a route-mocked shell. No model provider was connected,
+so every figure shown is the honest-gap path rather than a live model turn.
+
+| File | Records |
+|---|---|
+| `120-BUG-21-pricing-registry-live.png` | Models → Pricing: exact model ids, source, all four rate components, effective dates, expanded price history, and per-provider sync state |
+| `121-BUG-21-context-price-unknown-live.png` | The context popover on a model with no exact rate — no fabricated `$0.00` |
+| `122-BUG-22-chat-conversation-menu-live.png` | Chat's conversation menu: Export conversation… and Print / Save as PDF |
+| `123-BUG-22-build-conversation-menu-live.png` | The same menu in Build, in the same place |
+| `124-BUG-23-code-block-controls-live.png` | A real stored transcript: language labels, Copy code, and locally-shipped highlighting |
+| `125-BUG-24-parked-turn-live.png` | The Chat surface whose parked-turn continuation is driven by `/api/approvals/resumable` |
+| `126-build-composer-parity-live.png` | Build's composer carrying the same context, conversation, and approval controls as Chat |
+| `127-workbench-composer-parity-live.png` | The Workbench composer stating what it actually offers per work mode |

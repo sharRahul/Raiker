@@ -5,6 +5,7 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import ProviderLogo from "../components/ProviderLogo.svelte";
+  import ModelPricingPanel from "../components/ModelPricingPanel.svelte";
   import { api, ApiError } from "../api";
   import type { ModelProfile, ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
@@ -664,6 +665,9 @@
       <p class="error" role="alert">{selectError}</p>
     {/if}
   {/if}
+
+  <!-- BUG-21 — the price registry, next to the models it prices. -->
+  <ModelPricingPanel />
 
   <section class="card fallback" aria-labelledby="fallback-h">
     <h2 id="fallback-h">Model fallback sequence</h2>

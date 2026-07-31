@@ -165,15 +165,26 @@
     <div class="main-column">
       <form class="composer card" onsubmit={startWork}>
         <label class="composer-label" for="workbench-prompt">What would you like Raiker to do?</label>
-        <p class="composer-help">Describe an outcome, ask a question, or attach a file.</p>
+        <!-- This composer starts work; it does not carry files. Chat's composer
+             owns attachments (the "+" control there), and saying so is better
+             than offering an attach affordance this form does not have. -->
+        <p class="composer-help">Describe an outcome or ask a question. To work with a file, start in Chat and attach it there.</p>
         <div class="mode-tabs" role="tablist" aria-label="Work mode">
           {#each [["chat", "Chat"], ["build", "Build"], ["task", "Create task"], ["schedule", "Schedule"]] as option}
             <button type="button" role="tab" aria-selected={workMode === option[0]} class:active={workMode === option[0]} onclick={() => (workMode = option[0] as typeof workMode)}>{option[1]}</button>
           {/each}
         </div>
-        <textarea id="workbench-prompt" class="textarea prompt" rows="4" bind:value={draft} placeholder="Ask a question, describe an outcome, or add a file…"></textarea>
+        <textarea id="workbench-prompt" class="textarea prompt" rows="4" bind:value={draft} placeholder="Ask a question or describe an outcome…"></textarea>
         <div class="scope">
-          <label><span class="field-label">Start as</span><select class="select" bind:value={continueSession} aria-label="Conversation to continue"><option value="">New conversation</option>{#each named.slice(0, 10) as session (session.session_id)}<option value={session.session_id}>{session.title}</option>{/each}</select></label>
+          <!-- Continuing an existing conversation only means anything for Chat:
+               Build starts its own workspace conversation, and a task runs in a
+               server-owned session. Offering the control in those modes would
+               promise a continuation that silently does not happen. -->
+          {#if workMode === "chat"}
+            <label><span class="field-label">Start as</span><select class="select" bind:value={continueSession} aria-label="Conversation to continue"><option value="">New conversation</option>{#each named.slice(0, 10) as session (session.session_id)}<option value={session.session_id}>{session.title}</option>{/each}</select></label>
+          {:else}
+            <div class="scope-fact"><span class="field-label">Start as</span><p>{workMode === "build" ? "A new build conversation" : workMode === "task" ? "A task run" : "A scheduled run"}</p></div>
+          {/if}
           <div class="scope-fact"><span class="field-label">Project</span><p>{activeProject?.name ?? "No project"}</p></div>
           <div><span class="field-label">Model</span>{#if workMode === "chat"}<ModelPicker {profiles} {selectedProfile} bind:profileId={chatProfile} bind:model={chatModel} />{:else if workMode === "build"}<ModelPicker {profiles} {selectedProfile} bind:profileId={buildProfile} bind:model={buildModel} />{:else if workMode === "task"}<ModelPicker {profiles} {selectedProfile} bind:profileId={taskProfile} bind:model={taskModel} />{:else}<p class="global-model">Global at run time — {selectedProfile?.model ?? "not selected"}</p>{/if}</div>
         </div>

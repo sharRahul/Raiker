@@ -600,9 +600,65 @@ class ContextUsageView:
     session_turns: int = 0
     session_input_tokens: int = 0
     session_output_tokens: int = 0
+    # BUG-21 — the individual rate components behind `session_cost`, read from
+    # the normalised registry. All four are optional and independently sourced:
+    # a provider that publishes no cache rate leaves those None rather than
+    # having one inferred from the input rate.
+    price_input_per_mtok: str | None = None
+    price_output_per_mtok: str | None = None
+    price_cache_write_per_mtok: str | None = None
+    price_cache_read_per_mtok: str | None = None
+    price_effective_from: str | None = None
+    # True when the conversation runs on a billable provider for which no exact
+    # rate exists. The popover states "Unknown" and offers Configure → rather
+    # than showing nothing or implying the turn was free.
+    price_unknown: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class ModelPricingEntryView:
+    """One exact model's pricing row for the Models → Pricing surface (BUG-21)."""
+
+    provider: str
+    model: str
+    profile_id: str | None
+    source: str | None
+    currency: str | None
+    input_per_mtok: str | None
+    output_per_mtok: str | None
+    cache_write_per_mtok: str | None
+    cache_read_per_mtok: str | None
+    effective_from: str | None
+    as_of: str | None
+    recorded_at: str | None
+    recorded_by: str | None
+    reason: str | None
+    has_owner_override: bool
+    history: tuple[dict[str, Any], ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["history"] = [dict(entry) for entry in self.history]
+        return data
+
+
+@dataclass(frozen=True)
+class ModelPricingView:
+    """Everything Models → Pricing has to state, in one governed read."""
+
+    entries: tuple[ModelPricingEntryView, ...]
+    sync: tuple[dict[str, Any], ...]
+    can_override: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "entries": [entry.to_dict() for entry in self.entries],
+            "sync": [dict(state) for state in self.sync],
+            "can_override": self.can_override,
+        }
 
 
 @dataclass(frozen=True)
@@ -1197,6 +1253,78 @@ class DashboardService:
             return None
         turns = tuple(self._turn_view(t) for t in self.store.list_turns(session_id))
         return SessionDetailView(session=self._session_view(row), turns=turns)
+
+    # ── BUG-22: conversation transcript export ───────────────────────────
+
+    def build_session_transcript(
+        self,
+        session_id: str,
+        *,
+        user_id: str | None,
+        principal_id: str | None,
+    ) -> Any | None:
+        """A redacted, scoped transcript ready to render, or None if not visible.
+
+        Visibility is the existing session boundary — this reads through
+        ``get_session``, so an export can never reach a conversation the caller
+        could not already open. Attachment metadata is folded in so the review
+        step can name every file the transcript will list.
+        """
+        from raiker.sessions.transcript import build_transcript
+
+        detail = self.get_session(session_id, user_id=user_id)
+        if detail is None:
+            return None
+        files: list[Any] = []
+        if principal_id:
+            with contextlib.suppress(Exception):
+                from raiker.runtime.attachment_preview import AttachmentPreviewService
+
+                files = list(
+                    AttachmentPreviewService(self.store).list_session_files(
+                        session_id, principal_id
+                    )
+                )
+        return build_transcript(
+            session_id=session_id,
+            title=detail.session.title or "Untitled conversation",
+            created_at=detail.session.created_at,
+            turns=detail.turns,
+            files=files,
+        )
+
+    def record_transcript_export(
+        self,
+        session_id: str,
+        *,
+        acting_principal_id: str,
+        export_format: str,
+        message_count: int,
+        file_count: int,
+        byte_size: int,
+    ) -> None:
+        """Audit that a transcript left the runtime. Metadata only, never text."""
+        from raiker.contracts.models import AgentEvent
+        from raiker.sessions.transcript import REDACTION_POLICY
+
+        with contextlib.suppress(Exception):
+            EventLogWriter(self.store).append(
+                AgentEvent(
+                    event_id=new_id("evt_"),
+                    timestamp=utc_now(),
+                    session_id=session_id,
+                    turn_id=None,
+                    event_type="session_transcript_exported",
+                    actor=acting_principal_id,
+                    payload={
+                        "format": export_format,
+                        "message_count": message_count,
+                        "file_count": file_count,
+                        "byte_size": byte_size,
+                        "redaction_policy": REDACTION_POLICY,
+                    },
+                )
+            )
 
     def search_sessions(self, query: str, user_id: str | None = None) -> list[SessionView]:
         return [self._session_view(row) for row in self.store.search_sessions(query.strip(), user_id)]
@@ -2810,9 +2938,22 @@ class DashboardService:
         return keyed
 
     def _resolve_facts(self, profile: Any, model: str, principal_id: str | None) -> Any:
-        """Merge owner override, cached provider report, and shipped config."""
+        """Merge owner override, cached provider report, and shipped config.
+
+        BUG-21 — the normalised price registry is consulted first, because it is
+        the only source that carries effective dating and the cache-write and
+        cache-read components. Its answer is exact-model-id only, so a model the
+        registry has never seen falls through to the pre-registry resolution
+        below rather than borrowing a sibling's rate.
+        """
+        from raiker.models.price_registry import PriceRegistry
         from raiker.models.pricing import resolve_model_facts
         facts_store = ModelFactsStore(self.store)
+        registered = (
+            PriceRegistry(self.store).resolve(principal_id, profile.provider, model)
+            if principal_id and model
+            else None
+        )
         owner_price = (
             facts_store.owner_price(principal_id, profile.provider, model)
             if principal_id and model else None
@@ -2823,6 +2964,10 @@ class DashboardService:
         )
         raw = getattr(profile, "raw", {}) or {}
         configured_window = raw.get("context_window_tokens")
+        if registered is not None:
+            # A registered rate outranks all three legacy sources: it *is* one
+            # of them, resolved by the same precedence, but dated and complete.
+            owner_price = registered.rates.to_price(registered.source, registered.as_of)
         return resolve_model_facts(
             provider=profile.provider,
             model=model,
@@ -2912,6 +3057,16 @@ class DashboardService:
             provider_total = _priced_total(matching) if matching else None
 
         price = facts.price if facts is not None else None
+        # BUG-21 — a billable conversation with no exact rate says so. Silence
+        # here reads as "free", which is the one thing it certainly is not.
+        price_unknown = bool(billable and price is None)
+        registered = None
+        if profile is not None and model and acting_principal_id:
+            from raiker.models.price_registry import PriceRegistry
+
+            registered = PriceRegistry(self.store).resolve(
+                acting_principal_id, profile.provider, model
+            )
         return ContextUsageView(
             session_id=session_id,
             profile_id=profile.profile_id if profile is not None else None,
@@ -2930,6 +3085,164 @@ class DashboardService:
             session_turns=session_totals.turns,
             session_input_tokens=session_totals.input_tokens,
             session_output_tokens=session_totals.output_tokens,
+            price_input_per_mtok=str(price.input_per_mtok) if price is not None else None,
+            price_output_per_mtok=str(price.output_per_mtok) if price is not None else None,
+            price_cache_write_per_mtok=(
+                str(price.cache_write_per_mtok)
+                if price is not None and price.cache_write_per_mtok is not None
+                else None
+            ),
+            price_cache_read_per_mtok=(
+                str(price.cache_read_per_mtok)
+                if price is not None and price.cache_read_per_mtok is not None
+                else None
+            ),
+            price_effective_from=registered.effective_from if registered is not None else None,
+            price_unknown=price_unknown,
+        )
+
+    # ── BUG-21: the pricing registry surface ─────────────────────────────
+
+    def list_model_pricing(
+        self, acting_principal_id: str | None, *, history_limit: int = 10
+    ) -> ModelPricingView:
+        """Every priced model this owner has, with source, dates, and history.
+
+        The list is the union of what the registry holds and what the shipped
+        profiles document, so a model whose price has never been synchronised
+        still appears — with its documented rate and its ``as_of`` date — rather
+        than being invisible until a network call succeeds.
+        """
+        from raiker.models.price_registry import PriceRegistry
+        from raiker.models.price_sync import PriceSynchroniser
+
+        owner = acting_principal_id or ""
+        registry = PriceRegistry(self.store)
+        synchroniser = PriceSynchroniser(self.store, registry)
+        if not owner:
+            return ModelPricingView(entries=(), sync=(), can_override=False)
+
+        # Seed the reviewed-documentation adapter for anything not yet recorded,
+        # so first open is populated without pretending a provider was called.
+        self._sync_documented_prices(owner, force=False)
+
+        profile_registry = ModelProfileRegistry.load()
+        profile_by_model: dict[tuple[str, str], str] = {}
+        for profile in profile_registry.list_profiles():
+            if bool(profile.raw.get("test_only", False)):
+                continue
+            pricing_block = profile.raw.get("pricing")
+            models = (
+                pricing_block.get("models") if isinstance(pricing_block, dict) else None
+            )
+            if isinstance(models, dict):
+                for model_id in models:
+                    if isinstance(model_id, str):
+                        profile_by_model.setdefault(
+                            (profile.provider, model_id), profile.profile_id
+                        )
+            if isinstance(profile.model, str) and profile.model not in ("", "<model>"):
+                profile_by_model.setdefault(
+                    (profile.provider, profile.model), profile.profile_id
+                )
+
+        entries: list[ModelPricingEntryView] = []
+        for provider, model in registry.models(owner):
+            current = registry.resolve(owner, provider, model)
+            if current is None:
+                continue
+            history = registry.history(owner, provider, model, limit=history_limit)
+            entries.append(
+                ModelPricingEntryView(
+                    provider=provider,
+                    model=model,
+                    profile_id=profile_by_model.get((provider, model)),
+                    source=current.source,
+                    currency=current.rates.currency,
+                    input_per_mtok=str(current.rates.input_per_mtok),
+                    output_per_mtok=str(current.rates.output_per_mtok),
+                    cache_write_per_mtok=(
+                        None
+                        if current.rates.cache_write_per_mtok is None
+                        else str(current.rates.cache_write_per_mtok)
+                    ),
+                    cache_read_per_mtok=(
+                        None
+                        if current.rates.cache_read_per_mtok is None
+                        else str(current.rates.cache_read_per_mtok)
+                    ),
+                    effective_from=current.effective_from,
+                    as_of=current.as_of,
+                    recorded_at=current.recorded_at,
+                    recorded_by=current.recorded_by,
+                    reason=current.reason,
+                    has_owner_override=any(row.source == "owner" for row in history),
+                    history=tuple(row.to_dict() for row in history),
+                )
+            )
+
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        can_override = principal is not None and self.control._is_gate_manager(principal)  # noqa: SLF001
+        return ModelPricingView(
+            entries=tuple(entries),
+            sync=tuple(state.to_dict() for state in synchroniser.states(owner)),
+            can_override=bool(can_override),
+        )
+
+    def _sync_documented_prices(self, owner_principal_id: str, *, force: bool) -> list[Any]:
+        """Run the reviewed-documentation adapter for every shipped profile.
+
+        ``force`` bypasses the 6–24 hour cadence for an explicit refresh. Without
+        it a provider that is not yet due is skipped, which is what keeps opening
+        the Models page from re-recording prices on every visit.
+        """
+        from raiker.models.price_sync import PriceSynchroniser
+
+        synchroniser = PriceSynchroniser(self.store)
+        blocks: dict[str, dict[str, Any]] = {}
+        for profile in ModelProfileRegistry.load().list_profiles():
+            if bool(profile.raw.get("test_only", False)):
+                continue
+            pricing_block = profile.raw.get("pricing")
+            if not isinstance(pricing_block, dict):
+                continue
+            merged = blocks.setdefault(
+                profile.provider,
+                {
+                    "currency": pricing_block.get("currency", "USD"),
+                    "as_of": pricing_block.get("as_of"),
+                    "models": {},
+                },
+            )
+            models = pricing_block.get("models")
+            if isinstance(models, dict):
+                merged["models"].update(models)
+
+        results = []
+        for provider, block in sorted(blocks.items()):
+            if not force and not synchroniser.due(owner_principal_id, provider):
+                continue
+            results.append(
+                synchroniser.sync_from_documentation(owner_principal_id, provider, block)
+            )
+        return results
+
+    def refresh_model_pricing(self, acting_principal_id: str | None) -> ControlResult:
+        """Run the synchronisation now, on explicit demand.
+
+        Only the reviewed adapters run here. A provider catalogue is contacted
+        exclusively by the user-initiated model listing, which feeds the registry
+        on its way past — this route never opens a connection of its own.
+        """
+        if not acting_principal_id:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        results = self._sync_documented_prices(acting_principal_id, force=True)
+        return ControlResult(
+            ok=True,
+            data={
+                "providers": [result.to_dict() for result in results],
+                "changes_written": sum(result.changes_written for result in results),
+            },
         )
 
     def set_model_price(
@@ -2941,15 +3254,27 @@ class DashboardService:
         output_per_mtok: str | None,
         currency: str = "USD",
         acting_principal_id: str | None,
+        cache_write_per_mtok: str | None = None,
+        cache_read_per_mtok: str | None = None,
+        effective_from: str | None = None,
+        reason: str | None = None,
     ) -> ControlResult:
-        """Set or clear one model's owner price override.
+        """Set or clear one model's administrator price override (BUG-21).
 
-        Both rates absent clears the override. A price is owner data, not a
-        capability, so this needs no gate — but it is scoped to the acting
-        principal, so it can never change what another account is charged.
+        Both input and output absent clears the override, returning the model to
+        its provider-published or documented rate. An override is administrator
+        work rather than a personal preference — it changes what every figure in
+        the product claims a turn cost — so it requires the gate-manager role and
+        is recorded in the registry with who set it and why. It is still scoped
+        to the acting principal, so it can never change another account's costs.
         """
         if not acting_principal_id:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if not self.control._is_gate_manager(principal):  # noqa: SLF001
+            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
         if not model or model == "<model>":
             return ControlResult(ok=False, reason_code="model_not_specified")
         registry = ModelProfileRegistry.load()
@@ -2957,17 +3282,39 @@ class DashboardService:
             profile = registry.resolve_profile_id(profile_id)
         except Exception:  # noqa: BLE001 — unknown profile fails closed
             return ControlResult(ok=False, reason_code="unknown_model_profile")
+
+        from raiker.models.price_registry import PriceRates, PriceRegistry, PriceRegistryError
+
+        price_registry = PriceRegistry(self.store)
         facts_store = ModelFactsStore(self.store)
         if input_per_mtok is None and output_per_mtok is None:
             facts_store.clear_owner_price(acting_principal_id, profile.provider, model)
+            price_registry.clear_source(
+                acting_principal_id, profile.provider, model, "owner"
+            )
+            self._record_price_audit(
+                acting_principal_id, profile.provider, model, "cleared", reason
+            )
             return ControlResult(ok=True, data={"model": model, "cleared": True})
+
+        def _rate(value: str | None) -> Decimal | None:
+            if value is None or str(value).strip() == "":
+                return None
+            parsed = Decimal(str(value))
+            if not parsed.is_finite() or parsed < 0:
+                raise ValueError("model_price_invalid")
+            return parsed
+
         try:
-            price_in = Decimal(str(input_per_mtok))
-            price_out = Decimal(str(output_per_mtok))
+            price_in = _rate(input_per_mtok)
+            price_out = _rate(output_per_mtok)
+            cache_write = _rate(cache_write_per_mtok)
+            cache_read = _rate(cache_read_per_mtok)
         except Exception:  # noqa: BLE001 — a malformed price is rejected, not guessed
             return ControlResult(ok=False, reason_code="model_price_invalid")
-        if not (price_in.is_finite() and price_out.is_finite()) or price_in < 0 or price_out < 0:
+        if price_in is None or price_out is None:
             return ControlResult(ok=False, reason_code="model_price_invalid")
+
         facts_store.set_owner_price(
             acting_principal_id,
             profile.provider,
@@ -2976,10 +3323,72 @@ class DashboardService:
             output_per_mtok=price_out,
             currency=currency or "USD",
         )
-        return ControlResult(
-            ok=True, data={"model": model, "input_per_mtok": str(price_in),
-                           "output_per_mtok": str(price_out), "currency": currency or "USD"}
+        try:
+            price_registry.record(
+                acting_principal_id,
+                profile.provider,
+                model,
+                PriceRates(
+                    input_per_mtok=price_in,
+                    output_per_mtok=price_out,
+                    cache_write_per_mtok=cache_write,
+                    cache_read_per_mtok=cache_read,
+                    currency=currency or "USD",
+                ),
+                source="owner",
+                effective_from=effective_from,
+                as_of=effective_from,
+                recorded_by=acting_principal_id,
+                reason=reason or "Administrator price override",
+            )
+        except PriceRegistryError as exc:
+            return ControlResult(ok=False, reason_code=str(exc))
+        self._record_price_audit(
+            acting_principal_id, profile.provider, model, "set", reason
         )
+        return ControlResult(
+            ok=True,
+            data={
+                "model": model,
+                "input_per_mtok": str(price_in),
+                "output_per_mtok": str(price_out),
+                "cache_write_per_mtok": None if cache_write is None else str(cache_write),
+                "cache_read_per_mtok": None if cache_read is None else str(cache_read),
+                "currency": currency or "USD",
+            },
+        )
+
+    def _record_price_audit(
+        self,
+        acting_principal_id: str,
+        provider: str,
+        model: str,
+        action: str,
+        reason: str | None,
+    ) -> None:
+        """Write the override to the governed event log. Never fails the write."""
+        from raiker.contracts.models import AgentEvent
+
+        with contextlib.suppress(Exception):
+            EventLogWriter(self.store).append(
+                AgentEvent(
+                    event_id=new_id("evt_"),
+                    timestamp=utc_now(),
+                    session_id=TERMINAL_MODEL_SESSION_ID,
+                    turn_id=None,
+                    event_type=(
+                        "model_price_override_cleared"
+                        if action == "cleared"
+                        else "model_price_override_recorded"
+                    ),
+                    actor=acting_principal_id,
+                    payload={
+                        "provider": provider,
+                        "model": model,
+                        "reason": redact_secret_like_text(reason or ""),
+                    },
+                )
+            )
 
     async def list_provider_models(
         self, profile_id: str, acting_principal_id: str | None = None
@@ -3043,6 +3452,15 @@ class DashboardService:
         if acting_principal_id:
             with contextlib.suppress(Exception):  # caching never fails a listing
                 ModelFactsStore(self.store).save_provider_facts(
+                    acting_principal_id, profile.provider, list(models)
+                )
+            # BUG-21 — the same listing is the provider's own price feed, so it
+            # also lands in the effective-dated registry. Recording is idempotent:
+            # a catalogue whose rates have not moved writes no history row.
+            with contextlib.suppress(Exception):
+                from raiker.models.price_sync import PriceSynchroniser
+
+                PriceSynchroniser(self.store).sync_from_catalogue(
                     acting_principal_id, profile.provider, list(models)
                 )
         return ProviderModelListView(

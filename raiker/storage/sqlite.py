@@ -127,6 +127,8 @@ from raiker.storage.migrations import (
     MODEL_ADVISOR_SQL,
     MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
     MODEL_FALLBACK_SEQUENCE_SQL,
+    MODEL_PRICE_REGISTRY_MIGRATION_ID,
+    MODEL_PRICE_REGISTRY_SQL,
     MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
     MODEL_SESSION_RESOLVED_MODEL_SQL,
     MODEL_USAGE_LEDGER_MIGRATION_ID,
@@ -727,6 +729,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 TASK_MODEL_CHOICES_MIGRATION_ID, TASK_MODEL_CHOICES_SQL, connection
+            )
+            self._apply_migration(
+                MODEL_PRICE_REGISTRY_MIGRATION_ID, MODEL_PRICE_REGISTRY_SQL, connection
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -2920,6 +2925,35 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             row = connection.execute(query, params).fetchone()
         return dict(row) if row is not None else None
+
+    def list_resumable_suspended_turns(
+        self, principal_id: str, session_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Parked turns whose approval has been resolved and which may resume (BUG-24).
+
+        A turn qualifies only when it is still ``suspended`` *and* carries an
+        ``outcome_json`` — that outcome is written when the approval is resolved,
+        so its presence is exactly the "this approval has been decided" signal a
+        Chat tab in another window needs. A turn already claimed by a resuming
+        client has moved to ``resuming`` and is not listed, so two tabs polling
+        together cannot both start the same continuation.
+
+        Owner-scoped by principal: this can never reveal another account's turn.
+        No conversation state is returned — ids and metadata only.
+        """
+        query = (
+            "SELECT approval_id, session_id, turn_id, tool_name, outcome_json, created_at "
+            "FROM suspended_turns WHERE principal_id = ? AND status = 'suspended' "
+            "AND outcome_json IS NOT NULL"
+        )
+        params: tuple[Any, ...] = (principal_id,)
+        if session_id is not None:
+            query += " AND session_id = ?"
+            params = (principal_id, session_id)
+        query += " ORDER BY created_at ASC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
 
     def record_suspended_turn_outcome(self, approval_id: str, outcome_json: str) -> bool:
         """Attach the resolution outcome the model will see as its tool result.

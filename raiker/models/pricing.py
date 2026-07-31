@@ -50,27 +50,49 @@ def _positive_int(value: Any) -> int | None:
 
 @dataclass(frozen=True)
 class ModelPrice:
-    """A resolved price for one model, with the source that supplied it."""
+    """A resolved price for one model, with the source that supplied it.
+
+    Cache-write and cache-read are separate optional components (BUG-21).
+    Providers bill them independently of the normal input rate — Anthropic
+    writes cache above the input rate and reads it far below — so they are held
+    as their own numbers and stay ``None`` when nobody published them. They are
+    never derived from the input rate: an inferred cache rate would be
+    indistinguishable in the UI from one a provider actually stated.
+    """
 
     input_per_mtok: Decimal
     output_per_mtok: Decimal
     currency: str
     source: FactSource
     as_of: str | None = None
+    cache_write_per_mtok: Decimal | None = None
+    cache_read_per_mtok: Decimal | None = None
 
-    def cost(self, *, input_tokens: int, output_tokens: int) -> Decimal:
-        """Cost for one turn's counts. Cache reads are billed as input here.
+    def cost(
+        self,
+        *,
+        input_tokens: int,
+        output_tokens: int,
+        cache_write_tokens: int = 0,
+        cache_read_tokens: int = 0,
+    ) -> Decimal:
+        """Cost for one turn's counts.
 
-        Providers discount cached input (Anthropic reads at a fraction of the
-        normal rate), so this is an upper bound when caching is active. It is
-        deliberately an over-estimate rather than an under-estimate: a bill
-        should never be a surprise in the expensive direction.
+        Cache counts are billed at their own rate when one is known. When they
+        are not, they fall back to the plain input rate — which over-states a
+        cache read rather than under-stating it, because a bill should never be
+        a surprise in the expensive direction.
         """
         billable_in = Decimal(max(0, input_tokens))
         billable_out = Decimal(max(0, output_tokens))
-        return (
-            billable_in * self.input_per_mtok + billable_out * self.output_per_mtok
-        ) / TOKENS_PER_PRICE_UNIT
+        total = billable_in * self.input_per_mtok + billable_out * self.output_per_mtok
+        for tokens, rate in (
+            (cache_write_tokens, self.cache_write_per_mtok),
+            (cache_read_tokens, self.cache_read_per_mtok),
+        ):
+            counted = Decimal(max(0, tokens))
+            total += counted * (self.input_per_mtok if rate is None else rate)
+        return total / TOKENS_PER_PRICE_UNIT
 
 
 @dataclass(frozen=True)

@@ -166,12 +166,31 @@ class SetModelSelectionRequest(BaseModel):
     model: str | None = None
 
 
-class ModelPriceRequest(BaseModel):
-    """An owner's price override for one model, quoted per million tokens.
+class ExportSessionRequest(BaseModel):
+    """Which rendering of a conversation transcript to produce (BUG-22).
 
-    Both rates null clears the override and returns the model to the
-    provider-published or shipped list price. Rates are strings so a decimal
+    The format is the whole request: scope comes from the authenticated session
+    and the session id in the path, never from the body, so an export cannot be
+    widened by what a caller asks for.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    format: str = "html"
+
+
+class ModelPriceRequest(BaseModel):
+    """An administrator's price override for one model, per million tokens.
+
+    Both input and output null clears the override and returns the model to the
+    provider-published or documented list price. Rates are strings so a decimal
     price survives the round trip without binary float drift.
+
+    Cache-write and cache-read are separate optional components (BUG-21): a
+    provider bills them independently of input, and an omitted one stays unset
+    rather than being inferred. ``effective_from`` dates the row so a correction
+    can be recorded as of when it actually applied, and ``reason`` is kept with
+    the row so an override is never anonymous.
     """
 
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
@@ -179,7 +198,11 @@ class ModelPriceRequest(BaseModel):
     model: str
     input_per_mtok: str | None = None
     output_per_mtok: str | None = None
+    cache_write_per_mtok: str | None = None
+    cache_read_per_mtok: str | None = None
     currency: str | None = None
+    effective_from: str | None = None
+    reason: str | None = None
 
 
 class ModelConnectionRequest(BaseModel):

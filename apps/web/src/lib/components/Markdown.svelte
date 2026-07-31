@@ -7,12 +7,60 @@
   // source. See the module header in ../markdown.ts for the full argument.
   let { text, muted = false }: { text: string; muted?: boolean } = $props();
   const html = $derived(renderMarkdown(text));
+
+  // BUG-23 — the copy action for rendered code blocks.
+  //
+  // `{@html}` output is inert markup, so the button the renderer emits has no
+  // handler of its own. One delegated listener on the wrapper supplies it,
+  // which keeps the renderer free of anything executable and means a block that
+  // arrives mid-stream is operable the moment it renders.
+  //
+  // What is copied is the *code*, not the rendered spans: `textContent` on the
+  // `<code>` element yields exactly the source the model wrote, highlighting
+  // and all removed.
+  let announcement = $state("");
+  let announcementTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function announce(message: string) {
+    announcement = message;
+    clearTimeout(announcementTimer);
+    // Cleared so a second copy of the same block re-announces rather than
+    // leaving a stale "Copied" that no longer refers to anything.
+    announcementTimer = setTimeout(() => (announcement = ""), 4000);
+  }
+
+  async function onWrapperClick(event: MouseEvent) {
+    const target = event.target as HTMLElement | null;
+    const button = target?.closest?.("[data-md-copy]") as HTMLElement | null;
+    if (button === null || button === undefined) return;
+    const block = button.closest(".md-code")?.querySelector("code");
+    const code = block?.textContent ?? "";
+    try {
+      await navigator.clipboard.writeText(code);
+      button.textContent = "Copied";
+      announce("Code copied to the clipboard.");
+      setTimeout(() => {
+        if (button.isConnected) button.textContent = "Copy code";
+      }, 2000);
+    } catch {
+      // A denied clipboard permission or an insecure origin. Say so — a copy
+      // button that silently does nothing is worse than no copy button.
+      button.textContent = "Copy failed";
+      announce("Could not copy — your browser blocked clipboard access.");
+      setTimeout(() => {
+        if (button.isConnected) button.textContent = "Copy code";
+      }, 2500);
+    }
+  }
 </script>
 
-<div class="markdown" class:muted>
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<div class="markdown" class:muted onclick={onWrapperClick}>
   <!-- eslint-disable-next-line svelte/no-at-html-tags -->
   {@html html}
 </div>
+<span class="sr-only" role="status" aria-live="polite">{announcement}</span>
 
 <style>
   .markdown {
@@ -106,16 +154,68 @@
     background: var(--bg);
     overflow: hidden;
   }
-  .markdown :global(.md-code-lang) {
-    display: block;
-    padding: 0.25rem 0.6rem;
+  /* BUG-23 — the block header: what language this is, and how to take it. */
+  .markdown :global(.md-code-head) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.2rem 0.35rem 0.2rem 0.6rem;
     border-bottom: 1px solid var(--border);
     background: var(--neutral-soft);
+  }
+  .markdown :global(.md-code-lang) {
     color: var(--text-3);
     font-family: var(--font-mono);
     font-size: 0.7rem;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+  }
+  .markdown :global(.md-copy) {
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--text-3);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15rem 0.45rem;
+  }
+  .markdown :global(.md-copy:hover) {
+    border-color: var(--border-strong);
+    color: var(--text-1);
+  }
+  /* Always focusable and always visible on focus: the action must be reachable
+     by keyboard, not only by a mouse that happens to be over the block. */
+  .markdown :global(.md-copy:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+    color: var(--text-1);
+  }
+
+  /* Token colours. Both themes are served by the same variables the rest of
+     the product uses, so highlighting follows a theme switch rather than
+     pinning one palette. Under forced colours the spans drop back to system
+     text — a high-contrast reader gets contrast, not our accent ramp. */
+  .markdown :global(.tok-comment) { color: var(--text-3); font-style: italic; }
+  .markdown :global(.tok-string) { color: var(--ok); }
+  .markdown :global(.tok-keyword) { color: var(--accent); font-weight: 650; }
+  .markdown :global(.tok-number) { color: var(--warn); }
+  .markdown :global(.tok-type) { color: var(--text-1); font-weight: 600; }
+  .markdown :global(.tok-punct) { color: var(--text-2); }
+  @media (forced-colors: active) {
+    .markdown :global(.tok-comment),
+    .markdown :global(.tok-string),
+    .markdown :global(.tok-keyword),
+    .markdown :global(.tok-number),
+    .markdown :global(.tok-type),
+    .markdown :global(.tok-punct) {
+      color: CanvasText;
+      font-weight: inherit;
+      font-style: normal;
+    }
+    .markdown :global(.md-copy) { border-color: ButtonBorder; color: ButtonText; }
   }
   .markdown :global(pre) {
     margin: 0;

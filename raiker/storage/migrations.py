@@ -2056,3 +2056,57 @@ TASK_MODEL_CHOICES_SQL = """
 ALTER TABLE tasks ADD COLUMN model_profile TEXT;
 ALTER TABLE tasks ADD COLUMN model TEXT;
 """
+
+
+# BUG-21 — the historical price registry.
+#
+# Prices are facts with a date, not a current value: a bill produced last month
+# must stay reproducible after a provider changes its rates. Rows are therefore
+# append-only and effective-dated, one per (owner, provider, exact model id,
+# source, effective_from). Nothing is ever overwritten, so `history` is the
+# table itself rather than a derived audit log.
+#
+# `content_hash` is what keeps a 6-hourly sync from writing an identical row
+# every cycle: a refresh that observes unchanged rates only moves the sync
+# state's timestamps, never the registry.
+#
+# Cache-write and cache-read rates are stored independently of the input rate
+# because providers charge them independently — Anthropic writes cache at 1.25x
+# input and reads it at 0.1x — and a registry that folds them into "input"
+# cannot answer what a cached turn actually cost.
+MODEL_PRICE_REGISTRY_MIGRATION_ID = "RAIKER-1032-model-price-registry"
+MODEL_PRICE_REGISTRY_SQL = """
+CREATE TABLE IF NOT EXISTS model_price_registry (
+  owner_principal_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  source TEXT NOT NULL,
+  effective_from TEXT NOT NULL,
+  input_per_mtok TEXT NOT NULL,
+  output_per_mtok TEXT NOT NULL,
+  cache_write_per_mtok TEXT,
+  cache_read_per_mtok TEXT,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  as_of TEXT,
+  content_hash TEXT NOT NULL,
+  recorded_at TEXT NOT NULL,
+  recorded_by TEXT,
+  reason TEXT,
+  PRIMARY KEY (owner_principal_id, provider, model, source, effective_from)
+);
+CREATE INDEX IF NOT EXISTS idx_model_price_registry_owner
+  ON model_price_registry(owner_principal_id, provider, model, effective_from DESC);
+
+CREATE TABLE IF NOT EXISTS model_price_sync_state (
+  owner_principal_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  interval_hours INTEGER NOT NULL,
+  last_attempt_at TEXT,
+  last_success_at TEXT,
+  next_refresh_at TEXT,
+  last_error TEXT,
+  last_good_payload TEXT,
+  models_recorded INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (owner_principal_id, provider)
+);
+"""

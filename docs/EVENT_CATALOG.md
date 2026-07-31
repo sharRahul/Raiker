@@ -13,6 +13,10 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 | `turn_suspended_for_approval` | A turn parked its working state against an approval so resolving it resumes the same turn (approval id, tool name, and counts only — the parked conversation stays in the encrypted store) |
 | `turn_suspension_failed` | The working state could not be parked, so the turn is not resumable; the approval itself is unaffected |
 | `turn_resumed_after_approval` | A parked turn picked up again with the resolved tool result appended (approval id and counts only) |
+| `session_transcript_exported` | A conversation transcript was rendered to a file the owner keeps (format, message and file counts, byte size, and the redaction policy applied — never the transcript text) |
+| `model_price_override_recorded` | An administrator set a model's price, with the exact provider and model id and their stated reason. The rate itself lives in the effective-dated price registry |
+| `model_price_override_cleared` | An administrator withdrew a price override, returning the model to its published or documented rate |
+| `model_price_synchronised` | A provider's prices were refreshed into the registry (provider and counts only) |
 | `tool_started` | A governed executor started work |
 | `tool_completed` | A governed executor completed work |
 | `tool_failed` | A governed executor failed safely |

@@ -5,6 +5,7 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, auth, getToken, setToken, ApiError } from "../api";
+  import { publishApprovalResolved } from "../approvalResume";
   import type { ApprovalDetailView, ApprovalView } from "../apiTypes";
   import { approvalBadge } from "../statusMaps";
   import { capabilityLabel } from "../capabilityModel";
@@ -100,6 +101,16 @@
         result.resume?.resumable && result.resume.session_id
           ? { approval_id: result.approval_id, session_id: result.resume.session_id }
           : null;
+      // BUG-24 — the inbox is where most decisions are actually made, so this is
+      // the broadcast that matters most: a Chat or Build tab showing the turn
+      // this approval parked picks it up immediately, without a reload. A hint
+      // only — the receiving tab re-checks with the server before continuing.
+      publishApprovalResolved({
+        approvalId: result.approval_id,
+        sessionId: result.resume?.session_id ?? selected.approval.session_id ?? null,
+        turnId: result.resume?.turn_id ?? null,
+        approved: approve,
+      });
       selected = null;
       await load();
     } catch (e) {

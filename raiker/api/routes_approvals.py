@@ -93,6 +93,56 @@ async def list_approvals(
     )
 
 
+@router.get("/api/approvals/resumable")
+async def list_resumable_turns(
+    request: Request,
+    session_id: str | None = None,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Parked turns this account may continue right now (BUG-24).
+
+    A Chat tab that did not resolve the approval itself has no way to learn that
+    another tab did. This is that signal, made authoritative rather than
+    inferred: the server already knows which suspended turns have a recorded
+    outcome and have not yet been claimed, so a client asks rather than guesses.
+
+    The read is authenticated and principal-scoped, returns ids only, and is
+    idempotent — polling it changes nothing. Exactly-once resumption is still
+    enforced where it always was, by ``claim_suspended_turn``: a turn listed to
+    two tabs can only ever be claimed by one of them.
+    """
+    session, _principal = _auth_data
+    rows = SQLiteStore(_ws(request)).list_resumable_suspended_turns(
+        session.principal_id, session_id
+    )
+    return {
+        "session_id": session_id,
+        "turns": [
+            {
+                "approval_id": str(row["approval_id"]),
+                "session_id": str(row["session_id"]),
+                "turn_id": str(row["turn_id"]),
+                "tool_name": str(row.get("tool_name") or ""),
+                # The decision itself, so the tab can say "Approved — continuing…"
+                # or "Rejected" before the stream produces its first token.
+                "outcome_status": _outcome_status(row.get("outcome_json")),
+                "created_at": str(row.get("created_at") or ""),
+            }
+            for row in rows
+        ],
+    }
+
+
+def _outcome_status(outcome_json: Any) -> str:
+    """The model-visible status of a resolution, or "unknown" if unreadable."""
+    try:
+        parsed = json.loads(str(outcome_json))
+    except (TypeError, ValueError):
+        return "unknown"
+    status_value = parsed.get("status") if isinstance(parsed, dict) else None
+    return str(status_value) if isinstance(status_value, str) else "unknown"
+
+
 @router.get("/api/approvals/{approval_id}")
 async def get_approval(
     approval_id: str,

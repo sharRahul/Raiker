@@ -74,10 +74,12 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-50 | High | Local models / context capacity | Fixed (runtime capacity discovery) |
 | FIXED-51 | High | Knowledge Map / force simulation | Fixed (found during live Playwright verification) |
 | FIXED-52 | Medium | Knowledge Map / theme integration | Fixed (found during visual review) |
-| BUG-21 | Medium | Models / pricing | Open |
-| BUG-22 | Medium | Chat / export | Open |
-| BUG-23 | Low | Chat / code ergonomics | Open |
-| BUG-24 | High | Approvals / cross-tab continuation | Open |
+| FIXED-53 | Medium | Models / pricing | Fixed (was BUG-21) |
+| FIXED-54 | Medium | Chat / Build export | Fixed (was BUG-22) |
+| FIXED-55 | Low | Chat / Build code ergonomics | Fixed (was BUG-23) |
+| FIXED-56 | High | Approvals / cross-tab continuation | Fixed (was BUG-24) |
+| FIXED-57 | Low | Models / shipped configuration | Fixed (found while fixing BUG-21) |
+| FIXED-58 | Low | Web test runtime | Fixed (found while verifying BUG-21) |
 | BUG-25 | High | Tasks / approval continuation | Open |
 | BUG-26 | Low | File inspector / images | Open |
 | BUG-27 | Medium | Memory / provenance | Open |
@@ -87,6 +89,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-31 | High | Build / remote execution containment | Open |
 | BUG-32 | Medium | Terminal / approval execution | Open |
 | BUG-33 | Medium | Local models / capacity administration | Open |
+| BUG-34 | Medium | Chat / restored approval state | Open |
+| BUG-35 | Low | Build / composer attachments | Open |
+| BUG-36 | Low | Models / shipped price review cadence | Open |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -1754,80 +1759,212 @@ Live browser evidence is recorded in
 
 ---
 
-## BUG-21 — Provider pricing is not synchronised into a historical registry
+## FIXED-53 — Provider pricing is synchronised into a historical registry
 
-**Status: open; audited from FIXED-03.**
+**Status: fixed in this change (was BUG-21).**
 
-**Observed.** Shipped prices require manual verification, provider catalogue
-facts refresh only during an interactive listing, owner price overrides have no
-Settings UI, price history is overwritten rather than retained as reproducible
-evidence, and cache-hit/cache-write pricing is not represented independently.
+**Root cause.** A price was stored as a *current value*: whatever the shipped
+profile said, or whatever the last catalogue listing cached, overwritten in
+place. That cannot answer the only question a bill ever raises — what a model's
+rate was on the day a turn ran — and it cannot show an owner why a number
+changed. Cache-write and cache-read were folded into the input rate, which
+over-states a cached turn by roughly ten times, and an owner override had no
+interface, no attribution, and no reason.
 
-**Required fix.** Add a validated 6–24 hour synchronisation job for providers
-that expose pricing, retain the last known good response, map exact provider
-model IDs without sibling substitution, store effective-dated input/output/
-cache-write/cache-hit rates, retain price history, and audit administrator
-overrides. Public documentation feeds need an explicit reviewed adapter rather
-than live scraping from a popover.
+**Fix applied.** A normalised, effective-dated registry
+(`raiker/models/price_registry.py`, table `model_price_registry`) holds one
+append-only row per owner, provider, **exact** model id, source, and
+effective-from date. `content_hash` covers every rate component, so a refresh
+that observes unchanged rates writes nothing — history records changes, not
+polls. Input, output, cache-write, and cache-read are four independent columns;
+a component nobody published stays `None` rather than being inferred from
+another. A sibling model never inherits a rate.
 
-**UI when closed.** Models → Pricing shows source, exact model ID, last refresh,
-next refresh, stale/error state, rate components, price history, and an
-administrator-only override workflow. The context popover reads the normalised
-registry and shows **Unknown** with **Configure →** when no exact rate exists.
+A bounded synchronisation job (`raiker/models/price_sync.py`, table
+`model_price_sync_state`) refreshes no more often than every 6 hours and no
+less often than every 24, clamping any out-of-range cadence rather than
+refusing it. A failed refresh moves only the attempt clock: the last known good
+response, its success timestamp, and the rate itself are all retained, and the
+provider is marked stale with its reason. Two feeds exist and no others — a
+provider's own catalogue (the same user-initiated listing the Models page
+already triggers) and a reviewed documentation adapter that reads the `pricing`
+block a human committed to `model-profiles.json`. Nothing is scraped at render
+time.
+
+An override is administrator work: it requires the runtime gate-manager role,
+carries a mandatory reason, records `recorded_by` in the registry, and writes
+`model_price_override_recorded` / `model_price_override_cleared` to the governed
+event log. Clearing it returns the model to its published or documented rate
+with that history intact.
+
+**UI.** Models → **Pricing** states, per exact model id: the source
+(administrator override / published by the provider / reviewed documentation),
+each of the four rate components, the effective date, and the full price
+history. Each provider shows its last refresh, next due time, cadence, and a
+**Current**/**Stale** badge, with the failure reason and an explicit note that
+the previous rates remain in effect. The override form is offered only to a
+gate-manager; everyone else sees the registry read-only.
+
+The context popover in both Chat and Build reads the registry, lists the rate
+components it actually has, and shows **Unknown** with **Configure →** whenever
+a billable model has no exact rate — including before the first turn, where the
+previous rule stayed silent and therefore read as "free".
+
+Live browser evidence:
+[`screenshots/working/120-BUG-21-pricing-registry-live.png`](screenshots/working/120-BUG-21-pricing-registry-live.png)
+and [`screenshots/working/121-BUG-21-context-price-unknown-live.png`](screenshots/working/121-BUG-21-context-price-unknown-live.png).
 
 ---
 
-## BUG-22 — Chat has no first-class transcript export or print workflow
+## FIXED-54 — Chat and Build export a transcript, and print as a document
 
-**Status: open; audited from FIXED-06, FIXED-12, and FIXED-45.**
+**Status: fixed in this change (was BUG-22).**
 
-**Observed.** Rendered transcript HTML exists, but Chat still has no download,
-browser print/Save as PDF, or clearly scoped export action.
+**Root cause.** Rendered transcript HTML existed, but nothing turned a
+conversation into a file the owner keeps. Printing produced a photograph of the
+application chrome rather than a document.
 
-**Required fix.** Produce an account/session-authorised export with a declared
-format, redaction policy, attachment treatment, timestamps, and audit record.
+**Fix applied.** `raiker/sessions/transcript.py` builds a redacted, scoped
+transcript and renders it three ways. Scope is the session and only the session:
+the build reads through the existing `get_session` visibility boundary, so an
+export can never reach a conversation the caller could not already open. Message
+text passes through the same secret-shaped-value redactor the API responses use
+*before* any rendering, so a key pasted into a chat cannot leave inside an
+export. Attached files are listed by name, media type, and size; their bytes are
+never embedded.
 
-**UI when closed.** The conversation menu contains **Export conversation** with
-HTML/Markdown/PDF choices, a review of included messages and files, progress,
-success/download state, and field-level errors. Browser print uses a dedicated
-print layout rather than the application chrome.
+HTML is one self-contained page — inline styles, no script, no remote asset, so
+it renders offline and cannot call out. PDF is written by a small dependency-free
+generator using the base-14 fonts every reader ships, so producing one opens no
+process, loads no font file, and reaches no network. Markdown is plain text.
+`POST /api/sessions/{id}/export` is exempted from the JSON redaction middleware
+for the same reason the project export is — the payload is a document, not JSON —
+and every successful export writes `session_transcript_exported` to the event
+log carrying counts and the policy, never the transcript.
+
+**UI.** The conversation menu in **both Chat and Build** contains **Export
+conversation…**, which opens a dialog that reviews what will be included — the
+message count, the exact files, and the redaction policy in words — before a
+format is chosen. Progress, success with the download name, and field-level
+errors are all reported. **Print / Save as PDF** uses a dedicated print
+stylesheet on both surfaces: sidebar, topbar, composer, rails, and the code
+blocks' copy buttons are dropped, turns never split across a page, and the page
+margins are set for paper.
+
+Live browser evidence:
+[`screenshots/working/122-BUG-22-chat-conversation-menu-live.png`](screenshots/working/122-BUG-22-chat-conversation-menu-live.png)
+and [`screenshots/working/123-BUG-22-build-conversation-menu-live.png`](screenshots/working/123-BUG-22-build-conversation-menu-live.png).
 
 ---
 
-## BUG-23 — Rendered code blocks lack daily-use interaction controls
+## FIXED-55 — Rendered code blocks carry daily-use interaction controls
 
-**Status: open; audited from FIXED-06.**
+**Status: fixed in this change (was BUG-23).**
 
-**Observed.** Safe fenced code renders, but there is no syntax highlighting,
-copy button, or language label; user-authored Markdown remains literal.
+**Root cause.** Safe fenced code rendered, but with no syntax highlighting, no
+copy action, and only a raw language token as a label.
 
-**Required fix.** Add a locally shipped, allowlisted grammar path and reliable
-copy behavior without remote assets or weakening sanitisation. Decide and
-document whether user bubbles deliberately remain literal.
+**Fix applied.** `apps/web/src/lib/highlight.ts` is a locally-shipped,
+allowlisted grammar scanner — no CDN grammar, no lazy-loaded language pack, no
+`eval`. It preserves `markdown.ts`'s structural security argument rather than
+adding a filter: the scanner produces `(kind, start, end)` spans over raw source
+and never builds HTML, every token's text is escaped at emit time, and the only
+tag emitted is `<span>` with a `class` from a fixed six-value allowlist. A fence
+tagged with a language outside the allowlist renders as plain escaped text with
+its label intact — mis-highlighting reads as a lie about what the code is; plain
+text does not.
 
-**UI when closed.** Every assistant code block has a language label and
-keyboard-accessible **Copy code** action with copied/error announcements;
-highlighting respects both themes and high-contrast mode. User-message behavior
-is explained in product help rather than left ambiguous.
+The renderer emits a header carrying the language's conventional name and a
+`<button data-md-copy>`. The button has no handler of its own; `Markdown.svelte`
+delegates one click listener on the wrapper, so the `{@html}` output stays
+inert and a block that arrives mid-stream is operable the moment it renders.
+What is copied is `textContent` of the `<code>` element — the source the model
+wrote, with highlighting removed.
+
+**UI.** Every code block in both Chat and Build shows its language and a
+keyboard-focusable **Copy code** action that announces *Code copied to the
+clipboard* or *Could not copy — your browser blocked clipboard access* through
+an `aria-live` region and on the button itself. Token colours come from the
+shared design tokens, so highlighting follows a theme switch, and
+`forced-colors: active` drops back to system text for high-contrast readers.
+
+**User-message behaviour, decided and documented.** A user bubble deliberately
+renders literally: what the owner typed is shown exactly as typed, because a
+prompt is an instruction whose exact characters matter, and silently
+re-formatting it would misrepresent what was sent. Only assistant output is
+rendered as Markdown. This is stated in
+[the composer guide](../guide/README.md) rather than left ambiguous.
+
+Live browser evidence:
+[`screenshots/working/124-BUG-23-code-block-controls-live.png`](screenshots/working/124-BUG-23-code-block-controls-live.png).
 
 ---
 
-## BUG-24 — Approval resolution in another tab does not continue Chat
+## FIXED-56 — Approval resolution in another tab continues Chat
 
-**Status: open; audited from FIXED-09.**
+**Status: fixed in this change (was BUG-24).**
 
-**Observed.** Build can stream a parked continuation and Approvals can offer a
-manual continuation, but a Chat tab does not observe a resolution completed in
-another tab.
+**Root cause.** Build could stream a parked continuation and Approvals could
+offer a manual one, but only the surface that *recorded* the decision knew it
+had been made. A Chat tab sat on **Waiting for approval** indefinitely, and the
+owner's only recovery was to re-prompt — which discards the model's working
+state and pays for the whole context again.
 
-**Required fix.** Publish an authenticated, idempotent resolution event keyed
-to the parked turn and resume it exactly once, preserving the original session,
-tool-call boundary, and cancellation controls.
+**Fix applied.** Two independent signals, because a stuck conversation is the
+worst outcome. `BroadcastChannel("raiker:approvals")` delivers a resolution to
+every other tab of the same origin instantly; it carries ids only and is treated
+as a *hint*, never as authority. The authority is
+`GET /api/approvals/resumable`, an authenticated, principal-scoped, idempotent
+read backed by `list_resumable_suspended_turns`, which lists a parked turn
+exactly while it is resolved-but-unclaimed and returns ids and the decision —
+never conversation state. Polling covers what a broadcast cannot reach: a
+decision made in another browser, on a phone, or by the CLI.
 
-**UI when closed.** The parked Chat turn changes from **Waiting for approval**
-to **Approved — continuing…** without reload, streams the resumed work in the
-same transcript, and offers a recoverable **Continue now** action if the live
-event channel is unavailable.
+Exactly-once resumption is not enforced in the browser. The client guards
+against obvious double-starts, but the real guarantee is the pre-existing atomic
+`claim_suspended_turn` (suspended → resuming): two tabs that both react will both
+call resume and exactly one gets the stream. The loser receives
+`suspended_turn_already_resumed`, which is a **success** from the owner's point
+of view and is reported as *Continued in another tab*, not as an error.
+
+**UI.** The parked turn in **both Chat and Build** moves from **Waiting for
+approval** to **Approved — continuing…** (or *Rejected — telling Raiker…*)
+without a reload, and the resumed work streams into the same transcript row — the
+original session, tool-call boundary, and cancellation controls are all preserved
+because the server replays the same suspended state. When the live channel
+cannot be reached, the card says so and offers a recoverable **Continue now**.
+
+Live browser evidence:
+[`screenshots/working/125-BUG-24-parked-turn-live.png`](screenshots/working/125-BUG-24-parked-turn-live.png).
+
+---
+
+## FIXED-57 — The shipped model profile existed as two divergent copies
+
+**Status: fixed in this change; found while fixing BUG-21.**
+
+**Observed.** Adding cache rates to `raiker/config/model-profiles.json` changed
+nothing at runtime. `_read_config_text` prefers a workspace-relative
+`config/model-profiles.json` and only falls back to the packaged resource, so the
+repository-root copy silently won and the edit was invisible.
+
+**Fix applied.** The two files are now identical, and the discrepancy is
+recorded here so the next editor knows both must move together. The underlying
+absence of a check that keeps them in step is tracked as **BUG-36**.
+
+---
+
+## FIXED-58 — Playwright could not launch the pre-installed browser
+
+**Status: fixed in this change; found while verifying BUG-21.**
+
+**Observed.** On a machine whose Chromium build number does not match the one
+the pinned `@playwright/test` would download, every live spec failed with
+*Executable doesn't exist* before reaching an assertion.
+
+**Fix applied.** `apps/web/playwright.config.ts` honours an optional
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE` environment variable. Unset — the normal case,
+including CI — Playwright resolves its own managed browser exactly as before.
 
 ---
 
@@ -2039,6 +2176,79 @@ last checked, freshness, and refresh errors. Administrators can select
 review the exact provider/model/endpoint scope, save or clear it, and inspect
 change history. Chat and Build visibly distinguish **reported by runtime**,
 **configured in Raiker**, **stale last-known value**, and **unavailable**.
+
+---
+
+## BUG-34 — A reloaded Chat loses the approval a turn is parked on
+
+**Status: open; found while implementing FIXED-56.**
+
+**Observed.** A restored transcript carries only what is persisted — prompt
+text, the agent's response message, and the turn status. `restoredTurn` in
+`apps/web/src/lib/views/ChatView.svelte` therefore sets `approval: null`, so a
+conversation reopened after a reload shows no **Waiting for approval** card for a
+turn that is genuinely still parked. Cross-tab continuation (FIXED-56) then has
+nothing to attach to in that tab: the watcher only polls while this surface
+believes it has a parked turn, so a reloaded Chat cannot continue a turn it can
+no longer see is waiting.
+
+**Required fix.** Persist and restore the approval a turn is parked on, keyed to
+the turn, and rehydrate it alongside the transcript so a reopened conversation
+presents the same parked state a live one does. The read must stay
+principal-scoped and metadata-only, exactly like `/api/approvals/resumable`.
+
+**UI when closed.** Reopening a conversation whose turn is parked shows the same
+**Waiting for approval** card, with the same **Review approval** and recoverable
+**Continue now** actions, and continues automatically once a decision is
+recorded anywhere — with no difference in behaviour between a live tab and a
+reloaded one.
+
+---
+
+## BUG-35 — The Build composer cannot carry a file
+
+**Status: open; found while reviewing composer parity for FIXED-53 to FIXED-56.**
+
+**Observed.** Chat's composer attaches workspace paths, images, and documents
+through the governed attachment store. Build's composer attaches only the
+selected repository's local subpath, automatically. An owner working in Build who
+wants to hand Raiker a design document, a failing log, or a screenshot has to
+start the work in Chat instead, and the two conversation surfaces are otherwise
+deliberately identical.
+
+**Required fix.** Give Build the same attachment control Chat has, over the same
+governed store and the same fail-closed server-side validation, without
+duplicating the composer — the attachment logic is the same code in both places
+or it will drift.
+
+**UI when closed.** Build's composer offers the same **+** control, the same
+chips with the same inspector behaviour, and the same limits and error copy as
+Chat's, so what an owner learns on one surface is true on the other.
+
+---
+
+## BUG-36 — Nothing keeps the two shipped model-profile copies in step
+
+**Status: open; found while fixing BUG-21 (see FIXED-57).**
+
+**Observed.** `config/model-profiles.json` and `raiker/config/model-profiles.json`
+are separate files with the same content. `_read_config_text` prefers the
+workspace-relative path and falls back to the packaged resource, so the
+repository-root copy silently wins. An edit applied to only one of them appears
+to do nothing, with no error and no warning — which is exactly how a price
+correction could be believed applied while the runtime still charges the old
+rate.
+
+**Required fix.** Make one copy authoritative, or add a check that fails the
+build when the two diverge. Whichever is chosen, a shipped rate must not be able
+to differ from the rate the runtime reads. The same review discipline needs to
+extend to the rates themselves: shipped list prices carry an `as_of` date and
+now feed a registry that dates them, but nothing yet prompts a human to
+re-verify them on a cadence.
+
+**UI when closed.** Models → Pricing states when each shipped documented rate
+was last reviewed by a human, distinct from when it was last synchronised, and
+flags a rate whose review is overdue.
 
 ---
 

@@ -49,9 +49,35 @@ test.afterAll(async () => {
   await page?.close();
 });
 
-test("BUG-21 — Models states each rate, its source, its dates, and its history", async () => {
+test("Models is split by action category, with Pricing on its own tab", async () => {
   test.setTimeout(90_000);
   await page.goto(`${BASE}/#/models`);
+  const strip = page.getByRole("tablist", { name: "Model settings" });
+  await expect(strip).toBeVisible({ timeout: 20_000 });
+  await expect(strip.getByRole("tab")).toHaveText(["Providers", "Routing", "Pricing", "Posture"]);
+
+  // Providers is the default and shows only provider work.
+  await expect(page.getByRole("heading", { name: "Global model" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pricing" })).toHaveCount(0);
+  await page.screenshot({ path: join(SHOTS, "130-models-providers-tab-live.png"), fullPage: true });
+
+  // Each tab is a shareable location, not hidden client state.
+  await strip.getByRole("tab", { name: "Routing" }).click();
+  await expect(page.getByRole("heading", { name: "Model fallback sequence" })).toBeVisible();
+  await expect(page).toHaveURL(/#\/models\?tab=routing$/);
+  await page.screenshot({ path: join(SHOTS, "131-models-routing-tab-live.png"), fullPage: true });
+
+  await strip.getByRole("tab", { name: "Posture" }).click();
+  await expect(page.getByRole("heading", { name: "Off-machine provider posture" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Model fallback sequence" })).toHaveCount(0);
+  await page.screenshot({ path: join(SHOTS, "132-models-posture-tab-live.png"), fullPage: true });
+
+  // The context popover's Configure -> link lands here directly.
+  await page.goto(`${BASE}/#/models?tab=pricing`);
+  await expect(page.getByRole("tab", { name: "Pricing" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible({ timeout: 20_000 });
 
   // The registry is populated by the reviewed-documentation adapter on first

@@ -38,6 +38,10 @@ export const DEFAULT_ROUTE = "home";
  * link, the sidebar, and the hub's own tab strip all resolve to the same panel.
  */
 export const HUB_TABS: Record<string, string[]> = {
+  // Models is organised by what you came to do, not by which table the data
+  // lives in: connect and choose a provider, decide what serves a turn when the
+  // first choice cannot, see what it costs, or read the off-machine posture.
+  models: ["providers", "routing", "pricing", "posture"],
   extensions: ["connectors", "mcp", "plugins", "channels"],
   observe: ["overview", "sessions", "activity", "checkpoints", "diagnostics", "work", "notifications"],
 };

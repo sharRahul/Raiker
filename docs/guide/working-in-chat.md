@@ -231,7 +231,7 @@ under the figures:
 
 | Source | Shown as | Where it comes from |
 |---|---|---|
-| Owner | "administrator override" | A rate an administrator set, with a reason, on the Models → Pricing page. Always wins. |
+| Owner | "administrator override" | A rate an administrator set, with a reason, on the Models → **Pricing** tab. Always wins. |
 | Provider | "provider-reported" | Published by the provider's own API. OpenRouter does this; most do not. |
 | Config | "list price, as of 2026-07" | A documented list price shipped in `config/model-profiles.json`. |
 
@@ -249,8 +249,9 @@ which over-states rather than under-states: a bill should never surprise you in
 the expensive direction.
 
 Every rate lives in an effective-dated registry, so what a turn cost on the day
-it ran stays reproducible after a provider changes its prices. **Models →
-Pricing** shows the whole registry: the exact model id each rate belongs to, its
+it ran stays reproducible after a provider changes its prices. The **Models**
+page is split by what you came to do — **Providers**, **Routing**, **Pricing**,
+**Posture** — and its **Pricing** tab shows the whole registry: the exact model id each rate belongs to, its
 source, when it took effect, its full change history, and — per provider — when
 prices were last synchronised, when the next refresh is due, and whether the
 current reading is stale. Recording an override needs the runtime gate-manager

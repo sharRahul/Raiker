@@ -177,7 +177,7 @@
         {:else if current === "capabilities"}
           <CapabilitiesView {principal} />
         {:else if current === "models"}
-          <ModelsView />
+          <ModelsView tab={currentTab ?? "providers"} />
         {:else if current === "extensions"}
           <ExtensionsView tab={currentTab ?? "connectors"} />
         {:else if current === "observe"}

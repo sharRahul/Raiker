@@ -71,3 +71,10 @@ so every figure shown is the honest-gap path rather than a live model turn.
 | `125-BUG-24-parked-turn-live.png` | The Chat surface whose parked-turn continuation is driven by `/api/approvals/resumable` |
 | `126-build-composer-parity-live.png` | Build's composer carrying the same context, conversation, and approval controls as Chat |
 | `127-workbench-composer-parity-live.png` | The Workbench composer stating what it actually offers per work mode |
+| `130-models-providers-tab-live.png` | Models → Providers: connect a provider and choose the exact model |
+| `131-models-routing-tab-live.png` | Models → Routing: the fallback sequence and the advisor model |
+| `132-models-posture-tab-live.png` | Models → Posture: the read-only off-machine gate status |
+
+The Models page is split by action category — Providers, Routing, Pricing,
+Posture — so each panel is one errand and a shareable location
+(`#/models?tab=pricing`).

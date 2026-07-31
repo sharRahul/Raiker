@@ -1797,7 +1797,11 @@ carries a mandatory reason, records `recorded_by` in the registry, and writes
 event log. Clearing it returns the model to its published or documented rate
 with that history intact.
 
-**UI.** Models → **Pricing** states, per exact model id: the source
+**UI.** The Models page is split by action category — **Providers**, **Routing**,
+**Pricing**, **Posture** — so looking up a rate is its own errand rather than a
+scroll past provider cards, and each panel is a shareable location
+(`#/models?tab=pricing`, which is exactly where the popover's **Configure →**
+now lands). Models → **Pricing** states, per exact model id: the source
 (administrator override / published by the provider / reviewed documentation),
 each of the four rate components, the effective date, and the full price
 history. Each provider shows its last refresh, next due time, cadence, and a

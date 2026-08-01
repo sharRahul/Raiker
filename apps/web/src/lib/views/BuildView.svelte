@@ -19,6 +19,8 @@
   import Badge from "../components/Badge.svelte";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
+  import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
+  import ModelCapacityBadge from "../components/ModelCapacityBadge.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
@@ -708,9 +710,11 @@
         {@const answer = answerText(turn)}
         {@const thinking = thinkingSteps(turn.events)}
         <article class="turn">
-          <div class="from-you">
-            <span class="mode-tag">{buildMode(turn.mode).label}</span>
-            <p class="bubble-text">{turn.prompt}</p>
+          <div class="user-message">
+            <div class="from-you">
+              <span class="mode-tag">{buildMode(turn.mode).label}</span>
+              <p class="bubble-text">{turn.prompt}</p>
+            </div>
             {#if turn.attachments.length > 0}
               <!-- The same cards the composer showed, so what you sent looks
                    like what you attached. Build has no file inspector of its
@@ -871,6 +875,8 @@
           ></textarea>
           <div class="upper-controls">
             <ModelPicker bind:profileId={modelProfile} bind:model {profiles} {selectedProfile} disabled={streaming} />
+            <ExecutionEnvironmentBadge />
+            <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
             {#if reasoningEfforts.length > 0}
               <select
                 class="bar-select"
@@ -1190,9 +1196,15 @@
     flex-direction: column;
     gap: var(--space-2);
   }
-  .from-you {
+  .user-message {
     align-self: flex-end;
     max-width: min(80%, 44rem);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: .5rem;
+  }
+  .from-you {
     background: var(--accent);
     color: var(--text-inverse);
     border-radius: 1.15rem 1.15rem 0.3rem 1.15rem;
@@ -1347,7 +1359,7 @@
     flex-wrap: wrap;
   }
 
-  .turn-attachments { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+  .turn-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
   .copy-message {
     display: inline-flex;
     align-items: center;

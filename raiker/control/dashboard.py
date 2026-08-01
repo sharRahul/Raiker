@@ -6,7 +6,7 @@ import json
 import os
 import re
 import shutil
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -375,6 +375,8 @@ class MemoryControlView:
     valid_until: str | None = None
     supersedes_memory_id: str | None = None
     remembered_reason: str | None = None
+    updated_at: str | None = None
+    last_used_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -401,6 +403,8 @@ class MemoryControlView:
             "valid_until": self.valid_until,
             "supersedes_memory_id": self.supersedes_memory_id,
             "remembered_reason": self.remembered_reason,
+            "updated_at": self.updated_at,
+            "last_used_at": self.last_used_at,
         }
 
 
@@ -915,9 +919,12 @@ class DashboardService:
         path = (root / candidate).resolve()
         if path != root and root not in path.parents:
             raise ValueError("brain_source_outside_workspace")
+        relative = path.relative_to(root)
+        if any(part in {".git", ".raiker", "node_modules"} for part in relative.parts):
+            raise ValueError("brain_source_protected_path")
         if not path.exists():
             raise ValueError("brain_source_not_found")
-        return path.relative_to(root).as_posix(), path
+        return relative.as_posix(), path
 
     def add_brain_source(self, raw_path: str, *, owner_principal_id: str) -> dict[str, Any]:
         relative_path, _path = self._workspace_source(raw_path)
@@ -931,6 +938,211 @@ class DashboardService:
             relative_path = raw_path.strip()
         self.store.remove_brain_source(owner_principal_id, relative_path)
         return {"ok": True, "path": relative_path}
+
+    def browse_brain_sources(self, raw_path: str = ".") -> dict[str, Any]:
+        """Browse one contained directory without exposing host filesystem paths."""
+        relative_path, path = self._workspace_source(raw_path or ".")
+        if not path.is_dir():
+            raise ValueError("brain_source_not_a_directory")
+        children: list[dict[str, Any]] = []
+        try:
+            values = sorted(path.iterdir(), key=lambda item: (not item.is_dir(), item.name.casefold()))
+        except OSError as exc:
+            raise ValueError("brain_source_unreadable") from exc
+        root = self.workspace_root.resolve()
+        for child in values[:200]:
+            try:
+                if child.name in {".git", ".raiker", "node_modules"}:
+                    continue
+                resolved = child.resolve()
+                if root not in resolved.parents and resolved != root:
+                    continue
+                children.append(
+                    {
+                        "name": child.name,
+                        "path": resolved.relative_to(root).as_posix(),
+                        "kind": "folder" if child.is_dir() else "file",
+                        "size_bytes": child.stat().st_size if child.is_file() else None,
+                    }
+                )
+            except OSError:
+                continue
+        return {
+            "path": relative_path,
+            "parent": None if path == root else path.parent.relative_to(root).as_posix() or ".",
+            "children": children,
+            "truncated": len(values) > 200,
+        }
+
+    def review_brain_source(self, raw_path: str) -> dict[str, Any]:
+        """Build a bounded, read-only indexing plan before a source is selected."""
+        relative_path, path = self._workspace_source(raw_path)
+        supported_extensions = {
+            ".md", ".txt", ".rst", ".py", ".ts", ".tsx", ".js", ".jsx", ".json",
+            ".toml", ".yaml", ".yml", ".html", ".css", ".scss", ".sql", ".go",
+            ".rs", ".java", ".cs", ".cpp", ".c", ".h", ".sh", ".ps1",
+        }
+        candidates = [path] if path.is_file() else path.rglob("*")
+        supported = 0
+        unsupported = 0
+        total_bytes = 0
+        scanned = 0
+        examples: list[str] = []
+        warnings: list[str] = []
+        root = self.workspace_root.resolve()
+        for candidate in candidates:
+            if scanned >= 5000:
+                warnings.append("More than 5,000 entries were found; review is capped and indexing will remain incremental.")
+                break
+            try:
+                resolved = candidate.resolve()
+                if resolved != root and root not in resolved.parents:
+                    continue
+                if not candidate.is_file() or any(part in {".git", ".raiker", "node_modules"} for part in candidate.parts):
+                    continue
+                size = candidate.stat().st_size
+            except OSError:
+                continue
+            scanned += 1
+            if candidate.suffix.casefold() in supported_extensions and size <= 5 * 1024 * 1024:
+                supported += 1
+                total_bytes += size
+                if len(examples) < 8:
+                    examples.append(resolved.relative_to(root).as_posix())
+            else:
+                unsupported += 1
+        if total_bytes > 100 * 1024 * 1024:
+            warnings.append("The selected source exceeds 100 MB; content will be loaded incrementally as it is needed.")
+        if unsupported:
+            warnings.append(f"{unsupported} unsupported or oversized file(s) will be skipped.")
+        return {
+            "path": relative_path,
+            "kind": "folder" if path.is_dir() else "file",
+            "supported_files": supported,
+            "unsupported_files": unsupported,
+            "total_bytes": total_bytes,
+            "examples": examples,
+            "warnings": warnings,
+            "review_cap": 5000,
+        }
+
+    def get_brain_preferences(self, owner_principal_id: str) -> dict[str, Any]:
+        return {"settings": self.store.load_brain_preferences(owner_principal_id)}
+
+    def save_brain_preferences(
+        self, settings: dict[str, Any], *, owner_principal_id: str
+    ) -> dict[str, Any]:
+        allowed = {"transform", "display", "forces", "groups", "positions", "filters", "motion"}
+        clean = {key: value for key, value in settings.items() if key in allowed}
+        serialized = json.dumps(clean, sort_keys=True)
+        if len(serialized) > 100_000:
+            raise ValueError("brain_preferences_too_large")
+        if not all(isinstance(value, (dict, list, str, int, float, bool, type(None))) for value in clean.values()):
+            raise ValueError("invalid_brain_preferences")
+        updated_at = self.store.save_brain_preferences(owner_principal_id, clean)
+        return {"ok": True, "settings": clean, "updated_at": updated_at}
+
+    def execution_environments(self, owner_principal_id: str) -> dict[str, Any]:
+        """List selectable execution targets without exposing credential values."""
+        selected = self.store.selected_execution_environment(owner_principal_id)
+        environments: list[dict[str, Any]] = [
+            {
+                "profile_id": "local_native", "kind": "local", "name": "Local workspace",
+                "enabled": True, "configured": True, "available": True,
+                "status": "ready", "selected": selected == "local_native",
+                "credential_configured": True, "budget": None,
+            },
+            {
+                "profile_id": "container_default", "kind": "container", "name": "Local container",
+                "enabled": True, "configured": bool(os.environ.get("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "").strip()),
+                "available": bool(os.environ.get("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "").strip()),
+                "status": "ready" if os.environ.get("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "").strip() else "configuration_required",
+                "selected": selected == "container_default", "credential_configured": True, "budget": None,
+            },
+        ]
+        for row in self.store.list_remote_execution_profiles(owner_principal_id=owner_principal_id):
+            try:
+                config = json.loads(row["config_json"])
+            except (TypeError, ValueError):
+                config = {}
+            kind = "daytona" if row["profile_type"] == "cloud" else str(row["profile_type"])
+            credential_env = str(config.get("credential_env") or config.get("api_key_env") or "")
+            credential_configured = bool(credential_env and os.environ.get(credential_env, "").strip())
+            configured = bool(config.get("host") and config.get("user") and credential_env) if kind == "ssh" else bool(config.get("sandbox_id") and credential_env)
+            available = bool(row["enabled"] and configured and credential_configured)
+            environments.append(
+                {
+                    "profile_id": str(row["profile_id"]), "kind": kind, "name": str(row["name"]),
+                    "enabled": bool(row["enabled"]), "configured": configured, "available": available,
+                    "status": "ready" if available else ("credential_required" if configured and not credential_configured else "configuration_required"),
+                    "selected": selected == row["profile_id"], "credential_configured": credential_configured,
+                    "budget": config.get("max_cost"),
+                    "config": {key: value for key, value in config.items() if key not in {"password", "token", "api_key", "secret"}},
+                }
+            )
+        if not any(item["selected"] for item in environments):
+            environments[0]["selected"] = True
+            selected = "local_native"
+        return {"selected_profile_id": selected, "environments": environments}
+
+    def configure_execution_environment(
+        self,
+        *,
+        profile_id: str | None,
+        kind: str,
+        name: str,
+        config: dict[str, Any],
+        enabled: bool,
+        owner_principal_id: str,
+    ) -> ControlResult:
+        if kind not in {"ssh", "daytona"}:
+            return ControlResult(ok=False, reason_code="unsupported_execution_environment")
+        forbidden = {"password", "token", "api_key", "secret", "private_key"}
+        if any(key.casefold() in forbidden for key in config):
+            return ControlResult(ok=False, reason_code="execution_credentials_must_use_environment_reference")
+        env_key = "credential_env" if kind == "ssh" else "api_key_env"
+        credential_env = str(config.get(env_key, "")).strip()
+        if credential_env and not re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", credential_env):
+            return ControlResult(ok=False, reason_code="invalid_execution_credential_reference")
+        if kind == "ssh":
+            host = str(config.get("host", "")).strip()
+            user = str(config.get("user", "")).strip()
+            if not re.fullmatch(r"[A-Za-z0-9.-]{1,253}", host) or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", user):
+                return ControlResult(ok=False, reason_code="invalid_ssh_profile")
+        elif not str(config.get("sandbox_id", "")).strip():
+            return ControlResult(ok=False, reason_code="daytona_sandbox_required")
+        now = utc_now()
+        existing = self.store.load_remote_execution_profile(
+            profile_id or "", owner_principal_id=owner_principal_id
+        )
+        actual_id = str(existing["profile_id"]) if existing else new_id("rex_")
+        from raiker.contracts.models import RemoteExecutionProfile
+
+        self.store.insert_remote_execution_profile(
+            RemoteExecutionProfile(
+                actual_id,
+                "ssh" if kind == "ssh" else "cloud",
+                name.strip() or ("SSH host" if kind == "ssh" else "Daytona sandbox"),
+                json.dumps(config, sort_keys=True),
+                enabled,
+                owner_principal_id,
+                str(existing["created_at"]) if existing else now,
+                now,
+            )
+        )
+        return ControlResult(ok=True, data={"profile_id": actual_id})
+
+    def select_execution_environment(
+        self, profile_id: str, owner_principal_id: str
+    ) -> ControlResult:
+        view = self.execution_environments(owner_principal_id)
+        environment = next((item for item in view["environments"] if item["profile_id"] == profile_id), None)
+        if environment is None:
+            return ControlResult(ok=False, reason_code="unknown_execution_environment")
+        if not environment["available"]:
+            return ControlResult(ok=False, reason_code="execution_environment_unavailable")
+        self.store.select_execution_environment(owner_principal_id, profile_id)
+        return ControlResult(ok=True, data={"selected_profile_id": profile_id})
 
     # ── Code workspace repositories ─────────────────────────────────────
     # The Build workspace points a coding chat at a repository. Connecting one is
@@ -1816,6 +2028,12 @@ class DashboardService:
             include_search_disabled=True,
             owner_principal_id=acting_principal_id,
         )
+        histories = {
+            e.memory_id: self.store.list_memory_lifecycle_events(
+                e.memory_id, owner_principal_id=e.owner_principal_id
+            )
+            for e in entries
+        }
         views = [
             MemoryControlView(
                 memory_id=e.memory_id,
@@ -1841,6 +2059,15 @@ class DashboardService:
                 valid_until=e.valid_until,
                 supersedes_memory_id=e.supersedes_memory_id,
                 remembered_reason=e.remembered_reason,
+                updated_at=e.updated_at,
+                last_used_at=next(
+                    (
+                        event["created_at"]
+                        for event in histories[e.memory_id]
+                        if event["action"] == "recall"
+                    ),
+                    None,
+                ),
             )
             for e in entries
         ]
@@ -1863,7 +2090,174 @@ class DashboardService:
         if get_memory(memory_id, workspace_root=self.workspace_root, owner_principal_id=principal.principal_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
         self.store.set_memory_pinned(memory_id, pinned)
+        self.store.record_memory_lifecycle_event(
+            memory_id, "pin" if pinned else "unpin", principal.principal_id
+        )
         return ControlResult(ok=True, data={"memory_id": memory_id, "pinned": pinned})
+
+    def list_memory_proposals(self, acting_principal_id: str | None) -> list[dict[str, Any]]:
+        if not self._is_human(acting_principal_id):
+            return []
+        return self.store.list_memory_candidates(
+            decision="deferred", owner_principal_id=acting_principal_id
+        )
+
+    def decide_memory_proposal(
+        self,
+        candidate_id: str,
+        *,
+        decision: str,
+        edited_text: str | None,
+        reason: str | None,
+        expected_decision: str,
+        acting_principal_id: str | None,
+    ) -> ControlResult:
+        """Human-only, stale-safe approval/rejection for durable memory proposals."""
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if decision not in {"approved", "rejected"}:
+            return ControlResult(ok=False, reason_code="invalid_memory_proposal_decision")
+        candidate = self.store.get_memory_candidate(
+            candidate_id, owner_principal_id=acting_principal_id or ""
+        )
+        if candidate is None:
+            return ControlResult(ok=False, reason_code=f"unknown_memory_proposal:{candidate_id}")
+        if candidate["decision"] != expected_decision:
+            return ControlResult(ok=False, reason_code="stale_memory_proposal")
+        text = (edited_text if edited_text is not None else str(candidate["text"])).strip()
+        if decision == "approved" and not text:
+            return ControlResult(ok=False, reason_code="empty_memory_text")
+        from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
+
+        sensitivity = classify_memory_sensitivity(text)
+        if decision == "approved" and sensitivity in {
+            MemorySensitivity.SECRET_LIKE,
+            MemorySensitivity.CREDENTIAL_LIKE,
+        }:
+            return ControlResult(ok=False, reason_code="secret_like_memory_blocked")
+        if not self.store.resolve_memory_candidate(
+            candidate_id,
+            owner_principal_id=acting_principal_id or "",
+            expected_decision=expected_decision,
+            decision=decision,
+            reason=reason,
+            resolved_at=utc_now(),
+        ):
+            return ControlResult(ok=False, reason_code="stale_memory_proposal")
+        if decision == "rejected":
+            self.store.record_memory_lifecycle_event(
+                candidate_id,
+                "reject",
+                acting_principal_id or "",
+                {"reason": reason or "", "source_event_id": candidate["source_event_id"]},
+            )
+            return ControlResult(ok=True, data={"candidate_id": candidate_id, "decision": decision})
+
+        from raiker.memory.store import MemoryGovernance, write_memory
+
+        entry = write_memory(
+            text,
+            workspace_root=self.workspace_root,
+            scope=str(candidate["scope"]),
+            memory_type=str(candidate["memory_type"]),
+            source="human_approved_proposal",
+            store=self.store,
+            owner_principal_id=acting_principal_id,
+            governance=MemoryGovernance(
+                source_event_id=str(candidate["source_event_id"]),
+                source_session_id="",
+                source_turn_id=None,
+                source_type="memory_proposal",
+                confidence=float(candidate["confidence"]),
+                trust_score=1.0,
+                retention="until_forget",
+                approval_state="approved",
+                created_by=acting_principal_id or "",
+            ),
+        )
+        self.store.record_memory_lifecycle_event(
+            entry.memory_id,
+            "approve",
+            acting_principal_id or "",
+            {
+                "candidate_id": candidate_id,
+                "edited": edited_text is not None and edited_text != candidate["text"],
+                "reason": reason or "",
+            },
+        )
+        return ControlResult(
+            ok=True,
+            data={"candidate_id": candidate_id, "decision": decision, "memory_id": entry.memory_id},
+        )
+
+    def memory_history(
+        self, memory_id: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        events = self.store.list_memory_lifecycle_events(
+            memory_id, owner_principal_id=acting_principal_id or ""
+        )
+        if not events:
+            memory = get_memory(
+                memory_id,
+                workspace_root=self.workspace_root,
+                include_expired=True,
+                include_archived=True,
+                owner_principal_id=acting_principal_id,
+            )
+            if memory is None:
+                return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        return ControlResult(ok=True, data={"memory_id": memory_id, "events": events})
+
+    def change_memory_scope(
+        self,
+        memory_id: str,
+        scope: str,
+        expected_updated_at: str | None,
+        reason: str,
+        acting_principal_id: str | None,
+    ) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        normalized = scope.strip()
+        if not normalized or not (
+            normalized in {"account", "project", "session"}
+            or normalized.startswith(("project:", "session:"))
+        ):
+            return ControlResult(ok=False, reason_code="invalid_memory_scope")
+        current = get_memory(
+            memory_id,
+            workspace_root=self.workspace_root,
+            include_expired=True,
+            include_archived=True,
+            owner_principal_id=acting_principal_id,
+        )
+        if current is None:
+            return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        if current.updated_at != expected_updated_at:
+            return ControlResult(ok=False, reason_code="stale_memory_scope_change")
+        from raiker.memory.store import update_memory
+
+        updated = update_memory(
+            memory_id,
+            workspace_root=self.workspace_root,
+            scope=normalized,
+            store=self.store,
+            owner_principal_id=acting_principal_id,
+        )
+        if updated is None:
+            return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        self.store.record_memory_lifecycle_event(
+            memory_id,
+            "scope_change",
+            acting_principal_id or "",
+            {"from": current.scope, "to": normalized, "reason": reason.strip()},
+        )
+        return ControlResult(
+            ok=True,
+            data={"memory_id": memory_id, "scope": normalized, "updated_at": updated.updated_at},
+        )
 
     def forget_memory_controlled(
         self, memory_id: str, acting_principal_id: str | None
@@ -2075,6 +2469,17 @@ class DashboardService:
         )
         if updated is None:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
+        if text is not None:
+            self.store.record_memory_lifecycle_event(
+                memory_id, "edit", acting_principal_id or "", {"text_changed": True}
+            )
+        if update_expires_at:
+            self.store.record_memory_lifecycle_event(
+                memory_id,
+                "expiry_change",
+                acting_principal_id or "",
+                {"expires_at": updated.expires_at},
+            )
         return ControlResult(
             ok=True,
             data={
@@ -2968,7 +3373,7 @@ class DashboardService:
             # A registered rate outranks all three legacy sources: it *is* one
             # of them, resolved by the same precedence, but dated and complete.
             owner_price = registered.rates.to_price(registered.source, registered.as_of)
-        return resolve_model_facts(
+        resolved = resolve_model_facts(
             provider=profile.provider,
             model=model,
             owner_price=owner_price,
@@ -2980,6 +3385,17 @@ class DashboardService:
                 else None
             ),
         )
+        owner_capacity = (
+            facts_store.owner_context_capacity(principal_id, profile.provider, model)
+            if principal_id and model else None
+        )
+        if owner_capacity is not None:
+            resolved = replace(
+                resolved,
+                context_window_tokens=owner_capacity[0],
+                context_window_source="owner",
+            )
+        return resolved
 
     def get_context_usage(
         self, session_id: str, acting_principal_id: str | None = None
@@ -3244,6 +3660,108 @@ class DashboardService:
                 "changes_written": sum(result.changes_written for result in results),
             },
         )
+
+    def model_capacity_status(self, acting_principal_id: str | None) -> ControlResult:
+        if not acting_principal_id:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        models = self.get_models(acting_principal_id)
+        facts_store = ModelFactsStore(self.store)
+        entries: list[dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+        for profile in (*models.profiles, *models.chat_profiles):
+            key = (profile.profile_id, profile.provider, profile.model)
+            if profile.model == "<model>" or key in seen:
+                continue
+            seen.add(key)
+            entries.append(
+                {
+                    "profile_id": profile.profile_id,
+                    "provider": profile.provider,
+                    "model": profile.model,
+                    "endpoint_identity": f"{profile.profile_id}:{profile.endpoint_kind}",
+                    "context_window_tokens": profile.context_window_tokens,
+                    "source": profile.context_window_source,
+                    "history": facts_store.capacity_history(
+                        acting_principal_id, profile.provider, profile.model
+                    ),
+                }
+            )
+        sync = facts_store.capacity_refresh_state(acting_principal_id)
+        registry = ModelProfileRegistry.load()
+        local_ids = [
+            profile.profile_id
+            for profile in registry.list_profiles()
+            if profile.local_only and not bool(profile.raw.get("test_only", False))
+        ]
+        due = any(facts_store.capacity_refresh_due(acting_principal_id, profile_id) for profile_id in local_ids)
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        return ControlResult(
+            ok=True,
+            data={
+                "entries": entries,
+                "sync": sync,
+                "refresh_due": due,
+                "cadence_hours": 24,
+                "can_override": bool(principal and self.control._is_gate_manager(principal)),  # noqa: SLF001
+            },
+        )
+
+    async def refresh_local_model_capacities(
+        self, acting_principal_id: str | None, *, force: bool = False
+    ) -> ControlResult:
+        if not acting_principal_id:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        registry = ModelProfileRegistry.load()
+        facts_store = ModelFactsStore(self.store)
+        refreshed: list[dict[str, Any]] = []
+        for profile in registry.list_profiles():
+            if not profile.local_only or bool(profile.raw.get("test_only", False)):
+                continue
+            if not force and not facts_store.capacity_refresh_due(acting_principal_id, profile.profile_id):
+                continue
+            view = await self.list_provider_models(profile.profile_id, acting_principal_id)
+            status_value = view.status if view is not None else "unavailable"
+            reason_code = view.reason_code if view is not None else "unknown_model_profile"
+            facts_store.record_capacity_refresh(
+                acting_principal_id, profile.profile_id, status_value, reason_code
+            )
+            refreshed.append(
+                {"profile_id": profile.profile_id, "status": status_value, "reason_code": reason_code}
+            )
+        return ControlResult(ok=True, data={"profiles": refreshed})
+
+    def set_model_context_capacity(
+        self,
+        profile_id: str,
+        model: str,
+        tokens: int | None,
+        reason: str,
+        acting_principal_id: str | None,
+    ) -> ControlResult:
+        if not acting_principal_id:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None or not self.control._is_gate_manager(principal):  # noqa: SLF001
+            return ControlResult(ok=False, reason_code="not_authorized_gate_manager")
+        if not model or model == "<model>":
+            return ControlResult(ok=False, reason_code="model_not_specified")
+        try:
+            profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
+        except Exception:
+            return ControlResult(ok=False, reason_code="unknown_model_profile")
+        try:
+            ModelFactsStore(self.store).set_owner_context_capacity(
+                acting_principal_id,
+                profile.provider,
+                model,
+                tokens=tokens,
+                endpoint_identity=f"{profile.profile_id}:{profile.raw.get('endpoint_kind', 'unknown')}",
+                reason=redact_secret_like_text(reason.strip()),
+                recorded_by=acting_principal_id,
+            )
+        except ValueError as exc:
+            return ControlResult(ok=False, reason_code=str(exc))
+        return ControlResult(ok=True, data={"profile_id": profile_id, "model": model, "tokens": tokens})
 
     def set_model_price(
         self,

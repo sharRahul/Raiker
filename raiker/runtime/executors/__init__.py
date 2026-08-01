@@ -134,6 +134,8 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "channel_approval_relay",
     # Phase 4 — local sandboxed container execution (no network, no host mounts)
     "container_execution_cap",
+    "remote_execution_cap",
+    "cloud_execution_cap",
     # Phase 4 — local on-demand scheduled routines (no daemon)
     "scheduled_routines",
     # Control Deck task 4 — governed local stdio MCP builder + connector. The
@@ -225,6 +227,8 @@ def build_default_executor_registry(
     registry.register("external_channel_runtime", ExternalChannelExecutor(ws, store))
     registry.register("channel_approval_relay", ChannelApprovalRelayExecutor(ws, store))
     registry.register("container_execution_cap", ContainerExecutionExecutor(ws))
+    registry.register("remote_execution_cap", RemoteExecutionExecutor(ws, store))
+    registry.register("cloud_execution_cap", CloudExecutionExecutor(ws, store))
     registry.register("scheduled_routines", ScheduledRoutinesExecutor(ws, store))
     registry.register("mcp_builder_runtime", McpBuilderExecutor(ws, store))
     registry.register("mcp_connector_runtime", McpConnectorExecutor(ws, store))

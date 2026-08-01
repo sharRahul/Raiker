@@ -356,6 +356,43 @@ class TestReads:
         assert rejected.status_code == 422
         assert rejected.json()["detail"]["reason_code"] == "brain_source_outside_workspace"
 
+    def test_brain_source_review_browse_and_preferences_persist(
+        self, bootstrapped_workspace: Path, client: TestClient
+    ) -> None:
+        source = bootstrapped_workspace / "large-review"
+        source.mkdir()
+        (source / "notes.md").write_text("review me", encoding="utf-8")
+        (source / "archive.bin").write_bytes(b"\x00\x01")
+        token = _token(client)
+        headers = _auth_headers(token)
+
+        browse = client.get("/api/brain/sources/browse?path=.", headers=headers)
+        assert browse.status_code == 200, browse.text
+        assert any(item["path"] == "large-review" for item in browse.json()["children"])
+        assert not any(item["name"] in {".git", ".raiker", "node_modules"} for item in browse.json()["children"])
+        protected = client.post(
+            "/api/brain/sources/review", headers=headers, json={"path": ".raiker"}
+        )
+        assert protected.status_code == 422
+        assert protected.json()["detail"]["reason_code"] == "brain_source_protected_path"
+        review = client.post(
+            "/api/brain/sources/review", headers=headers, json={"path": "large-review"}
+        )
+        assert review.status_code == 200, review.text
+        assert review.json()["supported_files"] == 1
+        assert review.json()["unsupported_files"] == 1
+        assert review.json()["warnings"]
+
+        saved = client.put(
+            "/api/brain/settings",
+            headers=headers,
+            json={"settings": {"transform": {"x": 12, "y": 8, "k": 1.2}, "motion": "paused"}},
+        )
+        assert saved.status_code == 200, saved.text
+        loaded = client.get("/api/brain/settings", headers=headers).json()
+        assert loaded["settings"]["transform"]["x"] == 12
+        assert loaded["settings"]["motion"] == "paused"
+
     def test_task_create_rejects_blank_title(self, client: TestClient) -> None:
         response = client.post(
             "/api/tasks",

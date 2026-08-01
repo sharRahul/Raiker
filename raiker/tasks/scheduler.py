@@ -51,6 +51,21 @@ class TaskScheduler:
         self.workspace_root = Path(workspace_root)
         self.store = SQLiteStore(self.workspace_root)
 
+    async def refresh_model_capacities(self) -> int:
+        """Refresh due local-model facts on the resident host's 24-hour cadence."""
+        owner = self.store.original_account_principal_id()
+        if owner is None:
+            return 0
+        # Local import avoids a module cycle: DashboardService also uses this
+        # scheduler for task controls.
+        from raiker.control.dashboard import DashboardService
+
+        result = await DashboardService(self.workspace_root).refresh_local_model_capacities(owner)
+        if not result.ok or not isinstance(result.data, dict):
+            return 0
+        profiles = result.data.get("profiles", [])
+        return len(profiles) if isinstance(profiles, list) else 0
+
     # ── continuing approved work (BUG-25) ────────────────────────────────
 
     async def resume_approved(self) -> int:

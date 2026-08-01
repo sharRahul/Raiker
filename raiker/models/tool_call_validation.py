@@ -25,6 +25,8 @@ _TOOL_RISK: dict[str, tuple[str, bool]] = {
     "edit_file": ("high", True),
     "apply_patch": ("high", True),
     "shell": ("high", True),
+    "remote_execute": ("high", True),
+    "cloud_execute": ("high", True),
     "run_command": ("medium", False),
     # Governed inside the tool: advisor_model_runtime gate + decision mode
     # (default `ask` withholds) + provider policy at call time.
@@ -78,6 +80,8 @@ _REQUIRED_ARGS: dict[str, tuple[str, ...]] = {
     "edit_file": ("path", "old_text", "new_text"),
     "apply_patch": ("patch",),
     "shell": ("command",),
+    "remote_execute": ("command",),
+    "cloud_execute": ("command",),
     "run_command": ("command",),
     "consult_advisor": ("question",),
     "github_read": ("resource", "repo", "number"),
@@ -113,6 +117,14 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
     "edit_file": "Propose one exact, unique text replacement in a file (approval required).",
     "apply_patch": "Propose one atomic, context-anchored unified diff across one or more files (approval required once for the complete change set). An optional path may identify the first target for backward compatibility.",
     "shell": "Propose running a shell command (approval required).",
+    "remote_execute": (
+        "Propose running a command through the owner's selected SSH execution environment. "
+        "Raiker resolves the profile, credential reference, capability gate, and approval."
+    ),
+    "cloud_execute": (
+        "Propose running a command through the owner's selected Daytona cloud sandbox. "
+        "Raiker resolves the profile, credential reference, budget ceiling, gate, and approval."
+    ),
     "run_command": (
         "Run an owner-authorised command in the workspace and return bounded stdout, stderr, "
         "and its exit code. The command must match this session's active command grant."

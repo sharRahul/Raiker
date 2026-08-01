@@ -4,7 +4,7 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
-  import type { BrainEdge, BrainNode, BrainView as BrainData } from "../apiTypes";
+  import type { BrainEdge, BrainNode, BrainSourceBrowse, BrainSourceReview, BrainView as BrainData } from "../apiTypes";
 
   type MotionMode = "paused" | "activity" | "alive";
   type GraphNode = BrainNode & SimulationNodeDatum & { degree: number; virtual?: boolean; color?: string; pinned?: boolean };
@@ -42,6 +42,8 @@
   let sourceKind = $state<"folder" | "file">("folder");
   let sourceError = $state<string | null>(null);
   let sourceBusy = $state(false);
+  let sourceBrowse = $state<BrainSourceBrowse | null>(null);
+  let sourceReview = $state<BrainSourceReview | null>(null);
   let motion = $state<MotionMode>("alive");
   let centerStrength = $state(0.08);
   let chargeStrength = $state(-220);
@@ -67,6 +69,8 @@
   let renderedLinks = $state<GraphLink[]>([]);
   const positionCache = new Map<string, GraphNode>();
   let transform = $state({ x: 0, y: 0, k: 1 });
+  let savedPositions = $state<Record<string, { x: number; y: number; pinned: boolean }>>({});
+  let preferencesLoaded = $state(false);
   let panning = false;
   let panOrigin = { x: 0, y: 0, tx: 0, ty: 0 };
   let contextMenu = $state<{ x: number; y: number; node: GraphNode } | null>(null);
@@ -81,7 +85,33 @@
     } finally { refreshing = false; }
   }
 
+  async function loadPreferences() {
+    try {
+      const raw = (await api.brainPreferences()).settings as Record<string, unknown>;
+      if (raw.transform && typeof raw.transform === "object") transform = { ...transform, ...(raw.transform as typeof transform) };
+      if (raw.display && typeof raw.display === "object") {
+        const display = raw.display as Partial<{ showOrphans: boolean; showLabels: boolean; showArrows: boolean; showParticles: boolean; nodeScale: number; linkThickness: number; labelThreshold: number }>;
+        showOrphans = display.showOrphans ?? showOrphans; showLabels = display.showLabels ?? showLabels;
+        showArrows = display.showArrows ?? showArrows; showParticles = display.showParticles ?? showParticles;
+        nodeScale = display.nodeScale ?? nodeScale; linkThickness = display.linkThickness ?? linkThickness;
+        labelThreshold = display.labelThreshold ?? labelThreshold;
+      }
+      if (raw.forces && typeof raw.forces === "object") {
+        const forces = raw.forces as Partial<{ centerStrength: number; chargeStrength: number; linkStrength: number; linkDistance: number; collisionPadding: number }>;
+        centerStrength = forces.centerStrength ?? centerStrength; chargeStrength = forces.chargeStrength ?? chargeStrength;
+        linkStrength = forces.linkStrength ?? linkStrength; linkDistance = forces.linkDistance ?? linkDistance;
+        collisionPadding = forces.collisionPadding ?? collisionPadding;
+      }
+      if (Array.isArray(raw.groups)) groups = raw.groups as Group[];
+      if (raw.positions && typeof raw.positions === "object") savedPositions = raw.positions as typeof savedPositions;
+      if (raw.filters && typeof raw.filters === "object") enabledTypes = { ...enabledTypes, ...(raw.filters as Record<string, boolean>) };
+      if (typeof raw.motion === "string" && ["paused", "activity", "alive"].includes(raw.motion)) motion = raw.motion as MotionMode;
+    } catch { /* Older runtimes simply start with the documented defaults. */ }
+    finally { preferencesLoaded = true; }
+  }
+
   onMount(() => {
+    void loadPreferences();
     void load();
     const timer = window.setInterval(() => void load(), 15_000);
     const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(([entry]) => {
@@ -91,6 +121,17 @@
     });
     if (graphElement) resize?.observe(graphElement);
     return () => { window.clearInterval(timer); resize?.disconnect(); simulation?.stop(); };
+  });
+
+  $effect(() => {
+    if (!preferencesLoaded) return;
+    const settings = {
+      transform, display: { showOrphans, showLabels, showArrows, showParticles, nodeScale, linkThickness, labelThreshold },
+      forces: { centerStrength, chargeStrength, linkStrength, linkDistance, collisionPadding },
+      groups, positions: savedPositions, filters: enabledTypes, motion,
+    };
+    const timer = window.setTimeout(() => { void api.saveBrainPreferences(settings).catch(() => undefined); }, 500);
+    return () => window.clearTimeout(timer);
   });
 
   const rawNodes = $derived(brain?.nodes ?? []);
@@ -173,8 +214,11 @@
     const data = visibleData;
     const nodes: GraphNode[] = data.nodes.map((node) => ({
       ...node, degree: degrees.get(node.node_id) ?? (node.node_id === "starter:workspace" ? 2 : 1),
-      color: groupColorFor(node), x: positionCache.get(node.node_id)?.x ?? graphWidth / 2 + (Math.random() - 0.5) * 80,
-      y: positionCache.get(node.node_id)?.y ?? graphHeight / 2 + (Math.random() - 0.5) * 80,
+      color: groupColorFor(node), x: positionCache.get(node.node_id)?.x ?? savedPositions[node.node_id]?.x ?? graphWidth / 2 + (Math.random() - 0.5) * 80,
+      y: positionCache.get(node.node_id)?.y ?? savedPositions[node.node_id]?.y ?? graphHeight / 2 + (Math.random() - 0.5) * 80,
+      fx: savedPositions[node.node_id]?.pinned ? savedPositions[node.node_id].x : undefined,
+      fy: savedPositions[node.node_id]?.pinned ? savedPositions[node.node_id].y : undefined,
+      pinned: savedPositions[node.node_id]?.pinned ?? false,
     }));
     const links: GraphLink[] = data.edges.map((edge) => ({ ...edge }));
     simulation?.stop();
@@ -195,15 +239,15 @@
 
   function selectNode(event: MouseEvent, node: GraphNode) {
     event.stopPropagation(); contextMenu = null;
-    if (node.node_id === "starter:add") { sourceOpen = true; return; }
+    if (node.node_id === "starter:add") { void openSourcePicker(); return; }
     selectedIds = event.shiftKey ? (selectedIds.includes(node.node_id) ? selectedIds.filter((id) => id !== node.node_id) : [...selectedIds, node.node_id]) : [node.node_id];
     inspectorOpen = true;
   }
   function centreNode(node: GraphNode) { centreId = node.node_id; graphMode = "local"; selectedIds = [node.node_id]; inspectorOpen = true; }
   function dragStart(event: PointerEvent, node: GraphNode) { event.stopPropagation(); (event.currentTarget as Element).setPointerCapture(event.pointerId); node.fx = node.x; node.fy = node.y; simulation?.alphaTarget(0.1).restart(); }
   function dragMove(event: PointerEvent, node: GraphNode) { if (!(event.currentTarget as Element).hasPointerCapture(event.pointerId)) return; node.fx = (event.offsetX - transform.x) / transform.k; node.fy = (event.offsetY - transform.y) / transform.k; }
-  function dragEnd(event: PointerEvent, node: GraphNode) { (event.currentTarget as Element).releasePointerCapture(event.pointerId); node.pinned = true; simulation?.alphaTarget(motion === "alive" ? 0.015 : 0); }
-  function unpin(node: GraphNode) { node.fx = null; node.fy = null; node.pinned = false; simulation?.alpha(0.25).restart(); contextMenu = null; }
+  function dragEnd(event: PointerEvent, node: GraphNode) { (event.currentTarget as Element).releasePointerCapture(event.pointerId); node.pinned = true; savedPositions = { ...savedPositions, [node.node_id]: { x: node.fx ?? node.x ?? 0, y: node.fy ?? node.y ?? 0, pinned: true } }; simulation?.alphaTarget(motion === "alive" ? 0.015 : 0); }
+  function unpin(node: GraphNode) { node.fx = null; node.fy = null; node.pinned = false; const next = { ...savedPositions }; delete next[node.node_id]; savedPositions = next; simulation?.alpha(0.25).restart(); contextMenu = null; }
   function onWheel(event: WheelEvent) { event.preventDefault(); const next = Math.max(0.35, Math.min(3, transform.k * Math.exp(-event.deltaY * 0.001))); const rect = graphElement?.getBoundingClientRect(); if (!rect) return; const px = event.clientX - rect.left; const py = event.clientY - rect.top; transform = { k: next, x: px - ((px - transform.x) / transform.k) * next, y: py - ((py - transform.y) / transform.k) * next }; }
   function panStart(event: PointerEvent) { if (event.target !== event.currentTarget && (event.target as Element).closest(".graph-stage")) return; panning = true; panOrigin = { x: event.clientX, y: event.clientY, tx: transform.x, ty: transform.y }; (event.currentTarget as Element).setPointerCapture(event.pointerId); }
   function panMove(event: PointerEvent) { if (panning) transform = { ...transform, x: panOrigin.tx + event.clientX - panOrigin.x, y: panOrigin.ty + event.clientY - panOrigin.y }; }
@@ -211,10 +255,27 @@
   function fitGraph() { transform = { x: 0, y: 0, k: 1 }; simulation?.alpha(0.18).restart(); }
   async function toggleFullscreen() { if (!document.fullscreenElement) await graphElement?.requestFullscreen(); else await document.exitFullscreen(); }
 
-  async function addSource() {
+  async function openSourcePicker() {
+    sourceOpen = true; sourceError = null; sourceReview = null;
+    try { sourceBrowse = await api.browseBrainSources("."); } catch { sourceBrowse = null; }
+  }
+  async function browseSource(path: string) {
+    sourceBusy = true; sourceError = null; sourceReview = null;
+    try { sourceBrowse = await api.browseBrainSources(path); sourcePath = sourceBrowse.path; }
+    catch { sourceError = "Could not browse this workspace folder."; }
+    finally { sourceBusy = false; }
+  }
+  async function reviewSource() {
     if (!sourcePath.trim()) return; sourceBusy = true; sourceError = null;
-    try { await api.addBrainSource(sourcePath.trim()); sourcePath = ""; sourceOpen = false; await load(); }
+    try { sourceReview = await api.reviewBrainSource(sourcePath.trim()); }
     catch (error) { sourceError = error instanceof ApiError ? "Choose an existing file or folder inside this Raiker workspace." : "Could not add this source."; }
+    finally { sourceBusy = false; }
+  }
+  async function addSource() {
+    if (!sourceReview) return;
+    sourceBusy = true; sourceError = null;
+    try { await api.addBrainSource(sourceReview.path); sourcePath = ""; sourceReview = null; sourceOpen = false; await load(); }
+    catch { sourceError = "Could not add this reviewed source."; }
     finally { sourceBusy = false; }
   }
   async function removeSource(path: string) { try { await api.removeBrainSource(path); await load(); } catch { sourceError = "Could not remove this source."; } }
@@ -234,7 +295,7 @@
       <div class="title-block"><span class="eyebrow">Workspace intelligence</span><h2>Knowledge Map</h2></div>
       <label class="search"><Icon name="search" size={16} /><input bind:value={search} placeholder="Search records or use type:, status:…" aria-label="Search records" /></label>
       <div class="mode-switch" role="group" aria-label="Graph scope"><button class:active={graphMode === "global"} onclick={() => graphMode = "global"}>Global</button><button class:active={graphMode === "local"} disabled={!centreId} onclick={() => graphMode = "local"}>Local</button></div>
-      <button class="icon-button" aria-label="Add workspace source" title="Add source" onclick={() => sourceOpen = true}>+</button>
+      <button class="icon-button" aria-label="Add workspace source" title="Add source" onclick={() => void openSourcePicker()}>+</button>
       <button class="icon-button" aria-label="Graph settings" aria-expanded={settingsOpen} onclick={() => settingsOpen = !settingsOpen}><Icon name="settings" size={17} /></button>
       <button class="icon-button" aria-label="Enter fullscreen" onclick={toggleFullscreen}>⛶</button>
     </header>
@@ -297,7 +358,11 @@
     </div>
   </main>
 
-  {#if sourceOpen}<div class="modal-backdrop" role="presentation" onclick={() => sourceOpen = false}><section class="source-modal" role="dialog" aria-modal="true" aria-labelledby="source-title" onclick={(event) => event.stopPropagation()}><button class="close" aria-label="Close add source" onclick={() => sourceOpen = false}>×</button><span class="eyebrow">Workspace boundary</span><h2 id="source-title">Add workspace source</h2><p>Choose an existing file or folder inside this Raiker workspace. Sources remain governed, read-only context and do not become approved memories automatically.</p><div class="kind-toggle" role="radiogroup" aria-label="Source kind"><button class:active={sourceKind === "folder"} onclick={() => sourceKind = "folder"}>Folder</button><button class:active={sourceKind === "file"} onclick={() => sourceKind = "file"}>File</button></div><form onsubmit={(event) => { event.preventDefault(); void addSource(); }}><label>Workspace-relative path<input bind:value={sourcePath} placeholder={sourceKind === "folder" ? "documents/research" : "notes/ideas.md"} aria-label="Workspace-relative path" /></label>{#if sourceError}<p class="error" role="alert">{sourceError}</p>{/if}<button class="primary" disabled={sourceBusy || !sourcePath.trim()}>{sourceBusy ? "Adding…" : "Add and index"}</button></form>{#if sourceRoots.length}<h3>Current sources</h3>{#each sourceRoots as source}<div class="current-source"><span>{source.detail}</span><button aria-label={`Remove ${source.detail} from graph`} onclick={() => void removeSource(source.detail ?? "")}>Remove</button></div>{/each}{/if}</section></div>{/if}
+  {#if sourceOpen}<div class="modal-backdrop" role="presentation" onclick={() => sourceOpen = false}><section class="source-modal" role="dialog" aria-modal="true" aria-labelledby="source-title" onclick={(event) => event.stopPropagation()}><button class="close" aria-label="Close add source" onclick={() => sourceOpen = false}>×</button><span class="eyebrow">Workspace boundary</span><h2 id="source-title">Review workspace source</h2><p>Browse incrementally, review what will be indexed, then confirm. Unsupported and oversized files are skipped; sources never become approved memory automatically.</p><div class="kind-toggle" role="radiogroup" aria-label="Source kind"><button class:active={sourceKind === "folder"} onclick={() => sourceKind = "folder"}>Folder</button><button class:active={sourceKind === "file"} onclick={() => sourceKind = "file"}>File</button></div>
+    {#if sourceBrowse}<nav class="source-browser" aria-label="Workspace source browser">{#if sourceBrowse.parent}<button onclick={() => void browseSource(sourceBrowse!.parent ?? ".")}>← {sourceBrowse.parent}</button>{/if}{#each sourceBrowse.children as item}<button class:selected={sourcePath === item.path} onclick={() => { if (item.kind === "folder") void browseSource(item.path); else { sourcePath = item.path; sourceKind = "file"; sourceReview = null; } }}><span>{item.kind === "folder" ? "Folder" : "File"}</span><b>{item.name}</b></button>{/each}{#if sourceBrowse.truncated}<small>Showing the first 200 entries. Open a folder to continue.</small>{/if}</nav>{/if}
+    <form onsubmit={(event) => { event.preventDefault(); void reviewSource(); }}><label>Workspace-relative path<input bind:value={sourcePath} placeholder={sourceKind === "folder" ? "documents/research" : "notes/ideas.md"} aria-label="Workspace-relative path" oninput={() => sourceReview = null} /></label>{#if sourceError}<p class="error" role="alert">{sourceError}</p>{/if}<button class="primary" disabled={sourceBusy || !sourcePath.trim()}>{sourceBusy ? "Reviewing…" : "Review indexing plan"}</button></form>
+    {#if sourceReview}<section class="source-review" aria-label="Source indexing review"><h3>Indexing plan</h3><p><b>{sourceReview.supported_files}</b> supported files · <b>{sourceReview.total_bytes.toLocaleString()}</b> bytes · <b>{sourceReview.unsupported_files}</b> skipped</p>{#each sourceReview.warnings as warning}<p class="warning">{warning}</p>{/each}<button class="primary" disabled={sourceBusy} onclick={() => void addSource()}>Add reviewed source</button></section>{/if}
+    {#if sourceRoots.length}<h3>Current sources</h3>{#each sourceRoots as source}<div class="current-source"><span>{source.detail}</span><button aria-label={`Remove ${source.detail} from graph`} onclick={() => void removeSource(source.detail ?? "")}>Remove</button></div>{/each}{/if}</section></div>{/if}
 
   {#if contextMenu}<div class="context-menu" style={`left:${contextMenu.x}px;top:${contextMenu.y}px`} role="menu"><button onclick={() => centreNode(contextMenu!.node)}>Open local graph</button><button onclick={() => { selectedIds = [contextMenu!.node.node_id]; inspectorOpen = true; contextMenu = null; }}>Trace provenance</button><button onclick={() => contextMenu!.node.pinned ? unpin(contextMenu!.node) : (contextMenu!.node.fx = contextMenu!.node.x, contextMenu!.node.fy = contextMenu!.node.y, contextMenu!.node.pinned = true, contextMenu = null)}>{contextMenu.node.pinned ? "Unpin" : "Pin"}</button><button onclick={() => centreNode(contextMenu!.node)}>View neighbours</button></div>{/if}
 {/if}
@@ -335,6 +400,7 @@
   .inspector { padding:18px; width:280px; bottom:14px; } .inspector .close,.source-modal .close { position:absolute; right:12px; top:9px; } .record-kicker { display:flex; align-items:center; gap:7px; color:#8892a5; text-transform:uppercase; letter-spacing:.11em; font-size:.6rem; } .inspector h3 { margin:10px 24px 4px 0; font-size:1.05rem; } .status-line { display:flex; gap:8px; color:#7f899e; font-size:.66rem; } .status-line span { padding:3px 6px; border:1px solid #ffffff12; border-radius:4px; } .inspector > p { color:#a5adbd; font-size:.73rem; line-height:1.55; } .inspector h4 { margin:20px 0 7px; color:#7f899e; text-transform:uppercase; letter-spacing:.1em; font-size:.62rem; }
   .relationship { display:grid; width:100%; gap:2px; padding:8px 0; border:0; border-bottom:1px solid #ffffff0e; background:transparent; text-align:left; cursor:pointer; } .relationship span { color:#687286; font-size:.6rem; } .relationship b { color:#cbd1dd; font-size:.72rem; } .inspector-actions { display:grid; gap:7px; margin-top:18px; } .inspector-actions button { border:1px solid #ffffff16; border-radius:6px; padding:7px; background:#ffffff08; color:#c2c9d6; cursor:pointer; }
   .modal-backdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; background:#08090dbb; backdrop-filter:blur(5px); } .source-modal { position:relative; width:min(480px, calc(100vw - 32px)); max-height:80vh; overflow:auto; padding:24px; border:1px solid #ffffff1c; border-radius:13px; background:#1c1e24; color:#eef0f6; box-shadow:0 25px 80px #000c; } .source-modal h2 { margin:6px 0; font-size:1.15rem; } .source-modal > p { color:#9ba4b6; font-size:.75rem; line-height:1.5; } .kind-toggle { display:flex; width:max-content; margin:15px 0; padding:3px; border:1px solid #ffffff16; border-radius:7px; } .kind-toggle button { border:0; border-radius:5px; padding:6px 14px; background:transparent; color:#929bad; cursor:pointer; } .kind-toggle button.active { background:#343842; color:white; } .source-modal form label { display:grid; gap:6px; color:#a9b0bf; font-size:.7rem; } .source-modal form input { border:1px solid #ffffff18; border-radius:6px; padding:10px; background:#111216; color:white; } .primary { width:100%; margin-top:12px; border:0; border-radius:6px; padding:9px; background:#5c87c5; color:white; cursor:pointer; } .error { color:#ff8c98 !important; } .current-source { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #ffffff0e; color:#aeb6c5; font-size:.7rem; } .current-source button { border:0; background:transparent; color:#ef7885; cursor:pointer; }
+  .source-browser { display:grid; max-height:190px; overflow:auto; margin:0 0 12px; border:1px solid #ffffff16; border-radius:7px; } .source-browser button { display:flex; gap:8px; border:0; border-bottom:1px solid #ffffff0d; padding:7px 9px; background:transparent; color:#cbd1dc; text-align:left; cursor:pointer; } .source-browser button:hover,.source-browser button.selected { background:#ffffff0c; } .source-browser button span { width:42px; color:#7f899e; font-size:.62rem; } .source-browser button b { font-size:.7rem; } .source-browser small { padding:8px; color:#7f899e; } .source-review { margin-top:12px; padding:12px; border:1px solid #ffffff16; border-radius:7px; background:#ffffff08; } .source-review h3 { margin:0 0 6px; } .source-review p { font-size:.7rem; } .source-review .warning { color:#d89b45; }
   .context-menu { position:fixed; z-index:120; display:grid; min-width:160px; padding:5px; border:1px solid #ffffff20; border-radius:7px; background:#202229; box-shadow:0 14px 35px #000b; } .context-menu button { border:0; border-radius:4px; padding:7px 9px; background:transparent; color:#cbd1dc; text-align:left; cursor:pointer; font-size:.7rem; } .context-menu button:hover { background:#ffffff0c; }
 
   /* The graph keeps the Obsidian interaction model while using Raiker's
@@ -363,6 +429,7 @@
   .group-form { border-color:#dce5e7; background:#f6f9f9; } .group-form input { border-color:#d4dfe1; } .group-form label,.motion-options label { color:#607689; }
   .inspector .record-kicker,.status-line,.inspector h4 { color:#6e8292; } .status-line span,.relationship,.inspector-actions button { border-color:#dde6e8; } .inspector > p { color:#607689; } .relationship span { color:#778b9b; } .relationship b { color:#29465d; } .inspector-actions button { background:#f2f7f7; color:#36566b; }
   .modal-backdrop { background:#26415052; } .source-modal { border-color:#c8d5d8; background:#fff; color:#183047; box-shadow:0 25px 80px #38556b4d; } .source-modal > p,.source-modal form label { color:#607689; } .kind-toggle { border-color:#cfdcde; } .kind-toggle button { color:#607689; } .kind-toggle button.active { background:#cce9e7; color:#0b716e; } .source-modal form input { border-color:#cad8da; background:#f8fbfb; color:#183047; } .primary { background:#178d88; } .current-source { border-color:#e0e8e9; color:#526b7e; }
+  .source-browser { border-color:#d6e0e2; } .source-browser button { border-color:#e6edef; color:#36566b; } .source-browser button:hover,.source-browser button.selected,.source-review { background:#f0f7f7; } .source-review { border-color:#d6e0e2; }
   .context-menu { border-color:#cbd8da; background:#fff; box-shadow:0 14px 35px #38556b3d; } .context-menu button { color:#36566b; } .context-menu button:hover { background:#edf6f5; }
   :global(:root[data-theme="dark"]) .knowledge-shell { background:var(--bg); color:var(--text-1); }
   :global(:root[data-theme="dark"]) .graph-toolbar { border-color:var(--border); background:color-mix(in srgb, var(--surface) 96%, transparent); box-shadow:var(--shadow-1); }

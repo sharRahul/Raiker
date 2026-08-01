@@ -262,7 +262,7 @@ Safety invariants for this slice:
 - Rollback plans do not execute rollback.
 - Legacy preview surfaces do not execute graph writes; the current graph indexing runtime is a separate governed real executor.
 - Legacy preview surfaces do not write semantic memory; current semantic memory and vector embedding/search runtimes are separate governed real executors.
-- Plugin slices, the reference external channel, subagent/team executors, and local container runtime are governed real executors; remote/cloud command execution remains no-executor/fail-closed.
+- Plugin slices, the reference external channel, subagent/team executors, local container runtime, and owner-configured SSH/Daytona command execution are governed real executors; other remote/cloud providers remain no-executor/fail-closed.
 - GitHub Actions remain paused due quota exhaustion; local/cloud validation evidence is mandatory.
 - CI must be re-enabled later when quota is available and must not be claimed as passed while Actions are paused.
 
@@ -280,5 +280,5 @@ Safety status:
 - Legacy lifecycle/preview surfaces do not write graph data directly; current graph indexing is a governed real executor.
 - Legacy preview surfaces do not write semantic memory; current semantic/vector runtimes are governed real executors.
 - Rollback execution remains disabled.
-- Plugin slices, the reference external channel, subagent/team executors, and local container runtime are governed real executors; remote/cloud command execution remains no-executor/fail-closed.
+- Plugin slices, the reference external channel, subagent/team executors, local container runtime, and owner-configured SSH/Daytona command execution are governed real executors; other remote/cloud providers remain no-executor/fail-closed.
 - GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.

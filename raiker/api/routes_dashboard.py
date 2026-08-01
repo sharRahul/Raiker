@@ -449,7 +449,22 @@ async def get_session(
     view = _service(request).get_session(session_id, user_id=auth_data[1].delegated_by_user_id)
     if view is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown session: {session_id}")
-    return serialize_dto(view)
+    body = serialize_dto(view)
+    # BUG-34: transcript restoration carries the metadata-only approval link
+    # for unresolved parked turns. Conversation/model state remains encrypted
+    # server-side; the projection is scoped to the authenticated principal.
+    body["parked_approvals"] = [
+        {
+            "approval_id": str(row["approval_id"]),
+            "turn_id": str(row["turn_id"]),
+            "tool_name": str(row["tool_name"]),
+            "created_at": str(row["created_at"]),
+        }
+        for row in _service(request).store.list_pending_suspended_turns(
+            auth_data[0].principal_id, session_id
+        )
+    ]
+    return body
 
 
 @router.get("/api/sessions/{session_id}/export/manifest")
@@ -792,6 +807,66 @@ async def add_brain_source(
         ) from exc
 
 
+@router.get("/api/brain/sources/browse")
+async def browse_brain_sources(
+    request: Request,
+    path: str = ".",
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    del auth_data
+    try:
+        return _service(request).browse_brain_sources(path)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": str(exc)},
+        ) from exc
+
+
+@router.post("/api/brain/sources/review")
+async def review_brain_source(
+    body: BrainSourceRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    del auth_data
+    try:
+        return _service(request).review_brain_source(body.path)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": str(exc)},
+        ) from exc
+
+
+@router.get("/api/brain/settings")
+async def get_brain_preferences(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _service(request).get_brain_preferences(auth_data[0].principal_id)
+
+
+@router.put("/api/brain/settings")
+async def save_brain_preferences(
+    body: dict[str, Any],
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    try:
+        settings = body.get("settings", {})
+        if not isinstance(settings, dict):
+            raise ValueError("invalid_brain_preferences")
+        return _service(request).save_brain_preferences(
+            settings, owner_principal_id=auth_data[0].principal_id
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": str(exc)},
+        ) from exc
+
+
 @router.delete("/api/brain/sources")
 async def remove_brain_source(
     path: str,
@@ -799,6 +874,48 @@ async def remove_brain_source(
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     return _service(request).remove_brain_source(path, owner_principal_id=auth_data[0].principal_id)
+
+
+@router.get("/api/execution-environments")
+async def get_execution_environments(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _service(request).execution_environments(auth_data[0].principal_id)
+
+
+@router.put("/api/execution-environments/configure")
+async def configure_execution_environment(
+    body: dict[str, Any],
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    raw_config = body.get("config", {})
+    if not isinstance(raw_config, dict):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"ok": False, "reason_code": "invalid_execution_config"})
+    result = _service(request).configure_execution_environment(
+        profile_id=str(body["profile_id"]) if body.get("profile_id") else None,
+        kind=str(body.get("kind", "")), name=str(body.get("name", "")),
+        config=raw_config, enabled=bool(body.get("enabled", False)),
+        owner_principal_id=auth_data[0].principal_id,
+    )
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/execution-environments/selection")
+async def select_execution_environment(
+    body: dict[str, Any],
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).select_execution_environment(
+        str(body.get("profile_id", "")), auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
 
 
 @router.get("/api/code/repos")
@@ -1324,6 +1441,58 @@ async def refresh_model_pricing(
     if not result.ok:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.get("/api/models/capacities")
+async def get_model_capacities(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).model_capacity_status(auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/models/capacities/refresh")
+async def refresh_model_capacities(
+    request: Request,
+    force: bool = False,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = await _service(request).refresh_local_model_capacities(
+        auth_data[0].principal_id, force=force
+    )
+    if not result.ok:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"ok": False, "reason_code": result.reason_code})
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/models/{profile_id}/capacity")
+async def set_model_capacity(
+    profile_id: str,
+    body: dict[str, Any],
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    raw_tokens = body.get("tokens")
+    try:
+        tokens = None if raw_tokens in (None, "") else int(str(raw_tokens))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"ok": False, "reason_code": "model_context_capacity_invalid"},
+        ) from exc
+    result = _service(request).set_model_context_capacity(
+        profile_id, str(body.get("model", "")), tokens,
+        str(body.get("reason", "")), auth_data[0].principal_id,
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN if result.reason_code == "not_authorized_gate_manager" else status.HTTP_400_BAD_REQUEST,
             detail={"ok": False, "reason_code": result.reason_code},
         )
     return {"ok": True, **result.data}

@@ -52,6 +52,8 @@ from raiker.storage.migrations import (
     API_SESSIONS_SQL,
     ATTACHMENT_STORE_MIGRATION_ID,
     ATTACHMENT_STORE_SQL,
+    BRAIN_PREFERENCES_MIGRATION_ID,
+    BRAIN_PREFERENCES_SQL,
     BRAIN_SOURCES_MIGRATION_ID,
     BRAIN_SOURCES_SQL,
     CALENDAR_EVENTS_MIGRATION_ID,
@@ -76,6 +78,8 @@ from raiker.storage.migrations import (
     EIDETIC_OBSERVATIONS_SQL,
     EMAIL_DRAFTS_MIGRATION_ID,
     EMAIL_DRAFTS_SQL,
+    EXECUTION_ENVIRONMENT_CONTROL_MIGRATION_ID,
+    EXECUTION_ENVIRONMENT_CONTROL_SQL,
     GIST_MEMORY_MIGRATION_ID,
     GIST_MEMORY_SQL,
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
@@ -125,6 +129,8 @@ from raiker.storage.migrations import (
     MEMORY_TEMPORAL_EVALUATION_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
     MODEL_ADVISOR_SQL,
+    MODEL_CAPACITY_CONTROL_MIGRATION_ID,
+    MODEL_CAPACITY_CONTROL_SQL,
     MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
     MODEL_FALLBACK_SEQUENCE_SQL,
     MODEL_PRICE_REGISTRY_MIGRATION_ID,
@@ -598,6 +604,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 PRINCIPAL_CONTROL_SCOPE_MIGRATION_ID, PRINCIPAL_CONTROL_SCOPE_SQL, connection
             )
             self._apply_migration(BRAIN_SOURCES_MIGRATION_ID, BRAIN_SOURCES_SQL, connection)
+            self._apply_migration(
+                BRAIN_PREFERENCES_MIGRATION_ID, BRAIN_PREFERENCES_SQL, connection
+            )
+            self._apply_migration(
+                EXECUTION_ENVIRONMENT_CONTROL_MIGRATION_ID,
+                EXECUTION_ENVIRONMENT_CONTROL_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MODEL_CAPACITY_CONTROL_MIGRATION_ID, MODEL_CAPACITY_CONTROL_SQL, connection
+            )
             self._backfill_legacy_brain_sources(connection)
             self._backfill_legacy_account_bootstrap_roles(connection)
             self._migrate_legacy_controls_to_original_owner(connection)
@@ -1021,6 +1038,33 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "INSERT OR IGNORE INTO brain_sources (owner_principal_id, path, created_at) VALUES (?, ?, ?)",
                 (owner_principal_id, path, utc_now()),
             )
+
+    def load_brain_preferences(self, owner_principal_id: str) -> dict[str, Any]:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT settings_json FROM brain_preferences WHERE owner_principal_id = ?",
+                (owner_principal_id,),
+            ).fetchone()
+        if row is None:
+            return {}
+        try:
+            value = json.loads(row["settings_json"])
+        except (TypeError, ValueError):
+            return {}
+        return value if isinstance(value, dict) else {}
+
+    def save_brain_preferences(
+        self, owner_principal_id: str, settings: dict[str, Any]
+    ) -> str:
+        updated_at = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO brain_preferences (owner_principal_id, settings_json, updated_at)
+                VALUES (?, ?, ?) ON CONFLICT(owner_principal_id) DO UPDATE SET
+                settings_json = excluded.settings_json, updated_at = excluded.updated_at""",
+                (owner_principal_id, json.dumps(settings, sort_keys=True), updated_at),
+            )
+        return updated_at
 
     def _backfill_legacy_brain_sources(self, connection: sqlite3.Connection) -> None:
         """Migrate the former shared source list to the original account once."""
@@ -2955,6 +2999,24 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
+    def list_pending_suspended_turns(
+        self, principal_id: str, session_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Metadata for unresolved parked turns, scoped to their owner (BUG-34)."""
+        query = (
+            "SELECT approval_id, session_id, turn_id, tool_name, created_at "
+            "FROM suspended_turns WHERE principal_id = ? AND status = 'suspended' "
+            "AND outcome_json IS NULL"
+        )
+        params: tuple[Any, ...] = (principal_id,)
+        if session_id is not None:
+            query += " AND session_id = ?"
+            params = (principal_id, session_id)
+        query += " ORDER BY created_at ASC"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
     def record_suspended_turn_outcome(self, approval_id: str, outcome_json: str) -> bool:
         """Attach the resolution outcome the model will see as its tool result.
 
@@ -3678,6 +3740,43 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
+    def get_memory_candidate(
+        self, candidate_id: str, *, owner_principal_id: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM memory_candidates WHERE candidate_id = ? AND owner_principal_id = ?",
+                (candidate_id, owner_principal_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def resolve_memory_candidate(
+        self,
+        candidate_id: str,
+        *,
+        owner_principal_id: str,
+        expected_decision: str,
+        decision: str,
+        reason: str | None,
+        resolved_at: str,
+    ) -> bool:
+        """Resolve exactly one proposal without allowing stale double decisions."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE memory_candidates
+                SET decision = ?, reason = ?, resolved_at = ?
+                WHERE candidate_id = ? AND owner_principal_id = ? AND decision = ?""",
+                (
+                    decision,
+                    reason,
+                    resolved_at,
+                    candidate_id,
+                    owner_principal_id,
+                    expected_decision,
+                ),
+            )
+        return cursor.rowcount == 1
+
     def insert_approved_memory(self, entry: Any) -> None:
         with self.connect() as connection:
             connection.execute(
@@ -3722,7 +3821,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def update_approved_memory(self, entry: Any) -> bool:
         with self.connect() as connection:
             cursor = connection.execute(
-                """UPDATE approved_memory SET text = ?, content_checksum = ?, sensitivity = ?, tags_json = ?, updated_at = ?,
+                """UPDATE approved_memory SET text = ?, content_checksum = ?, scope = ?, sensitivity = ?, tags_json = ?, updated_at = ?,
                 search_enabled = ?, expires_at = ?, valid_from = ?, valid_until = ?,
                 supersedes_memory_id = ?, superseded_at = ?, remembered_reason = ?
                 WHERE memory_id = ? AND deleted_at IS NULL"""
@@ -3730,6 +3829,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (
                     entry.text,
                     hashlib.sha256(entry.text.encode()).hexdigest(),
+                    entry.scope,
                     entry.sensitivity,
                     json.dumps(list(entry.tags)),
                     entry.updated_at,
@@ -4610,6 +4710,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
         if action not in {
             "archive", "restore", "forget", "purge", "correct", "export", "import", "recall",
+            "approve", "reject", "edit", "pin", "unpin", "scope_change", "expiry_change",
             "legal_hold", "backup_access", "admin_access",
         }:
             raise ValueError("invalid_memory_lifecycle_action")
@@ -4620,6 +4721,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (audit_id, memory_id, action, actor_id, json.dumps(details or {}, sort_keys=True), utc_now()),
             )
         return audit_id
+
+    def list_memory_lifecycle_events(
+        self, memory_id: str, *, owner_principal_id: str
+    ) -> list[dict[str, Any]]:
+        """Return immutable history only while the caller still owns the record."""
+        with self.connect() as connection:
+            owned = connection.execute(
+                "SELECT 1 FROM approved_memory WHERE memory_id = ? AND owner_principal_id = ?",
+                (memory_id, owner_principal_id),
+            ).fetchone()
+            if owned is None:
+                return []
+            rows = connection.execute(
+                """SELECT audit_id, memory_id, action, actor_id, details_json, created_at
+                FROM memory_lifecycle_audit WHERE memory_id = ? ORDER BY created_at DESC, audit_id DESC""",
+                (memory_id,),
+            ).fetchall()
+        return [
+            {**dict(row), "details": json.loads(row["details_json"] or "{}")}
+            for row in rows
+        ]
 
     # ── Phase 6: Channels & Relay ──
 
@@ -4752,21 +4874,54 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR REPLACE INTO remote_execution_profiles
-                (profile_id, profile_type, name, config_json, enabled, created_by, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (profile_id, profile_type, name, config_json, enabled, created_by, created_at, updated_at, owner_principal_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (profile.profile_id, profile.profile_type, profile.name, profile.config_json, int(profile.enabled), profile.created_by, profile.created_at, profile.updated_at),
+                (profile.profile_id, profile.profile_type, profile.name, profile.config_json, int(profile.enabled), profile.created_by, profile.created_at, profile.updated_at, profile.created_by),
             )
 
-    def list_remote_execution_profiles(self, enabled_only: bool = False) -> list[dict[str, Any]]:
+    def list_remote_execution_profiles(self, enabled_only: bool = False, *, owner_principal_id: str | None = None) -> list[dict[str, Any]]:
         query = "SELECT * FROM remote_execution_profiles"
         params: list[Any] = []
+        conditions: list[str] = []
         if enabled_only:
-            query += " WHERE enabled = 1"
+            conditions.append("enabled = 1")
+        if owner_principal_id is not None:
+            conditions.append("owner_principal_id = ?")
+            params.append(owner_principal_id)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY created_at DESC"
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
+
+    def load_remote_execution_profile(
+        self, profile_id: str, *, owner_principal_id: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM remote_execution_profiles WHERE profile_id = ? AND owner_principal_id = ?",
+                (profile_id, owner_principal_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def select_execution_environment(self, owner_principal_id: str, profile_id: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO execution_environment_selection VALUES (?, ?, ?)
+                ON CONFLICT(owner_principal_id) DO UPDATE SET profile_id = excluded.profile_id,
+                selected_at = excluded.selected_at""",
+                (owner_principal_id, profile_id, utc_now()),
+            )
+
+    def selected_execution_environment(self, owner_principal_id: str) -> str:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT profile_id FROM execution_environment_selection WHERE owner_principal_id = ?",
+                (owner_principal_id,),
+            ).fetchone()
+        return str(row["profile_id"]) if row else "local_native"
 
     def insert_execution_budget(self, budget: ExecutionBudget) -> None:
         with self.connect() as connection:

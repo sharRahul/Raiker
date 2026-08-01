@@ -14,6 +14,7 @@ from raiker.api.app import create_app
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.context.gatherer import ContextGatherer
 from raiker.control.dashboard import DashboardService
+from raiker.memory.candidates import create_deferred_candidate
 from raiker.memory.store import MemoryGovernance, get_memory, search_memory, write_memory
 from raiker.storage.sqlite import SQLiteStore
 
@@ -229,6 +230,91 @@ class TestMemoryEditAndSearchParticipation:
         assert "export" in actions and "import" in actions
 
 
+class TestGovernedMemoryProposalsAndHistory:
+    def test_human_can_edit_and_approve_a_proposal_once(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        candidate = create_deferred_candidate("evt_proposal", "Use tabs.", "project:alpha")
+        service.store.insert_memory_candidate(candidate, owner_principal_id=OWNER)
+
+        assert service.list_memory_proposals(OWNER)[0]["candidate_id"] == candidate.candidate_id
+        result = service.decide_memory_proposal(
+            candidate.candidate_id,
+            decision="approved",
+            edited_text="Use spaces.",
+            reason="Corrected before approval",
+            expected_decision="deferred",
+            acting_principal_id=OWNER,
+        )
+        assert result.ok
+        memory = get_memory(
+            result.data["memory_id"], workspace_root=workspace, owner_principal_id=OWNER
+        )
+        assert memory is not None and memory.text == "Use spaces."
+        assert service.list_memory_proposals(OWNER) == []
+        stale = service.decide_memory_proposal(
+            candidate.candidate_id,
+            decision="rejected",
+            edited_text=None,
+            reason="too late",
+            expected_decision="deferred",
+            acting_principal_id=OWNER,
+        )
+        assert stale.reason_code == "stale_memory_proposal"
+
+    def test_reject_and_secret_like_approval_fail_closed(
+        self, service: DashboardService
+    ) -> None:
+        rejected = create_deferred_candidate("evt_reject", "Temporary observation")
+        service.store.insert_memory_candidate(rejected, owner_principal_id=OWNER)
+        result = service.decide_memory_proposal(
+            rejected.candidate_id,
+            decision="rejected",
+            edited_text=None,
+            reason="Not durable",
+            expected_decision="deferred",
+            acting_principal_id=OWNER,
+        )
+        assert result.ok and result.data["decision"] == "rejected"
+
+        secret = create_deferred_candidate("evt_secret", "api_key=abcdefghijklmnop")
+        service.store.insert_memory_candidate(secret, owner_principal_id=OWNER)
+        blocked = service.decide_memory_proposal(
+            secret.candidate_id,
+            decision="approved",
+            edited_text=None,
+            reason=None,
+            expected_decision="deferred",
+            acting_principal_id=OWNER,
+        )
+        assert blocked.reason_code == "secret_like_memory_blocked"
+        candidate = service.store.get_memory_candidate(
+            secret.candidate_id, owner_principal_id=OWNER
+        )
+        assert candidate is not None
+        assert candidate["decision"] == "deferred"
+
+    def test_scope_change_is_stale_safe_and_history_is_owner_scoped(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        mid = _seed_memory(service.store, workspace)
+        current = service.list_memories(acting_principal_id=OWNER)[0]
+        changed = service.change_memory_scope(
+            mid, "account", current.updated_at, "Useful across projects", OWNER
+        )
+        assert changed.ok
+        memory = get_memory(mid, workspace_root=workspace, owner_principal_id=OWNER)
+        assert memory is not None
+        assert memory.scope == "account"
+        assert service.change_memory_scope(
+            mid, "project:other", current.updated_at, "stale", OWNER
+        ).reason_code == "stale_memory_scope_change"
+        history = service.memory_history(mid, OWNER)
+        assert history.ok
+        assert "scope_change" in [event["action"] for event in history.data["events"]]
+        assert not service.memory_history(mid, "principal_missing").ok
+
+
 class TestIncognitoBoundary:
     def test_incognito_round_trips(self, service: DashboardService) -> None:
         assert service.get_memory_settings().incognito is False
@@ -351,3 +437,27 @@ class TestMemoryApi:
         )
         assert imported.status_code == 200, imported.text
         assert imported.json()["count"] == 1
+
+    def test_proposal_scope_and_history_routes(self, client: TestClient, workspace: Path) -> None:
+        headers = self._headers(client)
+        store = SQLiteStore(workspace)
+        candidate = create_deferred_candidate("evt_api_proposal", "Keep concise notes")
+        store.insert_memory_candidate(candidate, owner_principal_id=OWNER)
+        assert client.get("/api/memory/proposals", headers=headers).json()[0]["candidate_id"] == candidate.candidate_id
+        approved = client.post(
+            f"/api/memory/proposals/{candidate.candidate_id}/decision",
+            json={"decision": "approved", "edited_text": "Keep concise project notes", "expected_decision": "deferred"},
+            headers=headers,
+        )
+        assert approved.status_code == 200, approved.text
+        mid = approved.json()["memory_id"]
+        memory = client.get("/api/memory", headers=headers).json()[0]
+        scoped = client.put(
+            f"/api/memory/{mid}/scope",
+            json={"scope": "account", "expected_updated_at": memory["updated_at"], "reason": "shared preference"},
+            headers=headers,
+        )
+        assert scoped.status_code == 200, scoped.text
+        history = client.get(f"/api/memory/{mid}/history", headers=headers)
+        assert history.status_code == 200
+        assert {event["action"] for event in history.json()["events"]} >= {"approve", "scope_change"}

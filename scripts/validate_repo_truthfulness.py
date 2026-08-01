@@ -150,6 +150,7 @@ APPROVAL_BOUNDARY_MARKERS = (
     "for every capability except an approved",
     "metadata-only otherwise",
     "executes exactly one narrow class of action",
+    "executes a narrow allowlist",
     "metadata-only: it records the human decision",
     "records the decision and executes nothing",
 )
@@ -229,7 +230,7 @@ def main() -> int:
         # client and the local web dashboard. Native/hosted clients stay Phase 8 deferred (below).
         "launchable local UIs are the plain local terminal client and the local web dashboard",
         "Phase 8 deferred",
-        "every other approval records a decision only",
+        "other approvals remain decision-only",
         "durable memory mutation is broker-governed",
     ):
         if marker.lower() not in readme.lower():
@@ -246,10 +247,10 @@ def main() -> int:
 
     security_arch = (ROOT / "docs/SECURITY_ARCHITECTURE.md").read_text(encoding="utf-8")
     for marker in (
-        "remote execution | disabled/fail-closed",
-        "cloud execution | disabled/fail-closed",
-        "finance/investment/medical/pregnancy/CCTV/home-security/hardware domains | disabled/fail-closed",
-        "Approval resolution executes exactly one narrow class of action",
+        "SSH remote execution | unavailable until owner profile selection",
+        "Daytona cloud execution | unavailable until owner profile",
+        "finance, medical, pregnancy, CCTV, home security, hardware | disabled/fail-closed",
+        "Approval resolution executes a narrow allowlist",
         "remains metadata-only: it records the decision and executes nothing",
         "no tamper-proof logging is implemented",
     ):

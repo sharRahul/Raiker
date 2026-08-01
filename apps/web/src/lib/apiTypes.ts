@@ -674,6 +674,12 @@ export interface TurnSummary {
 export interface SessionDetail {
   session: SessionSummary;
   turns: TurnSummary[];
+  parked_approvals?: Array<{
+    approval_id: string;
+    turn_id: string;
+    tool_name: string;
+    created_at: string;
+  }>;
 }
 
 // GET /api/turns/{id} — raiker/control/dashboard.py TurnDetailView.to_dict()
@@ -952,6 +958,28 @@ export interface MemoryControlView {
   pinned: boolean;
   search_enabled: boolean;
   expires_at: string | null;
+  updated_at: string | null;
+  last_used_at: string | null;
+}
+
+export interface MemoryProposal {
+  candidate_id: string;
+  source_event_id: string;
+  memory_type: string;
+  scope: string;
+  text: string;
+  sensitivity: string;
+  confidence: number;
+  decision: string;
+  created_at: string;
+}
+
+export interface MemoryHistoryEvent {
+  audit_id: string;
+  action: string;
+  actor_id: string;
+  created_at: string;
+  details: Record<string, unknown>;
 }
 
 export interface MemorySettingsView {
@@ -987,6 +1015,62 @@ export interface BrainView {
 export interface BrainSourceResult {
   ok: boolean;
   path: string;
+}
+
+export interface BrainSourceBrowse {
+  path: string;
+  parent: string | null;
+  children: Array<{ name: string; path: string; kind: "folder" | "file"; size_bytes: number | null }>;
+  truncated: boolean;
+}
+
+export interface BrainSourceReview {
+  path: string;
+  kind: "folder" | "file";
+  supported_files: number;
+  unsupported_files: number;
+  total_bytes: number;
+  examples: string[];
+  warnings: string[];
+  review_cap: number;
+}
+
+export interface ExecutionEnvironment {
+  profile_id: string;
+  kind: "local" | "container" | "ssh" | "daytona";
+  name: string;
+  enabled: boolean;
+  configured: boolean;
+  available: boolean;
+  status: string;
+  selected: boolean;
+  credential_configured: boolean;
+  budget: number | null;
+  config?: Record<string, unknown>;
+}
+
+export interface ExecutionEnvironmentsView {
+  selected_profile_id: string;
+  environments: ExecutionEnvironment[];
+}
+
+export interface ModelCapacityEntry {
+  profile_id: string;
+  provider: string;
+  model: string;
+  endpoint_identity: string;
+  context_window_tokens: number | null;
+  source: string | null;
+  history: Array<{ capacity_id: string; context_window_tokens: number | null; action: string; reason: string | null; recorded_by: string; recorded_at: string }>;
+}
+
+export interface ModelCapacitiesView {
+  ok: boolean;
+  entries: ModelCapacityEntry[];
+  sync: Array<{ profile_id: string; last_refresh_at: string | null; next_refresh_at: string; status: string; reason_code: string | null }>;
+  refresh_due: boolean;
+  cadence_hours: number;
+  can_override: boolean;
 }
 
 export interface InstanceLaunchResult {

@@ -49,7 +49,7 @@ Raiker is not:
 | Memory boundary | Long-term memory writes require governance. |
 | Channel boundary | External senders are untrusted until paired and scoped. |
 | Plugin boundary | Plugins are disabled until manifest, trust, and permission checks pass. |
-| Execution boundary | Remote/container/cloud execution is disabled until an execution profile and policy exist. |
+| Execution boundary | SSH/Daytona execution is unavailable until an owner profile, credential reference, selection, policy, and approval exist; unsupported types fail closed. |
 
 ---
 

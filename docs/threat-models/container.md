@@ -8,7 +8,8 @@
 Per-capability threat model required by
 [`docs/RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md) before
 `container_execution_cap` may join `REAL_EXECUTOR_CAPABILITIES`. This covers
-**local** Docker only; remote/cloud execution stays fail-closed.
+**local** Docker only; SSH/Daytona use separate owner-profile-gated executors,
+and other remote/cloud providers stay fail-closed.
 
 ## What the executor does
 
@@ -46,4 +47,5 @@ token. AI principals can never flip the gate.
   images the owner vets can run. A live-daemon successful run is verified
   manually (CI exercises governance + fail-closed paths via an injected runner).
 - Out of scope: host bind mounts, networked containers, GPU/privileged mode,
-  Kubernetes/remote/cloud execution. Those remain gated and fail closed.
+  Kubernetes, and arbitrary remote/cloud providers. Those remain gated and fail
+  closed; the separately modeled SSH/Daytona executors are out of scope here.

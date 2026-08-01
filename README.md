@@ -9,7 +9,7 @@ Raiker is a local-first AI-agent runtime. Every model interaction and tool
 action passes through policy, capability gates, approvals, and audit records, so
 local automation stays under your control.
 
-The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-app` (or `raiker-web` for explicit service control), the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed; every other approval records a decision only. Durable memory mutation is broker-governed, and strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
+The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-app` (or `raiker-web` for explicit service control), the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed. Approved SSH and Daytona actions likewise execute once through their dedicated governed executors; other approvals remain decision-only. Durable memory mutation is broker-governed, and strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
 
 ## Quick start
 
@@ -97,17 +97,20 @@ human confirmation, and whether a real executor exists for it. The single
 runtime does all of it, and the only runtime-level decision left is binary —
 accepting executions, or stopped.
 
-Approving does one of two things, and the approval detail says which **before**
-you decide. A proposed **file change** is performed once, through the governed
+The approval detail says what will happen **before** you decide. A proposed
+**file change** is performed once, through the governed
 approval execution relay — re-governed at execution time, with the previous
 contents checkpointed so it can be rewound, and never into `.raiker/` or
-`.git/`. **Everything else** — shell, network, process — records your decision
-and executes nothing. Disabling either the `approval_execution_relay` or
+`.git/`. Approved **SSH remote** and **Daytona cloud** actions execute once
+through bounded, owner-selected profiles with fresh policy, posture, credential,
+host-key, and cost-ceiling checks. Other shell, network, and process approvals
+record the decision and execute nothing. Disabling either the
+`approval_execution_relay` or
 `file_write_execution` capability returns file approvals to record-only, and a
 critical approval always uses the human-only, step-up-verified lifecycle
 instead.
 
-Deferred dangerous domains — remote and cloud execution, finance, medical, CCTV, home security, and hardware actions — have no governed executor
+Deferred dangerous domains — finance, medical, CCTV, home security, and hardware actions — have no governed executor
 and therefore offer no enable path at all. They fail closed and are listed under
 Observability → Diagnostics.
 

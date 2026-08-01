@@ -93,11 +93,11 @@ def test_architecture_and_security_docs_state_current_truth() -> None:
     assert "Current Backend Capability Matrix" in architecture
     assert "gateway finalisation events" in architecture
     assert "no `/sessions` command is currently implemented" in architecture
-    # BUG-06 — resolution executes a file mutation and nothing else. The security
-    # doc must state *both* halves of that boundary, not just one of them.
-    assert "approval resolution executes exactly one narrow class of action" in security.lower()
+    # The security doc must state both the narrow executable allowlist and the
+    # metadata-only remainder.
+    assert "approval resolution executes a narrow allowlist" in security.lower()
     assert "remains metadata-only: it records the decision and executes nothing" in security.lower()
-    assert "remote execution | disabled/fail-closed" in security.lower()
+    assert "ssh remote execution | unavailable until owner profile selection" in security.lower()
     assert "plugin runtime slices" in security.lower()
 
 
@@ -106,7 +106,8 @@ def test_catalog_marks_memory_and_approval_semantics_precisely() -> None:
     assert "implemented_approval_required" in catalog
     assert "metadata_only" in catalog
     assert "executed once through the governed approval execution relay" in catalog
-    assert "metadata-only for every other capability" in catalog
+    assert "SSH/Daytona command" in catalog
+    assert "metadata-only" in catalog
 
 
 def test_truthfulness_validator_detects_known_overclaim_patterns() -> None:

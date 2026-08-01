@@ -73,6 +73,34 @@ describe("MemoryView", () => {
     );
   });
 
+  it("reviews governed proposals directly on the Memory page", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": { incognito: false },
+      "GET /api/memory/proposals": [{
+        candidate_id: "memcand_1",
+        source_event_id: "evt_1",
+        memory_type: "project",
+        scope: "project:alpha",
+        text: "Prefer concise answers",
+        sensitivity: "normal",
+        confidence: 0.8,
+        decision: "deferred",
+        created_at: "2026-07-12T00:00:00Z",
+      }],
+      "POST /api/memory/proposals/memcand_1/decision": {
+        ok: true, candidate_id: "memcand_1", decision: "approved", memory_id: "mem_1",
+      },
+    });
+    render(MemoryView);
+    await waitFor(() => expect(screen.getByText("Prefer concise answers")).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: /^approve$/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/memory/proposals/memcand_1/decision",
+      expect.objectContaining({ method: "POST" }),
+    ));
+  });
+
   it("toggles incognito and reflects the new state", async () => {
     const fetchMock = stubFetch({
       "GET /api/memory": [],

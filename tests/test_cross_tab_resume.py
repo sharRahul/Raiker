@@ -66,6 +66,39 @@ def _park(
 
 
 class TestResumableTurns:
+    def test_pending_parked_turn_metadata_can_be_restored_with_a_session(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        headers, principal = _session(client)
+        store = _park(workspace, principal)
+        store.create_session("sess_1", str(workspace), user_id="owner")
+        store.insert_turn("sess_1", "turn_1", "write notes.md", "needs_approval")
+
+        body = client.get("/api/sessions/sess_1", headers=headers).json()
+
+        assert len(body["parked_approvals"]) == 1
+        assert body["parked_approvals"][0] == {
+            "approval_id": "appr_1",
+            "turn_id": "turn_1",
+            "tool_name": "write_file",
+            "created_at": body["parked_approvals"][0]["created_at"],
+        }
+        assert "messages_json" not in client.get(
+            "/api/sessions/sess_1", headers=headers
+        ).text
+
+    def test_pending_parked_turn_metadata_is_principal_scoped(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        headers, principal = _session(client)
+        store = _park(workspace, "principal_someone_else")
+        store.create_session("sess_1", str(workspace), user_id="owner")
+        store.insert_turn("sess_1", "turn_1", "write notes.md", "needs_approval")
+
+        body = client.get("/api/sessions/sess_1", headers=headers).json()
+        assert principal != "principal_someone_else"
+        assert body["parked_approvals"] == []
+
     def test_a_turn_is_not_resumable_until_its_approval_is_resolved(
         self, client: TestClient, workspace: Path
     ) -> None:

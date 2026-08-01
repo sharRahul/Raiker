@@ -476,6 +476,7 @@ def get_memory(
 
 def update_memory(
     memory_id: str, *, workspace_root: str | Path = ".", text: str | None = None,
+    scope: str | None = None,
     search_enabled: bool | None = None, expires_at: str | None = None,
     update_expires_at: bool = False,
     store: SQLiteStore | None = None,
@@ -487,6 +488,7 @@ def update_memory(
     updated = replace(
         entry,
         text=entry.text if text is None else text,
+        scope=entry.scope if scope is None else scope,
         sensitivity=entry.sensitivity if text is None else classify_memory_sensitivity(text).value,
         search_enabled=entry.search_enabled if search_enabled is None else search_enabled,
         expires_at=expires_at if update_expires_at else entry.expires_at,

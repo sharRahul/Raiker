@@ -29,8 +29,10 @@ silent bypass.
   local, reversible, checkpointed capabilities the relay is wired for.
 - Evidence is redacted and metadata-oriented; credentials and secret-like
   durable-memory content are denied before persistence.
-- Unsupported, remote, cloud, and sensitive domains remain disabled and
-  fail-closed until a real executor and all governance requirements exist.
+- Unsupported and sensitive domains remain disabled and fail-closed until a
+  real executor and all governance requirements exist. Supported SSH/Daytona
+  execution remains unavailable until its owner profile, credential reference,
+  policy gate, decision mode, cost ceiling, and explicit approval all permit it.
 - Controls should be inspectable, reversible where the underlying operation
   permits it, and least disruptive to ordinary safe work.
 

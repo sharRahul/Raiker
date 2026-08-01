@@ -5,6 +5,8 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
+  import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
+  import ModelCapacityBadge from "../components/ModelCapacityBadge.svelte";
   import { api, ApiError } from "../api";
   import type { ApprovalView, TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
@@ -189,7 +191,7 @@
     {#if title.trim() && !objective.trim()}<p id="instructions-error" class="field-error" role="alert">Instructions are required.</p>{/if}
     <div class="fields"><label>Parent work<select class="select" aria-label="Parent work" bind:value={parentTaskId}><option value="">No parent — top-level work</option>{#each tasks ?? [] as task (task.task_id)}<option value={task.task_id}>{task.title}</option>{/each}</select></label><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>{#if cadence === "once" || cadence === "daily"}<label>Start time<input class="input" aria-label="Start time" type="datetime-local" bind:value={scheduledAt} required /></label>{/if}</div>
     {#if cadence === "now"}
-      <div class="task-model"><span>Task model</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model /></div>
+      <div class="task-model"><span>Task model</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model /><ExecutionEnvironmentBadge /><ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} /></div>
     {:else}
       <p class="schedule-model-note">Uses the global model active when this run begins.</p>
     {/if}

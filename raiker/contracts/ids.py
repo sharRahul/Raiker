@@ -17,6 +17,8 @@ _PREFIXES = {
     "task_",
     # One row of per-turn token accounting in the model usage ledger.
     "usage_",
+    # Administrator context-capacity registry history row.
+    "mcap_",
     "appr_",
     "memcand_",
     "ver_",

@@ -7,6 +7,8 @@ import type {
   AuthSession,
   BrainView,
   BrainSourceResult,
+  BrainSourceBrowse,
+  BrainSourceReview,
   CapabilityDecisionMode,
   CapabilityGate,
   ContextUsage,
@@ -19,6 +21,7 @@ import type {
   Diagnostics,
   DiagnosticsExport,
   EventEntry,
+  ExecutionEnvironmentsView,
   ExtensionsOverview,
   InterruptRequestBody,
   InstanceLaunchResult,
@@ -28,8 +31,11 @@ import type {
   McpFinding,
   Notification,
   MemoryControlView,
+  MemoryProposal,
+  MemoryHistoryEvent,
   MemorySettingsView,
   ModelPricingView,
+  ModelCapacitiesView,
   ModelsView,
   PasswordRecoveryBeginResult,
   ProjectDetail,
@@ -277,6 +283,16 @@ export const api = {
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   models: () => request<ModelsView>("/api/models"),
+  modelCapacities: () => request<ModelCapacitiesView>("/api/models/capacities"),
+  refreshModelCapacities: (force = false) =>
+    postJson<{ ok: boolean; profiles: Array<{ profile_id: string; status: string; reason_code: string | null }> }>(
+      withQuery("/api/models/capacities/refresh", { force: force ? "true" : undefined }), {},
+    ),
+  setModelCapacity: (profileId: string, model: string, tokens: number | null, reason: string) =>
+    request<{ ok: boolean; profile_id: string; model: string; tokens: number | null }>(
+      `/api/models/${encodeURIComponent(profileId)}/capacity`,
+      { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model, tokens, reason }) },
+    ),
   // Read-only status of governed service connectors (never reaches the network;
   // never exposes a credential value). Enabling one is done via the capability
   // gate + decision-mode control plane, not here.
@@ -525,8 +541,29 @@ export const api = {
     request<EventEntry[]>(withQuery("/api/events", params)),
   brain: () => request<BrainView>("/api/brain"),
   addBrainSource: (path: string) => postJson<BrainSourceResult>("/api/brain/sources", { path }),
+  browseBrainSources: (path = ".") =>
+    request<BrainSourceBrowse>(withQuery("/api/brain/sources/browse", { path })),
+  reviewBrainSource: (path: string) =>
+    postJson<BrainSourceReview>("/api/brain/sources/review", { path }),
+  brainPreferences: () => request<{ settings: Record<string, unknown> }>("/api/brain/settings"),
+  saveBrainPreferences: (settings: Record<string, unknown>) =>
+    request<{ ok: boolean; settings: Record<string, unknown>; updated_at: string }>("/api/brain/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings }),
+    }),
   removeBrainSource: (path: string) =>
     request<BrainSourceResult>(withQuery("/api/brain/sources", { path }), { method: "DELETE" }),
+  executionEnvironments: () => request<ExecutionEnvironmentsView>("/api/execution-environments"),
+  configureExecutionEnvironment: (body: {
+    profile_id?: string; kind: "ssh" | "daytona"; name: string; config: Record<string, unknown>; enabled: boolean;
+  }) => request<{ ok: boolean; profile_id: string }>("/api/execution-environments/configure", {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  }),
+  selectExecutionEnvironment: (profile_id: string) =>
+    request<{ ok: boolean; selected_profile_id: string }>("/api/execution-environments/selection", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ profile_id }),
+    }),
   checkpoints: (sessionId?: string, projectId?: string) =>
     request<Checkpoint[]>(
       withQuery("/api/checkpoints", { session_id: sessionId, project_id: projectId }),
@@ -560,6 +597,35 @@ export const api = {
   // project memory from the turn context.
   memories: (scope?: string) =>
     request<MemoryControlView[]>(withQuery("/api/memory", { scope })),
+  memoryProposals: () => request<MemoryProposal[]>("/api/memory/proposals"),
+  decideMemoryProposal: (
+    id: string,
+    body: { decision: "approved" | "rejected"; edited_text?: string; reason?: string; expected_decision: string },
+  ) => postJson<{ ok: boolean; candidate_id: string; decision: string; memory_id?: string }>(
+    `/api/memory/proposals/${encodeURIComponent(id)}/decision`, body,
+  ),
+  memoryHistory: (id: string) =>
+    request<{ ok: boolean; memory_id: string; events: MemoryHistoryEvent[] }>(
+      `/api/memory/${encodeURIComponent(id)}/history`,
+    ),
+  changeMemoryScope: (id: string, scope: string, expectedUpdatedAt: string | null, reason: string) =>
+    request<{ ok: boolean; memory_id: string; scope: string; updated_at: string }>(
+      `/api/memory/${encodeURIComponent(id)}/scope`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope, expected_updated_at: expectedUpdatedAt, reason }),
+      },
+    ),
+  previewMemoryPurge: (id: string) =>
+    request<{ ok: boolean; memory_id: string; artifacts: string[]; backup_disposition: string; requires_confirmation: string }>(
+      `/api/memory/${encodeURIComponent(id)}/purge-preview`,
+    ),
+  purgeMemory: (id: string) =>
+    request<{ ok: boolean; memory_id: string; purged: boolean }>(
+      `/api/memory/${encodeURIComponent(id)}/purge`,
+      { method: "DELETE", headers: { "X-Memory-Purge-Confirm": id } },
+    ),
   setMemoryPinned: (id: string, pinned: boolean) =>
     request<{ ok: boolean; memory_id: string; pinned: boolean }>(
       `/api/memory/${encodeURIComponent(id)}/pin`,

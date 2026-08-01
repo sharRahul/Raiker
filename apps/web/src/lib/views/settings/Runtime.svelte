@@ -21,7 +21,7 @@
   import StepUpDialog from "../../components/StepUpDialog.svelte";
   import type { StepUpValues } from "../../components/StepUpDialog.svelte";
   import { api, ApiError } from "../../api";
-  import type { RuntimeMode } from "../../apiTypes";
+  import type { ExecutionEnvironmentsView, RuntimeMode } from "../../apiTypes";
   import { explainReasonCode } from "../../reasonCodes";
 
   let { principal = "—" }: { principal?: string } = $props();
@@ -32,6 +32,14 @@
   let pending = $state<Pending | null>(null);
   let busy = $state(false);
   let dialogError = $state<string | null>(null);
+  let environments = $state<ExecutionEnvironmentsView | null>(null);
+  let environmentKind = $state<"ssh" | "daytona">("ssh");
+  let environmentName = $state("");
+  let host = $state("");
+  let remoteUser = $state("");
+  let credentialEnv = $state("RAIKER_SSH_IDENTITY_FILE");
+  let sandboxId = $state("");
+  let maxCost = $state(10);
 
   // The runtime is on unless the owner switched it off. An unreadable state is
   // never reported as running — the card says it could not be read instead.
@@ -41,10 +49,28 @@
     loadError = null;
     try {
       mode = await api.runtimeMode();
+      try { environments = await api.executionEnvironments(); } catch { environments = null; }
     } catch (e) {
       mode = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
     }
+  }
+  async function saveEnvironment() {
+    busy = true; notice = null;
+    try {
+      const config = environmentKind === "ssh"
+        ? { host, user: remoteUser, credential_env: credentialEnv, max_runtime_seconds: 300 }
+        : { sandbox_id: sandboxId, api_key_env: credentialEnv, max_cost: maxCost, max_runtime_seconds: 300 };
+      await api.configureExecutionEnvironment({ kind: environmentKind, name: environmentName, config, enabled: true });
+      notice = { kind: "ok", text: `${environmentKind === "ssh" ? "SSH" : "Daytona"} environment saved. Credential values remain in the named environment variable.` };
+      environmentName = ""; host = ""; remoteUser = ""; sandboxId = "";
+      await load();
+    } catch { notice = { kind: "error", text: "The execution profile could not be saved." }; }
+    finally { busy = false; }
+  }
+  async function selectEnvironment(profileId: string) {
+    try { await api.selectExecutionEnvironment(profileId); await load(); }
+    catch { notice = { kind: "error", text: "That environment is not ready. Complete its configuration and credential reference first." }; }
   }
 
   async function confirm(values: StepUpValues) {
@@ -109,6 +135,32 @@
   {/if}
 </section>
 
+<section class="settings-card environment-settings">
+  <div class="card-heading"><span class="eyebrow">Execution targets</span><h3>Local, remote, and cloud environments</h3></div>
+  <p class="description">Choose where Chat, Build, and scheduled work execute. Remote commands still require the remote/cloud capability gate and a per-command approval. Profiles store credential references, never credential values.</p>
+  {#if environments}
+    <div class="environment-grid">
+      {#each environments.environments as environment}
+        <article class:selected={environment.selected}>
+          <div><strong>{environment.name}</strong><span>{environment.kind} · {environment.status.replaceAll("_", " ")}</span></div>
+          <button class="btn btn-ghost btn-sm" disabled={!environment.available || environment.selected} onclick={() => void selectEnvironment(environment.profile_id)}>{environment.selected ? "Selected" : "Select"}</button>
+        </article>
+      {/each}
+    </div>
+  {/if}
+  <details>
+    <summary>Add SSH or Daytona profile</summary>
+    <form class="environment-form" onsubmit={(event) => { event.preventDefault(); void saveEnvironment(); }}>
+      <label>Environment type<select bind:value={environmentKind} onchange={() => credentialEnv = environmentKind === "ssh" ? "RAIKER_SSH_IDENTITY_FILE" : "DAYTONA_API_KEY"}><option value="ssh">SSH remote host</option><option value="daytona">Daytona cloud sandbox</option></select></label>
+      <label>Display name<input bind:value={environmentName} required placeholder="Build host" /></label>
+      {#if environmentKind === "ssh"}<label>Host<input bind:value={host} required placeholder="build.example.com" /></label><label>Remote user<input bind:value={remoteUser} required placeholder="raiker" /></label>{:else}<label>Sandbox ID<input bind:value={sandboxId} required placeholder="sandbox-id" /></label><label>Maximum run cost (USD)<input type="number" min="0.01" step="0.01" bind:value={maxCost} /></label>{/if}
+      <label>Credential environment variable<input bind:value={credentialEnv} required pattern={"[A-Z][A-Z0-9_]{2,127}"} /></label>
+      <small>{environmentKind === "ssh" ? "The variable must contain the path to an OpenSSH private key; known-host verification stays strict." : "The variable must contain the Daytona API key; the configured budget is checked before execution."}</small>
+      <button class="btn btn-primary" disabled={busy}>Save environment</button>
+    </form>
+  </details>
+</section>
+
 <section class="danger-zone">
   <h3>Danger zone</h3>
   {#if running}
@@ -138,6 +190,7 @@
 <style>
   .section-heading { margin-bottom: var(--space-4); } .section-heading h2, h3, h4 { margin: 0; } .section-heading p, .description, .danger-zone p { color: var(--text-2); }
   .settings-card, .danger-zone { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: clamp(1.25rem, 3vw, 2rem); }
+  .environment-settings { margin-top:var(--space-5); } .environment-grid { display:grid; gap:var(--space-2); margin:var(--space-4) 0; } .environment-grid article { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-grid article.selected { border-color:var(--accent-border); background:var(--accent-soft); } .environment-grid article div { display:grid; gap:.2rem; } .environment-grid article span { color:var(--text-3); font-size:.75rem; text-transform:capitalize; } details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; color:var(--text-2); font-size:.78rem; } .environment-form input,.environment-form select { min-height:40px; padding:0 .65rem; border:1px solid var(--border); border-radius:var(--r-md); background:var(--sunken); color:var(--text-1); } .environment-form small,.environment-form button { grid-column:1/-1; }
   .status { color: var(--ok); font-size: .85rem; } .status.stopped { color: var(--warn); }
   .eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; font-weight: 700; }
   dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); padding: var(--space-4) 0; border-block: 1px solid var(--border); } dl div { display: grid; gap: .2rem; } dt { color: var(--text-3); font-size: .75rem; } dd { margin: 0; }

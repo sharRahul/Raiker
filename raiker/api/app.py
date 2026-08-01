@@ -220,6 +220,8 @@ def create_app(
                 # (BUG-25).
                 with suppress(Exception):
                     await scheduler.resume_approved()
+                with suppress(Exception):
+                    await scheduler.refresh_model_capacities()
                 with suppress(TimeoutError):
                     await asyncio.wait_for(stop.wait(), timeout=15)
         worker = asyncio.create_task(tick())

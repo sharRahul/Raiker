@@ -423,9 +423,11 @@ def test_high_risk_capabilities_default_disabled() -> None:
         assert cap in REAL_EXECUTOR_CAPABILITIES
         assert gates[cap].state == CapabilityState.ENABLED_RUNTIME, f"{cap} not enabled"
     # Not-yet-integrated (no-executor) capabilities stay DISABLED / fail closed.
-    for cap in ("finance_runtime", "medical_runtime", "cctv_runtime", "remote_execution_cap"):
+    for cap in ("finance_runtime", "medical_runtime", "cctv_runtime"):
         assert cap not in REAL_EXECUTOR_CAPABILITIES
         assert gates[cap].state in (CapabilityState.DISABLED, CapabilityState.PLANNED), f"{cap} not disabled"
+    assert "remote_execution_cap" in REAL_EXECUTOR_CAPABILITIES
+    assert gates["remote_execution_cap"].state == CapabilityState.ENABLED_RUNTIME
 
 
 def test_invalid_transitions_fail_closed() -> None:
@@ -1182,14 +1184,14 @@ def test_dangerous_capabilities_remain_disabled_by_default(authority: RuntimeAut
     from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
 
     # Not-yet-integrated (no real executor) dangerous capabilities must stay disabled.
-    not_integrated = [
-        "finance_runtime", "investment_runtime", "medical_runtime", "cctv_runtime",
-        "remote_execution_cap", "cloud_execution_cap",
-    ]
+    not_integrated = ["finance_runtime", "investment_runtime", "medical_runtime", "cctv_runtime"]
     for cap in not_integrated:
         assert cap not in REAL_EXECUTOR_CAPABILITIES
         gate = authority.get_effective_capability_gate(cap)
         assert gate["state"] == "disabled", f"{cap} should be disabled, got {gate['state']}"
+    for cap in ("remote_execution_cap", "cloud_execution_cap"):
+        assert cap in REAL_EXECUTOR_CAPABILITIES
+        assert authority.get_effective_capability_gate(cap)["state"] == "enabled_runtime"
     # Integrated dangerous capabilities ship enabled (governed by default-ask + env allowlists).
     for cap in ("shell_execution", "process_execution", "network_execution", "container_execution_cap"):
         assert cap in REAL_EXECUTOR_CAPABILITIES

@@ -384,6 +384,7 @@ describe("ChatView streaming transcript", () => {
     expect(body.attachments).toEqual([{ type: "path", path: "docs/HANDOFF.md" }]);
     // The sent turn shows the attachment chip; the composer input is cleared.
     expect((screen.getByLabelText("Attachment path") as HTMLInputElement).value).toBe("");
+    expect(screen.getByText("HANDOFF.md").closest(".message-bubble-user")).toBeNull();
   });
 
   it("uploads an image and sends it as an image attachment reference", async () => {

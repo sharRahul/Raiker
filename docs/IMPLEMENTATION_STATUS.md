@@ -20,13 +20,19 @@
 | `test_only` | Reserved for offline test support |
 | `disabled_deferred` | No usable executor; fails closed |
 
-Approval resolution is `metadata_only` for every capability except an approved
-local **file mutation** (`file_write_execution`, `patch_apply_execution`), which
-is executed once through the governed approval execution relay — re-governed at
-execution time and checkpointed so it stays reversible.
+Approval resolution is `metadata_only` except for approved local file mutations
+(`file_write_execution`, `patch_apply_execution`) and configured SSH/Daytona
+commands (`remote_execution_cap`, `cloud_execution_cap`). Those bounded actions
+execute once through the governed relay and are re-governed at execution time;
+file mutations are additionally checkpointed so they stay reversible.
+Approval remains metadata-only for every other capability.
 CLI durable memory mutation is `implemented_approval_required`.
 
-Integrated real executors (including graph indexing, semantic/vector runtimes, plugin execution slices, channel runtime, container, scheduled routines, model-provider runtime, and local email/calendar/reminder stores) are `implemented_policy_gated`/governed per action; remote/cloud command execution and sensitive finance/investment/medical/pregnancy/CCTV/home-security/hardware domains remain `disabled_deferred` and fail closed.
+Integrated real executors (including graph indexing, semantic/vector runtimes,
+plugin slices, channels, container, scheduled routines, model providers,
+SSH/Daytona command execution, and local email/calendar/reminder stores) are
+governed per action. Sensitive finance/investment/medical/pregnancy/CCTV/
+home-security/hardware domains remain `disabled_deferred` and fail closed.
 
 Phase 4 memory MVP is implemented. The launchable interfaces are the local
 terminal client and loopback web dashboard. Owner bootstrap creates the owner
@@ -73,6 +79,6 @@ Phase 3 is complete for the following metadata and readiness slices. Phase 4 rem
 | Slice M | Storage cleanup reports readiness and produces cleanup previews. Cleanup execution remains governed and fail-closed where no executor is available. |
 | Slice N | Plugin server startup readiness reports plugin capability and blockers; plugins do not become an authority bypass. |
 | Slice O | External channels and notifications expose metadata readiness only; runtime dispatch events are introduced only with a governed executor. |
-| Slice P | Remote, container, and cloud readiness records metadata only. These execution domains remain disabled and fail-closed. |
+| Slice P | The historical Phase 3 readiness record remains metadata-only. Current SSH and Daytona profiles have real executors and stay unavailable until an owner configures and selects one; other remote/container/cloud types remain fail-closed. |
 
 Strict non-allow blocking, role revoke governed, and capability gate per action are enforced. This document distinguishes metadata-only, dry-run-only, contract-only, readiness-only, implemented-read-only, and test-only surfaces from executable capabilities.

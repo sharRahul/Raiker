@@ -14,14 +14,23 @@ if TYPE_CHECKING:
 
 # Local container execution (Phase 4 slice 3), sandboxed-first: run an
 # owner-allowlisted image with no network, dropped capabilities, no host mounts,
-# memory/cpu/pid limits, a read-only rootfs, and a timeout. Remote/cloud
-# execution stays fail-closed (tier5_network). Only images the owner explicitly
-# allowlists can run; an empty allowlist denies everything (fail closed).
+# memory/cpu/pid limits, a read-only rootfs, and a timeout. Only images the owner
+# explicitly allowlists can run; an empty allowlist denies everything (fail
+# closed).
 
 CONTAINER_RUN_TIMEOUT = 60.0
 _MAX_TIMEOUT = 300.0
 
 CommandRunner = Callable[..., dict[str, Any]]
+
+
+def _docker_user_args() -> list[str]:
+    """Preserve host ownership on POSIX without calling unavailable Windows APIs."""
+    getuid = getattr(os, "getuid", None)
+    getgid = getattr(os, "getgid", None)
+    if getuid is None or getgid is None:
+        return []
+    return ["--user", f"{getuid()}:{getgid()}"]
 
 
 def command_sandbox_image() -> str:
@@ -57,7 +66,7 @@ def run_isolated_workspace_command(
         "--pids-limit", "256",
         "--cap-drop", "ALL",
         "--security-opt", "no-new-privileges",
-        "--user", f"{os.getuid()}:{os.getgid()}",
+        *_docker_user_args(),
         "--mount", f"type=bind,src={workspace},dst=/workspace",
         "--workdir", "/workspace",
         image,

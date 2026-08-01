@@ -13,14 +13,12 @@ from raiker.runtime.executors import (
     REAL_EXECUTOR_CAPABILITIES,
     build_default_executor_registry,
 )
-from raiker.runtime.executors.tier5_network import RemoteExecutionExecutor
 from raiker.runtime.executors.tier6_domains import FinanceRuntimeExecutor, MedicalRuntimeExecutor
 from raiker.storage.sqlite import SQLiteStore
 
 _SENSITIVE = (
     "medical_runtime", "finance_runtime", "investment_runtime", "cctv_runtime",
-    "home_security_runtime", "hardware_operator_runtime", "remote_execution_cap",
-    "cloud_execution_cap",
+    "home_security_runtime", "hardware_operator_runtime",
     # vector_embedding_runtime (local) and model_provider_runtime (provider-backed)
     # are now real executors; the sensitive/no-executor domains above stay stubbed.
 )
@@ -69,7 +67,7 @@ def test_stub_executors_fail_closed(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     action = SimpleNamespace(action_id="act_x", arguments={})
     principal = SimpleNamespace(principal_id="p")
-    for executor in (MedicalRuntimeExecutor(ws), FinanceRuntimeExecutor(ws), RemoteExecutionExecutor(ws)):
+    for executor in (MedicalRuntimeExecutor(ws), FinanceRuntimeExecutor(ws)):
         result = executor.execute(action, principal)  # type: ignore[arg-type]
         assert result.ok is False
         assert result.reason_code is not None

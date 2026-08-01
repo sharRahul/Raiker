@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import BrainView from "./BrainView.svelte";
 import { stubFetch, stubFetchPending } from "../test-helpers";
@@ -66,5 +66,38 @@ describe("BrainView", () => {
     expect(await screen.findByRole("complementary", { name: "Graph settings" })).toBeInTheDocument();
     expect(screen.getByText("Centre force")).toBeInTheDocument();
     expect(screen.getByText("Always alive")).toBeInTheDocument();
+  });
+
+  it("browses and reviews a source before adding it", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/brain": {
+        generated_at: "2026-07-15T00:00:00Z", illustrative_motion_notice: "Visual motion only.",
+        nodes: [{ node_id: "principal:p", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: true }], edges: [],
+      },
+      "GET /api/brain/settings": { settings: {} },
+      "GET /api/brain/sources/browse?path=.": {
+        path: ".", parent: null, truncated: false,
+        children: [{ name: "docs", path: "docs", kind: "folder", size_bytes: null }],
+      },
+      "GET /api/brain/sources/browse?path=docs": {
+        path: "docs", parent: ".", truncated: false,
+        children: [{ name: "notes.md", path: "docs/notes.md", kind: "file", size_bytes: 12 }],
+      },
+      "POST /api/brain/sources/review": {
+        path: "docs", kind: "folder", supported_files: 1, unsupported_files: 0,
+        total_bytes: 12, examples: ["docs/notes.md"], warnings: [], review_cap: 5000,
+      },
+      "POST /api/brain/sources": { ok: true, path: "docs" },
+    });
+    render(BrainView);
+    await screen.findByRole("button", { name: "Add workspace source" });
+    await fireEvent.click(screen.getByRole("button", { name: "Add workspace source" }));
+    await fireEvent.input(screen.getByLabelText("Workspace-relative path"), { target: { value: "docs" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Review indexing plan" }));
+    expect(await screen.findByText("Indexing plan")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Add reviewed source" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/brain/sources", expect.objectContaining({ method: "POST" }),
+    ));
   });
 });

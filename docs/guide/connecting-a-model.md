@@ -43,9 +43,11 @@ Consent by configuration is scoped, not a blanket opening:
   any other host.
 - A capability gate you **explicitly** turn off wins over a saved connection.
   Revocation is absolute, or the control would be theatre.
-- Deferred dangerous domains — remote and cloud execution, finance, medical,
-  pregnancy, CCTV, home security, hardware — have no governed executor and stay
-  unavailable regardless.
+- Deferred dangerous domains — finance, medical, pregnancy, CCTV, home
+  security, and hardware — have no governed executor and stay unavailable
+  regardless. SSH and Daytona execution are separate, explicit owner-profile
+  features with approval, credential-reference, host-key, timeout/output, and
+  cost-ceiling controls.
 - Critical actions still stop for approval, and the STOP switch still halts work
   at a safe boundary.
 

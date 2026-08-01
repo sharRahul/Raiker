@@ -10,8 +10,8 @@ Per-capability threat model required by
 `hosted_model_runtime` and `private_network_model_runtime` may join
 `REAL_EXECUTOR_CAPABILITIES`. This slice satisfies the per-integration opt-in
 checklist recorded in [`remote-cloud.md`](remote-cloud.md) for the two
-model-runtime capabilities; **remote/cloud command execution stays
-fail-closed** per that document.
+model-runtime capabilities. SSH/Daytona command execution remains separately
+owner-profile gated; other remote/cloud providers stay fail-closed.
 
 ## What this slice covers
 

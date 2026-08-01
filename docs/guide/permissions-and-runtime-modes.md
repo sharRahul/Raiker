@@ -90,11 +90,13 @@ MCP) require all three of:
 ### Capabilities with no enable path
 
 Some capabilities show no **Turn on** at all: CCTV, finance, medical,
-pregnancy/baby, home security, hardware operation, remote and cloud execution,
-checkpoint-restore execution. These are **deferred**, not merely gated — no
-governed executor exists, so the runtime refuses to pretend one does.
-Observability → Diagnostics lists them (42 on a stock install) under *"Disabled
-/ deferred capabilities"*.
+pregnancy/baby, home security, hardware operation, and checkpoint-restore
+execution. These are **deferred**, not merely gated — no governed executor
+exists, so the runtime refuses to pretend one does. SSH remote and Daytona
+cloud execution instead require an owner-configured profile, their dedicated
+capability gate, and approval for each action.
+Observability → Diagnostics lists them under *"Disabled / deferred
+capabilities"*.
 
 ---
 

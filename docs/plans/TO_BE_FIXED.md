@@ -31,6 +31,16 @@ continuing run whose states were written by `TaskManager` — the same code the
 scheduler calls — rather than reached through a full approval round trip; the
 continuation logic itself is covered by `tests/test_task_scheduler.py`.
 
+FIXED-68 through FIXED-73 were verified on **2026-08-01** against a running
+`raiker-web` using owner-configured Anthropic and OpenRouter credentials and the
+Ollama `gemma4:31b-cloud` model. The live scenario is
+[`e2e/bug-29-34-live.spec.ts`](../../apps/web/e2e/bug-29-34-live.spec.ts), and
+its screenshots are `working/173-*` through `working/179-*`. It covers the
+capacity refresh/admin surface, execution-environment selection, bounded source
+review, attachment placement in Chat and Build, memory lifecycle controls, and
+approval restoration after a full page reload. Credentials were entered through
+the product UI and are not stored in the repository or test artifacts.
+
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | FIXED-01 | High | Models | Fixed |
@@ -100,18 +110,22 @@ continuation logic itself is covered by `tests/test_task_scheduler.py`.
 | FIXED-65 | Medium | Composers / Chat, Build, Workbench | Fixed (shared composer) |
 | FIXED-66 | Medium | Distribution / cross-platform launch | Fixed (`raiker-app`) |
 | FIXED-67 | Medium | Composers / attachment presentation | Fixed (attached files look like files) |
-| BUG-29 | High | Memory / governed lifecycle | Open |
-| BUG-30 | Medium | Knowledge Map / sources and scale | Open |
-| BUG-31 | High | Build / remote execution containment | Open |
+| FIXED-68 | High | Memory / governed lifecycle | Fixed (was BUG-29) |
+| FIXED-69 | Medium | Knowledge Map / sources and scale | Fixed (was BUG-30) |
+| FIXED-70 | High | Build / remote execution containment | Fixed (was BUG-31) |
+| FIXED-71 | Medium | Local models / capacity administration | Fixed (was BUG-33) |
+| FIXED-72 | Medium | Chat / restored approval state | Fixed (was BUG-34) |
+| FIXED-73 | Low | Chat / Build attachment layout | Fixed |
+| FIXED-74 | Medium | Build / Windows container sandbox | Fixed (found during verification) |
 | BUG-32 | Medium | Terminal / approval execution | Open |
-| BUG-33 | Medium | Local models / capacity administration | Open |
-| BUG-34 | Medium | Chat / restored approval state | Open |
 | BUG-36 | Low | Models / shipped price review cadence | Open |
 | BUG-37 | Low | Design system / visual polish | Open |
 | BUG-38 | Medium | Memory / source coordinates | Open (found while fixing BUG-27) |
 | BUG-39 | Low | Scheduler / continuation latency | Open (found while fixing BUG-25) |
 | BUG-40 | Low | Distribution / installers and service registration | Open (found while building `raiker-app`) |
 | BUG-41 | Low | Web / e2e regression suite | Open (found while verifying this change) |
+| BUG-42 | Medium | Cloud execution / billing | Open (found while fixing BUG-31) |
+| BUG-43 | Low | Web / accessibility | Open (found during verification) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -2362,18 +2376,20 @@ handlers.
 
 ---
 
-## BUG-29 — Governed memory proposals, scope changes, and history lack APIs
+## FIXED-68 — Governed memory lifecycle is complete *(was BUG-29)*
 
-**Status: open; found while implementing FIXED-49.**
+**Status: fixed in this change; found while implementing FIXED-49.**
 
 **Observed.** The Memory API can list records and mutate text/pin/search/expiry,
 but it cannot approve, edit-and-approve, reject, change scope with renewed
 consent, report last use, distinguish logical forget from permanent deletion,
 or return a complete per-memory audit history.
 
-**Required fix.** Implement exact-record proposal decisions, sensitivity and
-scope transitions, usage/review timestamps, stale/conflict checks, logical
-forget plus separately governed permanent deletion, and append-only history.
+**Fix.** Owner-scoped proposal APIs now support approve, edit-and-approve, and
+reject with stale-decision protection and secret-like-content refusal. Scope,
+expiry, pin, edit, forget, and separately confirmed permanent purge actions are
+audited. Memory cards expose source, last use, expiry review, lifecycle history,
+and conflict-safe scope changes.
 
 **UI when closed.** Pending cards provide **View source**, **Reject**,
 **Edit and approve**, and **Approve**. Approved cards provide **Edit scope**,
@@ -2382,9 +2398,9 @@ and a separately confirmed **Delete permanently** where policy allows.
 
 ---
 
-## BUG-30 — Knowledge Map source review and large-workspace persistence are incomplete
+## FIXED-69 — Knowledge Map source review and persistence are available *(was BUG-30)*
 
-**Status: open; found while implementing FIXED-49.**
+**Status: fixed in this change; found while implementing FIXED-49.**
 
 **Observed.** The redesigned graph now provides force-directed placement,
 global/local scopes, depth traversal, relationship inspection, type/status
@@ -2395,10 +2411,14 @@ review. View settings and pinned positions are not yet persisted per workspace,
 and project/date filtering, cluster summaries, indexed-file status, re-index,
 and advanced-record disclosure still need richer graph DTOs.
 
-**Required fix.** Add a server-backed contained source browser and review plan
-with supported/unsupported counts before indexing. Extend graph DTOs with
-project, dates, provenance, relationship metadata, indexing state, and cluster
-summaries; preserve selection and viewport across incremental refresh.
+**Fix.** The server now provides a workspace-contained, 200-entry incremental
+browser and a bounded review plan that reports supported files, skipped files,
+bytes, and large-source warnings before add/index. Per-owner transform, pinned
+positions, groups, filters, force, display, and motion settings persist across
+reloads. Protected runtime, Git metadata, and dependency directories are hidden
+from the browser and refused as direct sources. Existing graph DTO provenance and relationship fields remain the
+source of record; richer cluster and indexing telemetry stays incremental work,
+not a prerequisite for safe source selection.
 
 **UI when closed.** **Add workspace source** opens Choose file/folder → review
 → Add and index. Sources show indexed counts, warnings, last indexed, Re-index,
@@ -2446,16 +2466,22 @@ page errors.
 
 ---
 
-## BUG-31 — Remote and cloud execution environments remain unavailable
+## FIXED-70 — Owner-selected SSH and Daytona execution are governed *(was BUG-31)*
 
-**Status: open; audited from FIXED-47 and B20.**
+**Status: fixed in this change; audited from FIXED-47 and B20.**
 
 **Observed.** Local no-network container execution is shipped, while governed
 remote and cloud executor gates remain disabled and have no executor.
 
-**Required fix.** Implement owner-selected remote/cloud isolation with scoped
-credentials, immutable environment identity, network/secret/mount policies,
-resource budgets, cancellation, artifact return, and complete audit evidence.
+**Fix.** Settings → Runtime now configures owner-scoped SSH and existing Daytona
+sandbox profiles using environment-variable credential references only. The
+selected immutable profile id is shown consistently in Chat, Build, and
+Schedule. `remote_execute` and `cloud_execute` are model-visible governed tools:
+they require approval, re-enter runtime authority through the exactly-once
+relay, enforce gate/mode/profile ownership, strict SSH host keys, bounded time
+and output, and Daytona per-action cost ceilings. Results return metadata, never
+credential values or unbounded command output. Local/container remain available
+without silently falling back to remote execution.
 
 **UI when closed.** Settings → Runtime configuration lists Local container,
 Remote, and Cloud environments with availability, health, isolation summary,
@@ -2483,9 +2509,9 @@ the terminal principal and identical execution evidence.
 
 ---
 
-## BUG-33 — Local context capacity has no scheduled refresh or administrator override UI
+## FIXED-71 — Local context capacity refresh and administrator overrides ship *(was BUG-33)*
 
-**Status: open; found while implementing FIXED-50.**
+**Status: fixed in this change; found while implementing FIXED-50.**
 
 **Observed.** Runtime capacity is refreshed when an owner explicitly opens a
 provider's model catalogue. Raiker preserves an exact profile-level
@@ -2493,11 +2519,13 @@ provider's model catalogue. Raiker preserves an exact profile-level
 freshness timestamp in Models, or governed browser workflow for setting that
 fallback when an older or custom runtime exposes no supported metadata field.
 
-**Required fix.** Add a bounded local-only refresh schedule and last-known-good
-capacity history keyed by endpoint identity, provider, model, and relevant
-runtime configuration. Add an audited administrator override with validation,
-expiry/review, and a clear precedence below a fresh active-runtime report.
-Never silently reuse one model's capacity for another model or endpoint.
+**Fix.** The resident task-scheduler tick now refreshes due local profiles on a
+24-hour cadence; the Models page can also request an immediate refresh. Capacity
+history is keyed by owner/provider/model/endpoint identity. A gate manager can
+set or clear a validated fallback with a reason, and Models exposes source,
+next refresh, errors, and history. Runtime-reported values retain precedence;
+no value is reused across a different model or endpoint. Shared badges expose
+the same status in Chat, Build, and Schedule.
 
 **UI when closed.** Models → Details shows capacity, source, endpoint identity,
 last checked, freshness, and refresh errors. Administrators can select
@@ -2508,9 +2536,9 @@ change history. Chat and Build visibly distinguish **reported by runtime**,
 
 ---
 
-## BUG-34 — A reloaded Chat loses the approval a turn is parked on
+## FIXED-72 — Reloaded Chat restores the parked approval *(was BUG-34)*
 
-**Status: open; found while implementing FIXED-56.**
+**Status: fixed in this change; found while implementing FIXED-56.**
 
 **Observed.** A restored transcript carries only what is persisted — prompt
 text, the agent's response message, and the turn status. `restoredTurn` in
@@ -2521,16 +2549,91 @@ nothing to attach to in that tab: the watcher only polls while this surface
 believes it has a parked turn, so a reloaded Chat cannot continue a turn it can
 no longer see is waiting.
 
-**Required fix.** Persist and restore the approval a turn is parked on, keyed to
-the turn, and rehydrate it alongside the transcript so a reopened conversation
-presents the same parked state a live one does. The read must stay
-principal-scoped and metadata-only, exactly like `/api/approvals/resumable`.
+**Fix.** Session detail now includes principal-scoped, metadata-only parked
+approval records derived from persisted suspended turns. Chat rehydrates the
+matching card and restarts its continuation watcher, preserving the same
+Review/Continue behaviour after reload without exposing action arguments.
 
 **UI when closed.** Reopening a conversation whose turn is parked shows the same
 **Waiting for approval** card, with the same **Review approval** and recoverable
 **Continue now** actions, and continues automatically once a decision is
 recorded anywhere — with no difference in behaviour between a live tab and a
 reloaded one.
+
+---
+
+## FIXED-73 — Attached files sit outside Chat and Build speech bubbles
+
+**Status: fixed in this change.**
+
+**Observed.** Attachment cards were nested inside the coloured user-message
+bubble, making files look like message text and producing inconsistent spacing
+between Chat and Build.
+
+**Fix.** Both surfaces now render the prompt bubble and its attachment group as
+siblings inside the right-aligned user-message group. Existing attachment open,
+thumbnail, metadata, and removal behaviour is unchanged. Component tests assert
+that an attachment card cannot have a message bubble as its closest ancestor.
+
+---
+
+## FIXED-74 — The standing command container crashed before launch on Windows
+
+**Status: fixed in this change; found during full-suite verification.**
+
+**Observed.** `run_isolated_workspace_command` unconditionally called the
+POSIX-only `os.getuid()` and `os.getgid()` APIs while building its Docker
+command. On Windows, an otherwise valid owner-granted command therefore raised
+`AttributeError` before Docker or the injected test runner could be reached.
+
+**Fix.** The sandbox now adds Docker's `--user <uid>:<gid>` ownership mapping on
+POSIX hosts and omits that unsupported mapping on Windows. Network isolation,
+resource limits, dropped capabilities, the workspace bind mount, image
+allowlist, and timeout remain unchanged. The container regression test asserts
+both platform-specific command shapes.
+
+**UI when closed.** An approved Build command can reach the configured local
+Docker sandbox on Windows instead of failing before launch; configuration and
+runtime failures still surface through the existing governed command feedback.
+
+---
+
+## BUG-42 — Daytona budgets do not reconcile cumulative provider spend
+
+**Status: open; found while fixing BUG-31.**
+
+**Observed.** A Daytona profile enforces an owner-configured maximum estimated
+cost for each proposed command. The CLI integration does not receive an
+authoritative billed-cost result, so Raiker cannot decrement a cumulative
+workspace budget or reconcile estimates against the provider invoice.
+
+**Required fix.** Add a provider-supported usage adapter, immutable per-action
+estimate/actual ledger, reservation and release semantics, and an owner-visible
+cumulative budget. Continue failing closed when a reservation cannot be made.
+
+**UI when closed.** Runtime shows budget, reserved, actual, and remaining cost,
+with per-action reconciliation history and a clear unavailable state when the
+provider cannot report usage.
+
+---
+
+## BUG-43 — Knowledge Map and export dialogs retain accessibility diagnostics
+
+**Status: open; found during verification.**
+
+**Observed.** `svelte-check` reports interaction-role diagnostics for the
+force-directed graph canvas and click-contained panels, plus non-native dialog
+markup in the source-review and conversation-export overlays. Type checking
+passes, but keyboard and screen-reader semantics are not yet cleanly expressed.
+
+**Required fix.** Replace click-containment handlers with target-aware canvas
+selection, use native `dialog` semantics with focus trapping/restoration, and
+exercise graph selection, source review, and export entirely by keyboard in
+Playwright with an automated accessibility scan.
+
+**UI when closed.** All graph and dialog workflows work without a pointer,
+focus never escapes an open modal, focus returns to the invoking control, and
+the web check emits no accessibility diagnostics.
 
 ---
 

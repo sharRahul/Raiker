@@ -205,7 +205,7 @@ def main() -> int:
     not_integrated_remain_disabled = {
         "finance_runtime", "investment_runtime", "medical_runtime",
         "pregnancy_baby_runtime", "cctv_runtime", "home_security_runtime",
-        "hardware_operator_runtime", "remote_execution_cap", "cloud_execution_cap",
+        "hardware_operator_runtime",
     }
     for cap in not_integrated_remain_disabled:
         remain_gate = gates.get(cap)
@@ -266,7 +266,6 @@ def main() -> int:
         "finance_runtime", "investment_runtime",
         "medical_runtime", "pregnancy_baby_runtime", "cctv_runtime",
         "home_security_runtime", "hardware_operator_runtime",
-        "remote_execution_cap", "cloud_execution_cap",
     }
     # Promoted/integrated capabilities are real, bounded, threat-modelled executors;
     # they default enabled and are governed per action (checked above):
@@ -277,8 +276,6 @@ def main() -> int:
     # env-only credentials), and plugin_install (slice 8 — local manifest
     # validation + install-record creation only), and plugin_execution_cap
     # (slice 9 — brokered read-only installed-plugin tool invocation only).
-    # Remote/cloud command execution must still lack a default executor
-    # (fail-closed).
     for cap in must_not_have_default_executor:
         if cap in REAL_EXECUTOR_CAPABILITIES:
             errors.append(f"sensitive_capability_has_default_executor:{cap}")

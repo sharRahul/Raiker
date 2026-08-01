@@ -8,10 +8,11 @@ answers "what do we know about this model, and who told us".
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from raiker.contracts.ids import utc_now
+from raiker.contracts.ids import new_id, utc_now
 from raiker.models.pricing import ModelFacts, ModelPrice, facts_from_provider_metadata
 
 
@@ -93,6 +94,104 @@ class ModelFactsStore:
     ) -> ModelPrice | None:
         facts = self._read(owner_principal_id, provider, model, "owner")
         return facts.price if facts else None
+
+    def owner_context_capacity(
+        self, owner_principal_id: str, provider: str, model: str
+    ) -> tuple[int, str] | None:
+        with self.store.connect() as connection:
+            row = connection.execute(
+                """SELECT context_window_tokens, fetched_at FROM model_facts_cache
+                WHERE owner_principal_id = ? AND provider = ? AND model = ? AND source = 'owner'""",
+                (owner_principal_id, provider, model),
+            ).fetchone()
+        if row is None or row["context_window_tokens"] is None:
+            return None
+        return int(row["context_window_tokens"]), str(row["fetched_at"])
+
+    def set_owner_context_capacity(
+        self,
+        owner_principal_id: str,
+        provider: str,
+        model: str,
+        *,
+        tokens: int | None,
+        endpoint_identity: str,
+        reason: str,
+        recorded_by: str,
+    ) -> None:
+        if tokens is not None and (isinstance(tokens, bool) or tokens < 1024 or tokens > 100_000_000):
+            raise ValueError("model_context_capacity_invalid")
+        now = utc_now()
+        with self.store.connect() as connection:
+            if tokens is None:
+                connection.execute(
+                    """UPDATE model_facts_cache SET context_window_tokens = NULL, fetched_at = ?
+                    WHERE owner_principal_id = ? AND provider = ? AND model = ? AND source = 'owner'""",
+                    (now, owner_principal_id, provider, model),
+                )
+            else:
+                connection.execute(
+                    """INSERT INTO model_facts_cache (
+                      owner_principal_id, provider, model, source, context_window_tokens,
+                      max_output_tokens, input_price_per_mtok, output_price_per_mtok, currency, fetched_at
+                    ) VALUES (?, ?, ?, 'owner', ?, NULL, NULL, NULL, NULL, ?)
+                    ON CONFLICT(owner_principal_id, provider, model, source) DO UPDATE SET
+                      context_window_tokens = excluded.context_window_tokens,
+                      fetched_at = excluded.fetched_at""",
+                    (owner_principal_id, provider, model, tokens, now),
+                )
+            connection.execute(
+                "INSERT INTO model_capacity_history VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    new_id("mcap_"), owner_principal_id, provider, model,
+                    endpoint_identity, tokens, "cleared" if tokens is None else "set",
+                    reason, recorded_by, now,
+                ),
+            )
+
+    def capacity_history(
+        self, owner_principal_id: str, provider: str, model: str
+    ) -> list[dict[str, Any]]:
+        with self.store.connect() as connection:
+            rows = connection.execute(
+                """SELECT capacity_id, endpoint_identity, context_window_tokens, action,
+                reason, recorded_by, recorded_at FROM model_capacity_history
+                WHERE owner_principal_id = ? AND provider = ? AND model = ?
+                ORDER BY recorded_at DESC, capacity_id DESC""",
+                (owner_principal_id, provider, model),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def capacity_refresh_state(self, owner_principal_id: str) -> list[dict[str, Any]]:
+        with self.store.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM model_capacity_refresh_state WHERE owner_principal_id = ? ORDER BY profile_id",
+                (owner_principal_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def capacity_refresh_due(self, owner_principal_id: str, profile_id: str) -> bool:
+        with self.store.connect() as connection:
+            row = connection.execute(
+                "SELECT next_refresh_at FROM model_capacity_refresh_state WHERE owner_principal_id = ? AND profile_id = ?",
+                (owner_principal_id, profile_id),
+            ).fetchone()
+        return row is None or str(row["next_refresh_at"]) <= utc_now()
+
+    def record_capacity_refresh(
+        self, owner_principal_id: str, profile_id: str, status: str, reason_code: str | None
+    ) -> None:
+        now = datetime.now(UTC)
+        now_text = now.isoformat().replace("+00:00", "Z")
+        next_text = (now + timedelta(hours=24)).isoformat().replace("+00:00", "Z")
+        with self.store.connect() as connection:
+            connection.execute(
+                """INSERT INTO model_capacity_refresh_state VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(owner_principal_id, profile_id) DO UPDATE SET
+                last_refresh_at = excluded.last_refresh_at, next_refresh_at = excluded.next_refresh_at,
+                status = excluded.status, reason_code = excluded.reason_code""",
+                (owner_principal_id, profile_id, now_text, next_text, status, reason_code),
+            )
 
     def _read(
         self, owner_principal_id: str, provider: str, model: str, source: str

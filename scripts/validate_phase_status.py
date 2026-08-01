@@ -13,9 +13,10 @@ REQUIRED_DOCS = [
 REQUIRED_MARKERS = {
     Path("docs/IMPLEMENTATION_STATUS.md"): [
         "Canonical Backend Capability Statuses",
-        "Approval resolution is `metadata_only` for every capability except",
+        "Approval resolution is `metadata_only` except for approved local file mutations",
         "CLI durable memory mutation is `implemented_approval_required`",
-        "Integrated real executors (including graph indexing, semantic/vector runtimes, plugin execution slices, channel runtime, container, scheduled routines, model-provider runtime, and local email/calendar/reminder stores) are `implemented_policy_gated`/governed per action; remote/cloud command execution and sensitive finance/investment/medical/pregnancy/CCTV/home-security/hardware domains remain `disabled_deferred` and fail closed.",
+        "SSH/Daytona command execution, and local email/calendar/reminder stores) are",
+        "Sensitive finance/investment/medical/pregnancy/CCTV/",
         "Phase 4 memory MVP is implemented",
     ],
     Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"): [
@@ -32,9 +33,9 @@ REQUIRED_MARKERS = {
         "tool_failed",
     ],
     Path("docs/SECURITY_ARCHITECTURE.md"): [
-        "Approval resolution executes exactly one narrow class of action",
-        "remote execution | disabled/fail-closed",
-        "cloud execution | disabled/fail-closed",
+        "Approval resolution executes a narrow allowlist",
+        "SSH remote execution | unavailable until owner profile selection; approval-required",
+        "Daytona cloud execution | unavailable until owner profile, credential reference, and cost ceiling; approval-required",
     ],
 }
 

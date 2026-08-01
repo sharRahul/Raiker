@@ -8,7 +8,7 @@
   import ModelPricingPanel from "../components/ModelPricingPanel.svelte";
   import TabStrip from "../components/TabStrip.svelte";
   import { api, ApiError } from "../api";
-  import type { ModelProfile, ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
+  import type { ModelCapacitiesView, ModelProfile, ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
   import { humanize, providerName } from "../format";
   import { formatCost, sourceNote, spendShares } from "../contextPresentation";
@@ -41,6 +41,8 @@
 
   let models = $state<ModelsData | null>(null);
   let loadError = $state<string | null>(null);
+  let capacities = $state<ModelCapacitiesView | null>(null);
+  let capacityRefreshAttempted = false;
 
   // Editable copy of the user-owned fallback sequence (ordered profile ids).
   let sequence = $state<string[]>([]);
@@ -53,6 +55,15 @@
     loadError = null;
     try {
       models = await api.models();
+      try {
+        capacities = await api.modelCapacities();
+        if (capacities.refresh_due && !capacityRefreshAttempted) {
+          capacityRefreshAttempted = true;
+          await api.refreshModelCapacities(false);
+          models = await api.models();
+          capacities = await api.modelCapacities();
+        }
+      } catch { capacities = null; }
       // Mirror the fresh snapshot into the shared store so every mounted
       // composer (Chat, Build) updates its model picker without a reload —
       // connecting a provider, selecting a model, or reordering the fallback
@@ -119,10 +130,23 @@
     if (!profile.context_window_tokens) {
       return "Not reported by this runtime. Refresh its model catalogue or configure an exact fallback before relying on a percentage.";
     }
-    const source = profile.context_window_source === "provider"
-      ? "Reported by the provider runtime"
-      : "Configured in Raiker";
+    const source = profile.context_window_source === "owner"
+      ? "Administrator override"
+      : profile.context_window_source === "provider"
+        ? "Reported by the provider runtime"
+        : "Configured in Raiker";
     return `${new Intl.NumberFormat().format(profile.context_window_tokens)} tokens · ${source}`;
+  }
+
+  async function configureCapacity(profile: ModelProfile) {
+    const raw = window.prompt("Exact context capacity in tokens. Leave blank to clear the administrator override.", profile.context_window_tokens?.toString() ?? "");
+    if (raw === null) return;
+    const tokens = raw.trim() ? Number(raw) : null;
+    if (tokens !== null && (!Number.isInteger(tokens) || tokens < 1024)) { selectError = "Context capacity must be an integer of at least 1,024 tokens."; return; }
+    const reason = window.prompt("Why is this override needed?", "Verified against the local runtime configuration");
+    if (reason === null) return;
+    try { await api.setModelCapacity(profile.profile_id, profile.model, tokens, reason); await load(); }
+    catch { selectError = "Could not update context capacity."; }
   }
 
   function openSignIn(profileId: string) {
@@ -812,6 +836,7 @@
 {/if}
 
 {#if detailsFor}
+  {@const capacityEntry = capacities?.entries.find((entry) => entry.profile_id === detailsFor!.profile_id && entry.model === detailsFor!.model)}
   <div class="details-overlay" role="presentation" onclick={(event) => event.target === event.currentTarget && (detailsFor = null)}>
     <div class="details-dialog card" role="dialog" aria-modal="true" aria-labelledby="model-details-title" tabindex="-1">
       <button class="close" aria-label="Close model details" onclick={() => detailsFor = null}>×</button>
@@ -821,9 +846,12 @@
         <div><dt>Selected model</dt><dd><code>{detailsFor.selected ? modelName(detailsFor.model) : "Not selected"}</code></dd></div>
         <div><dt>Connection</dt><dd>{detailsFor.connection_configured ? "Encrypted instance connection saved" : "Not configured"}</dd></div>
         <div><dt>Context capacity</dt><dd>{contextCapacity(detailsFor)}</dd></div>
+        <div><dt>Local refresh</dt><dd>{capacities?.sync.find((state) => state.profile_id === detailsFor?.profile_id)?.next_refresh_at ? `Next check ${capacities.sync.find((state) => state.profile_id === detailsFor?.profile_id)?.next_refresh_at}` : "Scheduled when this local runtime is available"}</dd></div>
         <div><dt>Current context usage</dt><dd>No provider context telemetry has been received for this model yet.</dd></div>
         <div><dt>Subscription / rate limits</dt><dd>Not available through this connection. Raiker only displays daily or weekly limits when an authorized provider API exposes them.</dd></div>
       </dl>
+      {#if capacities?.can_override}<button class="btn btn-ghost btn-sm" onclick={() => void configureCapacity(detailsFor!)}>Configure exact capacity</button>{/if}
+      {#if capacityEntry?.history.length}<details><summary>Administrator override history</summary><ol>{#each capacityEntry.history as event}<li>{event.action} · {event.context_window_tokens?.toLocaleString() ?? "cleared"} · {event.recorded_at}{#if event.reason} — {event.reason}{/if}</li>{/each}</ol></details>{/if}
     </div>
   </div>
 {/if}

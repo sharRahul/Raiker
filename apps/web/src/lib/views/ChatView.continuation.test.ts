@@ -79,6 +79,27 @@ async function parkATurn() {
 }
 
 describe("ChatView — cross-tab approval continuation (BUG-24)", () => {
+  it("restores a pending approval card when a parked conversation is reloaded", async () => {
+    stubFetch(baseRoutes({
+      "GET /api/sessions/sess_1": {
+        session: { session_id: "sess_1", title: "Notes" },
+        turns: [{
+          turn_id: "turn_1", session_id: "sess_1", turn_type: "prompt",
+          status: "needs_approval", prompt_text: "Write notes", created_at: "2026-08-01T10:00:00Z",
+          completed_at: null, summary: "",
+        }],
+        parked_approvals: [{
+          approval_id: "apv_1", turn_id: "turn_1", tool_name: "write_file",
+          created_at: "2026-08-01T10:00:00Z",
+        }],
+      },
+    }));
+
+    render(ChatView, { props: { sessionId: "sess_1" } });
+
+    expect(await screen.findByText("Waiting for approval")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review approval" })).toBeInTheDocument();
+  });
   it("shows a parked turn as Waiting for approval", async () => {
     stubFetch(baseRoutes());
     render(ChatView, {});

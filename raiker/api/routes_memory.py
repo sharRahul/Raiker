@@ -49,6 +49,38 @@ async def list_memories(
     )
 
 
+@router.get("/api/memory/proposals")
+async def list_memory_proposals(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    return _service(request).list_memory_proposals(auth_data[0].principal_id)
+
+
+@router.post("/api/memory/proposals/{candidate_id}/decision")
+async def decide_memory_proposal(
+    candidate_id: str,
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).decide_memory_proposal(
+        candidate_id,
+        decision=str(body.get("decision", "")),
+        edited_text=(str(body["edited_text"]) if body.get("edited_text") is not None else None),
+        reason=(str(body["reason"]) if body.get("reason") is not None else None),
+        expected_decision=str(body.get("expected_decision", "deferred")),
+        acting_principal_id=auth_data[0].principal_id,
+    )
+    if not result.ok:
+        conflict = result.reason_code in {"stale_memory_proposal"}
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT if conflict else status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
 @router.put("/api/memory/{memory_id}/pin")
 async def set_memory_pinned(
     memory_id: str,
@@ -205,6 +237,44 @@ async def get_memory_source(
     service = SourceProvenanceService(SQLiteStore(ws))
     excerpt = service.resolve(dict(memory.provenance), memory.text, principal_id)
     return {"ok": True, "memory_id": memory_id, **excerpt.to_dict()}
+
+
+@router.get("/api/memory/{memory_id}/history")
+async def get_memory_history(
+    memory_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).memory_history(memory_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/memory/{memory_id}/scope")
+async def change_memory_scope(
+    memory_id: str,
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).change_memory_scope(
+        memory_id,
+        str(body.get("scope", "")),
+        body.get("expected_updated_at"),
+        str(body.get("reason", "")),
+        auth_data[0].principal_id,
+    )
+    if not result.ok:
+        conflict = result.reason_code == "stale_memory_scope_change"
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT if conflict else status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
 
 
 @router.put("/api/memory/{memory_id}/archive")

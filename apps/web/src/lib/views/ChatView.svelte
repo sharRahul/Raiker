@@ -9,6 +9,8 @@
   import FileInspector from "../components/FileInspector.svelte";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
+  import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
+  import ModelCapacityBadge from "../components/ModelCapacityBadge.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
@@ -387,7 +389,8 @@
     closeInspector();
     try {
       const detail = await api.session(id);
-      turns = detail.turns.map((t) => restoredTurn(t, id));
+      const parked = new Map((detail.parked_approvals ?? []).map((approval) => [approval.turn_id, approval]));
+      turns = detail.turns.map((t) => restoredTurn(t, id, parked.get(t.turn_id)));
       nextId = turns.length + 1;
       await restoreAttachmentChips(id);
       void scrollToEnd();
@@ -438,7 +441,11 @@
     void resolveThumbnails(turns.flatMap((turn) => turn.attachments));
   }
 
-  function restoredTurn(t: SessionDetail["turns"][number], sessionId: string): ChatTurn {
+  function restoredTurn(
+    t: SessionDetail["turns"][number],
+    sessionId: string,
+    parked?: NonNullable<SessionDetail["parked_approvals"]>[number],
+  ): ChatTurn {
     return {
       id: nextId++,
       prompt: t.prompt_text ?? "",
@@ -452,11 +459,23 @@
         message: t.summary ?? "",
         events_path: null,
         checkpoint_path: null,
-        approval: null,
+        approval: parked ? {
+          action_id: "",
+          approval_id: parked.approval_id,
+          tool_name: parked.tool_name,
+          arguments: {},
+          risk_level: "governed",
+          reasons: [],
+          message: `${humanize(parked.tool_name)} is waiting for your approval.`,
+          expected_effect: "The same parked turn continues after your decision.",
+          resumable: true,
+        } : null,
         last_event_id: null,
       },
       streaming: false,
       error: null,
+      resumeState: parked ? "waiting" : null,
+      resumeNote: null,
     };
   }
 
@@ -834,6 +853,7 @@
         <div class="message-group message-group-user">
           <div class="message-bubble message-bubble-user">
           <p class="bubble-text">{turn.prompt}</p>
+          </div>
           {#if uploadedAttachments.length > 0}
             <div class="turn-attachments">
               {#each uploadedAttachments as a, i (a.attachmentId ?? a.path ?? i)}
@@ -852,7 +872,6 @@
               {/each}
             </div>
           {/if}
-        </div>
         </div>
 
         <div class="message-group message-group-raiker">
@@ -1115,6 +1134,8 @@
         ></textarea>
         <div class="upper-controls">
           <ModelPicker bind:profileId={modelProfile} bind:model {profiles} {selectedProfile} disabled={streaming} />
+          <ExecutionEnvironmentBadge />
+          <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
           {#if reasoningEfforts.length > 0}
             <select
               class="bar-select"

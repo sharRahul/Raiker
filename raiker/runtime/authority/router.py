@@ -72,6 +72,8 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "checkpoint_restore": "checkpoint_restore_execution",
     "checkpoint_restore_execution": "checkpoint_restore_execution",
     "shell": "shell_execution",
+    "remote_execute": "remote_execution_cap",
+    "cloud_execute": "cloud_execution_cap",
     "process": "process_execution",
     "network": "network_execution",
     "web_fetch": "web_fetch",

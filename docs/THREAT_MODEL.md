@@ -74,7 +74,7 @@ Raiker must protect:
 | Hook abuse | Hook silently approves command | Hooks disabled in Phase 1; no policy bypass | Hook decision authority constrained by policy |
 | Channel abuse | Unknown Slack sender controls agent | External channels disabled in Phase 1 | Pairing, sender trust, rate limits |
 | Supply-chain risk | Dependency/plugin update adds malware | Minimal dependencies in Phase 1 | Lockfiles, checksums, signed plugins |
-| Excessive agency | Agent spawns agents or remote jobs | Subagents/remote execution disabled | Budgets, max depth/runtime, parent verification |
+| Excessive agency | Agent spawns agents or remote jobs | Unsupported types disabled; SSH/Daytona require owner profile, gate, approval, timeout, and output/cost bounds | Cumulative provider billing, max depth/runtime, parent verification |
 | Resource exhaustion | Huge grep output or infinite command | Output bounds; command not auto-run | Timeouts, cancellation, quotas |
 | Secret leakage in logs | Env/token appears in event payload | Redaction requirement and tests | Secret scanner and managed policy |
 

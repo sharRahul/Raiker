@@ -17,12 +17,13 @@ an acting principal. AI principals cannot hold human-only roles, including
 `RuntimeAuthority` persists and evaluates `runtime_mode_state` and
 `capability_gate_state`; owner recovery is explicit, local, and audited.
 
-Approval resolution executes exactly one narrow class of action: a local file
-mutation (`file_write_execution`, `patch_apply_execution`), and only through the
+Approval resolution executes a narrow allowlist: local file mutations
+(`file_write_execution`, `patch_apply_execution`) and owner-configured
+SSH/Daytona commands (`remote_execution_cap`, `cloud_execution_cap`), only through the
 approval execution relay — a distinct, governed execution path that re-checks the
 target's capability gate, decision mode, policy review and the resolver's posture
-at execution time, and that captures the file's pre-image first so the change is
-reversible. For every other capability, approval
+at execution time. File mutations additionally capture the pre-image so the
+change is reversible. For every other capability, approval
 resolution remains metadata-only: it records the decision and executes nothing.
 Which of the two applies is computed by the server and stated to the owner
 before they decide.
@@ -39,14 +40,12 @@ before they decide.
 
 | Capability | Default posture |
 |---|---|
-| remote execution | disabled/fail-closed |
-| cloud execution | disabled/fail-closed |
+| SSH remote execution | unavailable until owner profile selection; approval-required |
+| Daytona cloud execution | unavailable until owner profile, credential reference, and cost ceiling; approval-required |
 | finance, medical, pregnancy, CCTV, home security, hardware | disabled/fail-closed |
 | plugin runtime slices | governed only when a real, policy-gated executor is available |
 
 Logs are audit records, not tamper-proof evidence. Credentials remain outside
 normal logs and must be supplied through explicit local configuration.
-
-finance/investment/medical/pregnancy/CCTV/home-security/hardware domains | disabled/fail-closed
 
 No tamper-proof logging is implemented.

@@ -1875,6 +1875,55 @@ CREATE TABLE IF NOT EXISTS brain_sources (
 CREATE INDEX IF NOT EXISTS idx_brain_sources_owner ON brain_sources(owner_principal_id, created_at);
 """
 
+BRAIN_PREFERENCES_MIGRATION_ID = "RAIKER-2030-brain-preferences"
+BRAIN_PREFERENCES_SQL = """
+CREATE TABLE IF NOT EXISTS brain_preferences (
+  owner_principal_id TEXT PRIMARY KEY,
+  settings_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
+EXECUTION_ENVIRONMENT_CONTROL_MIGRATION_ID = "RAIKER-2031-execution-environment-control"
+EXECUTION_ENVIRONMENT_CONTROL_SQL = """
+ALTER TABLE remote_execution_profiles ADD COLUMN owner_principal_id TEXT;
+UPDATE remote_execution_profiles SET owner_principal_id = created_by WHERE owner_principal_id IS NULL;
+CREATE INDEX IF NOT EXISTS idx_remote_execution_profiles_owner
+  ON remote_execution_profiles(owner_principal_id, updated_at);
+CREATE TABLE IF NOT EXISTS execution_environment_selection (
+  owner_principal_id TEXT PRIMARY KEY,
+  profile_id TEXT NOT NULL,
+  selected_at TEXT NOT NULL
+);
+"""
+
+MODEL_CAPACITY_CONTROL_MIGRATION_ID = "RAIKER-2032-model-capacity-control"
+MODEL_CAPACITY_CONTROL_SQL = """
+CREATE TABLE IF NOT EXISTS model_capacity_history (
+  capacity_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  endpoint_identity TEXT NOT NULL,
+  context_window_tokens INTEGER,
+  action TEXT NOT NULL,
+  reason TEXT,
+  recorded_by TEXT NOT NULL,
+  recorded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_model_capacity_history_lookup
+  ON model_capacity_history(owner_principal_id, provider, model, recorded_at);
+CREATE TABLE IF NOT EXISTS model_capacity_refresh_state (
+  owner_principal_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  last_refresh_at TEXT,
+  next_refresh_at TEXT NOT NULL,
+  status TEXT NOT NULL,
+  reason_code TEXT,
+  PRIMARY KEY (owner_principal_id, profile_id)
+);
+"""
+
 CODE_REPOS_MIGRATION_ID = "RAIKER-2024-code-workspace-repos"
 CODE_REPOS_SQL = """
 CREATE TABLE IF NOT EXISTS code_repos (

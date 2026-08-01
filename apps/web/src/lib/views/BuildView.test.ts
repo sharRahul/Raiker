@@ -293,6 +293,25 @@ describe("Build repository context", () => {
     ]);
   });
 
+  it("renders sent attachment cards outside the prompt bubble", async () => {
+    stubFetch(baseRoutes());
+    respondWith("Done.");
+    render(BuildView);
+
+    await fireEvent.click(screen.getByLabelText("Add attachment"));
+    await fireEvent.input(screen.getByLabelText("Attachment path"), {
+      target: { value: "docs/HANDOFF.md" },
+    });
+    await fireEvent.click(screen.getByText("Attach"));
+    await fireEvent.input(screen.getByLabelText("Describe the change"), {
+      target: { value: "Read the handoff" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
+    expect(screen.getByText("HANDOFF.md").closest(".from-you")).toBeNull();
+  });
+
   it("states a GitHub coordinate in the prompt the user can see", async () => {
     // The preamble is prepended in the browser rather than injected server-side
     // precisely so the transcript shows what was actually sent.

@@ -11,10 +11,11 @@
 | Model profiles | implemented_policy_gated | Local first; hosted use requires explicit policy |
 | Policy, approvals, audit, checkpoints | implemented_verified | Approval resolution executes an approved file mutation (relayed, re-governed, checkpointed); metadata-only otherwise |
 | Local runtime executors | implemented_policy_gated | Gate and decision mode checked per action |
-| Memory MVP | implemented_verified | Durable mutation remains approval-required |
+| Memory MVP | implemented_verified | Proposal decisions, scope/expiry changes, forget/purge, and owner-scoped history are governed |
 | Build workspace (coding surface) | implemented_policy_gated | Composer modes set real decision modes; repository references grant nothing and fail closed |
 | Scheduled background agents | implemented_policy_gated | One governed turn per cycle; unknown cadences refused |
-| Remote/cloud and sensitive domains | disabled_deferred | Fail closed without a real executor |
+| SSH/Daytona execution | implemented_approval_required | Owner profile and env-only credential references; no local-to-remote fallback |
+| Sensitive domains | disabled_deferred | Finance, medical, CCTV, hardware, and similar domains fail closed without an executor |
 
 Strict non-allow blocking, role revoke governed, and capability gate per action
 are enforced. The detailed current posture is [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).

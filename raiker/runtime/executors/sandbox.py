@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
@@ -32,6 +33,7 @@ def run_command(
     max_output_bytes: int = 100_000,
     allowlist: frozenset[str] | None = None,
     cwd: str | Path | None = None,
+    env: dict[str, str] | None = None,
 ) -> dict:
     if allowlist is not None:
         check_command_allowlist(command, allowlist)
@@ -42,6 +44,7 @@ def run_command(
             text=False,
             timeout=timeout,
             cwd=cwd,
+            env={**os.environ, **env} if env else None,
         )
     except subprocess.TimeoutExpired:
         raise SandboxError(f"command_timeout:{timeout}s") from None

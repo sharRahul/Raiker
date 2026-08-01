@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -177,6 +178,10 @@ def test_standing_command_grant_uses_no_network_workspace_container(
     assert command[command.index("--cap-drop") + 1] == "ALL"
     assert command[command.index("--workdir") + 1] == "/workspace"
     assert "type=bind" in command[command.index("--mount") + 1]
+    if os.name == "nt":
+        assert "--user" not in command
+    else:
+        assert "--user" in command
     assert command[-3:] == ["python", "-c", "print('ok')"]
 
 

@@ -2,7 +2,27 @@
 
 Raiker can execute work locally or in isolated, remote, containerised, or cloud environments according to phase-scheduled execution profiles. Execution environments are high-risk because they can mutate files, consume resources, leak data, or run untrusted code.
 
-Phase 1 supports local native execution only through policy-gated tools, but every execution type has a documented profile and safety contract now.
+Local native and contained container execution remain available through
+policy-gated tools. Owner-configured SSH and existing Daytona sandboxes now have
+real, approval-required executors. Other profile types remain documented and
+fail closed until they receive an executor and the controls below.
+
+## Current implemented slice
+
+- Settings stores only owner-scoped profile metadata and environment-variable
+  credential references; raw keys and private-key contents are rejected.
+- SSH uses `BatchMode=yes`, strict host-key checking, an explicit identity-file
+  reference, bounded output, and a 300-second hard timeout.
+- Daytona targets an existing sandbox, injects its API key only into the child
+  CLI process, enforces a positive per-action estimate ceiling, and returns
+  bounded result metadata.
+- Chat, Build, and Schedule display the same selected profile and capacity
+  facts. Selection grants no authority: the capability gate, decision mode,
+  policy review, approval, and owner/profile match are rechecked at execution.
+- No surface silently falls back from local/container to SSH or cloud.
+
+Provider-billed cumulative cost reconciliation is not available yet and is
+tracked as BUG-42 in `docs/plans/TO_BE_FIXED.md`.
 
 ---
 
@@ -197,7 +217,9 @@ Tests must prove:
 - timeout cancels command;
 - output is truncated and logged;
 - network commands denied by default;
-- container, SSH, VPS, Kubernetes, Modal, Daytona, and managed cloud profiles exist but are disabled until configured;
+- SSH and Daytona remain unavailable until an owner configures and selects a
+  valid profile; VPS, Kubernetes, Modal, and managed-cloud profiles remain
+  disabled until an executor is implemented;
 - artifact metadata includes checksum;
 - cancellation emits events;
 - dashboard can list configured and unconfigured execution profiles.

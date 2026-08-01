@@ -255,6 +255,25 @@ The first browser pass exposed and then verified the FIXED-51 reactive
 simulation-loop correction; visual review then exposed and verified FIXED-52's
 shared-theme integration. Both are recorded in `docs/plans/TO_BE_FIXED.md`.
 
+## Result — 2026-08-01 (governance, execution, persistence, and attachment layout)
+
+| Check | Result |
+|---|---|
+| Governed memory lifecycle | ✅ owner-scoped proposals, decisions, history, scope changes, expiry, edit, pin, forget, and purge controls exercised |
+| Knowledge Map source review | ✅ bounded browse/review flow hides protected internals and persists owner graph preferences |
+| Execution environments | ✅ local, container, SSH, and Daytona profiles render consistently; unavailable prerequisites fail closed |
+| Local model capacity | ✅ `gemma4:31b-cloud` runtime capacity, scheduled refresh state, history, and owner override controls render |
+| Reloaded approval | ✅ a parked file-write approval is restored after opening its persisted conversation and reloading the page |
+| Chat and Build attachments | ✅ attached-file cards are sibling elements outside their user-message bubbles |
+| Live model path | ✅ Anthropic and OpenRouter credentials connected through the UI; a real Ollama `gemma4:31b-cloud` Chat and Build turn completed |
+| Browser assertions | ✅ `bug-29-34-live.spec.ts` passed in Chrome with no credential material written to the repository |
+
+Evidence: `docs/plans/screenshots/working/173-BUG-33-capacity-admin-live.png`
+through `179-BUG-34-reloaded-approval-live.png`. The source-review pass exposed
+and verified protected-path filtering. Verification also identified the
+cumulative Daytona billing reconciliation and accessibility diagnostics tracked
+as BUG-42 and BUG-43 in `docs/plans/TO_BE_FIXED.md`.
+
 ## Repeatable procedure
 
 1. **Bootstrap + enable the backend's gate** (human owner). For a hosted

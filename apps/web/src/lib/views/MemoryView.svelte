@@ -3,12 +3,13 @@
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import FileInspector from "../components/FileInspector.svelte";
-  import type { MemoryControlView, MemorySettingsView, SourceExcerptView } from "../apiTypes";
+  import type { MemoryControlView, MemoryHistoryEvent, MemoryProposal, MemorySettingsView, SourceExcerptView } from "../apiTypes";
   import { relativeTime } from "../format";
 
   type MemoryImport = Array<Partial<MemoryControlView> & { text: string }>;
   let memories = $state<MemoryControlView[] | null>(null);
   let settings = $state<MemorySettingsView | null>(null);
+  let proposals = $state<MemoryProposal[]>([]);
   let loadError = $state<string | null>(null);
   let actionError = $state<string | null>(null);
   let busy = $state(false);
@@ -22,10 +23,16 @@
   let editDraft = $state("");
   let importPreview = $state<MemoryImport | null>(null);
   let importFileName = $state("");
+  let proposalEditingId = $state<string | null>(null);
+  let proposalDraft = $state("");
+  let historyById = $state<Record<string, MemoryHistoryEvent[]>>({});
 
   async function load() {
     loadError = null;
-    try { [memories, settings] = await Promise.all([api.memories(), api.memorySettings()]); }
+    try {
+      [memories, settings] = await Promise.all([api.memories(), api.memorySettings()]);
+      try { proposals = await api.memoryProposals(); } catch { proposals = []; }
+    }
     catch (e) { memories = null; settings = null; loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable"; }
   }
   async function toggleIncognito() {
@@ -47,6 +54,42 @@
     if (!window.confirm("Forget this memory? Raiker will stop using it in future work. Existing responses and required audit records will not be rewritten.")) return;
     try { await api.forgetMemory(m.memory_id); await load(); }
     catch { actionError = "Could not forget this memory."; }
+  }
+  async function decideProposal(proposal: MemoryProposal, decision: "approved" | "rejected", editedText?: string) {
+    const reason = decision === "rejected" ? window.prompt("Why should this proposal be rejected?", "Not useful as durable memory") : "";
+    if (decision === "rejected" && reason === null) return;
+    try {
+      await api.decideMemoryProposal(proposal.candidate_id, { decision, edited_text: editedText, reason: reason ?? "", expected_decision: proposal.decision });
+      proposalEditingId = null;
+      await load();
+    } catch { actionError = "This proposal could not be decided. Refresh in case it changed elsewhere."; }
+  }
+  async function changeScope(m: MemoryControlView) {
+    const scope = window.prompt("New scope (account, project, project:<id>, session, or session:<id>)", m.scope);
+    if (!scope || scope === m.scope) return;
+    const reason = window.prompt("Why is this scope appropriate?", "Owner-requested scope change");
+    if (reason === null) return;
+    try { await api.changeMemoryScope(m.memory_id, scope, m.updated_at, reason); await load(); }
+    catch { actionError = "Could not change scope. Refresh in case this memory changed elsewhere."; }
+  }
+  async function viewHistory(m: MemoryControlView) {
+    try { historyById = { ...historyById, [m.memory_id]: (await api.memoryHistory(m.memory_id)).events }; }
+    catch { actionError = "Could not load this memory's history."; }
+  }
+  async function reviewExpiry(m: MemoryControlView) {
+    const value = window.prompt("Review/expiry date as ISO-8601, or leave blank for no expiry", m.expires_at ?? "");
+    if (value === null) return;
+    try { await api.setMemoryExpiry(m.memory_id, value.trim() || null); await load(); }
+    catch { actionError = "Could not update the review or expiry date."; }
+  }
+  async function purge(m: MemoryControlView) {
+    try {
+      const preview = await api.previewMemoryPurge(m.memory_id);
+      const confirmation = window.prompt(`Permanent deletion removes ${preview.artifacts.length} active artifact(s). Backups: ${preview.backup_disposition}. Type ${m.memory_id} to continue.`);
+      if (confirmation !== m.memory_id) return;
+      await api.purgeMemory(m.memory_id);
+      await load();
+    } catch { actionError = "Could not permanently delete this memory."; }
   }
   async function exportMemories() {
     try {
@@ -119,7 +162,7 @@
   }
 
   const approved = $derived((memories ?? []).filter((m) => m.approval_state === "approved"));
-  const pending = $derived((memories ?? []).filter((m) => m.approval_state !== "approved"));
+  const pending = $derived(proposals);
   const expired = $derived((memories ?? []).filter((m) => m.expires_at && new Date(m.expires_at) <= new Date()));
   const scopes = $derived([...new Set((memories ?? []).map((m) => m.scope))]);
   const sensitivities = $derived([...new Set((memories ?? []).map((m) => m.sensitivity))]);
@@ -160,7 +203,16 @@
 
   {#if pending.length}
     <section class="memory-section"><div class="section-head"><h3>Pending review</h3><span>{pending.length}</span></div>
-      {#each pending as m (m.memory_id)}<article class="memory-card pending"><h4>{m.text}</h4><p>Proposed from: {provenanceLabel(m)}</p><div class="meta"><span>{m.scope}</span><span>{m.sensitivity} sensitivity</span><span>{m.retention}</span></div><p class="review-note">Approval and rejection are completed in the governed approval queue.</p><div class="card-actions"><button class="btn btn-ghost btn-sm" aria-label={`View the source of “${m.text.slice(0, 40)}”`} onclick={() => void viewSource(m)}>View source</button><a class="btn btn-ghost btn-sm" href="#/approvals">Review proposal</a></div></article>{/each}
+      {#each pending as proposal (proposal.candidate_id)}<article class="memory-card pending">
+        {#if proposalEditingId === proposal.candidate_id}<textarea rows="3" bind:value={proposalDraft} aria-label="Edit proposed memory"></textarea>{:else}<h4>{proposal.text}</h4>{/if}
+        <p>Proposed from event: {proposal.source_event_id}</p>
+        <div class="meta"><span>{proposal.scope}</span><span>{proposal.sensitivity} sensitivity</span><span>{Math.round(proposal.confidence * 100)}% confidence</span></div>
+        <details><summary>View source details</summary><p>Source event: {proposal.source_event_id}. The original event remains governed by its session access.</p></details>
+        <div class="card-actions">
+          {#if proposalEditingId === proposal.candidate_id}<button class="btn btn-primary btn-sm" onclick={() => void decideProposal(proposal, "approved", proposalDraft)}>Approve edited proposal</button><button class="btn btn-ghost btn-sm" onclick={() => proposalEditingId = null}>Cancel</button>
+          {:else}<button class="btn btn-primary btn-sm" onclick={() => void decideProposal(proposal, "approved")}>Approve</button><button class="btn btn-ghost btn-sm" onclick={() => { proposalEditingId = proposal.candidate_id; proposalDraft = proposal.text; }}>Edit &amp; approve</button><button class="btn btn-ghost btn-sm danger" onclick={() => void decideProposal(proposal, "rejected")}>Reject</button>{/if}
+        </div>
+      </article>{/each}
     </section>
   {/if}
 
@@ -171,8 +223,9 @@
       <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size={12} /> Pinned</span>{/if}</div>
       <div class="meta"><span>Approved</span><span>{m.scope} scope</span><span>{m.sensitivity} sensitivity</span></div>
       <dl><div><dt>Source</dt><dd>{provenanceLabel(m)}</dd></div><div><dt>Approved</dt><dd>{relativeTime(m.created_at)}</dd></div><div><dt>Review or expiry</dt><dd>{m.expires_at ? relativeTime(m.expires_at) : "No date set"}</dd></div></dl>
-      <div class="card-actions">{#if editingId === m.memory_id}<button class="btn btn-primary btn-sm" aria-label="Save memory" onclick={() => void saveEdit(m)}>Save</button><button class="btn btn-ghost btn-sm" onclick={() => editingId = null}>Cancel</button>{:else}<button class="btn btn-ghost btn-sm" aria-label={`View the source of “${m.text.slice(0, 40)}”`} onclick={() => void viewSource(m)}>View source</button><button class="btn btn-ghost btn-sm" aria-label="Edit memory" onclick={() => { editingId = m.memory_id; editDraft = m.text; }}>Edit</button><button class="btn btn-ghost btn-sm" aria-label={m.pinned ? "Unpin memory" : "Pin memory"} onclick={() => void togglePin(m)}>{m.pinned ? "Unpin" : "Pin"}</button><button class="btn btn-ghost btn-sm danger" aria-label="Forget memory" onclick={() => void forget(m)}>Forget</button>{/if}</div>
-      <details><summary>Advanced metadata and history</summary><p>Type: {m.memory_type} · Retention: {m.retention} · Confidence: {m.confidence.toFixed(2)} · Trust: {m.trust_score.toFixed(2)}</p><p>Source record details: {Object.keys(m.provenance).length ? Object.keys(m.provenance).join(", ") : "Source metadata unavailable"}</p></details>
+      <div class="card-actions">{#if editingId === m.memory_id}<button class="btn btn-primary btn-sm" aria-label="Save memory" onclick={() => void saveEdit(m)}>Save</button><button class="btn btn-ghost btn-sm" onclick={() => editingId = null}>Cancel</button>{:else}<button class="btn btn-ghost btn-sm" aria-label={`View the source of “${m.text.slice(0, 40)}”`} onclick={() => void viewSource(m)}>View source</button><button class="btn btn-ghost btn-sm" aria-label="Edit memory" onclick={() => { editingId = m.memory_id; editDraft = m.text; }}>Edit</button><button class="btn btn-ghost btn-sm" onclick={() => void changeScope(m)}>Edit scope</button><button class="btn btn-ghost btn-sm" onclick={() => void reviewExpiry(m)}>Review expiry</button><button class="btn btn-ghost btn-sm" aria-label={m.pinned ? "Unpin memory" : "Pin memory"} onclick={() => void togglePin(m)}>{m.pinned ? "Unpin" : "Pin"}</button><button class="btn btn-ghost btn-sm" onclick={() => void viewHistory(m)}>View history</button><button class="btn btn-ghost btn-sm danger" aria-label="Forget memory" onclick={() => void forget(m)}>Forget</button>{/if}</div>
+      <details><summary>Advanced metadata and deletion</summary><p>Type: {m.memory_type} · Retention: {m.retention} · Confidence: {m.confidence.toFixed(2)} · Trust: {m.trust_score.toFixed(2)}</p><p>Last used: {m.last_used_at ? relativeTime(m.last_used_at) : "Never recalled"}. Source record details: {Object.keys(m.provenance).length ? Object.keys(m.provenance).join(", ") : "Source metadata unavailable"}</p><button class="btn btn-ghost btn-sm danger" onclick={() => void purge(m)}>Delete permanently</button></details>
+      {#if historyById[m.memory_id]}<ol class="history" aria-label="Memory history">{#each historyById[m.memory_id] as event}<li><strong>{event.action.replaceAll("_", " ")}</strong> <span>{relativeTime(event.created_at)}</span></li>{/each}</ol>{/if}
     </article>{/each}</div>{/if}
   </section>
 
@@ -200,6 +253,5 @@
   .pin-label { display:flex; align-items:center; gap:.25rem; color:var(--accent); font-size:.72rem; } .meta { display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; } .meta span { padding:.22rem .48rem; border-radius:var(--r-pill); background:var(--sunken); color:var(--text-2); font-size:.72rem; } dl { display:grid; grid-template-columns:2fr 1fr 1fr; gap:var(--space-3); padding-block:var(--space-3); border-block:1px solid var(--border); } dl div { min-width:0; } dt { color:var(--text-3); font-size:.7rem; } dd { margin:.15rem 0 0; overflow-wrap:anywhere; font-size:.82rem; } .card-actions { justify-content:flex-start; margin-top:var(--space-3); } .danger { color:var(--danger); } details { margin-top:var(--space-3); color:var(--text-2); font-size:.78rem; } details summary { cursor:pointer; color:var(--text-1); }
   .empty { padding:var(--space-7); text-align:center; border:1px dashed var(--border-strong); border-radius:var(--r-lg); color:var(--text-2); } .empty h4 { color:var(--text-1); margin-top:var(--space-2); }
   .advanced { margin-top:var(--space-6); padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .advanced summary { margin:0; list-style:none; } .advanced summary span { display:grid; gap:.2rem; } .advanced small { color:var(--text-2); font-weight:400; } .advanced-body { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); padding-top:var(--space-4); } .file-button input { position:absolute; width:1px; height:1px; opacity:0; } .import-review { width:100%; display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); background:var(--sunken); border-radius:var(--r-md); }
-  .review-note { color:var(--text-2); font-size:.8rem; }
   @media (max-width:45rem) { .summary { grid-template-columns:repeat(2,1fr); } dl { grid-template-columns:1fr; } .page-intro,.control-card { flex-direction:column; } }
 </style>

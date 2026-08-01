@@ -225,14 +225,16 @@ def test_write_file_proposal_states_that_approving_writes_the_file(tmp_path) -> 
     )
 
 
-def test_shell_proposal_still_states_metadata_only(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_shell_proposal_states_that_approving_executes_once(tmp_path) -> None:  # type: ignore[no-untyped-def]
     broker = _broker(tmp_path)
     result, _decision = broker.execute(
         ToolAction(new_id("act_"), "shell", {"command": "ls"}, "high", True),
         session_id=new_id("sess_"),
         turn_id=new_id("turn_"),
     )
-    assert "metadata-only" in result.output["expected_effect"]  # type: ignore[index]
+    assert result.output["expected_effect"] == (  # type: ignore[index]
+        "Approving executes this exact bounded shell command once."
+    )
 
 
 def test_a_write_into_the_governance_directory_fails_instead_of_being_proposed(tmp_path) -> None:  # type: ignore[no-untyped-def]

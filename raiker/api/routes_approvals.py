@@ -259,6 +259,19 @@ async def resolve_approval(
             "execution": {
                 "capability": execution.capability,
                 "path": execution.artifacts.get("path"),
+                **{
+                    key: execution.artifacts[key]
+                    for key in (
+                        "returncode",
+                        "stdout_bytes",
+                        "stderr_bytes",
+                        "stdout",
+                        "stderr",
+                        "truncated",
+                        "output_redacted",
+                    )
+                    if key in execution.artifacts
+                },
             },
             "resume": _record_resume_outcome(
                 request,

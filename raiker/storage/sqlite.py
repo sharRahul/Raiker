@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import atexit
 import contextlib
 import hashlib
 import json
 import re
+import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -269,6 +271,39 @@ from raiker.storage.migrations import (
     THREAT_MODEL_ACKS_SQL,
 )
 
+# SQLCipher performs its key derivation when a connection is opened. API routes
+# construct short-lived SQLiteStore objects, so opening in ``connect`` made a
+# burst of cheap reads pay that KDF once per request. Keep one keyed connection
+# per workspace and worker thread for the host lifetime instead. The connection
+# is never shared for query work across threads; ``check_same_thread=False`` only
+# allows shutdown/invalidation to close every worker's handle from one place.
+_CONNECTIONS: dict[tuple[Path, int], sqlite3.Connection] = {}
+_CONNECTIONS_LOCK = threading.RLock()
+
+
+def invalidate_workspace_connections(workspace_root: str | Path) -> None:
+    """Close every cached SQLCipher connection for one workspace."""
+    root = Path(workspace_root).resolve()
+    with _CONNECTIONS_LOCK:
+        doomed = [key for key in _CONNECTIONS if key[0] == root]
+        connections = [_CONNECTIONS.pop(key) for key in doomed]
+    for connection in connections:
+        with contextlib.suppress(Exception):
+            connection.close()
+
+
+def close_cached_connections() -> None:
+    """Close all keyed connections during process shutdown."""
+    with _CONNECTIONS_LOCK:
+        connections = list(_CONNECTIONS.values())
+        _CONNECTIONS.clear()
+    for connection in connections:
+        with contextlib.suppress(Exception):
+            connection.close()
+
+
+atexit.register(close_cached_connections)
+
 
 @dataclass(frozen=True)
 class RuntimePaths:
@@ -317,13 +352,25 @@ class SQLiteStore:
         self.bootstrap()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(str(self.db_path), timeout=5.0)
-        key_hex = hashlib.sha256(ensure_app_key(self.paths.workspace_root)).hexdigest()
-        connection.execute(f"PRAGMA key = \"x'{key_hex}'\"")
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("PRAGMA busy_timeout = 5000")
-        return connection
+        cache_key = (self.paths.workspace_root, threading.get_ident())
+        with _CONNECTIONS_LOCK:
+            connection = _CONNECTIONS.get(cache_key)
+            if connection is not None:
+                try:
+                    connection.execute("SELECT 1")
+                    return connection
+                except sqlite3.Error:
+                    _CONNECTIONS.pop(cache_key, None)
+            connection = sqlite3.connect(
+                str(self.db_path), timeout=5.0, check_same_thread=False
+            )
+            key_hex = hashlib.sha256(ensure_app_key(self.paths.workspace_root)).hexdigest()
+            connection.execute(f"PRAGMA key = \"x'{key_hex}'\"")
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA busy_timeout = 5000")
+            _CONNECTIONS[cache_key] = connection
+            return connection
 
     def bootstrap(self) -> None:
         self.paths.ensure()

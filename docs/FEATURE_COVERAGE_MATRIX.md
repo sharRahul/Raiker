@@ -9,7 +9,7 @@
 |---|---|---|
 | Terminal client and loopback dashboard | implemented_verified | Share the governed backend |
 | Model profiles | implemented_policy_gated | Local first; hosted use requires explicit policy |
-| Policy, approvals, audit, checkpoints | implemented_verified | Approval resolution executes an approved file mutation (relayed, re-governed, checkpointed); metadata-only otherwise |
+| Policy, approvals, audit, checkpoints | implemented_verified | Approval resolution executes approved file mutations and bounded allowlisted shell commands (relayed and re-governed; mutations checkpointed); metadata-only for every other capability |
 | Local runtime executors | implemented_policy_gated | Gate and decision mode checked per action |
 | Memory MVP | implemented_verified | Proposal decisions, scope/expiry changes, forget/purge, and owner-scoped history are governed |
 | Build workspace (coding surface) | implemented_policy_gated | Composer modes set real decision modes; repository references grant nothing and fail closed |

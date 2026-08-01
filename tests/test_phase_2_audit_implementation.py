@@ -4,9 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from raiker.api.sessions import ApiSessionStore
 from raiker.approvals import ApprovalInbox
 from raiker.checkpoints.service import CheckpointService
 from raiker.cli.commands import handle_approval_resolution, handle_approvals, handle_slash_command
+from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import InterruptAction, SideQuestionTurn, ToolAction
 from raiker.events.writer import EventLogWriter
@@ -22,6 +24,14 @@ from raiker.tasks.manager import TaskManager
 from raiker.tools.broker import ToolBroker
 from raiker.tools.filesystem import diff_files, proposed_write_snapshot, stat_path
 from raiker.tools.git import run_git
+
+
+def _authenticate_terminal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    token, _session = ApiSessionStore(tmp_path).create_session(
+        "principal_owner", device_label="test terminal"
+    )
+    monkeypatch.setenv("RAIKER_API_TOKEN", token)
 
 
 def test_side_question_contract_and_read_only_runtime(tmp_path: Path) -> None:
@@ -50,11 +60,17 @@ def test_interrupt_controller_applies_at_safe_boundary(tmp_path: Path) -> None:
     assert store.load_task(task.task_id).status == "paused"  # type: ignore[union-attr]
 
 
-def test_approval_inbox_and_terminal_resolution(tmp_path: Path) -> None:
+def test_approval_inbox_and_terminal_resolution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authenticate_terminal(tmp_path, monkeypatch)
+    store = SQLiteStore(tmp_path)
+    store.create_session("sess", str(tmp_path), user_id="owner")
     broker = ToolBroker(
         workspace_root=tmp_path,
         policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)),
-        store=SQLiteStore(tmp_path),
+        store=store,
+        principal_id="principal_owner",
     )
     result, _ = broker.execute(
         ToolAction(new_id("act_"), "write_file", {"path": "a.txt", "text": "x"}, "high", True),
@@ -64,16 +80,23 @@ def test_approval_inbox_and_terminal_resolution(tmp_path: Path) -> None:
     approval_id = str(result.output["approval_id"])  # type: ignore[index]
     assert approval_id in handle_approvals(workspace_root=tmp_path)
     assert ApprovalInbox(broker.store).list_pending()[0]["approval_scope"] == "action"  # type: ignore[arg-type,union-attr]
-    resolution_output = handle_approval_resolution(
+    preview = handle_approval_resolution(
         f"/approve {approval_id}", workspace_root=tmp_path
     )
-    assert "approved" in resolution_output
-    assert "Metadata only; no action was executed." in resolution_output
+    assert "Effect preview" in preview
+    assert "Nothing has executed" in preview
+    resolution_output = handle_approval_resolution(
+        f"/approve {approval_id} --confirm {approval_id}", workspace_root=tmp_path
+    )
+    assert "Executing" in resolution_output
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "x"
     assert handle_approvals(workspace_root=tmp_path) == "No pending approvals."
 
 
 def test_terminal_slash_approval_commands(tmp_path: Path) -> None:
-    assert handle_slash_command("/approvals", workspace_root=tmp_path) == "No pending approvals."
+    assert "Authentication required" in handle_slash_command(
+        "/approvals", workspace_root=tmp_path
+    )
     assert "Usage:" in handle_slash_command("/approve", workspace_root=tmp_path)
 
 
@@ -163,13 +186,18 @@ def test_write_approval_includes_before_snapshot_and_resolution_event(tmp_path: 
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "before"
 
 
-def test_tampered_approval_payload_cannot_be_resolved(tmp_path: Path) -> None:
+def test_tampered_approval_payload_cannot_be_resolved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _authenticate_terminal(tmp_path, monkeypatch)
     store = SQLiteStore(tmp_path)
+    store.create_session("sess", str(tmp_path), user_id="owner")
     broker = ToolBroker(
         workspace_root=tmp_path,
         policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)),
         store=store,
         writer=EventLogWriter(store),
+        principal_id="principal_owner",
     )
     result, _ = broker.execute(
         ToolAction(new_id("act_"), "write_file", {"path": "a.txt", "text": "after"}, "high", True),
@@ -183,7 +211,7 @@ def test_tampered_approval_payload_cannot_be_resolved(tmp_path: Path) -> None:
             ('{"path":"a.txt","text":"tampered"}', result.action_id),
         )
     assert "approval_payload_tampered" in handle_approval_resolution(
-        f"/approve {approval_id}", workspace_root=tmp_path
+        f"/approve {approval_id} --confirm {approval_id}", workspace_root=tmp_path
     )
 
 

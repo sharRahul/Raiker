@@ -715,6 +715,7 @@ export interface ApprovalView {
   is_expired: boolean; // server-calculated snapshot; resolution re-checks the TTL
   executes_action: boolean; // true only for an approved, single-use connector write intent
   critical: boolean; // server-supplied: needs elevated, human-only lifecycle
+  resolved_by: string | null;
 }
 
 // raiker/control/dashboard.py ApprovalDetailView.to_dict()
@@ -727,6 +728,16 @@ export interface ApprovalDetailView {
   metadata_only_notice: string;
   // Server-computed: does pressing Approve actually perform this action?
   executes_on_approval: boolean;
+  execution_evidence: {
+    principal_id?: string;
+    returncode?: number;
+    stdout_bytes?: number;
+    stderr_bytes?: number;
+    stdout?: string;
+    stderr?: string;
+    truncated?: boolean;
+    output_redacted?: boolean;
+  };
 }
 
 // POST /api/approvals/{id}/resolve response.
@@ -738,7 +749,17 @@ export interface ResolveApprovalResult {
   reason: string;
   connector_result?: Record<string, unknown>;
   // Present when an approved file mutation was carried out by the execution relay.
-  execution?: { capability: string; path: string | null };
+  execution?: {
+    capability: string;
+    path: string | null;
+    returncode?: number;
+    stdout_bytes?: number;
+    stderr_bytes?: number;
+    stdout?: string;
+    stderr?: string;
+    truncated?: boolean;
+    output_redacted?: boolean;
+  };
   // B2 — whether a turn was parked on this approval and can now pick up again.
   resume?: { resumable: boolean; session_id?: string; turn_id?: string };
 }

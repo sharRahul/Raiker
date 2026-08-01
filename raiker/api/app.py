@@ -268,6 +268,9 @@ def create_app(
             for task in (worker, nudged):
                 with suppress(asyncio.CancelledError):
                     await task
+            from raiker.storage.sqlite import invalidate_workspace_connections
+
+            invalidate_workspace_connections(app.state.workspace_root)
 
     app = FastAPI(
         title="Raiker API",

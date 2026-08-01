@@ -495,6 +495,8 @@ class ToolBroker:
             if ApprovalExecutionBridge(self.store).executes_on_resolution(
                 action.tool_name, self.principal_id
             ):
+                if action.tool_name == "shell":
+                    return "Approving executes this exact bounded shell command once."
                 # The sentence is stored in events and returned to the client, so
                 # the model-supplied path is scrubbed by credential shape first —
                 # the same treatment every other argument gets on the way out.

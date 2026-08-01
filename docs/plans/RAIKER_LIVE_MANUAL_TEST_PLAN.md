@@ -4,7 +4,8 @@
 > Raiker instance, plus the recorded result of the round executed on
 > **2026-07-26** against hosted Anthropic (`claude-haiku-4-5-20251001`), with
 > focused file-retention re-verification on **2026-07-28** using local Ollama
-> (`gemma4:31b-cloud`).
+> (`gemma4:31b-cloud`), and a provider/terminal/storage verification round on
+> **2026-08-01** using the same Ollama model.
 >
 > Every step below was executed in a real Chromium session against
 > `raiker-web` serving the built SPA. Screenshots are in
@@ -126,6 +127,14 @@ to rotate the vault key.
 | 5.1.2 | Inspect the transcript | No phase labels, no "completed", no cache chips, no model metadata | ✅ (matches the conversational-chat design) |
 | 5.1.3 | Console | 0 errors | ✅ |
 
+**Result 2026-08-01:** Anthropic and OpenRouter credentials were added only
+through their Connect dialogs. Ollama discovered nine models, selected
+`gemma4:31b-cloud` globally, and returned the exact requested live reply.
+Evidence: `working/194-live-gemma4-31b-cloud-turn.png`. The Ollama connectivity
+message was duplicated under unrelated hosted-provider cards; configured-state
+evidence is `working/195-live-provider-setup.png`, and the placement defect is
+tracked as BUG-47.
+
 ### 5.2 Does a new chat appear on the left?
 
 **Yes.** A **RECENT CHATS** group appears in the sidebar with the chat title and
@@ -245,10 +254,28 @@ existing text file per action; multi-file/create/delete/fuzzy patches are not
 accepted. **B3's defined strict, single-file scope is complete (FIXED-23); its
 broader patch-format expansion is not completed and is deliberately deferred.**
 
-Metadata-only resolution remains the safety model for shell, network, process,
-and every non-file capability. Approved local file mutations are the deliberate
-exception: they execute once through the governed relay, with a fresh gate,
-policy, posture, and checkpoint check. See FIXED-08 and FIXED-23.
+Metadata-only resolution remains the safety model for network, process, and
+every other non-relayed capability. Approved local file mutations and bounded
+shell commands are the deliberate exceptions: they execute once through the
+governed relay, with a fresh gate, policy, posture, and checkpoint check. A
+terminal shell approval additionally requires a live control/elevated API
+session, shows an effect preview, and requires the approval id to be repeated as
+an explicit confirmation. Its result includes bounded stdout/stderr, byte
+counts, exit status, truncation state, and the resolving principal. See
+FIXED-08, FIXED-23, and FIXED-90. Secret-like stdout/stderr is redacted before
+display or durable history.
+
+### 6.8 Terminal approval re-check (2026-08-01)
+
+Automated live-workspace probing verified that `/approve <id>` authenticates
+and prints the exact argv, workspace cwd, timeout, and output limit without
+executing. The isolated account correctly refused the confirmed command while
+its Shell and Approval Relay permissions remained off. The managed test
+environment blocked the subsequent UI permission change, so the live execution
+half remains to be re-run after an owner explicitly authorises those two
+disposable-workspace permissions. The full authenticated
+preview/confirm/execute/exactly-once path is covered by
+`tests/test_terminal_approval_execution.py`.
 
 ---
 

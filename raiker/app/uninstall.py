@@ -156,6 +156,12 @@ def apply_uninstall(
     from raiker.app.service import uninstall as remove_service
 
     done: list[str] = []
+    # Release SQLCipher handles before export/erase/rename operations. This is
+    # required on Windows and ensures a removed workspace cannot retain a keyed
+    # connection in the resident process.
+    from raiker.storage.sqlite import invalidate_workspace_connections
+
+    invalidate_workspace_connections(workspace)
     if plan.service_registered:
         result = remove_service(
             service_plan(workspace, port=port, os_name=os_name, home=home)

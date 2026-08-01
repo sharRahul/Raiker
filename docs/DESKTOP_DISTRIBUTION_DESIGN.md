@@ -21,12 +21,14 @@ What exists today (FIXED-88 in [to be fixed](plans/TO_BE_FIXED.md)):
   would keep before removing anything, with a per-instance retain / export /
   securely-erase choice.
 
-What does not exist yet (BUG-44): signed installers, the signed update channel
-with atomic migration and rollback, the setup wizard, and a native tray icon.
-Each needs code-signing identities and per-OS release runners, so none of it can
-be built from a source checkout. The **Install** and **Update** rows of the
-lifecycle table below, and the release requirements section, are therefore still
-specification rather than description.
+What does not exist yet (BUG-44): signed installers, a published signed update
+channel, the setup wizard, and a native tray icon. The platform-independent
+update boundary now exists in `raiker/app/update.py`: it verifies an Ed25519
+manifest and artifact digest before changing the installation, creates a
+recovery copy before staging migration, and swaps or restores the installation
+by sibling-directory rename. Publishing still needs code-signing identities and
+per-OS release runners, so the **Install** row, channel delivery, and release
+requirements below remain specification rather than description.
 
 ## Product decision
 
@@ -124,6 +126,15 @@ dependencies. The first release must test fresh install, upgrade, restart,
 offline use, backup/restore, and uninstall on every supported architecture.
 Native encrypted-database dependencies require packaging tests on every target;
 development-machine success is insufficient.
+
+Every update channel manifest uses schema `1` and is signed over its exact JSON
+bytes with the release Ed25519 key. The manifest binds the version, artifact
+filename, and SHA-256 digest. Verification precedes extraction; extraction
+rejects absolute paths, parent traversal, and symlinks. Migration runs only in a
+staged sibling tree after the current installation has been copied to its
+versioned recovery directory. The installed directory is replaced by rename,
+and a failed second rename restores the previous directory immediately. The
+recovery point remains until a later, separately governed retention decision.
 
 ## First-run experience
 

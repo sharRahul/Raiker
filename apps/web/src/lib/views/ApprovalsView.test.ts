@@ -205,6 +205,39 @@ describe("ApprovalsView", () => {
     expect(await screen.findByText(/was NOT executed \(metadata-only\)/i)).toBeInTheDocument();
   });
 
+  it("shows the terminal principal and bounded execution evidence in history", async () => {
+    const resolved = {
+      ...PENDING,
+      status: "executed",
+      requires_approval: false,
+      resolved_by: "principal_owner",
+    };
+    stubFetch({
+      "GET /api/approvals": [resolved],
+      "GET /api/approvals/appr_1": {
+        ...DETAIL,
+        approval: resolved,
+        execution_evidence: {
+          principal_id: "principal_owner",
+          returncode: 0,
+          stdout_bytes: 15,
+          stderr_bytes: 0,
+          stdout: "terminal relay\n",
+          stderr: "",
+          truncated: false,
+        },
+      },
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+
+    expect(await screen.findByText("Execution evidence")).toBeInTheDocument();
+    expect(screen.getAllByText("principal_owner").length).toBeGreaterThan(0);
+    expect(screen.getByText("terminal relay")).toBeInTheDocument();
+    expect(screen.getByText(/15 B stdout/)).toBeInTheDocument();
+  });
+
   // B2 — resolving an approval closes the tool call the model was waiting on,
   // so the turn it parked can continue instead of costing the owner a re-prompt.
   it("offers to continue the parked turn when the server says one is waiting", async () => {

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import shlex
 from pathlib import Path
 from typing import cast
@@ -1553,14 +1554,17 @@ def handle_memory_list_command(command: str, *, workspace_root: str | Path = "."
 
 
 def handle_approvals(*, workspace_root: str | Path = ".") -> str:
-    inbox = ApprovalInbox(SQLiteStore(workspace_root))
-    approvals = inbox.list_pending()
+    authenticated = _terminal_approval_session(workspace_root)
+    if isinstance(authenticated, str):
+        return authenticated
+    store, session, _principal = authenticated
+    user_id = store.principal_user_id(session.principal_id)
+    approvals = store.list_approvals(
+        status="pending", user_id=user_id, principal_id=session.principal_id
+    )
     if not approvals:
         return "No pending approvals."
-    # The terminal client resolves metadata-only for *every* capability. The
-    # web dashboard additionally executes an approved file mutation through the
-    # governed relay (BUG-06); resolving here never does, and says so.
-    lines = ["Pending approvals (metadata only here; /approve does not execute actions):"]
+    lines = ["Pending approvals (authenticated terminal session):"]
     for approval in approvals:
         lines.append(
             f"- {approval['approval_id']} action={approval['action_id']} tool={approval['tool_name']} risk={approval['risk_level']} args={approval['arguments_json']}"
@@ -1570,18 +1574,157 @@ def handle_approvals(*, workspace_root: str | Path = ".") -> str:
 
 def handle_approval_resolution(command: str, *, workspace_root: str | Path = ".") -> str:
     parts = shlex.split(command)
-    if len(parts) != 2:
-        return "Usage: /approve <approval_id> or /deny <approval_id>"
-    inbox = ApprovalInbox(SQLiteStore(workspace_root))
-    try:
-        resolution = inbox.resolve(parts[1], approve=parts[0] == "/approve")
-    except ValueError as exc:
-        return f"Approval resolution failed: {exc}"
-    return (
-        f"Approval {resolution.approval_id} {resolution.status} for action "
-        f"{resolution.action_id}. Metadata only; no action was executed. "
-        "(Approving a file change in the web dashboard does perform it.)"
+    if len(parts) not in {2, 4} or (len(parts) == 4 and parts[2] != "--confirm"):
+        return (
+            "Usage: /approve <approval_id> [--confirm <approval_id>] or "
+            "/deny <approval_id> [--confirm <approval_id>]"
+        )
+    approval_id = parts[1]
+    authenticated = _terminal_approval_session(workspace_root)
+    if isinstance(authenticated, str):
+        return authenticated
+    store, session, principal = authenticated
+    user_id = store.principal_user_id(session.principal_id)
+    approval = store.load_approval(
+        approval_id, user_id=user_id, principal_id=session.principal_id
     )
+    if approval is None:
+        return f"Approval resolution refused: approval_not_found ({approval_id})."
+    if str(approval.get("status")) != "pending":
+        return f"Approval resolution refused: already resolved ({approval_id})."
+    preview = _terminal_approval_preview(approval, workspace_root)
+    if len(parts) == 2:
+        return (
+            f"Effect preview for {approval_id}:\n{preview}\n"
+            f"Authenticated as {session.principal_id}. Nothing has executed.\n"
+            f"Confirm with {parts[0]} {approval_id} --confirm {approval_id}"
+        )
+    if parts[3] != approval_id:
+        return "Approval resolution refused: confirmation_id_mismatch."
+
+    approve = parts[0] == "/approve"
+    if not approve:
+        inbox = ApprovalInbox(store, EventLogWriter(store))
+        try:
+            resolution = inbox.resolve(
+                approval_id,
+                approve=False,
+                resolved_by=session.principal_id,
+                user_id=user_id,
+            )
+        except ValueError as exc:
+            return f"Approval resolution refused: {exc}."
+        return f"Approval {resolution.approval_id} denied. No action executed."
+
+    from raiker.approvals.execution import ApprovalExecutionBridge
+    from raiker.runtime.turn_suspension import approval_outcome
+
+    bridge = ApprovalExecutionBridge(store, EventLogWriter(store))
+    if not bridge.executes_on_resolution(
+        str(approval.get("tool_name", "")),
+        session.principal_id,
+        critical=bool(approval.get("critical")),
+    ):
+        return (
+            "Approval execution refused: capability or relay gate is disabled, "
+            "unsupported, or requires the critical approval lifecycle."
+        )
+    execution = bridge.execute(
+        approval,
+        principal,
+        session_id=session.session_id,
+        reason="authenticated terminal confirmation",
+    )
+    if not execution.ok:
+        return f"Executing {approval_id}\nRefused: {execution.reason_code or execution.status}."
+
+    resumable = store.load_suspended_turn(approval_id)
+    continuation = "Continuing turn: no parked turn was attached to this approval."
+    if resumable is not None and str(resumable.get("status")) == "suspended":
+        outcome = approval_outcome(
+            approved=True,
+            executed=True,
+            capability=execution.capability,
+            artifacts=execution.artifacts,
+        )
+        store.record_suspended_turn_outcome(
+            approval_id, json.dumps(outcome, sort_keys=True)
+        )
+        try:
+            response = asyncio.run(
+                AgentGateway(
+                    workspace_root, principal_id=session.principal_id
+                ).aresume_after_approval(approval_id)
+            )
+            continuation = f"Continuing turn: {response.status} - {response.message}"
+        except Exception as exc:
+            continuation = f"Continuing turn refused: {type(exc).__name__}: {exc}"
+
+    evidence = _terminal_execution_evidence(execution.artifacts)
+    return f"Executing {approval_id}\n{evidence}\n{continuation}"
+
+
+def _terminal_approval_session(workspace_root: str | Path):  # type: ignore[no-untyped-def]
+    """Resolve a fresh, revocation-aware control session from the environment."""
+    from raiker.api.sessions import ApiSessionStore
+    from raiker.runtime.authority.models import Principal
+
+    token = os.environ.get("RAIKER_API_TOKEN", "").strip()
+    if not token:
+        return (
+            "Authentication required: set RAIKER_API_TOKEN to a live Raiker "
+            "control-session token."
+        )
+    session = ApiSessionStore(workspace_root).get_by_token(token)
+    if session is None:
+        return "Authentication refused: invalid terminal session token."
+    if session.revoked:
+        return "Authentication refused: terminal session token is revoked."
+    if session.is_expired():
+        return "Authentication refused: terminal session token is expired."
+    if session.scope not in {"control", "elevated"}:
+        return "Authentication refused: terminal session lacks control scope."
+    store = SQLiteStore(workspace_root)
+    raw = store.get_principal(session.principal_id)
+    if raw is None or not bool(raw.get("is_active", True)):
+        return "Authentication refused: terminal principal is missing or inactive."
+    return store, session, Principal(**raw)
+
+
+def _terminal_approval_preview(
+    approval: dict[str, object], workspace_root: str | Path
+) -> str:
+    try:
+        arguments = json.loads(str(approval.get("arguments_json") or "{}"))
+    except json.JSONDecodeError:
+        arguments = {}
+    tool_name = str(approval.get("tool_name") or "unknown")
+    lines = [f"  tool: {tool_name}", f"  risk: {approval.get('risk_level', 'unknown')}"]
+    if tool_name == "shell" and isinstance(arguments, dict):
+        argv = arguments.get("command")
+        if isinstance(argv, list) and all(isinstance(item, str) for item in argv):
+            lines.append(f"  argv: {shlex.join(argv)}")
+        lines.append(f"  workspace cwd: {Path(workspace_root).resolve()}")
+        lines.append(f"  timeout: {arguments.get('timeout', 30)} seconds")
+        lines.append(f"  output limit: {arguments.get('max_output_bytes', 100_000)} bytes")
+    else:
+        lines.append(f"  arguments: {json.dumps(arguments, sort_keys=True)}")
+    return "\n".join(lines)
+
+
+def _terminal_execution_evidence(artifacts: dict[str, object]) -> str:
+    lines = [
+        f"Result: exit={artifacts.get('returncode', 'n/a')} "
+        f"stdout={artifacts.get('stdout_bytes', 0)}b "
+        f"stderr={artifacts.get('stderr_bytes', 0)}b"
+    ]
+    if artifacts.get("stdout"):
+        lines.append(f"stdout:\n{str(artifacts['stdout']).rstrip()}")
+    if artifacts.get("stderr"):
+        lines.append(f"stderr:\n{str(artifacts['stderr']).rstrip()}")
+    if artifacts.get("truncated"):
+        lines.append("Output was truncated at the approved bound.")
+    return "\n".join(lines)
 
 
 def _profile_status(profile: ModelProfile) -> str:

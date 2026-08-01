@@ -22,7 +22,7 @@ the historical mode names (`development_preview`, the single-user modes,
 `multi_user_local_runtime`, `hosted_or_networked_runtime`) are still accepted
 wherever a mode name is read and every one of them resolves to it. `checkpoint_created` and `turn_closed` are gateway finalisation events, not
 runtime states. Strict non-allow blocking, role revoke governed, and capability
-gate per action are enforced.
+gate per action are enforced. The capability gate per action is mandatory.
 
 ## Current Backend Capability Matrix
 
@@ -31,16 +31,22 @@ gate per action are enforced.
 | Terminal and web dashboard | Implemented local clients; no direct authority |
 | Local model profiles | Supported through governed provider contracts |
 | Integrated executors | Governed per capability and decision mode |
-| Approval resolution | Executes an approved file mutation through the governed relay (re-governed at execution time, checkpointed); metadata-only for every other capability |
+| Approval resolution | Executes approved file mutations and allowlisted, bounded shell commands through the governed relay (re-governed at execution time; file mutations checkpointed); unsupported capabilities remain metadata-only |
 | Remote/cloud and sensitive domains | Disabled and fail-closed |
 
 Owner bootstrap creates a persisted principal and a human `runtime_gate_manager`.
 The runtime state and capability gate state are durable. No `/sessions` command is
-currently implemented; sessions: deferred; no `/sessions` command is currently
-implemented. Session records are exposed through the documented
+currently implemented. sessions: deferred; no `/sessions` command is currently implemented.
+Session records are exposed through the documented
 commands and local API.
 
 See [implementation status](IMPLEMENTATION_STATUS.md) for the current capability
 ledger and [security architecture](SECURITY_ARCHITECTURE.md) for trust boundaries.
 
-Approval resolution executes an approved local file mutation through the governed relay and is metadata-only for every other capability. Strict non-allow blocking, role revoke governed, and capability gate per action are enforced. sessions: deferred; no `/sessions` command is currently implemented.
+Approval resolution executes approved local file mutations and allowlisted,
+workspace-contained shell commands through the governed relay. The terminal
+requires `RAIKER_API_TOKEN`, previews the immutable effect, and requires the id
+again before execution. Resolution is metadata-only for every other capability.
+Strict
+non-allow blocking, role revoke governance, session revocation, and capability
+gates per action are enforced. sessions: deferred; no `/sessions` command is currently implemented.

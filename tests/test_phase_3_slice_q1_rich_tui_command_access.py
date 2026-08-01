@@ -50,7 +50,7 @@ def test_events_routes_through_command_handler(tmp_path) -> None:  # type: ignor
 
 def test_approvals_routes_through_command_handler(tmp_path) -> None:  # type: ignore[no-untyped-def]
     out = _route_input("/approvals", tmp_path, _PLAIN)
-    assert "approvals" in out.lower()
+    assert "authentication required" in out.lower()
 
 
 def test_review_summary_routes_through_command_handler(tmp_path) -> None:  # type: ignore[no-untyped-def]

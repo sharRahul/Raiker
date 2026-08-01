@@ -19,9 +19,9 @@ and policy review *at execution time*). The relay is itself entered through
 What is relayed, and what is not:
 
 * only :data:`EXECUTABLE_ON_APPROVAL` — checkpointed file mutations and the
-  owner-configured remote/cloud command capabilities. Local ``shell``,
-  ``process``, ``network`` and every other capability keep metadata-only
-  resolution.
+  owner-configured remote/cloud command capabilities, plus bounded local
+  ``shell`` commands. ``process``, ``network`` and every other capability keep
+  metadata-only resolution.
 * **critical** approvals never come here. They keep the human-only, step-up
   gated lifecycle in :meth:`RuntimeAuthority.resolve_critical_approval`.
 * if either gate is off — the relay's own ``approval_execution_relay`` or the
@@ -53,6 +53,7 @@ RELAY_CAPABILITY = "approval_execution_relay"
 EXECUTABLE_ON_APPROVAL: frozenset[str] = frozenset({
     "file_write_execution",
     "patch_apply_execution",
+    "shell_execution",
     "remote_execution_cap",
     "cloud_execution_cap",
 })
@@ -196,9 +197,13 @@ class ApprovalExecutionBridge:
                 },
             )
         )
+        relay_result = result.artifacts.get("result")
         return ApprovalExecution(
             ok=True,
             status=status,
             capability=capability,
-            artifacts={"path": approval_arguments(approval).get("path")},
+            artifacts={
+                **(relay_result if isinstance(relay_result, dict) else {}),
+                "path": approval_arguments(approval).get("path"),
+            },
         )

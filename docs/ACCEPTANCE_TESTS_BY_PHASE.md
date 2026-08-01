@@ -92,7 +92,7 @@ Every phase must preserve these rules:
 |---|---|
 | `tests/test_global_command.py` | Installed `raiker` command opens configured terminal client or documented bootstrap module path. |
 | `tests/test_terminal_client_smoke.py` | Terminal prompt creates PromptEnvelope, calls gateway, renders response, creates event log and checkpoint. |
-| `tests/test_terminal_approvals.py` | Approval card is shown; action does not run by default; approval request event exists. |
+| `tests/test_terminal_approval_execution.py` | Approval requires a live control session, preview does not execute, repeated-id confirmation executes exactly once, revoked sessions fail closed, and web history retains bounded evidence. |
 | `tests/test_terminal_registry_panels.py` | `/channels` and `/models` list registry profiles; disabled profiles visible as disabled. |
 
 ---

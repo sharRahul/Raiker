@@ -158,9 +158,11 @@ is not stored in the repository or test artifacts.
 | FIXED-87 | Low | Scheduler / continuation latency | Fixed (was BUG-39) |
 | FIXED-88 | Medium | Distribution / host lifecycle | Fixed (was BUG-40, less packaging — see BUG-44) |
 | FIXED-89 | Low | Web / e2e regression suite | Fixed (was BUG-41) |
-| BUG-32 | Medium | Terminal / approval execution | Open |
+| FIXED-90 | Medium | Terminal / approval execution | Fixed (was BUG-32) |
 | BUG-44 | Medium | Distribution / signed installers and updates | Open (split out of BUG-40) |
-| BUG-45 | Low | Storage / per-request key derivation | Open (found while verifying BUG-37) |
+| FIXED-91 | Low | Storage / per-request key derivation | Fixed (was BUG-45) |
+| BUG-46 | Medium | Storage / Windows locked memory | Open (found while verifying FIXED-91) |
+| BUG-47 | Low | Models / provider test feedback | Open (found during live verification) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -2525,17 +2527,38 @@ selected environment and block start with actionable configuration guidance.
 
 ---
 
-## BUG-32 — Terminal approval remains metadata-only
+## FIXED-90 — Terminal approval authenticates, previews, executes, and continues *(was BUG-32)*
 
-**Status: open; audited from FIXED-08.**
+**Status: fixed in this change; audited from FIXED-08.**
 
 **Observed.** The terminal client's `/approve` can resolve metadata without an
 authenticated web session, so it cannot execute the bounded approval relay or
 resume work. Approval-gated `shell` likewise remains record-only.
 
-**Required fix.** Add authenticated terminal approval and exactly-once relay
-support without weakening session-revocation, capability, command containment,
-or STOP checks.
+**Fix.** `/approvals`, `/approve`, and `/deny` now require a live control-session
+token in `RAIKER_API_TOKEN`. The token is looked up afresh for every decision, so
+revocation, expiry, scope, principal activity, and account ownership are checked
+before the approval is shown. `/approve <id>` is preview-only: it prints the
+immutable tool, risk, argv, workspace working directory, timeout, and output
+bound. Execution requires the approval id to be repeated exactly as
+`/approve <id> --confirm <id>`.
+
+`shell_execution` now enters the same narrow `ApprovalExecutionBridge` used by
+the web app. The relay still checks TTL and the immutable payload hash, claims
+the approval atomically, captures the approving session posture, and re-routes
+the target through its current capability gate, decision mode, policy, command
+allowlist, workspace containment, timeout, and output bound. The authority now
+returns the executor's bounded evidence instead of discarding it. Terminal and
+web history therefore show the same exit code, byte counts, bounded stdout and
+stderr, truncation state, and resolving principal. Secret-like output is
+redacted before it enters either the terminal response or durable history. If a
+turn is parked, the
+terminal records the outcome and claims the same exactly-once continuation; if
+none is attached it says so rather than implying a model resumed.
+
+Regressions: `tests/test_terminal_approval_execution.py`, the shell relay case in
+`tests/test_api_approvals.py`, and the approval-history component case in
+`apps/web/src/lib/views/ApprovalsView.test.ts`.
 
 **UI when closed.** The terminal prints an exact effect preview, requires an
 authenticated confirmation, then shows **Executing**, bounded output/result,
@@ -3169,11 +3192,23 @@ installer, creates a private instance, connects or defers a model, and updates i
 — without Python, Node, a terminal, or an environment variable. An update that
 fails leaves the previous version running on its own data.
 
+**Progress in this change (still open).** `raiker/app/update.py` implements the
+platform-independent security boundary the future channel must call: an
+Ed25519-signed, schema-pinned manifest; artifact-name and SHA-256 verification;
+path- and symlink-safe archive staging; a retained recovery copy made before
+migration; migration against staging only; and sibling-directory replacement
+that restores the previous installation if the atomic swap fails. Tampered
+artifacts and failed migrations are regression-tested in
+`tests/test_signed_updates.py`. This does **not** turn BUG-44 green: the checkout
+still has no Apple notarisation identity, Authenticode certificate, native
+installer jobs, setup wizard, or native tray binary, so it still cannot publish
+the signed per-platform artifacts the required fix names.
+
 ---
 
-## BUG-45 — A burst of reads queues minutes of key derivation
+## FIXED-91 — A worker pays SQLCipher key derivation once per workspace *(was BUG-45)*
 
-**Status: open; found while verifying FIXED-86.**
+**Status: fixed in this change; found while verifying FIXED-86.**
 
 **Observed.** The visual audit walks all 17 routes at four widths in two themes —
 136 page loads, each firing its own reads. Two things happened. First, the
@@ -3189,15 +3224,68 @@ drains long after the requests that caused it. Nothing is incorrect and nothing
 is lost — it is latency, and only under a load no person generates — but it is
 the shape of problem that becomes a real one the moment a page fans out.
 
-**Required fix.** A per-workspace connection pool, or a cached keyed connection
-per event-loop worker, so the derivation is paid on first use rather than per
-request. It must not weaken the encryption posture: the key stays in memory for
-exactly as long as the host runs, which is already true, and a workspace that is
-locked or removed must invalidate the pool.
+**Fix.** `SQLiteStore.connect()` now caches one keyed SQLCipher connection per
+resolved workspace and worker thread. Short-lived store objects on the same API
+worker reuse it, so the worker pays key derivation on first use instead of on
+every route. Query work is never shared between workers. `check_same_thread` is
+disabled only so the host's shutdown path can close every worker handle from one
+place.
+
+The cache has explicit invalidation rather than relying on garbage collection:
+the FastAPI lifespan closes the workspace at shutdown, uninstall invalidates it
+before export/erase/rename, a closed handle is detected and re-keyed on its next
+read, and process exit closes anything left. Encryption remains SQLCipher with
+the same app key and foreign-key/busy-timeout setup. Regressions in
+`tests/test_sqlite_connection_cache.py` prove repeated stores open one keyed
+connection and invalidation forces exactly one fresh key derivation; the existing
+SQLCipher and lifecycle suites cover encryption and removal compatibility.
 
 **UI when closed.** No user-visible change under normal use; a page that fans out
 across several reads renders as quickly as one that makes a single read, and a
 burst does not leave the next page waiting behind it.
+
+---
+
+## BUG-46 — SQLCipher cannot lock key-bearing pages on this Windows host
+
+**Status: open; found while verifying FIXED-91.**
+
+**Observed.** The Windows SQLCipher wheel repeatedly reports
+`sqlcipher_mlock: VirtualLock() returned 0 LastError=1453` while opening test
+workspaces. Database encryption, reads, writes, and key-cache invalidation all
+pass, so this is not an at-rest confidentiality or correctness failure. It does
+mean SQLCipher could not prove that key-bearing memory stayed out of the page
+file on this host.
+
+**Required fix.** Reproduce on clean supported Windows 10 and 11 runners, record
+the installed wheel/SQLite build and process memory-lock limits, and either ship
+a SQLCipher build whose secure-memory lock succeeds or surface a durable degraded
+posture with an actionable platform remedy. Do not suppress the warning unless a
+test proves key pages are locked.
+
+**UI when closed.** Settings → Security reports database encryption and locked
+memory separately. A host whose key pages cannot be locked says **Degraded** and
+links to the precise remediation; a healthy host says **Locked in memory**.
+
+---
+
+## BUG-47 — A provider test result appears under unrelated provider cards
+
+**Status: open; found during the 2026-08-01 Playwright live run.**
+
+**Observed.** Models → Ollama → **Test** correctly contacted the local Ollama
+service and reported nine models, but the success message, *"Ollama responded
+and exposed 9 models"*, appeared beneath the Anthropic and OpenRouter cards
+instead of remaining attached to the Ollama card. The provider connection and
+model selection were correct; only the feedback placement was wrong.
+
+**Required fix.** Key transient test state by provider/profile id and render it
+inside only the card that initiated the request. Add a component regression
+that tests two connected providers, runs one provider's test, and proves the
+message occurs exactly once under that provider.
+
+**UI when closed.** Testing Ollama shows one result beneath Ollama. Hosted cards
+retain their own independent status and never repeat another provider's result.
 
 ---
 

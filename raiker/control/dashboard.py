@@ -849,6 +849,7 @@ class ApprovalView:
     executes_action: bool = False
     # Critical approvals use the elevated, human-only RuntimeAuthority lifecycle.
     critical: bool = False
+    resolved_by: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -872,6 +873,7 @@ class ApprovalDetailView:
     # are both enabled — for a file mutation. The owner is told which of the two
     # kinds of decision they are making before they make it.
     executes_on_approval: bool = False
+    execution_evidence: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -882,6 +884,7 @@ class ApprovalDetailView:
             "preview_kind": self.preview_kind,
             "metadata_only_notice": self.metadata_only_notice,
             "executes_on_approval": self.executes_on_approval,
+            "execution_evidence": dict(self.execution_evidence),
         }
 
 
@@ -4329,6 +4332,7 @@ class DashboardService:
             expires_at=expires_at,
             is_expired=status == "pending" and bool(expires_at and utc_now() > expires_at),
             critical=bool(row.get("critical")),
+            resolved_by=(str(row["approved_by"]) if row.get("approved_by") else None),
         )
 
     def _approval_detail(
@@ -4373,7 +4377,35 @@ class DashboardService:
             preview_kind=kind,
             metadata_only_notice=notice,
             executes_on_approval=connector_write or relays,
+            execution_evidence=self._approval_execution_evidence(
+                view.approval_id, turn_id=view.turn_id
+            ),
         )
+
+    def _approval_execution_evidence(
+        self, approval_id: str, *, turn_id: str | None
+    ) -> dict[str, Any]:
+        """Return the durable relay evidence for one resolved approval."""
+        from raiker.events.query import EventViewer
+
+        viewer = EventViewer(self.store)
+        # Relay audit events use the resolving API session id, not the original
+        # chat session id. A turn id remains stable across both boundaries and
+        # narrows the durable lookup to the approval's own execution history.
+        event_rows = viewer.list_events(
+            turn_id=turn_id, event_type="approval_executed", limit=50
+        ) if turn_id else viewer.list_events(event_type="approval_executed", limit=500)
+        for row in event_rows:
+            event = viewer.read_event_payload(str(row.get("event_id", "")))
+            payload = event.get("payload") if isinstance(event, dict) else None
+            if not isinstance(payload, dict) or payload.get("approval_id") != approval_id:
+                continue
+            result = payload.get("result")
+            return {
+                "principal_id": payload.get("principal_id"),
+                **(result if isinstance(result, dict) else {}),
+            }
+        return {}
 
     @classmethod
     def _redact_arguments(cls, args: Any) -> dict[str, Any]:

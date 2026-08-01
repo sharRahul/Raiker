@@ -109,4 +109,6 @@ def test_workspace_view_cli_command_is_in_help_and_read_only(tmp_path) -> None: 
     assert "read_only: True" in output
     assert "shared_contract_path: True" in output
     assert handle_slash_command("/tasks", workspace_root=tmp_path) == "No tasks."
-    assert handle_slash_command("/approvals", workspace_root=tmp_path) == "No pending approvals."
+    assert "Authentication required" in handle_slash_command(
+        "/approvals", workspace_root=tmp_path
+    )

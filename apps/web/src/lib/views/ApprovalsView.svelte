@@ -329,7 +329,31 @@
       {#if selected.approval.expires_at}
         <div><dt>Expires</dt><dd>{formatTimestamp(selected.approval.expires_at)}</dd></div>
       {/if}
+      {#if selected.approval.resolved_by}
+        <div><dt>Resolved by</dt><dd class="mono">{selected.approval.resolved_by}</dd></div>
+      {/if}
     </dl>
+
+    {#if Object.keys(selected.execution_evidence ?? {}).length > 0}
+      <h3>Execution evidence</h3>
+      <dl class="meta">
+        <div><dt>Principal</dt><dd class="mono">{selected.execution_evidence.principal_id ?? selected.approval.resolved_by ?? "unknown"}</dd></div>
+        <div><dt>Exit</dt><dd>{selected.execution_evidence.returncode ?? "n/a"}</dd></div>
+        <div><dt>Output</dt><dd>{selected.execution_evidence.stdout_bytes ?? 0} B stdout / {selected.execution_evidence.stderr_bytes ?? 0} B stderr</dd></div>
+      </dl>
+      {#if selected.execution_evidence.stdout}
+        <pre class="diff">{selected.execution_evidence.stdout}</pre>
+      {/if}
+      {#if selected.execution_evidence.stderr}
+        <pre class="diff">{selected.execution_evidence.stderr}</pre>
+      {/if}
+      {#if selected.execution_evidence.truncated}
+        <p class="notice">Output was truncated at the approved bound.</p>
+      {/if}
+      {#if selected.execution_evidence.output_redacted}
+        <p class="notice">Secret-like output was redacted before it entered history.</p>
+      {/if}
+    {/if}
 
     {#if selected.approval.is_expired}
       <p class="notice notice-danger" role="alert">

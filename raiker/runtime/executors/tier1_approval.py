@@ -246,6 +246,8 @@ class ApprovalExecutionRelay:
                 "capability": target_cap,
                 "tool_name": tool_name,
                 "decision": result.decision,
+                "principal_id": principal.principal_id,
+                "result": result.artifacts,
                 "posture": posture,
             })
             return ExecutionResult(
@@ -256,6 +258,7 @@ class ApprovalExecutionRelay:
                     "target_action_id": target_action.action_id,
                     "capability": target_cap,
                     "decision": result.decision,
+                    "result": result.artifacts,
                 },
             )
 
@@ -293,5 +296,6 @@ class ApprovalExecutionRelay:
                 "target_decision": result.decision,
                 "capability": target_cap,
                 "released_to_pending": nothing_ran,
+                "result": result.artifacts,
             },
         )

@@ -112,9 +112,11 @@ class TestApprovalsRead:
     def test_detail_says_metadata_only_when_the_capability_cannot_execute(
         self, workspace: Path, client: TestClient
     ) -> None:
-        # `shell` is deliberately outside the relayed set, so approving it still
+        # `network` is deliberately outside the relayed set, so approving it still
         # only records a decision — and the detail view still says so.
-        _pending_approval(workspace, tool_name="shell", arguments={"command": "ls"})
+        _pending_approval(
+            workspace, tool_name="network", arguments={"url": "https://example.com"}
+        )
         token = _token(client)
         body = client.get("/api/approvals/appr_1", headers=_headers(token)).json()
         assert body["executes_on_approval"] is False
@@ -160,10 +162,39 @@ class TestApprovalsRead:
 
 
 class TestApprovalsResolve:
+    def test_approved_shell_executes_once_with_bounded_evidence(
+        self, workspace: Path, client: TestClient
+    ) -> None:
+        _pending_approval(
+            workspace,
+            tool_name="shell",
+            arguments={
+                "command": ["python", "-c", "print('web relay')"],
+                "max_output_bytes": 64,
+            },
+        )
+        token = _token(client)
+
+        response = client.post(
+            "/api/approvals/appr_1/resolve",
+            json={"approve": True, "reason": "reviewed command"},
+            headers=_headers(token),
+        )
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["status"] == "executed"
+        assert body["executes_action"] is True
+        assert body["execution"]["returncode"] == 0
+        assert body["execution"]["stdout"].strip() == "web relay"
+        assert body["execution"]["stdout_bytes"] <= 64
+
     def test_approve_records_metadata_only_for_a_non_relayed_capability(
         self, workspace: Path, client: TestClient
     ) -> None:
-        _pending_approval(workspace, tool_name="shell", arguments={"command": "ls"})
+        _pending_approval(
+            workspace, tool_name="network", arguments={"url": "https://example.com"}
+        )
         token = _token(client)
         resp = client.post(
             "/api/approvals/appr_1/resolve",

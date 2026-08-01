@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from raiker.context.redaction import redact_text
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import ALLOWED_SHELL_COMMANDS, SandboxError, run_command
 
@@ -41,6 +42,8 @@ class ShellExecutor:
                 reason_code=str(exc),
                 summary="Shell execution blocked by sandbox.",
             )
+        stdout, stdout_redacted = redact_text(result["stdout"])
+        stderr, stderr_redacted = redact_text(result["stderr"])
         return ExecutionResult(
             ok=result["returncode"] == 0,
             capability=self.capability,
@@ -51,6 +54,9 @@ class ShellExecutor:
                 "returncode": result["returncode"],
                 "stdout_bytes": result["stdout_bytes"],
                 "stderr_bytes": result["stderr_bytes"],
+                "stdout": stdout,
+                "stderr": stderr,
+                "output_redacted": stdout_redacted or stderr_redacted,
                 "truncated": result["truncated"],
             },
         )

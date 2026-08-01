@@ -147,11 +147,13 @@ class TestDeferredCapsNotEnableable:
 #    else. Both halves are guards: the executing half must stay bounded to the
 #    relayed capabilities, and the recording half must never start executing.
 class TestApprovalExecutionIsNarrow:
-    def test_approving_a_tier2_action_still_only_records_a_decision(
+    def test_approving_an_unsupported_action_still_only_records_a_decision(
         self, workspace: Path, client: TestClient
     ) -> None:
         approval_id = _seed_pending_write_approval(
-            workspace, tool_name="shell", arguments={"command": "touch should_not_exist.txt"}
+            workspace,
+            tool_name="network",
+            arguments={"url": "https://example.invalid/should-not-run"},
         )
         resp = client.post(
             f"/api/approvals/{approval_id}/resolve",
@@ -160,7 +162,7 @@ class TestApprovalExecutionIsNarrow:
         )
         assert resp.status_code == 200
         assert resp.json()["executes_action"] is False
-        # Nothing ran: shell is deliberately outside the relayed capability set.
+        # Nothing ran: generic network execution is outside the relayed set.
         assert not (workspace / "should_not_exist.txt").exists()
         store = SQLiteStore(workspace)
         viewer = EventViewer(store)

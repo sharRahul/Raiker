@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id, utc_now
@@ -168,6 +168,7 @@ class GovernedActionResult:
     message: str = ""
     error: str | None = None
     approval_id: str | None = None
+    artifacts: dict[str, Any] = field(default_factory=dict)
 
 
 class RuntimeAuthority:
@@ -1373,6 +1374,7 @@ class RuntimeAuthority:
                 policy_decision=decision,
                 message="executed" if result.ok else f"execution_failed:{result.reason_code}",
                 error=None if result.ok else result.reason_code,
+                artifacts=result.artifacts,
             )
 
         return GovernedActionResult(

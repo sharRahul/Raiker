@@ -39,6 +39,7 @@ class TaskManager:
         project_id: str | None = None,
         model_profile: str | None = None,
         model: str | None = None,
+        attachments: list[dict[str, object]] | None = None,
     ) -> TaskRecord:
         now = utc_now()
         task = TaskRecord(
@@ -58,6 +59,7 @@ class TaskManager:
             project_id=project_id,
             model_profile=model_profile,
             model=model,
+            attachments=list(attachments or []),
         )
         self.store.insert_task(task)
         event = make_event(
@@ -71,6 +73,7 @@ class TaskManager:
                 "title": title,
                 "objective": objective,
                 "status": task.status,
+                "attachments": task.attachments,
             },
         )
         self.writer.append(event)

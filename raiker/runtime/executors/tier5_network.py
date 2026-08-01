@@ -5,6 +5,7 @@ import os
 import re
 import shlex
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -17,6 +18,25 @@ if TYPE_CHECKING:
     from raiker.runtime.authority.router import GovernedAction
 
 CommandRunner = Callable[..., dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class ProviderSpendSnapshot:
+    """A provider-reported cumulative USD total, or an explicit unavailable state."""
+
+    cumulative_cost: float | None
+    reference: str = ""
+    reason: str = ""
+
+
+ProviderSpendReader = Callable[[dict[str, Any], str], ProviderSpendSnapshot]
+
+
+def unavailable_daytona_spend(_config: dict[str, Any], _api_key: str) -> ProviderSpendSnapshot:
+    # Daytona's documented organization usage API reports quota consumption,
+    # not billed cost. Do not present that resource count as money. Deployments
+    # can inject a billing adapter; until then the estimate stays reserved.
+    return ProviderSpendSnapshot(None, reason="daytona_spend_api_unavailable")
 
 
 class _NetworkExecutorBase:
@@ -145,6 +165,26 @@ class CloudExecutionExecutor(_NetworkExecutorBase):
 
     capability = "cloud_execution_cap"
 
+    def __init__(
+        self,
+        workspace_root: str | Path,
+        store: SQLiteStore,
+        *,
+        runner: CommandRunner | None = None,
+        spend_reader: ProviderSpendReader | None = None,
+    ) -> None:
+        super().__init__(workspace_root, store, runner=runner)
+        self._spend_reader = spend_reader or unavailable_daytona_spend
+
+    def _spend(self, config: dict[str, Any], api_key: str) -> ProviderSpendSnapshot:
+        try:
+            snapshot = self._spend_reader(config, api_key)
+            if snapshot.cumulative_cost is not None and snapshot.cumulative_cost < 0:
+                return ProviderSpendSnapshot(None, reason="invalid_provider_spend")
+            return snapshot
+        except Exception:
+            return ProviderSpendSnapshot(None, reason="provider_spend_read_failed")
+
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         loaded = self._profile(action, principal, "cloud")
         if isinstance(loaded, ExecutionResult):
@@ -161,14 +201,6 @@ class CloudExecutionExecutor(_NetworkExecutorBase):
                 command = []
         estimated_cost = max(float(action.arguments.get("estimated_cost", 0)), 0)
         max_cost = max(float(config.get("max_cost", 0)), 0)
-        if max_cost <= 0 or estimated_cost > max_cost:
-            return ExecutionResult(
-                False,
-                self.capability,
-                action.action_id,
-                "cloud_execution_budget_exceeded",
-                "Daytona execution denied: no sufficient owner budget is configured.",
-            )
         if (
             not re.fullmatch(r"[A-Za-z0-9._-]{1,128}", sandbox_id)
             or not api_key
@@ -181,6 +213,30 @@ class CloudExecutionExecutor(_NetworkExecutorBase):
                 action.action_id,
                 "daytona_profile_not_ready",
                 "Daytona execution denied: sandbox, API-key reference, or command is incomplete.",
+            )
+        before = self._spend(config, api_key)
+        if before.cumulative_cost is not None:
+            self._store.record_cloud_execution_cost(
+                owner_principal_id=principal.principal_id,
+                profile_id=str(row["profile_id"]),
+                action_id=action.action_id,
+                event_type="provider_snapshot",
+                amount=before.cumulative_cost,
+                provider_reference=before.reference or None,
+            )
+        if not self._store.reserve_cloud_execution_cost(
+            owner_principal_id=principal.principal_id,
+            profile_id=str(row["profile_id"]),
+            action_id=action.action_id,
+            estimated_cost=estimated_cost,
+            max_cost=max_cost,
+        ):
+            return ExecutionResult(
+                False,
+                self.capability,
+                action.action_id,
+                "cloud_execution_budget_exceeded",
+                "Daytona execution denied: cumulative actual and reserved spend would exceed the owner budget.",
             )
         timeout = min(max(float(action.arguments.get("timeout", 60)), 1), 300)
         daytona_command = [
@@ -197,11 +253,47 @@ class CloudExecutionExecutor(_NetworkExecutorBase):
                 env={"DAYTONA_API_KEY": api_key},
             )
         except SandboxError as exc:
+            self._store.record_cloud_execution_cost(
+                owner_principal_id=principal.principal_id,
+                profile_id=str(row["profile_id"]),
+                action_id=action.action_id,
+                event_type="released",
+                amount=estimated_cost,
+                reason="execution_did_not_start",
+            )
             return ExecutionResult(
                 False,
                 self.capability,
                 action.action_id,
                 str(exc),
                 "Daytona execution failed closed.",
+            )
+        after = self._spend(config, api_key)
+        if after.cumulative_cost is not None:
+            self._store.record_cloud_execution_cost(
+                owner_principal_id=principal.principal_id,
+                profile_id=str(row["profile_id"]),
+                action_id=action.action_id,
+                event_type="provider_snapshot",
+                amount=after.cumulative_cost,
+                provider_reference=after.reference or None,
+            )
+        if before.cumulative_cost is not None and after.cumulative_cost is not None:
+            self._store.record_cloud_execution_cost(
+                owner_principal_id=principal.principal_id,
+                profile_id=str(row["profile_id"]),
+                action_id=action.action_id,
+                event_type="reconciled",
+                amount=max(after.cumulative_cost - before.cumulative_cost, 0),
+                provider_reference=after.reference or None,
+            )
+        else:
+            self._store.record_cloud_execution_cost(
+                owner_principal_id=principal.principal_id,
+                profile_id=str(row["profile_id"]),
+                action_id=action.action_id,
+                event_type="provider_unavailable",
+                amount=estimated_cost,
+                reason=after.reason or before.reason or "provider_spend_unavailable",
             )
         return self._result(action, str(row["profile_id"]), result, "Daytona command")

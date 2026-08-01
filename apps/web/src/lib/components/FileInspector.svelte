@@ -250,6 +250,13 @@
           <span class="source-eyebrow"><Icon name="quote" size={14} /> Source</span>
           {#if source.title}<strong>{source.title}</strong>{/if}
         </div>
+        {#if source.status === "resolved" && source.resolution_method}
+          <span class="resolution-badge" class:verified={source.resolution_method === "stored_coordinates"}>
+            {source.resolution_method === "stored_coordinates"
+              ? "Verified from stored coordinates"
+              : "Located by matching text"}
+          </span>
+        {/if}
         {#if sourceNote}<p class="muted source-note">{sourceNote}</p>{/if}
         {#if sourceParts !== null && source.excerpt !== ""}
           <blockquote class="source-excerpt">
@@ -348,6 +355,8 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
+  .resolution-badge { color:var(--text-3); font-size:.7rem; font-weight:650; }
+  .resolution-badge.verified { color:var(--ok); }
   .source-note { margin: 0; font-size: 0.78rem; }
   .source-excerpt {
     margin: 0;

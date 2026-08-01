@@ -51,6 +51,31 @@ def test_due_task_runs_as_its_owner(tmp_path: Path, monkeypatch) -> None:  # typ
     assert saved.summary == "Finished safely."
 
 
+def test_due_task_carries_saved_attachments_into_its_governed_prompt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    store = SQLiteStore(tmp_path)
+    session_id = "sess_inbox_principal_owner"
+    store.create_session(session_id, str(tmp_path))
+    TaskManager(store, EventLogWriter(store)).create_task(
+        session_id=session_id,
+        title="Review source",
+        objective="Review the attached source",
+        scheduled_at="2020-01-01T09:00:00Z",
+        attachments=[{"type": "path", "path": "docs/source.md"}],
+    )
+    captured = []
+
+    async def completed(_gateway, envelope):  # type: ignore[no-untyped-def]
+        captured.append(envelope.prompt.attachments)
+        return SimpleNamespace(status="completed", message="Reviewed.")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.submit_prompt_async", completed)
+    assert asyncio.run(TaskScheduler(tmp_path).run_due()) == 1
+    assert captured == [[{"type": "path", "path": "docs/source.md"}]]
+
+
 def test_immediate_task_uses_its_pair_while_schedule_uses_global(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -293,9 +293,14 @@ class TestPricingApi:
         assert set(entry) >= {
             "provider", "model", "source", "currency", "input_per_mtok",
             "output_per_mtok", "cache_write_per_mtok", "cache_read_per_mtok",
-            "effective_from", "as_of", "history", "has_owner_override",
+            "effective_from", "as_of", "reviewed_at", "review_due_at",
+            "review_status", "history", "has_owner_override",
         }
         assert entry["source"] in {"owner", "provider", "config"}
+        if entry["source"] == "config":
+            assert entry["reviewed_at"] == "2026-08-01"
+            assert entry["review_due_at"] == "2026-11-01"
+            assert entry["review_status"] == "current"
 
     def test_pricing_requires_a_bearer_token(self, client: TestClient) -> None:
         assert client.get("/api/models/pricing").status_code in (401, 403)

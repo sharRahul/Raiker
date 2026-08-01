@@ -7,8 +7,11 @@
   import ModelPicker from "../components/ModelPicker.svelte";
   import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
   import ModelCapacityBadge from "../components/ModelCapacityBadge.svelte";
+  import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
+  import ComposerChips from "../components/ComposerChips.svelte";
+  import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { api, ApiError } from "../api";
-  import type { ApprovalView, TaskView } from "../apiTypes";
+  import type { ApprovalView, PromptAttachment, TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { ACTIVE_TASK_STATES, taskBadge, taskStatusLabel } from "../statusMaps";
   import { chatProfiles, refreshModels } from "../models.svelte";
@@ -27,6 +30,7 @@
   let scheduledAt = $state("");
   let modelProfile = $state("");
   let model = $state("");
+  const attachStore = createAttachmentStore();
   const profiles = $derived(chatProfiles());
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
 
@@ -83,6 +87,21 @@
     return `Scheduled for ${when}`;
   }
 
+  function wireAttachments(items: ComposerAttachment[]): PromptAttachment[] | undefined {
+    const attachments = items.map((item) => item.kind === "image"
+      ? { type: "image" as const, attachment_id: item.attachmentId ?? "" }
+      : item.kind === "document"
+        ? { type: "document" as const, attachment_id: item.attachmentId ?? "" }
+        : { type: "path" as const, path: item.path ?? "" });
+    return attachments.length ? attachments : undefined;
+  }
+
+  function attachmentLabel(attachment: PromptAttachment): string {
+    return attachment.type === "path"
+      ? attachment.path
+      : `${attachment.type === "image" ? "Image" : "Document"} ${attachment.attachment_id}`;
+  }
+
   async function load() {
     try {
       loadError = null;
@@ -96,8 +115,9 @@
   }
 
   async function createTask() {
-    if (!title.trim() || !objective.trim() || ((cadence === "once" || cadence === "daily") && !scheduledAt)) return;
+    if (!title.trim() || !objective.trim() || attachStore.uploading || ((cadence === "once" || cadence === "daily") && !scheduledAt)) return;
     creating = true; notice = null;
+    const attachments = wireAttachments(attachStore.take());
     try {
       await api.createTask({
         title: title.trim(), description: objective.trim(), priority,
@@ -106,9 +126,11 @@
         ...(cadence === "daily" ? { recurrence: "daily" } : cadence === "background" ? { recurrence: "background" } : {}),
         ...(projectId ? { project_id: projectId } : {}),
         ...(cadence === "now" && modelProfile && model ? { model_profile: modelProfile, model } : {}),
+        ...(attachments ? { attachments } : {}),
       });
       title = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; scheduledAt = ""; modelProfile = ""; model = "";
       notice = "Saved to your work queue.";
+      attachStore.clear();
       await load();
     } catch (error) { notice = error instanceof ApiError ? `Could not save task (${error.status}).` : "Could not save task."; }
     finally { creating = false; }
@@ -163,6 +185,7 @@
         scheduledAt?: string;
         profileId?: string | null;
         model?: string | null;
+        attachments?: ComposerAttachment[];
       }>).detail;
       if (!detail?.text.trim()) return;
       objective = detail.text;
@@ -174,6 +197,7 @@
       scheduledAt = detail.scheduledAt ?? "";
       modelProfile = detail.profileId ?? "";
       model = detail.model ?? "";
+      if (detail.attachments?.length) attachStore.set([...detail.attachments]);
     };
     window.addEventListener("raiker:task-compose", onCompose);
     const timer = window.setInterval(() => void load(), 15_000);
@@ -189,13 +213,15 @@
     <label>Title<input class="input" aria-label="Task title" bind:value={title} required maxlength="240" placeholder={cadence === "background" ? "e.g. Research local AI news" : cadence === "daily" ? "e.g. Review today’s priorities" : "What should Raiker work on?"} /></label>
     <label>Instructions *<textarea class="textarea" aria-label="Instructions" aria-invalid={Boolean(title.trim() && !objective.trim())} aria-describedby={title.trim() && !objective.trim() ? "instructions-error" : undefined} bind:value={objective} required placeholder="Add the outcome, context, or constraints for this work."></textarea></label>
     {#if title.trim() && !objective.trim()}<p id="instructions-error" class="field-error" role="alert">Instructions are required.</p>{/if}
+    <ComposerChips store={attachStore} disabled={creating} />
+    <ComposerAttachPanel store={attachStore} disabled={creating} idPrefix="task" />
     <div class="fields"><label>Parent work<select class="select" aria-label="Parent work" bind:value={parentTaskId}><option value="">No parent — top-level work</option>{#each tasks ?? [] as task (task.task_id)}<option value={task.task_id}>{task.title}</option>{/each}</select></label><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>{#if cadence === "once" || cadence === "daily"}<label>Start time<input class="input" aria-label="Start time" type="datetime-local" bind:value={scheduledAt} required /></label>{/if}</div>
     {#if cadence === "now"}
       <div class="task-model"><span>Task model</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model /><ExecutionEnvironmentBadge /><ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} /></div>
     {:else}
       <p class="schedule-model-note">Uses the global model active when this run begins.</p>
     {/if}
-    <button class="btn btn-primary" disabled={creating || !title.trim() || !objective.trim() || ((cadence === "once" || cadence === "daily") && !scheduledAt)}>{creating ? "Saving…" : cadence === "background" ? "Start background agent" : cadence === "daily" ? "Create daily routine" : cadence === "once" ? "Schedule task" : "Create task"}</button>
+    <button class="btn btn-primary" disabled={creating || attachStore.uploading || !title.trim() || !objective.trim() || ((cadence === "once" || cadence === "daily") && !scheduledAt)}>{creating ? "Saving…" : attachStore.uploading ? "Uploading…" : cadence === "background" ? "Start background agent" : cadence === "daily" ? "Create daily routine" : cadence === "once" ? "Schedule task" : "Create task"}</button>
   </form>
 
   {#if notice}<p class="notice" role="status">{notice}</p>{/if}
@@ -218,6 +244,13 @@
               </div>
               <Badge variant={taskBadge(task.status)} label={taskStatusLabel(task.status)} />
             </div>
+            {#if (task.attachments ?? []).length > 0}
+              <div class="task-attachments" aria-label="Files attached to this task">
+                {#each task.attachments ?? [] as attachment}
+                  <span><Icon name="file" size={14} /> {attachmentLabel(attachment)}</span>
+                {/each}
+              </div>
+            {/if}
 
             <!-- BUG-25 — the whole life of an approval, on the card that owns
                  it. Waiting names the decision and links to it; continuing says
@@ -265,5 +298,5 @@
 </section>
 
 <style>
-  .tasks{max-width:64rem}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.tasks header .page-lead{margin:0;max-width:60ch}.composer p,.task p{color:var(--text-2);font-size:.85rem;margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3)}.composer label{color:var(--text-2);display:grid;font-size:.8rem;gap:.35rem}.composer .field-error{color:var(--danger);font-size:.8rem;margin:calc(var(--space-3) * -.5) 0 0}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:.85rem}.summary strong{color:var(--text-1);font-size:1.1rem}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:.96rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:.76rem;margin-top:.8rem}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:.8rem}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1)}.outcome{color:var(--text-2);font-size:.82rem;margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
+  .tasks{max-width:64rem}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.tasks header .page-lead{margin:0;max-width:60ch}.composer p,.task p{color:var(--text-2);font-size:.85rem;margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3)}.composer label{color:var(--text-2);display:grid;font-size:.8rem;gap:.35rem}.composer .field-error{color:var(--danger);font-size:.8rem;margin:calc(var(--space-3) * -.5) 0 0}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:.85rem}.summary strong{color:var(--text-1);font-size:1.1rem}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:.96rem}.task-attachments{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}.task-attachments span{align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-2);display:flex;font-size:.75rem;gap:.3rem;max-width:100%;overflow-wrap:anywhere;padding:.35rem .5rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:.76rem;margin-top:.8rem}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:.8rem}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1)}.outcome{color:var(--text-2);font-size:.82rem;margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
 </style>

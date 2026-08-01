@@ -90,4 +90,14 @@ describe("ExportConversationDialog — BUG-22", () => {
     await fireEvent.click(screen.getByRole("button", { name: /Print \/ Save as PDF/ }));
     expect(onprint).toHaveBeenCalled();
   });
+
+  it("uses a native modal dialog and closes through its cancel event", async () => {
+    stubFetch(routes());
+    const onclose = vi.fn();
+    render(ExportConversationDialog, { sessionId: "sess_1", onclose });
+    const dialog = await screen.findByRole("dialog", { name: "Export conversation" });
+    expect(dialog.tagName).toBe("DIALOG");
+    await fireEvent(dialog, new Event("cancel", { cancelable: true }));
+    expect(onclose).toHaveBeenCalledTimes(1);
+  });
 });

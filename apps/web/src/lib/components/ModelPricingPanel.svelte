@@ -257,6 +257,13 @@
                   <span class="source" class:owner={entry.source === "owner"}>
                     {SOURCE_LABELS[entry.source ?? ""] ?? "Unknown"}
                   </span>
+                  {#if entry.reviewed_at}
+                    <span class="review-fact">Reviewed {entry.reviewed_at}</span>
+                    <span class="review-fact">Review due {entry.review_due_at}</span>
+                    <span class="review-state" class:overdue={entry.review_status === "overdue"}>
+                      Review {entry.review_status}
+                    </span>
+                  {/if}
                 </td>
                 <td class="num">{rate(entry.input_per_mtok, entry.currency)}</td>
                 <td class="num">{rate(entry.output_per_mtok, entry.currency)}</td>
@@ -386,6 +393,9 @@
   .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .source { color: var(--text-2); }
   .source.owner { color: var(--accent); font-weight: 650; }
+  .review-fact, .review-state { display:block; margin-top:.18rem; color:var(--text-3); font-size:.7rem; white-space:nowrap; }
+  .review-state { color:var(--ok); font-weight:650; }
+  .review-state.overdue { color:var(--warn); }
   .actions { display: flex; gap: .25rem; flex-wrap: wrap; }
 
   .expansion td { background: var(--sunken); }

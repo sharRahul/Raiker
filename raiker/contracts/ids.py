@@ -17,6 +17,8 @@ _PREFIXES = {
     "task_",
     # One row of per-turn token accounting in the model usage ledger.
     "usage_",
+    # Append-only cloud execution budget ledger event.
+    "cost_",
     # Administrator context-capacity registry history row.
     "mcap_",
     "appr_",

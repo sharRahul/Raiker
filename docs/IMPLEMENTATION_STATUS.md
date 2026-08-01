@@ -28,6 +28,11 @@ file mutations are additionally checkpointed so they stay reversible.
 Approval remains metadata-only for every other capability.
 CLI durable memory mutation is `implemented_approval_required`.
 
+Daytona execution additionally reserves cumulative owner/profile budget in an
+append-only ledger before launch. Provider actuals reconcile reservations when
+available; an unavailable billing adapter is explicit and retains the estimate.
+Scheduled task turns carry the same validated attachments as Chat and Build.
+
 Integrated real executors (including graph indexing, semantic/vector runtimes,
 plugin slices, channels, container, scheduled routines, model providers,
 SSH/Daytona command execution, and local email/calendar/reminder stores) are

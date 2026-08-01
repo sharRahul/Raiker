@@ -123,7 +123,8 @@
   function startWork(event: SubmitEvent) {
     event.preventDefault();
     const text = draft.trim();
-    if (text === "" || effectiveModel === null) return;
+    if (text === "" || effectiveModel === null || attachStore.uploading) return;
+    const attachments = attachStore.take();
     if (workMode === "task" || workMode === "schedule") {
       window.location.hash = "#/tasks";
       window.setTimeout(() => window.dispatchEvent(new CustomEvent("raiker:task-compose", {
@@ -133,13 +134,14 @@
           scheduledAt: workMode === "schedule" ? scheduleAt : "",
           profileId: workMode === "task" ? effectiveModel.profile_id : null,
           model: workMode === "task" ? effectiveModel.model : null,
+          attachments,
         },
       })), 0);
       draft = "";
+      attachStore.clear();
       handedOff = true;
       return;
     }
-    const attachments = attachStore.take();
     if (workMode === "build") {
       window.location.hash = "#/build";
       window.setTimeout(() => window.dispatchEvent(new CustomEvent("raiker:build-compose", {
@@ -218,7 +220,7 @@
         {/if}
         <div class="composer-actions">
           <ComposerAttach bind:this={attachControl} bind:open={attachOpen} />
-          <button class="btn btn-primary" type="submit" disabled={draft.trim() === "" || effectiveModel === null}><Icon name="send" size={15} /> {primaryLabel}</button>
+          <button class="btn btn-primary" type="submit" disabled={draft.trim() === "" || effectiveModel === null || attachStore.uploading}><Icon name="send" size={15} /> {primaryLabel}</button>
         </div>
         {#if handedOff}<p class="handoff" role="status">{workMode === "build" ? "Sent to Build. Review and start the governed build there." : workMode === "task" ? "Sent to Tasks. Review and create the task there." : workMode === "schedule" ? "Sent to Tasks. Review the schedule and create it there." : "Sent to Chat. The conversation and its governed turn continue there."}</p>{/if}
       </form>

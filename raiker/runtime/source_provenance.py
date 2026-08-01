@@ -37,6 +37,7 @@ would remove the search entirely; that is tracked, not pretended.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -76,6 +77,7 @@ class SourceExcerpt:
     turn_id: str = ""
     attachment_id: str = ""
     truncated: bool = False
+    resolution_method: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -89,6 +91,7 @@ class SourceExcerpt:
             "turn_id": self.turn_id,
             "attachment_id": self.attachment_id,
             "truncated": self.truncated,
+            "resolution_method": self.resolution_method,
         }
 
 
@@ -165,6 +168,69 @@ def build_excerpt(source: str, passage: str) -> tuple[str, int, int, bool]:
     )
 
 
+def turn_source_text(turn: dict[str, Any]) -> str:
+    """The stable text representation used for capture and later resolution."""
+    parts = [str(turn.get("prompt_text") or ""), str(turn.get("summary") or "")]
+    return "\n\n".join(part for part in parts if part.strip())
+
+
+def capture_source_coordinates(
+    store: SQLiteStore, session_id: str, turn_id: str | None, passage: str
+) -> dict[str, Any]:
+    """Capture a verified UTF-8 byte range while the source turn is present."""
+    if not turn_id:
+        return {}
+    turn = store.load_turn(turn_id)
+    if turn is None or str(turn.get("session_id") or "") != session_id:
+        return {}
+    source = turn_source_text(turn)
+    start, length = locate_passage(source, passage)
+    if start < 0:
+        return {}
+    byte_start = len(source[:start].encode("utf-8"))
+    captured = source[start : start + length].encode("utf-8")
+    return {
+        "source_byte_start": byte_start,
+        "source_byte_end": byte_start + len(captured),
+        "source_passage_sha256": hashlib.sha256(captured).hexdigest(),
+    }
+
+
+def _coordinate_passage(
+    source: str, provenance: dict[str, Any]
+) -> tuple[int, int] | None:
+    try:
+        byte_start = int(provenance["source_byte_start"])
+        byte_end = int(provenance["source_byte_end"])
+        expected_hash = str(provenance["source_passage_sha256"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    encoded = source.encode("utf-8")
+    if byte_start < 0 or byte_end <= byte_start or byte_end > len(encoded):
+        return None
+    captured = encoded[byte_start:byte_end]
+    if hashlib.sha256(captured).hexdigest() != expected_hash:
+        return None
+    try:
+        start = len(encoded[:byte_start].decode("utf-8"))
+        length = len(captured.decode("utf-8"))
+    except UnicodeDecodeError:
+        return None
+    return start, length
+
+
+def build_excerpt_at(source: str, start: int, length: int) -> tuple[str, int, int, bool]:
+    window_start = max(0, start - CONTEXT_CHARS)
+    window_end = min(len(source), start + length + CONTEXT_CHARS)
+    if window_end - window_start > MAX_EXCERPT_CHARS:
+        window_end = window_start + MAX_EXCERPT_CHARS
+    excerpt = source[window_start:window_end]
+    highlight_length = min(length, len(excerpt) - (start - window_start))
+    return excerpt, start - window_start, max(highlight_length, 0), (
+        window_start > 0 or window_end < len(source)
+    )
+
+
 class SourceProvenanceService:
     """Resolves stored source coordinates into a passage this caller may read."""
 
@@ -180,15 +246,18 @@ class SourceProvenanceService:
         attachment_id = str(provenance.get("source_attachment_id") or "").strip()
 
         if attachment_id:
-            return self._resolve_attachment(session_id, attachment_id, passage, owner_principal_id)
+            return self._resolve_attachment(
+                session_id, attachment_id, passage, owner_principal_id, provenance
+            )
         if not session_id and not turn_id:
             return SourceExcerpt(status=STATUS_NO_PROVENANCE)
-        return self._resolve_turn(session_id, turn_id, passage, owner_principal_id)
+        return self._resolve_turn(session_id, turn_id, passage, owner_principal_id, provenance)
 
     # ── conversation turns ───────────────────────────────────────────────
 
     def _resolve_turn(
-        self, session_id: str, turn_id: str, passage: str, owner_principal_id: str
+        self, session_id: str, turn_id: str, passage: str, owner_principal_id: str,
+        provenance: dict[str, Any],
     ) -> SourceExcerpt:
         turn = self._store.load_turn(turn_id) if turn_id else None
         resolved_session = session_id or (str(turn.get("session_id", "")) if turn else "")
@@ -216,25 +285,53 @@ class SourceProvenanceService:
 
         # The turn as the owner would read it back: what they asked, and what
         # Raiker recorded for it.
-        parts = [str(turn.get("prompt_text") or ""), str(turn.get("summary") or "")]
-        source = "\n\n".join(part for part in parts if part.strip())
-        excerpt, start, length, truncated = build_excerpt(source, passage)
+        source = turn_source_text(turn)
+        # The resolver receives provenance in ``resolve``. Pass it through the
+        # private turn path so legacy records can retain text matching.
+        return self._resolved_text_excerpt(
+            source, passage, provenance, kind="conversation",
+            title=str(session.get("title") or "Untitled conversation"),
+            session_id=resolved_session, turn_id=str(turn.get("turn_id") or turn_id),
+        )
+
+    def _resolved_text_excerpt(
+        self,
+        source: str,
+        passage: str,
+        provenance: dict[str, Any],
+        *,
+        kind: str,
+        title: str,
+        session_id: str,
+        turn_id: str = "",
+        attachment_id: str = "",
+    ) -> SourceExcerpt:
+        coordinates = _coordinate_passage(source, provenance)
+        if coordinates is not None:
+            excerpt, start, length, truncated = build_excerpt_at(source, *coordinates)
+            method = "stored_coordinates"
+        else:
+            excerpt, start, length, truncated = build_excerpt(source, passage)
+            method = "matching_text" if start >= 0 else ""
         return SourceExcerpt(
             status=STATUS_RESOLVED if start >= 0 else STATUS_SOURCE_CHANGED,
-            kind="conversation",
-            title=str(session.get("title") or "Untitled conversation"),
+            kind=kind,
+            title=title,
             excerpt=excerpt,
             highlight_start=start,
             highlight_length=length,
-            session_id=resolved_session,
-            turn_id=str(turn.get("turn_id") or turn_id),
+            session_id=session_id,
+            turn_id=turn_id,
+            attachment_id=attachment_id,
             truncated=truncated,
+            resolution_method=method,
         )
 
     # ── attachments ──────────────────────────────────────────────────────
 
     def _resolve_attachment(
-        self, session_id: str, attachment_id: str, passage: str, owner_principal_id: str
+        self, session_id: str, attachment_id: str, passage: str, owner_principal_id: str,
+        provenance: dict[str, Any],
     ) -> SourceExcerpt:
         from raiker.runtime.attachment_preview import AttachmentPreviewService
 
@@ -258,17 +355,9 @@ class SourceProvenanceService:
                 session_id=session_id,
                 attachment_id=attachment_id,
             )
-        excerpt, start, length, truncated = build_excerpt(preview.text, passage)
-        return SourceExcerpt(
-            status=STATUS_RESOLVED if start >= 0 else STATUS_SOURCE_CHANGED,
-            kind="file",
-            title=preview.filename,
-            excerpt=excerpt,
-            highlight_start=start,
-            highlight_length=length,
-            session_id=session_id,
-            attachment_id=attachment_id,
-            truncated=truncated,
+        return self._resolved_text_excerpt(
+            preview.text, passage, provenance, kind="file", title=preview.filename,
+            session_id=session_id, attachment_id=attachment_id,
         )
 
     # ── authorisation ────────────────────────────────────────────────────

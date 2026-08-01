@@ -17,6 +17,9 @@ const ENTRY = {
   cache_read_per_mtok: "0.10",
   effective_from: "2026-07-01T00:00:00Z",
   as_of: "2026-07",
+  reviewed_at: "2026-08-01",
+  review_due_at: "2026-11-01",
+  review_status: "current",
   recorded_at: "2026-07-01T00:00:00Z",
   recorded_by: null,
   reason: "Shipped list price, reviewed documentation adapter",
@@ -83,6 +86,20 @@ describe("ModelPricingPanel — BUG-21", () => {
     expect(screen.getByText(/Last refresh/)).toBeInTheDocument();
     expect(screen.getByText(/Next due/)).toBeInTheDocument();
     expect(screen.getByText(/every 12h/)).toBeInTheDocument();
+  });
+
+  it("distinguishes a human price review from provider synchronisation", async () => {
+    stubFetch(pricing());
+    render(ModelPricingPanel);
+    expect(await screen.findByText("Reviewed 2026-08-01")).toBeInTheDocument();
+    expect(screen.getByText("Review due 2026-11-01")).toBeInTheDocument();
+    expect(screen.getByText("Review current")).toBeInTheDocument();
+  });
+
+  it("flags a documented rate whose human review is overdue", async () => {
+    stubFetch(pricing({ entries: [{ ...ENTRY, review_status: "overdue" }] }));
+    render(ModelPricingPanel);
+    expect(await screen.findByText("Review overdue")).toBeInTheDocument();
   });
 
   it("shows a failed refresh as stale while keeping the last good rate visible", async () => {

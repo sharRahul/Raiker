@@ -7,7 +7,7 @@ import os
 import re
 import shutil
 from dataclasses import asdict, dataclass, field, replace
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -515,6 +515,7 @@ class TaskView:
     project_id: str | None = None
     model_profile: str | None = None
     model: str | None = None
+    attachments: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -637,6 +638,9 @@ class ModelPricingEntryView:
     cache_read_per_mtok: str | None
     effective_from: str | None
     as_of: str | None
+    reviewed_at: str | None
+    review_due_at: str | None
+    review_status: str | None
     recorded_at: str | None
     recorded_by: str | None
     reason: str | None
@@ -1050,7 +1054,7 @@ class DashboardService:
                 "profile_id": "local_native", "kind": "local", "name": "Local workspace",
                 "enabled": True, "configured": True, "available": True,
                 "status": "ready", "selected": selected == "local_native",
-                "credential_configured": True, "budget": None,
+                "credential_configured": True, "budget": None, "cost": None,
             },
             {
                 "profile_id": "container_default", "kind": "container", "name": "Local container",
@@ -1058,6 +1062,7 @@ class DashboardService:
                 "available": bool(os.environ.get("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "").strip()),
                 "status": "ready" if os.environ.get("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "").strip() else "configuration_required",
                 "selected": selected == "container_default", "credential_configured": True, "budget": None,
+                "cost": None,
             },
         ]
         for row in self.store.list_remote_execution_profiles(owner_principal_id=owner_principal_id):
@@ -1070,13 +1075,18 @@ class DashboardService:
             credential_configured = bool(credential_env and os.environ.get(credential_env, "").strip())
             configured = bool(config.get("host") and config.get("user") and credential_env) if kind == "ssh" else bool(config.get("sandbox_id") and credential_env)
             available = bool(row["enabled"] and configured and credential_configured)
+            budget = config.get("max_cost") if kind == "daytona" else None
+            cost = self.store.cloud_execution_cost_summary(
+                owner_principal_id, str(row["profile_id"]), max_cost=float(budget or 0)
+            ) if kind == "daytona" else None
             environments.append(
                 {
                     "profile_id": str(row["profile_id"]), "kind": kind, "name": str(row["name"]),
                     "enabled": bool(row["enabled"]), "configured": configured, "available": available,
                     "status": "ready" if available else ("credential_required" if configured and not credential_configured else "configuration_required"),
                     "selected": selected == row["profile_id"], "credential_configured": credential_configured,
-                    "budget": config.get("max_cost"),
+                    "budget": budget,
+                    "cost": cost,
                     "config": {key: value for key, value in config.items() if key not in {"password", "token", "api_key", "secret"}},
                 }
             )
@@ -1111,6 +1121,12 @@ class DashboardService:
                 return ControlResult(ok=False, reason_code="invalid_ssh_profile")
         elif not str(config.get("sandbox_id", "")).strip():
             return ControlResult(ok=False, reason_code="daytona_sandbox_required")
+        elif kind == "daytona":
+            try:
+                if float(config.get("max_cost", 0) or 0) <= 0:
+                    return ControlResult(ok=False, reason_code="daytona_budget_required")
+            except (TypeError, ValueError):
+                return ControlResult(ok=False, reason_code="daytona_budget_required")
         now = utc_now()
         existing = self.store.load_remote_execution_profile(
             profile_id or "", owner_principal_id=owner_principal_id
@@ -2829,6 +2845,7 @@ class DashboardService:
         project_id: str | None = None,
         model_profile: str | None = None,
         model: str | None = None,
+        attachments: list[dict[str, Any]] | None = None,
     ) -> TaskView:
         """Create a local planning task in the caller's server-owned Inbox session.
 
@@ -2853,6 +2870,25 @@ class DashboardService:
                 raise ValueError(f"test_profile_not_allowed:{model_profile}")
             if not self.store.is_configured_model(principal_id, model_profile, model):
                 raise ValueError("model_not_configured_for_task")
+        clean_attachments: list[dict[str, Any]] = []
+        if len(attachments or []) > 8:
+            raise ValueError("too_many_attachments")
+        for entry in attachments or []:
+            if not isinstance(entry, dict):
+                raise ValueError("invalid_attachment")
+            kind = entry.get("type")
+            if kind == "path" and isinstance(entry.get("path"), str) and entry["path"].strip():
+                clean_attachments.append({"type": "path", "path": entry["path"].strip()})
+                continue
+            attachment_id = entry.get("attachment_id")
+            if kind in {"image", "document"} and isinstance(attachment_id, str) and attachment_id.strip():
+                if self.store.load_attachment_metadata(
+                    attachment_id.strip(), owner_principal_id=principal_id
+                ) is None:
+                    raise ValueError("attachment_not_found")
+                clean_attachments.append({"type": kind, "attachment_id": attachment_id.strip()})
+                continue
+            raise ValueError("invalid_attachment")
         # An unscheduled task is work requested now; the resident host claims
         # it on its next scheduler tick. Explicit times remain untouched.
         if scheduled_at is None:
@@ -2893,6 +2929,7 @@ class DashboardService:
             project_id=project_id,
             model_profile=model_profile,
             model=model,
+            attachments=clean_attachments,
         )
         return self._task_view(task)
 
@@ -3544,6 +3581,7 @@ class DashboardService:
 
         profile_registry = ModelProfileRegistry.load()
         profile_by_model: dict[tuple[str, str], str] = {}
+        review_by_model: dict[tuple[str, str], tuple[str, str, str]] = {}
         for profile in profile_registry.list_profiles():
             if bool(profile.raw.get("test_only", False)):
                 continue
@@ -3551,12 +3589,27 @@ class DashboardService:
             models = (
                 pricing_block.get("models") if isinstance(pricing_block, dict) else None
             )
-            if isinstance(models, dict):
+            if isinstance(models, dict) and isinstance(pricing_block, dict):
                 for model_id in models:
                     if isinstance(model_id, str):
                         profile_by_model.setdefault(
                             (profile.provider, model_id), profile.profile_id
                         )
+                        reviewed_at = pricing_block.get("reviewed_at")
+                        interval = pricing_block.get("review_interval_days", 92)
+                        if isinstance(reviewed_at, str) and reviewed_at:
+                            try:
+                                reviewed = datetime.fromisoformat(reviewed_at).replace(tzinfo=UTC)
+                                due = reviewed + timedelta(days=max(int(interval), 1))
+                                review_by_model[(profile.provider, model_id)] = (
+                                    reviewed_at,
+                                    due.date().isoformat(),
+                                    "overdue" if datetime.now(UTC) > due else "current",
+                                )
+                            except (TypeError, ValueError):
+                                review_by_model[(profile.provider, model_id)] = (
+                                    reviewed_at, "", "invalid",
+                                )
             if isinstance(profile.model, str) and profile.model not in ("", "<model>"):
                 profile_by_model.setdefault(
                     (profile.provider, profile.model), profile.profile_id
@@ -3569,6 +3622,9 @@ class DashboardService:
                 continue
             history = registry.history(owner, provider, model, limit=history_limit)
             entries.append(
+                # A documented rate's human review is a different clock from
+                # provider synchronisation. Overrides and provider catalogue
+                # rows have no shipped-document review to claim.
                 ModelPricingEntryView(
                     provider=provider,
                     model=model,
@@ -3589,6 +3645,12 @@ class DashboardService:
                     ),
                     effective_from=current.effective_from,
                     as_of=current.as_of,
+                    reviewed_at=(review_by_model.get((provider, model)) or (None, None, None))[0]
+                    if current.source == "config" else None,
+                    review_due_at=(review_by_model.get((provider, model)) or (None, None, None))[1]
+                    if current.source == "config" else None,
+                    review_status=(review_by_model.get((provider, model)) or (None, None, None))[2]
+                    if current.source == "config" else None,
                     recorded_at=current.recorded_at,
                     recorded_by=current.recorded_by,
                     reason=current.reason,
@@ -4430,6 +4492,7 @@ class DashboardService:
             project_id=d.get("project_id"),
             model_profile=d.get("model_profile"),
             model=d.get("model"),
+            attachments=list(d.get("attachments") or []),
         )
 
 

@@ -151,11 +151,26 @@ CREATE TABLE tasks (
   status TEXT NOT NULL,
   current_step TEXT,
   progress_percent INTEGER,
+  attachments_json TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   completed_at TEXT
 );
 ```
+
+`attachments_json` contains validated prompt references only. Uploaded bytes
+remain owner-scoped in `attachments`; the scheduler binds those references to
+its turn before reading them.
+
+### cloud_execution_cost_ledger
+
+Daytona budget history is append-only. Each row identifies owner, profile,
+action, event type, decimal-string amount, optional provider reference/reason,
+and timestamp. A partial unique index permits exactly one `reserved` event per
+action. Admission uses `BEGIN IMMEDIATE` and sums reconciled actuals plus
+unsettled reservations, taking provider cumulative growth when it is higher.
+`released`, `provider_snapshot`, `reconciled`, and
+`provider_unavailable` append evidence; they never rewrite the reservation.
 
 ### events_index
 

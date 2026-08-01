@@ -41,6 +41,16 @@ review, attachment placement in Chat and Build, memory lifecycle controls, and
 approval restoration after a full page reload. Credentials were entered through
 the product UI and are not stored in the repository or test artifacts.
 
+FIXED-76 through FIXED-84 were verified on **2026-08-01** against a running
+`raiker-web` using owner-configured Anthropic and OpenRouter credentials and the
+Ollama `gemma4:31b-cloud` model. The live scenario is
+[`e2e/bug-36-38-42-43-live.spec.ts`](../../apps/web/e2e/bug-36-38-42-43-live.spec.ts),
+and its screenshots are `working/180-*` through `working/184-*`. It covers price
+review metadata, a real attachment-backed Chat turn, keyboard and axe checks for
+both dialogs, Schedule attachment presentation, and cumulative Daytona budget
+state. Credentials were entered through the product UI and are not stored in
+the repository or test artifacts.
+
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | FIXED-01 | High | Models | Fixed |
@@ -118,15 +128,20 @@ the product UI and are not stored in the repository or test artifacts.
 | FIXED-73 | Low | Chat / Build attachment layout | Fixed |
 | FIXED-74 | Medium | Build / Windows container sandbox | Fixed (found during verification) |
 | FIXED-75 | Low | Models / capacity history ordering | Fixed (found in GitHub CI) |
+| FIXED-76 | Low | Models / shipped price review cadence | Fixed (was BUG-36) |
+| FIXED-77 | Medium | Memory / source coordinates | Fixed (was BUG-38) |
+| FIXED-78 | Medium | Cloud execution / billing | Fixed (was BUG-42) |
+| FIXED-79 | Low | Web / accessibility | Fixed (was BUG-43) |
+| FIXED-80 | Low | Schedule / attachments | Fixed (consistency improvement) |
+| FIXED-81 | Medium | Chat / Build / Workbench / Tasks | Fixed (found during live verification) |
+| FIXED-82 | Medium | Export / Knowledge Map accessibility | Fixed (found by live axe verification) |
+| FIXED-83 | Medium | Chat / export keyboard activation | Fixed (found during live verification) |
+| FIXED-84 | Low | CI / dependency licensing | Fixed (found during workflow verification) |
 | BUG-32 | Medium | Terminal / approval execution | Open |
-| BUG-36 | Low | Models / shipped price review cadence | Open |
 | BUG-37 | Low | Design system / visual polish | Open |
-| BUG-38 | Medium | Memory / source coordinates | Open (found while fixing BUG-27) |
 | BUG-39 | Low | Scheduler / continuation latency | Open (found while fixing BUG-25) |
 | BUG-40 | Low | Distribution / installers and service registration | Open (found while building `raiker-app`) |
 | BUG-41 | Low | Web / e2e regression suite | Open (found while verifying this change) |
-| BUG-42 | Medium | Cloud execution / billing | Open (found while fixing BUG-31) |
-| BUG-43 | Low | Web / accessibility | Open (found during verification) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -2617,38 +2632,50 @@ action first, including rapid set/clear changes made within one clock tick.
 
 ---
 
-## BUG-42 — Daytona budgets do not reconcile cumulative provider spend
+## FIXED-78 — Daytona budgets reconcile cumulative provider spend *(was BUG-42)*
 
-**Status: open; found while fixing BUG-31.**
+**Status: fixed in this change; found while fixing BUG-31.**
 
 **Observed.** A Daytona profile enforces an owner-configured maximum estimated
 cost for each proposed command. The CLI integration does not receive an
 authoritative billed-cost result, so Raiker cannot decrement a cumulative
 workspace budget or reconcile estimates against the provider invoice.
 
-**Required fix.** Add a provider-supported usage adapter, immutable per-action
-estimate/actual ledger, reservation and release semantics, and an owner-visible
-cumulative budget. Continue failing closed when a reservation cannot be made.
+**Fix.** Every Daytona action now writes an immutable reservation before the CLI
+can start. Admission runs inside an immediate SQLite transaction against
+cumulative reconciled actuals, provider-reported cumulative growth, and
+unsettled reservations; a second individually-valid action is refused when the
+combined exposure exceeds the profile limit. Provider snapshots replace an
+estimate with actual cost when a deployment supplies the billing adapter. The
+default adapter explicitly reports unavailable because Daytona's documented
+organization-usage API reports resource quotas, not billed dollars; the
+estimate therefore remains reserved instead of being silently released or
+mislabelled as actual spend. A command that never starts writes a release.
 
-**UI when closed.** Runtime shows budget, reserved, actual, and remaining cost,
-with per-action reconciliation history and a clear unavailable state when the
-provider cannot report usage.
+**UI.** Settings → Runtime shows committed and remaining cost plus the
+reconciliation state. The API also returns reserved, Raiker actual,
+provider-cumulative, remaining, and the append-only per-action history. Covered
+by `tests/test_execution_environments.py`.
 
 ---
 
-## BUG-43 — Knowledge Map and export dialogs retain accessibility diagnostics
+## FIXED-79 — Knowledge Map and export dialogs have clean accessibility semantics *(was BUG-43)*
 
-**Status: open; found during verification.**
+**Status: fixed in this change; found during verification.**
 
 **Observed.** `svelte-check` reports interaction-role diagnostics for the
 force-directed graph canvas and click-contained panels, plus non-native dialog
 markup in the source-review and conversation-export overlays. Type checking
 passes, but keyboard and screen-reader semantics are not yet cleanly expressed.
 
-**Required fix.** Replace click-containment handlers with target-aware canvas
-selection, use native `dialog` semantics with focus trapping/restoration, and
-exercise graph selection, source review, and export entirely by keyboard in
-Playwright with an automated accessibility scan.
+**Fix.** Graph selection is target-aware and its pointer plumbing no longer
+requires click handlers on every containing panel. Source review and
+conversation export are native modal `dialog` elements; Escape closes them,
+the browser contains focus, and closing restores the invoking control (including
+the export menu button whose menu item is removed on open). The Knowledge Map
+canvas retains focusable keyboard-selectable nodes. `svelte-check` emits zero
+errors and zero warnings, component tests exercise keyboard open/close and focus
+restoration, and the live Playwright scenario runs axe scans on both workflows.
 
 **UI when closed.** All graph and dialog workflows work without a pointer,
 focus never escapes an open modal, focus returns to the invoking control, and
@@ -2656,9 +2683,109 @@ the web check emits no accessibility diagnostics.
 
 ---
 
-## BUG-36 — Nothing keeps the two shipped model-profile copies in step
+## FIXED-80 — Schedule carries and presents attachments like Chat and Build
 
-**Status: open; found while fixing BUG-21 (see FIXED-57).**
+**Status: fixed in this change; consistency improvement requested during this fix.**
+
+**Observed.** Chat, Build, and Workbench shared the governed attachment store,
+but a Workbench handoff to Task or Schedule discarded its files and the Tasks
+composer had no attachment control. This made the selected execution environment
+look consistent across the three surfaces while its prompt context was not.
+
+**Fix.** Workbench now transfers attachment ownership for task and schedule
+handoffs. Tasks uses the shared cards and upload/path panel, validates uploaded
+IDs against the creating owner, persists only the prompt attachment references,
+and delivers them to the governed scheduler turn. Task cards show the files in
+a separate attachment group outside the instruction copy; Chat and Build retain
+their existing sibling attachment groups outside the speech bubble.
+
+Covered by `TasksView.test.ts`, `tests/test_task_scheduler.py`, and the live
+Playwright schedule screenshot.
+
+---
+
+## FIXED-81 — Submission waits for attachment uploads on every composer
+
+**Status: fixed in this change; found during live Playwright verification.**
+
+**Observed.** A fast Send, Build, Task, or Schedule action could run while the
+shared attachment upload was still in flight. The prompt was accepted without
+the file and the completed attachment remained in the composer, making the
+visible input disagree with the governed turn or task that had just been made.
+
+**Fix.** Chat, Build, Workbench, and Tasks now reject submission while the
+attachment store is uploading, and their primary action stays disabled until
+the upload settles. The existing upload error remains visible and no prompt or
+task is created from a partially resolved attachment set.
+
+**UI when closed.** Clicking quickly after choosing a file cannot separate the
+file from the prompt. The action becomes available once every selected file is
+ready, consistently across Chat, Build, Task, and Schedule.
+
+---
+
+## FIXED-82 — Live axe findings are closed in Export and Knowledge Map
+
+**Status: fixed in this change; found during live Playwright verification.**
+
+**Observed.** The first real-browser axe pass found low-contrast secondary copy
+in the export dialog. After that was corrected, the full Knowledge Map scan
+found its page nested a second `main` landmark inside the application `main`
+and reported the small light-theme eyebrow at 3.92:1 contrast.
+
+**Fix.** Export metadata and policy copy use the readable secondary text token.
+Knowledge Map is now a labelled section within the application landmark, and
+its eyebrow is larger with AA-contrast colours in light and dark themes. The
+focused live scenario asserts zero axe violations for each open dialog and the
+Knowledge Map application content.
+
+**UI when closed.** The two modal workflows and Knowledge Map retain their
+visual hierarchy without duplicate landmarks or unreadable secondary labels.
+
+---
+
+## FIXED-83 — Chat export has deterministic keyboard activation
+
+**Status: fixed in this change; found during live Playwright verification.**
+
+**Observed.** In repeated real Chromium runs, focus reached the Export
+conversation menu item and Enter closed the transient menu, but the export
+dialog was not mounted consistently. Pointer activation and isolated dialog
+tests did not expose the intermittent menu-to-modal transition.
+
+**Fix.** The menu item now handles Enter and Space explicitly, prevents the
+native activation from racing the transient menu teardown, and opens the same
+modal path used by pointer activation. The live test opens the menu and item
+with the keyboard, asserts the dialog, closes it with Escape, and verifies focus
+returns to Conversation actions.
+
+**UI when closed.** Export opens reliably without a pointer and leaves keyboard
+focus at a predictable control when the dialog closes.
+
+---
+
+## FIXED-84 — Accessibility test dependencies pass the licensing gate
+
+**Status: fixed in this change; found during workflow verification.**
+
+**Observed.** Adding the live Playwright axe scan caused the licensing workflow
+to stop on the MPL-2.0 licences of `@axe-core/playwright` and `axe-core`. The
+repository policy correctly requires an explicit exception for every reviewed
+licence, even when the packages are development-only.
+
+**Fix.** Both exact packages now have documented MPL-2.0 exceptions: they are
+unmodified, development-only accessibility tooling, their source is not changed,
+and they are not shipped in Raiker's production web bundle or Python packages.
+The licensing check and generated SPDX inventory continue to enumerate them.
+
+**UI when closed.** No product surface changes; the accessibility regression
+test remains enforceable without weakening the general licensing policy.
+
+---
+
+## FIXED-76 — The shipped model-profile copies and human review cadence stay in step *(was BUG-36)*
+
+**Status: fixed in this change; found while fixing BUG-21 (see FIXED-57).**
 
 **Observed.** `config/model-profiles.json` and `raiker/config/model-profiles.json`
 are separate files with the same content. `_read_config_text` prefers the
@@ -2668,12 +2795,12 @@ to do nothing, with no error and no warning — which is exactly how a price
 correction could be believed applied while the runtime still charges the old
 rate.
 
-**Required fix.** Make one copy authoritative, or add a check that fails the
-build when the two diverge. Whichever is chosen, a shipped rate must not be able
-to differ from the rate the runtime reads. The same review discipline needs to
-extend to the rates themselves: shipped list prices carry an `as_of` date and
-now feed a registry that dates them, but nothing yet prompts a human to
-re-verify them on a cadence.
+**Fix.** The repository validation suite compares the packaged resource byte for
+byte with the workspace default and fails when either copy moves alone. Both
+pricing blocks now carry `reviewed_at` and `review_interval_days`; the backend
+derives the due date and current/overdue state independently from provider-sync
+timestamps. Registry and component tests pin both the copy invariant and review
+state.
 
 **UI when closed.** Models → Pricing states when each shipped documented rate
 was last reviewed by a human, distinct from when it was last synchronised, and
@@ -2742,9 +2869,9 @@ and [`screenshots/working/134-visual-refresh-models-dark.png`](screenshots/worki
 
 ---
 
-## BUG-38 — Source coordinates name a turn, not a passage inside it
+## FIXED-77 — Source coordinates identify the passage inside a turn *(was BUG-38)*
 
-**Status: open; found while fixing BUG-27 (see FIXED-61).**
+**Status: fixed in this change; found while fixing BUG-27 (see FIXED-61).**
 
 **Observed.** A memory's stored provenance names `source_session_id` and
 `source_turn_id` and nothing finer. FIXED-61 therefore locates the passage by
@@ -2753,10 +2880,14 @@ unchanged, and honestly reported as `source_changed` when it is not — but a
 memory whose wording was normalised on the way into the store, or whose source
 was edited in a way that preserves meaning, reads as changed when it is not.
 
-**Required fix.** Persist a byte range (and a content hash of the range) at the
-moment a memory is captured, so resolution is a lookup rather than a search.
-Keep the search as the fallback for records written before the coordinates
-existed, and say which of the two answered.
+**Fix.** Memory capture now stores UTF-8 byte start/end coordinates and the
+SHA-256 of the exact passage in provenance. Resolution checks the byte slice and
+hash first, then uses matching text only for legacy records or a changed slice.
+The returned `resolution_method` distinguishes `stored_coordinates` from
+`matching_text`; a changed coordinate can still resolve honestly through the
+fallback, while `source_changed` remains the terminal answer when neither
+method finds the passage. Multibyte and changed-coordinate regressions are in
+`tests/test_source_provenance.py`.
 
 **UI when closed.** A resolved passage states whether it was located by stored
 coordinates or by matching text, so an owner can tell a verified quotation from a

@@ -290,6 +290,7 @@ describe("FileInspector", () => {
       turn_id: "turn_9",
       attachment_id: "",
       truncated: false,
+      resolution_method: "stored_coordinates",
       ...overrides,
     });
 
@@ -302,6 +303,12 @@ describe("FileInspector", () => {
         "href",
         "#/new-chat?session=sess_9",
       );
+      expect(screen.getByText("Verified from stored coordinates")).toBeInTheDocument();
+    });
+
+    it("labels a legacy best-effort text match", async () => {
+      open({ preview: null, source: source({ resolution_method: "matching_text" }) });
+      expect(await screen.findByText("Located by matching text")).toBeInTheDocument();
     });
 
     it("says a source was deleted rather than showing an empty pane", async () => {

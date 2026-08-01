@@ -492,7 +492,7 @@
 
   async function submit() {
     const text = promptText.trim();
-    if (text === "" || streaming) return;
+    if (text === "" || streaming || attachStore.uploading) return;
     const sentAttachments = attachStore.take();
     turns = [
       ...turns,
@@ -740,6 +740,25 @@
   // ── BUG-22: export and print this conversation ───────────────────────────
   let conversationMenuOpen = $state(false);
   let exportOpen = $state(false);
+  let conversationActionsButton = $state<HTMLButtonElement>();
+
+  function openExport() {
+    conversationMenuOpen = false;
+    exportOpen = true;
+  }
+
+  function openExportFromKeyboard(event: KeyboardEvent) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    openExport();
+  }
+
+  async function closeExport() {
+    exportOpen = false;
+    await tick();
+    conversationActionsButton?.focus();
+  }
 
   function printConversation() {
     conversationMenuOpen = false;
@@ -792,6 +811,7 @@
            whole-conversation actions, rather than inside a per-message row. -->
       <div class="conversation-menu">
         <button
+          bind:this={conversationActionsButton}
           type="button"
           class="btn btn-ghost btn-sm"
           aria-label="Conversation actions"
@@ -806,7 +826,8 @@
               type="button"
               role="menuitem"
               disabled={sessionId === null}
-              onclick={() => { conversationMenuOpen = false; exportOpen = true; }}
+              onclick={openExport}
+              onkeydown={openExportFromKeyboard}
             >Export conversation…</button>
             <button type="button" role="menuitem" onclick={printConversation}>
               Print / Save as PDF
@@ -1209,7 +1230,7 @@
           <button
             type="submit"
             class="btn btn-primary send"
-            disabled={streaming || promptText.trim() === ""}
+            disabled={streaming || attachStore.uploading || promptText.trim() === ""}
             aria-label={streaming ? "Running" : "Send"}
           >
             <Icon name="send" size={15} />
@@ -1235,7 +1256,7 @@
 {#if exportOpen && sessionId !== null}
   <ExportConversationDialog
     sessionId={sessionId}
-    onclose={() => (exportOpen = false)}
+    onclose={() => void closeExport()}
     onprint={printConversation}
   />
 {/if}

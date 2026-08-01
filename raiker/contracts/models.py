@@ -770,6 +770,7 @@ class TaskRecord:
     project_id: str | None = None
     model_profile: str | None = None
     model: str | None = None
+    attachments: list[dict[str, Any]] = field(default_factory=list)
     schema_version: str = SCHEMA_VERSION
 
     def __post_init__(self) -> None:

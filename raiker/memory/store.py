@@ -133,6 +133,20 @@ def write_memory(
     sensitivity = classify_memory_sensitivity(text)
     memory_id = new_id("mem_")
     owner = owner_principal_id or (store.original_account_principal_id() if store is not None else None) or governance.created_by
+    provenance = {
+        "source_event_id": governance.source_event_id,
+        "source_session_id": governance.source_session_id,
+        "source_turn_id": governance.source_turn_id,
+        "source_type": governance.source_type,
+    }
+    if store is not None:
+        from raiker.runtime.source_provenance import capture_source_coordinates
+
+        provenance.update(
+            capture_source_coordinates(
+                store, governance.source_session_id, governance.source_turn_id, text
+            )
+        )
     entry = MemoryEntry(
         memory_id=memory_id,
         text=text,
@@ -143,12 +157,7 @@ def write_memory(
         created_at=utc_now(),
         tags=tags,
         source=source,
-        provenance={
-            "source_event_id": governance.source_event_id,
-            "source_session_id": governance.source_session_id,
-            "source_turn_id": governance.source_turn_id,
-            "source_type": governance.source_type,
-        },
+        provenance=provenance,
         confidence=governance.confidence,
         trust_score=governance.trust_score,
         retention=governance.retention,

@@ -92,6 +92,7 @@ describe("BrainView", () => {
     render(BrainView);
     await screen.findByRole("button", { name: "Add workspace source" });
     await fireEvent.click(screen.getByRole("button", { name: "Add workspace source" }));
+    expect(screen.getByRole("dialog", { name: "Review workspace source" }).tagName).toBe("DIALOG");
     await fireEvent.input(screen.getByLabelText("Workspace-relative path"), { target: { value: "docs" } });
     await fireEvent.click(screen.getByRole("button", { name: "Review indexing plan" }));
     expect(await screen.findByText("Indexing plan")).toBeInTheDocument();
@@ -99,5 +100,24 @@ describe("BrainView", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/brain/sources", expect.objectContaining({ method: "POST" }),
     ));
+  });
+
+  it("opens source review by keyboard and restores focus when it closes", async () => {
+    stubFetch({
+      "GET /api/brain": {
+        generated_at: "2026-07-15T00:00:00Z", illustrative_motion_notice: "Visual motion only.",
+        nodes: [{ node_id: "principal:p", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: true }], edges: [],
+      },
+      "GET /api/brain/settings": { settings: {} },
+      "GET /api/brain/sources/browse?path=.": { path: ".", parent: null, truncated: false, children: [] },
+    });
+    render(BrainView);
+    const trigger = await screen.findByRole("button", { name: "Add workspace source" });
+    trigger.focus();
+    await fireEvent.keyDown(trigger, { key: "Enter" });
+    await fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Review workspace source" });
+    await fireEvent(dialog, new Event("cancel", { cancelable: true }));
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });

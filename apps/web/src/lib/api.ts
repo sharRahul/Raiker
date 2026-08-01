@@ -42,6 +42,7 @@ import type {
   ProjectFilesView,
   ProjectTreeNode,
   ProjectsList,
+  PromptAttachment,
   PromptRequestBody,
   ProviderModelList,
   ResolveApprovalResult,
@@ -845,6 +846,7 @@ export const api = {
     project_id?: string | null;
     model_profile?: string;
     model?: string;
+    attachments?: PromptAttachment[];
   }) => postJson<TaskView>("/api/tasks", body),
   // BUG-25 — ask the host to continue one parked scheduled run now. The
   // scheduler does this on its own tick; this is the owner's retry for when

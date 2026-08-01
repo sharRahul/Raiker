@@ -308,7 +308,7 @@
 
   async function submit() {
     const text = promptText.trim();
-    if (text === "" || streaming) return;
+    if (text === "" || streaming || attachStore.uploading) return;
     const preamble = repoPreamble(activeRepo);
     // The preamble is prepended here, not server-side, so the transcript shows
     // the exact text the turn received.
@@ -996,7 +996,7 @@
             <button
               type="submit"
               class="btn btn-primary send"
-              disabled={streaming || promptText.trim() === ""}
+              disabled={streaming || attachStore.uploading || promptText.trim() === ""}
             >
               <Icon name={streaming ? "clock" : "send"} size={15} />
               {streaming ? "Working…" : "Send"}

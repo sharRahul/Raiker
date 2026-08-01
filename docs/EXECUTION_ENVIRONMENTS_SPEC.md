@@ -14,15 +14,19 @@ fail closed until they receive an executor and the controls below.
 - SSH uses `BatchMode=yes`, strict host-key checking, an explicit identity-file
   reference, bounded output, and a 300-second hard timeout.
 - Daytona targets an existing sandbox, injects its API key only into the child
-  CLI process, enforces a positive per-action estimate ceiling, and returns
-  bounded result metadata.
+  CLI process, atomically reserves against cumulative profile exposure, and
+  returns bounded result metadata. An append-only ledger retains estimate,
+  release, provider snapshot, reconciliation, and unavailable events.
 - Chat, Build, and Schedule display the same selected profile and capacity
   facts. Selection grants no authority: the capability gate, decision mode,
   policy review, approval, and owner/profile match are rechecked at execution.
 - No surface silently falls back from local/container to SSH or cloud.
 
-Provider-billed cumulative cost reconciliation is not available yet and is
-tracked as BUG-42 in `docs/plans/TO_BE_FIXED.md`.
+The provider-spend interface accepts cumulative billing snapshots. When a
+deployment cannot supply them, the Runtime UI says `provider unavailable` and
+the estimate remains reserved. Daytona's documented organization-usage endpoint
+reports quota consumption rather than billed dollars, so Raiker deliberately
+does not treat that response as cost.
 
 ---
 
@@ -206,6 +210,12 @@ Required events:
 - `execution_cleanup_completed`
 - `artifact_created`
 - `artifact_exported`
+
+The implemented Daytona cost ledger is a separate append-only record with
+`reserved`, `released`, `provider_snapshot`, `reconciled`, and
+`provider_unavailable` event types. Budget admission is serialized with an
+immediate database transaction and fails closed if committed exposure plus the
+new estimate exceeds the owner limit.
 
 ---
 

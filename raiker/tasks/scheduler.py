@@ -186,11 +186,23 @@ class TaskScheduler:
                 TaskManager(self.store, EventLogWriter(self.store)).fail_task(task.task_id, "Scheduled task has no valid owner.")
                 continue
             prompt = task.objective or task.title
+            turn_id = new_id("turn_")
+            for attachment in task.attachments:
+                attachment_id = str(attachment.get("attachment_id", ""))
+                if attachment_id and self.store.load_attachment_metadata(
+                    attachment_id, owner_principal_id=principal_id
+                ) is not None:
+                    self.store.save_session_attachment_ref(
+                        session_id=task.session_id,
+                        attachment_id=attachment_id,
+                        owner_principal_id=principal_id,
+                        turn_id=turn_id,
+                    )
             response = await AgentGateway(self.workspace_root, principal_id=principal_id).submit_prompt_async(
                 PromptEnvelope(
-                    request_id=new_id("req_"), session_id=task.session_id, turn_id=new_id("turn_"),
+                    request_id=new_id("req_"), session_id=task.session_id, turn_id=turn_id,
                     client=ClientMetadata(type="dashboard", name="raiker-scheduler", version="1"),
-                    user=UserMetadata(id=principal_id), prompt=PromptPayload(text=prompt),
+                    user=UserMetadata(id=principal_id), prompt=PromptPayload(text=prompt, attachments=task.attachments),
                     options=PromptOptions(
                         model_profile=task.model_profile or "",
                         model=task.model or "",

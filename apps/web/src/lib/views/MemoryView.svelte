@@ -134,6 +134,7 @@
       // than implying the memory has no source.
       sourceExcerpt = {
         status: "no_provenance",
+        resolution_method: "",
         kind: "",
         title: "",
         excerpt: "",

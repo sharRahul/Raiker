@@ -12,6 +12,12 @@ adapts to your choice.
 | **Daily routine** | Start time | Create daily routine | Repeats every day from then |
 | **Background agent** | — | Start background agent | Runs asynchronously until its work is complete or you stop it |
 
+Use the attachment panel to add a workspace path, image, or document. The same
+governed attachment payload used by Chat and Build is stored with the task and
+delivered when its scheduler turn starts. Attached files appear on the task card
+as their own group, not inside the instruction text. Workbench preserves these
+files when handing a draft to Task or Schedule.
+
 Common fields:
 
 - **Title** — required.

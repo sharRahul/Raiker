@@ -7,8 +7,10 @@ worth nothing; provenance that lies about why it cannot be checked is worse.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
+from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.runtime.source_provenance import (
     STATUS_NO_PROVENANCE,
     STATUS_RESOLVED,
@@ -80,6 +82,60 @@ def test_stored_coordinates_resolve_to_the_passage(tmp_path: Path) -> None:
     assert result.status == STATUS_RESOLVED
     assert result.excerpt[result.highlight_start : result.highlight_start + result.highlight_length] == PASSAGE
     assert result.session_id == "sess_1"
+    assert result.resolution_method == "matching_text"
+
+
+def test_memory_capture_persists_utf8_byte_coordinates_and_hash(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    source = "Résumé notes: I prefer metric units in every report."
+    store.create_session("sess_1", str(tmp_path))
+    store.insert_turn("sess_1", "turn_1", source)
+    entry = write_memory(
+        PASSAGE,
+        workspace_root=tmp_path,
+        store=store,
+        owner_principal_id="principal_owner",
+        governance=MemoryGovernance(
+            source_event_id="evt_1",
+            source_session_id="sess_1",
+            source_turn_id="turn_1",
+            source_type="chat",
+            confidence=1,
+            trust_score=1,
+            retention="until_forget",
+            approval_state="approved",
+            created_by="principal_owner",
+        ),
+    )
+    start = entry.provenance["source_byte_start"]
+    end = entry.provenance["source_byte_end"]
+    captured = source.encode("utf-8")[start:end]
+    assert captured.decode("utf-8") == PASSAGE
+    assert entry.provenance["source_passage_sha256"] == hashlib.sha256(captured).hexdigest()
+
+    result = SourceProvenanceService(store).resolve(
+        entry.provenance, "wording no longer needed for lookup", "principal_owner"
+    )
+    assert result.status == STATUS_RESOLVED
+    assert result.resolution_method == "stored_coordinates"
+    assert result.excerpt[result.highlight_start : result.highlight_start + result.highlight_length] == PASSAGE
+
+
+def test_changed_coordinates_fall_back_to_matching_text(tmp_path: Path) -> None:
+    store = _store_with_turn(tmp_path)
+    result = SourceProvenanceService(store).resolve(
+        {
+            "source_session_id": "sess_1",
+            "source_turn_id": "turn_1",
+            "source_byte_start": 0,
+            "source_byte_end": 6,
+            "source_passage_sha256": "not-the-current-hash",
+        },
+        PASSAGE,
+        "principal_owner",
+    )
+    assert result.status == STATUS_RESOLVED
+    assert result.resolution_method == "matching_text"
 
 
 def test_a_record_with_no_coordinates_says_so_rather_than_guessing(tmp_path: Path) -> None:

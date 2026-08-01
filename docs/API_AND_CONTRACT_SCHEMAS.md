@@ -67,7 +67,9 @@ Every download appends `attachment_downloaded` carrying metadata only.
 `GET /api/memory/{memory_id}/source` and
 `GET /api/sessions/{session_id}/attachments/{attachment_id}/provenance` resolve
 stored source coordinates into a bounded plain-text excerpt plus the offsets of
-the passage inside it. `status` is the contract: only `resolved` carries a
+the passage inside it. `resolution_method` is `stored_coordinates` when the
+UTF-8 byte slice and hash verify, `matching_text` for a legacy/fallback match,
+or empty when no passage resolved. `status` is the contract: only `resolved` carries a
 located passage; `no_provenance`, `source_deleted`, `source_changed`,
 `unsupported_source` and `not_authorized` are each a stated answer rather than
 an error. Authorisation is re-checked against the caller at read time — owning a

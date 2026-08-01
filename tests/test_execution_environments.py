@@ -14,7 +14,11 @@ from raiker.models.tool_call_validation import default_tool_specs
 from raiker.runtime.authority.models import Principal, PrincipalType
 from raiker.runtime.authority.router import GovernedAction
 from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES, build_default_executor_registry
-from raiker.runtime.executors.tier5_network import CloudExecutionExecutor, RemoteExecutionExecutor
+from raiker.runtime.executors.tier5_network import (
+    CloudExecutionExecutor,
+    ProviderSpendSnapshot,
+    RemoteExecutionExecutor,
+)
 
 OWNER = "principal_owner"
 
@@ -102,3 +106,70 @@ def test_remote_and_daytona_executors_are_real_bounded_adapters(
     assert {"remote_execute", "cloud_execute"} <= {spec.name for spec in default_tool_specs()}
     assert executable_capability("remote_execute") == "remote_execution_cap"
     assert executable_capability("cloud_execute") == "cloud_execution_cap"
+
+
+def test_daytona_budget_is_cumulative_and_provider_actual_replaces_reservation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _workspace(tmp_path)
+    service = DashboardService(workspace)
+    monkeypatch.setenv("RAIKER_TEST_DAYTONA_KEY", "not-logged")
+    cloud_id = service.configure_execution_environment(
+        profile_id=None,
+        kind="daytona",
+        name="Cloud",
+        enabled=True,
+        config={"sandbox_id": "sandbox-1", "api_key_env": "RAIKER_TEST_DAYTONA_KEY", "max_cost": 5},
+        owner_principal_id=OWNER,
+    ).data["profile_id"]
+    service.store.select_execution_environment(OWNER, cloud_id)
+    principal = Principal(OWNER, PrincipalType.HUMAN, "Owner")
+    calls: list[list[str]] = []
+
+    def runner(command: list[str], **_kwargs: Any) -> dict[str, Any]:
+        calls.append(command)
+        return {"returncode": 0, "stdout_bytes": 0, "stderr_bytes": 0, "truncated": False}
+
+    unavailable = CloudExecutionExecutor(workspace, service.store, runner=runner)
+    first = unavailable.execute(
+        GovernedAction("act_reserved", OWNER, "cloud_execute", "cloud_execute", {"command": "pwd", "estimated_cost": 3}),
+        principal,
+    )
+    denied = unavailable.execute(
+        GovernedAction("act_denied", OWNER, "cloud_execute", "cloud_execute", {"command": "pwd", "estimated_cost": 3}),
+        principal,
+    )
+    assert first.ok
+    assert not denied.ok and denied.reason_code == "cloud_execution_budget_exceeded"
+    assert len(calls) == 1
+    reserved = service.store.cloud_execution_cost_summary(OWNER, cloud_id, max_cost=5)
+    assert reserved["reserved_cost"] == 3
+    assert reserved["reconciliation_status"] == "provider_unavailable"
+
+    # A separate profile demonstrates actual-cost reconciliation without
+    # mutating or discarding the reservation/history events.
+    second_id = service.configure_execution_environment(
+        profile_id=None,
+        kind="daytona",
+        name="Metered cloud",
+        enabled=True,
+        config={"sandbox_id": "sandbox-2", "api_key_env": "RAIKER_TEST_DAYTONA_KEY", "max_cost": 5},
+        owner_principal_id=OWNER,
+    ).data["profile_id"]
+    service.store.select_execution_environment(OWNER, second_id)
+    snapshots = iter([ProviderSpendSnapshot(100, "before"), ProviderSpendSnapshot(101.25, "after")])
+    metered = CloudExecutionExecutor(
+        workspace, service.store, runner=runner, spend_reader=lambda _config, _key: next(snapshots)
+    )
+    result = metered.execute(
+        GovernedAction("act_metered", OWNER, "cloud_execute", "cloud_execute", {"command": "pwd", "estimated_cost": 3}),
+        principal,
+    )
+    assert result.ok
+    actual = service.store.cloud_execution_cost_summary(OWNER, second_id, max_cost=5)
+    assert actual["actual_cost"] == 1.25
+    assert actual["provider_cost"] == 1.25
+    assert actual["reserved_cost"] == 0
+    assert [item["event_type"] for item in actual["history"]] == [
+        "provider_snapshot", "reserved", "provider_snapshot", "reconciled"
+    ]

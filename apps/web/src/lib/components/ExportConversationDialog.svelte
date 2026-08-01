@@ -14,6 +14,7 @@
    * is what makes the browser's own Save as PDF produce a document instead of a
    * screenshot of the application chrome.
    */
+  import { onMount } from "svelte";
   import { api, ApiError } from "../api";
   import type { TranscriptExportManifest } from "../apiTypes";
   import Icon from "./Icon.svelte";
@@ -39,6 +40,27 @@
   let busy = $state(false);
   let notice = $state<string | null>(null);
   let fieldError = $state<string | null>(null);
+  let dialogElement = $state<HTMLDialogElement>();
+
+  onMount(() => {
+    const returnFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    if (dialogElement) {
+      if (typeof dialogElement.showModal === "function") dialogElement.showModal();
+      else dialogElement.setAttribute("open", "");
+    }
+    return () => returnFocus?.focus();
+  });
+
+  function cancel(event: Event) {
+    event.preventDefault();
+    onclose();
+  }
+
+  function backdrop(event: MouseEvent) {
+    if (event.target === event.currentTarget) onclose();
+  }
 
   async function load() {
     loading = true;
@@ -94,14 +116,13 @@
   }
 </script>
 
-<div
-  class="scrim"
-  role="presentation"
-  onclick={(event) => {
-    if (event.target === event.currentTarget) onclose();
-  }}
+<dialog
+  class="dialog"
+  bind:this={dialogElement}
+  aria-labelledby="export-title"
+  oncancel={cancel}
+  onclick={backdrop}
 >
-  <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="export-title">
     <header>
       <h2 id="export-title">Export conversation</h2>
       <button type="button" class="icon-btn" aria-label="Close" onclick={onclose}>×</button>
@@ -159,20 +180,14 @@
         </button>
       </footer>
     {/if}
-  </section>
-</div>
+</dialog>
 
 <style>
-  .scrim {
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    display: grid;
-    place-items: center;
-    padding: var(--space-4);
+  .dialog::backdrop {
     background: color-mix(in srgb, #0b1417 55%, transparent);
   }
   .dialog {
+    color:var(--text-1);
     width: min(34rem, 100%);
     max-height: min(85vh, 46rem);
     overflow-y: auto;
@@ -203,11 +218,11 @@
   .files { list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.25rem; }
   .files li { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--text-2); }
   .file-name { font-weight: 600; overflow-wrap: anywhere; }
-  .file-meta { color: var(--text-3); }
+  .file-meta { color: var(--text-2); }
   .policy {
     margin: 0.7rem 0 0; padding-left: 0.6rem;
     border-left: 3px solid var(--accent-border);
-    color: var(--text-3); font-size: 0.76rem; line-height: 1.45;
+    color: var(--text-2); font-size: 0.76rem; line-height: 1.45;
   }
   .formats { display: grid; gap: 0.4rem; border: 0; padding: 0; margin: 0; }
   .formats legend { font-size: 0.82rem; font-weight: 650; padding: 0; margin-bottom: 0.3rem; }
@@ -224,10 +239,10 @@
   .format.selected { border-color: var(--accent-border); background: var(--accent-soft); }
   .format input { grid-row: 1 / 3; align-self: center; }
   .format-label { font-weight: 650; font-size: 0.86rem; }
-  .format-detail { grid-column: 2; color: var(--text-3); font-size: 0.76rem; }
+  .format-detail { grid-column: 2; color: var(--text-2); font-size: 0.76rem; }
   footer { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .spacer { flex: 1; }
-  .muted { color: var(--text-3); font-size: 0.84rem; margin: 0; }
+  .muted { color: var(--text-2); font-size: 0.84rem; margin: 0; }
   .error { color: var(--danger); font-size: 0.82rem; margin: 0; }
   .ok { color: var(--ok); font-size: 0.82rem; margin: 0; font-weight: 600; }
 </style>

@@ -226,6 +226,8 @@
         "currency": "USD",
         "unit": "per_million_tokens",
         "as_of": "2026-07",
+        "reviewed_at": "2026-08-01",
+        "review_interval_days": 92,
         "source": "provider_public_list_price",
         "cache_rate_note": "Anthropic bills prompt caching separately from ordinary input: a 5-minute cache write at 1.25x the input rate, and a cache read at 0.1x. Both are stated per model below as absolute rates rather than left to be inferred, so the registry never has to derive one price from another.",
         "models": {
@@ -295,6 +297,8 @@
         "currency": "USD",
         "unit": "per_million_tokens",
         "as_of": "2026-07",
+        "reviewed_at": "2026-08-01",
+        "review_interval_days": 92,
         "source": "provider_public_list_price",
         "models": {
           "gpt-4o": {

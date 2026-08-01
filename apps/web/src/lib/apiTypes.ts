@@ -267,6 +267,9 @@ export interface ModelPricingEntry {
   cache_read_per_mtok: string | null;
   effective_from: string | null;
   as_of: string | null;
+  reviewed_at: string | null;
+  review_due_at: string | null;
+  review_status: "current" | "overdue" | "invalid" | null;
   recorded_at: string | null;
   recorded_by: string | null;
   reason: string | null;
@@ -812,6 +815,7 @@ export interface TaskView {
   parent_task_id?: string | null;
   model_profile?: string | null;
   model?: string | null;
+  attachments?: PromptAttachment[];
 }
 
 // POST /api/interrupts response (raiker/api/routes_prompts.py).
@@ -909,6 +913,7 @@ export interface SourceExcerptView {
   turn_id: string;
   attachment_id: string;
   truncated: boolean;
+  resolution_method: "stored_coordinates" | "matching_text" | "";
 }
 
 // GET /api/sessions/{id}/attachments — metadata only, so a reloaded chat can
@@ -1022,6 +1027,7 @@ export interface BrainSourceBrowse {
   parent: string | null;
   children: Array<{ name: string; path: string; kind: "folder" | "file"; size_bytes: number | null }>;
   truncated: boolean;
+  resolution_method: "stored_coordinates" | "matching_text" | "";
 }
 
 export interface BrainSourceReview {
@@ -1046,6 +1052,23 @@ export interface ExecutionEnvironment {
   selected: boolean;
   credential_configured: boolean;
   budget: number | null;
+  cost: {
+    actual_cost: number;
+    provider_cost: number;
+    reserved_cost: number;
+    committed_cost: number;
+    remaining_cost: number | null;
+    reconciliation_status: "not_started" | "reserved" | "reconciled" | "provider_unavailable";
+    history: Array<{
+      event_id: string;
+      action_id: string;
+      event_type: "reserved" | "reconciled" | "released" | "provider_snapshot" | "provider_unavailable";
+      amount: number;
+      provider_reference: string | null;
+      reason: string | null;
+      recorded_at: string;
+    }>;
+  } | null;
   config?: Record<string, unknown>;
 }
 

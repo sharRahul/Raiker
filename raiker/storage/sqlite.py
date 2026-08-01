@@ -6,6 +6,7 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +63,8 @@ from raiker.storage.migrations import (
     CAPABILITY_DECISION_MODE_SQL,
     CHECKPOINT_CAPTURE_MANIFEST_MIGRATION_ID,
     CHECKPOINT_CAPTURE_MANIFEST_SQL,
+    CLOUD_EXECUTION_COST_LEDGER_MIGRATION_ID,
+    CLOUD_EXECUTION_COST_LEDGER_SQL,
     CODE_REPOS_MIGRATION_ID,
     CODE_REPOS_SQL,
     CONFIGURED_MODELS_MIGRATION_ID,
@@ -258,6 +261,8 @@ from raiker.storage.migrations import (
     SUBAGENT_BUDGETS_SQL,
     SUSPENDED_TURNS_MIGRATION_ID,
     SUSPENDED_TURNS_SQL,
+    TASK_ATTACHMENTS_MIGRATION_ID,
+    TASK_ATTACHMENTS_SQL,
     TASK_MODEL_CHOICES_MIGRATION_ID,
     TASK_MODEL_CHOICES_SQL,
     THREAT_MODEL_ACKS_MIGRATION_ID,
@@ -749,6 +754,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 MODEL_PRICE_REGISTRY_MIGRATION_ID, MODEL_PRICE_REGISTRY_SQL, connection
+            )
+            self._apply_migration(
+                CLOUD_EXECUTION_COST_LEDGER_MIGRATION_ID,
+                CLOUD_EXECUTION_COST_LEDGER_SQL,
+                connection,
+            )
+            self._apply_migration(
+                TASK_ATTACHMENTS_MIGRATION_ID, TASK_ATTACHMENTS_SQL, connection
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -3341,8 +3354,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR IGNORE INTO tasks
-                (task_id, session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (task_id, session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, attachments_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.task_id,
@@ -3364,15 +3377,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     task.project_id,
                     task.model_profile,
                     task.model,
+                    json.dumps(task.attachments, sort_keys=True),
                 ),
             )
+
+    @staticmethod
+    def _task_from_row(row: Any) -> TaskRecord:
+        data = dict(row)
+        raw_attachments = data.pop("attachments_json", "[]")
+        try:
+            attachments = json.loads(raw_attachments or "[]")
+        except (TypeError, ValueError):
+            attachments = []
+        data["attachments"] = attachments if isinstance(attachments, list) else []
+        return TaskRecord(**data)
 
     def load_task(self, task_id: str) -> TaskRecord | None:
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,)).fetchone()
         if row is None:
             return None
-        return TaskRecord(**dict(row))
+        return self._task_from_row(row)
 
     def list_tasks(
         self,
@@ -3408,7 +3433,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         query += " ORDER BY created_at DESC"
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
-        return [TaskRecord(**dict(row)) for row in rows]
+        return [self._task_from_row(row) for row in rows]
 
     def claim_due_tasks(self, now: str, limit: int = 10) -> list[TaskRecord]:
         """Atomically claim scheduled work so two host ticks cannot run it twice."""
@@ -3424,7 +3449,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     "UPDATE tasks SET status = 'running', current_step = ?, updated_at = ? WHERE task_id = ? AND status = 'queued'",
                     ("Starting scheduled run", now, row["task_id"]),
                 ).rowcount:
-                    claimed.append(TaskRecord(**dict(row)))
+                    claimed.append(self._task_from_row(row))
         return claimed
 
     def reschedule_task(self, task_id: str, scheduled_at: str, summary: str) -> None:
@@ -4922,6 +4947,151 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (owner_principal_id,),
             ).fetchone()
         return str(row["profile_id"]) if row else "local_native"
+
+    @staticmethod
+    def _cloud_cost_totals(rows: list[Any]) -> tuple[Decimal, Decimal, Decimal, list[dict[str, Any]]]:
+        actions: dict[str, dict[str, Any]] = {}
+        provider_snapshots: list[Decimal] = []
+        history: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            try:
+                amount = Decimal(str(item["amount"]))
+            except (InvalidOperation, ValueError):
+                amount = Decimal("0")
+            event_type = str(item["event_type"])
+            if event_type == "provider_snapshot":
+                provider_snapshots.append(amount)
+                action = None
+            else:
+                action = actions.setdefault(
+                    str(item["action_id"]),
+                    {"estimated": Decimal("0"), "actual": None, "released": False, "status": "pending"},
+                )
+            if event_type == "reserved":
+                assert action is not None
+                action.update(estimated=amount, status="reserved")
+            elif event_type == "reconciled":
+                assert action is not None
+                action.update(actual=amount, status="reconciled")
+            elif event_type == "released":
+                assert action is not None
+                action.update(released=True, status="released")
+            elif event_type == "provider_unavailable" and action is not None and action["status"] == "reserved":
+                action["status"] = "provider_unavailable"
+            history.append(
+                {
+                    "event_id": str(item["event_id"]),
+                    "action_id": str(item["action_id"]),
+                    "event_type": event_type,
+                    "amount": float(amount),
+                    "provider_reference": item.get("provider_reference"),
+                    "reason": item.get("reason"),
+                    "recorded_at": str(item["recorded_at"]),
+                }
+            )
+        actual = sum(
+            (entry["actual"] for entry in actions.values() if entry["actual"] is not None),
+            Decimal("0"),
+        )
+        reserved = sum(
+            (
+                entry["estimated"]
+                for entry in actions.values()
+                if entry["actual"] is None and not entry["released"]
+            ),
+            Decimal("0"),
+        )
+        provider_spend = (
+            max(provider_snapshots[-1] - provider_snapshots[0], Decimal("0"))
+            if len(provider_snapshots) >= 2 else Decimal("0")
+        )
+        return actual, reserved, provider_spend, history
+
+    def reserve_cloud_execution_cost(
+        self,
+        *,
+        owner_principal_id: str,
+        profile_id: str,
+        action_id: str,
+        estimated_cost: float,
+        max_cost: float,
+    ) -> bool:
+        """Atomically reserve cumulative budget before Daytona execution."""
+        estimate = Decimal(str(max(estimated_cost, 0)))
+        limit = Decimal(str(max(max_cost, 0)))
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            rows = connection.execute(
+                """SELECT * FROM cloud_execution_cost_ledger
+                WHERE owner_principal_id = ? AND profile_id = ?
+                ORDER BY rowid""",
+                (owner_principal_id, profile_id),
+            ).fetchall()
+            if any(str(row["action_id"]) == action_id and row["event_type"] == "reserved" for row in rows):
+                return False
+            actual, reserved, provider_spend, _history = self._cloud_cost_totals(list(rows))
+            if limit <= 0 or max(actual, provider_spend) + reserved + estimate > limit:
+                return False
+            connection.execute(
+                """INSERT INTO cloud_execution_cost_ledger
+                (event_id, owner_principal_id, profile_id, action_id, event_type, amount,
+                 provider_reference, reason, recorded_at)
+                VALUES (?, ?, ?, ?, 'reserved', ?, NULL, NULL, ?)""",
+                (new_id("cost_"), owner_principal_id, profile_id, action_id, str(estimate), utc_now()),
+            )
+        return True
+
+    def record_cloud_execution_cost(
+        self,
+        *,
+        owner_principal_id: str,
+        profile_id: str,
+        action_id: str,
+        event_type: str,
+        amount: float,
+        provider_reference: str | None = None,
+        reason: str | None = None,
+    ) -> None:
+        if event_type not in {"reconciled", "released", "provider_snapshot", "provider_unavailable"}:
+            raise ValueError("invalid_cloud_cost_event")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO cloud_execution_cost_ledger
+                (event_id, owner_principal_id, profile_id, action_id, event_type, amount,
+                 provider_reference, reason, recorded_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    new_id("cost_"), owner_principal_id, profile_id, action_id, event_type,
+                    str(Decimal(str(max(amount, 0)))), provider_reference, reason, utc_now(),
+                ),
+            )
+
+    def cloud_execution_cost_summary(
+        self, owner_principal_id: str, profile_id: str, *, max_cost: float | None = None
+    ) -> dict[str, Any]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM cloud_execution_cost_ledger
+                WHERE owner_principal_id = ? AND profile_id = ?
+                ORDER BY rowid""",
+                (owner_principal_id, profile_id),
+            ).fetchall()
+        actual, reserved, provider_spend, history = self._cloud_cost_totals(list(rows))
+        limit = Decimal(str(max_cost)) if max_cost is not None else None
+        committed = max(actual, provider_spend) + reserved
+        return {
+            "actual_cost": float(actual),
+            "provider_cost": float(provider_spend),
+            "reserved_cost": float(reserved),
+            "committed_cost": float(committed),
+            "remaining_cost": float(max(limit - committed, Decimal("0"))) if limit is not None else None,
+            "reconciliation_status": (
+                "provider_unavailable" if any(item["event_type"] == "provider_unavailable" for item in history)
+                and reserved > 0 else "reconciled" if history and reserved == 0 else "reserved" if reserved > 0 else "not_started"
+            ),
+            "history": history,
+        }
 
     def insert_execution_budget(self, budget: ExecutionBudget) -> None:
         with self.connect() as connection:

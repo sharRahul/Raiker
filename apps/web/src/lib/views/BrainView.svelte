@@ -243,6 +243,23 @@
     selectedIds = event.shiftKey ? (selectedIds.includes(node.node_id) ? selectedIds.filter((id) => id !== node.node_id) : [...selectedIds, node.node_id]) : [node.node_id];
     inspectorOpen = true;
   }
+  function clearGraphSelection(event: MouseEvent) {
+    const target = event.target;
+    if (!(target instanceof Element) || target.closest(".graph-node, button, input, label, details, aside, .context-menu")) return;
+    selectedIds = [];
+    inspectorOpen = false;
+    contextMenu = null;
+  }
+  function modal(node: HTMLDialogElement) {
+    const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (typeof node.showModal === "function") node.showModal();
+    else node.setAttribute("open", "");
+    return { destroy() { returnFocus?.focus(); } };
+  }
+  function closeSourceDialog(event?: Event) {
+    event?.preventDefault();
+    sourceOpen = false;
+  }
   function centreNode(node: GraphNode) { centreId = node.node_id; graphMode = "local"; selectedIds = [node.node_id]; inspectorOpen = true; }
   function dragStart(event: PointerEvent, node: GraphNode) { event.stopPropagation(); (event.currentTarget as Element).setPointerCapture(event.pointerId); node.fx = node.x; node.fy = node.y; simulation?.alphaTarget(0.1).restart(); }
   function dragMove(event: PointerEvent, node: GraphNode) { if (!(event.currentTarget as Element).hasPointerCapture(event.pointerId)) return; node.fx = (event.offsetX - transform.x) / transform.k; node.fy = (event.offsetY - transform.y) / transform.k; }
@@ -252,6 +269,20 @@
   function panStart(event: PointerEvent) { if (event.target !== event.currentTarget && (event.target as Element).closest(".graph-stage")) return; panning = true; panOrigin = { x: event.clientX, y: event.clientY, tx: transform.x, ty: transform.y }; (event.currentTarget as Element).setPointerCapture(event.pointerId); }
   function panMove(event: PointerEvent) { if (panning) transform = { ...transform, x: panOrigin.tx + event.clientX - panOrigin.x, y: panOrigin.ty + event.clientY - panOrigin.y }; }
   function panEnd(event: PointerEvent) { panning = false; if ((event.currentTarget as Element).hasPointerCapture(event.pointerId)) (event.currentTarget as Element).releasePointerCapture(event.pointerId); }
+  function graphInteractions(node: HTMLDivElement) {
+    node.addEventListener("wheel", onWheel);
+    node.addEventListener("pointerdown", panStart);
+    node.addEventListener("pointermove", panMove);
+    node.addEventListener("pointerup", panEnd);
+    node.addEventListener("click", clearGraphSelection);
+    return { destroy() {
+      node.removeEventListener("wheel", onWheel);
+      node.removeEventListener("pointerdown", panStart);
+      node.removeEventListener("pointermove", panMove);
+      node.removeEventListener("pointerup", panEnd);
+      node.removeEventListener("click", clearGraphSelection);
+    } };
+  }
   function fitGraph() { transform = { x: 0, y: 0, k: 1 }; simulation?.alpha(0.18).restart(); }
   async function toggleFullscreen() { if (!document.fullscreenElement) await graphElement?.requestFullscreen(); else await document.exitFullscreen(); }
 
@@ -290,7 +321,7 @@
 {:else if brain === null}
   <PageState state="loading" title="Loading the knowledge graph…" />
 {:else}
-  <main class="knowledge-shell" aria-label="Knowledge Map">
+  <section class="knowledge-shell" aria-label="Knowledge Map">
     <header class="graph-toolbar">
       <div class="title-block"><span class="eyebrow">Workspace intelligence</span><h2>Knowledge Map</h2></div>
       <label class="search"><Icon name="search" size={16} /><input bind:value={search} placeholder="Search records or use type:, status:…" aria-label="Search records" /></label>
@@ -300,7 +331,7 @@
       <button class="icon-button" aria-label="Enter fullscreen" onclick={toggleFullscreen}>⛶</button>
     </header>
 
-    <div class="graph-workspace" bind:this={graphElement} onwheel={onWheel} onpointerdown={panStart} onpointermove={panMove} onpointerup={panEnd} onclick={() => { selectedIds = []; inspectorOpen = false; contextMenu = null; }} role="application" aria-label="Interactive force-directed knowledge graph">
+    <div class="graph-workspace" bind:this={graphElement} use:graphInteractions role="application" aria-label="Interactive force-directed knowledge graph">
       <div class="vignette"></div>
       <svg class="graph-stage" width={graphWidth} height={graphHeight} aria-label={`${renderedNodes.length} nodes and ${renderedLinks.length} relationships`}>
         <defs><marker id="arrow" viewBox="0 -5 10 10" refX="16" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="rgba(180,188,205,.55)" /></marker></defs>
@@ -329,13 +360,13 @@
       {/if}
 
       <button class="summary-pill" aria-expanded={summaryOpen} onclick={(event) => { event.stopPropagation(); summaryOpen = !summaryOpen; }}><span>{renderedNodes.length} nodes</span><i></i><span>{renderedLinks.length} relationships</span><span aria-hidden="true">{summaryOpen ? "⌃" : "⌄"}</span></button>
-      {#if summaryOpen}<section class="summary-popover" onclick={(event) => event.stopPropagation()}><h3>Workspace summary</h3>{#each summary as item}<p><span>{item[0]}</span><b>{item[1]}</b></p>{/each}<small><Icon name="shield" size={13} /> Governed workspace boundary</small></section>{/if}
+      {#if summaryOpen}<section class="summary-popover"><h3>Workspace summary</h3>{#each summary as item}<p><span>{item[0]}</span><b>{item[1]}</b></p>{/each}<small><Icon name="shield" size={13} /> Governed workspace boundary</small></section>{/if}
 
-      <div class="viewport-controls" onclick={(event) => event.stopPropagation()}><button aria-label="Fit graph" onclick={fitGraph}>Fit</button><button aria-label="Zoom out" onclick={() => transform = { ...transform, k: Math.max(.35, transform.k - .15) }}>−</button><span>{Math.round(transform.k * 100)}%</span><button aria-label="Zoom in" onclick={() => transform = { ...transform, k: Math.min(3, transform.k + .15) }}>+</button></div>
+      <div class="viewport-controls"><button aria-label="Fit graph" onclick={fitGraph}>Fit</button><button aria-label="Zoom out" onclick={() => transform = { ...transform, k: Math.max(.35, transform.k - .15) }}>−</button><span>{Math.round(transform.k * 100)}%</span><button aria-label="Zoom in" onclick={() => transform = { ...transform, k: Math.min(3, transform.k + .15) }}>+</button></div>
       <div class="graph-meta"><span class="live-dot"></span>{updatedAt ? "Live workspace graph" : "Loading"}<button onclick={(event) => { event.stopPropagation(); void load(); }} disabled={refreshing}>{refreshing ? "Updating…" : "Refresh"}</button></div>
 
       {#if settingsOpen}
-        <aside class="settings-panel" aria-label="Graph settings" onclick={(event) => event.stopPropagation()}>
+        <aside class="settings-panel" aria-label="Graph settings">
           <div class="panel-title"><div><span>Graph settings</span><small>Personal workspace view</small></div><button aria-label="Close graph settings" onclick={() => settingsOpen = false}>×</button></div>
           <details open><summary>Filters</summary><label class="panel-search"><Icon name="search" size={14} /><input bind:value={search} placeholder="Search records…" /></label>{#each FILTER_TYPES as type}<label class="check-row"><input type="checkbox" checked={enabledTypes[type]} onchange={(event) => enabledTypes = { ...enabledTypes, [type]: event.currentTarget.checked }} /><span>{type === "session" ? "Conversations" : type === "memory" ? "Approved memories" : type.charAt(0).toUpperCase() + type.slice(1) + "s"}</span></label>{/each}<label class="check-row"><input type="checkbox" bind:checked={showOrphans} /><span>Orphan records</span></label></details>
           <details open><summary>Groups</summary>{#each groups as group}<div class="group-row"><i style={`background:${group.color}`}></i><span><b>{group.name}</b><small>{group.query}</small></span></div>{/each}<button class="text-action" onclick={() => newGroupOpen = !newGroupOpen}>+ New group</button>{#if newGroupOpen}<div class="group-form"><input bind:value={groupName} placeholder="Group name" /><input bind:value={groupQuery} placeholder='type:memory status:approved' /><label>Colour <input type="color" bind:value={groupColor} /></label><button onclick={addGroup}>Add group</button></div>{/if}</details>
@@ -346,23 +377,23 @@
       {/if}
 
       {#if inspectorOpen}
-        <aside class="inspector" aria-label="Record inspector" onclick={(event) => event.stopPropagation()}>
+        <aside class="inspector" aria-label="Record inspector">
           <button class="close" aria-label="Close inspector" onclick={() => inspectorOpen = false}>×</button>
           {#if selected}<span class="record-kicker"><i style={`background:${selected.color}`}></i>{selected.node_type} record</span><h3>{selected.label}</h3><div class="status-line"><span>{statusLabel(selected.status)}</span><span>{selected.degree} connection{selected.degree === 1 ? "" : "s"}</span></div><p>{selected.detail ?? "No additional stored metadata is available."}</p><h4>Relationships</h4>{#if selectedConnections.length}{#each selectedConnections as edge}<button class="relationship" onclick={() => { const other = nodeId(edge.source) === selected.node_id ? nodeId(edge.target) : nodeId(edge.source); selectedIds = [other]; }}><span>{edge.relationship}</span><b>{renderedNodes.find((node) => node.node_id === (nodeId(edge.source) === selected.node_id ? nodeId(edge.target) : nodeId(edge.source)))?.label}</b></button>{/each}{:else}<p class="muted">No stored relationships yet.</p>{/if}<div class="inspector-actions"><button onclick={() => centreNode(selected)}>View neighbours</button>{#if selected.pinned}<button onclick={() => unpin(selected)}>Unpin position</button>{/if}</div>{:else}<p>Select a node to inspect it.</p>{/if}
         </aside>
       {/if}
 
       {#if graphMode === "local"}
-        <div class="depth-control" onclick={(event) => event.stopPropagation()}><span>Relationship depth</span><input type="range" min="1" max="3" step="1" bind:value={depth} aria-label="Relationship depth" /><b>{depth}</b></div>
+        <div class="depth-control"><span>Relationship depth</span><input type="range" min="1" max="3" step="1" bind:value={depth} aria-label="Relationship depth" /><b>{depth}</b></div>
       {/if}
     </div>
-  </main>
+  </section>
 
-  {#if sourceOpen}<div class="modal-backdrop" role="presentation" onclick={() => sourceOpen = false}><section class="source-modal" role="dialog" aria-modal="true" aria-labelledby="source-title" onclick={(event) => event.stopPropagation()}><button class="close" aria-label="Close add source" onclick={() => sourceOpen = false}>×</button><span class="eyebrow">Workspace boundary</span><h2 id="source-title">Review workspace source</h2><p>Browse incrementally, review what will be indexed, then confirm. Unsupported and oversized files are skipped; sources never become approved memory automatically.</p><div class="kind-toggle" role="radiogroup" aria-label="Source kind"><button class:active={sourceKind === "folder"} onclick={() => sourceKind = "folder"}>Folder</button><button class:active={sourceKind === "file"} onclick={() => sourceKind = "file"}>File</button></div>
+  {#if sourceOpen}<dialog use:modal class="source-modal" aria-labelledby="source-title" oncancel={closeSourceDialog} onclick={(event) => { if (event.target === event.currentTarget) closeSourceDialog(); }}><button class="close" aria-label="Close add source" onclick={() => closeSourceDialog()}>×</button><span class="eyebrow">Workspace boundary</span><h2 id="source-title">Review workspace source</h2><p>Browse incrementally, review what will be indexed, then confirm. Unsupported and oversized files are skipped; sources never become approved memory automatically.</p><div class="kind-toggle" role="group" aria-label="Source kind"><button aria-pressed={sourceKind === "folder"} class:active={sourceKind === "folder"} onclick={() => sourceKind = "folder"}>Folder</button><button aria-pressed={sourceKind === "file"} class:active={sourceKind === "file"} onclick={() => sourceKind = "file"}>File</button></div>
     {#if sourceBrowse}<nav class="source-browser" aria-label="Workspace source browser">{#if sourceBrowse.parent}<button onclick={() => void browseSource(sourceBrowse!.parent ?? ".")}>← {sourceBrowse.parent}</button>{/if}{#each sourceBrowse.children as item}<button class:selected={sourcePath === item.path} onclick={() => { if (item.kind === "folder") void browseSource(item.path); else { sourcePath = item.path; sourceKind = "file"; sourceReview = null; } }}><span>{item.kind === "folder" ? "Folder" : "File"}</span><b>{item.name}</b></button>{/each}{#if sourceBrowse.truncated}<small>Showing the first 200 entries. Open a folder to continue.</small>{/if}</nav>{/if}
     <form onsubmit={(event) => { event.preventDefault(); void reviewSource(); }}><label>Workspace-relative path<input bind:value={sourcePath} placeholder={sourceKind === "folder" ? "documents/research" : "notes/ideas.md"} aria-label="Workspace-relative path" oninput={() => sourceReview = null} /></label>{#if sourceError}<p class="error" role="alert">{sourceError}</p>{/if}<button class="primary" disabled={sourceBusy || !sourcePath.trim()}>{sourceBusy ? "Reviewing…" : "Review indexing plan"}</button></form>
     {#if sourceReview}<section class="source-review" aria-label="Source indexing review"><h3>Indexing plan</h3><p><b>{sourceReview.supported_files}</b> supported files · <b>{sourceReview.total_bytes.toLocaleString()}</b> bytes · <b>{sourceReview.unsupported_files}</b> skipped</p>{#each sourceReview.warnings as warning}<p class="warning">{warning}</p>{/each}<button class="primary" disabled={sourceBusy} onclick={() => void addSource()}>Add reviewed source</button></section>{/if}
-    {#if sourceRoots.length}<h3>Current sources</h3>{#each sourceRoots as source}<div class="current-source"><span>{source.detail}</span><button aria-label={`Remove ${source.detail} from graph`} onclick={() => void removeSource(source.detail ?? "")}>Remove</button></div>{/each}{/if}</section></div>{/if}
+    {#if sourceRoots.length}<h3>Current sources</h3>{#each sourceRoots as source}<div class="current-source"><span>{source.detail}</span><button aria-label={`Remove ${source.detail} from graph`} onclick={() => void removeSource(source.detail ?? "")}>Remove</button></div>{/each}{/if}</dialog>{/if}
 
   {#if contextMenu}<div class="context-menu" style={`left:${contextMenu.x}px;top:${contextMenu.y}px`} role="menu"><button onclick={() => centreNode(contextMenu!.node)}>Open local graph</button><button onclick={() => { selectedIds = [contextMenu!.node.node_id]; inspectorOpen = true; contextMenu = null; }}>Trace provenance</button><button onclick={() => contextMenu!.node.pinned ? unpin(contextMenu!.node) : (contextMenu!.node.fx = contextMenu!.node.x, contextMenu!.node.fy = contextMenu!.node.y, contextMenu!.node.pinned = true, contextMenu = null)}>{contextMenu.node.pinned ? "Unpin" : "Pin"}</button><button onclick={() => centreNode(contextMenu!.node)}>View neighbours</button></div>{/if}
 {/if}
@@ -371,7 +402,7 @@
   :global(.content:has(.knowledge-shell)) { padding:0 !important; overflow:hidden; }
   .knowledge-shell { height:calc(100vh - 58px); min-height:650px; display:grid; grid-template-rows:64px 1fr; background:#17181c; color:#eef0f6; }
   .graph-toolbar { display:grid; grid-template-columns:auto minmax(220px, 620px) auto auto auto auto; gap:10px; align-items:center; padding:0 18px; border-bottom:1px solid rgba(180,188,205,.12); background:rgba(23,24,28,.96); z-index:20; }
-  .title-block { min-width:190px; } .title-block h2 { margin:1px 0 0; color:#eef0f6; font-size:1.06rem; letter-spacing:-.01em; } .eyebrow { color:#8790a6; font-size:.62rem; letter-spacing:.13em; text-transform:uppercase; }
+  .title-block { min-width:190px; } .title-block h2 { margin:1px 0 0; color:#eef0f6; font-size:1.06rem; letter-spacing:-.01em; } .eyebrow { color:#9da7bd; font-size:.7rem; letter-spacing:.13em; text-transform:uppercase; }
   .search { display:flex; align-items:center; gap:8px; height:36px; padding:0 11px; border:1px solid rgba(180,188,205,.15); border-radius:7px; background:rgba(255,255,255,.045); color:#8f98ad; } .search:focus-within { border-color:#708db8; box-shadow:0 0 0 2px rgba(112,141,184,.15); } .search input { width:100%; border:0; outline:0; background:transparent; color:#eef0f6; font:inherit; font-size:.78rem; }
   .mode-switch { display:flex; padding:3px; border:1px solid rgba(180,188,205,.14); border-radius:7px; background:#111216; } .mode-switch button,.icon-button { border:0; color:#9ba4b8; background:transparent; cursor:pointer; } .mode-switch button { padding:6px 10px; border-radius:5px; font:inherit; font-size:.72rem; } .mode-switch button.active { background:#30333b; color:#f3f5fa; box-shadow:0 1px 3px #0008; } .mode-switch button:disabled { opacity:.38; cursor:not-allowed; }
   .icon-button { display:grid; place-items:center; width:34px; height:34px; border:1px solid rgba(180,188,205,.13); border-radius:7px; font-size:1.25rem; } .icon-button:hover { color:white; border-color:rgba(180,188,205,.3); background:rgba(255,255,255,.05); }
@@ -399,7 +430,7 @@
   .motion-options { display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; } .motion-options label { display:flex; align-items:center; gap:3px; color:#939caf; font-size:.62rem; }
   .inspector { padding:18px; width:280px; bottom:14px; } .inspector .close,.source-modal .close { position:absolute; right:12px; top:9px; } .record-kicker { display:flex; align-items:center; gap:7px; color:#8892a5; text-transform:uppercase; letter-spacing:.11em; font-size:.6rem; } .inspector h3 { margin:10px 24px 4px 0; font-size:1.05rem; } .status-line { display:flex; gap:8px; color:#7f899e; font-size:.66rem; } .status-line span { padding:3px 6px; border:1px solid #ffffff12; border-radius:4px; } .inspector > p { color:#a5adbd; font-size:.73rem; line-height:1.55; } .inspector h4 { margin:20px 0 7px; color:#7f899e; text-transform:uppercase; letter-spacing:.1em; font-size:.62rem; }
   .relationship { display:grid; width:100%; gap:2px; padding:8px 0; border:0; border-bottom:1px solid #ffffff0e; background:transparent; text-align:left; cursor:pointer; } .relationship span { color:#687286; font-size:.6rem; } .relationship b { color:#cbd1dd; font-size:.72rem; } .inspector-actions { display:grid; gap:7px; margin-top:18px; } .inspector-actions button { border:1px solid #ffffff16; border-radius:6px; padding:7px; background:#ffffff08; color:#c2c9d6; cursor:pointer; }
-  .modal-backdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; background:#08090dbb; backdrop-filter:blur(5px); } .source-modal { position:relative; width:min(480px, calc(100vw - 32px)); max-height:80vh; overflow:auto; padding:24px; border:1px solid #ffffff1c; border-radius:13px; background:#1c1e24; color:#eef0f6; box-shadow:0 25px 80px #000c; } .source-modal h2 { margin:6px 0; font-size:1.15rem; } .source-modal > p { color:#9ba4b6; font-size:.75rem; line-height:1.5; } .kind-toggle { display:flex; width:max-content; margin:15px 0; padding:3px; border:1px solid #ffffff16; border-radius:7px; } .kind-toggle button { border:0; border-radius:5px; padding:6px 14px; background:transparent; color:#929bad; cursor:pointer; } .kind-toggle button.active { background:#343842; color:white; } .source-modal form label { display:grid; gap:6px; color:#a9b0bf; font-size:.7rem; } .source-modal form input { border:1px solid #ffffff18; border-radius:6px; padding:10px; background:#111216; color:white; } .primary { width:100%; margin-top:12px; border:0; border-radius:6px; padding:9px; background:#5c87c5; color:white; cursor:pointer; } .error { color:#ff8c98 !important; } .current-source { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #ffffff0e; color:#aeb6c5; font-size:.7rem; } .current-source button { border:0; background:transparent; color:#ef7885; cursor:pointer; }
+  .source-modal::backdrop { background:#08090dbb; backdrop-filter:blur(5px); } .source-modal { position:relative; width:min(480px, calc(100vw - 32px)); max-height:80vh; overflow:auto; padding:24px; border:1px solid #ffffff1c; border-radius:13px; background:#1c1e24; color:#eef0f6; box-shadow:0 25px 80px #000c; } .source-modal h2 { margin:6px 0; font-size:1.15rem; } .source-modal > p { color:#9ba4b6; font-size:.75rem; line-height:1.5; } .kind-toggle { display:flex; width:max-content; margin:15px 0; padding:3px; border:1px solid #ffffff16; border-radius:7px; } .kind-toggle button { border:0; border-radius:5px; padding:6px 14px; background:transparent; color:#929bad; cursor:pointer; } .kind-toggle button.active { background:#343842; color:white; } .source-modal form label { display:grid; gap:6px; color:#a9b0bf; font-size:.7rem; } .source-modal form input { border:1px solid #ffffff18; border-radius:6px; padding:10px; background:#111216; color:white; } .primary { width:100%; margin-top:12px; border:0; border-radius:6px; padding:9px; background:#5c87c5; color:white; cursor:pointer; } .error { color:#ff8c98 !important; } .current-source { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #ffffff0e; color:#aeb6c5; font-size:.7rem; } .current-source button { border:0; background:transparent; color:#ef7885; cursor:pointer; }
   .source-browser { display:grid; max-height:190px; overflow:auto; margin:0 0 12px; border:1px solid #ffffff16; border-radius:7px; } .source-browser button { display:flex; gap:8px; border:0; border-bottom:1px solid #ffffff0d; padding:7px 9px; background:transparent; color:#cbd1dc; text-align:left; cursor:pointer; } .source-browser button:hover,.source-browser button.selected { background:#ffffff0c; } .source-browser button span { width:42px; color:#7f899e; font-size:.62rem; } .source-browser button b { font-size:.7rem; } .source-browser small { padding:8px; color:#7f899e; } .source-review { margin-top:12px; padding:12px; border:1px solid #ffffff16; border-radius:7px; background:#ffffff08; } .source-review h3 { margin:0 0 6px; } .source-review p { font-size:.7rem; } .source-review .warning { color:#d89b45; }
   .context-menu { position:fixed; z-index:120; display:grid; min-width:160px; padding:5px; border:1px solid #ffffff20; border-radius:7px; background:#202229; box-shadow:0 14px 35px #000b; } .context-menu button { border:0; border-radius:4px; padding:7px 9px; background:transparent; color:#cbd1dc; text-align:left; cursor:pointer; font-size:.7rem; } .context-menu button:hover { background:#ffffff0c; }
 
@@ -407,7 +438,7 @@
      calm light control-deck palette and existing surface language. */
   .knowledge-shell { background:#f3f7f7; color:#183047; }
   .graph-toolbar { border-color:#d8e2e4; background:rgba(250,252,252,.97); box-shadow:0 1px 4px #38556b12; }
-  .title-block h2 { color:#173047; } .eyebrow { color:#6c8192; }
+  .title-block h2 { color:#173047; } .eyebrow { color:#536a7b; }
   .search { border-color:#cedadd; background:#fff; color:#718697; } .search:focus-within { border-color:#79b8b5; box-shadow:0 0 0 2px #bce3e147; } .search input { color:#173047; }
   .mode-switch { border-color:#cfdbde; background:#edf3f3; } .mode-switch button,.icon-button { color:#5d7487; } .mode-switch button.active { background:#cce9e7; color:#0b716e; box-shadow:0 1px 3px #38556b20; }
   .icon-button { border-color:#cfdbde; background:#fff; } .icon-button:hover { color:#087b77; border-color:#8cc5c2; background:#e9f6f5; }
@@ -428,12 +459,12 @@
   .group-row b { color:#3d566b; } .group-row small { color:#7b8e9e; } .text-action { color:#087b77; }
   .group-form { border-color:#dce5e7; background:#f6f9f9; } .group-form input { border-color:#d4dfe1; } .group-form label,.motion-options label { color:#607689; }
   .inspector .record-kicker,.status-line,.inspector h4 { color:#6e8292; } .status-line span,.relationship,.inspector-actions button { border-color:#dde6e8; } .inspector > p { color:#607689; } .relationship span { color:#778b9b; } .relationship b { color:#29465d; } .inspector-actions button { background:#f2f7f7; color:#36566b; }
-  .modal-backdrop { background:#26415052; } .source-modal { border-color:#c8d5d8; background:#fff; color:#183047; box-shadow:0 25px 80px #38556b4d; } .source-modal > p,.source-modal form label { color:#607689; } .kind-toggle { border-color:#cfdcde; } .kind-toggle button { color:#607689; } .kind-toggle button.active { background:#cce9e7; color:#0b716e; } .source-modal form input { border-color:#cad8da; background:#f8fbfb; color:#183047; } .primary { background:#178d88; } .current-source { border-color:#e0e8e9; color:#526b7e; }
+  .source-modal::backdrop { background:#26415052; } .source-modal { border-color:#c8d5d8; background:#fff; color:#183047; box-shadow:0 25px 80px #38556b4d; } .source-modal > p,.source-modal form label { color:#607689; } .kind-toggle { border-color:#cfdcde; } .kind-toggle button { color:#607689; } .kind-toggle button.active { background:#cce9e7; color:#0b716e; } .source-modal form input { border-color:#cad8da; background:#f8fbfb; color:#183047; } .primary { background:#178d88; } .current-source { border-color:#e0e8e9; color:#526b7e; }
   .source-browser { border-color:#d6e0e2; } .source-browser button { border-color:#e6edef; color:#36566b; } .source-browser button:hover,.source-browser button.selected,.source-review { background:#f0f7f7; } .source-review { border-color:#d6e0e2; }
   .context-menu { border-color:#cbd8da; background:#fff; box-shadow:0 14px 35px #38556b3d; } .context-menu button { color:#36566b; } .context-menu button:hover { background:#edf6f5; }
   :global(:root[data-theme="dark"]) .knowledge-shell { background:var(--bg); color:var(--text-1); }
   :global(:root[data-theme="dark"]) .graph-toolbar { border-color:var(--border); background:color-mix(in srgb, var(--surface) 96%, transparent); box-shadow:var(--shadow-1); }
-  :global(:root[data-theme="dark"]) .title-block h2 { color:var(--text-1); } :global(:root[data-theme="dark"]) .eyebrow { color:var(--text-3); }
+  :global(:root[data-theme="dark"]) .title-block h2 { color:var(--text-1); } :global(:root[data-theme="dark"]) .eyebrow { color:var(--text-2); }
   :global(:root[data-theme="dark"]) .search,:global(:root[data-theme="dark"]) .icon-button { border-color:var(--border-strong); background:var(--surface); color:var(--text-2); } :global(:root[data-theme="dark"]) .search input { color:var(--text-1); }
   :global(:root[data-theme="dark"]) .mode-switch { border-color:var(--border-strong); background:var(--sunken); } :global(:root[data-theme="dark"]) .mode-switch button.active { background:var(--accent-soft); color:var(--accent-strong); }
   :global(:root[data-theme="dark"]) .graph-workspace { background:radial-gradient(circle at 50% 45%, #18272a 0%, var(--surface) 45%, var(--bg) 100%); } :global(:root[data-theme="dark"]) .vignette { background:radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.35) 100%); }

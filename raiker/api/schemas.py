@@ -154,6 +154,7 @@ class TaskCreateRequest(BaseModel):
     project_id: str | None = None
     model_profile: str | None = None
     model: str | None = None
+    attachments: list[dict[str, Any]] | None = None
 
 
 class SetModelSelectionRequest(BaseModel):

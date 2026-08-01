@@ -2159,3 +2159,40 @@ CREATE TABLE IF NOT EXISTS model_price_sync_state (
   PRIMARY KEY (owner_principal_id, provider)
 );
 """
+
+
+# BUG-42 — cumulative cloud execution spend.
+#
+# These events are append-only. A reservation protects the budget before a
+# command starts; a reconciliation replaces that estimate with provider actual
+# cost, and a release removes an estimate when execution never began. Keeping
+# events rather than a mutable counter preserves the evidence behind every
+# admission decision and makes interrupted runs remain conservatively charged.
+CLOUD_EXECUTION_COST_LEDGER_MIGRATION_ID = "RAIKER-1033-cloud-execution-cost-ledger"
+CLOUD_EXECUTION_COST_LEDGER_SQL = """
+CREATE TABLE IF NOT EXISTS cloud_execution_cost_ledger (
+  event_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  action_id TEXT NOT NULL,
+  event_type TEXT NOT NULL CHECK(event_type IN ('reserved', 'reconciled', 'released', 'provider_snapshot', 'provider_unavailable')),
+  amount TEXT NOT NULL,
+  provider_reference TEXT,
+  reason TEXT,
+  recorded_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cloud_cost_one_reservation
+  ON cloud_execution_cost_ledger(owner_principal_id, profile_id, action_id)
+  WHERE event_type = 'reserved';
+CREATE INDEX IF NOT EXISTS idx_cloud_cost_profile
+  ON cloud_execution_cost_ledger(owner_principal_id, profile_id, recorded_at, event_id);
+"""
+
+
+# Schedule/task prompt attachments use the same validated payload as Chat and
+# Build. JSON keeps the prompt shape intact until the scheduler creates its
+# governed turn; uploaded bytes remain in the attachment store.
+TASK_ATTACHMENTS_MIGRATION_ID = "RAIKER-1034-task-attachments"
+TASK_ATTACHMENTS_SQL = """
+ALTER TABLE tasks ADD COLUMN attachments_json TEXT NOT NULL DEFAULT '[]';
+"""

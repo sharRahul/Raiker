@@ -34,6 +34,36 @@ describe("TasksView", () => {
     });
   });
 
+  it("carries attachments into scheduled work and renders them outside the instructions", async () => {
+    const task = {
+      task_id: "task_files", session_id: "sess_inbox", status: "queued",
+      title: "Review source", objective: "Check the attached source.",
+      current_step: null, progress_percent: null,
+      created_at: "2026-08-01T10:00:00Z", updated_at: "2026-08-01T10:00:00Z",
+      completed_at: null, summary: null, project_id: null,
+      scheduled_at: "2026-08-02T10:00:00Z",
+      attachments: [{ type: "path", path: "docs/source.md" }],
+    };
+    const fetchMock = stubFetch({ "GET /api/tasks": [task], "POST /api/tasks": task });
+    render(TasksView);
+    await screen.findByRole("heading", { name: "Review source" });
+
+    const attachment = screen.getByText("docs/source.md");
+    expect(attachment.closest(".task-attachments")).not.toBeNull();
+    expect(attachment.closest(".task-title")).toBeNull();
+
+    await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Use source" } });
+    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "Read it." } });
+    await fireEvent.input(screen.getByLabelText("Attachment path"), { target: { value: "docs/plan.md" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Attach" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Create task" }));
+
+    const post = await waitFor(() => fetchMock.mock.calls.find(([, init]) => init?.method === "POST"));
+    expect(JSON.parse(String(post?.[1]?.body)).attachments).toEqual([
+      { type: "path", path: "docs/plan.md" },
+    ]);
+  });
+
   it("explains that schedules resolve the global model when they run", async () => {
     stubFetch({ "GET /api/tasks": [], "GET /api/models": { profiles: [], chat_profiles: [] } });
     render(TasksView);

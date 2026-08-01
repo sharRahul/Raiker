@@ -30,6 +30,25 @@
  */
 
 import { highlight, languageLabel } from "./highlight";
+import { ICON_PATHS, type IconName } from "./icons";
+
+/**
+ * One inline SVG glyph from the shipped icon set.
+ *
+ * Literal markup built from a fixed, in-repo path table — nothing here is
+ * derived from model output, so it does not widen the closed tag set in any way
+ * that source text can reach. Used for the copy action on a code block, which
+ * reads better as a glyph than as the word "Copy code" repeated down a
+ * transcript.
+ */
+function iconSvg(name: IconName, state: string): string {
+  const paths = ICON_PATHS[name].map((d) => `<path d="${d}" />`).join("");
+  return (
+    `<svg class="md-copy-glyph" data-state="${state}" width="14" height="14" viewBox="0 0 24 24" ` +
+    `fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" ` +
+    `stroke-linejoin="round" aria-hidden="true">${paths}</svg>`
+  );
+}
 
 const HTML_ESCAPES: Record<string, string> = {
   "&": "&amp;",
@@ -188,10 +207,21 @@ function renderFence(
   // emits. The copy button carries no handler — Markdown.svelte delegates one
   // click listener on the wrapper, so no source-derived script can ride along.
   const label = named ? languageLabel(language) : "Code";
+  // BUG-23 / composer polish — the copy action is a glyph, not a word. A
+  // transcript full of "Copy code" reads as chrome competing with the answer;
+  // the icon is the same affordance, quieter, and still fully labelled for a
+  // screen reader and a tooltip. All three states ship in the markup and CSS
+  // picks one, so the delegated handler only ever sets an attribute — it never
+  // writes text into the button.
   const header =
     `<div class="md-code-head">` +
     `<span class="md-code-lang">${escapeHtml(label)}</span>` +
-    `<button type="button" class="md-copy" data-md-copy aria-label="Copy code">Copy code</button>` +
+    `<button type="button" class="md-copy" data-md-copy data-copy-state="idle" ` +
+    `aria-label="Copy code" title="Copy code">` +
+    iconSvg("copy", "idle") +
+    iconSvg("check", "copied") +
+    iconSvg("warning", "failed") +
+    `</button>` +
     `</div>`;
   const attr = named ? ` class="language-${token}"` : "";
   const rendered = named ? highlight(source, token) : escapeHtml(source);

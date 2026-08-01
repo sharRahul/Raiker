@@ -20,11 +20,23 @@ class RiskLevelValue(StrEnum):
 
 
 class RuntimeMode(StrEnum):
-    DEVELOPMENT_PREVIEW = "development_preview"
-    LOCAL_SINGLE_USER_SAFE = "local_single_user_safe"
-    LOCAL_SINGLE_USER_RUNTIME = "local_single_user_runtime"
-    MULTI_USER_LOCAL_RUNTIME = "multi_user_local_runtime"
-    HOSTED_OR_NETWORKED_RUNTIME = "hosted_or_networked_runtime"
+    """Raiker has exactly one runtime.
+
+    It used to have five — ``development_preview``, two single-user modes, a
+    multi-user mode and a hosted mode — and a person installing Raiker had to
+    pick one in Settings before a capability could reach ``enabled_runtime``.
+    That was a second switch in front of the switches that actually decide
+    anything. What a capability may do is already decided by its own gate state,
+    its threat-model acknowledgement, its human confirmation, and whether a real
+    executor is registered for it; the mode added a fifth answer that could only
+    ever say "not yet" to work the other four had already authorised.
+
+    One runtime does all of it. The only remaining runtime-level question is
+    binary and stays in Settings' danger zone: is the agent runtime accepting
+    new executions at all (``status``: ``active`` or ``disabled``).
+    """
+
+    RAIKER_RUNTIME = "raiker_runtime"
 
 
 class DomainScope(StrEnum):
@@ -56,7 +68,10 @@ class Principal:
     session_id: str | None = None
     role_ids: tuple[str, ...] = ()
     domain_scopes: tuple[str, ...] = ()
-    max_runtime_mode: str = RuntimeMode.DEVELOPMENT_PREVIEW
+    # Legacy column. It named a ceiling in an ordered list of runtime modes;
+    # with one runtime there is no ceiling to name. Kept so stored principals
+    # round-trip unchanged, read by nothing that decides anything.
+    max_runtime_mode: str = RuntimeMode.RAIKER_RUNTIME
     created_at: str = ""
     expires_at: str | None = None
     is_active: bool = True
@@ -128,7 +143,36 @@ RISK_ACCEPTANCE_REQUIRED_FIELDS = frozenset({
     "created_at",
 })
 
+RAIKER_RUNTIME = RuntimeMode.RAIKER_RUNTIME.value
+
 RUNTIME_MODES = frozenset(mode.value for mode in RuntimeMode)
+
+# Mode names Raiker shipped before the runtime was unified. They are still
+# accepted wherever a mode name is read — a stored row, a CLI line, an older
+# client — and every one of them resolves to the single runtime. Nothing is
+# silently reinterpreted: they all named a Raiker runtime, and there is now one.
+LEGACY_RUNTIME_MODE_NAMES = frozenset({
+    "development_preview",
+    "local_single_user_safe",
+    "local_single_user_runtime",
+    "multi_user_local_runtime",
+    "hosted_or_networked_runtime",
+})
+
+RUNTIME_STATUS_ACTIVE = "active"
+RUNTIME_STATUS_DISABLED = "disabled"
+
+
+def normalize_runtime_mode(name: str | None) -> str | None:
+    """The single runtime for any name that ever meant a Raiker runtime.
+
+    ``None`` for anything else, so an unrecognised name is still refused rather
+    than quietly treated as the runtime.
+    """
+    candidate = (name or "").strip()
+    if candidate in RUNTIME_MODES or candidate in LEGACY_RUNTIME_MODE_NAMES:
+        return RAIKER_RUNTIME
+    return None
 
 PRINCIPAL_TYPES = frozenset(pt.value for pt in PrincipalType)
 

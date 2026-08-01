@@ -10,6 +10,7 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import SubagentContract, TeamLedger, ToolAction
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.authority.models import RAIKER_RUNTIME
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.broker import ToolBroker
 
@@ -244,7 +245,7 @@ class SubagentRunner:
                 if parent and parent.get("delegated_by_user_id") else None
             ),
             session_id=session_id or None,
-            max_runtime_mode="development_preview",
+            max_runtime_mode=RAIKER_RUNTIME,
         )
         self._store.insert_subagent_contract(contract)
 

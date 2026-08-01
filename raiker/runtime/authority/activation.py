@@ -4,11 +4,20 @@ from dataclasses import dataclass
 from typing import Any
 
 from raiker.phase_gates import CapabilityState
-from raiker.runtime.authority.models import Principal, PrincipalType
+from raiker.runtime.authority.models import (
+    RUNTIME_STATUS_ACTIVE,
+    Principal,
+    PrincipalType,
+)
 
 ACTIVATION_BLOCKED_NO_EXECUTOR = "activation_blocked:no_executor"
 ACTIVATION_BLOCKED_NO_THREAT_MODEL_ACK = "activation_blocked:no_threat_model_ack"
-ACTIVATION_BLOCKED_RUNTIME_MODE_NOT_ACTIVE = "activation_blocked:runtime_mode_not_active"
+# Raiker has one runtime, so a capability is never blocked for being in the
+# wrong mode. It is still blocked while the owner has switched the agent runtime
+# off in Settings' danger zone, and this is that refusal. The reason code keeps
+# its historical spelling so stored audit rows and older clients still resolve.
+ACTIVATION_BLOCKED_RUNTIME_DISABLED = "activation_blocked:runtime_mode_not_active"
+ACTIVATION_BLOCKED_RUNTIME_MODE_NOT_ACTIVE = ACTIVATION_BLOCKED_RUNTIME_DISABLED
 ACTIVATION_BLOCKED_NEEDS_HUMAN_CONFIRMATION = "activation_blocked:needs_human_confirmation"
 ACTIVATION_BLOCKED_NO_REQUIREMENT_ENTRY = "activation_blocked:no_requirement_entry"
 
@@ -17,7 +26,6 @@ ACTIVATION_BLOCKED_NO_REQUIREMENT_ENTRY = "activation_blocked:no_requirement_ent
 class ActivationRequirement:
     capability: str
     risk_tier: str
-    requires_runtime_mode: tuple[str, ...] = ("local_single_user_runtime",)
     requires_executor: bool = True
     requires_policy_rules: bool = False
     requires_storage: bool = False
@@ -31,7 +39,6 @@ def _req(
     cap: str,
     tier: str,
     *,
-    mode: tuple[str, ...] | None = None,
     executor: bool = True,
     threat_ack: bool = False,
     human_confirm: bool = False,
@@ -40,7 +47,6 @@ def _req(
     return ActivationRequirement(
         capability=cap,
         risk_tier=tier,
-        requires_runtime_mode=mode or ("local_single_user_runtime",),
         requires_executor=executor,
         requires_threat_model_ack=threat_ack,
         requires_human_confirmation_to_enable=human_confirm,
@@ -67,13 +73,13 @@ def _build_registry() -> dict[str, ActivationRequirement]:
 
     # Phase 4
     for cap in ("external_channels",):
-        r[cap] = _req(cap, "5", mode=("multi_user_local_runtime",), threat_ack=True, human_confirm=True,
+        r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Alias for external_channel_runtime.")
     for cap in ("subagents", "multi_agent_teams"):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Spawning/team runtime; isolation + budgets.")
     for cap in ("remote_execution", "container_execution"):
-        r[cap] = _req(cap, "5", mode=("hosted_or_networked_runtime",), threat_ack=True, human_confirm=True,
+        r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Alias for remote_execution_cap / container_execution_cap.")
 
     # Runtime domain — Tier 1
@@ -110,23 +116,22 @@ def _build_registry() -> dict[str, ActivationRequirement]:
 
     # Tier 5
     for cap in ("external_channel_runtime", "channel_approval_relay"):
-        # Raiker is single-user: the reference channel is a single-owner bridge,
-        # so it activates under local_single_user_runtime (not multi-user).
+        # The reference channel is a single-owner bridge: its containment is the
+        # connector's own auth plus the owner egress allowlist, not a mode.
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Single-user reference channel: connector auth + owner egress allowlist.")
-    # Local sandboxed container execution activates under the single-user runtime
-    # (it is local Docker with no network / no host mounts). Remote/cloud egress
-    # stays gated to hosted_or_networked_runtime.
+    # Local sandboxed container execution: local Docker, no network, no host
+    # mounts. Remote/cloud execution is a separate capability with its own gate
+    # and threat model — see BUG-31 for the containment work still owed there.
     r["container_execution_cap"] = _req(
         "container_execution_cap", "5", threat_ack=True, human_confirm=True,
         notes="Local sandboxed container: no network, no mounts, owner image allowlist.")
     for cap in ("remote_execution_cap", "cloud_execution_cap"):
-        r[cap] = _req(cap, "5", mode=("hosted_or_networked_runtime",), threat_ack=True, human_confirm=True,
+        r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Isolation, secrets, egress, budget required.")
-    # Hosted / private-network model APIs are called *from* the local
-    # single-user machine (like the reference channel): owner egress
-    # allowlist + env-only credentials, so they activate under
-    # local_single_user_runtime. See docs/threat-models/hosted-models.md.
+    # Hosted / private-network model APIs are called *from* the owner's machine
+    # (like the reference channel): owner egress allowlist + env-only
+    # credentials. See docs/threat-models/hosted-models.md.
     for cap in ("hosted_model_runtime", "private_network_model_runtime"):
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Owner egress allowlist, env-only credentials, metadata-only events.")
@@ -229,15 +234,18 @@ def evaluate_activation_requirement(
     if principal.principal_type != PrincipalType.HUMAN:
         return f"{ACTIVATION_BLOCKED_NEEDS_HUMAN_CONFIRMATION}:{capability}"
 
+    # One runtime, one question: is it accepting executions? A stored row is
+    # only ever consulted for its status now, never for which of five modes it
+    # named, and no stored row at all means the runtime is on — a fresh install
+    # has nothing to activate before its gates mean what they say.
     if target_state == CapabilityState.ENABLED_RUNTIME.value:
-        active_mode = (
+        active = (
             store.get_principal_runtime_mode(principal.principal_id)
             if store.get_account(principal.principal_id) is not None
-            else store.get_active_runtime_mode()
+            else store.get_latest_runtime_mode()
         )
-        mode_name = active_mode["mode_name"] if active_mode else "development_preview"
-        if mode_name not in req.requires_runtime_mode:
-            return f"{ACTIVATION_BLOCKED_RUNTIME_MODE_NOT_ACTIVE}:{capability} (needs {req.requires_runtime_mode})"
+        if active is not None and str(active.get("status", RUNTIME_STATUS_ACTIVE)) != RUNTIME_STATUS_ACTIVE:
+            return f"{ACTIVATION_BLOCKED_RUNTIME_DISABLED}:{capability} (the agent runtime is disabled)"
 
     if req.requires_executor and not has_executor(capability, registry):
         return f"{ACTIVATION_BLOCKED_NO_EXECUTOR}:{capability}"

@@ -5,7 +5,9 @@
   import { api, ApiError } from "../api";
   import type { BrainNode, BrainView } from "../apiTypes";
 
-  const ACTIVE = new Set(["queued", "running", "paused", "waiting_for_approval"]);
+  // `continuing` is a granted approval being replayed into a parked scheduled
+// run (BUG-25): unfinished, so it belongs on the live board.
+const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_for_approval"]);
   // A run that ended is still the thing the owner most needs to read, because
   // the reason it ended lives nowhere else on this page (BUG-09).
   const FINISHED = new Set(["completed", "failed", "cancelled"]);
@@ -39,7 +41,7 @@
 
   // Cartoon character state derives from the agent's runtime status.
   function mood(status: string): "working" | "idle" | "queued" | "paused" {
-    if (status === "running") return "working";
+    if (status === "running" || status === "continuing") return "working";
     if (status === "queued") return "queued";
     if (status === "paused") return "paused";
     return "idle";
@@ -72,6 +74,7 @@
       case "paused": return "Paused";
       case "waiting": return "Waiting";
       case "waiting_for_approval": return "Waiting for approval";
+      case "continuing": return "Continuing after approval";
       case "cancelled": return "Stopped";
       case "completed": return "Done";
       case "failed": return "Failed";

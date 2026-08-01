@@ -21,6 +21,10 @@
     SessionSummary,
     TaskView,
   } from "../apiTypes";
+  import ComposerAttach from "../components/ComposerAttach.svelte";
+  import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
+  import ComposerChips from "../components/ComposerChips.svelte";
+  import { createAttachmentStore } from "../composerAttachments.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
@@ -38,6 +42,17 @@
   // One reactive view of the shared model store; refreshes live when the
   // Models page connects a provider or selects a model, without a remount.
   const profiles = $derived(chatProfiles());
+
+  // The Workbench composer carries files too, and hands their references to
+  // whichever surface actually runs the work. It used to say "to work with a
+  // file, start in Chat and attach it there", which was true and was also an
+  // admission that this composer was a lesser one.
+  const attachStore = createAttachmentStore();
+  let attachControl = $state<ComposerAttach | undefined>();
+  let attachOpen = $state(false);
+  // Schedule mode needs a time. Without one the handoff landed in Tasks with an
+  // empty, required start field and the owner had to notice and fill it in.
+  let scheduleAt = $state("");
 
   let draft = $state("");
   let continueSession = $state("");
@@ -115,18 +130,23 @@
         detail: {
           text,
           cadence: workMode === "schedule" ? "once" : "now",
+          scheduledAt: workMode === "schedule" ? scheduleAt : "",
           profileId: workMode === "task" ? effectiveModel.profile_id : null,
           model: workMode === "task" ? effectiveModel.model : null,
         },
       })), 0);
+      draft = "";
+      handedOff = true;
       return;
     }
+    const attachments = attachStore.take();
     if (workMode === "build") {
       window.location.hash = "#/build";
       window.setTimeout(() => window.dispatchEvent(new CustomEvent("raiker:build-compose", {
-        detail: { text, profileId: effectiveModel.profile_id, model: effectiveModel.model },
+        detail: { text, profileId: effectiveModel.profile_id, model: effectiveModel.model, attachments },
       })), 0);
       draft = "";
+      attachStore.clear();
       handedOff = true;
       return;
     }
@@ -139,16 +159,19 @@
     window.setTimeout(() => {
       window.dispatchEvent(
         new CustomEvent("raiker:compose", {
-          detail: { text, sessionId: continueSession || null, profileId: effectiveModel.profile_id, model: effectiveModel.model },
+          detail: { text, sessionId: continueSession || null, profileId: effectiveModel.profile_id, model: effectiveModel.model, attachments },
         }),
       );
     }, 0);
     draft = "";
+    attachStore.clear();
     handedOff = true;
   }
 
   onMount(load);
 </script>
+
+<svelte:window onclick={(event) => attachControl?.handleOutsideClick(event)} />
 
 <section class="workbench" aria-labelledby="workbench-title">
   <div class="intro">
@@ -165,15 +188,13 @@
     <div class="main-column">
       <form class="composer card" onsubmit={startWork}>
         <label class="composer-label" for="workbench-prompt">What would you like Raiker to do?</label>
-        <!-- This composer starts work; it does not carry files. Chat's composer
-             owns attachments (the "+" control there), and saying so is better
-             than offering an attach affordance this form does not have. -->
-        <p class="composer-help">Describe an outcome or ask a question. To work with a file, start in Chat and attach it there.</p>
+        <p class="composer-help">Describe an outcome or ask a question. Attach a workspace file, an image, or a document and it rides along to wherever the work runs.</p>
         <div class="mode-tabs" role="tablist" aria-label="Work mode">
           {#each [["chat", "Chat"], ["build", "Build"], ["task", "Create task"], ["schedule", "Schedule"]] as option}
             <button type="button" role="tab" aria-selected={workMode === option[0]} class:active={workMode === option[0]} onclick={() => (workMode = option[0] as typeof workMode)}>{option[1]}</button>
           {/each}
         </div>
+        <ComposerChips store={attachStore} />
         <textarea id="workbench-prompt" class="textarea prompt" rows="4" bind:value={draft} placeholder="Ask a question or describe an outcome…"></textarea>
         <div class="scope">
           <!-- Continuing an existing conversation only means anything for Chat:
@@ -182,6 +203,8 @@
                promise a continuation that silently does not happen. -->
           {#if workMode === "chat"}
             <label><span class="field-label">Start as</span><select class="select" bind:value={continueSession} aria-label="Conversation to continue"><option value="">New conversation</option>{#each named.slice(0, 10) as session (session.session_id)}<option value={session.session_id}>{session.title}</option>{/each}</select></label>
+          {:else if workMode === "schedule"}
+            <label><span class="field-label">Start time</span><input class="input" type="datetime-local" bind:value={scheduleAt} aria-label="Scheduled start time" /></label>
           {:else}
             <div class="scope-fact"><span class="field-label">Start as</span><p>{workMode === "build" ? "A new build conversation" : workMode === "task" ? "A task run" : "A scheduled run"}</p></div>
           {/if}
@@ -190,8 +213,14 @@
         </div>
         {#if effectiveModel === null}<p class="model-error" role="alert"><strong>A model is required before work can start.</strong> <a href="#/models">Choose a model</a> or ask an administrator.</p>{/if}
         <details class="governed"><summary><Icon name="shield" size={14} /> Governed execution</summary><p>Raiker requests your approval before restricted external actions. Project boundaries and connected-tool policies still apply.</p></details>
-        <div class="composer-actions"><button class="btn btn-primary" type="submit" disabled={draft.trim() === "" || effectiveModel === null}><Icon name="send" size={15} /> {primaryLabel}</button></div>
-        {#if handedOff}<p class="handoff" role="status">{workMode === "build" ? "Sent to Build. Review and start the governed build there." : "Sent to Chat. The conversation and its governed turn continue there."}</p>{/if}
+        {#if attachOpen}
+          <ComposerAttachPanel store={attachStore} idPrefix="workbench" />
+        {/if}
+        <div class="composer-actions">
+          <ComposerAttach bind:this={attachControl} bind:open={attachOpen} />
+          <button class="btn btn-primary" type="submit" disabled={draft.trim() === "" || effectiveModel === null}><Icon name="send" size={15} /> {primaryLabel}</button>
+        </div>
+        {#if handedOff}<p class="handoff" role="status">{workMode === "build" ? "Sent to Build. Review and start the governed build there." : workMode === "task" ? "Sent to Tasks. Review and create the task there." : workMode === "schedule" ? "Sent to Tasks. Review the schedule and create it there." : "Sent to Chat. The conversation and its governed turn continue there."}</p>{/if}
       </form>
 
       <div><h3 class="block-title">Quick actions</h3><nav class="action-grid" aria-label="Quick actions">
@@ -332,7 +361,7 @@
   .governed summary { display: flex; align-items: center; gap: .45rem; cursor: pointer; font-weight: 650; color: var(--text-1); }
   .governed p { margin: .5rem 0 0 1.25rem; }
   .model-error { margin: 0; padding: .65rem .8rem; border-radius: var(--r-md); background: var(--danger-soft); color: var(--danger); font-size: .82rem; }
-  .composer-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+  .composer-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .handoff { margin: 0; color: var(--ok); font-size: 0.82rem; font-weight: 600; }
   .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
   .card-head h3 { margin: 0; }

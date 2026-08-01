@@ -21,6 +21,8 @@ from raiker.api.sessions import ApiSession
 from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.runtime.authority.models import Principal
+from raiker.runtime.source_provenance import SourceProvenanceService
+from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
 
@@ -164,6 +166,45 @@ async def forget_memory(
             detail={"ok": False, "reason_code": result.reason_code},
         )
     return {"ok": True, **result.data}
+
+
+@router.get("/api/memory/{memory_id}/source")
+async def get_memory_source(
+    memory_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """The passage this memory was drawn from, if it can still be opened (BUG-27).
+
+    Memory already stored where each record came from and offered no way to go
+    there, which made provenance unverifiable — indistinguishable, from the
+    owner's seat, from provenance that was invented. This resolves those stored
+    coordinates against the caller's own access and returns bounded plain text
+    plus the offsets of the passage inside it.
+
+    Every non-resolvable case is a named status rather than an error, because
+    "this memory's source was deleted" and "you may not read that conversation"
+    are both true answers the owner is entitled to see. Nothing here reveals
+    whether a conversation the caller may not read exists.
+    """
+    principal_id = auth_data[0].principal_id
+    memory = next(
+        (
+            record
+            for record in _service(request).list_memories(acting_principal_id=principal_id)
+            if record.memory_id == memory_id
+        ),
+        None,
+    )
+    if memory is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": "memory_not_found"},
+        )
+    ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
+    service = SourceProvenanceService(SQLiteStore(ws))
+    excerpt = service.resolve(dict(memory.provenance), memory.text, principal_id)
+    return {"ok": True, "memory_id": memory_id, **excerpt.to_dict()}
 
 
 @router.put("/api/memory/{memory_id}/archive")

@@ -430,7 +430,7 @@ def test_ai_proposed_restore_needs_approval(tmp_path: Path) -> None:
         display_name="AI",
         role_ids=("rl_assistant",),
         domain_scopes=("coding",),
-        max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_SAFE,
+        max_runtime_mode=RuntimeMode.RAIKER_RUNTIME,
         is_active=True,
     )
     action = GovernedAction(

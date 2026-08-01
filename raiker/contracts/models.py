@@ -156,6 +156,10 @@ EVENT_TYPES = {
     # message and file counts, and the redaction policy applied. The transcript
     # itself is never written into an event payload.
     "session_transcript_exported",
+    # BUG-28 — a file this conversation holds left the runtime as bytes. Metadata
+    # only: which attachment, its name, type and size. The bytes themselves are
+    # never written into an event payload.
+    "attachment_downloaded",
     "runtime_error_recorded",
     # A chat moved into or out of an organizing project. The move grants
     # nothing; it changes only the bounded context the chat receives.
@@ -200,6 +204,12 @@ EVENT_TYPES = {
     # work did not go wrong, it is waiting for the owner's decision, and the
     # payload always states which one and why (BUG-09).
     "task_blocked",
+    # A granted approval is being replayed into a parked run, and the same run
+    # could not be continued automatically (BUG-25). The pair is what makes an
+    # approval's effect readable after the fact: the decision, the attempt to
+    # act on it, and — when the attempt could not proceed — the stated reason.
+    "task_resume_started",
+    "task_resume_blocked",
     "side_question_received",
     "side_question_answered",
     "interrupt_received",
@@ -721,6 +731,11 @@ class ConnectorProfile:
 TASK_STATUSES = {
     "queued",
     "running",
+    # A granted approval being replayed into a run that parked on it (BUG-25).
+    # Distinct from `running` on purpose: the owner needs to see their decision
+    # take effect, and "running" on a card that was waiting a moment ago does
+    # not say that the approval is what moved it.
+    "continuing",
     "waiting_for_approval",
     "waiting_for_user_answer",
     "paused",

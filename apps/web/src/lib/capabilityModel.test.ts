@@ -143,7 +143,9 @@ describe("enableability for Security Settings", () => {
     );
     expect(below.kind).toBe("below_runtime");
     expect(below.reason).toMatch(/enabled, but only at/i);
-    expect(below.href).toBe("#/settings");
+    // One runtime: there is no mode to activate first, so the only action that
+    // raises a capability to runtime level lives in Permissions.
+    expect(below.href).toBe("#/capabilities");
 
     // No executor in this runtime: nowhere to send the owner, so say that
     // rather than offer an action that cannot work.

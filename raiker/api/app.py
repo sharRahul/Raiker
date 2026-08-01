@@ -213,6 +213,13 @@ def create_app(
             while not stop.is_set():
                 with suppress(Exception):
                     await scheduler.run_due()
+                # Continuing approved work is a separate pass from starting due
+                # work, and it is suppressed separately: a continuation that
+                # throws must not stop the next tick from starting due runs, and
+                # a failed due run must not stop approved work from finishing
+                # (BUG-25).
+                with suppress(Exception):
+                    await scheduler.resume_approved()
                 with suppress(TimeoutError):
                     await asyncio.wait_for(stop.wait(), timeout=15)
         worker = asyncio.create_task(tick())

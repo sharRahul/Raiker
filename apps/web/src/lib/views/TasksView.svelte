@@ -52,7 +52,7 @@
   // terminal task without a reason (BUG-09); this is the line that shows it, so
   // "failed" is never the whole story the owner gets.
   function outcome(task: TaskView): string | null {
-    if (["queued", "running", "paused"].includes(task.status)) return null;
+    if (["queued", "running", "continuing", "paused"].includes(task.status)) return null;
     return task.summary?.trim() || "No reason was recorded for this outcome.";
   }
 
@@ -112,6 +112,32 @@
     finally { creating = false; }
   }
 
+  // BUG-25 — the owner's retry. A scheduled run that parked on an approval is
+  // continued automatically by the host's own scheduler tick; this is what to
+  // press when that could not proceed (another tab claimed it, the host was
+  // down when the decision landed, the continuation threw). It is the same
+  // governed path, so pressing it can never continue something the automatic
+  // pass would have refused, and it never re-runs a turn that already ran.
+  async function resumeTask(task: TaskView) {
+    busyTask = task.task_id;
+    notice = null;
+    try {
+      const result = await api.resumeTask(task.task_id);
+      notice = result.ok
+        ? `Continuing “${task.title}”.`
+        : result.reason_code === "no_resolved_approval"
+          ? "No decision has been recorded yet, so there is nothing to continue."
+          : `Could not continue this run (${result.reason_code ?? "unknown reason"}).`;
+      await load();
+    } catch (error) {
+      notice = error instanceof ApiError
+        ? `Could not continue this run (${error.reasonCode ?? error.status}).`
+        : "Could not continue this run.";
+    } finally {
+      busyTask = null;
+    }
+  }
+
   async function stopTask(task: TaskView) {
     busyTask = task.task_id; notice = null;
     try {
@@ -129,11 +155,21 @@
   onMount(() => {
     void refreshModels();
     const onCompose = (event: Event) => {
-      const detail = (event as CustomEvent<{ text: string; cadence?: "now" | "once"; profileId?: string | null; model?: string | null }>).detail;
+      const detail = (event as CustomEvent<{
+        text: string;
+        cadence?: "now" | "once";
+        scheduledAt?: string;
+        profileId?: string | null;
+        model?: string | null;
+      }>).detail;
       if (!detail?.text.trim()) return;
       objective = detail.text;
       title = detail.text.slice(0, 80);
       cadence = detail.cadence ?? "now";
+      // The Workbench schedule composer picks the time; carrying it through
+      // means the handoff arrives complete rather than as a half-filled form
+      // whose required field the owner has to notice.
+      scheduledAt = detail.scheduledAt ?? "";
       modelProfile = detail.profileId ?? "";
       model = detail.model ?? "";
     };
@@ -166,11 +202,66 @@
   {:else}
     <div class="summary"><span><strong>{active.length}</strong> open</span><span><strong>{scheduled.length}</strong> scheduled</span><span><strong>{history.length}</strong> finished</span></div>
     {#if rows.length === 0}<div class="card"><EmptyState icon="tasks" title="No work queued" body="Create a task for immediate work, or schedule a routine for later." /></div>
-    {:else}<section class="work-list" aria-labelledby="open-work"><h3 id="open-work">Open work</h3>{#each rows as row (row.task.task_id)}<article class="card task" style={`--depth:${row.depth}`}><div class="task-main"><div class="task-title"><span class="branch" aria-hidden="true">{row.depth > 0 ? "↳" : ""}</span><div><h4>{row.task.title}</h4><p>{row.task.objective || "No additional instructions."}</p></div></div><Badge variant={taskBadge(row.task.status)} label={taskStatusLabel(row.task.status)} /></div>{#if blockedBy(row.task).length > 0}<p class="blocked" role="status"><Icon name="approvals" size={14} /> Waiting on {blockedBy(row.task).length === 1 ? "a decision" : `${blockedBy(row.task).length} decisions`} before this can continue. <a href={`#/approvals?session=${encodeURIComponent(row.task.session_id)}`}>Review {blockedBy(row.task).length === 1 ? "it" : "them"}</a></p>{:else if outcome(row.task)}<p class="outcome" role="status">{outcome(row.task)}</p>{/if}{#if row.task.current_step}<p class="step">Now: {row.task.current_step}</p>{/if}{#if row.task.progress_percent !== null}<div class="progress" role="progressbar" aria-valuenow={row.task.progress_percent} aria-valuemin="0" aria-valuemax="100"><div style={`width:${row.task.progress_percent}%`}></div></div>{/if}<footer><span title={row.task.scheduled_at ?? row.task.updated_at}>{scheduleLabel(row.task)} · updated {relativeTime(row.task.updated_at)}</span>{#if ACTIVE_TASK_STATES.includes(row.task.status)}<button type="button" class="btn btn-danger btn-sm" onclick={() => stopTask(row.task)} disabled={busyTask === row.task.task_id}>{busyTask === row.task.task_id ? "Stopping…" : "Stop"}</button>{/if}</footer></article>{/each}</section>{/if}
+    {:else}
+      <section class="work-list" aria-labelledby="open-work">
+        <h3 id="open-work">Open work</h3>
+        {#each rows as row (row.task.task_id)}
+          {@const task = row.task}
+          {@const pending = blockedBy(task)}
+          <article class="card task" style={`--depth:${row.depth}`}>
+            <div class="task-main">
+              <div class="task-title">
+                <span class="branch" aria-hidden="true">{row.depth > 0 ? "↳" : ""}</span>
+                <div><h4>{task.title}</h4><p>{task.objective || "No additional instructions."}</p></div>
+              </div>
+              <Badge variant={taskBadge(task.status)} label={taskStatusLabel(task.status)} />
+            </div>
+
+            <!-- BUG-25 — the whole life of an approval, on the card that owns
+                 it. Waiting names the decision and links to it; continuing says
+                 the granted decision is being replayed right now; a parked run
+                 whose automatic continuation could not proceed states why and
+                 offers the retry, so a granted approval is never a dead end. -->
+            {#if task.status === "continuing"}
+              <p class="continuing" role="status">
+                <Icon name="refresh" size={14} /> Approved — continuing this run now.
+              </p>
+            {:else if pending.length > 0}
+              <p class="blocked" role="status">
+                <Icon name="approvals" size={14} />
+                Waiting on {pending.length === 1 ? "a decision" : `${pending.length} decisions`} before this can continue.
+                <a href={`#/approvals?session=${encodeURIComponent(task.session_id)}`}>Review {pending.length === 1 ? "it" : "them"}</a>
+              </p>
+            {:else if task.status === "waiting_for_approval"}
+              <p class="blocked" role="status">
+                <Icon name="approvals" size={14} />
+                {outcome(task) ?? "This run is waiting for your approval to continue."}
+                <button type="button" class="btn btn-sm" onclick={() => resumeTask(task)} disabled={busyTask === task.task_id}>
+                  {busyTask === task.task_id ? "Continuing…" : "Continue now"}
+                </button>
+              </p>
+            {:else if outcome(task)}
+              <p class="outcome" role="status">{outcome(task)}</p>
+            {/if}
+
+            {#if task.current_step}<p class="step">Now: {task.current_step}</p>{/if}
+            {#if task.progress_percent !== null}
+              <div class="progress" role="progressbar" aria-valuenow={task.progress_percent} aria-valuemin="0" aria-valuemax="100"><div style={`width:${task.progress_percent}%`}></div></div>
+            {/if}
+            <footer>
+              <span title={task.scheduled_at ?? task.updated_at}>{scheduleLabel(task)} · updated {relativeTime(task.updated_at)}</span>
+              {#if ACTIVE_TASK_STATES.includes(task.status)}
+                <button type="button" class="btn btn-danger btn-sm" onclick={() => stopTask(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Stopping…" : "Stop"}</button>
+              {/if}
+            </footer>
+          </article>
+        {/each}
+      </section>
+    {/if}
     {#if history.length > 0}<section class="history"><h3>Finished work</h3>{#each history as task (task.task_id)}<div class="history-row"><div class="history-main"><span class="history-title">{task.title}</span><p class="outcome">{outcome(task)}</p></div><Badge variant={taskBadge(task.status)} label={taskStatusLabel(task.status)} /><span>{relativeTime(task.updated_at)}</span></div>{/each}</section>{/if}
   {/if}
 </section>
 
 <style>
-  .tasks{max-width:64rem}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.tasks header .page-lead{margin:0;max-width:60ch}.composer p,.task p{color:var(--text-2);font-size:.85rem;margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3)}.composer label{color:var(--text-2);display:grid;font-size:.8rem;gap:.35rem}.composer .field-error{color:var(--danger);font-size:.8rem;margin:calc(var(--space-3) * -.5) 0 0}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:.85rem}.summary strong{color:var(--text-1);font-size:1.1rem}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:.96rem}.step{color:var(--accent)!important}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:.76rem;margin-top:.8rem}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:.8rem}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1)}.outcome{color:var(--text-2);font-size:.82rem;margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
+  .tasks{max-width:64rem}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.tasks header .page-lead{margin:0;max-width:60ch}.composer p,.task p{color:var(--text-2);font-size:.85rem;margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3)}.composer label{color:var(--text-2);display:grid;font-size:.8rem;gap:.35rem}.composer .field-error{color:var(--danger);font-size:.8rem;margin:calc(var(--space-3) * -.5) 0 0}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:.85rem}.summary strong{color:var(--text-1);font-size:1.1rem}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:.96rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:.76rem;margin-top:.8rem}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:.8rem}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1)}.outcome{color:var(--text-2);font-size:.82rem;margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
 </style>

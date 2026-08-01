@@ -31,6 +31,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import UploadAttachmentRequest
 from raiker.api.sessions import ApiSession
+from raiker.events.types import make_event
+from raiker.events.writer import EventLogWriter
 from raiker.runtime.attachment_preview import AttachmentPreviewService
 from raiker.runtime.attachments import (
     DOCUMENT_MEDIA_TYPES,
@@ -42,6 +44,7 @@ from raiker.runtime.attachments import (
     store_image,
 )
 from raiker.runtime.authority.models import Principal
+from raiker.runtime.source_provenance import SourceProvenanceService
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -216,6 +219,119 @@ def get_attachment_preview_image(
         raise _not_found("attachment_preview_not_found")
     filename, media_type, data = image
     return _inline_bytes(data, media_type, filename)
+
+
+@router.get("/api/sessions/{session_id}/attachments/{attachment_id}/provenance")
+def get_attachment_provenance(
+    session_id: str,
+    attachment_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Which exchange produced this file, and the passage that asked for it (BUG-27).
+
+    A generated document arrived in the transcript with no way back to the
+    request behind it. The stored reference already names the turn; this
+    resolves it the same way memory provenance is resolved, so both surfaces
+    give the same four honest answers — resolved, deleted, changed, or not
+    readable here — instead of one of them offering a dead **View source**.
+    """
+    store = SQLiteStore(_ws(request))
+    owner_id = auth_data[0].principal_id
+    if not store.session_attachment_ref_exists(
+        session_id=session_id, attachment_id=attachment_id, owner_principal_id=owner_id
+    ):
+        raise _not_found("attachment_unavailable")
+    turn_id = ""
+    for ref in store.list_session_attachment_refs(
+        session_id=session_id, owner_principal_id=owner_id
+    ):
+        if str(ref.get("attachment_id", "")) == attachment_id:
+            turn_id = str(ref.get("turn_id", ""))
+            break
+    metadata = store.load_attachment_metadata(attachment_id, owner_principal_id=owner_id)
+    filename = str((metadata or {}).get("filename", ""))
+    excerpt = SourceProvenanceService(store).resolve(
+        {"source_session_id": session_id, "source_turn_id": turn_id},
+        # The prompt that produced the file is the passage worth highlighting,
+        # and it is not stored separately — so the filename is the anchor we
+        # actually have. Not found simply means no highlight, which is the
+        # `source_changed` answer the resolver already states honestly.
+        filename,
+        owner_id,
+    )
+    return {"ok": True, "attachment_id": attachment_id, "filename": filename, **excerpt.to_dict()}
+
+
+@router.get("/api/sessions/{session_id}/attachments/{attachment_id}/download")
+def download_attachment(
+    session_id: str,
+    attachment_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> Response:
+    """Take one authorised file away with you (BUG-28).
+
+    A generated document was previewable and nothing else: the only way to get a
+    report Raiker wrote onto disk was to select the preview text and paste it
+    somewhere. This is the byte download, and it is deliberately narrow:
+
+    * **Authorisation is the stored reference**, exactly as for preview — this
+      session, this attachment, this owner — so a download can never reach a file
+      the same person could not already open. 404 for anything else; a 403 would
+      confirm the id exists.
+    * **Nothing is served as something the browser will run.** The response is
+      always ``application/octet-stream`` with an attachment disposition and
+      ``nosniff``. HTML, SVG and script-bearing formats are not upload types
+      here, and even so the browser is never invited to interpret a download.
+    * **The filename is rebuilt, not echoed.** ``_download_filename`` strips
+      anything that could break out of the header or name a path.
+    * **The download is evidence.** Every one appends ``attachment_downloaded``
+      with metadata only — id, name, type, size — never the bytes.
+    """
+    store = SQLiteStore(_ws(request))
+    served = AttachmentPreviewService(store).download_bytes(
+        session_id, attachment_id, auth_data[0].principal_id
+    )
+    if served is None:
+        raise _not_found("attachment_unavailable")
+    filename, media_type, data = served
+    EventLogWriter(store).append(
+        make_event(
+            session_id=session_id,
+            turn_id=None,
+            event_type="attachment_downloaded",
+            actor="web_ui",
+            payload={
+                "attachment_id": attachment_id,
+                "filename": filename,
+                "media_type": media_type,
+                "byte_size": len(data),
+            },
+        )
+    )
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{_download_filename(filename)}"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store",
+            "Content-Length": str(len(data)),
+        },
+    )
+
+
+def _download_filename(filename: str) -> str:
+    """A safe, path-free name for a downloaded file.
+
+    Built from the stored name rather than trusted from it: separators are
+    dropped so nothing can suggest a directory, and the header-breaking
+    characters ``_inline_filename`` already removes stay removed.
+    """
+    flattened = filename.replace("/", "_").replace("\\", "_")
+    cleaned = _inline_filename(flattened).lstrip(".")
+    return cleaned or "download"
 
 
 def _inline_bytes(data: bytes, media_type: str, filename: str) -> Response:

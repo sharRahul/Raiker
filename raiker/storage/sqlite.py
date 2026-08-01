@@ -3391,6 +3391,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         now = utc_now()
         self._update_task(task_id, status="cancelled", completed_at=now, summary=reason)
 
+    def resume_task_after_approval(self, task_id: str, current_step: str) -> None:
+        """Move a parked task back to running as its continuation starts (BUG-25).
+
+        Guarded on ``waiting_for_approval`` so a task the owner cancelled, or one
+        another continuation already picked up, is never dragged back to running.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE tasks SET status = 'continuing', current_step = ?, summary = NULL, "
+                "updated_at = ? WHERE task_id = ? AND status = 'waiting_for_approval'",
+                (current_step, utc_now(), task_id),
+            )
+
     def block_task_on_approval(self, task_id: str, reason: str) -> None:
         """A run reached an approval boundary: blocked, not finished.
 
@@ -5349,7 +5362,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                          session_id: str | None = None,
                          role_ids: tuple[str, ...] = (),
                          domain_scopes: tuple[str, ...] = (),
-                         max_runtime_mode: str = "development_preview",
+                         max_runtime_mode: str = "raiker_runtime",
                          expires_at: str | None = None,
                          is_active: bool = True) -> None:
         with self.connect() as connection:
@@ -5754,6 +5767,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT * FROM runtime_mode_state WHERE status = 'active' ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+        return dict(row) if row else None
+
+    def get_latest_runtime_mode(self) -> dict[str, Any] | None:
+        """The most recent runtime state row, active or not.
+
+        ``get_active_runtime_mode`` filters on ``status = 'active'``, so it
+        cannot tell "never configured" from "the owner switched the runtime
+        off" — both come back as ``None``. With one runtime that distinction is
+        the whole of the remaining runtime question, so the authority reads the
+        latest row and looks at its status itself.
+        """
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM runtime_mode_state ORDER BY created_at DESC, rowid DESC LIMIT 1"
             ).fetchone()
         return dict(row) if row else None
 

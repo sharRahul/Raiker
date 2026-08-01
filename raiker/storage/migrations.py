@@ -853,7 +853,7 @@ CREATE TABLE IF NOT EXISTS principals (
   session_id TEXT,
   role_ids TEXT NOT NULL DEFAULT '[]',
   domain_scopes TEXT NOT NULL DEFAULT '[]',
-  max_runtime_mode TEXT NOT NULL DEFAULT 'development_preview',
+  max_runtime_mode TEXT NOT NULL DEFAULT 'raiker_runtime',
   created_at TEXT NOT NULL,
   expires_at TEXT,
   is_active INTEGER NOT NULL DEFAULT 1

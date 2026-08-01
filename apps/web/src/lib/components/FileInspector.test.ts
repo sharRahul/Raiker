@@ -206,7 +206,7 @@ describe("FileInspector", () => {
     expect(image).toHaveAttribute("src", "blob:shot");
   });
 
-  it("offers no upload, download, or mutation control", async () => {
+  it("offers no upload or mutation control, and no download unless one is wired", async () => {
     open({ preview: preview({ truncated: true }) });
     await screen.findByRole("complementary", { name: /file preview/i });
     const buttons = screen.getAllByRole("button");
@@ -214,5 +214,146 @@ describe("FileInspector", () => {
     expect(buttons[0]).toHaveAccessibleName(/close file preview/i);
     expect(document.querySelector("input")).toBeNull();
     expect(document.querySelector("a[download]")).toBeNull();
+  });
+
+  // ── BUG-26: looking at a picture, not just seeing it ─────────────────────
+
+  describe("image inspection", () => {
+    function openImage(props: Record<string, unknown> = {}) {
+      return open({
+        preview: preview({
+          filename: "shot.png",
+          media_type: "image/png",
+          kind: "image",
+          text: "",
+          image_url: "/api/sessions/sess_1/attachments/att_1/preview/image",
+        }),
+        filename: "shot.png",
+        objectUrl: "blob:shot",
+        ...props,
+      });
+    }
+
+    it("exposes labelled zoom, fit, rotate and reset controls with the current level", async () => {
+      openImage();
+      for (const name of [/zoom in/i, /zoom out/i, /fit to pane/i, /rotate right/i, /reset the view/i]) {
+        expect(await screen.findByRole("button", { name })).toBeInTheDocument();
+      }
+      expect(screen.getByText("100%")).toBeInTheDocument();
+    });
+
+    it("zooms the picture without touching the stored file", async () => {
+      openImage();
+      const image = await screen.findByRole("img", { name: "shot.png" });
+      const before = image.getAttribute("src");
+      await fireEvent.click(screen.getByRole("button", { name: /zoom in/i }));
+      expect(screen.getByText("125%")).toBeInTheDocument();
+      expect(image.getAttribute("style")).toContain("scale(1.25)");
+      // The bytes on screen are the same bytes: this is a way of looking.
+      expect(image.getAttribute("src")).toBe(before);
+    });
+
+    it("resets back to the picture as it arrived", async () => {
+      openImage();
+      await fireEvent.click(screen.getByRole("button", { name: /zoom in/i }));
+      await fireEvent.click(screen.getByRole("button", { name: /rotate right/i }));
+      await fireEvent.click(screen.getByRole("button", { name: /reset the view/i }));
+      expect(screen.getByText("100%")).toBeInTheDocument();
+      const image = await screen.findByRole("img", { name: "shot.png" });
+      expect(image.getAttribute("style")).toContain("scale(1) rotate(0deg)");
+    });
+
+    it("is operable from the keyboard on the picture itself", async () => {
+      openImage();
+      const frame = await screen.findByRole("application");
+      await fireEvent.keyDown(frame, { key: "+" });
+      expect(screen.getByText("125%")).toBeInTheDocument();
+      await fireEvent.keyDown(frame, { key: "-" });
+      expect(screen.getByText("100%")).toBeInTheDocument();
+      await fireEvent.keyDown(frame, { key: "r" });
+      const image = screen.getByRole("img", { name: "shot.png" });
+      expect(image.getAttribute("style")).toContain("rotate(90deg)");
+    });
+  });
+
+  // ── BUG-27: opening a record at the passage it came from ─────────────────
+
+  describe("source passage", () => {
+    const source = (overrides: Record<string, unknown> = {}) => ({
+      status: "resolved" as const,
+      kind: "conversation",
+      title: "Weekly planning",
+      excerpt: "before the passage and after",
+      highlight_start: 7,
+      highlight_length: 11,
+      session_id: "sess_9",
+      turn_id: "turn_9",
+      attachment_id: "",
+      truncated: false,
+      ...overrides,
+    });
+
+    it("marks the passage inside its surrounding text and links to the conversation", async () => {
+      open({ preview: null, source: source() });
+      const mark = document.querySelector("mark");
+      expect(mark).not.toBeNull();
+      expect(mark?.textContent).toBe("the passage");
+      expect(await screen.findByRole("link", { name: /open conversation/i })).toHaveAttribute(
+        "href",
+        "#/new-chat?session=sess_9",
+      );
+    });
+
+    it("says a source was deleted rather than showing an empty pane", async () => {
+      open({ preview: null, source: source({ status: "source_deleted", excerpt: "" }) });
+      expect(await screen.findByText(/has been deleted/i)).toBeInTheDocument();
+      expect(document.querySelector("mark")).toBeNull();
+    });
+
+    it("shows a changed source without pretending to have found the passage", async () => {
+      open({
+        preview: null,
+        source: source({ status: "source_changed", highlight_start: -1, highlight_length: 0 }),
+      });
+      expect(await screen.findByText(/no longer contains this passage/i)).toBeInTheDocument();
+      expect(document.querySelector("mark")?.textContent).toBe("");
+    });
+
+    it("states a record that never stored where it came from", async () => {
+      open({ preview: null, source: source({ status: "no_provenance", excerpt: "", title: "" }) });
+      expect(await screen.findByText(/did not store where it came from/i)).toBeInTheDocument();
+    });
+
+    it("states a source this account may not read", async () => {
+      open({ preview: null, source: source({ status: "not_authorized", excerpt: "", title: "" }) });
+      expect(await screen.findByText(/cannot read the source/i)).toBeInTheDocument();
+    });
+  });
+
+  // ── BUG-28: taking the file away ─────────────────────────────────────────
+
+  describe("download", () => {
+    it("offers Download beside Close when a download is wired, and calls it", async () => {
+      const ondownload = vi.fn();
+      open({ preview: preview(), ondownload });
+      const button = await screen.findByRole("button", { name: /download notes\.md/i });
+      await fireEvent.click(button);
+      expect(ondownload).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports its progress and never claims a refused download succeeded", async () => {
+      const { rerender } = open({ preview: preview(), ondownload: () => {}, downloadState: "working" });
+      expect(await screen.findByText(/downloading/i)).toBeInTheDocument();
+      await rerender({
+        preview: preview(),
+        filename: "notes.md",
+        onclose: () => {},
+        ondownload: () => {},
+        downloadState: "idle",
+        downloadError: "This account is not permitted to download this file.",
+      });
+      expect(await screen.findByRole("alert")).toHaveTextContent(/not permitted/i);
+      expect(screen.queryByText(/downloaded$/i)).not.toBeInTheDocument();
+    });
   });
 });

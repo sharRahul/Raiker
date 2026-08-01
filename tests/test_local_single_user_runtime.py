@@ -260,17 +260,20 @@ class TestEndToEndLocalRuntime:
         result = bootstrap_owner("owner", "Owner", workspace_root=ws)
         assert "Owner bootstrap successful" in result
 
-        # 2. Runtime mode status shows default
+        # 2. There is one runtime and it is already accepting work: nothing has
+        #    to be selected before the capability gates below mean what they say.
         status = handle_runtime_mode_status(workspace_root=ws)
-        assert "development_preview" in status
+        assert "raiker_runtime" in status
+        assert "Status: active" in status
         assert "Acting principal" in status
 
-        # 3. Owner activates local_single_user_runtime
+        # 3. A legacy mode name still activates, and resolves to that one runtime.
         result = handle_runtime_mode_activate(
             "/runtime-mode activate local_single_user_runtime --reason e2e-test",
             workspace_root=ws,
         )
         assert "denied" not in result.lower()
+        assert "raiker_runtime" in handle_runtime_mode_status(workspace_root=ws)
 
         # 4. Owner enables admin_mutation
         result = handle_capability_gate_enable(

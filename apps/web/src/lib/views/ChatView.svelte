@@ -24,27 +24,18 @@
     ContextUsage,
     ProjectsList,
     SessionDetail,
+    SourceExcerptView,
     StreamEvent,
   } from "../apiTypes";
+  import AttachmentCard from "../components/AttachmentCard.svelte";
+  import ComposerAttach from "../components/ComposerAttach.svelte";
+  import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
+  import ComposerChips from "../components/ComposerChips.svelte";
+  import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, relativeTime } from "../format";
   import { reactionForResponse, thinkingSteps } from "../chatPresentation";
   import { chatProfiles, refreshModels } from "../models.svelte";
-
-  // One composer attachment chip: a workspace path, an image, or a text
-  // document already uploaded into the governed attachment store (referenced by
-  // id — the bytes stay server-side). An image is only ever delivered as an
-  // image block when the turn's model profile supports vision; a document's
-  // extracted text is folded into context as bounded, untrusted data.
-  interface ComposerAttachment {
-    kind: "path" | "image" | "document";
-    label: string;
-    detail: string;
-    path?: string;
-    attachmentId?: string;
-    source?: "uploaded" | "generated";
-    createdAt?: string;
-  }
 
   interface ChatTurn {
     id: number;
@@ -146,165 +137,48 @@
     Math.ceil(turns.reduce((count, turn) => count + turn.prompt.length + answerText(turn).length, 0) / 4),
   );
 
-  // Attachments for the next prompt: workspace paths (resolved server-side
-  // inside the workspace — anything outside fails closed — and included as
-  // bounded, untrusted-labelled context) and uploaded images (validated
-  // fail-closed server-side: media-type allowlist, 5 MB cap, magic-byte sniff).
-  const MAX_ATTACHMENTS = 8;
-  const IMAGE_MEDIA_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
-  const MAX_IMAGE_BYTES = 5_000_000;
-  // Documents: extracted text is folded into context as bounded, untrusted data
-  // (validated fail-closed server-side: allowlist, 32 MB cap, per-type sniff —
-  // UTF-8 for text, %PDF- for PDF, OOXML zip for .docx/.xlsx; PDF and the
-  // Office formats are extracted locally, no bytes leave the box).
-  const DOCX_MEDIA_TYPE =
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-  const XLSX_MEDIA_TYPE =
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-  const DOCUMENT_MEDIA_TYPES = [
-    "text/plain",
-    "text/markdown",
-    "text/csv",
-    "application/pdf",
-    DOCX_MEDIA_TYPE,
-    XLSX_MEDIA_TYPE,
-  ];
-  const DOCUMENT_EXTENSIONS = [".txt", ".md", ".markdown", ".csv", ".pdf", ".docx", ".xlsx"];
-  const MAX_DOCUMENT_BYTES = 32_000_000;
-  let attachments = $state<ComposerAttachment[]>([]);
-  let attachInput = $state("");
-  // The "+" button reveals the attach controls (path input + image upload).
-  let showAttach = $state(false);
-  let uploading = $state(false);
-  let attachError = $state<string | null>(null);
+  // Attachments for the next prompt. The rules, the limits and the upload path
+  // are shared with Build (`composerAttachments.svelte.ts`) so a file behaves
+  // identically in both conversations rather than only working in this one.
+  const attachStore = createAttachmentStore();
+  let attachControl = $state<ComposerAttach | undefined>();
+  let attachOpen = $state(false);
 
-  function addAttachment() {
-    const path = attachInput.trim();
-    if (
-      path === "" ||
-      attachments.some((a) => a.path === path) ||
-      attachments.length >= MAX_ATTACHMENTS
-    )
-      return;
-    attachments = [
-      ...attachments,
-      { kind: "path", label: fileName(path), detail: path, path },
-    ];
-    attachInput = "";
-  }
+  // Thumbnails for images already in the transcript, keyed by attachment id.
+  //
+  // An image the owner just picked shows the local file back and costs nothing.
+  // One restored from a reload has no local copy, so its bytes are fetched once
+  // — through the same session-authorised preview route the inspector uses,
+  // with the bearer token an <img> cannot send — and reused for every render.
+  // Failure is silent by design: the card falls back to its type glyph, which
+  // is a worse thumbnail and a perfectly good attachment.
+  let thumbnails = $state<Record<string, string>>({});
+  const resolvingThumbnails = new Set<string>();
 
-  function removeAttachment(index: number) {
-    attachments = attachments.filter((_, i) => i !== index);
-  }
-
-  async function onImagePicked(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = "";
-    if (!file || attachments.length >= MAX_ATTACHMENTS) return;
-    attachError = null;
-    if (!IMAGE_MEDIA_TYPES.includes(file.type)) {
-      attachError = "Only PNG, JPEG, WebP, or GIF images can be attached.";
-      return;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      attachError = "Image is too large (5 MB max).";
-      return;
-    }
-    uploading = true;
-    try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-      const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
-      const stored = await api.uploadAttachment({
-        filename: file.name,
-        media_type: file.type,
-        data_base64: base64,
-      });
-      attachments = [
-        ...attachments,
-        {
-          kind: "image",
-          label: file.name,
-          detail: `${file.name} (${stored.media_type}, ${stored.byte_size} bytes)`,
-          attachmentId: stored.attachment_id,
-        },
-      ];
-    } catch (e) {
-      attachError =
-        e instanceof ApiError
-          ? `Upload rejected (${e.reasonCode ?? e.status}).`
-          : "Upload failed — could not reach the local runtime.";
-    } finally {
-      uploading = false;
-    }
-  }
-
-  // Browsers report text media types inconsistently (a .md file often arrives
-  // with an empty or non-standard type), so fall back to the extension. The
-  // server re-validates fail-closed regardless of what we send.
-  function documentMediaType(file: File): string | null {
-    if (DOCUMENT_MEDIA_TYPES.includes(file.type)) return file.type;
-    const lower = file.name.toLowerCase();
-    if (lower.endsWith(".csv")) return "text/csv";
-    if (lower.endsWith(".md") || lower.endsWith(".markdown")) return "text/markdown";
-    if (lower.endsWith(".txt")) return "text/plain";
-    if (lower.endsWith(".pdf")) return "application/pdf";
-    if (lower.endsWith(".docx")) return DOCX_MEDIA_TYPE;
-    if (lower.endsWith(".xlsx")) return XLSX_MEDIA_TYPE;
-    return null;
-  }
-
-  async function onDocumentPicked(event: Event) {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = "";
-    if (!file || attachments.length >= MAX_ATTACHMENTS) return;
-    attachError = null;
-    const mediaType = documentMediaType(file);
-    if (mediaType === null) {
-      attachError =
-        "Only plain-text, Markdown, CSV, PDF, Word (.docx), or Excel (.xlsx) documents can be attached.";
-      return;
-    }
-    if (file.size > MAX_DOCUMENT_BYTES) {
-      attachError = "Document is too large (32 MB max).";
-      return;
-    }
-    uploading = true;
-    try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-      const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
-      const stored = await api.uploadAttachment({
-        filename: file.name,
-        media_type: mediaType,
-        data_base64: base64,
-      });
-      attachments = [
-        ...attachments,
-        {
-          kind: "document",
-          label: file.name,
-          detail: `${file.name} (${stored.media_type}, ${stored.byte_size} bytes)`,
-          attachmentId: stored.attachment_id,
-        },
-      ];
-    } catch (e) {
-      attachError =
-        e instanceof ApiError
-          ? `Upload rejected (${e.reasonCode ?? e.status}).`
-          : "Upload failed — could not reach the local runtime.";
-    } finally {
-      uploading = false;
+  async function resolveThumbnails(attachments: ComposerAttachment[]) {
+    for (const attachment of attachments) {
+      const id = attachment.attachmentId;
+      if (
+        attachment.kind !== "image" ||
+        id === undefined ||
+        sessionId === null ||
+        attachment.previewUrl !== undefined ||
+        thumbnails[id] !== undefined ||
+        resolvingThumbnails.has(id)
+      ) {
+        continue;
+      }
+      resolvingThumbnails.add(id);
+      try {
+        const preview = await api.attachmentPreview(sessionId, id);
+        if (preview.image_url === null) continue;
+        thumbnails = {
+          ...thumbnails,
+          [id]: await api.attachmentPreviewObjectUrl(preview.image_url),
+        };
+      } catch {
+        // The card shows its type glyph instead. Nothing is claimed that failed.
+      }
     }
   }
 
@@ -371,17 +245,96 @@
     preview = null;
     previewError = null;
     previewLoading = false;
+    inspectorSource = null;
+    sourceLoading = false;
+    downloadState = "idle";
+    downloadError = null;
+  }
+
+  // BUG-27 — where a generated file came from. Resolved on demand, because the
+  // answer depends on what is still readable *now*, not on what was true when
+  // the file was written.
+  let inspectorSource = $state<SourceExcerptView | null>(null);
+  let sourceLoading = $state(false);
+
+  async function openGeneratedFile(attachmentId: string, label: string) {
+    await openInspector(attachmentId, label);
+    if (sessionId === null || inspecting?.attachmentId !== attachmentId) return;
+    sourceLoading = true;
+    try {
+      const resolved = await api.attachmentProvenance(sessionId, attachmentId);
+      if (inspecting?.attachmentId === attachmentId) inspectorSource = resolved;
+    } catch {
+      // Provenance is supplementary to the file itself. A failure leaves the
+      // preview intact and simply shows no source panel rather than replacing a
+      // readable document with an error.
+      if (inspecting?.attachmentId === attachmentId) inspectorSource = null;
+    } finally {
+      if (inspecting?.attachmentId === attachmentId) sourceLoading = false;
+    }
+  }
+
+  // BUG-28 — the file itself, saved where the owner wants it. Distinct from
+  // Preview (which reads it here) and from conversation export (which writes a
+  // transcript). Every outcome is stated: a refusal, an expired retention, and
+  // an unreachable runtime all say which one happened.
+  let downloadState = $state<"idle" | "working" | "done">("idle");
+  let downloadError = $state<string | null>(null);
+
+  /** Download straight from an artifact card, without opening the pane first. */
+  async function downloadArtifact(attachmentId: string, label: string) {
+    if (sessionId === null) return;
+    try {
+      const blob = await api.attachmentDownload(sessionId, attachmentId);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = label || "download";
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      artifactNotice = null;
+    } catch (e) {
+      artifactNotice = {
+        attachmentId,
+        text:
+          e instanceof ApiError && e.status === 404
+            ? `“${label}” is no longer kept in this conversation, so it cannot be downloaded.`
+            : `Could not download “${label}”.`,
+      };
+    }
+  }
+  // Scoped to the card that failed: a refusal on one artifact must not appear
+  // under every other turn that happens to have produced a file.
+  let artifactNotice = $state<{ attachmentId: string; text: string } | null>(null);
+
+  async function downloadInspected() {
+    if (inspecting === null || sessionId === null) return;
+    const { attachmentId, filename } = inspecting;
+    downloadState = "working";
+    downloadError = null;
+    try {
+      const blob = await api.attachmentDownload(sessionId, attachmentId);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = preview?.filename || filename || "download";
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      downloadState = "done";
+    } catch (e) {
+      downloadState = "idle";
+      downloadError =
+        e instanceof ApiError && e.status === 404
+          ? "This file is no longer kept in this conversation, so it cannot be downloaded."
+          : e instanceof ApiError && e.status === 403
+            ? "This account is not permitted to download this file."
+            : "Could not download this file.";
+    }
   }
 
   // Chips show only the file/folder name; the full workspace path stays in the
   // tooltip and is what actually rides the prompt.
-  function fileName(path: string): string {
-    const parts = path.split("/").filter(Boolean);
-    return parts.length > 0 ? parts[parts.length - 1] : path;
-  }
-
   let scrollEl: HTMLDivElement | undefined = $state();
-  let composerCardEl: HTMLDivElement | undefined = $state();
 
   onMount(() => {
     void refreshModels();
@@ -391,7 +344,13 @@
     // `submit()` below — the Workbench never talks to the API directly, so a
     // prompt started there is identical to one typed here.
     const onCompose = (event: Event) => {
-      const detail = (event as CustomEvent<{ text: string; sessionId: string | null; profileId?: string; model?: string }>).detail;
+      const detail = (event as CustomEvent<{
+        text: string;
+        sessionId: string | null;
+        profileId?: string;
+        model?: string;
+        attachments?: ComposerAttachment[];
+      }>).detail;
       if (detail === undefined || detail.text.trim() === "") return;
       if (detail.sessionId !== null && detail.sessionId !== sessionId) {
         sessionId = detail.sessionId;
@@ -399,6 +358,11 @@
       }
       modelProfile = detail.profileId ?? "";
       model = detail.model ?? "";
+      // Files picked in the Workbench composer ride the handoff, so starting
+      // work there is genuinely the same act as starting it here rather than a
+      // reduced version of it. They are already uploaded and governed; only
+      // their references cross.
+      if (detail.attachments?.length) attachStore.set([...detail.attachments]);
       promptText = detail.text;
       void submit();
     };
@@ -457,6 +421,8 @@
         attachmentId: file.attachment_id,
         source: file.source,
         createdAt: file.created_at,
+        mediaType: file.media_type,
+        byteSize: file.byte_size,
       });
       byTurn.set(file.turn_id, chips);
     }
@@ -469,6 +435,7 @@
       const merged = [...existing, ...chips.filter((c) => !existing.some((e) => e.attachmentId === c.attachmentId))];
       return { ...turn, attachments: merged };
     });
+    void resolveThumbnails(turns.flatMap((turn) => turn.attachments));
   }
 
   function restoredTurn(t: SessionDetail["turns"][number], sessionId: string): ChatTurn {
@@ -507,7 +474,7 @@
   async function submit() {
     const text = promptText.trim();
     if (text === "" || streaming) return;
-    const sentAttachments = [...attachments];
+    const sentAttachments = attachStore.take();
     turns = [
       ...turns,
       {
@@ -524,7 +491,7 @@
     // bypass Svelte 5's signals and the transcript would never re-render.
     const turn = turns[turns.length - 1];
     promptText = "";
-    attachments = [];
+    attachStore.clear();
     streaming = true;
     void scrollToEnd();
     try {
@@ -600,17 +567,25 @@
 
   function newConversation() {
     if (streaming) return;
+    // Release the transcript's thumbnails with the transcript. They are held
+    // for as long as the images are on screen and no longer — a blob URL kept
+    // past its last render pins the whole file in memory.
+    releaseThumbnails();
     turns = [];
     sessionId = null;
+  }
+
+  function releaseThumbnails() {
+    for (const url of Object.values(thumbnails)) URL.revokeObjectURL?.(url);
+    thumbnails = {};
+    resolvingThumbnails.clear();
   }
 
   function onWindowClick(event: MouseEvent) {
     if (contextOpen && contextControlEl && !contextControlEl.contains(event.target as Node)) {
       contextOpen = false;
     }
-    if (showAttach && composerCardEl && !composerCardEl.contains(event.target as Node)) {
-      showAttach = false;
-    }
+    attachControl?.handleOutsideClick(event);
     if (
       conversationMenuOpen &&
       !(event.target as HTMLElement | null)?.closest?.(".conversation-menu")
@@ -755,6 +730,10 @@
     setTimeout(() => window.print?.(), 0);
   }
 
+  // Which response was last copied, so the icon-only control can confirm it
+  // did something. An icon that reports nothing is worse than a word that does.
+  let copiedTurnId = $state<string | null>(null);
+
   async function copyAnswer(turn: ChatTurn) {
     // The clipboard is not always available (an insecure origin, or a denied
     // permission). Say so rather than failing silently — a copy button that
@@ -762,8 +741,13 @@
     try {
       await navigator.clipboard.writeText(answerText(turn));
       exportNotice = "Response copied.";
+      copiedTurnId = String(turn.id);
+      window.setTimeout(() => {
+        if (copiedTurnId === String(turn.id)) copiedTurnId = null;
+      }, 2000);
     } catch {
       exportNotice = "Could not copy — your browser blocked clipboard access.";
+      copiedTurnId = null;
     }
   }
 </script>
@@ -851,30 +835,22 @@
           <div class="message-bubble message-bubble-user">
           <p class="bubble-text">{turn.prompt}</p>
           {#if uploadedAttachments.length > 0}
-            <p class="turn-attachments">
+            <div class="turn-attachments">
               {#each uploadedAttachments as a, i (a.attachmentId ?? a.path ?? i)}
-                {#if a.attachmentId !== undefined && sessionId !== null}
-                  <!-- Uploaded files open in the inspector. A workspace-path
-                       chip has no stored bytes to show, so it stays inert
-                       rather than pretending to be clickable. -->
-                  <button
-                    type="button"
-                    class="attach-chip attach-chip-button"
-                    title={a.detail}
-                    aria-expanded={inspecting?.attachmentId === a.attachmentId}
-                    onclick={() => void openInspector(a.attachmentId as string, a.label)}
-                  >
-                    <Icon name="file" size={13} />
-                    {a.label}
-                  </button>
-                {:else}
-                  <span class="attach-chip" title={a.detail}>
-                    <Icon name="file" size={13} />
-                    {a.label}
-                  </span>
-                {/if}
+                <!-- The same card the composer used, so what you sent looks
+                     like what you attached. An uploaded file opens in the
+                     inspector; a workspace path has no stored bytes to show,
+                     so it stays inert rather than pretending to be clickable. -->
+                <AttachmentCard
+                  attachment={a}
+                  thumbnail={a.attachmentId ? (thumbnails[a.attachmentId] ?? null) : null}
+                  expanded={inspecting?.attachmentId === a.attachmentId}
+                  onopen={a.attachmentId !== undefined && sessionId !== null
+                    ? () => void openInspector(a.attachmentId as string, a.label)
+                    : null}
+                />
               {/each}
-            </p>
+            </div>
           {/if}
         </div>
         </div>
@@ -992,7 +968,16 @@
               <Markdown text={answer} />
             </div>
             {#if !turn.streaming}
-              <button type="button" class="copy-message" onclick={() => void copyAnswer(turn)}>Copy response</button>
+              <!-- A glyph, like the code-block copy action, so the transcript
+                   reads as the answer rather than as chrome around it. -->
+              <button
+                type="button"
+                class="copy-message"
+                class:copied={copiedTurnId === String(turn.id)}
+                onclick={() => void copyAnswer(turn)}
+                aria-label={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
+                title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
+              ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size={15} /></button>
             {/if}
           {:else if !turn.streaming && turn.error === null && turn.response !== null}
             <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">(No answer text was returned.)</p></div>
@@ -1015,18 +1000,32 @@
                     </p>
                   </div>
                   {#if file.attachmentId !== undefined && sessionId !== null}
-                    <button
-                      type="button"
-                      class="btn btn-primary btn-sm artifact-preview"
-                      aria-expanded={inspecting?.attachmentId === file.attachmentId}
-                      onclick={() => void openInspector(file.attachmentId as string, file.label)}
-                    >Preview document</button>
+                    <div class="artifact-actions">
+                      <button
+                        type="button"
+                        class="btn btn-primary btn-sm artifact-preview"
+                        aria-expanded={inspecting?.attachmentId === file.attachmentId}
+                        onclick={() => void openGeneratedFile(file.attachmentId as string, file.label)}
+                      >Preview</button>
+                      <!-- BUG-28 — Download is its own action, not a second
+                           name for Preview: it produces the file on disk. -->
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-sm artifact-download"
+                        aria-label={`Download ${file.label}`}
+                        onclick={() => void downloadArtifact(file.attachmentId as string, file.label)}
+                      ><Icon name="download" size={14} /> Download</button>
+                    </div>
                   {:else}
                     <span class="artifact-unavailable">Preview unavailable</span>
+                  {/if}
+                  {#if artifactNotice !== null && artifactNotice.attachmentId === file.attachmentId}
+                    <p class="artifact-error error-line" role="alert">{artifactNotice.text}</p>
                   {/if}
                 </article>
               {/each}
             </section>
+
           {/if}
 
           {#if turn.error !== null}
@@ -1097,25 +1096,8 @@
       void submit();
     }}
   >
-    <div class="composer-card" bind:this={composerCardEl}>
-      {#if attachments.length > 0}
-        <div class="attach-chips">
-          {#each attachments as a, i (a.attachmentId ?? a.path ?? i)}
-            <span class="attach-chip" title={a.detail}>
-              <Icon name="file" size={13} />
-              {a.label}
-              <button
-                type="button"
-                class="attach-remove"
-                onclick={() => removeAttachment(i)}
-                aria-label={`Remove attachment ${a.detail}`}
-              >
-                ×
-              </button>
-            </span>
-          {/each}
-        </div>
-      {/if}
+    <div class="composer-card">
+      <ComposerChips store={attachStore} disabled={streaming} />
 
       <label for="prompt-input" class="sr-only">Prompt</label>
       <div class="composer-upper">
@@ -1150,81 +1132,13 @@
         </div>
       </div>
 
-      {#if showAttach}
-        <div class="attach-popover">
-          <input
-            class="attach-input"
-            type="text"
-            placeholder="Workspace file or folder path…"
-            bind:value={attachInput}
-            onkeydown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addAttachment();
-              }
-            }}
-            disabled={streaming || attachments.length >= MAX_ATTACHMENTS}
-            aria-label="Attachment path"
-          />
-          <button
-            type="button"
-            class="btn btn-sm"
-            onclick={addAttachment}
-            disabled={streaming || attachInput.trim() === "" || attachments.length >= MAX_ATTACHMENTS}
-          >
-            Attach
-          </button>
-          <input
-            class="sr-only"
-            id="image-upload-input"
-            type="file"
-            accept={IMAGE_MEDIA_TYPES.join(",")}
-            onchange={onImagePicked}
-            disabled={streaming || uploading || attachments.length >= MAX_ATTACHMENTS}
-            aria-label="Upload image"
-          />
-          <label
-            class="btn btn-sm"
-            for="image-upload-input"
-            title="Upload an image (PNG/JPEG/WebP/GIF, 5 MB max). Sent to the model only if the selected model supports vision."
-          >
-            {uploading ? "Uploading…" : "Image…"}
-          </label>
-          <input
-            class="sr-only"
-            id="document-upload-input"
-            type="file"
-            accept={[...DOCUMENT_MEDIA_TYPES, ...DOCUMENT_EXTENSIONS].join(",")}
-            onchange={onDocumentPicked}
-            disabled={streaming || uploading || attachments.length >= MAX_ATTACHMENTS}
-            aria-label="Upload document"
-          />
-          <label
-            class="btn btn-sm"
-            for="document-upload-input"
-            title="Upload a document (plain text/Markdown/CSV/PDF/Word .docx/Excel .xlsx, 32 MB max). Its extracted text is added to context as untrusted data."
-          >
-            {uploading ? "Uploading…" : "Document…"}
-          </label>
-        </div>
-        {#if attachError !== null}
-          <p class="error-line" role="alert">{attachError}</p>
-        {/if}
+      {#if attachOpen}
+        <ComposerAttachPanel store={attachStore} disabled={streaming} idPrefix="chat" />
       {/if}
 
       <div class="composer-bar">
         <div class="bar-left">
-          <button
-            type="button"
-            class="round-btn"
-            onclick={() => (showAttach = !showAttach)}
-            aria-label="Add attachment"
-            aria-expanded={showAttach}
-            title="Attach a workspace file or folder"
-            disabled={streaming}
-          >
-            +
-          </button>
+          <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={streaming} />
           {#if projects && projects.projects.length > 0}
             <label class="composer-scope">
               <span class="sr-only">Project for this chat</span>
@@ -1312,6 +1226,11 @@
     loading={previewLoading}
     error={previewError}
     objectUrl={objectUrl}
+    source={inspectorSource}
+    {sourceLoading}
+    ondownload={downloadInspected}
+    {downloadState}
+    {downloadError}
     onclose={closeInspector}
   />
 {/if}
@@ -1441,15 +1360,20 @@
     margin-right: auto;
   }
   .copy-message {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
     background: transparent;
-    border: 0;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
     color: var(--text-3);
     cursor: pointer;
-    font: inherit;
-    font-size: .75rem;
-    padding: .3rem .2rem;
+    padding: 0;
   }
-  .copy-message:hover { color: var(--text-1); }
+  .copy-message:hover { color: var(--text-1); border-color: var(--border); }
+  .copy-message.copied { color: var(--ok); }
   .artifact-stack { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
   .artifact-card {
     display: grid;
@@ -1475,10 +1399,15 @@
     background: var(--ok-soft); font-size: 0.7rem; font-weight: 700;
   }
   .artifact-meta { color: var(--text-3) !important; font-size: 0.72rem !important; }
+  .artifact-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .artifact-error { grid-column: 1 / -1; margin: var(--space-2) 0 0; font-size: 0.78rem; }
   .artifact-unavailable { color: var(--text-3); font-size: 0.78rem; }
   @media (max-width: 40rem) {
     .artifact-card { grid-template-columns: auto minmax(0, 1fr); }
-    .artifact-preview, .artifact-unavailable { grid-column: 1 / -1; justify-self: stretch; text-align: center; }
+    .artifact-actions, .artifact-unavailable { grid-column: 1 / -1; justify-self: stretch; }
+    .artifact-actions { justify-content: stretch; }
+    .artifact-actions > * { flex: 1; justify-content: center; }
+    .artifact-unavailable { text-align: center; }
   }
 
   /* BUG-22 — the print layout. Save as PDF has to produce a document, not a
@@ -1740,11 +1669,15 @@
     text-align: right;
   }
   /* One clean card: prompt on top, "+" and the per-turn controls at the bottom. */
+  /* One composer surface, defined identically in Chat and Build so the two
+     conversations are the same instrument in two rooms rather than two
+     instruments that resemble each other. */
   .composer-card {
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
     background: var(--surface);
     box-shadow: var(--shadow-1);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
     /* Even padding all round: the old tighter bottom made the control bar look
        cropped against the card edge. */
     padding: 0.75rem 0.85rem;
@@ -1752,8 +1685,14 @@
     flex-direction: column;
     gap: 0.5rem;
   }
+  /* Typing is the primary act on both pages, so the card lifts while it has
+     focus instead of only changing a border colour by one shade. */
   .composer-card:focus-within {
     border-color: var(--accent-border);
+    box-shadow: var(--shadow-2);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .composer-card { transition: none; }
   }
   /* Upper area: textarea on the left, model + effort on the right. The
      controls column stays top-aligned so it doesn't drift as the textarea
@@ -1809,29 +1748,6 @@
     gap: .25rem;
     min-width: 0;
   }
-  .round-btn {
-    width: 1.9rem;
-    height: 1.9rem;
-    border-radius: 50%;
-    border: 1px solid var(--neutral-border);
-    background: var(--neutral-soft);
-    color: var(--text-2);
-    font-size: 1.1rem;
-    line-height: 1;
-    cursor: pointer;
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .round-btn:hover:not(:disabled) {
-    border-color: var(--accent-border);
-    color: var(--accent);
-  }
-  .round-btn:disabled {
-    opacity: 0.55;
-    cursor: default;
-  }
   /* Per-turn settings sit on the right of the bar, ending in the send action. */
   .bar-right {
     margin-left: auto;
@@ -1867,67 +1783,10 @@
     opacity: 0.6;
   }
   .bar-select:focus-visible,
-  .round-btn:focus-visible {
-    outline: 2px solid var(--focus-ring);
-  }
-  .attach-popover {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-  .attach-input {
-    flex: 1;
-    min-width: 12rem;
-    font-size: 0.8rem;
-    padding: 0.35rem 0.5rem;
-    border-radius: var(--r-md);
-    border: 1px solid var(--neutral-border);
-    background: var(--surface-1);
-    color: var(--text-1);
-  }
-  .attach-chips {
-    display: flex;
-    gap: 0.3rem;
-    flex-wrap: wrap;
-  }
-  .attach-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.74rem;
-    border-radius: var(--r-pill);
-    border: 1px solid var(--neutral-border);
-    background: var(--neutral-soft);
-    color: var(--text-2);
-    padding: 0.1rem 0.5rem;
-  }
-  /* A chip that opens the inspector is a real button: it looks identical to the
-     inert one, but it is focusable, keyboard-operable, and says so on hover. */
-  .attach-chip-button {
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .attach-chip-button:hover,
-  .attach-chip-button:focus-visible {
-    border-color: var(--border-strong);
-    color: var(--text-1);
-  }
-  .attach-remove {
-    border: none;
-    background: none;
-    color: var(--text-3);
-    cursor: pointer;
-    font-size: 0.85rem;
-    padding: 0 0.1rem;
-    line-height: 1;
-  }
-  .attach-remove:hover {
-    color: var(--danger);
-  }
   .turn-attachments {
-    margin: 0.4rem 0 0;
+    margin: 0.5rem 0 0;
     display: flex;
-    gap: 0.3rem;
+    gap: 0.4rem;
     flex-wrap: wrap;
   }
   .send {

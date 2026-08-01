@@ -9,7 +9,7 @@ Raiker is a local-first AI-agent runtime. Every model interaction and tool
 action passes through policy, capability gates, approvals, and audit records, so
 local automation stays under your control.
 
-The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-web`, the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed; every other approval records a decision only. Durable memory mutation is broker-governed, and strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
+The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-app` (or `raiker-web` for explicit service control), the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed; every other approval records a decision only. Durable memory mutation is broker-governed, and strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
 
 ## Quick start
 
@@ -25,6 +25,22 @@ python -m pip install -e ".[dev]"
 npm --prefix apps/web ci
 npm --prefix apps/web run build
 
+raiker-app                              # detects your OS, opens your browser
+```
+
+`raiker-app` is the application entry point. It keeps its data where your
+platform expects an application to (`%LOCALAPPDATA%\Raiker` on Windows,
+`~/Library/Application Support/Raiker` on macOS, `$XDG_DATA_HOME/raiker` on
+Linux — `RAIKER_HOME` overrides all three), binds a free loopback port, and
+opens your default browser. If a Raiker is already running it opens that one
+rather than starting a second host over the same encrypted workspace. Run
+`raiker-app --print-paths` to see what it resolved.
+
+`raiker-web` remains the service entry point for an explicit workspace and port,
+and is the only path that can bind beyond loopback (`--allow-public`, which also
+requires a hardened owner token):
+
+```bash
 raiker-web --workspace . --no-browser   # then open http://127.0.0.1:8765
 ```
 
@@ -59,7 +75,7 @@ Controls that stand between an AI-proposed action and it happening:
 
 | Control | Where | What it decides |
 |---|---|---|
-| **Runtime mode** | Settings → General | How far *any* capability may be enabled |
+| **Agent runtime** | Settings → Runtime configuration | Whether Raiker accepts new executions at all |
 | **Capability gate** | Permissions | Whether this capability exists for you at all |
 | **Decision mode** | Permissions, or the Chat composer | Ask / Allow / Auto / Deny before each action |
 | **Approval** | Approvals | A human decision on the specific proposed action |
@@ -69,8 +85,17 @@ a reason, a short phrase they type to record their intent, and a threat-model
 acknowledgement — all recorded against your principal. The phrase is not a
 credential. Owner **recovery** is governed and audited.
 
-A human `runtime_gate_manager` alone may change runtime modes and capability
-gates.
+A human `runtime_gate_manager` alone may change capability gates or stop the
+agent runtime.
+
+There is one runtime. Raiker used to ship five modes — a development preview,
+two single-user modes, a multi-user mode and a hosted mode — and require one to
+be selected before a capability could reach runtime level. That was a second
+switch in front of the switches that decide anything: what an action may do is
+already settled by its capability gate, its threat-model acknowledgement, its
+human confirmation, and whether a real executor exists for it. The single
+runtime does all of it, and the only runtime-level decision left is binary —
+accepting executions, or stopped.
 
 Approving does one of two things, and the approval detail says which **before**
 you decide. A proposed **file change** is performed once, through the governed

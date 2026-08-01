@@ -210,3 +210,125 @@ def test_background_agent_runs_until_the_governed_task_completes(tmp_path: Path,
     saved = store.load_task(task.task_id)
     assert saved is not None and saved.status == "completed" and saved.recurrence == "background"
     assert saved.summary == "One research cycle complete."
+
+
+# ── BUG-25: continuing a scheduled run after its approval is granted ────────
+#
+# A scheduler-launched turn has no client watching it, so when its approval was
+# granted nothing continued it and the task sat in `waiting_for_approval`
+# forever. These cover the worker that now owns that continuation: it runs only
+# for a decided approval, it re-checks the task before replaying anything, and a
+# continuation it cannot perform leaves a stated reason rather than silence.
+
+
+def _park_turn(
+    store: SQLiteStore, *, approval_id: str, session_id: str, principal_id: str
+) -> None:
+    store.insert_suspended_turn({
+        "approval_id": approval_id, "session_id": session_id, "turn_id": "turn_1",
+        "request_id": "req_1", "principal_id": principal_id, "action_id": "act_1",
+        "tool_name": "write_file", "call_id": "call_1", "prompt_text": "Write the report",
+        "messages_json": "[]", "options_json": "{}", "client_json": "{}",
+        "tool_calls_made": 1,
+    })
+
+
+def _parked_task(tmp_path: Path) -> tuple[SQLiteStore, str, str]:
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    store = SQLiteStore(tmp_path)
+    session_id = "sess_inbox_principal_owner"
+    store.create_session(session_id, str(tmp_path))
+    task = TaskManager(store, EventLogWriter(store)).create_task(
+        session_id=session_id, title="Weekly report", objective="Write the report",
+    )
+    store.block_task_on_approval(task.task_id, "Waiting for your approval before this run can continue.")
+    _park_turn(store, approval_id="apr_1", session_id=session_id, principal_id="principal_owner")
+    return store, task.task_id, session_id
+
+
+def test_pending_approval_is_left_alone(tmp_path: Path) -> None:
+    """No decision yet means nothing to continue — and no state change."""
+    store, task_id, _ = _parked_task(tmp_path)
+
+    assert asyncio.run(TaskScheduler(tmp_path).resume_approved()) == 0
+    saved = store.load_task(task_id)
+    assert saved is not None and saved.status == "waiting_for_approval"
+
+
+def test_granted_approval_continues_the_scheduled_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A decision recorded anywhere is enough: the host continues the run."""
+    store, task_id, _ = _parked_task(tmp_path)
+    store.record_suspended_turn_outcome("apr_1", '{"status": "approved_and_executed"}')
+
+    async def resumed(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        return SimpleNamespace(status="completed", message="Report written.")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.aresume_after_approval", resumed)
+    assert asyncio.run(TaskScheduler(tmp_path).resume_approved()) == 1
+    saved = store.load_task(task_id)
+    assert saved is not None and saved.status == "completed"
+    assert saved.summary == "Report written."
+
+
+def test_a_cancelled_task_is_never_continued(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The owner stopping the work outranks a decision they made before that."""
+    store, task_id, _ = _parked_task(tmp_path)
+    store.record_suspended_turn_outcome("apr_1", '{"status": "approved_and_executed"}')
+    store.cancel_task(task_id, "user stopped this task")
+
+    async def must_not_run(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("a cancelled task must never be continued")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.aresume_after_approval", must_not_run)
+    assert asyncio.run(TaskScheduler(tmp_path).resume_approved()) == 0
+    saved = store.load_task(task_id)
+    assert saved is not None and saved.status == "cancelled"
+
+
+def test_a_turn_already_continued_elsewhere_is_reported_not_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Losing the claim race is someone else's success, not this task's failure."""
+    from raiker.runtime.turn_suspension import TurnSuspensionError
+
+    store, task_id, _ = _parked_task(tmp_path)
+    store.record_suspended_turn_outcome("apr_1", '{"status": "approved_and_executed"}')
+
+    async def already(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise TurnSuspensionError("suspended_turn_already_resumed")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.aresume_after_approval", already)
+    assert asyncio.run(TaskScheduler(tmp_path).resume_approved()) == 0
+    saved = store.load_task(task_id)
+    assert saved is not None and saved.status == "waiting_for_approval"
+    assert "already continued somewhere else" in (saved.summary or "")
+
+
+def test_owner_retry_refuses_another_accounts_task(tmp_path: Path) -> None:
+    """The retry is owner-scoped, and answers the same way for a missing task."""
+    _store, task_id, _ = _parked_task(tmp_path)
+    result = asyncio.run(TaskScheduler(tmp_path).resume_task(task_id, "principal_someone_else"))
+    assert result["ok"] is False
+    assert result["reason_code"] == "task_not_found"
+
+
+def test_owner_retry_continues_a_decided_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The retry runs the same path the automatic pass does."""
+    store, task_id, _ = _parked_task(tmp_path)
+    store.record_suspended_turn_outcome("apr_1", '{"status": "approved_and_executed"}')
+
+    async def resumed(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        return SimpleNamespace(status="completed", message="Report written.")
+
+    monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.aresume_after_approval", resumed)
+    result = asyncio.run(TaskScheduler(tmp_path).resume_task(task_id, "principal_owner"))
+    assert result["ok"] is True
+    assert result["task_status"] == "completed"
+    saved = store.load_task(task_id)
+    assert saved is not None and saved.status == "completed"

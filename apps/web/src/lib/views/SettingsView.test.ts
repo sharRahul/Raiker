@@ -27,12 +27,12 @@ function stubApi(options: { failPut?: boolean } = {}) {
       },
       "/api/auth/sessions": [],
       "/api/runtime-mode": {
-        mode_name: "local_single_user_runtime",
+        mode_name: "raiker_runtime",
         status: "active",
         activated_by: "alice",
         activated_at: "",
         reason: "",
-        allowed_modes: ["local_single_user_runtime"],
+        allowed_modes: ["raiker_runtime"],
       },
       "/api/diagnostics": { counts: { sessions: 0, events: 0, tasks: 0, checkpoints: 0 } },
     };

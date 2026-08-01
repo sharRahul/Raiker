@@ -55,6 +55,11 @@
   } from "../buildModes";
   import { humanize, relativeTime } from "../format";
   import { approvalBadge } from "../statusMaps";
+  import AttachmentCard from "../components/AttachmentCard.svelte";
+  import ComposerAttach from "../components/ComposerAttach.svelte";
+  import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
+  import ComposerChips from "../components/ComposerChips.svelte";
+  import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
   import { thinkingSteps } from "../chatPresentation";
   import { chatProfiles, refreshModels } from "../models.svelte";
@@ -68,6 +73,8 @@
     id: number;
     prompt: string;
     mode: BuildMode;
+    /** What this turn carried, shown back the way the composer showed it. */
+    attachments: ComposerAttachment[];
     events: StreamEvent[];
     response: AgentResponse | null;
     streaming: boolean;
@@ -77,6 +84,14 @@
     resumeState?: "waiting" | "continuing" | "elsewhere" | null;
     resumeNote?: string | null;
   }
+
+  // BUG-35 — Build carries files too. Same store, same limits, same governed
+  // upload path as Chat: a stack trace, a failing screenshot or a spec document
+  // is exactly what you want to hand a coding agent, and until now this
+  // composer had no way to hand it one.
+  const attachStore = createAttachmentStore();
+  let attachControl = $state<ComposerAttach | undefined>();
+  let attachOpen = $state(false);
 
   let promptText = $state("");
   let turns = $state<BuildTurn[]>([]);
@@ -179,11 +194,19 @@
     void refreshModels();
     void syncModeFromRuntime();
     const onCompose = (event: Event) => {
-      const detail = (event as CustomEvent<{ text: string; profileId?: string; model?: string }>).detail;
+      const detail = (event as CustomEvent<{
+        text: string;
+        profileId?: string;
+        model?: string;
+        attachments?: ComposerAttachment[];
+      }>).detail;
       if (!detail?.text.trim()) return;
       promptText = detail.text;
       modelProfile = detail.profileId ?? "";
       model = detail.model ?? "";
+      // Same handoff contract as Chat: files picked in the Workbench composer
+      // arrive here as references, already uploaded and governed.
+      if (detail.attachments?.length) attachStore.set([...detail.attachments]);
     };
     window.addEventListener("raiker:build-compose", onCompose);
     return () => window.removeEventListener("raiker:build-compose", onCompose);
@@ -264,6 +287,23 @@
     }
   }
 
+  /** The repository path plus the composer's own files, in wire order. */
+  function buildAttachments(sent: ReturnType<typeof attachStore.take>) {
+    const wire = [
+      ...(activeRepo?.kind === "local" && activeRepo.local_subpath
+        ? [{ type: "path" as const, path: activeRepo.local_subpath }]
+        : []),
+      ...sent.map((a) =>
+        a.kind === "image"
+          ? { type: "image" as const, attachment_id: a.attachmentId ?? "" }
+          : a.kind === "document"
+            ? { type: "document" as const, attachment_id: a.attachmentId ?? "" }
+            : { type: "path" as const, path: a.path ?? "" },
+      ),
+    ];
+    return wire.length > 0 ? wire : undefined;
+  }
+
   async function submit() {
     const text = promptText.trim();
     if (text === "" || streaming) return;
@@ -272,12 +312,17 @@
     // the exact text the turn received.
     const sent = preamble === "" ? text : `${preamble}\n\n${text}`;
     const sentMode = mode;
+    const sentAttachments = attachStore.take();
     turns = [
       ...turns,
-      { id: nextId++, prompt: sent, mode: sentMode, events: [], response: null, streaming: true, error: null },
+      {
+        id: nextId++, prompt: sent, mode: sentMode, attachments: sentAttachments,
+        events: [], response: null, streaming: true, error: null,
+      },
     ];
     const turn = turns[turns.length - 1];
     promptText = "";
+    attachStore.clear();
     streaming = true;
     void scrollToEnd();
     try {
@@ -290,11 +335,10 @@
           ...(reasoningEfforts.includes(reasoningEffort) ? { reasoning_effort: reasoningEffort } : {}),
           planning_mode: buildMode(sentMode).planningMode ?? undefined,
           // A local repository rides the turn as a real workspace-path
-          // attachment, resolved and bounded server-side like any other.
-          attachments:
-            activeRepo?.kind === "local" && activeRepo.local_subpath
-              ? [{ type: "path" as const, path: activeRepo.local_subpath }]
-              : undefined,
+          // attachment, resolved and bounded server-side like any other — now
+          // alongside whatever the composer is carrying, in the same shape the
+          // prompt route already accepts from Chat.
+          attachments: buildAttachments(sentAttachments),
         },
         (event) => {
           if (event.kind === "final" && event.response !== null) {
@@ -333,7 +377,10 @@
       (() => {
         turns = [
           ...turns,
-          { id: nextId++, prompt: "", mode, events: [], response: null, streaming: true, error: null },
+          {
+            id: nextId++, prompt: "", mode, attachments: [],
+            events: [], response: null, streaming: true, error: null,
+          },
         ];
         return turns[turns.length - 1];
       })();
@@ -527,6 +574,26 @@
     }
   }
 
+  // Copying a response, matching Chat exactly (BUG-23 / composer parity). The
+  // clipboard is not always available — an insecure origin, a denied
+  // permission — so a failure is stated rather than swallowed.
+  let copiedTurnId = $state<string | null>(null);
+  let copyNotice = $state<string | null>(null);
+
+  async function copyAnswer(turn: BuildTurn) {
+    try {
+      await navigator.clipboard.writeText(answerText(turn));
+      copyNotice = null;
+      copiedTurnId = String(turn.id);
+      window.setTimeout(() => {
+        if (copiedTurnId === String(turn.id)) copiedTurnId = null;
+      }, 2000);
+    } catch {
+      copiedTurnId = null;
+      copyNotice = "Could not copy — your browser blocked clipboard access.";
+    }
+  }
+
   function answerText(turn: BuildTurn): string {
     const streamed = collectText(turn.events);
     return streamed.trim() !== "" ? streamed : (turn.response?.message ?? "");
@@ -536,6 +603,7 @@
     if (contextOpen && contextControlEl && !contextControlEl.contains(event.target as Node)) {
       contextOpen = false;
     }
+    attachControl?.handleOutsideClick(event);
     if (
       conversationMenuOpen &&
       !(event.target as HTMLElement | null)?.closest?.(".conversation-menu")
@@ -643,6 +711,17 @@
           <div class="from-you">
             <span class="mode-tag">{buildMode(turn.mode).label}</span>
             <p class="bubble-text">{turn.prompt}</p>
+            {#if turn.attachments.length > 0}
+              <!-- The same cards the composer showed, so what you sent looks
+                   like what you attached. Build has no file inspector of its
+                   own, so these state what rode along without claiming to
+                   open it. -->
+              <div class="turn-attachments">
+                {#each turn.attachments as a, i (a.attachmentId ?? a.path ?? i)}
+                  <AttachmentCard attachment={a} />
+                {/each}
+              </div>
+            {/if}
           </div>
 
           <div class="from-raiker">
@@ -685,10 +764,23 @@
 
             {#if answer !== ""}
               <div class="answer"><Markdown text={answer} /></div>
+              {#if !turn.streaming}
+                <!-- Parity with Chat: the same glyph, the same behaviour, so a
+                     response reads the same way in either conversation. -->
+                <button
+                  type="button"
+                  class="copy-message"
+                  class:copied={copiedTurnId === String(turn.id)}
+                  onclick={() => void copyAnswer(turn)}
+                  aria-label={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
+                  title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
+                ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size={15} /></button>
+              {/if}
             {:else if !turn.streaming && turn.error === null && turn.response !== null}
               <div class="answer"><p class="bubble-text muted">(No answer text was returned.)</p></div>
             {/if}
 
+            {#if copyNotice !== null}<p class="error" role="alert">{copyNotice}</p>{/if}
             {#if turn.error !== null}<p class="error" role="alert">{turn.error}</p>{/if}
 
             {#if turn.events.some((event) => event.kind === "lifecycle" || event.kind === "tool")}
@@ -760,6 +852,7 @@
       }}
     >
       <div class="composer-card">
+        <ComposerChips store={attachStore} disabled={streaming} />
         <label for="build-prompt" class="sr-only">Describe the change</label>
         <div class="composer-upper">
           <textarea
@@ -812,8 +905,13 @@
           {/if}
         {/if}
 
+        {#if attachOpen}
+          <ComposerAttachPanel store={attachStore} disabled={streaming} idPrefix="build" />
+        {/if}
+
         <div class="composer-bar">
           <div class="bar-left">
+            <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={streaming} />
             <div class="mode-picker" role="group" aria-label="How much Raiker may do">
               {#each BUILD_MODES as option (option.id)}
                 <button
@@ -1249,22 +1347,49 @@
     flex-wrap: wrap;
   }
 
+  .turn-attachments { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+  .copy-message {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin-top: var(--space-2);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 0;
+  }
+  .copy-message:hover { color: var(--text-1); border-color: var(--border); }
+  .copy-message.copied { color: var(--ok); }
   .composer {
     display: grid;
     gap: 0.3rem;
   }
+  /* One composer surface, defined identically in Chat and Build so the two
+     conversations are the same instrument in two rooms rather than two
+     instruments that resemble each other. */
   .composer-card {
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
     background: var(--surface);
     box-shadow: var(--shadow-1);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
     padding: 0.75rem 0.85rem;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
   }
+  /* Typing is the primary act on both pages, so the card lifts while it has
+     focus instead of only changing a border colour by one shade. */
   .composer-card:focus-within {
     border-color: var(--accent-border);
+    box-shadow: var(--shadow-2);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .composer-card { transition: none; }
   }
   /* Upper area: textarea on the left, model + effort on the right. Same
      layout as the Chat composer so both surfaces present model selection
@@ -1440,6 +1565,7 @@
   }
   .context-trigger:hover { border-color: var(--accent-border); color: var(--accent); }
   .context-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+  /* Same hint treatment as Chat: quiet, right-aligned, out of the way. */
   .shortcut-hint {
     margin: 0;
     text-align: right;

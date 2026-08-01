@@ -31,7 +31,8 @@ Integrated real executors (including graph indexing, semantic/vector runtimes, p
 Phase 4 memory MVP is implemented. The launchable interfaces are the local
 terminal client and loopback web dashboard. Owner bootstrap creates the owner
 principal, every request resolves an acting-principal, and a human
-`runtime_gate_manager` governs runtime mode and capability changes.
+`runtime_gate_manager` governs capability changes and stopping or starting the
+single agent runtime.
 
 Strict non-allow blocking, role revoke governed, and capability gate per action
 are enforced. Disabled runtime flags remain false where no executor exists:

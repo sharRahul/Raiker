@@ -23,10 +23,14 @@ from raiker.runtime.authority.decision_modes import (
 from raiker.runtime.authority.models import (
     AI_ROLE_NAMES,
     HUMAN_ONLY_ROLES,
+    RAIKER_RUNTIME,
+    RUNTIME_STATUS_ACTIVE,
+    RUNTIME_STATUS_DISABLED,
     Principal,
     PrincipalType,
     RiskAcceptance,
     RiskLevelValue,
+    normalize_runtime_mode,
 )
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.storage.sqlite import SQLiteStore
@@ -482,19 +486,29 @@ class RuntimeAuthority:
         return None
 
     def get_runtime_mode(self, principal_id: str | None = None) -> dict[str, Any]:
-        active = (
+        """The one runtime, and whether it is accepting executions.
+
+        A stored row keeps whatever it recorded, except that its ``mode_name``
+        is normalised: a workspace written before the runtime was unified holds
+        one of the five historical names, and reporting those back would imply a
+        choice that no longer exists. With no stored row at all the runtime is
+        active — there is nothing left to select, so a fresh install is ready.
+        """
+        stored = (
             self.store.get_principal_runtime_mode(str(principal_id))
-            if self._uses_principal_controls(principal_id) else self.store.get_active_runtime_mode()
+            if self._uses_principal_controls(principal_id) else self.store.get_latest_runtime_mode()
         )
-        if active is not None:
-            return active
+        if stored is not None:
+            record = dict(stored)
+            record["mode_name"] = normalize_runtime_mode(record.get("mode_name")) or RAIKER_RUNTIME
+            return record
         return {
-            "runtime_mode_id": "default_dev_preview",
-            "mode_name": "development_preview",
-            "status": "active",
+            "runtime_mode_id": "raiker_runtime_default",
+            "mode_name": RAIKER_RUNTIME,
+            "status": RUNTIME_STATUS_ACTIVE,
             "activated_by": "system",
             "activated_at": utc_now(),
-            "reason": "Default runtime mode",
+            "reason": "Raiker runs one runtime; it is active unless explicitly disabled.",
         }
 
     def activate_runtime_mode(
@@ -506,14 +520,17 @@ class RuntimeAuthority:
                 "mode_name": mode_name, "status": "denied", "reason": gate_check,
             })
             return gate_check
-        if mode_name not in ("development_preview", "local_single_user_safe", "local_single_user_runtime",
-                             "multi_user_local_runtime", "hosted_or_networked_runtime"):
+        # Every historical mode name still resolves — a CLI line, a stored row,
+        # or an older client asking for `local_single_user_runtime` gets the one
+        # runtime. Anything else is still refused rather than assumed.
+        resolved = normalize_runtime_mode(mode_name)
+        if resolved is None:
             return f"unknown_runtime_mode:{mode_name}"
         now = utc_now()
         record = {
             "runtime_mode_id": new_id("rm_"),
-            "mode_name": mode_name,
-            "status": "active",
+            "mode_name": resolved,
+            "status": RUNTIME_STATUS_ACTIVE,
             "activated_by": principal.principal_id,
             "activated_at": now,
             "reason": reason,
@@ -526,7 +543,7 @@ class RuntimeAuthority:
             self.store.disable_all_runtime_modes(principal.principal_id, f"activating {mode_name}")
             self.store.insert_runtime_mode_state(record)
         self._event("runtime_mode_activated", principal.principal_id, {
-            "mode_name": mode_name, "runtime_mode_id": record["runtime_mode_id"], "reason": reason,
+            "mode_name": resolved, "runtime_mode_id": record["runtime_mode_id"], "reason": reason,
         })
         return None
 
@@ -538,13 +555,16 @@ class RuntimeAuthority:
             })
             return gate_check
         now = utc_now()
+        # Disabling is now what it says: the one runtime stops accepting new
+        # executions. It used to mean "fall back to development_preview", which
+        # left a runtime running under a name that implied it was not.
         record = {
             "runtime_mode_id": new_id("rm_"),
-            "mode_name": "development_preview",
-            "status": "active",
+            "mode_name": RAIKER_RUNTIME,
+            "status": RUNTIME_STATUS_DISABLED,
             "activated_by": principal.principal_id,
             "activated_at": now,
-            "reason": "Disabled; reverted to development_preview",
+            "reason": reason or "The owner disabled the agent runtime.",
             "created_at": now,
             "updated_at": now,
         }
@@ -554,7 +574,7 @@ class RuntimeAuthority:
             self.store.disable_all_runtime_modes(principal.principal_id, reason)
             self.store.insert_runtime_mode_state(record)
         self._event("runtime_mode_disabled", principal.principal_id, {
-            "mode_name": "development_preview", "reason": reason,
+            "mode_name": RAIKER_RUNTIME, "status": RUNTIME_STATUS_DISABLED, "reason": reason,
         })
         return None
 

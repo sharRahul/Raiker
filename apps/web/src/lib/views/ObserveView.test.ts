@@ -12,7 +12,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const READINESS = { mode: "local_single_user_runtime", gates: [], summary: {} };
+const READINESS = { mode: "raiker_runtime", gates: [], summary: {} };
 
 function routes(overrides: Record<string, unknown> = {}) {
   return {
@@ -81,7 +81,7 @@ describe("ObserveView", () => {
     const bundle = {
       generated_at: "2026-07-24T00:00:00Z",
       scope: "local single-user runtime",
-      runtime_mode: "local_single_user_runtime",
+      runtime_mode: "raiker_runtime",
       counts: {},
       missing_config: [],
       disabled_capabilities: [],

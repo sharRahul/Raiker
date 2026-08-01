@@ -31,6 +31,11 @@ dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "httpx2>=2.9"]
 
 [project.scripts]
 raiker = "raiker.cli.main:main"
+# The application entry point: detects the OS, keeps data where that platform
+# expects it, finds a free loopback port, and opens the default browser.
+raiker-app = "apps.api.launcher:main"
+# The service entry point, unchanged: explicit workspace, explicit port, and the
+# deliberate --allow-public path for reaching Raiker from another machine.
 raiker-web = "apps.api.main:main"
 
 [tool.setuptools.packages.find]

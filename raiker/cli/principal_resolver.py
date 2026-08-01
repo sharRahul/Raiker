@@ -7,7 +7,7 @@ from raiker.contracts.ids import utc_now
 from raiker.contracts.models import Role, User
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
-from raiker.runtime.authority.models import Principal, PrincipalType, RuntimeMode
+from raiker.runtime.authority.models import RAIKER_RUNTIME, Principal, PrincipalType, RuntimeMode
 from raiker.storage.sqlite import SQLiteStore
 
 OWNER_ROLE_ID = "rl_owner"
@@ -129,7 +129,7 @@ def bootstrap_owner(
         store.upsert_capability_gate_state({
             "capability": cap,
             "state": "enabled_runtime",
-            "runtime_mode": "local_single_user_runtime",
+            "runtime_mode": RAIKER_RUNTIME,
             "requested_by": "system_bootstrap",
             "requested_at": now,
             "activated_by": "system_bootstrap",
@@ -151,7 +151,7 @@ def bootstrap_owner(
             user=user,
             principal_id=principal_id,
             role_ids=OWNER_BOOTSTRAP_ROLES,
-            max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_RUNTIME.value,
+            max_runtime_mode=RuntimeMode.RAIKER_RUNTIME.value,
         ):
             return "Bootstrap denied: instance account already exists."
     except Exception:
@@ -189,7 +189,7 @@ def bootstrap_owner(
         f"  Principal: {principal_id}\n"
         f"  Display name: {display_name}\n"
         f"  Roles: owner, admin, runtime_gate_manager, approver\n"
-        f"  Max runtime mode: {RuntimeMode.LOCAL_SINGLE_USER_RUNTIME.value}\n"
+        f"  Max runtime mode: {RuntimeMode.RAIKER_RUNTIME.value}\n"
         f"  You can now use --as {principal_id} for privileged commands."
     )
 
@@ -260,7 +260,7 @@ def _handle_owner_recovery(
         store.recover_owner_atomic(
             user=user, principal_id=principal_id, role_ids=OWNER_BOOTSTRAP_ROLES,
             old_principal_ids=old_owner_ids, credential_owner_id=credential_owner,
-            max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_RUNTIME.value,
+            max_runtime_mode=RuntimeMode.RAIKER_RUNTIME.value,
         )
     except (ValueError, OSError):
         return "Recovery denied: credential transfer could not be completed safely."
@@ -448,7 +448,7 @@ def get_principal_info(
         f"  Domain scopes: {', '.join(principal.domain_scopes) or '(none)'}",
         f"  Max runtime mode: {principal.max_runtime_mode}",
         f"  Active: {principal.is_active}",
-        f"  Current runtime mode: {mode.get('mode_name', 'development_preview')}",
+        f"  Current runtime: {mode.get('mode_name', RAIKER_RUNTIME)} ({mode.get('status', 'active')})",
     ]
     return "\n".join(lines)
 
@@ -488,7 +488,7 @@ def get_principal_detail(principal_id: str, workspace_root: str | Path = ".") ->
         f"  Type: {raw.get('principal_type', '')}",
         f"  Roles: {', '.join(role_names)}",
         f"  Domain scopes: {', '.join(raw.get('domain_scopes', ())) or '(none)'}",
-        f"  Max runtime mode: {raw.get('max_runtime_mode', 'development_preview')}",
+        f"  Max runtime mode: {raw.get('max_runtime_mode', RAIKER_RUNTIME)}",
         f"  Active: {bool(raw.get('is_active', True))}",
         f"  Delegated by user: {raw.get('delegated_by_user_id') or 'N/A'}",
     ]

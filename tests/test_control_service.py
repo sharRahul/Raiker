@@ -118,12 +118,13 @@ class TestResolvePrincipal:
 
 class TestGetRuntimeMode:
     def test_default_mode(self, service: RuntimeControlService) -> None:
+        """A fresh workspace reports the one runtime, active, with nothing to pick."""
         view = service.get_runtime_mode()
         assert isinstance(view, RuntimeModeView)
-        assert view.mode_name == "development_preview"
+        assert view.mode_name == "raiker_runtime"
         assert view.status == "active"
         assert view.activated_by == "system"
-        assert len(view.allowed_modes) == 5
+        assert view.allowed_modes == ("raiker_runtime",)
 
     def test_mode_matches_authority(self, service: RuntimeControlService, authority: RuntimeAuthority) -> None:
         view = service.get_runtime_mode()
@@ -131,18 +132,12 @@ class TestGetRuntimeMode:
         assert view.mode_name == raw["mode_name"]
         assert view.status == raw["status"]
 
-    def test_allowed_modes_are_development_preview_local_safe_local_runtime_multi_user_hosted(
+    def test_allowed_modes_is_the_single_runtime(
         self, service: RuntimeControlService,
     ) -> None:
+        """There is one runtime, so the list a client renders holds one entry."""
         view = service.get_runtime_mode()
-        expected = (
-            "development_preview",
-            "local_single_user_safe",
-            "local_single_user_runtime",
-            "multi_user_local_runtime",
-            "hosted_or_networked_runtime",
-        )
-        assert view.allowed_modes == expected
+        assert view.allowed_modes == ("raiker_runtime",)
 
     def test_to_dict_no_secrets(self, service: RuntimeControlService) -> None:
         view = service.get_runtime_mode()
@@ -301,9 +296,10 @@ class TestActivateRuntimeMode:
         assert "unknown_runtime_mode" in (result.reason_code or "")
 
     def test_mode_persisted(self, service: RuntimeControlService, owner_principal: Principal) -> None:
+        """A legacy mode name still activates, and resolves to the one runtime."""
         service.activate_runtime_mode("local_single_user_runtime", None, "enable")
         mode_view = service.get_runtime_mode()
-        assert mode_view.mode_name == "local_single_user_runtime"
+        assert mode_view.mode_name == "raiker_runtime"
         assert mode_view.status == "active"
 
     def test_ai_principal_refused(self, service: RuntimeControlService, store: SQLiteStore) -> None:
@@ -340,11 +336,16 @@ class TestDisableRuntimeMode:
         assert result.ok is False
         assert result.reason_code is not None
 
-    def test_disable_reverts_to_development_preview(self, service: RuntimeControlService, owner_principal: Principal) -> None:
+    def test_disable_stops_the_runtime_rather_than_renaming_it(
+        self, service: RuntimeControlService, owner_principal: Principal,
+    ) -> None:
+        """Disabling means the runtime stops accepting executions, not that it
+        keeps running under a name that implies it is not."""
         service.activate_runtime_mode("local_single_user_safe", None, "")
         service.disable_runtime_mode(None, "revert")
         mode_view = service.get_runtime_mode()
-        assert mode_view.mode_name == "development_preview"
+        assert mode_view.mode_name == "raiker_runtime"
+        assert mode_view.status == "disabled"
 
     def test_ai_principal_refused(self, service: RuntimeControlService, store: SQLiteStore) -> None:
         from raiker.contracts.ids import utc_now
@@ -394,9 +395,18 @@ class TestSetCapabilityState:
         assert result.ok is False
         assert "invalid_target_state" in (result.reason_code or "")
 
-    def test_runtime_mode_not_activated_for_enabled_runtime(
+    def test_enabled_runtime_needs_no_mode_selection(
         self, service: RuntimeControlService, owner_principal: Principal,
     ) -> None:
+        """One runtime, active by default: nothing has to be selected first."""
+        result = service.set_capability_state("admin_mutation", "enabled_runtime", None, "")
+        assert result.ok is True
+
+    def test_enabled_runtime_refused_while_the_runtime_is_disabled(
+        self, service: RuntimeControlService, owner_principal: Principal,
+    ) -> None:
+        """The danger-zone switch is the one runtime-level refusal left."""
+        service.disable_runtime_mode(None, "stop accepting work")
         result = service.set_capability_state("admin_mutation", "enabled_runtime", None, "")
         assert result.ok is False
         assert result.reason_code is not None and "runtime_mode_not_active" in result.reason_code

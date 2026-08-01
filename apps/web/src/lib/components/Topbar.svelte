@@ -4,6 +4,7 @@
   import { api } from "../api";
   import { relativeTime } from "../format";
   import Icon from "./Icon.svelte";
+  import HostControl from "./HostControl.svelte";
   import StopSwitch from "./StopSwitch.svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
 
@@ -125,6 +126,7 @@
         </section>
       {/if}
     </div>
+    <HostControl />
     <ThemeToggle />
     <StopSwitch />
   </div>

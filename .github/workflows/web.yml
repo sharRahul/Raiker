@@ -41,3 +41,13 @@ jobs:
         run: npm run test
       - name: Build
         run: npm run build
+      # BUG-41 — the mocked end-to-end suite runs against the build produced by
+      # the step above. It needs no credential and no network: every API call is
+      # answered from a fixture inside the spec. The `live` project, which drives
+      # a real host holding real provider keys, is deliberately not run here —
+      # CI has no key, and a suite that cannot really pass must not report that
+      # it did.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end (mocked)
+        run: npm run test:e2e:mocked

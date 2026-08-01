@@ -36,6 +36,30 @@ opens your default browser. If a Raiker is already running it opens that one
 rather than starting a second host over the same encrypted workspace. Run
 `raiker-app --print-paths` to see what it resolved.
 
+Subcommands cover the rest of the host's life. Bare `raiker-app` still means
+"start Raiker", so a desktop shortcut is unaffected:
+
+```bash
+raiker-app service install    # start in the background at sign-in, using your
+                              # platform's own service manager: launchd on
+                              # macOS, systemd --user on Linux, the Startup
+                              # folder on Windows
+raiker-app status             # running / paused / needs attention / stopped,
+                              # and what background work is in flight
+raiker-app pause              # stop starting new background work; a run you
+raiker-app resume             # have already approved still finishes
+raiker-app quit               # stop the host, reporting waiting work first
+raiker-app uninstall          # print exactly what removal takes and what it
+                              # keeps; add --yes to carry it out, and
+                              # --data keep|export|erase per instance
+```
+
+The same controls are in the app: the **Host** control in the top bar reports
+the state, names what a quit would interrupt, and offers Pause, Restart and
+Quit. Signed installers and a signed update channel are not built yet — see
+`docs/DESKTOP_DISTRIBUTION_DESIGN.md` and BUG-44 in
+[to be fixed](docs/plans/TO_BE_FIXED.md).
+
 `raiker-web` remains the service entry point for an explicit workspace and port,
 and is the only path that can bind beyond loopback (`--allow-public`, which also
 requires a hardened owner token):

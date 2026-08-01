@@ -250,6 +250,22 @@ describe("TasksView blocked-on-approval pointer", () => {
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
   });
 
+  // BUG-39 — approving now signals the host directly, so the card must stop
+  // presenting the manual button as the way to get a granted run moving.
+  it("names automatic continuation and keeps Continue now as the recovery path", async () => {
+    stubFetch({
+      "GET /api/tasks": [{ ...TASK, status: "waiting_for_approval" }],
+      "GET /api/approvals": [],
+    });
+    render(TasksView);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Publish the release note" })).toBeInTheDocument(),
+    );
+
+    expect(screen.getByText("Approving continues this run automatically.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue now" })).toHaveClass("btn-ghost");
+  });
+
   // BUG-09 — "failed" was the entire story the finished list told. The reason
   // the backend recorded is the point of the row.
   it("states why a finished run ended", async () => {

@@ -191,7 +191,7 @@
               title={item.hint}
               onclick={() => closeNavigation(false)}
             >
-              <Icon name={item.icon} size={17} />
+              <Icon name={item.icon} size="lg" filled={current === item.id} />
               <span>{item.label}</span>
             </a>
           </li>
@@ -265,7 +265,7 @@
       aria-current={current === item.id ? "page" : undefined}
       aria-label={item.label}
     >
-      <Icon name={item.icon} size={18} />
+      <Icon name={item.icon} size="lg" filled={current === item.id} />
       <span>{item.label}</span>
     </a>
   {/each}

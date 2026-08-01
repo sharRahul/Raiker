@@ -57,7 +57,7 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
 
 
 def _record_resume_outcome(
-    store: SQLiteStore, approval_id: str, outcome: dict[str, Any]
+    request: Request, store: SQLiteStore, approval_id: str, outcome: dict[str, Any]
 ) -> dict[str, Any]:
     """Attach the decision's outcome to the turn it unblocked, if there is one (B2).
 
@@ -65,17 +65,44 @@ def _record_resume_outcome(
     if so, which session and turn the continuation belongs to. Not every approval
     has one — a connector-store write has no chat turn behind it, and a turn that
     failed to park is simply not resumable.
+
+    A scheduled run has no client to return this to, so recording the outcome is
+    also the moment to tell the host's scheduler that its parked run can move
+    (BUG-39).
     """
     row = store.load_suspended_turn(approval_id)
     if row is None or str(row.get("status")) != "suspended":
         return {"resumable": False}
     if not store.record_suspended_turn_outcome(approval_id, json.dumps(outcome, sort_keys=True)):
         return {"resumable": False}
+    session_id = str(row["session_id"])
+    _nudge_scheduler(request, session_id)
     return {
         "resumable": True,
-        "session_id": str(row["session_id"]),
+        "session_id": session_id,
         "turn_id": str(row["turn_id"]),
     }
+
+
+def _nudge_scheduler(request: Request, session_id: str) -> None:
+    """Tell the resident scheduler an approval it was waiting on has been decided.
+
+    BUG-39. Chat continues within a second because the tab that resolved the
+    approval goes straight on to resume the turn; a scheduler-launched run has no
+    tab, so it used to wait for the next 15-second sweep with its card still
+    reading *waiting for approval*. This is that missing signal.
+
+    Scoped to the Inbox sessions scheduled work actually runs in: a Chat or Build
+    approval is continued by the client that made it and has nothing for the
+    scheduler to do. Nudging is best-effort in both directions — an unstarted or
+    already-shutting-down host simply falls back to the sweep, and a nudge that
+    arrives while a sweep is running is coalesced into the next one.
+    """
+    if not session_id.startswith("sess_inbox_"):
+        return
+    wakeup = getattr(request.app.state, "scheduler_wakeup", None)
+    if wakeup is not None:
+        wakeup.request()
 
 
 @router.get("/api/approvals")
@@ -234,6 +261,7 @@ async def resolve_approval(
                 "path": execution.artifacts.get("path"),
             },
             "resume": _record_resume_outcome(
+                request,
                 store,
                 approval_id,
                 approval_outcome(
@@ -311,6 +339,7 @@ async def resolve_approval(
                 "reason": body.reason,
                 "connector_result": output,
                 "resume": _record_resume_outcome(
+                    request,
                     store,
                     approval_id,
                     approval_outcome(
@@ -328,6 +357,7 @@ async def resolve_approval(
         # so a parked turn can pick up from here. Rejection is carried through as
         # a refusal rather than silence, which is what lets the model react.
         "resume": _record_resume_outcome(
+            request,
             store,
             approval_id,
             approval_outcome(

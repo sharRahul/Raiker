@@ -47,12 +47,30 @@
     loadError = null;
     try {
       const s = await api.settings();
-      settings = s.settings;
+      // FIXED-85 — an edit made while this read was in flight must survive it.
+      // The controls render before the read resolves, so a fast owner (or a
+      // second load triggered by a re-mount) could choose a value, watch the
+      // control show it, and then have the arriving snapshot overwrite it
+      // underneath — leaving the page dirty with the *old* value and saving
+      // that on the next Save. Server values are the base; unsaved edits are
+      // reapplied on top, and `serverSettings` still records what the server
+      // actually holds so Discard and the failure rollback stay honest.
+      const unsaved = dirty ? changedFromServer() : {};
+      settings = { ...s.settings, ...unsaved };
       serverSettings = { ...s.settings };
       status = s.status;
     } catch (e) {
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
     }
+  }
+
+  /** The keys the owner has changed since the last confirmed server snapshot. */
+  function changedFromServer(): Record<string, unknown> {
+    const changed: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(settings)) {
+      if (JSON.stringify(serverSettings[key]) !== JSON.stringify(value)) changed[key] = value;
+    }
+    return changed;
   }
 
   function save(patch: Record<string, unknown>) {

@@ -12,7 +12,9 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint .",
     "test": "node scripts/run-tests.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:mocked": "playwright test --project=mocked",
+    "test:e2e:live": "playwright test --project=live"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

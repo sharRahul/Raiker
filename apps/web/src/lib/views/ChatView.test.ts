@@ -369,9 +369,11 @@ describe("ChatView streaming transcript", () => {
     const attach = screen.getByLabelText("Attachment path") as HTMLInputElement;
     await fireEvent.input(attach, { target: { value: "docs/HANDOFF.md" } });
     await fireEvent.click(screen.getByText("Attach"));
-    // The chip shows only the file name; the full path stays in the tooltip.
+    // The card names the file and, underneath, where in the workspace it is —
+    // both on one line each, ellipsised, so adding files never rewraps the
+    // composer under the text being typed.
     expect(screen.getByText("HANDOFF.md")).toBeInTheDocument();
-    expect(screen.queryByText("docs/HANDOFF.md")).not.toBeInTheDocument();
+    expect(screen.getByText("docs/HANDOFF.md")).toBeInTheDocument();
 
     const box = screen.getByRole("textbox", { name: /prompt/i });
     await fireEvent.input(box, { target: { value: "summarize the attachment" } });
@@ -982,8 +984,13 @@ describe("ChatView file inspector", () => {
     await screen.findByRole("complementary", { name: /file preview/i });
     const image = await screen.findByRole("img", { name: "shot.png" });
     await waitFor(() => expect(image).toHaveAttribute("src", "blob:shot"));
-    // The bytes ride an authorized fetch, not a bare src on the API path.
-    expect(createObjectURL).toHaveBeenCalledOnce();
+    // Every image on screen — the transcript thumbnail and the inspector's own
+    // copy — rides an authorized fetch turned into a blob. Nothing ever points
+    // a bare src at the API path, which could not carry the bearer token.
+    expect(createObjectURL).toHaveBeenCalled();
+    for (const rendered of document.querySelectorAll("img")) {
+      expect(rendered.getAttribute("src")).not.toMatch(/^\/api\//);
+    }
     await fireEvent.click(screen.getByRole("button", { name: /close file preview/i }));
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:shot");
   });

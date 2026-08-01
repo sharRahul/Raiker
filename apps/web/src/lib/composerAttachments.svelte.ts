@@ -28,7 +28,7 @@
 
 import { api, ApiError } from "./api";
 
-/** One composer attachment chip. */
+/** One attachment the composer is carrying, or that a turn carried. */
 export interface ComposerAttachment {
   kind: "path" | "image" | "document";
   label: string;
@@ -37,6 +37,35 @@ export interface ComposerAttachment {
   attachmentId?: string;
   source?: "uploaded" | "generated";
   createdAt?: string;
+  /** What it is and how big, so a card can say so instead of just naming it. */
+  mediaType?: string;
+  byteSize?: number;
+  /**
+   * A local object URL for an image the owner just picked, used as its
+   * thumbnail. Held here so it can be revoked when the attachment is removed or
+   * the composer is cleared — a leaked handle keeps the whole file in memory.
+   * Never a remote URL, and never used for anything but display.
+   */
+  previewUrl?: string;
+}
+
+/** A human file size. Bytes for the tiny cases, then KB, then MB. */
+export function formatBytes(bytes: number | undefined): string {
+  if (bytes === undefined || bytes <= 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** The short badge a document card shows: PDF, DOCX, CSV, MD… */
+export function typeLabel(attachment: ComposerAttachment): string {
+  if (attachment.kind === "path") return "PATH";
+  const extension = attachment.label.split(".").pop() ?? "";
+  if (extension && extension !== attachment.label && extension.length <= 5) {
+    return extension.toUpperCase();
+  }
+  const subtype = (attachment.mediaType ?? "").split("/").pop() ?? "";
+  return (subtype.split(".").pop() || "FILE").slice(0, 5).toUpperCase();
 }
 
 export const MAX_ATTACHMENTS = 8;
@@ -80,6 +109,21 @@ export function documentMediaType(file: File): string | null {
   if (lower.endsWith(".docx")) return DOCX_MEDIA_TYPE;
   if (lower.endsWith(".xlsx")) return XLSX_MEDIA_TYPE;
   return null;
+}
+
+function objectUrlFor(file: File): string | undefined {
+  // Absent in jsdom. Its absence costs the thumbnail, not the attachment.
+  if (typeof URL?.createObjectURL !== "function") return undefined;
+  try {
+    return URL.createObjectURL(file);
+  } catch {
+    return undefined;
+  }
+}
+
+function revoke(attachment: ComposerAttachment | undefined): void {
+  if (attachment?.previewUrl === undefined) return;
+  URL.revokeObjectURL?.(attachment.previewUrl);
 }
 
 function readBase64(file: File): Promise<string> {
@@ -137,6 +181,11 @@ export function createAttachmentStore(): AttachmentStore {
           label: file.name,
           detail: `${file.name} (${stored.media_type}, ${stored.byte_size} bytes)`,
           attachmentId: stored.attachment_id,
+          mediaType: stored.media_type,
+          byteSize: stored.byte_size,
+          // The picture the owner just chose is already in the browser, so its
+          // thumbnail costs no request: it is the local file, shown back.
+          previewUrl: kind === "image" ? objectUrlFor(file) : undefined,
         },
       ];
     } catch (e) {
@@ -164,12 +213,18 @@ export function createAttachmentStore(): AttachmentStore {
       return true;
     },
     remove(index: number) {
+      revoke(items[index]);
       items = items.filter((_, i) => i !== index);
     },
     set(next: ComposerAttachment[]) {
+      // Handed over rather than copied: the receiving composer now owns these
+      // and will revoke them, so revoking here would blank its thumbnails.
       items = next;
     },
     clear() {
+      // `take()` hands ownership of the thumbnails to the turn that is being
+      // sent, so clearing after a send must not revoke them — the transcript is
+      // still showing them. Only attachments still held here are released.
       items = [];
       error = null;
     },

@@ -27,6 +27,7 @@
     SourceExcerptView,
     StreamEvent,
   } from "../apiTypes";
+  import AttachmentCard from "../components/AttachmentCard.svelte";
   import ComposerAttach from "../components/ComposerAttach.svelte";
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
@@ -142,6 +143,44 @@
   const attachStore = createAttachmentStore();
   let attachControl = $state<ComposerAttach | undefined>();
   let attachOpen = $state(false);
+
+  // Thumbnails for images already in the transcript, keyed by attachment id.
+  //
+  // An image the owner just picked shows the local file back and costs nothing.
+  // One restored from a reload has no local copy, so its bytes are fetched once
+  // — through the same session-authorised preview route the inspector uses,
+  // with the bearer token an <img> cannot send — and reused for every render.
+  // Failure is silent by design: the card falls back to its type glyph, which
+  // is a worse thumbnail and a perfectly good attachment.
+  let thumbnails = $state<Record<string, string>>({});
+  const resolvingThumbnails = new Set<string>();
+
+  async function resolveThumbnails(attachments: ComposerAttachment[]) {
+    for (const attachment of attachments) {
+      const id = attachment.attachmentId;
+      if (
+        attachment.kind !== "image" ||
+        id === undefined ||
+        sessionId === null ||
+        attachment.previewUrl !== undefined ||
+        thumbnails[id] !== undefined ||
+        resolvingThumbnails.has(id)
+      ) {
+        continue;
+      }
+      resolvingThumbnails.add(id);
+      try {
+        const preview = await api.attachmentPreview(sessionId, id);
+        if (preview.image_url === null) continue;
+        thumbnails = {
+          ...thumbnails,
+          [id]: await api.attachmentPreviewObjectUrl(preview.image_url),
+        };
+      } catch {
+        // The card shows its type glyph instead. Nothing is claimed that failed.
+      }
+    }
+  }
 
   // ── File inspector (BUG-07) ───────────────────────────────────────────────
   // An attachment chip opens a view-only preview of the file it names. Nothing
@@ -382,6 +421,8 @@
         attachmentId: file.attachment_id,
         source: file.source,
         createdAt: file.created_at,
+        mediaType: file.media_type,
+        byteSize: file.byte_size,
       });
       byTurn.set(file.turn_id, chips);
     }
@@ -394,6 +435,7 @@
       const merged = [...existing, ...chips.filter((c) => !existing.some((e) => e.attachmentId === c.attachmentId))];
       return { ...turn, attachments: merged };
     });
+    void resolveThumbnails(turns.flatMap((turn) => turn.attachments));
   }
 
   function restoredTurn(t: SessionDetail["turns"][number], sessionId: string): ChatTurn {
@@ -525,8 +567,18 @@
 
   function newConversation() {
     if (streaming) return;
+    // Release the transcript's thumbnails with the transcript. They are held
+    // for as long as the images are on screen and no longer — a blob URL kept
+    // past its last render pins the whole file in memory.
+    releaseThumbnails();
     turns = [];
     sessionId = null;
+  }
+
+  function releaseThumbnails() {
+    for (const url of Object.values(thumbnails)) URL.revokeObjectURL?.(url);
+    thumbnails = {};
+    resolvingThumbnails.clear();
   }
 
   function onWindowClick(event: MouseEvent) {
@@ -783,31 +835,22 @@
           <div class="message-bubble message-bubble-user">
           <p class="bubble-text">{turn.prompt}</p>
           {#if uploadedAttachments.length > 0}
-            <p class="turn-attachments">
+            <div class="turn-attachments">
               {#each uploadedAttachments as a, i (a.attachmentId ?? a.path ?? i)}
-                {#if a.attachmentId !== undefined && sessionId !== null}
-                  <!-- Uploaded files open in the inspector. A workspace-path
-                       chip has no stored bytes to show, so it stays inert
-                       rather than pretending to be clickable. -->
-                  <button
-                    type="button"
-                    class="attach-chip attach-chip-button"
-                    title={a.detail}
-                    aria-label={`Open ${a.label}`}
-                    aria-expanded={inspecting?.attachmentId === a.attachmentId}
-                    onclick={() => void openInspector(a.attachmentId as string, a.label)}
-                  >
-                    <Icon name="file" size={13} />
-                    {a.label}
-                  </button>
-                {:else}
-                  <span class="attach-chip" title={a.detail}>
-                    <Icon name="file" size={13} />
-                    {a.label}
-                  </span>
-                {/if}
+                <!-- The same card the composer used, so what you sent looks
+                     like what you attached. An uploaded file opens in the
+                     inspector; a workspace path has no stored bytes to show,
+                     so it stays inert rather than pretending to be clickable. -->
+                <AttachmentCard
+                  attachment={a}
+                  thumbnail={a.attachmentId ? (thumbnails[a.attachmentId] ?? null) : null}
+                  expanded={inspecting?.attachmentId === a.attachmentId}
+                  onopen={a.attachmentId !== undefined && sessionId !== null
+                    ? () => void openInspector(a.attachmentId as string, a.label)
+                    : null}
+                />
               {/each}
-            </p>
+            </div>
           {/if}
         </div>
         </div>
@@ -1705,29 +1748,6 @@
     gap: .25rem;
     min-width: 0;
   }
-  .round-btn {
-    width: 1.9rem;
-    height: 1.9rem;
-    border-radius: 50%;
-    border: 1px solid var(--neutral-border);
-    background: var(--neutral-soft);
-    color: var(--text-2);
-    font-size: 1.1rem;
-    line-height: 1;
-    cursor: pointer;
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .round-btn:hover:not(:disabled) {
-    border-color: var(--accent-border);
-    color: var(--accent);
-  }
-  .round-btn:disabled {
-    opacity: 0.55;
-    cursor: default;
-  }
   /* Per-turn settings sit on the right of the bar, ending in the send action. */
   .bar-right {
     margin-left: auto;
@@ -1763,67 +1783,10 @@
     opacity: 0.6;
   }
   .bar-select:focus-visible,
-  .round-btn:focus-visible {
-    outline: 2px solid var(--focus-ring);
-  }
-  .attach-popover {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-  .attach-input {
-    flex: 1;
-    min-width: 12rem;
-    font-size: 0.8rem;
-    padding: 0.35rem 0.5rem;
-    border-radius: var(--r-md);
-    border: 1px solid var(--neutral-border);
-    background: var(--surface-1);
-    color: var(--text-1);
-  }
-  .attach-chips {
-    display: flex;
-    gap: 0.3rem;
-    flex-wrap: wrap;
-  }
-  .attach-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.74rem;
-    border-radius: var(--r-pill);
-    border: 1px solid var(--neutral-border);
-    background: var(--neutral-soft);
-    color: var(--text-2);
-    padding: 0.1rem 0.5rem;
-  }
-  /* A chip that opens the inspector is a real button: it looks identical to the
-     inert one, but it is focusable, keyboard-operable, and says so on hover. */
-  .attach-chip-button {
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .attach-chip-button:hover,
-  .attach-chip-button:focus-visible {
-    border-color: var(--border-strong);
-    color: var(--text-1);
-  }
-  .attach-remove {
-    border: none;
-    background: none;
-    color: var(--text-3);
-    cursor: pointer;
-    font-size: 0.85rem;
-    padding: 0 0.1rem;
-    line-height: 1;
-  }
-  .attach-remove:hover {
-    color: var(--danger);
-  }
   .turn-attachments {
-    margin: 0.4rem 0 0;
+    margin: 0.5rem 0 0;
     display: flex;
-    gap: 0.3rem;
+    gap: 0.4rem;
     flex-wrap: wrap;
   }
   .send {

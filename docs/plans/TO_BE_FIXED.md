@@ -99,6 +99,7 @@ continuation logic itself is covered by `tests/test_task_scheduler.py`.
 | FIXED-64 | Low | Build / composer attachments | Fixed (was BUG-35) |
 | FIXED-65 | Medium | Composers / Chat, Build, Workbench | Fixed (shared composer) |
 | FIXED-66 | Medium | Distribution / cross-platform launch | Fixed (`raiker-app`) |
+| FIXED-67 | Medium | Composers / attachment presentation | Fixed (attached files look like files) |
 | BUG-29 | High | Memory / governed lifecycle | Open |
 | BUG-30 | Medium | Knowledge Map / sources and scale | Open |
 | BUG-31 | High | Build / remote execution containment | Open |
@@ -2312,6 +2313,52 @@ Reaching Raiker from another machine remains the deliberate
 
 Covered by `tests/test_app_launcher.py`, which asks for each platform explicitly
 rather than testing whatever the runner happens to be.
+
+---
+
+## FIXED-67 — An attached file did not look like the file it was
+
+**Status: fixed in this change.**
+
+**Observed.** Every attachment rendered as the same small grey pill: a generic
+paper glyph and a filename, whether you had attached a photograph, a
+spreadsheet, or a workspace folder path. That tells you nothing you did not
+already know from typing the name, and a composer carrying three files read as a
+row of tags rather than as work about to be handed over. It was also
+indistinguishable from what the transcript showed afterwards, so there was no
+way to confirm at a glance that what you sent was what you picked.
+
+**Fix applied.** `AttachmentCard.svelte`, used by the composer *and* the
+transcript in both Chat and Build:
+
+- **A picture shows the picture.** An image the owner just picked is shown from
+  the local file — no request, no placeholder. One already in the transcript has
+  no local copy, so its bytes are fetched once through the same
+  session-authorised preview route the inspector uses (an `<img>` cannot carry
+  the bearer token) and reused for every render. A failure falls back to the
+  type glyph: a worse card, and a perfectly good attachment.
+- **Everything else states what it is.** A coloured type badge, the name, and
+  the size — `PDF · 153 KB` — because those are the two facts a person checks
+  before sending something. A workspace path names its folder instead, since
+  that is what identifies it.
+- **Names never rewrap the composer.** One line each, ellipsised, so adding
+  files cannot push the text you are typing around.
+- **Object URLs have an owner.** Removing an attachment revokes its thumbnail;
+  sending transfers ownership to the turn (so clearing the composer must *not*
+  revoke it, or the transcript would blank); starting a new conversation
+  releases the transcript's. A blob URL kept past its last render pins the whole
+  file in memory.
+
+**UI when closed.** Verified with a real 2.2 MB JPEG and a real PDF:
+`working/169-composer-attachments-live.png` (composer),
+`working/170-transcript-attachments-live.png` (the same cards shown back, after
+a real vision turn answered about the photograph),
+`working/171-photo-inspection-live.png` (the same photograph at 156 % in the
+inspector) and `working/172-build-attachment-card-live.png` (Build).
+
+Covered by `AttachmentCard.test.ts` — type and size, local thumbnail, resolved
+thumbnail, glyph fallback, workspace path, inert by default, and the open/remove
+handlers.
 
 ---
 

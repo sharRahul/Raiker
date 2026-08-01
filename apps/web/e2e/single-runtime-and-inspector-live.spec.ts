@@ -111,6 +111,25 @@ test("Chat and Build offer the same composer affordances", async () => {
   await page.screenshot({ path: join(SHOTS, "163-build-composer-attach-live.png"), fullPage: true });
 });
 
+test("Build shows what a turn carried, the same way the composer did", async () => {
+  test.skip(process.env.RAIKER_E2E_IMAGE === undefined, "set RAIKER_E2E_IMAGE");
+  test.setTimeout(120_000);
+  await page.goto(`${BASE}/#/build`);
+  await expect(page.getByRole("group", { name: "How much Raiker may do" })).toBeVisible({
+    timeout: 20_000,
+  });
+  // The panel may already be open from the previous test — Build stays mounted
+  // across navigations — so open it only when it is actually shut.
+  const upload = page.getByLabel("Upload image");
+  if (!(await upload.count())) {
+    await page.getByRole("button", { name: "Add attachment" }).click();
+  }
+  await upload.setInputFiles(String(process.env.RAIKER_E2E_IMAGE));
+  const row = page.getByLabel("Attached to this prompt");
+  await expect(row.locator("img")).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: join(SHOTS, "172-build-attachment-card-live.png"), fullPage: true });
+});
+
 test("Memory offers View source on every record", async () => {
   test.setTimeout(90_000);
   await page.goto(`${BASE}/#/memory`);

@@ -55,6 +55,7 @@
   } from "../buildModes";
   import { humanize, relativeTime } from "../format";
   import { approvalBadge } from "../statusMaps";
+  import AttachmentCard from "../components/AttachmentCard.svelte";
   import ComposerAttach from "../components/ComposerAttach.svelte";
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
@@ -72,6 +73,8 @@
     id: number;
     prompt: string;
     mode: BuildMode;
+    /** What this turn carried, shown back the way the composer showed it. */
+    attachments: ComposerAttachment[];
     events: StreamEvent[];
     response: AgentResponse | null;
     streaming: boolean;
@@ -309,12 +312,15 @@
     // the exact text the turn received.
     const sent = preamble === "" ? text : `${preamble}\n\n${text}`;
     const sentMode = mode;
+    const sentAttachments = attachStore.take();
     turns = [
       ...turns,
-      { id: nextId++, prompt: sent, mode: sentMode, events: [], response: null, streaming: true, error: null },
+      {
+        id: nextId++, prompt: sent, mode: sentMode, attachments: sentAttachments,
+        events: [], response: null, streaming: true, error: null,
+      },
     ];
     const turn = turns[turns.length - 1];
-    const sentAttachments = attachStore.take();
     promptText = "";
     attachStore.clear();
     streaming = true;
@@ -371,7 +377,10 @@
       (() => {
         turns = [
           ...turns,
-          { id: nextId++, prompt: "", mode, events: [], response: null, streaming: true, error: null },
+          {
+            id: nextId++, prompt: "", mode, attachments: [],
+            events: [], response: null, streaming: true, error: null,
+          },
         ];
         return turns[turns.length - 1];
       })();
@@ -702,6 +711,17 @@
           <div class="from-you">
             <span class="mode-tag">{buildMode(turn.mode).label}</span>
             <p class="bubble-text">{turn.prompt}</p>
+            {#if turn.attachments.length > 0}
+              <!-- The same cards the composer showed, so what you sent looks
+                   like what you attached. Build has no file inspector of its
+                   own, so these state what rode along without claiming to
+                   open it. -->
+              <div class="turn-attachments">
+                {#each turn.attachments as a, i (a.attachmentId ?? a.path ?? i)}
+                  <AttachmentCard attachment={a} />
+                {/each}
+              </div>
+            {/if}
           </div>
 
           <div class="from-raiker">
@@ -1327,6 +1347,7 @@
     flex-wrap: wrap;
   }
 
+  .turn-attachments { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
   .copy-message {
     display: inline-flex;
     align-items: center;

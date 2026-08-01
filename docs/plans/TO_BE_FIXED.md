@@ -117,6 +117,7 @@ the product UI and are not stored in the repository or test artifacts.
 | FIXED-72 | Medium | Chat / restored approval state | Fixed (was BUG-34) |
 | FIXED-73 | Low | Chat / Build attachment layout | Fixed |
 | FIXED-74 | Medium | Build / Windows container sandbox | Fixed (found during verification) |
+| FIXED-75 | Low | Models / capacity history ordering | Fixed (found in GitHub CI) |
 | BUG-32 | Medium | Terminal / approval execution | Open |
 | BUG-36 | Low | Models / shipped price review cadence | Open |
 | BUG-37 | Low | Design system / visual polish | Open |
@@ -2595,6 +2596,24 @@ both platform-specific command shapes.
 **UI when closed.** An approved Build command can reach the configured local
 Docker sandbox on Windows instead of failing before launch; configuration and
 runtime failures still surface through the existing governed command feedback.
+
+---
+
+## FIXED-75 — Capacity history order was unstable for same-timestamp changes
+
+**Status: fixed in this change; found in GitHub CI.**
+
+**Observed.** Setting and immediately clearing an owner context-capacity
+override can produce identical stored timestamps. The history query used a
+random identifier as its secondary sort key, so CI could show the older `set`
+event before the newer `cleared` event even though both writes succeeded.
+
+**Fix.** Capacity history now orders equal timestamps by SQLite insertion order,
+newest first. The regression test pins both events to the same timestamp and
+asserts the stable lifecycle order.
+
+**UI when closed.** Models always shows the newest capacity administration
+action first, including rapid set/clear changes made within one clock tick.
 
 ---
 

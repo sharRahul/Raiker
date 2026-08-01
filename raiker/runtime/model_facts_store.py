@@ -157,7 +157,7 @@ class ModelFactsStore:
                 """SELECT capacity_id, endpoint_identity, context_window_tokens, action,
                 reason, recorded_by, recorded_at FROM model_capacity_history
                 WHERE owner_principal_id = ? AND provider = ? AND model = ?
-                ORDER BY recorded_at DESC, capacity_id DESC""",
+                ORDER BY recorded_at DESC, rowid DESC""",
                 (owner_principal_id, provider, model),
             ).fetchall()
         return [dict(row) for row in rows]

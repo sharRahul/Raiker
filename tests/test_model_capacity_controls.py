@@ -10,9 +10,14 @@ from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.tasks.scheduler import TaskScheduler
 
 
-def test_admin_context_capacity_override_and_history(tmp_path: Path) -> None:
+def test_admin_context_capacity_override_and_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = tmp_path / "capacity"
     workspace.mkdir()
+    monkeypatch.setattr(
+        "raiker.runtime.model_facts_store.utc_now", lambda: "2026-08-01T12:00:00+00:00"
+    )
     bootstrap_owner("owner", "Owner", workspace_root=workspace)
     client = TestClient(create_app(workspace))
     token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]

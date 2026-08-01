@@ -92,6 +92,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-34 | Medium | Chat / restored approval state | Open |
 | BUG-35 | Low | Build / composer attachments | Open |
 | BUG-36 | Low | Models / shipped price review cadence | Open |
+| BUG-37 | Low | Design system / visual polish | Open |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -2253,6 +2254,67 @@ re-verify them on a cadence.
 **UI when closed.** Models → Pricing states when each shipped documented rate
 was last reviewed by a human, distinct from when it was last synchronised, and
 flags a rate whose review is overdue.
+
+---
+
+## BUG-37 — The visual language is correct but not yet finished
+
+**Status: open; a first token-level pass shipped in this change.**
+
+**What shipped now.** The refinements worth making at the token level, because
+each one lifts every page at once rather than one screen at a time:
+
+- **A real depth ladder.** `--shadow-1` was two near-identical mid blurs, which
+  reads as haze rather than elevation. Each level is now a tight contact shadow
+  plus a wider ambient one, in both themes, with a new `--shadow-0` for the
+  faintest surfaces.
+- **Optical tracking.** A `--tracking-tight` token, applied to `h1` and a
+  `.display` class. Type set large keeps the letter spacing it was drawn with,
+  which reads loose at display sizes.
+- **Themed scrollbars.** This app is mostly scrollers — the transcript, tables,
+  the sidebar, code blocks — and a default platform scrollbar was the loudest
+  undesigned element on screen. Firefox uses the standard properties, WebKit and
+  Blink the pseudo-elements; the hit area is unchanged.
+- **A readable selection.** `::selection` set only a background, so selected
+  text inside an accent bubble inherited a colour that vanished against it.
+- **A softer focus halo.** A 4px `--accent-soft` glow behind the existing 2px
+  outline, so focus reads on both a white card and a dark deck without
+  thickening the outline. Dropped under `forced-colors`, where the system owns
+  focus.
+
+**What remains.** These need design decisions, not just token edits, and each
+one is a change to how a page is composed rather than how a surface is painted:
+
+1. **A type scale with intent.** `h1`/`h2`/`h3` currently sit at 1.45 / 1.08 /
+   0.95rem — barely separated, so heading level is carried by weight alone.
+   A proper modular scale, with the serif face used deliberately for display
+   rather than only in empty states.
+2. **Density modes.** The workspace is dense by nature; an owner reviewing a
+   long transcript and one scanning a pricing table want different row heights.
+   A comfortable/compact setting, applied through spacing tokens.
+3. **Empty and loading states as first-class art.** `PageState` and `EmptyState`
+   are functional but plain. They are the first thing a new owner sees on almost
+   every page.
+4. **Iconography.** `Icon.svelte` is a hand-rolled set at one weight. It needs a
+   consistent optical size, a filled/outline pair for selected states, and a
+   review for the icons that currently repeat across unrelated meanings.
+5. **Data-visual language.** The context meter, spend bars, and the pricing
+   table each invented their own treatment. One set of rules for meters, bars,
+   and numeric tables — including tabular figures everywhere a number is
+   compared vertically.
+6. **Motion.** One `--ease` and a 120ms convention exist, but transitions are
+   applied ad hoc. A small documented set — enter, exit, emphasis — honoured
+   under `prefers-reduced-motion`.
+
+**UI when closed.** A documented visual specification a contributor can build a
+new page from without inventing, and every existing page audited against it in
+both themes at 375 / 768 / 1024 / 1440 px.
+
+Live evidence for the pass that shipped:
+[`screenshots/working/133-visual-refresh-workbench-light.png`](screenshots/working/133-visual-refresh-workbench-light.png),
+[`screenshots/working/133-visual-refresh-workbench-dark.png`](screenshots/working/133-visual-refresh-workbench-dark.png),
+[`screenshots/working/134-visual-refresh-models-light.png`](screenshots/working/134-visual-refresh-models-light.png),
+and [`screenshots/working/134-visual-refresh-models-dark.png`](screenshots/working/134-visual-refresh-models-dark.png).
 
 ---
 

@@ -74,6 +74,8 @@ so every figure shown is the honest-gap path rather than a live model turn.
 | `130-models-providers-tab-live.png` | Models → Providers: connect a provider and choose the exact model |
 | `131-models-routing-tab-live.png` | Models → Routing: the fallback sequence and the advisor model |
 | `132-models-posture-tab-live.png` | Models → Posture: the read-only off-machine gate status |
+| `133-visual-refresh-workbench-{light,dark}.png` | BUG-37 token pass: depth ladder, tracking, scrollbars, focus halo — Workbench, both themes |
+| `134-visual-refresh-models-{light,dark}.png` | The same pass on a dense table surface, both themes |
 
 The Models page is split by action category — Providers, Routing, Pricing,
 Posture — so each panel is one errand and a shareable location

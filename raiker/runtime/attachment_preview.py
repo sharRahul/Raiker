@@ -202,6 +202,35 @@ class AttachmentPreviewService:
             return None
         return str(record.get("filename", "")), media_type, data
 
+    def download_bytes(
+        self, session_id: str, attachment_id: str, owner_id: str
+    ) -> tuple[str, str, bytes] | None:
+        """Authorise one attachment for download (BUG-28).
+
+        Download is deliberately *not* ``served_bytes``. That path exists to put
+        pixels or a PDF in front of the browser's own viewer, so it is limited to
+        the two types that can be displayed safely and re-validates them as
+        exactly those types. Taking a file away with you is a different act: a
+        generated .docx, a .xlsx, a Markdown report are all legitimate downloads
+        and none of them can be displayed inline. So this authorises anything the
+        conversation actually holds — the same stored reference, the same owner
+        scoping, no wider — and leaves *how* it is delivered to the route, which
+        never serves a download as anything the browser will run.
+
+        Returns ``(filename, media_type, bytes)`` or ``None`` when this account
+        may not see the file, or when the bytes are no longer retained.
+        """
+        record = self.authorized_record(session_id, attachment_id, owner_id)
+        if record is None:
+            return None
+        data = bytes(record.get("data", b""))
+        if not data:
+            # The reference survives but the bytes do not. Distinguishable from
+            # "you may not see this" by the caller, so the pane can say the file
+            # is no longer retained instead of implying it never existed.
+            return None
+        return str(record.get("filename", "")), str(record.get("media_type", "")), data
+
     def list_session_files(self, session_id: str, owner_id: str) -> list[dict[str, Any]]:
         """Metadata for every attachment referenced by one session (no bytes).
 

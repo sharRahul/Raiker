@@ -3,6 +3,7 @@ import type {
   ApprovalDetailView,
   ApprovalView,
   AttachmentPreview,
+  SourceExcerptView,
   AuthSession,
   BrainView,
   BrainSourceResult,
@@ -501,6 +502,25 @@ export const api = {
     const blob = await requestBlob(bytesPath);
     return URL.createObjectURL(blob);
   },
+  // BUG-28 — the bytes of one authorised file, for saving rather than reading.
+  // Fetched with the bearer token for the same reason previews are: a bare
+  // <a download> cannot send one. The server always answers
+  // application/octet-stream, so nothing downloaded is ever handed to the
+  // browser as something it will run.
+  attachmentDownload: (sessionId: string, attachmentId: string): Promise<Blob> =>
+    requestBlob(
+      `/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/download`,
+    ),
+  // BUG-27 — which exchange produced a generated file, resolved the same way
+  // memory provenance is, so both surfaces give the same honest answers.
+  attachmentProvenance: (sessionId: string, attachmentId: string) =>
+    request<SourceExcerptView>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/provenance`,
+    ),
+  // BUG-27 — the passage a memory was drawn from. Every non-resolvable case
+  // comes back as a named status rather than an error.
+  memorySource: (memoryId: string) =>
+    request<SourceExcerptView>(`/api/memory/${encodeURIComponent(memoryId)}/source`),
   events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
     request<EventEntry[]>(withQuery("/api/events", params)),
   brain: () => request<BrainView>("/api/brain"),
@@ -760,6 +780,14 @@ export const api = {
     model_profile?: string;
     model?: string;
   }) => postJson<TaskView>("/api/tasks", body),
+  // BUG-25 — ask the host to continue one parked scheduled run now. The
+  // scheduler does this on its own tick; this is the owner's retry for when
+  // automatic continuation could not proceed, and it runs the same path.
+  resumeTask: (taskId: string) =>
+    postJson<{ ok: boolean; reason_code: string | null; task_status: string; summary: string }>(
+      `/api/tasks/${encodeURIComponent(taskId)}/resume`,
+      {},
+    ),
 
   // ── Prompts / interrupts ──
   // Non-streaming prompt submit; returns the final governed AgentResponse.

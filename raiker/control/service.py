@@ -26,14 +26,15 @@ from raiker.runtime.authority.activation import (
     has_executor,
     has_threat_model_ack,
 )
-from raiker.runtime.authority.models import Principal, PrincipalType, RiskLevelValue
+from raiker.runtime.authority.models import (
+    RAIKER_RUNTIME,
+    RUNTIME_STATUS_ACTIVE,
+    Principal,
+    PrincipalType,
+    RiskLevelValue,
+)
 from raiker.runtime.authority.router import GovernedAction, GovernedActionResult, RuntimeAuthority
 from raiker.storage.sqlite import SQLiteStore
-
-_RUNTIME_ENABLEMENT_MODES = frozenset({
-    "local_single_user_runtime",
-    "multi_user_local_runtime",
-})
 
 _DANGEROUS_CAPS = frozenset({
     "shell_execution", "process_execution", "network_execution",
@@ -49,13 +50,10 @@ _DANGEROUS_CAPS = frozenset({
     "hosted_model_runtime", "private_network_model_runtime",
 })
 
-_ALLOWED_RUNTIME_MODES = (
-    "development_preview",
-    "local_single_user_safe",
-    "local_single_user_runtime",
-    "multi_user_local_runtime",
-    "hosted_or_networked_runtime",
-)
+# Raiker has one runtime. `allowed_modes` stays on the DTO because clients read
+# it, and it now reports the single truth rather than a menu: there is one entry,
+# so a client that renders a picker from it renders a fact, not a choice.
+_ALLOWED_RUNTIME_MODES = (RAIKER_RUNTIME,)
 
 
 class RuntimeControlService:
@@ -105,12 +103,15 @@ class RuntimeControlService:
         for cs in CapabilityState:
             sv = cs.value
             if cs == CapabilityState.ENABLED_RUNTIME:
-                active_mode = (
+                # One runtime: the only thing that can withhold this transition
+                # is the owner having switched the agent runtime off.
+                runtime = (
                     self._store.get_principal_runtime_mode(principal_id)
-                    if principal_id else self._store.get_active_runtime_mode()
+                    if principal_id else self._store.get_latest_runtime_mode()
                 )
-                mode_name = (active_mode or {}).get("mode_name", "development_preview")
-                if mode_name not in _RUNTIME_ENABLEMENT_MODES:
+                if runtime is not None and str(
+                    runtime.get("status", RUNTIME_STATUS_ACTIVE)
+                ) != RUNTIME_STATUS_ACTIVE:
                     continue
             if cs in (CapabilityState.ENABLED_RUNTIME, CapabilityState.ENABLED_POLICY_GATED) and req is not None and req.requires_executor and not has_executor(capability, self._registry):
                     continue
@@ -199,8 +200,8 @@ class RuntimeControlService:
     def get_runtime_mode(self, acting_principal_id: str | None = None) -> RuntimeModeView:
         mode = self._authority.get_runtime_mode(acting_principal_id)
         return RuntimeModeView(
-            mode_name=mode.get("mode_name", "development_preview"),
-            status=mode.get("status", "inactive"),
+            mode_name=mode.get("mode_name", RAIKER_RUNTIME) or RAIKER_RUNTIME,
+            status=mode.get("status", RUNTIME_STATUS_ACTIVE) or RUNTIME_STATUS_ACTIVE,
             activated_by=mode.get("activated_by", "") or "",
             activated_at=mode.get("activated_at", "") or "",
             reason=mode.get("reason", "") or "",
@@ -259,8 +260,9 @@ class RuntimeControlService:
 
         production_ready = (
             owner_ok
-            and mode_view.mode_name in ("local_single_user_runtime", "local_single_user_safe")
-            and mode_view.status == "active"
+            # One runtime, so readiness asks whether it is accepting executions
+            # rather than which of five names it happens to be running under.
+            and mode_view.status == RUNTIME_STATUS_ACTIVE
             and gm_ok
             and acting_ok
             and dangerous_caps_disabled

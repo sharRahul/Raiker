@@ -697,3 +697,117 @@ def test_docx_fixture_is_shared_with_the_document_suite() -> None:
     # Guards the cross-suite import above: a rename there must fail here, not
     # silently reduce this file's coverage.
     assert DOCX_BYTES.startswith(b"PK\x03\x04")
+
+
+# ── BUG-28: taking a generated artifact away ────────────────────────────────
+#
+# Download is a different act from preview, so it gets its own authorization
+# test rather than riding on the preview ones: the whole risk of a byte route is
+# that it is wider than the reader beside it.
+
+
+def _download_url(attachment_id: str, session_id: str = SESSION_ID) -> str:
+    return f"/api/sessions/{session_id}/attachments/{attachment_id}/download"
+
+
+class TestAttachmentDownload:
+    def test_download_returns_the_stored_bytes_as_an_attachment(
+        self, client: TestClient, store: SQLiteStore, owner_token: str
+    ) -> None:
+        attachment_id = _attach(
+            store, filename="report.md", media_type="text/markdown", data=MD_SOURCE.encode()
+        )
+        response = client.get(_download_url(attachment_id), headers=_auth(owner_token))
+        assert response.status_code == 200
+        assert response.content == MD_SOURCE.encode()
+        # Never handed to the browser as something it will run, and never
+        # displayed inline in place of the conversation.
+        assert response.headers["content-type"].startswith("application/octet-stream")
+        assert response.headers["content-disposition"].startswith("attachment;")
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert response.headers["cache-control"] == "no-store"
+
+    def test_download_is_limited_to_the_owner_and_the_conversation(
+        self, client: TestClient, store: SQLiteStore, owner_token: str, workspace: Path, seed_account: Any
+    ) -> None:
+        attachment_id = _attach(
+            store, filename="report.md", media_type="text/markdown", data=MD_SOURCE.encode()
+        )
+        _, other_token = seed_account(workspace, "bob")
+        assert client.get(_download_url(attachment_id), headers=_auth(other_token)).status_code == 404
+        assert client.get(
+            _download_url(attachment_id, session_id="sess_other"), headers=_auth(owner_token)
+        ).status_code == 404
+
+    def test_download_requires_authentication(
+        self, client: TestClient, store: SQLiteStore
+    ) -> None:
+        attachment_id = _attach(
+            store, filename="report.md", media_type="text/markdown", data=MD_SOURCE.encode()
+        )
+        assert client.get(_download_url(attachment_id)).status_code == 401
+
+    def test_the_download_filename_cannot_name_a_path_or_break_the_header(
+        self, client: TestClient, store: SQLiteStore, owner_token: str
+    ) -> None:
+        attachment_id = _attach(
+            store,
+            filename='../../etc/pa"sswd; x=y.md',
+            media_type="text/markdown",
+            data=MD_SOURCE.encode(),
+        )
+        disposition = client.get(
+            _download_url(attachment_id), headers=_auth(owner_token)
+        ).headers["content-disposition"]
+        assert "/" not in disposition.split("filename=", 1)[1]
+        assert ";" not in disposition.split('filename="', 1)[1].rsplit('"', 1)[0]
+
+    def test_a_download_leaves_audit_evidence_without_the_bytes(
+        self, client: TestClient, store: SQLiteStore, owner_token: str
+    ) -> None:
+        attachment_id = _attach(
+            store, filename="report.md", media_type="text/markdown", data=MD_SOURCE.encode()
+        )
+        from raiker.events.query import EventViewer
+
+        client.get(_download_url(attachment_id), headers=_auth(owner_token))
+        viewer = EventViewer(store)
+        rows = viewer.list_events(event_type="attachment_downloaded")
+        assert len(rows) == 1
+        payload = viewer.read_event_payload(str(rows[0]["event_id"])) or {}
+        assert payload.get("payload", payload).get("attachment_id") == attachment_id
+        # Metadata only: the file's own contents never enter an event payload.
+        assert MD_SOURCE.split("\n")[0] not in str(payload)
+
+
+# ── BUG-27: where a generated file came from ───────────────────────────────
+
+
+class TestAttachmentProvenance:
+    def test_provenance_resolves_the_turn_that_produced_the_file(
+        self, client: TestClient, store: SQLiteStore, owner_token: str
+    ) -> None:
+        store.create_session(SESSION_ID, "workspace")
+        store.insert_turn(SESSION_ID, "turn_1", "Write me the quarterly report.md")
+        attachment_id = _attach(
+            store, filename="report.md", media_type="text/markdown", data=MD_SOURCE.encode()
+        )
+        body = client.get(
+            f"/api/sessions/{SESSION_ID}/attachments/{attachment_id}/provenance",
+            headers=_auth(owner_token),
+        ).json()
+        assert body["ok"] is True
+        assert body["status"] in ("resolved", "source_changed")
+        assert body["session_id"] == SESSION_ID
+
+    def test_provenance_is_owner_scoped(
+        self, client: TestClient, store: SQLiteStore, owner_token: str, workspace: Path, seed_account: Any
+    ) -> None:
+        attachment_id = _attach(
+            store, filename="report.md", media_type="text/markdown", data=MD_SOURCE.encode()
+        )
+        _, other_token = seed_account(workspace, "bob")
+        assert client.get(
+            f"/api/sessions/{SESSION_ID}/attachments/{attachment_id}/provenance",
+            headers=_auth(other_token),
+        ).status_code == 404

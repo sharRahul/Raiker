@@ -1164,6 +1164,34 @@ async def create_task(
     return serialize_dto(view)
 
 
+@router.post("/api/tasks/{task_id}/resume")
+async def resume_task(
+    task_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Continue one parked scheduled run whose approval has been granted (BUG-25).
+
+    The scheduler already does this on its own tick; this is the owner saying
+    "try that again" when automatic continuation could not proceed — a browser
+    tab won the claim, the host was down when the decision landed, the
+    continuation threw. It runs exactly the same code path, so it can never
+    continue something the automatic pass would have refused, and exactly-once
+    is still the store's atomic claim rather than anything added here.
+    """
+    from raiker.tasks.scheduler import TaskScheduler
+
+    session, _principal = auth_data
+    workspace: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
+    result = await TaskScheduler(workspace).resume_task(task_id, session.principal_id)
+    if result.get("reason_code") == "task_not_found":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": "task_not_found"},
+        )
+    return result
+
+
 @router.get("/api/models")
 async def get_models(
     request: Request,

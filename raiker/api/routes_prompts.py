@@ -52,7 +52,7 @@ REST_CLIENT = ClientMetadata(type="rest", name="raiker-rest", version="0.0.0")
 _PROMPT_CLIENTS = {"web_ui": WEB_UI_CLIENT, "rest": REST_CLIENT}
 # Work the owner can still stop. `waiting_for_approval` belongs here: the run is
 # unfinished and parked on a decision, so "stop everything" must reach it too.
-_ACTIVE_TASK_STATES = ("queued", "running", "paused", "waiting_for_approval")
+_ACTIVE_TASK_STATES = ("queued", "running", "continuing", "paused", "waiting_for_approval")
 
 
 def _ws(request: Request) -> str | Path:

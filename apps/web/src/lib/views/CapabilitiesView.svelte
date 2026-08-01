@@ -297,10 +297,10 @@
   <div class="runtime-note" role="note">
     <Icon name="info" size={16} />
     <span>
-      Capabilities with a real executor ship enabled in the local single-user runtime, but the web
-      dashboard fails closed per account — they start <strong>off</strong> here until you turn them on.
-      Reaching “runtime” also needs a runtime-enablement mode active; activate one under
-      <a href="#/settings">Settings → Runtime mode</a> (Development preview keeps everything off).
+      Capabilities with a real executor ship enabled in the Raiker runtime, but the web dashboard
+      fails closed per account — they start <strong>off</strong> here until you turn them on. Raiker
+      runs one runtime, so nothing has to be selected first; the only runtime-level switch is
+      <a href="#/settings">Settings → Runtime configuration</a>, which stops work entirely.
     </span>
   </div>
 {/if}

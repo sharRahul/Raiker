@@ -28,7 +28,7 @@ export const NAV_GROUPS: NavGroup[] = [
   { label: "Observe", items: [
     { id: "observe", label: "Observability", icon: "diagnostics", hint: "Readiness, audit log, checkpoints, live work, and notifications" },
   ] },
-  { label: "Utilities", items: [{ id: "settings", label: "Settings", icon: "settings", hint: "Runtime mode, security posture, appearance" }] },
+  { label: "Utilities", items: [{ id: "settings", label: "Settings", icon: "settings", hint: "Runtime, security posture, appearance" }] },
 ];
 export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 export const DEFAULT_ROUTE = "home";

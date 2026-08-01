@@ -2,7 +2,8 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
-  import type { MemoryControlView, MemorySettingsView } from "../apiTypes";
+  import FileInspector from "../components/FileInspector.svelte";
+  import type { MemoryControlView, MemorySettingsView, SourceExcerptView } from "../apiTypes";
   import { relativeTime } from "../format";
 
   type MemoryImport = Array<Partial<MemoryControlView> & { text: string }>;
@@ -70,6 +71,48 @@
     try { await api.importMemories(importPreview); importPreview = null; importFileName = ""; await load(); }
     catch { actionError = "Could not import memories."; }
   }
+  // BUG-27 — opening the passage a memory was drawn from. Provenance that
+  // cannot be checked is indistinguishable, from where the owner sits, from
+  // provenance that was invented; this is the check. Resolved on demand,
+  // because the answer depends on what is still readable now.
+  let sourceFor = $state<MemoryControlView | null>(null);
+  let sourceExcerpt = $state<SourceExcerptView | null>(null);
+  let sourceLoading = $state(false);
+
+  async function viewSource(m: MemoryControlView) {
+    sourceFor = m;
+    sourceExcerpt = null;
+    sourceLoading = true;
+    try {
+      sourceExcerpt = await api.memorySource(m.memory_id);
+    } catch {
+      // The resolver answers every knowable case with a status, so reaching
+      // here means the runtime itself could not be asked. Say that, rather
+      // than implying the memory has no source.
+      sourceExcerpt = {
+        status: "no_provenance",
+        kind: "",
+        title: "",
+        excerpt: "",
+        highlight_start: -1,
+        highlight_length: 0,
+        session_id: "",
+        turn_id: "",
+        attachment_id: "",
+        truncated: false,
+      };
+      actionError = "Could not reach the runtime to open this memory's source.";
+    } finally {
+      sourceLoading = false;
+    }
+  }
+
+  function closeSource() {
+    sourceFor = null;
+    sourceExcerpt = null;
+    sourceLoading = false;
+  }
+
   function provenanceLabel(m: MemoryControlView): string {
     const title = m.provenance["source_title"] ?? m.provenance["session_title"] ?? m.provenance["path"];
     return title ? `${m.source} — ${String(title)}` : m.source || "Source not available";
@@ -117,7 +160,7 @@
 
   {#if pending.length}
     <section class="memory-section"><div class="section-head"><h3>Pending review</h3><span>{pending.length}</span></div>
-      {#each pending as m (m.memory_id)}<article class="memory-card pending"><h4>{m.text}</h4><p>Proposed from: {provenanceLabel(m)}</p><div class="meta"><span>{m.scope}</span><span>{m.sensitivity} sensitivity</span><span>{m.retention}</span></div><p class="review-note">Approval and rejection are completed in the governed approval queue.</p><a class="btn btn-ghost btn-sm" href="#/approvals">Review proposal</a></article>{/each}
+      {#each pending as m (m.memory_id)}<article class="memory-card pending"><h4>{m.text}</h4><p>Proposed from: {provenanceLabel(m)}</p><div class="meta"><span>{m.scope}</span><span>{m.sensitivity} sensitivity</span><span>{m.retention}</span></div><p class="review-note">Approval and rejection are completed in the governed approval queue.</p><div class="card-actions"><button class="btn btn-ghost btn-sm" aria-label={`View the source of “${m.text.slice(0, 40)}”`} onclick={() => void viewSource(m)}>View source</button><a class="btn btn-ghost btn-sm" href="#/approvals">Review proposal</a></div></article>{/each}
     </section>
   {/if}
 
@@ -128,12 +171,22 @@
       <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size={12} /> Pinned</span>{/if}</div>
       <div class="meta"><span>Approved</span><span>{m.scope} scope</span><span>{m.sensitivity} sensitivity</span></div>
       <dl><div><dt>Source</dt><dd>{provenanceLabel(m)}</dd></div><div><dt>Approved</dt><dd>{relativeTime(m.created_at)}</dd></div><div><dt>Review or expiry</dt><dd>{m.expires_at ? relativeTime(m.expires_at) : "No date set"}</dd></div></dl>
-      <div class="card-actions">{#if editingId === m.memory_id}<button class="btn btn-primary btn-sm" aria-label="Save memory" onclick={() => void saveEdit(m)}>Save</button><button class="btn btn-ghost btn-sm" onclick={() => editingId = null}>Cancel</button>{:else}<button class="btn btn-ghost btn-sm" aria-label="Edit memory" onclick={() => { editingId = m.memory_id; editDraft = m.text; }}>Edit</button><button class="btn btn-ghost btn-sm" aria-label={m.pinned ? "Unpin memory" : "Pin memory"} onclick={() => void togglePin(m)}>{m.pinned ? "Unpin" : "Pin"}</button><button class="btn btn-ghost btn-sm danger" aria-label="Forget memory" onclick={() => void forget(m)}>Forget</button>{/if}</div>
+      <div class="card-actions">{#if editingId === m.memory_id}<button class="btn btn-primary btn-sm" aria-label="Save memory" onclick={() => void saveEdit(m)}>Save</button><button class="btn btn-ghost btn-sm" onclick={() => editingId = null}>Cancel</button>{:else}<button class="btn btn-ghost btn-sm" aria-label={`View the source of “${m.text.slice(0, 40)}”`} onclick={() => void viewSource(m)}>View source</button><button class="btn btn-ghost btn-sm" aria-label="Edit memory" onclick={() => { editingId = m.memory_id; editDraft = m.text; }}>Edit</button><button class="btn btn-ghost btn-sm" aria-label={m.pinned ? "Unpin memory" : "Pin memory"} onclick={() => void togglePin(m)}>{m.pinned ? "Unpin" : "Pin"}</button><button class="btn btn-ghost btn-sm danger" aria-label="Forget memory" onclick={() => void forget(m)}>Forget</button>{/if}</div>
       <details><summary>Advanced metadata and history</summary><p>Type: {m.memory_type} · Retention: {m.retention} · Confidence: {m.confidence.toFixed(2)} · Trust: {m.trust_score.toFixed(2)}</p><p>Source record details: {Object.keys(m.provenance).length ? Object.keys(m.provenance).join(", ") : "Source metadata unavailable"}</p></details>
     </article>{/each}</div>{/if}
   </section>
 
   <details class="advanced"><summary><span><strong>Advanced memory management</strong><small>Import or export governed memory records.</small></span><Icon name="chevron-down" size={16} /></summary><div class="advanced-body"><button class="btn btn-ghost" onclick={() => void exportMemories()}>Export memories</button><label class="btn btn-ghost file-button">Review import<input type="file" accept="application/json,.json" onchange={(e) => void reviewImport(e)} /></label>{#if importPreview}<div class="import-review" role="status"><strong>{importFileName}</strong><span>{importPreview.length} valid record{importPreview.length === 1 ? "" : "s"} ready for governed import.</span><button class="btn btn-primary btn-sm" onclick={() => void applyImport()}>Import reviewed records</button></div>{/if}</div></details>
+{/if}
+
+{#if sourceFor !== null}
+  <FileInspector
+    preview={null}
+    filename={sourceFor.text.slice(0, 60)}
+    source={sourceExcerpt}
+    {sourceLoading}
+    onclose={closeSource}
+  />
 {/if}
 
 <style>

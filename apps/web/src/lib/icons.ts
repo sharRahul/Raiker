@@ -46,7 +46,18 @@ export type IconName =
   | "user-plus"
   | "eye"
   | "eye-off"
-  | "bell";
+  | "bell"
+  // BUG-26 — the image inspection controls.
+  | "zoom-in"
+  | "zoom-out"
+  | "fit"
+  | "rotate"
+  // BUG-28 — taking a generated artifact away with you.
+  | "download"
+  // BUG-23 — the code-block copy action, as a glyph rather than a word.
+  | "copy"
+  // BUG-27 — opening the exact passage a memory or a file came from.
+  | "quote";
 
 // Each icon is one or more SVG path `d` strings (stroke, round caps).
 export const ICON_PATHS: Record<IconName, string[]> = {
@@ -145,5 +156,32 @@ export const ICON_PATHS: Record<IconName, string[]> = {
     "M9.9 5.9A9 9 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17.4 17.4 0 0 1-3.3 3.9",
     "M6.1 8.2A17 17 0 0 0 2.5 12S6 18.5 12 18.5c1 0 2-.2 2.9-.5",
     "M10.2 10.3a2.5 2.5 0 0 0 3.5 3.5",
+  ],
+  "zoom-in": [
+    "M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Z",
+    "M15.5 15.5 21 21",
+    "M10.5 7.8v5.4",
+    "M7.8 10.5h5.4",
+  ],
+  "zoom-out": [
+    "M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13Z",
+    "M15.5 15.5 21 21",
+    "M7.8 10.5h5.4",
+  ],
+  fit: [
+    "M4 9V5a1 1 0 0 1 1-1h4",
+    "M15 4h4a1 1 0 0 1 1 1v4",
+    "M20 15v4a1 1 0 0 1-1 1h-4",
+    "M9 20H5a1 1 0 0 1-1-1v-4",
+  ],
+  rotate: ["M20 12a8 8 0 1 1-2.3-5.6", "M20 3.5v5h-5"],
+  download: ["M12 4v10.5", "M8 11l4 4 4-4", "M5 19h14"],
+  copy: [
+    "M9 9.5A1.5 1.5 0 0 1 10.5 8h7A1.5 1.5 0 0 1 19 9.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 9 16.5v-7Z",
+    "M15 8V6.5A1.5 1.5 0 0 0 13.5 5h-7A1.5 1.5 0 0 0 5 6.5v7A1.5 1.5 0 0 0 6.5 15H8",
+  ],
+  quote: [
+    "M9.5 6.5C7 7.6 5.5 9.8 5.5 12.5v5h5v-5h-3c0-1.8.8-3.2 2.6-4.1Z",
+    "M18.5 6.5c-2.5 1.1-4 3.3-4 6v5h5v-5h-3c0-1.8.8-3.2 2.6-4.1Z",
   ],
 };

@@ -47,16 +47,16 @@ export const AUTH_SESSION = {
 };
 
 export const RUNTIME_MODE: RuntimeMode = {
-  mode_name: "local_single_user_runtime",
+  mode_name: "raiker_runtime",
   status: "active",
   activated_by: "prin_owner",
   activated_at: "2026-07-07T00:00:00Z",
   reason: "test",
-  allowed_modes: ["local_single_user_runtime"],
+  allowed_modes: ["raiker_runtime"],
 };
 
 export const DIAGNOSTICS: Diagnostics = {
-  runtime_mode: "local_single_user_runtime",
+  runtime_mode: "raiker_runtime",
   production_ready_local_single_user_runtime: true,
   summary: {},
   disabled_capabilities: ["finance_runtime"],

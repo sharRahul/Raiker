@@ -106,9 +106,11 @@ describe("McpView", () => {
       expect(screen.getAllByText(/enabled, but only at/i).length).toBe(2),
     );
     expect(screen.queryByText(/is turned off/i)).not.toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "Settings → Runtime mode" })[0]).toHaveAttribute(
+    // One runtime: raising a capability to runtime level is a Permissions
+    // action, so the link goes there rather than to a mode picker.
+    expect(screen.getAllByRole("link", { name: "Open Permissions" })[0]).toHaveAttribute(
       "href",
-      "#/settings",
+      "#/capabilities",
     );
   });
 

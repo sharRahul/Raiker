@@ -27,6 +27,7 @@ from raiker.cli.principal_resolver import (
 )
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import User
+from raiker.runtime.authority.models import RAIKER_RUNTIME
 from raiker.storage.sqlite import SQLiteStore
 
 LOCKOUT_THRESHOLD = 5
@@ -79,7 +80,7 @@ class AccountService:
         created = self._store.create_initial_account_atomic(
             user=User(user_id, username, None, True, now, now), principal_id=principal_id,
             username=username, password_hash=encoded, hash_algo=algo,
-            role_ids=OWNER_BOOTSTRAP_ROLES, max_runtime_mode="multi_user_local_runtime",
+            role_ids=OWNER_BOOTSTRAP_ROLES, max_runtime_mode=RAIKER_RUNTIME,
         )
         if not created:
             raise AuthError("Create new user and separate Raiker instance instead")

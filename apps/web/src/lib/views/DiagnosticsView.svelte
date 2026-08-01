@@ -48,8 +48,8 @@
   // Plain-English labels for backend identifiers.
   function runtimeModeLabel(mode: string): string {
     switch (mode) {
-      case "local_single_user_runtime": return "Local single-user";
-      case "production_ready_local_single_user_runtime": return "Local single-user (production-ready)";
+      case "raiker_runtime": return "Raiker runtime";
+      case "production_ready_local_single_user_runtime": return "Raiker runtime (production-ready)";
       default: return humanize(mode);
     }
   }

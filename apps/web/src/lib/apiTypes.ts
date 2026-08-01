@@ -867,6 +867,44 @@ export interface AttachmentPreview {
   unavailable_reason: string | null;
 }
 
+/**
+ * BUG-27 — one resolved source passage, or the stated reason there is not one.
+ *
+ * `status` is the whole contract. Only `resolved` carries a located passage;
+ * every other value is a fact the owner is entitled to see instead of an empty
+ * pane, and the inspector states each one in words:
+ *
+ * - `no_provenance` — the record never stored where it came from.
+ * - `source_deleted` — the conversation or turn is gone.
+ * - `source_changed` — the source is readable, but no longer contains the
+ *   passage, so the excerpt is shown without a highlight rather than with a
+ *   guessed one.
+ * - `unsupported_source` — a real, readable source with no text offset to open
+ *   it at (an image, a PDF, a spreadsheet).
+ * - `not_authorized` — this account may not read the source.
+ *
+ * `highlight_start` is `-1` whenever there is no located passage.
+ */
+export interface SourceExcerptView {
+  ok?: boolean;
+  status:
+    | "resolved"
+    | "no_provenance"
+    | "source_deleted"
+    | "source_changed"
+    | "unsupported_source"
+    | "not_authorized";
+  kind: string;
+  title: string;
+  excerpt: string;
+  highlight_start: number;
+  highlight_length: number;
+  session_id: string;
+  turn_id: string;
+  attachment_id: string;
+  truncated: boolean;
+}
+
 // GET /api/sessions/{id}/attachments — metadata only, so a reloaded chat can
 // redraw the attachment chips its transcript does not persist.
 export interface SessionAttachment {

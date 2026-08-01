@@ -33,6 +33,7 @@ from raiker.runtime.authority.models import (
     Principal,
     PrincipalType,
     RuntimeMode,
+    normalize_runtime_mode,
 )
 from raiker.storage.sqlite import SQLiteStore
 
@@ -76,7 +77,7 @@ def human_principal() -> Principal:
         display_name="Test Human",
         role_ids=("rl_admin",),
         domain_scopes=("coding", "email"),
-        max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_RUNTIME,
+        max_runtime_mode=RuntimeMode.RAIKER_RUNTIME,
         is_active=True,
     )
 
@@ -89,7 +90,7 @@ def ai_principal() -> Principal:
         display_name="Test AI Agent",
         role_ids=("rl_assistant",),
         domain_scopes=("coding",),
-        max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_SAFE,
+        max_runtime_mode=RuntimeMode.RAIKER_RUNTIME,
         is_active=True,
     )
 
@@ -102,7 +103,7 @@ def automation_principal() -> Principal:
         display_name="Test Automation",
         role_ids=("rl_automation",),
         domain_scopes=("finance",),
-        max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_SAFE,
+        max_runtime_mode=RuntimeMode.RAIKER_RUNTIME,
         is_active=True,
     )
 
@@ -647,11 +648,14 @@ def test_email_redacted() -> None:
 # ── Runtime Modes ──
 
 
-def test_runtime_modes_defined() -> None:
-    for mode in ("development_preview", "local_single_user_safe",
-                 "local_single_user_runtime", "multi_user_local_runtime",
-                 "hosted_or_networked_runtime"):
-        assert mode in RUNTIME_MODES, f"missing runtime mode: {mode}"
+def test_there_is_exactly_one_runtime() -> None:
+    """Raiker runs one runtime; every historical name resolves to it."""
+    assert {"raiker_runtime"} == RUNTIME_MODES
+    for legacy in ("development_preview", "local_single_user_safe",
+                   "local_single_user_runtime", "multi_user_local_runtime",
+                   "hosted_or_networked_runtime"):
+        assert normalize_runtime_mode(legacy) == "raiker_runtime"
+    assert normalize_runtime_mode("something_else") is None
 
 
 def test_principal_type_values() -> None:
@@ -669,7 +673,7 @@ def test_effective_permissions_intersection(authority: RuntimeAuthority) -> None
         display_name="Test",
         role_ids=("rl_assistant",),
         domain_scopes=("coding",),
-        max_runtime_mode=RuntimeMode.LOCAL_SINGLE_USER_SAFE,
+        max_runtime_mode=RuntimeMode.RAIKER_RUNTIME,
         is_active=True,
     )
     effective = authority.evaluate_effective_permissions(principal)
@@ -948,21 +952,14 @@ def test_runtime_enablement_validator_fails_on_bypass() -> None:
 # ── Controlled Runtime Mode Activation ──
 
 
-def test_default_runtime_mode_is_development_preview(tmp_path: Path) -> None:
+def test_the_runtime_is_active_with_nothing_configured(tmp_path: Path) -> None:
+    """A fresh workspace has nothing to select, so the runtime is simply on."""
     store = SQLiteStore(tmp_path)
     writer = EventLogWriter(store)
     authority = RuntimeAuthority(store, writer)
     mode = authority.get_runtime_mode()
-    assert mode["mode_name"] == "development_preview"
+    assert mode["mode_name"] == "raiker_runtime"
     assert mode["status"] == "active"
-
-
-def test_local_single_user_runtime_inactive_by_default(tmp_path: Path) -> None:
-    store = SQLiteStore(tmp_path)
-    writer = EventLogWriter(store)
-    authority = RuntimeAuthority(store, writer)
-    mode = authority.get_runtime_mode()
-    assert mode["mode_name"] != "local_single_user_runtime"
 
 
 def test_human_runtime_gate_manager_can_activate_runtime_mode(tmp_path: Path) -> None:
@@ -1065,7 +1062,7 @@ def test_runtime_mode_disable_emits_event(tmp_path: Path) -> None:
     assert "runtime_mode_disabled" in event_types
 
 
-def test_only_one_active_runtime_mode(tmp_path: Path) -> None:
+def test_disabling_stops_the_runtime_and_activating_starts_it_again(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     from raiker.contracts.models import Role
     now = utc_now()
@@ -1083,11 +1080,17 @@ def test_only_one_active_runtime_mode(tmp_path: Path) -> None:
         is_active=True,
     )
     authority.activate_runtime_mode("local_single_user_runtime", principal, "First")
-    mode1 = authority.get_runtime_mode()
-    assert mode1["mode_name"] == "local_single_user_runtime"
-    authority.activate_runtime_mode("development_preview", principal, "Second")
-    mode2 = authority.get_runtime_mode()
-    assert mode2["mode_name"] == "development_preview"
+    started = authority.get_runtime_mode()
+    assert started["mode_name"] == "raiker_runtime"
+    assert started["status"] == "active"
+
+    authority.disable_runtime_mode(principal, "Stop accepting work")
+    stopped = authority.get_runtime_mode()
+    assert stopped["mode_name"] == "raiker_runtime"
+    assert stopped["status"] == "disabled"
+
+    authority.activate_runtime_mode("raiker_runtime", principal, "Back on")
+    assert authority.get_runtime_mode()["status"] == "active"
 
 
 def test_admin_mutation_disabled_by_default(authority: RuntimeAuthority) -> None:

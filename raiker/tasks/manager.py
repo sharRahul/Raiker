@@ -154,6 +154,51 @@ class TaskManager:
             self.writer.append(event)
         return task
 
+    def mark_task_continuing(self, task_id: str, tool_name: str = "") -> TaskRecord | None:
+        """A granted approval is being replayed into this task's parked turn.
+
+        The card moves off *waiting for approval* the moment the continuation
+        starts, so the owner sees the decision take effect rather than watching
+        an unchanged card and wondering whether approving did anything (BUG-25).
+        From here the run lands on running, completed or failed like any other.
+        """
+        step = (
+            f"Continuing after approval of {tool_name}" if tool_name.strip()
+            else "Continuing after approval"
+        )
+        self.store.resume_task_after_approval(task_id, step)
+        task = self.get_task(task_id)
+        if task is not None:
+            event = make_event(
+                session_id=task.session_id,
+                turn_id=task.parent_turn_id,
+                event_type="task_resume_started",
+                actor="task_scheduler",
+                payload={"task_id": task_id, "tool_name": tool_name, "status": task.status},
+            )
+            self.writer.append(event)
+        return task
+
+    def report_resume_blocked(self, task_id: str, reason: str) -> TaskRecord | None:
+        """An automatic continuation could not proceed, and the card says why.
+
+        The task stays parked rather than being failed: nothing about the work
+        went wrong, and the owner still has a decision or a retry available.
+        """
+        stated = _stated(reason, NO_STATED_APPROVAL_REASON)
+        self.store.block_task_on_approval(task_id, stated)
+        task = self.get_task(task_id)
+        if task is not None:
+            event = make_event(
+                session_id=task.session_id,
+                turn_id=task.parent_turn_id,
+                event_type="task_resume_blocked",
+                actor="task_scheduler",
+                payload={"task_id": task_id, "reason": stated, "status": task.status},
+            )
+            self.writer.append(event)
+        return task
+
     def cancel_task(self, task_id: str, reason: str) -> TaskRecord | None:
         stated = _stated(reason, NO_STATED_CANCEL_REASON)
         self.store.cancel_task(task_id, stated)

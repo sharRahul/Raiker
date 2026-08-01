@@ -222,8 +222,9 @@ export function explainCapability(gate: CapabilityGate): CapabilityExplanation {
 // and they need three different actions from the owner. Saying "disabled —
 // enable it in Capabilities" for all of them sends the owner to a page where
 // the capability already reads as enabled, and following that advice changes
-// nothing. `enabled_runtime` additionally requires a runtime-enablement mode
-// (Settings → Runtime mode), which is where the second case actually resolves.
+// nothing. Raising a capability to `enabled_runtime` is now entirely a
+// Permissions action: Raiker runs one runtime and there is no mode to activate
+// first, so every one of these cases resolves on the same page.
 
 export type RuntimeBlockKind = "none" | "not_available" | "gate_off" | "below_runtime";
 
@@ -270,15 +271,15 @@ export function runtimeBlock(gate: CapabilityGate | undefined, label: string): R
     return {
       kind: "below_runtime",
       reason: `${label} is enabled, but only at “${humanize(gate.state)}” — this surface needs runtime level.`,
-      action: "Activate a runtime-enablement mode, then set the capability to “enabled runtime”.",
-      href: "#/settings",
-      linkLabel: "Settings → Runtime mode",
+      action: "Set the capability to “enabled runtime” in Permissions.",
+      href: "#/capabilities",
+      linkLabel: "Open Permissions",
     };
   }
   return {
     kind: "gate_off",
     reason: `${label} is turned off.`,
-    action: "Turn it on in Permissions. Reaching runtime level also needs a runtime mode active.",
+    action: "Turn it on in Permissions.",
     href: "#/capabilities",
     linkLabel: "Open Permissions",
   };

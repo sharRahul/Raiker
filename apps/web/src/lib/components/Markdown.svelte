@@ -29,6 +29,18 @@
     announcementTimer = setTimeout(() => (announcement = ""), 4000);
   }
 
+  // The button ships all three glyphs and CSS picks one, so feedback is an
+  // attribute flip rather than DOM the handler writes. The accessible name is
+  // kept in step with the glyph — an icon-only control that silently changes
+  // meaning is worse than a word.
+  function setCopyState(button: HTMLElement, state: "idle" | "copied" | "failed") {
+    button.setAttribute("data-copy-state", state);
+    const label =
+      state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy code";
+    button.setAttribute("aria-label", label);
+    button.setAttribute("title", label);
+  }
+
   async function onWrapperClick(event: MouseEvent) {
     const target = event.target as HTMLElement | null;
     const button = target?.closest?.("[data-md-copy]") as HTMLElement | null;
@@ -37,18 +49,18 @@
     const code = block?.textContent ?? "";
     try {
       await navigator.clipboard.writeText(code);
-      button.textContent = "Copied";
+      setCopyState(button, "copied");
       announce("Code copied to the clipboard.");
       setTimeout(() => {
-        if (button.isConnected) button.textContent = "Copy code";
+        if (button.isConnected) setCopyState(button, "idle");
       }, 2000);
     } catch {
       // A denied clipboard permission or an insecure origin. Say so — a copy
       // button that silently does nothing is worse than no copy button.
-      button.textContent = "Copy failed";
+      setCopyState(button, "failed");
       announce("Could not copy — your browser blocked clipboard access.");
       setTimeout(() => {
-        if (button.isConnected) button.textContent = "Copy code";
+        if (button.isConnected) setCopyState(button, "idle");
       }, 2500);
     }
   }
@@ -172,16 +184,27 @@
     text-transform: uppercase;
   }
   .markdown :global(.md-copy) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
     border: 1px solid transparent;
     border-radius: var(--r-sm);
     background: transparent;
     color: var(--text-3);
     cursor: pointer;
-    font: inherit;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 0.15rem 0.45rem;
+    padding: 0;
   }
+  /* Exactly one glyph is visible, chosen by the state the handler set. */
+  .markdown :global(.md-copy .md-copy-glyph) { display: none; }
+  .markdown :global(.md-copy[data-copy-state="idle"] .md-copy-glyph[data-state="idle"]),
+  .markdown :global(.md-copy[data-copy-state="copied"] .md-copy-glyph[data-state="copied"]),
+  .markdown :global(.md-copy[data-copy-state="failed"] .md-copy-glyph[data-state="failed"]) {
+    display: block;
+  }
+  .markdown :global(.md-copy[data-copy-state="copied"]) { color: var(--ok); }
+  .markdown :global(.md-copy[data-copy-state="failed"]) { color: var(--danger); }
   .markdown :global(.md-copy:hover) {
     border-color: var(--border-strong);
     color: var(--text-1);

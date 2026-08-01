@@ -2132,7 +2132,7 @@ def handle_runtime_mode_disable(command: str, *, workspace_root: str | Path = ".
     if not result.ok:
         return f"Runtime mode disable denied: {result.reason_code}"
     return (
-        "Runtime mode disabled. Reverted to development_preview.\n"
+        "Agent runtime disabled. It will not accept new executions until re-enabled.\n"
         f"Acting principal: {principal_ref.principal_id} ({principal_ref.display_name})"
     )
 
@@ -2362,10 +2362,8 @@ def handle_runtime_readiness(*, workspace_root: str | Path = ".") -> str:
     blockers = []
     if not owner_bootstrapped:
         blockers.append("Owner not bootstrapped. Run /bootstrap-owner first.")
-    if mode_name == "development_preview":
-        blockers.append("Runtime mode is development_preview")
-    if mode_status == "inactive":
-        blockers.append("Runtime mode is inactive")
+    if mode_status != "active":
+        blockers.append("The agent runtime is disabled")
     if not gate_manager_available:
         blockers.append("No runtime_gate_manager principal available")
     if not acting_principal_available:

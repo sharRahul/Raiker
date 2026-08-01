@@ -49,8 +49,34 @@ account cannot read, select, or delete another's references.
 schedules re-arm after each governed cycle; each cycle is one discrete governed
 turn, so policy, gates, and approvals apply to every one of them.
 
+`POST /api/tasks/{task_id}/resume` continues one parked scheduled run whose
+approval has been granted. It is the owner's retry for the host's own automatic
+pass, runs the same governed path, and is owner-scoped: another account's task
+answers `task_not_found`, as does a missing one. Exactly-once resumption remains
+the store's atomic `suspended → resuming` claim, so this can never replay a turn
+that already ran.
+
+`GET /api/sessions/{session_id}/attachments/{attachment_id}/download` returns
+the bytes of one authorised file for saving. Authorisation is the same stored
+session/attachment/owner reference the preview routes use, so a download can
+never reach a file the same person could not already open. The response is
+always `application/octet-stream` with an attachment disposition, `nosniff` and
+`no-store`, and the filename is rebuilt from the stored name rather than echoed.
+Every download appends `attachment_downloaded` carrying metadata only.
+
+`GET /api/memory/{memory_id}/source` and
+`GET /api/sessions/{session_id}/attachments/{attachment_id}/provenance` resolve
+stored source coordinates into a bounded plain-text excerpt plus the offsets of
+the passage inside it. `status` is the contract: only `resolved` carries a
+located passage; `no_provenance`, `source_deleted`, `source_changed`,
+`unsupported_source` and `not_authorized` are each a stated answer rather than
+an error. Authorisation is re-checked against the caller at read time — owning a
+memory is not owning its source — and `not_authorized` reveals nothing about
+whether the source exists.
+
 A persisted principal is resolved for each authenticated request. The durable
-`runtime_mode_state` and `capability_gate_state` records are the source of
+`runtime_mode_state` (one runtime, `raiker_runtime`, whose `status` is `active`
+or `disabled`) and `capability_gate_state` records are the source of
 runtime-control state. `/runtime-readiness` reports blockers and available
 governance controls.
 

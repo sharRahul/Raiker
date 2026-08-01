@@ -22,9 +22,12 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 | `tool_failed` | A governed executor failed safely |
 | `code_repo_connected` | A repository reference was added to the Build workspace (workspace-relative subpath, or a GitHub `owner/repo` coordinate) |
 | `code_repo_disconnected` | A repository reference was removed; the folder and the remote are untouched |
+| `attachment_downloaded` | A file this conversation holds was downloaded; metadata only — attachment id, filename, media type, byte size |
 | `task_created` | A task or schedule was queued (title, objective, and status only) |
 | `task_progress` | A running task reported a step and a percentage |
 | `task_blocked` | A run stopped at an approval boundary — unfinished, not failed; the payload always states the reason |
+| `task_resume_started` | A granted approval is being replayed into a run that parked on it; the payload names the tool the decision covered |
+| `task_resume_blocked` | An automatic continuation could not proceed; the run stays parked and the payload states why |
 | `task_completed` | A task finished; the payload carries its summary |
 | `task_failed` | A task ended in failure; the payload always states a reason, substituting a stated one when the run left none |
 | `task_cancelled` | A task was stopped at a safe boundary, with the reason it was stopped |

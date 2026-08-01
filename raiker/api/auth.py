@@ -6,7 +6,7 @@ from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from raiker.api.sessions import ApiSession, ApiSessionStore
-from raiker.runtime.authority.models import Principal, PrincipalType
+from raiker.runtime.authority.models import RAIKER_RUNTIME, Principal, PrincipalType
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -86,7 +86,7 @@ class AuthMiddleware:
             session_id=str(raw["session_id"]) if raw.get("session_id") else None,
             role_ids=raw.get("role_ids", ()),
             domain_scopes=raw.get("domain_scopes", ()),
-            max_runtime_mode=str(raw.get("max_runtime_mode", "development_preview")),
+            max_runtime_mode=str(raw.get("max_runtime_mode", RAIKER_RUNTIME)),
             created_at=str(raw.get("created_at", "")),
             expires_at=str(raw["expires_at"]) if raw.get("expires_at") else None,
             is_active=bool(raw.get("is_active", 1)),

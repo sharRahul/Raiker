@@ -20,6 +20,17 @@ that proves it, what is missing, and the concrete work.
 Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 [`screenshots/working/`](screenshots/working) (verified behaviour).
 
+FIXED-59 through FIXED-66 were verified on **2026-08-01** against a running
+`raiker-web` holding a real Anthropic credential — `claude-haiku-4-5-20251001`
+answering a live turn, not a route-mocked shell. The specs are
+[`e2e/single-runtime-and-inspector-live.spec.ts`](../../apps/web/e2e/single-runtime-and-inspector-live.spec.ts)
+and [`e2e/live-end-to-end.spec.ts`](../../apps/web/e2e/live-end-to-end.spec.ts),
+and their screenshots are `working/160-*` through `working/168-*`. The two task
+cards in `working/165-tasks-continuation-live.png` show a parked and a
+continuing run whose states were written by `TaskManager` — the same code the
+scheduler calls — rather than reached through a full approval round trip; the
+continuation logic itself is covered by `tests/test_task_scheduler.py`.
+
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | FIXED-01 | High | Models | Fixed |
@@ -80,19 +91,26 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-56 | High | Approvals / cross-tab continuation | Fixed (was BUG-24) |
 | FIXED-57 | Low | Models / shipped configuration | Fixed (found while fixing BUG-21) |
 | FIXED-58 | Low | Web test runtime | Fixed (found while verifying BUG-21) |
-| BUG-25 | High | Tasks / approval continuation | Open |
-| BUG-26 | Low | File inspector / images | Open |
-| BUG-27 | Medium | Memory / provenance | Open |
-| BUG-28 | Medium | Chat / artifact download | Open |
+| FIXED-59 | High | Tasks / approval continuation | Fixed (was BUG-25) |
+| FIXED-60 | Low | File inspector / images | Fixed (was BUG-26) |
+| FIXED-61 | Medium | Memory / provenance | Fixed (was BUG-27) |
+| FIXED-62 | Medium | Chat / artifact download | Fixed (was BUG-28) |
+| FIXED-63 | High | Runtime | Fixed (single runtime; no mode selection) |
+| FIXED-64 | Low | Build / composer attachments | Fixed (was BUG-35) |
+| FIXED-65 | Medium | Composers / Chat, Build, Workbench | Fixed (shared composer) |
+| FIXED-66 | Medium | Distribution / cross-platform launch | Fixed (`raiker-app`) |
 | BUG-29 | High | Memory / governed lifecycle | Open |
 | BUG-30 | Medium | Knowledge Map / sources and scale | Open |
 | BUG-31 | High | Build / remote execution containment | Open |
 | BUG-32 | Medium | Terminal / approval execution | Open |
 | BUG-33 | Medium | Local models / capacity administration | Open |
 | BUG-34 | Medium | Chat / restored approval state | Open |
-| BUG-35 | Low | Build / composer attachments | Open |
 | BUG-36 | Low | Models / shipped price review cadence | Open |
 | BUG-37 | Low | Design system / visual polish | Open |
+| BUG-38 | Medium | Memory / source coordinates | Open (found while fixing BUG-27) |
+| BUG-39 | Low | Scheduler / continuation latency | Open (found while fixing BUG-25) |
+| BUG-40 | Low | Distribution / installers and service registration | Open (found while building `raiker-app`) |
+| BUG-41 | Low | Web / e2e regression suite | Open (found while verifying this change) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -1973,68 +1991,327 @@ including CI — Playwright resolves its own managed browser exactly as before.
 
 ---
 
-## BUG-25 — Scheduled work cannot resume after its approval is granted
+## FIXED-59 — Scheduled work could not resume after its approval was granted
 
-**Status: open; audited from FIXED-13.**
+**Status: fixed in this change (was BUG-25).**
 
-**Observed.** Scheduler-launched turns remain `waiting_for_approval` because no
-client owns their continuation relay.
+**Observed.** A scheduler-launched turn that reached an approval boundary parked
+correctly — the turn suspended, the approval appeared in the inbox, the task card
+said *waiting for approval* — and then, when the owner granted it, nothing
+continued it. Chat can resume a parked turn because a Chat tab is watching for
+the resolution (FIXED-56). A scheduled run has no client at all, so its
+continuation had no owner and the task sat in `waiting_for_approval` forever.
 
-**Required fix.** Give the scheduler an authenticated, durable, exactly-once
-resume worker that revalidates task state, approval scope, expiry, STOP state,
-and runtime policy before continuing.
+**Root cause.** `raiker/tasks/scheduler.py` had one job — start due work. Nothing
+in the host owned the other half.
 
-**UI when closed.** Task and Work in action cards show the approval, resolution,
-resume attempt, and resulting state. A granted task moves through
-**Continuing → Running/Failed/Completed**, with a reason and retry action when
-automatic continuation cannot proceed.
+**Fix applied.** `TaskScheduler.resume_approved()` is that owner, and it is
+deliberately the *same* machinery a browser tab uses rather than a second one:
+`list_resumable_suspended_turns` names what is resolved-but-unclaimed, and
+`AgentGateway.aresume_after_approval` claims it through the atomic
+`suspended → resuming` transition. Exactly-once is that claim, so a scheduler
+tick and a tab racing on the same approval cannot both replay the turn — one
+wins and the other is told it was already continued, which is the truth and is
+reported as such rather than as a failure.
 
----
+Every continuation re-checks the world before it runs: the task still exists,
+has not been cancelled or stopped at a safe boundary, and still belongs to a real
+owner. Nothing resumes on the strength of what was true when it parked. The pass
+runs on the existing 15-second host tick, suppressed independently of `run_due`
+so neither half can stop the other.
 
-## BUG-26 — Image inspection has no zoom, pan, or rotation controls
+**UI when closed.** A new `continuing` task status carries the state between the
+decision and the outcome, so the card moves **Waiting for approval →
+Continuing → Completed/Failed** and the owner sees their decision take effect.
+When automatic continuation cannot proceed the task stays parked, states why, and
+offers **Continue now** — `POST /api/tasks/{id}/resume`, the same governed path,
+owner-scoped, which can never continue something the automatic pass would have
+refused. `task_resume_started` and `task_resume_blocked` make the whole life of
+an approval readable in the audit log.
 
-**Status: open; audited from FIXED-10.**
-
-**Required fix.** Add client-side, bounded image transforms that do not mutate
-the stored artifact or fetch remote content.
-
-**UI when closed.** The file inspector exposes labelled Zoom in/out, Fit,
-Rotate, and Reset controls, keyboard shortcuts, the current zoom level, and a
-reduced-motion-safe pan surface. Unsupported media retains the honest existing
-state.
-
----
-
-## BUG-27 — Memory and file provenance cannot open the exact source passage
-
-**Status: open; audited from FIXED-10 and FIXED-45.**
-
-**Observed.** Records expose source metadata, but no endpoint resolves an
-authorised source excerpt and no inspector can highlight the passage used.
-
-**Required fix.** Persist immutable source coordinates, authorise them against
-the current account/workspace, resolve supported document offsets, and report
-deleted, changed, unsupported, or inaccessible sources honestly.
-
-**UI when closed.** Memory **View source** and generated-file provenance open
-the existing inspector at a highlighted passage with document title, source
-status, and **Open conversation/document**. Missing provenance renders an
-explicit unavailable state, never a dead action.
+Covered by `tests/test_task_scheduler.py` (pending approval untouched, granted
+approval continued, cancelled task never continued, lost claim race reported not
+failed, owner retry scoped and effective).
 
 ---
 
-## BUG-28 — Generated artifacts have no general download surface
+## FIXED-60 — Image inspection had no zoom, pan, or rotation controls
 
-**Status: open; audited from FIXED-45.**
+**Status: fixed in this change (was BUG-26).**
 
-**Required fix.** Add an authorised byte-download endpoint with safe filenames,
-content disposition, retention checks, audit evidence, and no inline execution
-for active formats.
+**Observed.** The inspector could show a picture but not let you look at it. A
+screenshot scaled to fit a side column is unreadable, and there was no way to get
+closer, move around inside it, or turn a photo the right way up.
 
-**UI when closed.** Generated artifact cards and the file inspector provide a
-**Download** action with size/type, progress, completion, retention-expired,
-permission-denied, and unavailable states. Download remains distinct from
-Preview and from conversation export.
+**Fix applied.** `apps/web/src/lib/components/ImageViewport.svelte`. Everything
+happens in the browser, to pixels the server already sent:
+
+- **Nothing is mutated.** Zoom, pan and rotation are a CSS transform on the
+  `<img>`. The stored artifact is untouched, no re-encode happens, and closing
+  the pane discards the view — it is a way of looking, not an edit.
+- **Nothing is fetched.** The `src` is the same session-authorised blob URL the
+  inspector already resolved. No tile server, no remote image service.
+- **Every transform is bounded.** Zoom is clamped to 25 %–800 %; pan is clamped
+  to the overflow the zoom created, so a picture can never be dragged out of its
+  own frame and lost. Rotation is in right angles.
+- **Reduced motion is honoured.** Transitions are dropped entirely under
+  `prefers-reduced-motion`; the transform still applies, without animation.
+
+**UI when closed.** Labelled **Zoom out / Zoom in / Fit / Rotate / Reset**
+controls, a live zoom readout, and a focusable `role="application"` frame where
+`+`/`-` zoom, arrows pan, `r` rotates, `f` fits and `0` resets. Unsupported media
+keeps the honest existing state. Verified live in
+`working/167-image-inspection-live.png`.
+
+---
+
+## FIXED-61 — Memory and file provenance could not open the exact source passage
+
+**Status: fixed in this change (was BUG-27).**
+
+**Observed.** Every approved memory already carried where it came from —
+`source_session_id`, `source_turn_id`, `source_type`, written once by the
+governed memory path and never rewritten. What it did not carry was any way to
+*go there*. The Memory page could print "chat — Weekly planning" and nothing in
+the product would open that conversation at the sentence the memory was drawn
+from. The provenance was true and useless, which is the worst kind: a claim you
+cannot check reads exactly like a claim you can.
+
+**Fix applied.** `raiker/runtime/source_provenance.py` resolves those stored
+coordinates into a passage the inspector can show, under four rules:
+
+- **Coordinates are read, never inferred.** A record with no coordinates
+  resolves to `no_provenance` rather than to a guess at which conversation
+  "probably" produced it.
+- **Authorisation is re-checked at read time, against the caller.** Owning the
+  memory is not owning the source: the session behind the coordinates must
+  belong to this account *now*, or the answer is `not_authorized` — which
+  reveals nothing about whether that conversation exists.
+- **Every failure is a named state.** `source_deleted`, `source_changed`,
+  `unsupported_source` and `not_authorized` are each rendered in words.
+- **Nothing executes source content.** The excerpt is bounded plain text plus
+  two integers naming the run to mark; the highlight is applied by *slicing that
+  text*, never by rendering markup the source supplied.
+
+Served by `GET /api/memory/{id}/source` and
+`GET /api/sessions/{sid}/attachments/{aid}/provenance`, so a memory and a
+generated file give the same answers through the same resolver.
+
+**UI when closed.** Memory's **View source** (on approved records and on pending
+proposals, where reviewing a proposal you cannot read the basis of was the
+sharper gap) opens the existing inspector at the highlighted passage with the
+document title, the source status, and **Open conversation**. A generated file's
+**Preview** resolves its provenance alongside the document. Missing provenance
+renders an explicit unavailable state, never a dead action.
+
+Covered by `tests/test_source_provenance.py` and the `source passage` group in
+`FileInspector.test.ts`.
+
+**Deliberately not claimed.** The stored coordinates name a turn, not a byte
+range inside it, so the passage is located by searching the source text for the
+memory's own words — exact when the text is unchanged, and honestly reported as
+`source_changed` when it is not. Byte-range coordinates written at capture time
+would remove the search entirely; that is **BUG-38**, not something pretended
+here.
+
+---
+
+## FIXED-62 — Generated artifacts had no download surface
+
+**Status: fixed in this change (was BUG-28).**
+
+**Observed.** A generated document was previewable and nothing else. The only way
+to get a report Raiker wrote onto disk was to select the preview text and paste
+it somewhere.
+
+**Fix applied.** `GET /api/sessions/{sid}/attachments/{aid}/download`,
+deliberately narrow:
+
+- **Authorisation is the stored reference**, exactly as for preview — this
+  session, this attachment, this owner — so a download can never reach a file the
+  same person could not already open. 404 for anything else; a 403 would confirm
+  the id exists.
+- **Nothing is served as something the browser will run.** Always
+  `application/octet-stream`, attachment disposition, `nosniff`, `no-store`.
+- **The filename is rebuilt, not echoed.** Path separators and header-breaking
+  characters are dropped rather than escaped.
+- **The download is evidence.** Every one appends `attachment_downloaded` with
+  metadata only — id, name, type, size — never the bytes.
+
+`download_bytes` is intentionally separate from `served_bytes`: the display path
+is limited to the two types a browser can render safely, while a `.docx`, an
+`.xlsx` or a Markdown report is a legitimate download and none of them can be
+displayed inline.
+
+**UI when closed.** Generated artifact cards carry **Preview** and **Download**
+as distinct actions, and the inspector offers **Download** beside **Close** with
+size and type in the header. Progress, completion, retention-expired and
+permission-denied each have their own stated message. Verified live in
+`working/168-artifact-download-live.png`.
+
+Covered by `TestAttachmentDownload` in `tests/test_attachment_preview.py`
+(bytes, headers, owner scoping, filename safety, audit evidence without content).
+
+---
+
+## FIXED-63 — Raiker had five runtimes and needed one
+
+**Status: fixed in this change.**
+
+**Observed.** `RuntimeMode` shipped `development_preview`,
+`local_single_user_safe`, `local_single_user_runtime`,
+`multi_user_local_runtime` and `hosted_or_networked_runtime`, and Settings asked
+the owner to pick one before any capability could reach `enabled_runtime`. A
+fresh install defaulted to `development_preview`, under which every capability
+that needed runtime level refused — correctly, and unhelpfully, because nothing
+on the Permissions page said the refusal came from a different page.
+
+**Why it was wrong, not just awkward.** The mode was a fifth answer in front of
+four that already decided everything: a capability's own gate state, its
+threat-model acknowledgement, its human confirmation token, and whether a real
+executor is registered for it. Every genuinely dangerous thing was gated by
+those four. The mode could only ever say "not yet" to work they had already
+authorised — and, being a *choice*, it could also be set wrong in the permissive
+direction while reading as deliberate.
+
+**Fix applied.** One runtime, `raiker_runtime`.
+
+- `RuntimeMode` has one member. `normalize_runtime_mode()` accepts every
+  historical name — from a stored row, a CLI line, or an older client — and
+  resolves it to the single runtime; anything else is still refused.
+- `ActivationRequirement.requires_runtime_mode` is gone, and with it the mode
+  check in `evaluate_activation_requirement`. The remaining runtime-level
+  refusal is binary and is the danger-zone switch: `activation_blocked:
+  runtime_mode_not_active` now means *the agent runtime is disabled*, keeping
+  its historical spelling so stored audit rows and older clients still resolve.
+- **Disabling now disables.** It used to write a record naming
+  `development_preview` with status `active`, which left a runtime running under
+  a name implying it was not. It now writes `raiker_runtime` with status
+  `disabled`, and `SQLiteStore.get_latest_runtime_mode()` lets the authority tell
+  "never configured" from "the owner switched it off" — a distinction
+  `get_active_runtime_mode()` structurally could not make.
+- A fresh install is ready: no stored row means the runtime is on.
+
+**UI when closed.** Settings → Runtime configuration states what is running
+instead of asking. No picker, no mode list; **Disable agent runtime** (and
+**Enable** once disabled) is the only runtime-level control, with the same
+step-up dialog it always had. Capability copy across Permissions, Extensions and
+MCP now points at Permissions for every runtime-level block, because that is
+where all of them now resolve. Verified live in
+`working/160-settings-single-runtime-live.png`.
+
+**Posture change, stated plainly.** A fresh account can now raise a capability to
+`enabled_runtime` without first activating a mode. That removes a redundant
+switch, not a real one: the executor, gate, threat-ack and human-confirmation
+requirements are unchanged, and the kill switch remains.
+
+---
+
+## FIXED-64 — The Build composer could not carry a file
+
+**Status: fixed in this change (was BUG-35).**
+
+**Observed.** Chat's composer attached workspace paths, images and documents
+through the governed attachment store. Build's attached only the selected
+repository's local subpath, automatically. Build is the surface where "look at
+this stack trace", "here is the failing screenshot" and "match this spec
+document" are the most natural things to say, and the composer had no way to say
+them.
+
+**Fix applied.** Not a second implementation — the same one.
+`apps/web/src/lib/composerAttachments.svelte.ts` owns the attachment state, the
+limits and the upload path; `ComposerChips.svelte`, `ComposerAttach.svelte` and
+`ComposerAttachPanel.svelte` own the presentation. Chat was refactored onto them
+(its ~150 lines of inline attachment code deleted), and Build and the Workbench
+mount the same components. Build folds its files in beside the repository path in
+the shape the prompt route already accepts.
+
+**UI when closed.** Build's composer offers the same attach control in the same
+place, the same chips with the same remove control, and the same limits and error
+copy as Chat's — so what an owner learns on one surface is true on the other.
+Verified live in `working/162-chat-composer-attach-live.png` and
+`working/163-build-composer-attach-live.png`.
+
+---
+
+## FIXED-65 — Chat, Build and the Workbench composed work three different ways
+
+**Status: fixed in this change.**
+
+**Observed.** Three composers that looked like siblings and behaved like
+strangers. The Workbench's said, in as many words, *"To work with a file, start
+in Chat and attach it there"* — true, and an admission that it was a lesser
+instrument. Its **Schedule** mode handed Tasks a prompt with no time, landing the
+owner on a form whose required field they had to notice. Build had no copy action
+on a response at all.
+
+**Fix applied.**
+
+- **One attachment implementation** across all three (FIXED-64), and the
+  Workbench's files now ride the handoff: `raiker:compose` and
+  `raiker:build-compose` carry already-uploaded attachment references, so
+  starting work in the Workbench is the same act as starting it in Chat rather
+  than a reduced version of it.
+- **Schedule carries its time.** The Workbench asks for the start time in
+  Schedule mode and passes it through, so the handoff arrives complete. All four
+  modes now confirm where the work went.
+- **The attach panel opens in flow**, growing the composer card, rather than as a
+  floating popover over the text being typed — the first live screenshot of this
+  change showed the popover covering the prompt, which is exactly the wrong thing
+  to cover.
+- **Copy is a glyph, and Build has one.** The code-block action and the response
+  action are both SVG icons with all three states (idle / copied / failed) in the
+  markup and CSS choosing one, so the delegated handler only ever sets an
+  attribute and never writes into the button. The accessible name and tooltip
+  move with the glyph, because an icon-only control that silently changes meaning
+  is worse than a word.
+- **The card behaves the same in both conversations**: identical focus lift,
+  identical padding, identical hint treatment, and no motion under
+  `prefers-reduced-motion`.
+
+**UI when closed.** Verified live in `working/161-workbench-composer-live.png`,
+`working/162-chat-composer-attach-live.png`,
+`working/163-build-composer-attach-live.png` and `working/166-chat-live-turn.png`
+(real Anthropic turn, both copy glyphs visible).
+
+---
+
+## FIXED-66 — Raiker did not start like an application on any platform
+
+**Status: fixed in this change.**
+
+**Observed.** Raiker ran on Windows, macOS and Linux; it did not *behave* like an
+application on any of them. Starting it meant knowing to run `raiker-web`,
+knowing that state lands in the current working directory, knowing which port to
+keep free, and knowing to open a browser at the right URL. That is a service, and
+asking a person to operate a service is asking them to hold the operating
+system's job in their head.
+
+**Fix applied.** `apps/api/launcher.py`, shipped as `raiker-app`. One entry
+point, no per-OS script to keep in step:
+
+- **State lives where the platform says it should** — `%LOCALAPPDATA%\Raiker`,
+  `~/Library/Application Support/Raiker`, `$XDG_DATA_HOME/raiker` (falling back
+  to `~/.local/share/raiker`). `RAIKER_HOME` overrides all three; `--workspace`
+  overrides everything.
+- **An already-running Raiker is joined, not fought.** `/api/health` — the only
+  unauthenticated read, returning nothing but `{"status": "ok"}` — identifies a
+  Raiker without touching the workspace. Two hosts over one encrypted workspace
+  is a data-integrity problem; the person who started the app wants the app.
+- **The port is found, not assumed.** 8765 first so the URL stays familiar, then
+  the next free port, printed.
+- **The browser opens through the platform's own opener** (`os.startfile`,
+  `open`, `xdg-open`) with `webbrowser` as fallback. A headless machine prints
+  the URL rather than failing.
+- **Anything unrecognised is treated as POSIX** rather than refused: a BSD box
+  has a home directory and a loopback interface, which is all this needs.
+
+Exposure is unchanged: this binds loopback and offers no flag to do otherwise.
+Reaching Raiker from another machine remains the deliberate
+`raiker-web --allow-public` path with its own token requirement.
+
+Covered by `tests/test_app_launcher.py`, which asks for each platform explicitly
+rather than testing whatever the runner happens to be.
 
 ---
 
@@ -2210,28 +2487,6 @@ reloaded one.
 
 ---
 
-## BUG-35 — The Build composer cannot carry a file
-
-**Status: open; found while reviewing composer parity for FIXED-53 to FIXED-56.**
-
-**Observed.** Chat's composer attaches workspace paths, images, and documents
-through the governed attachment store. Build's composer attaches only the
-selected repository's local subpath, automatically. An owner working in Build who
-wants to hand Raiker a design document, a failing log, or a screenshot has to
-start the work in Chat instead, and the two conversation surfaces are otherwise
-deliberately identical.
-
-**Required fix.** Give Build the same attachment control Chat has, over the same
-governed store and the same fail-closed server-side validation, without
-duplicating the composer — the attachment logic is the same code in both places
-or it will drift.
-
-**UI when closed.** Build's composer offers the same **+** control, the same
-chips with the same inspector behaviour, and the same limits and error copy as
-Chat's, so what an owner learns on one surface is true on the other.
-
----
-
 ## BUG-36 — Nothing keeps the two shipped model-profile copies in step
 
 **Status: open; found while fixing BUG-21 (see FIXED-57).**
@@ -2315,6 +2570,94 @@ Live evidence for the pass that shipped:
 [`screenshots/working/133-visual-refresh-workbench-dark.png`](screenshots/working/133-visual-refresh-workbench-dark.png),
 [`screenshots/working/134-visual-refresh-models-light.png`](screenshots/working/134-visual-refresh-models-light.png),
 and [`screenshots/working/134-visual-refresh-models-dark.png`](screenshots/working/134-visual-refresh-models-dark.png).
+
+---
+
+## BUG-38 — Source coordinates name a turn, not a passage inside it
+
+**Status: open; found while fixing BUG-27 (see FIXED-61).**
+
+**Observed.** A memory's stored provenance names `source_session_id` and
+`source_turn_id` and nothing finer. FIXED-61 therefore locates the passage by
+searching the source text for the memory's own words: exact while the text is
+unchanged, and honestly reported as `source_changed` when it is not — but a
+memory whose wording was normalised on the way into the store, or whose source
+was edited in a way that preserves meaning, reads as changed when it is not.
+
+**Required fix.** Persist a byte range (and a content hash of the range) at the
+moment a memory is captured, so resolution is a lookup rather than a search.
+Keep the search as the fallback for records written before the coordinates
+existed, and say which of the two answered.
+
+**UI when closed.** A resolved passage states whether it was located by stored
+coordinates or by matching text, so an owner can tell a verified quotation from a
+best-effort one. `source_changed` is reserved for a source that genuinely no
+longer contains the passage.
+
+---
+
+## BUG-39 — An approved scheduled run waits for the next scheduler tick
+
+**Status: open; found while fixing BUG-25 (see FIXED-59).**
+
+**Observed.** FIXED-59 continues a parked scheduled run on the host's own
+15-second tick. A decision granted immediately after a tick therefore takes up
+to 15 seconds to take effect, with the card showing *waiting for approval* the
+whole time. Chat continues in the same situation within a second, because
+resolving an approval there nudges the watcher directly.
+
+**Required fix.** Have approval resolution signal the scheduler the way it
+already signals browser tabs, so a granted decision starts its continuation
+immediately and the tick becomes the recovery path rather than the primary one.
+`POST /api/tasks/{id}/resume` already covers the impatient case manually.
+
+**UI when closed.** A granted approval moves the task card to **Continuing**
+without a perceptible wait, and the manual **Continue now** action becomes a
+recovery affordance rather than the fast path.
+
+---
+
+## BUG-40 — `raiker-app` starts Raiker but nothing installs or registers it
+
+**Status: open; found while building `raiker-app` (see FIXED-66).**
+
+**Observed.** FIXED-66 makes Raiker start like an application once Python and the
+package are present. The lifecycle around that is still unimplemented:
+`docs/DESKTOP_DISTRIBUTION_DESIGN.md` specifies signed installers, background
+service registration (`launchd`, Windows per-user startup, `systemd --user`),
+tray/menu-bar control, signed updates with atomic migration and rollback, and an
+uninstall that offers to retain, export, or securely erase each instance. None of
+that exists, so "closing the browser does not stop the host" is true only for as
+long as the terminal that started it stays open.
+
+**Required fix.** Implement the lifecycle table in the distribution design,
+platform by platform, with the service registration native to each rather than a
+custom daemon manager.
+
+**UI when closed.** A tray/menu-bar control reports whether the host is running,
+what background work is in flight, and offers Pause and Quit; quitting reports
+waiting work before it stops. Uninstall states exactly what will be removed and
+what will be kept.
+
+---
+
+## BUG-41 — `e2e/composer.spec.ts` asserts a Workbench that no longer exists
+
+**Status: open; found while verifying this change. Pre-existing — it fails
+identically on the commit before this one.**
+
+**Observed.** Two of the three tests in `apps/web/e2e/composer.spec.ts` fail
+against the built app: they look for `Start a new chat` and `Schedule a task`
+links on the Workbench, and for Settings/Models controls, that the redesigns in
+FIXED-46 and FIXED-48 replaced. The suite is not in CI — `.github/workflows/web.yml`
+runs lint, check, test and build, not `test:e2e` — so the drift was invisible.
+
+**Required fix.** Update the spec to the current Workbench and Settings, then
+decide whether the mocked e2e suite belongs in CI. A regression suite that
+nothing runs is a regression suite that nothing protects.
+
+**UI when closed.** No user-facing change; this is about the evidence being
+trustworthy. A green `npm run test:e2e` means what it says.
 
 ---
 

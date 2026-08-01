@@ -14,9 +14,13 @@ tool authority.
 `client → gateway → policy → RuntimeAuthority → executor → audit/event store`
 
 The gateway resolves the principal and records request context. Policy classifies
-the requested action. RuntimeAuthority checks the runtime mode, capability gate,
-decision mode, approval state, and executor availability before any action can
-run. `checkpoint_created` and `turn_closed` are gateway finalisation events, not
+the requested action. RuntimeAuthority checks that the agent runtime is
+accepting executions, then the capability gate, decision mode, approval state,
+and executor availability before any action can run. There is one runtime —
+`raiker_runtime` — and its only runtime-level state is `active` or `disabled`;
+the historical mode names (`development_preview`, the single-user modes,
+`multi_user_local_runtime`, `hosted_or_networked_runtime`) are still accepted
+wherever a mode name is read and every one of them resolves to it. `checkpoint_created` and `turn_closed` are gateway finalisation events, not
 runtime states. Strict non-allow blocking, role revoke governed, and capability
 gate per action are enforced.
 
@@ -31,7 +35,7 @@ gate per action are enforced.
 | Remote/cloud and sensitive domains | Disabled and fail-closed |
 
 Owner bootstrap creates a persisted principal and a human `runtime_gate_manager`.
-The runtime mode and capability gate state are durable. No `/sessions` command is
+The runtime state and capability gate state are durable. No `/sessions` command is
 currently implemented; sessions: deferred; no `/sessions` command is currently
 implemented. Session records are exposed through the documented
 commands and local API.

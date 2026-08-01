@@ -42,7 +42,9 @@ describe("markdown — block structure", () => {
     const html = renderMarkdown("```python\nprint('hi')\n```");
     expect(html).toContain('<div class="md-code" data-lang="python">');
     expect(html).toContain('<span class="md-code-lang">Python</span>');
-    expect(html).toContain('<button type="button" class="md-copy" data-md-copy aria-label="Copy code">Copy code</button>');
+    // The copy action is a glyph, labelled for anyone who cannot see it.
+    expect(html).toContain('class="md-copy" data-md-copy data-copy-state="idle" aria-label="Copy code"');
+    expect(html).toContain('<svg class="md-copy-glyph" data-state="idle"');
     expect(html).toContain('<code class="language-python">');
     // The source is still escaped, token by token.
     expect(html).toContain("&#39;hi&#39;");

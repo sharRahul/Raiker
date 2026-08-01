@@ -5,6 +5,8 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import ProviderLogo from "../components/ProviderLogo.svelte";
+  import ModelPricingPanel from "../components/ModelPricingPanel.svelte";
+  import TabStrip from "../components/TabStrip.svelte";
   import { api, ApiError } from "../api";
   import type { ModelProfile, ModelsView as ModelsData, ProviderModelList } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
@@ -15,8 +17,27 @@
   import { setModels } from "../models.svelte";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
-  // so a selection here is reflected there without a full page reload.
-  let { onchanged }: { onchanged?: () => void } = $props();
+  // so a selection here is reflected there without a full page reload. `tab`
+  // comes from the hash, so every panel is a shareable location — the context
+  // popover's "Configure →" links straight to #/models?tab=pricing.
+  let { onchanged, tab = "providers" }: { onchanged?: () => void; tab?: string } = $props();
+
+  /**
+   * The page is split by *what you came to do*, not by which table the data
+   * lives in. Everything on this page used to be one long scroll, which meant
+   * an owner looking for a rate scrolled past provider cards, and an owner
+   * connecting a provider scrolled past the fallback list.
+   */
+  const TABS = [
+    { id: "providers", label: "Providers" },
+    { id: "routing", label: "Routing" },
+    { id: "pricing", label: "Pricing" },
+    { id: "posture", label: "Posture" },
+  ];
+
+  function selectTab(next: string) {
+    window.location.hash = `#/models?tab=${encodeURIComponent(next)}`;
+  }
 
   let models = $state<ModelsData | null>(null);
   let loadError = $state<string | null>(null);
@@ -433,9 +454,7 @@
 <div class="head-row">
   <p class="page-lead">
     The model profiles Raiker can talk to. The choice of backend belongs to you — local, home-lab,
-    or hosted — and there is never a silent fallback between them. Select a provider here (and,
-    where the provider serves several, the exact model), per prompt in Chat → Options, or in the
-    terminal client (<code>/model use …</code>).
+    or hosted — and there is never a silent fallback between them.
   </p>
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh models">
     <Icon name="refresh" size={15} />
@@ -443,11 +462,19 @@
   </button>
 </div>
 
+<TabStrip tabs={TABS} selected={tab} onselect={selectTab} label="Model settings" />
+
 {#if loadError}
   <PageState state="error" title="Couldn't load models" detail={loadError} />
 {:else if models === null}
   <PageState state="loading" title="Loading models…" />
 {:else}
+  {#if tab === "providers"}
+  <div class="panel" role="tabpanel" id="panel-providers" aria-labelledby="tab-providers">
+  <p class="tab-lead">
+    Connect a provider and choose the exact model that serves your work. You can also choose per
+    prompt in Chat, or in the terminal client (<code>/model use …</code>).
+  </p>
   {#if models.profiles.length === 0}
     <div class="card">
       <EmptyState icon="models" title="No model profiles configured" body="Add profiles in config/model-profiles.json." />
@@ -664,7 +691,15 @@
       <p class="error" role="alert">{selectError}</p>
     {/if}
   {/if}
+  </div>
+  {/if}
 
+  {#if tab === "routing"}
+  <div class="panel" role="tabpanel" id="panel-routing" aria-labelledby="tab-routing">
+  <p class="tab-lead">
+    What serves a turn when your first choice cannot, and which model a local model may consult.
+    Nothing here grants access: every candidate is still gated by provider policy at call time.
+  </p>
   <section class="card fallback" aria-labelledby="fallback-h">
     <h2 id="fallback-h">Model fallback sequence</h2>
     <p class="sub">
@@ -745,6 +780,19 @@
     </div>
   </section>
 
+  </div>
+  {/if}
+
+  {#if tab === "pricing"}
+  <div class="panel" role="tabpanel" id="panel-pricing" aria-labelledby="tab-pricing">
+    <!-- BUG-21 — the price registry. Its own destination, because looking up
+         what a model costs is its own errand, not a footnote to connecting one. -->
+    <ModelPricingPanel />
+  </div>
+  {/if}
+
+  {#if tab === "posture"}
+  <div class="panel" role="tabpanel" id="panel-posture" aria-labelledby="tab-posture">
   <section class="card gate-status" aria-labelledby="model-gates-h">
     <h2 id="model-gates-h">Off-machine provider posture</h2>
     <dl class="gates">
@@ -759,6 +807,8 @@
       allowlist, and provider key are all present{models.no_silent_hosted_fallback ? " — and there is no silent fallback to hosted models" : ""}.
     </p>
   </section>
+  </div>
+  {/if}
 {/if}
 
 {#if detailsFor}
@@ -838,6 +888,16 @@
 {/if}
 
 <style>
+  /* Each panel keeps the vertical rhythm the page had as one scroll, so moving
+     a section into a tab changed where it lives, not how it reads. */
+  .panel { display: grid; gap: var(--space-4); }
+  .tab-lead {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 0.86rem;
+    line-height: 1.5;
+    max-width: 72ch;
+  }
   .head-row { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-4); }
   .setup-overview, .global-model-card, .section-heading { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); }
   .setup-overview { margin:var(--space-4) 0; }

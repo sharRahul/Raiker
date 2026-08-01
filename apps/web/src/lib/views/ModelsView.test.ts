@@ -1,8 +1,9 @@
-// Coverage for the model fallback-sequence editor on the Models view: it renders
-// the persisted sequence, adds/removes/reorders entries, and PUTs the ordered
-// list back. The read is the single GET /api/models; the write is PUT
-// /api/model-fallback (human gate-manager only, enforced server-side).
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+// Coverage for the Models view: its action-category tabs (Providers, Routing,
+// Pricing, Posture), provider selection and catalogue, and the fallback-sequence
+// and advisor editors on the Routing tab. The read is the single GET
+// /api/models; writes go to PUT /api/model-fallback, /api/model-selection, and
+// /api/model-advisor (human gate-manager only, enforced server-side).
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelProfile, ModelsView as ModelsData } from "../apiTypes";
 import { stubFetch, stubFetchPending } from "../test-helpers";
@@ -131,14 +132,17 @@ describe("ModelsView state grammar", () => {
   });
 });
 
-describe("ModelsView fallback sequence", () => {
+// The Models page is split by action category: Providers, Routing, Pricing,
+// and Posture. Tests that exercise the fallback sequence or the advisor render
+// the Routing tab; everything else stays on the default Providers tab.
+describe("ModelsView routing, selection, and provider catalogue", () => {
   it("renders the persisted sequence in order", async () => {
     stubFetch({
       "GET /api/models": models({
         fallback_sequence: ["anthropic-hosted", "raiker-local-llama-cpp"],
       }),
     });
-    render(ModelsView);
+    render(ModelsView, { props: { tab: "routing" } });
     await waitFor(() =>
       expect(screen.getByText("Model fallback sequence")).toBeTruthy(),
     );
@@ -162,7 +166,7 @@ describe("ModelsView fallback sequence", () => {
 
   it("shows the empty state when no fallback is configured", async () => {
     stubFetch({ "GET /api/models": models({ fallback_sequence: [] }) });
-    render(ModelsView);
+    render(ModelsView, { props: { tab: "routing" } });
     await waitFor(() =>
       expect(screen.getByText(/No fallback configured/)).toBeTruthy(),
     );
@@ -173,7 +177,7 @@ describe("ModelsView fallback sequence", () => {
       "GET /api/models": models({ fallback_sequence: [] }),
       "PUT /api/model-fallback": { ok: true, fallback_sequence: ["raiker-local-llama-cpp"] },
     });
-    render(ModelsView);
+    render(ModelsView, { props: { tab: "routing" } });
     await waitFor(() => expect(screen.getByText("Model fallback sequence")).toBeTruthy());
 
     const select = screen.getByLabelText("Add a fallback backend") as HTMLSelectElement;
@@ -337,7 +341,7 @@ describe("ModelsView fallback sequence", () => {
       "GET /api/models": models({}),
       "PUT /api/model-advisor": { ok: true, advisor_profile_id: "anthropic-hosted" },
     });
-    render(ModelsView);
+    render(ModelsView, { props: { tab: "routing" } });
     await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
 
     const select = screen.getByLabelText("Advisor model profile") as HTMLSelectElement;
@@ -362,7 +366,7 @@ describe("ModelsView fallback sequence", () => {
       "GET /api/models": models({ advisor_profile_id: "anthropic-hosted" }),
       "PUT /api/model-advisor": { ok: true, advisor_profile_id: null },
     });
-    render(ModelsView);
+    render(ModelsView, { props: { tab: "routing" } });
     await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
 
     const select = screen.getByLabelText("Advisor model profile") as HTMLSelectElement;
@@ -390,7 +394,7 @@ describe("ModelsView fallback sequence", () => {
         ],
       }),
     });
-    render(ModelsView);
+    render(ModelsView, { props: { tab: "routing" } });
     await waitFor(() => expect(screen.getByText("Advisor model")).toBeTruthy());
     const select = screen.getByLabelText("Advisor model profile") as HTMLSelectElement;
     expect(select.textContent).toContain("Anthropic");
@@ -415,7 +419,7 @@ describe("ModelsView fallback sequence", () => {
     });
     vi.stubGlobal("fetch", mock);
 
-    render(ModelsView);
+    render(ModelsView, { props: { tab: "routing" } });
     await waitFor(() => expect(screen.getByText("Model fallback sequence")).toBeTruthy());
     // Reorder to make the form dirty, then save.
     await fireEvent.click(screen.getByLabelText("Remove"));
@@ -423,5 +427,63 @@ describe("ModelsView fallback sequence", () => {
     await waitFor(() =>
       expect(screen.getByText(/not_authorized_gate_manager/)).toBeTruthy(),
     );
+  });
+});
+
+describe("ModelsView action-category tabs", () => {
+  it("offers one tab per action category", async () => {
+    stubFetch({ "GET /api/models": models({}) });
+    render(ModelsView);
+    const strip = await screen.findByRole("tablist", { name: "Model settings" });
+    expect(within(strip).getAllByRole("tab").map((tab) => tab.textContent?.trim())).toEqual([
+      "Providers",
+      "Routing",
+      "Pricing",
+      "Posture",
+    ]);
+  });
+
+  it("shows only the selected category, so one errand is one screen", async () => {
+    stubFetch({ "GET /api/models": models({}) });
+    render(ModelsView);
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Global model" })).toBeTruthy(),
+    );
+    // Pricing and the fallback list belong to other tabs and must not be here.
+    expect(screen.queryByText("Model fallback sequence")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Pricing" })).toBeNull();
+    expect(screen.queryByText("Off-machine provider posture")).toBeNull();
+  });
+
+  it("puts Pricing on its own tab", async () => {
+    stubFetch({
+      "GET /api/models": models({}),
+      "GET /api/models/pricing": { entries: [], sync: [], can_override: false },
+    });
+    render(ModelsView, { props: { tab: "pricing" } });
+    expect(await screen.findByRole("heading", { name: "Pricing" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Global model" })).toBeNull();
+  });
+
+  it("puts the read-only posture on its own tab", async () => {
+    stubFetch({ "GET /api/models": models({}) });
+    render(ModelsView, { props: { tab: "posture" } });
+    expect(await screen.findByText("Off-machine provider posture")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Global model" })).toBeNull();
+  });
+
+  it("marks the selected tab and links each panel back to it", async () => {
+    stubFetch({ "GET /api/models": models({}) });
+    render(ModelsView, { props: { tab: "routing" } });
+    await waitFor(() => expect(screen.getByText("Model fallback sequence")).toBeTruthy());
+    expect(screen.getByRole("tab", { name: "Routing" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", "tab-routing");
+  });
+
+  it("selecting a tab writes it into the hash, so a panel is shareable", async () => {
+    stubFetch({ "GET /api/models": models({}) });
+    render(ModelsView);
+    await fireEvent.click(await screen.findByRole("tab", { name: "Pricing" }));
+    expect(window.location.hash).toBe("#/models?tab=pricing");
   });
 });

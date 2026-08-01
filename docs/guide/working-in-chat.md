@@ -13,6 +13,7 @@ event traces deliberately stay out of the transcript — they live in **Sessions
 | **+ → Image…** | Upload `png`, `jpeg`, `webp`, `gif` for vision-capable models |
 | **+ → Document…** | Upload `txt`, `md`, `csv`, `pdf`, `docx`, `xlsx`; text is extracted server-side |
 | **New chat** | Start a fresh conversation. Disabled while the current chat is still empty. |
+| **⋯ (Conversation actions)** | **Export conversation…** and **Print / Save as PDF**. Both are also in Build. |
 | **Planning** | `auto`, `Always plan`, `Never plan` |
 | **Model** | Only *configured* profiles. No free-text model ids. |
 | **Context** | Opens a read-only popover. It never compacts the conversation. |
@@ -33,6 +34,49 @@ The approval setting controls the interaction, not the runtime's protections:
 
 The selected policy is shared with Build and is remembered for the next
 composer session. It is not the same as Build's Plan/Edit/Auto runtime modes.
+
+## Reading a reply
+
+Raiker's replies are rendered as Markdown: headings, lists, tables, links, and
+fenced code. **Your own messages are shown exactly as you typed them, and this
+is deliberate** — a prompt is an instruction whose exact characters matter, so
+Chat never re-formats one. If you write `**bold**` in a prompt, the model
+receives those asterisks and you see those asterisks.
+
+Every code block in a reply carries:
+
+- **the language**, named conventionally (a ```` ```ts ```` fence reads
+  *TypeScript*). A language Raiker does not ship a grammar for is still labelled,
+  just not coloured — a wrong colour would be a claim about the code;
+- **Copy code**, reachable by keyboard, which copies the source the model wrote
+  with the highlighting stripped. It announces *Code copied to the clipboard*, or
+  says so plainly if your browser blocks clipboard access.
+
+Highlighting is produced entirely on your machine from a grammar shipped inside
+Raiker. Nothing is fetched to colour a keyword, and a code block can never
+execute — the renderer escapes every character of model output before it emits
+any markup.
+
+## Exporting a conversation
+
+The `⋯` menu above the transcript offers **Export conversation…** in both Chat
+and Build. It opens a review first: how many messages, exactly which files, and
+what redaction is applied — before you pick a format.
+
+| Format | Use it for |
+|---|---|
+| **HTML** | One self-contained page. No scripts, no remote assets; it opens offline. |
+| **Markdown** | Plain text you can edit, diff, or commit. |
+| **PDF** | A paginated document for filing or sending on. |
+
+Secret-shaped values — API keys, tokens, credentials — are replaced with
+`***REDACTED***` in every message before anything is rendered. Attached files are
+**listed** by name, type, and size; their contents are never embedded.
+
+**Print / Save as PDF** uses your browser's own print dialog against a dedicated
+print layout: the sidebar, topbar, composer, and controls are dropped, and a turn
+never splits across a page. Every export is recorded in the event log with its
+format and counts — never its text.
 
 ## Your conversations
 
@@ -102,6 +146,19 @@ Approving resumes the waiting turn. Where the governed action is eligible for
 execution, Raiker re-checks its runtime protections and executes it once; other
 approvals are record-only and show `executes_action: false`. Filters (Pending /
 Approved / Denied) and sorting (highest risk / newest) are on the same page.
+
+### Deciding in another tab
+
+A turn that is waiting shows **Waiting for approval**. You do not have to decide
+in the tab that raised it: record the decision in the Approvals inbox, in Build,
+or in another window, and the waiting conversation changes to **Approved —
+continuing…** on its own and picks up exactly where it stopped — same
+conversation, same session, no re-prompt.
+
+If Raiker cannot currently watch for a decision made elsewhere, the card says so
+and offers **Continue now** instead of leaving you guessing. A turn is continued
+exactly once even if several tabs react at the same moment; a tab that loses that
+race says **Continued in another tab** rather than reporting an error.
 
 ## Background work
 
@@ -174,18 +231,31 @@ under the figures:
 
 | Source | Shown as | Where it comes from |
 |---|---|---|
-| Owner | "your configured price" | A rate you set yourself. Always wins. |
+| Owner | "administrator override" | A rate an administrator set, with a reason, on the Models → **Pricing** tab. Always wins. |
 | Provider | "provider-reported" | Published by the provider's own API. OpenRouter does this; most do not. |
 | Config | "list price, as of 2026-07" | A documented list price shipped in `config/model-profiles.json`. |
 
-If none applies, the panel says no price is configured for that model rather
+If none applies the panel says **Unknown** and offers **Configure →** rather
 than showing `$0.00` — a zero always means "this was free", never "we do not
 know". Costs are stored as counts, not money, so correcting a price re-prices
 your history immediately.
 
-Cache reads are billed at the full input rate here. Providers discount cached
-input, so the figure is a deliberate slight over-estimate: a bill should never
-surprise you in the expensive direction.
+The panel lists each rate component it actually has: input, output, and — where
+a provider publishes them separately — cache write and cache read. A component
+nobody published is simply not listed; Raiker never derives one rate from
+another, because an inferred figure would be indistinguishable from a stated one.
+When a cache rate is unknown, cached tokens fall back to the full input rate,
+which over-states rather than under-states: a bill should never surprise you in
+the expensive direction.
+
+Every rate lives in an effective-dated registry, so what a turn cost on the day
+it ran stays reproducible after a provider changes its prices. The **Models**
+page is split by what you came to do — **Providers**, **Routing**, **Pricing**,
+**Posture** — and its **Pricing** tab shows the whole registry: the exact model id each rate belongs to, its
+source, when it took effect, its full change history, and — per provider — when
+prices were last synchronised, when the next refresh is due, and whether the
+current reading is stale. Recording an override needs the runtime gate-manager
+role and a reason; both are kept with the rate.
 
 Automatic compaction at 90 % and weekly quota display remain specified but not
 shipped — see

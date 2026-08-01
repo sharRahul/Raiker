@@ -18,6 +18,7 @@ from raiker.api.schemas import (
     CreateMcpServerRequest,
     CreateProjectRequest,
     CreateRemoteMcpServerRequest,
+    ExportSessionRequest,
     ModelConnectionRequest,
     ModelPriceRequest,
     MoveProjectRequest,
@@ -449,6 +450,82 @@ async def get_session(
     if view is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown session: {session_id}")
     return serialize_dto(view)
+
+
+@router.get("/api/sessions/{session_id}/export/manifest")
+async def get_session_export_manifest(
+    session_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """What an export of this conversation would contain (BUG-22).
+
+    Read before choosing a format, so the owner reviews the exact messages, the
+    exact files, and the redaction policy that will be applied — rather than
+    discovering them in a downloaded document.
+    """
+    session, principal = auth_data
+    transcript = _service(request).build_session_transcript(
+        session_id,
+        user_id=principal.delegated_by_user_id,
+        principal_id=session.principal_id,
+    )
+    if transcript is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": "session_not_found"},
+        )
+    return dict(transcript.manifest())
+
+
+@router.post("/api/sessions/{session_id}/export")
+async def export_session_transcript(
+    session_id: str,
+    body: ExportSessionRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> Response:
+    """Render this conversation as a downloadable file.
+
+    Authorised by the session boundary, redacted before rendering, audited after
+    it succeeds. The response is the document itself; nothing about the request
+    grants access the caller did not already have.
+    """
+    from raiker.sessions.transcript import EXPORT_FORMATS, render, safe_filename
+
+    session, principal = auth_data
+    export_format = (body.format or "html").lower()
+    if export_format not in EXPORT_FORMATS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"ok": False, "reason_code": "export_format_unsupported"},
+        )
+    service = _service(request)
+    transcript = service.build_session_transcript(
+        session_id,
+        user_id=principal.delegated_by_user_id,
+        principal_id=session.principal_id,
+    )
+    if transcript is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": "session_not_found"},
+        )
+    payload, media_type = render(transcript, export_format)
+    service.record_transcript_export(
+        session_id,
+        acting_principal_id=session.principal_id,
+        export_format=export_format,
+        message_count=transcript.message_count,
+        file_count=len(transcript.files),
+        byte_size=len(payload),
+    )
+    filename = safe_filename(transcript.title, session_id, export_format)
+    return Response(
+        content=payload,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.put("/api/sessions/{session_id}/pin")
@@ -1169,9 +1246,53 @@ async def set_model_price(
         body.model,
         input_per_mtok=body.input_per_mtok,
         output_per_mtok=body.output_per_mtok,
+        cache_write_per_mtok=body.cache_write_per_mtok,
+        cache_read_per_mtok=body.cache_read_per_mtok,
         currency=body.currency or "USD",
+        effective_from=body.effective_from,
+        reason=body.reason,
         acting_principal_id=session.principal_id,
     )
+    if not result.ok:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_403_FORBIDDEN
+                if result.reason_code == "not_authorized_gate_manager"
+                else status.HTTP_400_BAD_REQUEST
+            ),
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.get("/api/models/pricing")
+async def get_model_pricing(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """The normalised price registry for this owner (BUG-21).
+
+    One read answers everything the pricing surface must state: the exact model
+    id each rate belongs to, which source supplied it, when it took effect, the
+    individual input/output/cache-write/cache-read components, the full change
+    history, and each provider's synchronisation state including staleness.
+    """
+    session, _principal = auth_data
+    return serialize_dto(_service(request).list_model_pricing(session.principal_id))
+
+
+@router.post("/api/models/pricing/refresh")
+async def refresh_model_pricing(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Run the reviewed-documentation adapters now, bypassing the cadence.
+
+    No provider connection is opened here: a provider's own catalogue feeds the
+    registry only through the user-initiated model listing.
+    """
+    session, _principal = auth_data
+    result = _service(request).refresh_model_pricing(session.principal_id)
     if not result.ok:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

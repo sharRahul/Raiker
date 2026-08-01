@@ -98,6 +98,10 @@
   --topbar-h: 56px;
 
   --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Optical tracking. Type set large keeps the spacing it was drawn with, which
+     reads loose; display sizes need it pulled in. Body text is left alone. */
+  --tracking-tight: -0.018em;
 }
 
 /* ── Light theme tokens ("paper") ── */
@@ -147,8 +151,13 @@
   --neutral-soft: #eceff2;
   --neutral-border: #d5dce2;
 
-  --shadow-1: 0 1px 2px rgba(22, 35, 44, 0.05), 0 2px 8px rgba(22, 35, 44, 0.05);
-  --shadow-2: 0 4px 12px rgba(22, 35, 44, 0.08), 0 12px 32px rgba(22, 35, 44, 0.1);
+  /* A depth ladder, not two copies of the same blur. Each level pairs a tight
+     contact shadow (the edge that grounds the surface) with a wider ambient one
+     (the room it sits in). The old --shadow-1 was two near-identical mid blurs,
+     which read as haze rather than elevation. */
+  --shadow-0: 0 1px 1px rgba(22, 35, 44, 0.04);
+  --shadow-1: 0 1px 1px rgba(22, 35, 44, 0.04), 0 2px 6px -1px rgba(22, 35, 44, 0.07);
+  --shadow-2: 0 2px 4px -1px rgba(22, 35, 44, 0.06), 0 12px 28px -6px rgba(22, 35, 44, 0.16);
   --overlay: rgba(22, 35, 44, 0.42);
   --focus-ring: #0f766e;
 }
@@ -194,8 +203,9 @@
   --neutral-soft: rgba(154, 167, 180, 0.1);
   --neutral-border: rgba(154, 167, 180, 0.28);
 
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-2: 0 4px 14px rgba(0, 0, 0, 0.45), 0 16px 40px rgba(0, 0, 0, 0.4);
+  --shadow-0: 0 1px 1px rgba(0, 0, 0, 0.3);
+  --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.32), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.4), 0 14px 32px -6px rgba(0, 0, 0, 0.55);
   --overlay: rgba(3, 6, 9, 0.62);
   --focus-ring: #5eead4;
 }
@@ -242,8 +252,9 @@
     --neutral-soft: rgba(154, 167, 180, 0.1);
     --neutral-border: rgba(154, 167, 180, 0.28);
 
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.3);
-    --shadow-2: 0 4px 14px rgba(0, 0, 0, 0.45), 0 16px 40px rgba(0, 0, 0, 0.4);
+    --shadow-0: 0 1px 1px rgba(0, 0, 0, 0.3);
+    --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.32), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.4), 0 14px 32px -6px rgba(0, 0, 0, 0.55);
     --overlay: rgba(3, 6, 9, 0.62);
     --focus-ring: #5eead4;
   }
@@ -314,6 +325,13 @@ h4 {
 
 h1 {
   font-size: 1.45rem;
+  letter-spacing: var(--tracking-tight);
+}
+/* Anything set larger than the h1 step — the Workbench greeting, empty-state
+   titles — is display type and needs the same correction. */
+.display,
+h1.display {
+  letter-spacing: var(--tracking-tight);
 }
 h2 {
   font-size: 1.08rem;
@@ -345,10 +363,23 @@ code,
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 4px;
+  /* A soft halo behind the ring so focus reads on both a white card and a dark
+     deck without thickening the outline itself. The outline stays the
+     accessibility contract — this only softens the edge around it, and it is
+     dropped under forced colours where the system owns focus entirely. */
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+@media (forced-colors: active) {
+  :focus-visible {
+    box-shadow: none;
+  }
 }
 
+/* Naming both halves: a background-only rule inherits whatever colour the text
+   already had, which on an accent bubble left the selection unreadable. */
 ::selection {
   background: var(--accent-soft);
+  color: var(--text-1);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -363,6 +394,35 @@ code,
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Scrollbars follow the theme. This app is mostly scrollers — the transcript,
+   tables, the sidebar, code blocks — and a default platform bar is the loudest
+   undesigned element on the page. Firefox gets the standard properties; WebKit
+   and Blink get the pseudo-elements. Both keep a full-size hit area. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--r-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-3);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ── Shared component classes ── */

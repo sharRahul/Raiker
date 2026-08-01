@@ -10,7 +10,14 @@
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
-  import { api, ApiError, streamPrompt } from "../api";
+  import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
+  import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
+  import {
+    alreadyResumedElsewhere,
+    watchForResumableTurns,
+    type ResumableTurn,
+    type ResumeWatcher,
+  } from "../approvalResume";
   import type {
     AgentResponse,
     AttachmentPreview,
@@ -47,6 +54,13 @@
     response: AgentResponse | null;
     streaming: boolean;
     error: string | null;
+    // BUG-24 — how a parked turn is presented while its approval is outstanding
+    // and once a decision lands, wherever that decision was made.
+    //   "waiting"   — Waiting for approval
+    //   "continuing"— Approved (or rejected) elsewhere; the turn is resuming here
+    //   "elsewhere" — another tab won the race and is streaming the continuation
+    resumeState?: "waiting" | "continuing" | "elsewhere" | null;
+    resumeNote?: string | null;
   }
 
   let {
@@ -559,6 +573,11 @@
     } finally {
       turn.streaming = false;
       streaming = false;
+      // BUG-24 — a turn that just parked asks immediately whether the decision
+      // has already been made elsewhere, rather than waiting out a poll
+      // interval before it can say so. Checked here rather than in the event
+      // handler because the turn is only genuinely parked once its stream ends.
+      if (turn.response?.status === "needs_approval") resumeWatcher?.checkNow();
       void scrollToEnd();
     }
   }
@@ -591,6 +610,12 @@
     }
     if (showAttach && composerCardEl && !composerCardEl.contains(event.target as Node)) {
       showAttach = false;
+    }
+    if (
+      conversationMenuOpen &&
+      !(event.target as HTMLElement | null)?.closest?.(".conversation-menu")
+    ) {
+      conversationMenuOpen = false;
     }
   }
 
@@ -627,6 +652,109 @@
     }
   }
 
+  // ── BUG-24: continue a turn whose approval was resolved anywhere ──────────
+  //
+  // A parked turn used to be a dead end in Chat: Build could stream a parked
+  // continuation and Approvals could offer a manual one, but a Chat tab that
+  // did not itself record the decision never learned it had been made. The
+  // watcher below closes that, and the server keeps the guarantee — its atomic
+  // claim means a turn resumes exactly once even when two tabs both react.
+  let liveChannelDown = $state(false);
+  let resumeWatcher: ResumeWatcher | null = null;
+
+  onMount(() => {
+    resumeWatcher = watchForResumableTurns({
+      sessionId: () => sessionId,
+      hasParkedTurn: () =>
+        turns.some((turn) => turn.response?.status === "needs_approval" && !turn.streaming),
+      onResume: (turn) => resumeParkedTurn(turn.approval_id, turn.outcome_status),
+      onChannelUnavailable: (unavailable) => (liveChannelDown = unavailable),
+    });
+    return () => resumeWatcher?.stop();
+  });
+
+  /**
+   * Stream the continuation of a parked turn into its own transcript row.
+   *
+   * The row is the one that parked, so the resumed work lands in the same
+   * conversation rather than opening a second turn — the original session,
+   * tool-call boundary and cancellation controls are all preserved because the
+   * server replays the same suspended state.
+   */
+  async function resumeParkedTurn(approvalId: string, outcomeStatus = "") {
+    const turn = turns.findLast((candidate) => candidate.response?.status === "needs_approval");
+    if (turn === undefined || turn.streaming) return;
+    turn.resumeState = "continuing";
+    turn.resumeNote =
+      outcomeStatus === "rejected" ? "Rejected — telling Raiker…" : "Approved — continuing…";
+    turn.streaming = true;
+    turn.error = null;
+    streaming = true;
+    void scrollToEnd();
+    try {
+      await streamResumeAfterApproval(approvalId, (event) => {
+        if (event.kind === "final" && event.response !== null) {
+          turn.response = event.response;
+          turn.resumeState = null;
+          turn.resumeNote = null;
+          void restoreAttachmentChips(event.response.session_id);
+          if (contextOpen) void refreshContextUsage();
+        } else if (event.kind === "error") {
+          turn.error = event.text || "The continuation reported an error.";
+        } else {
+          turn.events = [...turn.events, event];
+        }
+        void scrollToEnd();
+      });
+    } catch (error) {
+      const code = error instanceof ApiError ? error.reasonCode : null;
+      if (alreadyResumedElsewhere(code)) {
+        // Not a failure: the decision did continue the turn, in another tab.
+        turn.resumeState = "elsewhere";
+        turn.resumeNote = "Continued in another tab. Reload to see the result here.";
+      } else {
+        turn.resumeState = "waiting";
+        turn.resumeNote = null;
+        turn.error =
+          error instanceof ApiError
+            ? `The turn could not continue (${code ?? error.status}).`
+            : "Could not reach the local runtime to continue the turn.";
+      }
+    } finally {
+      turn.streaming = false;
+      streaming = false;
+      void scrollToEnd();
+    }
+  }
+
+  /** The manual path, offered whenever the live channel cannot be relied on. */
+  async function continueNow() {
+    if (sessionId === null || streaming) return;
+    try {
+      const { turns: resumable } = await api.resumableTurns(sessionId);
+      if (resumable.length === 0) {
+        exportNotice = "No decision has been recorded for this turn yet.";
+        return;
+      }
+      const next: ResumableTurn = resumable[0];
+      await resumeParkedTurn(next.approval_id, next.outcome_status);
+    } catch {
+      exportNotice = "Could not check for a decision — the local runtime is unreachable.";
+    }
+  }
+
+  // ── BUG-22: export and print this conversation ───────────────────────────
+  let conversationMenuOpen = $state(false);
+  let exportOpen = $state(false);
+
+  function printConversation() {
+    conversationMenuOpen = false;
+    exportOpen = false;
+    // The dedicated print stylesheet at the bottom of this file drops the app
+    // chrome, so this produces a document rather than a screenshot of the UI.
+    setTimeout(() => window.print?.(), 0);
+  }
+
   async function copyAnswer(turn: ChatTurn) {
     // The clipboard is not always available (an insecure origin, or a denied
     // permission). Say so rather than failing silently — a copy button that
@@ -657,6 +785,32 @@
       >
         New chat
       </button>
+      <!-- BUG-22 — the conversation menu. Export lives here, beside the other
+           whole-conversation actions, rather than inside a per-message row. -->
+      <div class="conversation-menu">
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          aria-label="Conversation actions"
+          aria-expanded={conversationMenuOpen}
+          aria-haspopup="menu"
+          title="Conversation actions"
+          onclick={() => (conversationMenuOpen = !conversationMenuOpen)}
+        >•••</button>
+        {#if conversationMenuOpen}
+          <div class="menu" role="menu" aria-label="Conversation actions">
+            <button
+              type="button"
+              role="menuitem"
+              disabled={sessionId === null}
+              onclick={() => { conversationMenuOpen = false; exportOpen = true; }}
+            >Export conversation…</button>
+            <button type="button" role="menuitem" onclick={printConversation}>
+              Print / Save as PDF
+            </button>
+          </div>
+        {/if}
+      </div>
       <button
         type="button"
         class="btn btn-ghost btn-sm rail-toggle"
@@ -880,10 +1034,51 @@
           {/if}
 
           {#if turn.response?.status === "needs_approval" && turn.response.approval}
-            <div class="approval-card">
-              <p class="approval-title"><Icon name="approvals" size={15} /> Your approval is needed to continue</p>
-              <p class="approval-body">{turn.response.approval.message}</p>
-              <a class="btn btn-soft btn-sm" href="#/approvals">Review approval</a>
+            <!-- BUG-24 — this card is the parked turn's live state. Once a
+                 decision is recorded anywhere it flips to "continuing" without
+                 a reload, and the manual action stays available whenever the
+                 live channel cannot be relied on. -->
+            <div class="approval-card" class:continuing={turn.resumeState === "continuing"}>
+              {#if turn.resumeState === "continuing"}
+                <p class="approval-title" role="status" aria-live="polite">
+                  <span class="pulse" aria-hidden="true"></span>
+                  {turn.resumeNote ?? "Approved — continuing…"}
+                </p>
+                <p class="approval-note">
+                  Raiker is picking this turn up where it stopped, in this same conversation.
+                </p>
+              {:else if turn.resumeState === "elsewhere"}
+                <p class="approval-title" role="status" aria-live="polite">
+                  <Icon name="approvals" size={15} /> Continued in another tab
+                </p>
+                <p class="approval-note">{turn.resumeNote}</p>
+              {:else}
+                <p class="approval-title">
+                  <Icon name="approvals" size={15} /> Waiting for approval
+                </p>
+                <p class="approval-body">{turn.response.approval.message}</p>
+                <p class="approval-note">
+                  Decide here or in the Approvals inbox — this conversation continues on its own
+                  as soon as you do, in whichever tab you use.
+                </p>
+                <div class="approval-actions">
+                  <a class="btn btn-soft btn-sm" href="#/approvals">Review approval</a>
+                  {#if liveChannelDown}
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      disabled={streaming}
+                      onclick={() => void continueNow()}
+                    >Continue now</button>
+                  {/if}
+                </div>
+                {#if liveChannelDown}
+                  <p class="approval-note">
+                    Raiker cannot currently watch for a decision made elsewhere, so use
+                    <strong>Continue now</strong> once you have recorded one.
+                  </p>
+                {/if}
+              {/if}
             </div>
           {/if}
 
@@ -1102,6 +1297,14 @@
     </div>
   {/if}
 
+{#if exportOpen && sessionId !== null}
+  <ExportConversationDialog
+    sessionId={sessionId}
+    onclose={() => (exportOpen = false)}
+    onprint={printConversation}
+  />
+{/if}
+
 {#if inspecting !== null}
   <FileInspector
     preview={preview}
@@ -1278,15 +1481,23 @@
     .artifact-preview, .artifact-unavailable { grid-column: 1 / -1; justify-self: stretch; text-align: center; }
   }
 
+  /* BUG-22 — the print layout. Save as PDF has to produce a document, not a
+     photograph of the application: every piece of chrome and every control is
+     dropped, the transcript stops being a scroller, and a turn never splits
+     across a page boundary. Code blocks keep their frame but lose the copy
+     button, which means nothing on paper. */
   @media print {
     :global(.sidebar), :global(.topbar), :global(.skip-link), .composer,
-    .copy-message, :global(.file-inspector) { display: none !important; }
+    .copy-message, .chat-header, .rail-slot, .approval-actions,
+    :global(.md-copy), :global(.file-inspector) { display: none !important; }
     :global(.app-shell), :global(.app-main), :global(.content), :global(.responsive-page),
     .chat-layout, .chat { display: block !important; height: auto !important; max-width: none !important; }
     .thread { display: block; overflow: visible; }
     .turn { break-inside: avoid; margin-bottom: 1.5rem; }
     .message-group { max-width: none; }
     .message-bubble { box-shadow: none; border: 1px solid #bbb; }
+    :global(.md-code) { break-inside: avoid; }
+    @page { margin: 18mm 15mm; }
   }
   .turn {
     display: flex;
@@ -1420,6 +1631,53 @@
     color: var(--text-2);
     margin: 0 0 0.5rem;
   }
+  .approval-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  /* A turn that is picking itself up again reads as progress, not as a warning
+     still waiting on the owner. */
+  .approval-card.continuing {
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+  }
+  .approval-card.continuing .approval-title {
+    color: var(--accent);
+  }
+  /* BUG-22 — the conversation menu, anchored to its trigger. */
+  .conversation-menu {
+    position: relative;
+    display: inline-block;
+  }
+  .conversation-menu .menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 40;
+    min-width: 13rem;
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--raised);
+    box-shadow: var(--shadow-2);
+  }
+  .conversation-menu .menu button {
+    border: 0;
+    background: transparent;
+    color: var(--text-1);
+    font: inherit;
+    font-size: 0.86rem;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--r-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+  .conversation-menu .menu button:hover:not(:disabled) { background: var(--accent-soft); }
+  .conversation-menu .menu button:disabled { color: var(--text-3); cursor: default; }
   .under-hood {
     margin-top: 0.7rem;
     border-top: 1px dashed var(--border);

@@ -29,6 +29,8 @@
  * not extend the emitters with source-derived attributes.
  */
 
+import { highlight, languageLabel } from "./highlight";
+
 const HTML_ESCAPES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -175,10 +177,28 @@ function renderFence(
   const next = i < lines.length ? i + 1 : i;
   const language = info.trim().split(/\s+/)[0] ?? "";
   const named = LANGUAGE_TOKEN.test(language);
-  const attr = named ? ` class="language-${language.toLowerCase()}"` : "";
-  const label = named ? `<span class="md-code-lang">${escapeHtml(language)}</span>` : "";
+  const token = named ? language.toLowerCase() : "";
+  const source = body.join("\n");
+
+  // BUG-23 — every block carries a language label and a keyboard-operable copy
+  // action, and its contents are highlighted by the locally-shipped grammar
+  // scanner. The rules of this file are unchanged: the classes below are
+  // literals, `data-lang` is the normalised token matched against
+  // LANGUAGE_TOKEN (never raw source), and `highlight()` escapes every token it
+  // emits. The copy button carries no handler — Markdown.svelte delegates one
+  // click listener on the wrapper, so no source-derived script can ride along.
+  const label = named ? languageLabel(language) : "Code";
+  const header =
+    `<div class="md-code-head">` +
+    `<span class="md-code-lang">${escapeHtml(label)}</span>` +
+    `<button type="button" class="md-copy" data-md-copy aria-label="Copy code">Copy code</button>` +
+    `</div>`;
+  const attr = named ? ` class="language-${token}"` : "";
+  const rendered = named ? highlight(source, token) : escapeHtml(source);
   return {
-    html: `<div class="md-code">${label}<pre><code${attr}>${escapeHtml(body.join("\n"))}</code></pre></div>`,
+    html:
+      `<div class="md-code"${named ? ` data-lang="${token}"` : ""}>${header}` +
+      `<pre><code${attr}>${rendered}</code></pre></div>`,
     next,
   };
 }

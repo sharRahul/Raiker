@@ -22,6 +22,9 @@ docs/superpowers
 build/
 *.lock
 output/
+# Playwright writes its last-run marker beside the config unless outputDir
+# covers it; the evidence itself lives in output/ and docs/plans/screenshots.
+test-results/
 /artifacts/
 .playwright-mcp/
 .playwright/

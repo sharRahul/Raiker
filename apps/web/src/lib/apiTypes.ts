@@ -225,6 +225,116 @@ export interface ContextUsage {
   session_turns: number;
   session_input_tokens: number;
   session_output_tokens: number;
+  /** BUG-21 — the individual rate components behind `session_cost`, read from
+   *  the normalised registry. Each is independently sourced; a provider that
+   *  publishes no cache rate leaves those null rather than having one inferred. */
+  price_input_per_mtok?: string | null;
+  price_output_per_mtok?: string | null;
+  price_cache_write_per_mtok?: string | null;
+  price_cache_read_per_mtok?: string | null;
+  price_effective_from?: string | null;
+  /** True on a billable provider with no exact rate for this model. The popover
+   *  states **Unknown** and offers Configure → rather than implying it was free. */
+  price_unknown?: boolean;
+}
+
+/** BUG-21 — one exact model's row in the Models → Pricing surface. */
+export interface ModelPricingHistoryEntry {
+  provider: string;
+  model: string;
+  source: string;
+  effective_from: string;
+  recorded_at: string;
+  as_of: string | null;
+  recorded_by: string | null;
+  reason: string | null;
+  currency: string;
+  input_per_mtok: string;
+  output_per_mtok: string;
+  cache_write_per_mtok: string | null;
+  cache_read_per_mtok: string | null;
+}
+
+export interface ModelPricingEntry {
+  provider: string;
+  model: string;
+  profile_id: string | null;
+  source: string | null;
+  currency: string | null;
+  input_per_mtok: string | null;
+  output_per_mtok: string | null;
+  cache_write_per_mtok: string | null;
+  cache_read_per_mtok: string | null;
+  effective_from: string | null;
+  as_of: string | null;
+  recorded_at: string | null;
+  recorded_by: string | null;
+  reason: string | null;
+  has_owner_override: boolean;
+  history: ModelPricingHistoryEntry[];
+}
+
+export interface ModelPricingSyncState {
+  provider: string;
+  interval_hours: number;
+  last_attempt_at: string | null;
+  last_success_at: string | null;
+  next_refresh_at: string | null;
+  last_error: string | null;
+  models_recorded: number;
+  has_last_good: boolean;
+  due: boolean;
+  stale: boolean;
+}
+
+export interface ModelPricingView {
+  entries: ModelPricingEntry[];
+  sync: ModelPricingSyncState[];
+  /** Overrides are administrator work; a non-gate-manager sees the registry
+   *  read-only rather than an action that would be refused on submit. */
+  can_override: boolean;
+}
+
+/** BUG-22 — what an export of one conversation would contain, reviewed first. */
+export interface TranscriptExportMessage {
+  role: string;
+  text: string;
+  timestamp: string | null;
+  status: string | null;
+}
+
+export interface TranscriptExportFile {
+  filename: string;
+  media_type: string;
+  byte_size: number;
+  source: string;
+}
+
+export interface TranscriptExportManifest {
+  session_id: string;
+  title: string;
+  created_at: string | null;
+  message_count: number;
+  file_count: number;
+  files: TranscriptExportFile[];
+  redaction_policy: string;
+  formats: string[];
+  messages: TranscriptExportMessage[];
+}
+
+/** BUG-24 — parked turns this account may continue, ids only. */
+export interface ResumableTurn {
+  approval_id: string;
+  session_id: string;
+  turn_id: string;
+  tool_name: string;
+  outcome_status: string;
+  created_at: string;
+}
+
+export interface ResumableTurnsView {
+  session_id: string | null;
+  turns: ResumableTurn[];
 }
 
 export interface ModelsView {

@@ -145,6 +145,17 @@ EVENT_TYPES = {
     "reasoning_setting_changed",
     "reasoning_setting_rejected",
     "model_tool_call_rejected",
+    # BUG-21 — the price registry's audit trail. An administrator override is
+    # never anonymous: who set it, for which exact model, and why. The rates
+    # themselves live in the registry, which is effective-dated and append-only;
+    # these events record that a human changed what the product charges against.
+    "model_price_override_recorded",
+    "model_price_override_cleared",
+    "model_price_synchronised",
+    # BUG-22 — a transcript left the runtime as a file. Metadata only: format,
+    # message and file counts, and the redaction policy applied. The transcript
+    # itself is never written into an event payload.
+    "session_transcript_exported",
     "runtime_error_recorded",
     # A chat moved into or out of an organizing project. The move grants
     # nothing; it changes only the bounded context the chat receives.

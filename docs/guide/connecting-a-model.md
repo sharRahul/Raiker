@@ -18,7 +18,10 @@ made.
 
 ## Connect a hosted provider
 
-**Models** → the provider's card → **Connect** → paste the key → **Connect**.
+**Models → Providers** → the provider's card → **Connect** → paste the key →
+**Connect**. (The Models page is split by what you came to do: **Providers** to
+connect and choose, **Routing** for fallback and the advisor, **Pricing** for
+rates, **Posture** for the read-only gate status.)
 
 That is the whole flow. Behind it:
 

@@ -28,6 +28,7 @@ import type {
   Notification,
   MemoryControlView,
   MemorySettingsView,
+  ModelPricingView,
   ModelsView,
   PasswordRecoveryBeginResult,
   ProjectDetail,
@@ -37,6 +38,7 @@ import type {
   PromptRequestBody,
   ProviderModelList,
   ResolveApprovalResult,
+  ResumableTurnsView,
   ResolveCriticalApprovalResult,
   RestorePlan,
   RuntimeMode,
@@ -48,6 +50,7 @@ import type {
   StandingGrant,
   StreamEvent,
   TaskView,
+  TranscriptExportManifest,
   TurnDetail,
   UploadedAttachment,
 } from "./apiTypes";
@@ -266,22 +269,6 @@ export const api = {
   // ── Read-only governed views ──
   sessionContextUsage: (sessionId: string) =>
     request<ContextUsage>(`/api/sessions/${encodeURIComponent(sessionId)}/context-usage`),
-  setModelPrice: (
-    profileId: string,
-    model: string,
-    inputPerMtok: string | null,
-    outputPerMtok: string | null,
-    currency = "USD",
-  ) =>
-    request<{ ok: boolean }>(`/api/models/${encodeURIComponent(profileId)}/price`, {
-      method: "PUT",
-      body: JSON.stringify({
-        model,
-        input_per_mtok: inputPerMtok,
-        output_per_mtok: outputPerMtok,
-        currency,
-      }),
-    }),
   capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),
   capabilityGate: (capability: string) =>
     request<CapabilityGate>(`/api/capability-gates/${encodeURIComponent(capability)}`),
@@ -450,6 +437,54 @@ export const api = {
   // The preview is authorized by the session that carried the attachment, so
   // these paths 404 for a file this conversation never had. Nothing here
   // uploads, mutates, or downloads.
+  // ── BUG-22: conversation transcript export ──
+  // The manifest is read first so the owner reviews exactly what will leave the
+  // machine — which messages, which files, and the redaction policy — before a
+  // format is chosen. The export itself returns the document; scope comes from
+  // the authenticated session and the session id, never from the request body.
+  sessionExportManifest: (sessionId: string) =>
+    request<TranscriptExportManifest>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/export/manifest`,
+    ),
+  exportSession: async (
+    sessionId: string,
+    format: "html" | "markdown" | "pdf",
+    filename: string,
+  ): Promise<void> => {
+    const blob = await requestBlob(`/api/sessions/${encodeURIComponent(sessionId)}/export`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ format }),
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url));
+  },
+  // ── BUG-21: the normalised price registry ──
+  modelPricing: () => request<ModelPricingView>("/api/models/pricing"),
+  refreshModelPricing: () =>
+    postJson<{ ok: boolean; changes_written: number }>("/api/models/pricing/refresh", {}),
+  setModelPrice: (
+    profileId: string,
+    body: {
+      model: string;
+      input_per_mtok?: string | null;
+      output_per_mtok?: string | null;
+      cache_write_per_mtok?: string | null;
+      cache_read_per_mtok?: string | null;
+      currency?: string | null;
+      effective_from?: string | null;
+      reason?: string | null;
+    },
+  ) =>
+    request<{ ok: boolean }>(`/api/models/${encodeURIComponent(profileId)}/price`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
   sessionAttachments: (sessionId: string) =>
     request<SessionAttachmentsView>(
       `/api/sessions/${encodeURIComponent(sessionId)}/attachments`,
@@ -741,6 +776,11 @@ export const api = {
   // B2 — non-streaming continuation of a turn that was parked for this approval.
   resumeAfterApproval: (id: string) =>
     postJson<AgentResponse>(`/api/approvals/${encodeURIComponent(id)}/resume`, {}),
+  // BUG-24 — parked turns this account may continue right now, whoever resolved
+  // the approval and wherever they resolved it. Ids only; polling changes
+  // nothing, and the server still enforces exactly-once resumption.
+  resumableTurns: (sessionId?: string) =>
+    request<ResumableTurnsView>(withQuery("/api/approvals/resumable", { session_id: sessionId })),
   resolveCriticalApproval: (id: string, body: { approve: boolean; reason: string }) =>
     postJson<ResolveCriticalApprovalResult>(
       `/api/approvals/${encodeURIComponent(id)}/resolve-critical`,

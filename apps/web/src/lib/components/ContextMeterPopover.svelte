@@ -60,10 +60,25 @@
     usage?.billable ? formatCost(usage.provider_total_cost, usage.currency, locale) : null,
   );
   const priceNote = $derived(sourceNote(usage?.price_source, usage?.price_as_of));
-  // A billable provider that has run turns but resolves no price is the one
-  // case worth an explicit call to action rather than silence.
+  // BUG-21 — a billable provider with no exact rate in the registry says
+  // **Unknown** and offers a way to fix it. The server decides this
+  // (`price_unknown`), so the popover never has to infer a missing price from
+  // an absent cost; the old `session_turns > 0` condition stayed silent before
+  // the first turn, which read as "free" rather than "not yet known".
   const priceMissing = $derived(
-    (usage?.billable ?? false) && usage !== null && usage.session_turns > 0 && sessionCost === null,
+    usage?.price_unknown ??
+      ((usage?.billable ?? false) && usage !== null && usage.session_turns > 0 && sessionCost === null),
+  );
+  // The individual components behind the figure, exactly as the registry holds
+  // them. A cache rate the provider never published stays absent rather than
+  // being shown as equal to the input rate.
+  const rateRows = $derived(
+    [
+      ["Input", usage?.price_input_per_mtok],
+      ["Output", usage?.price_output_per_mtok],
+      ["Cache write", usage?.price_cache_write_per_mtok],
+      ["Cache read", usage?.price_cache_read_per_mtok],
+    ].filter((row): row is [string, string] => typeof row[1] === "string" && row[1] !== ""),
   );
   const providerLabel = $derived(usage?.provider ? `${usage.provider}, all time` : "All time");
 </script>
@@ -91,17 +106,33 @@
 
   {#if usage?.billable}
     <div class="cost" aria-label="API pricing and cost">
-      {#if sessionCost}
+      {#if priceMissing}
+        <!-- Stated, not implied. A billable model with no exact rate reads
+             "Unknown", never "$0.00", and the fix is one click away. -->
+        <div class="cost-row"><span>This chat</span><strong>Unknown</strong></div>
+        <p class="price-note">
+          No rate is recorded for <strong>{usage.model ?? "this model"}</strong> in the price
+          registry, so its cost cannot be shown.
+          <a class="configure" href="#/models?tab=pricing">Configure →</a>
+        </p>
+      {:else if sessionCost}
         <div class="cost-row"><span>This chat</span><strong>{sessionCost}</strong></div>
         {#if providerCost}
           <div class="cost-row dim"><span>{providerLabel}</span><strong>{providerCost}</strong></div>
         {/if}
-        {#if priceNote}<p class="price-note">{usage.model ? `${usage.model} — ` : ""}{priceNote}</p>{/if}
-      {:else if priceMissing}
-        <p class="price-note">
-          No price is configured for {usage.model ?? "this model"}, so its cost cannot be shown.
-          <a class="configure" href="#/models">Configure →</a>
-        </p>
+        {#if rateRows.length > 0}
+          <dl class="rates" aria-label="Rate components, per million tokens">
+            {#each rateRows as [label, rate] (label)}
+              <div><dt>{label}</dt><dd>{rate}</dd></div>
+            {/each}
+          </dl>
+        {/if}
+        {#if priceNote}
+          <p class="price-note">
+            {usage.model ? `${usage.model} — ` : ""}{priceNote}{#if usage.price_effective_from}
+              · effective {usage.price_effective_from.slice(0, 10)}{/if}
+          </p>
+        {/if}
       {:else}
         <p class="price-note">No billable usage recorded for this chat yet.</p>
       {/if}
@@ -126,5 +157,11 @@
   .cost-row + .cost-row { margin-top:.25rem; }
   .cost-row.dim, .dim { color:var(--text-3); }
   .price-note { margin:.4rem 0 0; font-size:.74rem; color:var(--text-3); }
+  /* Each rate component on its own row: input, output, and the cache rates a
+     provider bills separately. Absent ones are simply not listed. */
+  .rates { display:grid; gap:.15rem; margin:.5rem 0 0; }
+  .rates div { display:flex; justify-content:space-between; gap:1rem; font-size:.74rem; }
+  .rates dt { color:var(--text-3); margin:0; }
+  .rates dd { color:var(--text-2); margin:0; font-variant-numeric:tabular-nums; }
   .price-note a,.configure { color:var(--accent); font-weight:650; }
 </style>

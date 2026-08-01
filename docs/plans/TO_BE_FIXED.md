@@ -51,6 +51,22 @@ both dialogs, Schedule attachment presentation, and cumulative Daytona budget
 state. Credentials were entered through the product UI and are not stored in
 the repository or test artifacts.
 
+FIXED-85 through FIXED-89 were verified on **2026-08-01** against a running
+`raiker-web` holding an owner-entered Anthropic credential and answering with
+`claude-haiku-4-5-20251001`. The live scenario is
+[`e2e/bug-37-39-40-41-live.spec.ts`](../../apps/web/e2e/bug-37-39-40-41-live.spec.ts),
+and its screenshots are `working/185-*` through `working/193-*`. It walks every
+route at 375 / 768 / 1024 / 1440 px in both themes checking for horizontal
+overflow and console errors, reads the type, motion and density tokens back off
+the running document, shows Compact density shortening a real table row, drives
+the Host control through pause and resume, and records the Tasks card for a
+parked scheduled run. The parked run's state is written by `TaskManager` — the
+same code the scheduler calls — rather than reached through a full approval
+round trip; the signal that continues it is covered by
+`tests/test_scheduler_wakeup.py`, and the quit-with-waiting-work branch by
+`tests/test_api_host.py`. The credential was entered through the product UI and
+is not stored in the repository or test artifacts.
+
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | FIXED-01 | High | Models | Fixed |
@@ -137,11 +153,14 @@ the repository or test artifacts.
 | FIXED-82 | Medium | Export / Knowledge Map accessibility | Fixed (found by live axe verification) |
 | FIXED-83 | Medium | Chat / export keyboard activation | Fixed (found during live verification) |
 | FIXED-84 | Low | CI / dependency licensing | Fixed (found during workflow verification) |
+| FIXED-85 | Medium | Settings / concurrent load | Fixed (found while verifying BUG-37) |
+| FIXED-86 | Low | Design system / visual language | Fixed (was BUG-37) |
+| FIXED-87 | Low | Scheduler / continuation latency | Fixed (was BUG-39) |
+| FIXED-88 | Medium | Distribution / host lifecycle | Fixed (was BUG-40, less packaging — see BUG-44) |
+| FIXED-89 | Low | Web / e2e regression suite | Fixed (was BUG-41) |
 | BUG-32 | Medium | Terminal / approval execution | Open |
-| BUG-37 | Low | Design system / visual polish | Open |
-| BUG-39 | Low | Scheduler / continuation latency | Open (found while fixing BUG-25) |
-| BUG-40 | Low | Distribution / installers and service registration | Open (found while building `raiker-app`) |
-| BUG-41 | Low | Web / e2e regression suite | Open (found while verifying this change) |
+| BUG-44 | Medium | Distribution / signed installers and updates | Open (split out of BUG-40) |
+| BUG-45 | Low | Storage / per-request key derivation | Open (found while verifying BUG-37) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -2808,64 +2827,111 @@ flags a rate whose review is overdue.
 
 ---
 
-## BUG-37 — The visual language is correct but not yet finished
+## FIXED-86 — The visual language is finished, and written down *(was BUG-37)*
 
-**Status: open; a first token-level pass shipped in this change.**
+**Status: fixed in this change.**
 
-**What shipped now.** The refinements worth making at the token level, because
-each one lifts every page at once rather than one screen at a time:
+**Observed.** A first token-level pass had already shipped — a real depth ladder,
+optical tracking, themed scrollbars, a readable `::selection`, a softer focus
+halo. What remained were the six things that are decisions about how a page is
+*composed* rather than how a surface is painted, and the absence of a written
+specification a contributor could build a new page from.
 
-- **A real depth ladder.** `--shadow-1` was two near-identical mid blurs, which
-  reads as haze rather than elevation. Each level is now a tight contact shadow
-  plus a wider ambient one, in both themes, with a new `--shadow-0` for the
-  faintest surfaces.
-- **Optical tracking.** A `--tracking-tight` token, applied to `h1` and a
-  `.display` class. Type set large keeps the letter spacing it was drawn with,
-  which reads loose at display sizes.
-- **Themed scrollbars.** This app is mostly scrollers — the transcript, tables,
-  the sidebar, code blocks — and a default platform scrollbar was the loudest
-  undesigned element on screen. Firefox uses the standard properties, WebKit and
-  Blink the pseudo-elements; the hit area is unchanged.
-- **A readable selection.** `::selection` set only a background, so selected
-  text inside an accent bubble inherited a colour that vanished against it.
-- **A softer focus halo.** A 4px `--accent-soft` glow behind the existing 2px
-  outline, so focus reads on both a white card and a dark deck without
-  thickening the outline. Dropped under `forced-colors`, where the system owns
-  focus.
+**Fix.** All six, plus the specification:
 
-**What remains.** These need design decisions, not just token edits, and each
-one is a change to how a page is composed rather than how a surface is painted:
+1. **A type scale with intent.** Headings sat at 1.45 / 1.08 / 0.95rem — the
+   first interval is 14%, which reads as "the same size, only bolder", so
+   heading level was carried by weight alone. A modular scale at 1.22 now runs
+   `--text-2xs` through `--text-display`, every interval above 1.15×, and the
+   serif face is a deliberate voice through `.display`: the Workbench greeting,
+   empty-state titles, sign-in headlines — where Raiker speaks to the owner
+   rather than labels a control — at weight 500 and clamped so a 375px screen
+   is not handed three lines of display type.
+2. **Density modes.** Compact / Comfortable / Spacious were already a setting,
+   but they moved only the spacing scale, so a pricing table stayed exactly as
+   tall while the gaps around it changed — which is why the setting looked like
+   it did nothing. `--control-y`, `--control-x`, `--row-y` and `--row-x` are now
+   per-mode and are spent by `.btn`, `.input`, `.table` and `.card`. The control
+   is a radio group with a stated consequence and a preview of the row height
+   each mode produces.
+3. **Empty and loading states as first-class art.** `EmptyState` gets a mark
+   with depth (a tinted disc, a ring, a soft glow), a display-type title, and an
+   `action` slot — an empty state that names what is missing and stops is a dead
+   end. `PageState` gains a skeleton form (`lines`) for the cases where the
+   eventual shape is known; where it is not, the honest one-line form stays,
+   because drawing a fake shape is a guess presented as information.
+4. **Iconography.** `ICON_SIZE` names one optical size per role (`sm`/`md`/`lg`/
+   `xl`) where call sites had been passing 14, 15, 16, 17, 18, 20 and 22 more or
+   less interchangeably. `Icon`'s `filled` prop is the selected half of the
+   filled/outline pair — the same paths with a `currentColor` wash behind them,
+   so it cannot drift from the outline because it *is* the outline — and the
+   sidebar uses it for the current route. Three glyphs meant two things each:
+   `diagnostics` was byte-for-byte the clock-with-rewind of `checkpoints`,
+   `capabilities` was `sun` with four rays instead of eight, and `projects` was
+   the same folder as `folder`. All three are redrawn.
+5. **Data-visual language.** A **meter** is a proportion of a fixed capacity and
+   carries state tones; a **bar** is one value in a comparison and carries none,
+   because a large share is not a warning; a number compared vertically is set
+   in tabular figures via `.numeric` on the cell, so label columns stay in the
+   reading face. The context meter and the provider spend bars now use those
+   primitives instead of their own. A non-zero fill is never rounded down to
+   nothing.
+6. **Motion.** `--motion-enter` (180ms), `--motion-exit` (120ms) and
+   `--motion-emphasis` (240ms) with matching easings, exposed as `.motion-enter`
+   / `.motion-exit` / `.motion-emphasis`. Enter is slower than exit because
+   appearing needs to be noticed and disappearing needs to be out of the way.
+   Nothing moves layout, and under `prefers-reduced-motion` the end state is
+   named explicitly rather than only the duration collapsed — a 0.01ms animation
+   still paints its first frame, which is enough to flash.
 
-1. **A type scale with intent.** `h1`/`h2`/`h3` currently sit at 1.45 / 1.08 /
-   0.95rem — barely separated, so heading level is carried by weight alone.
-   A proper modular scale, with the serif face used deliberately for display
-   rather than only in empty states.
-2. **Density modes.** The workspace is dense by nature; an owner reviewing a
-   long transcript and one scanning a pricing table want different row heights.
-   A comfortable/compact setting, applied through spacing tokens.
-3. **Empty and loading states as first-class art.** `PageState` and `EmptyState`
-   are functional but plain. They are the first thing a new owner sees on almost
-   every page.
-4. **Iconography.** `Icon.svelte` is a hand-rolled set at one weight. It needs a
-   consistent optical size, a filled/outline pair for selected states, and a
-   review for the icons that currently repeat across unrelated meanings.
-5. **Data-visual language.** The context meter, spend bars, and the pricing
-   table each invented their own treatment. One set of rules for meters, bars,
-   and numeric tables — including tabular figures everywhere a number is
-   compared vertically.
-6. **Motion.** One `--ease` and a 120ms convention exist, but transitions are
-   applied ad hoc. A small documented set — enter, exit, emphasis — honoured
-   under `prefers-reduced-motion`.
+[`docs/VISUAL_DESIGN_SPEC.md`](../VISUAL_DESIGN_SPEC.md) states every rule above
+with its reason, names the test that enforces it, and ends with the seven steps
+for building a new page. `apps/web/src/lib/appCss.test.ts` and
+`apps/web/src/lib/icons.test.ts` fail if the scale loses a step, density stops
+reaching a row, reduced motion stops naming its end state, a meter stops taking
+its tone from the shared tokens, or two icons collide.
 
 **UI when closed.** A documented visual specification a contributor can build a
 new page from without inventing, and every existing page audited against it in
-both themes at 375 / 768 / 1024 / 1440 px.
+both themes at 375 / 768 / 1024 / 1440 px — the audit is
+[`e2e/bug-37-39-40-41-live.spec.ts`](../../apps/web/e2e/bug-37-39-40-41-live.spec.ts),
+which walks all 17 routes at all four widths in both themes and fails on any
+horizontal overflow of the shell or any console error.
 
-Live evidence for the pass that shipped:
-[`screenshots/working/133-visual-refresh-workbench-light.png`](screenshots/working/133-visual-refresh-workbench-light.png),
-[`screenshots/working/133-visual-refresh-workbench-dark.png`](screenshots/working/133-visual-refresh-workbench-dark.png),
-[`screenshots/working/134-visual-refresh-models-light.png`](screenshots/working/134-visual-refresh-models-light.png),
-and [`screenshots/working/134-visual-refresh-models-dark.png`](screenshots/working/134-visual-refresh-models-dark.png).
+Live evidence: `working/186-visual-workbench-{light,dark}.png`,
+`working/187-visual-models-pricing-{light,dark}.png`,
+`working/188-visual-settings-density-{light,dark}.png`,
+`working/189-visual-tasks-{light,dark}.png`, and
+[`working/190-BUG-37-density-compact-live.png`](screenshots/working/190-BUG-37-density-compact-live.png).
+The earlier token pass remains recorded at `working/133-*` and `working/134-*`.
+
+---
+
+## FIXED-85 — A settings choice made while the page was still loading was silently discarded
+
+**Status: fixed in this change; found while verifying FIXED-86 live.**
+
+**Observed.** Settings renders its controls before `GET /api/settings` resolves.
+Choosing a density in that window updated the control, and then the arriving
+snapshot replaced the whole settings object — so the radio flipped back, the
+page stayed *dirty*, and pressing **Save changes** wrote the **old** value while
+reporting *All changes saved*. It reproduced reliably in the live suite whenever
+Settings was re-entered from another route: the choice was accepted on screen and
+the opposite value was persisted.
+
+The window is small but the failure mode is the bad one: the owner is told their
+change was saved, and it was not.
+
+**Fix.** `load()` now treats the server snapshot as the base and reapplies the
+keys the owner has changed since the last confirmed snapshot on top of it.
+`serverSettings` still records what the server actually holds, so **Discard** and
+the failed-write rollback keep meaning exactly what they meant. The regression is
+`apps/web/src/lib/views/SettingsView.test.ts` — it holds the read open, makes a
+choice, then resolves the read with the old value, and fails against the previous
+code.
+
+**UI when closed.** A preference chosen the moment a Settings page opens is the
+preference that gets saved.
 
 ---
 
@@ -2896,68 +2962,242 @@ longer contains the passage.
 
 ---
 
-## BUG-39 — An approved scheduled run waits for the next scheduler tick
+## FIXED-87 — An approved scheduled run continues immediately *(was BUG-39)*
 
-**Status: open; found while fixing BUG-25 (see FIXED-59).**
+**Status: fixed in this change.**
 
-**Observed.** FIXED-59 continues a parked scheduled run on the host's own
-15-second tick. A decision granted immediately after a tick therefore takes up
-to 15 seconds to take effect, with the card showing *waiting for approval* the
-whole time. Chat continues in the same situation within a second, because
-resolving an approval there nudges the watcher directly.
+**Observed.** FIXED-59 continued a parked scheduled run on the host's own
+15-second tick. A decision granted just after a tick therefore took up to 15
+seconds to take effect, with the card reading *waiting for approval* the whole
+time. Chat continued in the same situation within a second, because the tab that
+resolved the approval goes straight on to resume the turn — a scheduler-launched
+run has no tab, so nothing told the host its decision had arrived.
 
-**Required fix.** Have approval resolution signal the scheduler the way it
-already signals browser tabs, so a granted decision starts its continuation
-immediately and the tick becomes the recovery path rather than the primary one.
-`POST /api/tasks/{id}/resume` already covers the impatient case manually.
+**Fix.** Approval resolution now signals the scheduler the way it already
+signals a browser tab. `raiker/tasks/wakeup.py` holds a `SchedulerWakeup` — one
+coalescing, loop-bound event — created on `app.state` so a route can raise it
+whether or not a scheduler is running. Recording a resolved outcome against a
+parked turn raises it, scoped to the `sess_inbox_*` sessions scheduled work
+actually runs in: a Chat or Build approval is continued by the client that made
+it and has nothing for the scheduler to do. The host runs a second worker
+alongside the tick that waits on that event and runs the continuation pass the
+moment it fires.
+
+Three properties are deliberate. **The tick is unchanged**, so it becomes the
+recovery path — a decision made in another process, or while a pass was already
+running, is still picked up within 15 seconds. **Exactly-once is untouched**: it
+remains `claim_suspended_turn`, so a nudge, a tick and a browser tab racing on
+one parked turn still produce exactly one continuation; an `asyncio.Lock` keeps
+the two workers from doing the same sweep twice, which is tidiness, not
+correctness. **Nudging never fails a decision**: a host that is shutting down, or
+one with no worker at all, simply falls back to the sweep.
 
 **UI when closed.** A granted approval moves the task card to **Continuing**
-without a perceptible wait, and the manual **Continue now** action becomes a
-recovery affordance rather than the fast path.
+without a perceptible wait. The card now says *"Approving continues this run
+automatically."* and **Continue now** is a quiet, ghost-styled recovery
+affordance — what to press when a granted run has not moved — rather than the
+fast path it was previously mistaken for.
+
+Regressions: `tests/test_scheduler_wakeup.py` (the signal, the coalescing, the
+cross-thread path, and the Chat/scheduled scoping) and
+`apps/web/src/lib/views/TasksView.test.ts`. Live evidence:
+[`working/193-BUG-39-approval-continues-live.png`](screenshots/working/193-BUG-39-approval-continues-live.png).
 
 ---
 
-## BUG-40 — `raiker-app` starts Raiker but nothing installs or registers it
+## FIXED-88 — `raiker-app` installs, registers, controls and removes itself *(was BUG-40)*
 
-**Status: open; found while building `raiker-app` (see FIXED-66).**
+**Status: fixed in this change for the lifecycle; the signed-installer and
+signed-update rows are split out as BUG-44.**
 
-**Observed.** FIXED-66 makes Raiker start like an application once Python and the
-package are present. The lifecycle around that is still unimplemented:
-`docs/DESKTOP_DISTRIBUTION_DESIGN.md` specifies signed installers, background
-service registration (`launchd`, Windows per-user startup, `systemd --user`),
-tray/menu-bar control, signed updates with atomic migration and rollback, and an
-uninstall that offers to retain, export, or securely erase each instance. None of
-that exists, so "closing the browser does not stop the host" is true only for as
-long as the terminal that started it stays open.
+**Observed.** FIXED-66 made Raiker *start* like an application once Python and
+the package were present. Everything around that start was unimplemented:
+`docs/DESKTOP_DISTRIBUTION_DESIGN.md` specifies background service registration,
+tray/menu-bar control, pause and quit with waiting work reported, signed updates,
+and an uninstall that offers to retain, export, or securely erase each instance.
+None of it existed, so "closing the browser does not stop the host" was true only
+for as long as the terminal that started it stayed open.
 
-**Required fix.** Implement the lifecycle table in the distribution design,
-platform by platform, with the service registration native to each rather than a
-custom daemon manager.
+**Fix.** The lifecycle table, platform by platform, with each platform's own
+service manager rather than a Raiker daemon:
 
-**UI when closed.** A tray/menu-bar control reports whether the host is running,
-what background work is in flight, and offers Pause and Quit; quitting reports
-waiting work before it stops. Uninstall states exactly what will be removed and
-what will be kept.
+| Platform | Mechanism | Activated with |
+|---|---|---|
+| macOS | `launchd` LaunchAgent (per-user) | `launchctl bootstrap gui/<uid>` |
+| Linux | `systemd --user` unit | `systemctl --user enable --now` |
+| Windows | per-user Startup folder entry | the shell, at sign-in |
+
+`raiker/app/service.py` builds each definition as data — so the same description
+can be shown before anything is written, asserted in a test on a platform it does
+not target, and then executed. The Windows choice is the Startup folder rather
+than a `Run` registry value so install, inspect and uninstall are the same three
+operations everywhere (write a file, read a file, delete a file) with nothing
+hiding in a hive an uninstall could miss; the Windows *service* path in the
+design belongs to the explicitly-configured shared host, which is a separate
+administrator decision. A failed activation is reported and never rolls the file
+back: a headless session where `launchctl` or `systemctl` cannot reach its
+manager is a normal place to be, and the definition still takes effect at the
+next sign-in.
+
+`raiker/app/host.py` answers *running* / *paused* / *needs attention* / *stopped*
+from `.raiker/host/`, file-backed because the running host and a `raiker-app`
+invocation in a terminal are different processes. A record whose process is gone
+reports *stopped*, not *running*. **Pause** stops new background work — the
+scheduler's due-work pass claims nothing and the capacity refresh is skipped —
+and deliberately does **not** stop an approved continuation, because that work is
+already under way and stranding it would make Pause a way to lose a decision.
+*Needs attention* is a distinct state from *running*: a control reading "running"
+while three approvals block every scheduled routine tells the truth about the
+process and lies about the product.
+
+`raiker/app/uninstall.py` states the plan before it acts — every path, its size,
+and the per-instance choice between `keep`, `export` and `erase` — and names the
+two things an uninstall is otherwise assumed to have taken: a backup configured
+to an external drive or provider, and the Python package itself. Instances are
+removed deepest-first, so a nested instance is not made a no-op by its parent
+disappearing first. `erase` overwrites each file before unlinking and is
+described as best effort, because on a copy-on-write filesystem or an SSD doing
+its own wear levelling an overwrite reaches the logical block and not necessarily
+every physical one.
+
+`GET /api/host` and `POST /api/host/{pause,resume,quit,restart}` are the control's
+contract, owner-authenticated exactly like every other route. Quit sends this
+process `SIGTERM` so uvicorn's own graceful shutdown runs the lifespan teardown
+and in-flight governed work reaches a safe boundary; nothing force-kills.
+**Restart is refused when it would be a lie** — a host started from a terminal
+has nothing that would start it again, so the route returns `not_registered` and
+says so rather than exiting and leaving a dead URL. When Raiker *is* registered,
+the process exits 75, a status both `launchd` and the generated `systemd` unit
+are configured to restart on.
+
+**What is deliberately not done, and is now BUG-44:** signed installers
+(`.dmg`/`.pkg`, `.msi`, AppImage, `.deb`) and the signed-update channel with
+atomic migration and rollback. Both need code-signing identities and per-OS
+release runners; neither can be honestly built from a source checkout, and an
+unsigned artifact shipped as if it were signed would be worse than none.
+
+**UI when closed.** A menu-bar control in the top bar reports whether the host is
+running, paused, needing attention or stopped, names what background work is in
+flight, says whether Raiker starts on its own and with which platform mechanism,
+and offers Pause, Restart and Quit. Quitting reports waiting work and requires a
+second, informed press before it stops. Uninstall states exactly what will be
+removed and what will be kept before it removes anything.
+
+The control is in the top bar rather than the OS tray: a native tray needs a
+packaged, signed binary per platform (BUG-44), and the behaviour an owner
+actually needs — an honest state, in-flight work named, and a quit that says what
+it would interrupt — should not wait for that. "Open Raiker" is the one tray
+action with no meaning in-app: you are already looking at it.
+
+Regressions: `tests/test_app_lifecycle.py` (state, pause gating the scheduler,
+each platform's definition parsed and asserted on every platform, install and
+uninstall round trips, the uninstall plan and its dispositions, and the CLI) and
+`tests/test_api_host.py` (authentication, the quit-with-waiting-work report, and
+the refused restart). Live evidence:
+[`working/191-BUG-40-host-control-live.png`](screenshots/working/191-BUG-40-host-control-live.png)
+and [`working/192-BUG-40-host-paused-live.png`](screenshots/working/192-BUG-40-host-paused-live.png).
 
 ---
 
-## BUG-41 — `e2e/composer.spec.ts` asserts a Workbench that no longer exists
+## FIXED-89 — `e2e/composer.spec.ts` matches the app, and CI runs it *(was BUG-41)*
 
-**Status: open; found while verifying this change. Pre-existing — it fails
-identically on the commit before this one.**
+**Status: fixed in this change.**
 
-**Observed.** Two of the three tests in `apps/web/e2e/composer.spec.ts` fail
-against the built app: they look for `Start a new chat` and `Schedule a task`
-links on the Workbench, and for Settings/Models controls, that the redesigns in
-FIXED-46 and FIXED-48 replaced. The suite is not in CI — `.github/workflows/web.yml`
-runs lint, check, test and build, not `test:e2e` — so the drift was invisible.
+**Observed.** Two of the three tests in `apps/web/e2e/composer.spec.ts` failed
+against the built app: they looked for `Start a new chat` and `Schedule a task`
+links on the Workbench, and for a "Make Raiker feel like yours" Settings heading,
+that the FIXED-46 and FIXED-48 redesigns had replaced. The suite was not in CI —
+`.github/workflows/web.yml` ran lint, check, test and build, not `test:e2e` — so
+the drift was invisible.
 
-**Required fix.** Update the spec to the current Workbench and Settings, then
-decide whether the mocked e2e suite belongs in CI. A regression suite that
-nothing runs is a regression suite that nothing protects.
+**Fix.** The spec is rewritten against the surfaces as they are: the Workbench's
+one composer with a mode per destination and its four current quick actions, the
+Settings section rail, the Models catalogue picker, and the Personalisation
+density modes. And the suite runs.
+
+Playwright now has two projects, told apart by filename: `mocked` needs
+`npm run build` and nothing else, because every response comes from a fixture
+inside the spec; `live` drives a running host holding real provider credentials.
+CI runs `test:e2e:mocked` after the build. It does **not** run `live` — CI has no
+key, and a suite that cannot really pass must not report that it did.
+
+The split matches on the whole filename containing `live` rather than a
+`-live.spec.ts` suffix, because `live-end-to-end.spec.ts` is a live spec that
+does not end that way, and a rule that quietly missed one live spec would hand CI
+a scenario it cannot pass and blame the pull request for it.
 
 **UI when closed.** No user-facing change; this is about the evidence being
-trustworthy. A green `npm run test:e2e` means what it says.
+trustworthy. A green `npm run test:e2e:mocked` means what it says, and it is now
+green on every pull request that touches `apps/web/`.
+
+---
+
+## BUG-44 — Raiker has no signed installer and no signed update channel
+
+**Status: open; split out of BUG-40 (see FIXED-88).**
+
+**Observed.** FIXED-88 implements the lifecycle around the host — background
+registration, pause, restart, quit with waiting work stated, and a removal that
+says what it takes. What it does not implement is the two rows of
+`docs/DESKTOP_DISTRIBUTION_DESIGN.md` that cannot be built from a source
+checkout: the **Install** row's *"Install signed application files only"* and the
+**Update** row's *"verify signature, back up before migration, migrate
+atomically, and retain a rollback path on failure"*.
+
+Both need artefacts the repository does not and should not contain: an Apple
+Developer ID and notarisation credentials, an Authenticode certificate, and
+per-OS release runners to build and sign on. `raiker-app` therefore still assumes
+Python and the package are present, and the first-run experience still requires a
+terminal — which the design's release bar explicitly rules out.
+
+A native tray/menu-bar icon belongs here too rather than with the control it
+would open: it needs the same packaged, signed binary per platform. The control's
+*behaviour* — state, in-flight work, Pause/Restart/Quit — already ships in the
+top bar (FIXED-88).
+
+**Required fix.** A release pipeline producing signed, reproducible artifacts for
+macOS (Apple Silicon and Intel), Windows 10/11, and Linux (AppImage and `.deb`),
+each bundling the service, the web assets, and the platform-compatible native
+dependencies — `sqlcipher3-wheels` in particular needs a packaging test on every
+target, because development-machine success is not evidence. Then a signed update
+channel that verifies before it migrates, creates a verified recovery point
+first, migrates atomically, and can roll back. Then the setup wizard the design
+describes, and a native tray icon that opens the control that already exists.
+
+**UI when closed.** A non-technical owner installs Raiker from a signed
+installer, creates a private instance, connects or defers a model, and updates it
+— without Python, Node, a terminal, or an environment variable. An update that
+fails leaves the previous version running on its own data.
+
+---
+
+## BUG-45 — A burst of reads queues minutes of key derivation
+
+**Status: open; found while verifying FIXED-86.**
+
+**Observed.** The visual audit walks all 17 routes at four widths in two themes —
+136 page loads, each firing its own reads. Two things happened. First, the
+default 120/min per-IP rate limit refused most of it, which is the limit doing
+exactly its job. Second, with the limit raised for the audit, the host stayed
+slow for a minute or more *after* the sweep finished: routes that normally render
+instantly sat on `Loading …`, and the sweep itself had already moved on.
+
+The cause is that every API request opens a fresh `SQLiteStore`, and every
+SQLCipher connection pays a full key derivation before it can read a row. A
+burst of a thousand cheap reads therefore queues a large amount of KDF work that
+drains long after the requests that caused it. Nothing is incorrect and nothing
+is lost — it is latency, and only under a load no person generates — but it is
+the shape of problem that becomes a real one the moment a page fans out.
+
+**Required fix.** A per-workspace connection pool, or a cached keyed connection
+per event-loop worker, so the derivation is paid on first use rather than per
+request. It must not weaken the encryption posture: the key stays in memory for
+exactly as long as the host runs, which is already true, and a workspace that is
+locked or removed must invalidate the pool.
+
+**UI when closed.** No user-visible change under normal use; a page that fans out
+across several reads renders as quickly as one that makes a single read, and a
+burst does not leave the next page waiting behind it.
 
 ---
 

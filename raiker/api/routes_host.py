@@ -1,0 +1,186 @@
+"""The menu-bar control, as an API the web app and the CLI both use.
+
+BUG-40. The distribution design requires a tray/menu-bar control that reports
+``running`` / ``paused`` / ``needs attention`` / ``stopped`` and offers Open,
+Pause, Restart and Quit — with quitting *reporting any waiting work before it
+stops*. These routes are that control's contract. The same answers back
+``raiker-app status`` in a terminal, so there is one source of truth about the
+host rather than one per surface.
+
+Two of these routes stop or restart the process serving them, which deserves its
+justification. They are owner-authenticated exactly like every other route, the
+host binds loopback by default, and the alternative — telling an owner to find
+and kill a process id — is precisely the "asking a person to operate a service"
+problem ``raiker-app`` exists to end. The stop itself is a ``SIGTERM`` to this
+process, so uvicorn's own graceful shutdown runs the lifespan teardown and
+in-flight governed work reaches a safe boundary. Nothing here force-kills.
+
+**Restart is refused when it would be a lie.** A host started from a terminal has
+nothing that would start it again, so ``/api/host/restart`` returns
+``not_registered`` and says so, rather than exiting and leaving the owner with a
+dead URL. When Raiker *is* registered with ``launchd`` or ``systemd --user``, the
+process exits with :data:`RESTART_EXIT_CODE` — a status both managers are
+configured to treat as "start it again" — and the platform does the restart.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+import signal
+from contextlib import suppress
+from pathlib import Path
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
+
+from raiker.api.auth import AuthMiddleware
+from raiker.api.sessions import ApiSession
+from raiker.app.host import HostControl
+from raiker.app.service import registration
+from raiker.runtime.authority.models import Principal
+
+router = APIRouter()
+
+# Exit status meaning "the owner asked for a restart". Chosen to be non-zero so
+# launchd's `KeepAlive → SuccessfulExit: false` restarts, and pinned in the
+# systemd unit's `RestartForceExitStatus` so it restarts there too.
+RESTART_EXIT_CODE = 75
+# How long to let the HTTP response finish before signalling the process. Long
+# enough for the client to have the answer in hand, short enough that Quit feels
+# like Quit.
+_STOP_DELAY_SECONDS = 0.35
+
+
+def _ws(request: Request) -> str | Path:
+    return request.app.state.workspace_root  # type: ignore[no-any-return]
+
+
+def _auth(request: Request) -> tuple[ApiSession, Principal]:
+    return AuthMiddleware(_ws(request)).authenticate(request)
+
+
+def _control(request: Request) -> HostControl:
+    return HostControl(_ws(request))
+
+
+def _port(request: Request) -> int:
+    saved = _control(request).record().get("port")
+    return saved if isinstance(saved, int) else 8765
+
+
+class PauseHostRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class StopHostRequest(BaseModel):
+    # False is the safe default: the first press reports what is in flight, and
+    # the owner decides again knowing it.
+    confirm: bool = False
+
+
+def _payload(request: Request) -> dict[str, Any]:
+    control = _control(request)
+    # The host answering this request *is* running, whatever the record says: a
+    # workspace opened before background registration existed has no record file,
+    # and reporting "stopped" to a browser loaded from this very process would be
+    # the one state that is provably wrong. Pause and needs-attention are still
+    # decided from the workspace, so the override cannot mask either.
+    view = control.status(running=True).to_dict()
+    if view["pid"] is None:
+        view["pid"] = os.getpid()
+    service = registration(control.workspace_root, port=_port(request))
+    view["service"] = service.to_dict()
+    view["restartable"] = service.registered
+    return view
+
+
+@router.get("/api/host")
+async def get_host(
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """State, in-flight work, and whether the host starts on its own."""
+    return _payload(request)
+
+
+@router.post("/api/host/pause")
+async def pause_host(
+    body: PauseHostRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Stop starting new background work. Approved continuations still finish."""
+    _control(request).pause(body.reason)
+    return {"ok": True, **_payload(request)}
+
+
+@router.post("/api/host/resume")
+async def resume_host(
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Start scheduled work again from the next tick."""
+    _control(request).resume()
+    return {"ok": True, **_payload(request)}
+
+
+@router.post("/api/host/quit")
+async def quit_host(
+    body: StopHostRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Stop the host, reporting what that interrupts unless already confirmed."""
+    view = _payload(request)
+    if view["waiting"] and not body.confirm:
+        return {"ok": False, "reason_code": "waiting_work", "stopping": False, **view}
+    _schedule_stop(request, 0)
+    return {"ok": True, "stopping": True, **view}
+
+
+@router.post("/api/host/restart")
+async def restart_host(
+    body: StopHostRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Stop with the status the platform's service manager restarts on."""
+    view = _payload(request)
+    if not view["restartable"]:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "ok": False,
+                "reason_code": "not_registered",
+                "message": (
+                    "Raiker is not registered to start in the background, so "
+                    "nothing would start it again. Run `raiker-app service "
+                    "install` first, or quit and start it yourself."
+                ),
+            },
+        )
+    if view["waiting"] and not body.confirm:
+        return {"ok": False, "reason_code": "waiting_work", "restarting": False, **view}
+    _schedule_stop(request, RESTART_EXIT_CODE)
+    return {"ok": True, "restarting": True, **view}
+
+
+def _schedule_stop(request: Request, exit_code: int) -> None:
+    """Signal this process to shut down gracefully, just after the response.
+
+    The exit status is left on ``app.state`` for the launcher to return, which is
+    what turns "the owner pressed Restart" into an exit code the service manager
+    understands. Signalling is best-effort: a host running under a test client or
+    an embedded server has no signal handler to receive it, and must not have its
+    request fail because of that.
+    """
+    request.app.state.exit_code = exit_code
+    loop = asyncio.get_running_loop()
+
+    def stop() -> None:
+        with suppress(OSError, ValueError, AttributeError):
+            os.kill(os.getpid(), getattr(signal, "SIGTERM", signal.SIGINT))
+
+    loop.call_later(_STOP_DELAY_SECONDS, stop)

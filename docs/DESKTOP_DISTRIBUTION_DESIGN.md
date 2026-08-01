@@ -2,9 +2,31 @@
 
 ## Status
 
-**Planned.** Raiker currently runs as a Python service with a web application.
+**Partly implemented.** Raiker runs as a Python service with a web application.
 This document defines the product shape required to distribute it as an
 installable application for Windows, macOS, and Linux.
+
+What exists today (FIXED-88 in [to be fixed](plans/TO_BE_FIXED.md)):
+
+- `raiker-app` starts Raiker with platform-appropriate data locations, a free
+  loopback port, and the default browser (`raiker/app/`, `apps/api/launcher.py`).
+- Background start is registered with each platform's own service manager —
+  `launchd` LaunchAgent, `systemd --user`, Windows per-user Startup — through
+  `raiker-app service install|status|uninstall`.
+- The host reports `running` / `paused` / `needs attention` / `stopped` with its
+  in-flight background work, and offers Pause, Restart and Quit, from
+  `raiker-app status|pause|resume|quit` and from the **Host** control in the web
+  app's top bar. Quitting reports waiting work before it stops.
+- `raiker-app uninstall` states every path it would remove and everything it
+  would keep before removing anything, with a per-instance retain / export /
+  securely-erase choice.
+
+What does not exist yet (BUG-44): signed installers, the signed update channel
+with atomic migration and rollback, the setup wizard, and a native tray icon.
+Each needs code-signing identities and per-OS release runners, so none of it can
+be built from a source checkout. The **Install** and **Update** rows of the
+lifecycle table below, and the release requirements section, are therefore still
+specification rather than description.
 
 ## Product decision
 
@@ -52,14 +74,29 @@ its authorized local users.
 
 Native service managers are preferred over a custom daemon manager:
 
-| Platform | Mechanism |
-|---|---|
-| macOS | `launchd` LaunchAgent for a desktop host; LaunchDaemon for an explicitly configured shared host |
-| Windows | per-user background/startup registration for a desktop host; Windows service for an explicitly configured shared host |
-| Linux | `systemd --user` for a desktop host; system service for an explicitly configured shared host |
+| Platform | Mechanism | Status |
+|---|---|---|
+| macOS | `launchd` LaunchAgent for a desktop host; LaunchDaemon for an explicitly configured shared host | LaunchAgent implemented |
+| Windows | per-user background/startup registration for a desktop host; Windows service for an explicitly configured shared host | Startup-folder entry implemented |
+| Linux | `systemd --user` for a desktop host; system service for an explicitly configured shared host | `--user` unit implemented |
+
+The per-user Windows registration is a Startup-folder entry rather than a `Run`
+registry value, so install, inspect and uninstall are the same three file
+operations on every platform and nothing survives an uninstall in a registry
+hive. The shared-host rows remain specification: each is an explicit,
+administrator-made decision with its own review.
 
 The tray/menu-bar control must show `running`, `paused`, `needs attention`, or
-`stopped`, and provide Open Raiker, Pause, Restart, and Quit actions.
+`stopped`, and provide Open Raiker, Pause, Restart, and Quit actions. Those
+states and the Pause / Restart / Quit actions are implemented in the web app's
+top bar and in `raiker-app`; a native tray icon needs the packaged, signed binary
+of BUG-44. `Restart` is offered only when a background registration exists —
+nothing else would start the host again, and offering it otherwise would be a
+control that lies.
+
+`Pause` stops *new* background work. A run already parked on an approval the
+owner has granted still continues: it is not new work, and abandoning it would
+make Pause a way to lose a decision.
 
 ## Data, backup, and recovery
 

@@ -31,6 +31,25 @@ Everything about *how Raiker runs* is unchanged: this binds loopback, serves the
 same app, and cannot widen exposure. Reaching Raiker from another machine is
 still the deliberate ``raiker-web --allow-public`` path with its own token
 requirement, and this launcher deliberately offers no flag for it.
+
+BUG-40 adds the rest of an application's life around that start, as
+subcommands — ``raiker-app`` with no arguments still means "start Raiker":
+
+* ``raiker-app status`` — running, paused, needs attention, or stopped, and what
+  background work is in flight.
+* ``raiker-app pause`` / ``resume`` — stop and restart the starting of new
+  background work, without stopping the host.
+* ``raiker-app quit`` — stop the host, reporting waiting work first.
+* ``raiker-app service install|status|uninstall`` — register the host to start in
+  the background with the platform's own service manager.
+* ``raiker-app uninstall`` — state exactly what removal takes and what it keeps,
+  with a per-instance retain / export / erase choice.
+
+What is deliberately *not* here, because it cannot be honestly built from a
+source checkout: signed installers (``.dmg``/``.pkg``, ``.msi``, AppImage,
+``.deb``) and the signed-update channel with atomic migration and rollback. Both
+need code-signing identities and per-OS release runners, and both are tracked as
+their own work rather than faked with an unsigned artifact.
 """
 
 from __future__ import annotations
@@ -47,6 +66,8 @@ import webbrowser
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
+
+from raiker.app.host import HostControl
 
 APP_NAME = "Raiker"
 DEFAULT_PORT = 8765
@@ -191,14 +212,8 @@ def _resolve_ui_dir() -> Path | None:
     return None
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        prog="raiker-app",
-        description=(
-            "Start Raiker as a desktop application: platform-appropriate data "
-            "directory, a free loopback port, and your default browser."
-        ),
-    )
+def _add_common(parser: argparse.ArgumentParser) -> None:
+    """The two options every subcommand needs to talk about the same host."""
     parser.add_argument(
         "--workspace",
         default=None,
@@ -207,6 +222,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--port", type=int, default=DEFAULT_PORT, help=f"Preferred port (default: {DEFAULT_PORT})."
     )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="raiker-app",
+        description=(
+            "Start Raiker as a desktop application: platform-appropriate data "
+            "directory, a free loopback port, and your default browser. "
+            "Subcommands control the background host and its removal."
+        ),
+    )
+    _add_common(parser)
     parser.add_argument(
         "--no-browser", action="store_true", help="Start the host without opening a browser."
     )
@@ -215,7 +242,56 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Print the detected platform and data directory, then exit.",
     )
-    args = parser.parse_args(argv)
+    # `required=False` keeps the bare `raiker-app` — the thing a desktop icon
+    # runs — meaning exactly what it meant before: start Raiker.
+    sub = parser.add_subparsers(dest="command")
+
+    status = sub.add_parser("status", help="Report whether the host is running, paused, or stopped.")
+    _add_common(status)
+
+    pause = sub.add_parser("pause", help="Stop starting new background work.")
+    _add_common(pause)
+    pause.add_argument("--reason", default=None, help="Why, recorded alongside the pause.")
+
+    resume = sub.add_parser("resume", help="Start scheduled background work again.")
+    _add_common(resume)
+
+    quit_parser = sub.add_parser("quit", help="Stop the host, reporting waiting work first.")
+    _add_common(quit_parser)
+    quit_parser.add_argument(
+        "--force", action="store_true", help="Stop even when background work is in flight."
+    )
+
+    service = sub.add_parser(
+        "service", help="Register the host to start in the background with this platform."
+    )
+    _add_common(service)
+    service.add_argument("action", choices=("install", "status", "uninstall"))
+    service.add_argument(
+        "--no-activate",
+        action="store_true",
+        help="Write the definition without asking the service manager to load it now.",
+    )
+
+    remove = sub.add_parser("uninstall", help="State what removing Raiker takes, and take it.")
+    _add_common(remove)
+    remove.add_argument(
+        "--data",
+        choices=("keep", "export", "erase"),
+        default="keep",
+        help="What to do with each local instance (default: keep).",
+    )
+    remove.add_argument("--export-to", default=None, help="Where to copy instances before removal.")
+    remove.add_argument(
+        "--yes", action="store_true", help="Carry out the plan instead of only printing it."
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if getattr(args, "command", None):
+        return _run_command(args)
 
     os_name = detect_os()
     workspace = Path(args.workspace).expanduser() if args.workspace else default_workspace(os_name)
@@ -270,7 +346,140 @@ def main(argv: list[str] | None = None) -> int:
 
     import uvicorn
 
-    uvicorn.run(app, host=LOOPBACK, port=port)
+    # BUG-40 — claim the workspace for this process, so `raiker-app status` in
+    # another terminal, the in-app Host control, and the service manager are all
+    # talking about the same host. Cleared on the way out whatever the reason,
+    # including a crash-free quit, so a stale record never reports "running".
+    control = HostControl(workspace)
+    control.record_start(pid=os.getpid(), port=port)
+    try:
+        uvicorn.run(app, host=LOOPBACK, port=port)
+    finally:
+        control.clear()
+    # Set by the Host control's Restart action: a status the platform's service
+    # manager is configured to restart on, rather than a clean exit it would
+    # (correctly) leave stopped.
+    exit_code = getattr(app.state, "exit_code", 0)
+    return int(exit_code) if isinstance(exit_code, int) else 0
+
+
+# ── the lifecycle subcommands ────────────────────────────────────────────
+
+
+def _resolved_workspace(args: argparse.Namespace) -> Path:
+    return Path(args.workspace).expanduser() if args.workspace else default_workspace()
+
+
+def _run_command(args: argparse.Namespace) -> int:
+    workspace = _resolved_workspace(args)
+    if args.command == "status":
+        return _command_status(workspace, args.port)
+    if args.command == "pause":
+        HostControl(workspace).pause(args.reason)
+        print("[raiker] Paused. No new background work will start until you resume.")
+        return _command_status(workspace, args.port)
+    if args.command == "resume":
+        HostControl(workspace).resume()
+        print("[raiker] Resumed. Scheduled work starts again from the next tick.")
+        return _command_status(workspace, args.port)
+    if args.command == "quit":
+        return _command_quit(workspace, force=args.force)
+    if args.command == "service":
+        return _command_service(workspace, args.port, args.action, activate=not args.no_activate)
+    return _command_uninstall(workspace, args)
+
+
+def _command_status(workspace: Path, port: int) -> int:
+    from raiker.app.service import registration
+
+    status = HostControl(workspace).status()
+    service = registration(workspace, port=port)
+    print(f"[raiker] {status.state} — {status.detail}")
+    print(f"[raiker] workspace: {workspace}")
+    if status.pid is not None:
+        print(f"[raiker] process {status.pid} on port {status.port}, since {status.started_at}")
+    for item in status.waiting:
+        print(f"[raiker]   · {item.label} — {item.detail}")
+    if service.supported:
+        state = "registered" if service.registered else "not registered"
+        print(f"[raiker] background start: {state} ({service.mechanism})")
+    else:
+        print(f"[raiker] background start: {service.note}")
+    return 0
+
+
+def _command_quit(workspace: Path, *, force: bool) -> int:
+    """Stop the host, stating what that interrupts before it happens."""
+    control = HostControl(workspace)
+    status = control.status()
+    if status.state == "stopped":
+        print("[raiker] No Raiker host is running for this workspace.")
+        return 0
+    if status.waiting and not force:
+        print("[raiker] Not stopping — this would interrupt work in progress:")
+        for item in status.waiting:
+            print(f"[raiker]   · {item.label}")
+            print(f"[raiker]     {item.detail}")
+        print("[raiker] Run `raiker-app quit --force` if that is what you want.")
+        return 1
+    if not control.request_quit():
+        print("[raiker] Could not signal the host. It may have already stopped.", file=sys.stderr)
+        return 2
+    print(f"[raiker] Asked process {status.pid} to stop at its next safe boundary.")
+    return 0
+
+
+def _command_service(workspace: Path, port: int, action: str, *, activate: bool) -> int:
+    from raiker.app.service import install, registration, service_plan, uninstall
+
+    plan = service_plan(workspace, port=port)
+    if not plan.supported:
+        print(f"[raiker] {plan.note}", file=sys.stderr)
+        return 2
+    if action == "status":
+        current = registration(workspace, port=port)
+        print(f"[raiker] {plan.mechanism}: {'registered' if current.registered else 'not registered'}")
+        print(f"[raiker] definition: {plan.path}")
+        print(f"[raiker] {plan.note}")
+        return 0
+    result = install(plan, activate=activate) if action == "install" else uninstall(plan)
+    print(f"[raiker] {result.message}")
+    for command in result.ran:
+        print(f"[raiker]   ran: {command}")
+    for failure in result.failed:
+        print(f"[raiker]   could not: {failure}", file=sys.stderr)
+    if action == "install":
+        print(f"[raiker] {plan.note}")
+    return 0 if result.ok else 2
+
+
+def _command_uninstall(workspace: Path, args: argparse.Namespace) -> int:
+    from raiker.app.uninstall import apply_uninstall, plan_uninstall
+
+    try:
+        plan = plan_uninstall(
+            workspace,
+            disposition=args.data,
+            export_to=args.export_to,
+            port=args.port,
+        )
+    except ValueError as error:
+        message = {
+            "export_requires_a_destination": "Pass --export-to with --data export.",
+        }.get(str(error), str(error))
+        print(f"[raiker] {message}", file=sys.stderr)
+        return 2
+
+    print("[raiker] Uninstalling Raiker would:")
+    for line in plan.describe():
+        print(f"[raiker]   {line}")
+    if not args.yes:
+        print("[raiker] Nothing has been changed. Re-run with --yes to carry this out.")
+        return 0
+    if plan.removes_data:
+        print("[raiker] Removing instance data. This cannot be undone.")
+    for line in apply_uninstall(plan, workspace, port=args.port):
+        print(f"[raiker]   {line}")
     return 0
 
 

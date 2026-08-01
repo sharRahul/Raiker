@@ -1108,3 +1108,42 @@ export interface PasswordRecoveryBeginResult {
   ok: boolean;
   ticket: string;
 }
+
+/** BUG-40 — the tray/menu-bar control's view of the host it is controlling.
+ * `state` is one of running / paused / needs attention / stopped, and `waiting`
+ * is what a quit would interrupt, stated before it happens. */
+export interface HostWaitingWork {
+  kind: string;
+  label: string;
+  detail: string;
+}
+
+export interface HostServiceRegistration {
+  supported: boolean;
+  registered: boolean;
+  mechanism: string;
+  label: string;
+  path: string | null;
+  note: string;
+}
+
+export interface HostStatusView {
+  state: string;
+  detail: string;
+  pid: number | null;
+  port: number | null;
+  started_at: string | null;
+  paused: boolean;
+  paused_since: string | null;
+  paused_reason: string | null;
+  waiting: HostWaitingWork[];
+  service: HostServiceRegistration;
+  restartable: boolean;
+}
+
+export interface HostActionResult extends HostStatusView {
+  ok: boolean;
+  reason_code?: string;
+  stopping?: boolean;
+  restarting?: boolean;
+}

@@ -97,11 +97,59 @@
   --sidebar-w: 232px;
   --topbar-h: 56px;
 
-  --ease: cubic-bezier(0.2, 0, 0, 1);
+  /* ── Type scale ──
+     A modular scale at 1.22, anchored on the 15px body. The old headings sat at
+     1.45 / 1.08 / 0.95rem — barely separated, so heading level was carried by
+     weight alone and a page read as one long run of bold text. Each step is now
+     a visible interval, and `--text-display` is the one size large enough to be
+     set in the serif face without looking like a mistake.
+
+     The scale is a token set rather than a set of element rules so a view can
+     reach for a step by name instead of inventing 0.83rem. */
+  --text-2xs: 0.68rem;
+  --text-xs: 0.74rem;
+  --text-sm: 0.82rem;
+  --text-md: 0.9rem;
+  --text-base: 1rem;
+  --text-lg: 1rem;
+  --text-xl: 1.22rem;
+  --text-2xl: 1.49rem;
+  --text-display: 1.82rem;
 
   /* Optical tracking. Type set large keeps the spacing it was drawn with, which
      reads loose; display sizes need it pulled in. Body text is left alone. */
   --tracking-tight: -0.018em;
+  --tracking-wide: 0.07em;
+
+  /* ── Motion ──
+     Three documented intents, so a transition is chosen rather than invented.
+     Enter is slightly slower than exit because appearing needs to be noticed
+     and disappearing needs to be out of the way. Emphasis is the only duration
+     long enough to read as a deliberate movement, and is reserved for something
+     changing state on its own (a value updating, a card being promoted) rather
+     than for responding to a click.
+
+     Every one collapses under `prefers-reduced-motion` through the global rule
+     below; nothing here needs to opt in. */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0.16, 0.84, 0.44, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-emphasis: cubic-bezier(0.2, 0, 0, 1);
+  --motion-fast: 120ms;
+  --motion-enter: 180ms;
+  --motion-exit: 120ms;
+  --motion-emphasis: 240ms;
+
+  /* ── Density ──
+     Set per density mode below. Views use these instead of hard-coded control
+     and row padding, which is what makes Compact reach a pricing table's row
+     height rather than only the gaps between cards. */
+  --control-y: 0.42rem;
+  --control-x: 0.85rem;
+  --row-y: 0.5rem;
+  --row-x: 0.6rem;
+  --card-pad-y: var(--space-4);
+  --card-pad-x: var(--space-5);
 }
 
 /* ── Light theme tokens ("paper") ── */
@@ -262,18 +310,33 @@
 
 /* ── UI preferences (Settings → Personalisation) ──
    Applied as data attributes on <html> by lib/prefs.svelte.ts. Presentation
-   only; the defaults (no attribute) are the comfortable Manrope layout. */
+   only; the defaults (no attribute) are the comfortable Manrope layout.
+
+   Density is a real mode rather than a gap adjustment. This workspace is dense
+   by nature and its two readers want opposite things: someone following a long
+   transcript wants air, someone scanning a pricing table wants rows. Compact
+   therefore tightens control padding and row height as well as the spacing
+   scale — otherwise a table stayed exactly as tall while only the space around
+   it moved, which is the part that looked like the setting did nothing. */
 :root[data-spacing="compact"] {
   --space-3: 0.6rem;
   --space-4: 0.8rem;
   --space-5: 1.15rem;
   --space-6: 1.5rem;
+  --control-y: 0.3rem;
+  --control-x: 0.7rem;
+  --row-y: 0.32rem;
+  --row-x: 0.5rem;
 }
 :root[data-spacing="spacious"] {
   --space-3: 0.9rem;
   --space-4: 1.25rem;
   --space-5: 1.9rem;
   --space-6: 2.6rem;
+  --control-y: 0.55rem;
+  --control-x: 1rem;
+  --row-y: 0.7rem;
+  --row-x: 0.8rem;
 }
 :root[data-font="system"] body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -324,20 +387,48 @@ h4 {
 }
 
 h1 {
-  font-size: 1.45rem;
-  letter-spacing: var(--tracking-tight);
-}
-/* Anything set larger than the h1 step — the Workbench greeting, empty-state
-   titles — is display type and needs the same correction. */
-.display,
-h1.display {
+  font-size: var(--text-2xl);
   letter-spacing: var(--tracking-tight);
 }
 h2 {
-  font-size: 1.08rem;
+  font-size: var(--text-xl);
 }
 h3 {
-  font-size: 0.95rem;
+  font-size: var(--text-lg);
+}
+h4 {
+  font-size: var(--text-md);
+}
+
+/* Display type. The serif is a deliberate voice, not decoration: it appears
+   where Raiker is speaking to the owner rather than labelling a control — the
+   Workbench greeting, an empty state's title, a sign-in headline — and nowhere
+   else. Set at a lighter weight because a serif at 700 above 1.5rem reads as
+   shouting, and with the tracking pulled in because type set large keeps the
+   spacing it was drawn with. */
+.display,
+h1.display,
+h2.display {
+  font-family: var(--font-serif);
+  /* The scale step is the ceiling, not a fixed size: at 375px a 1.82rem serif
+     greeting wraps to three lines and pushes the page it is introducing off
+     screen. Clamping here rather than in each view is what stops every page
+     that wants display type from inventing its own responsive rule. */
+  font-size: clamp(1.45rem, 3.2vw, var(--text-display));
+  font-weight: 500;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.2;
+}
+
+/* Named steps, so a view reaches for the scale rather than inventing 0.83rem. */
+.text-xs {
+  font-size: var(--text-xs);
+}
+.text-sm {
+  font-size: var(--text-sm);
+}
+.text-lg {
+  font-size: var(--text-lg);
 }
 
 p {
@@ -382,6 +473,54 @@ code,
   color: var(--text-1);
 }
 
+/* ── Motion, as three named intents ──
+   `.motion-enter` for something arriving, `.motion-exit` for something leaving,
+   `.motion-emphasis` for a value or state changing on its own. Each moves a
+   small distance and fades; none of them moves layout, so a reduced-motion user
+   losing the movement loses nothing but the movement.
+
+   The global reduce block below collapses every duration in the app, these
+   included, which is why none of them opts in separately. */
+@keyframes raiker-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes raiker-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+@keyframes raiker-emphasis {
+  0% {
+    background-color: transparent;
+  }
+  35% {
+    background-color: var(--accent-soft);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.motion-enter {
+  animation: raiker-enter var(--motion-enter) var(--ease-enter) both;
+}
+.motion-exit {
+  animation: raiker-exit var(--motion-exit) var(--ease-exit) both;
+}
+.motion-emphasis {
+  animation: raiker-emphasis var(--motion-emphasis) var(--ease-emphasis) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -393,6 +532,16 @@ code,
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* A collapsed duration still applies the animation's start frame for an
+     instant, which is enough to flash. Naming the end state removes even that. */
+  .motion-enter,
+  .motion-exit,
+  .motion-emphasis {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -431,7 +580,7 @@ code,
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--card-pad-y) var(--card-pad-x);
   box-shadow: var(--shadow-1);
 }
 
@@ -447,11 +596,11 @@ code,
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--r-sm);
-  padding: 0.42rem 0.85rem;
+  padding: var(--control-y) var(--control-x);
   cursor: pointer;
   transition:
-    background 120ms var(--ease),
-    border-color 120ms var(--ease),
+    background var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease),
     transform 60ms var(--ease);
 }
 .btn:hover:not(:disabled) {
@@ -506,8 +655,8 @@ code,
 }
 
 .btn-sm {
-  font-size: 0.78rem;
-  padding: 0.28rem 0.6rem;
+  font-size: var(--text-sm);
+  padding: calc(var(--control-y) * 0.68) calc(var(--control-x) * 0.72);
 }
 
 /* Touch targets: on narrow (touch-first) screens shared shell controls meet
@@ -525,13 +674,13 @@ code,
 .select,
 .textarea {
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--text-md);
   color: var(--text-1);
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--r-sm);
-  padding: 0.45rem 0.65rem;
-  transition: border-color 120ms var(--ease);
+  padding: var(--control-y) calc(var(--control-x) * 0.76);
+  transition: border-color var(--motion-fast) var(--ease);
 }
 .input:focus-visible,
 .select:focus-visible,
@@ -551,7 +700,7 @@ code,
 
 .field-label {
   display: block;
-  font-size: 0.76rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text-2);
   margin: 0 0 0.25rem;
@@ -560,29 +709,43 @@ code,
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
 }
 .table th {
   text-align: left;
-  font-size: 0.72rem;
+  font-size: var(--text-2xs);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: var(--tracking-wide);
   color: var(--text-3);
-  padding: 0.45rem 0.6rem;
+  padding: var(--row-y) var(--row-x);
   border-bottom: 1px solid var(--border);
 }
 .table td {
-  padding: 0.5rem 0.6rem;
+  padding: var(--row-y) var(--row-x);
   border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
 .table tbody tr:hover {
   background: var(--sunken);
 }
+/* A column of numbers is compared vertically, so its digits have to line up.
+   Manrope's proportional figures do not, which is why a spend column read as
+   ragged however carefully it was aligned. Marking the cell — not the table —
+   keeps the label columns in the reading face. */
+.table th.numeric,
+.table td.numeric,
+.numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.table th.numeric,
+.table td.numeric {
+  text-align: right;
+}
 
 .kicker {
-  font-size: 0.72rem;
+  font-size: var(--text-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.09em;
@@ -739,4 +902,124 @@ code,
   z-index: 2;
   background: var(--bg);
   padding: var(--space-2) 0;
+}
+
+/* ── Data-visual language ──
+   The context meter, the spend bars and the pricing table each invented their
+   own treatment, so three things that all mean "a proportion of a whole" looked
+   like three unrelated ideas. One set of rules:
+
+   * A **meter** is a proportion of a fixed capacity (context used of a window,
+     spend against a budget). It is a track plus a fill, it always shows the
+     whole even when nearly empty, and its tone carries the state.
+   * A **bar** is one value in a comparison (spend by provider). Same geometry,
+     no capacity implied, and it never borrows the meter's warning tones — a
+     large share is not a problem.
+   * A **number that is compared vertically** is set in tabular figures.
+
+   Views set `--meter-value` (0–100) and, when the state is not neutral, add a
+   tone class. Nothing here invents a colour: every tone resolves through the
+   same tokens the badges use, so a meter cannot drift from the badge beside it. */
+.meter,
+.bar {
+  --meter-value: 0;
+  position: relative;
+  height: 0.5rem;
+  border-radius: var(--r-pill);
+  background: var(--sunken);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.meter-fill,
+.bar-fill {
+  display: block;
+  height: 100%;
+  width: clamp(0%, calc(var(--meter-value) * 1%), 100%);
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width var(--motion-emphasis) var(--ease-emphasis);
+}
+.meter.tone-ok .meter-fill {
+  background: var(--ok);
+}
+.meter.tone-warn .meter-fill {
+  background: var(--warn);
+}
+.meter.tone-danger .meter-fill {
+  background: var(--danger);
+}
+/* A meter with a tiny non-zero value must still be visibly non-zero: rounding a
+   1% fill to a sliver reads as "none", which is a different fact. */
+.meter-fill:not([data-value="0"]),
+.bar-fill:not([data-value="0"]) {
+  min-width: 2px;
+}
+.meter-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  margin-bottom: 0.25rem;
+}
+.meter-label strong {
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Loading as a shape, not a sentence ──
+   A skeleton says how much is coming and where it will be, which a spinner
+   cannot. Used where the eventual content has a known shape (a list of cards, a
+   table); `PageState` keeps the honest one-line form for everything else. */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--sunken) 0%,
+    var(--neutral-soft) 50%,
+    var(--sunken) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--r-sm);
+  animation: raiker-skeleton 1.4s var(--ease) infinite;
+}
+.skeleton-line {
+  height: 0.7rem;
+  margin-bottom: 0.45rem;
+}
+.skeleton-line:last-child {
+  margin-bottom: 0;
+  width: 62%;
+}
+@keyframes raiker-skeleton {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--sunken);
+  }
+}
+
+/* ── Iconography ──
+   One optical size per role, so an icon inside a button and an icon inside a
+   nav row are not two different sizes that both look almost right. Views pass
+   `Icon`'s `size` prop by name; these are here because a few places set the box
+   rather than the glyph. */
+.icon-box-sm {
+  width: 1rem;
+  height: 1rem;
+}
+.icon-box-md {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.icon-box-lg {
+  width: 1.5rem;
+  height: 1.5rem;
 }

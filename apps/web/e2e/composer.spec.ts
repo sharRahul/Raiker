@@ -1,8 +1,21 @@
+// The mocked regression suite: the built app served from `dist`, every API call
+// answered from the fixture below, and no credential or network of any kind.
+// It is the only spec in `e2e/` that is not `*-live.spec.ts`, which is what lets
+// CI run it (see `.github/workflows/web.yml` and the `mocked` Playwright
+// project) while the live scenarios stay a deliberate, credentialled local run.
+//
+// BUG-41 — this file used to assert a Workbench and a Settings page that the
+// FIXED-46/FIXED-48 redesigns had already replaced: `Start a new chat` and
+// `Schedule a task` quick actions, and a "Make Raiker feel like yours" heading.
+// Nothing ran it, so the drift was invisible. The assertions below are written
+// against the surfaces as they are now, and the suite is in CI so the next
+// redesign cannot silently outrun it.
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 
 const dist = join(import.meta.dirname, "..", "dist");
+const shots = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
 const model = {
   profile_id: "anthropic-hosted", provider: "anthropic", model: "claude-sonnet-4-5",
   default_state: "enabled_runtime", local_only: false, requires_network: true,
@@ -30,6 +43,7 @@ test.beforeEach(async ({ page }) => {
       else if (path.endsWith("/provider-models")) body = { profile_id: model.profile_id, provider: model.provider, status: "available", reason_code: null, models: ["claude-sonnet-4-5", "claude-opus-4-1"] };
       else if (path === "/api/settings/composer-approval-mode") body = { approval_mode: "manual" };
       else if (path === "/api/code-repos") body = { repositories: [], active_repo_id: null };
+      else if (path === "/api/host") body = { state: "running", detail: "Raiker is running.", pid: 4242, waiting: [], background_work: 0, service: { supported: true, registered: false, mechanism: "systemd --user", label: "raiker.service" } };
       else if (path === "/api/tasks") body = [];
       else if (path === "/api/notifications") body = [];
       else if (path === "/api/sessions") body = [];
@@ -57,42 +71,83 @@ test("Chat and Build composers stay polished and usable", async ({ page }) => {
   await page.getByRole("button", { name: /Model for this turn/ }).click();
   await expect(page.getByRole("menu", { name: "Models" })).toBeVisible();
   await page.getByRole("menuitemradio", { name: /Sonnet 4\.5/i }).click();
-  await page.screenshot({ path: "../../output/playwright/bug15-chat-composer.png", fullPage: true });
+  await page.screenshot({ path: join(shots, "bug15-chat-composer.png"), fullPage: true });
 
   await page.getByRole("link", { name: "Build" }).click();
   await expect(page.getByLabel("Describe the change")).toBeVisible();
   await expect(page.getByRole("group", { name: "How much Raiker may do" })).toBeVisible();
   await page.getByRole("button", { name: /Model for this turn/ }).click();
   await expect(page.getByRole("menu", { name: "Models" })).toBeVisible();
-  await page.screenshot({ path: "../../output/playwright/bug15-build-composer.png", fullPage: true });
+  await page.screenshot({ path: join(shots, "bug15-build-composer.png"), fullPage: true });
 });
 
-test("Settings and Models present focused, human-readable controls", async ({ page }) => {
+test("Settings presents one section rail rather than a wall of fields", async ({ page }) => {
   await page.goto("http://raiker.test/#/settings");
-  await expect(page.getByRole("heading", { name: "Make Raiker feel like yours" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Storage" })).toHaveCount(0);
-  await page.screenshot({ path: "../../output/playwright/settings-redesign.png", fullPage: true });
+  // Scoped to the content region: the top bar carries the same page name, and an
+  // unscoped heading query would pass on that alone.
+  const main = page.getByRole("main");
+  await expect(main.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
 
+  // The rail is the redesign: personal sections first, system configuration
+  // named as such, and nothing that was folded away reachable as a stray tab.
+  const rail = page.getByRole("navigation", { name: "Settings sections" });
+  for (const section of [
+    "General",
+    "Notifications",
+    "Personalisation",
+    "Security & sign-in",
+    "Account",
+    "Runtime configuration",
+  ]) {
+    await expect(rail.getByRole("button", { name: section })).toBeVisible();
+  }
+  await expect(rail.getByRole("button", { name: "Storage" })).toHaveCount(0);
+
+  // Personalisation is where the density and typography choices live (BUG-37),
+  // so a redesign that drops them takes this test with it.
+  await rail.getByRole("button", { name: "Personalisation" }).click();
+  const density = page.getByRole("radiogroup", { name: "Density" });
+  await expect(density).toBeVisible();
+  for (const mode of ["Compact", "Comfortable", "Spacious"]) {
+    await expect(density.getByRole("radio", { name: new RegExp(mode) })).toBeVisible();
+  }
+  await page.screenshot({ path: join(shots, "settings-redesign.png"), fullPage: true });
+});
+
+test("Models names providers in plain language and offers a real model list", async ({ page }) => {
   await page.goto("http://raiker.test/#/models");
   await expect(page.getByRole("heading", { name: "Choose where Raiker thinks" })).toBeVisible();
+  // The internal profile id is never the thing the owner is shown.
   await expect(page.getByText("anthropic-hosted")).toHaveCount(0);
   await page.getByRole("button", { name: /Change model/i }).first().click();
   await expect(page.getByRole("combobox", { name: "Available models" })).toBeVisible();
-  await page.screenshot({ path: "../../output/playwright/models-redesign.png", fullPage: true });
+  await page.screenshot({ path: join(shots, "models-redesign.png"), fullPage: true });
 });
 
 test("new-account Workbench is welcoming and action oriented", async ({ page }) => {
   await page.goto("http://raiker.test/#/workbench");
   await expect(page.getByRole("heading", { name: "Welcome to your Work Dashboard" })).toBeVisible();
   await expect(page.getByText("Pick up where you left off", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /Start a new chat/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Create a project/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Create a task/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Schedule a task/ })).toBeVisible();
+
+  // One composer with a mode per destination — the redesign that replaced the
+  // old "Start a new chat" / "Schedule a task" link list.
+  const modes = page.getByRole("tablist", { name: "Work mode" });
+  for (const mode of ["Chat", "Build", "Create task", "Schedule"]) {
+    await expect(modes.getByRole("tab", { name: mode, exact: true })).toBeVisible();
+  }
+
+  const quick = page.getByRole("navigation", { name: "Quick actions" });
+  for (const action of [
+    "Create a project",
+    "Upload or review a file",
+    "Create a task",
+    "Schedule work",
+  ]) {
+    await expect(quick.getByRole("link", { name: new RegExp(action) })).toBeVisible();
+  }
+
   await expect(page.getByText("Resume a conversation", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Needs your attention" })).toBeVisible();
   await expect(page.getByText("Runtime issues", { exact: true })).toBeVisible();
-  await page.screenshot({
-    path: "../../docs/plans/screenshots/working/workbench-dashboard-redesign.png",
-    fullPage: true,
-  });
+  await page.screenshot({ path: join(shots, "workbench-dashboard-redesign.png"), fullPage: true });
 });

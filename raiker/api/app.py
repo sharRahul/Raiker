@@ -20,6 +20,7 @@ from raiker.api.routes_channels import router as channels_router
 from raiker.api.routes_connectors import router as connectors_router
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
+from raiker.api.routes_host import router as host_router
 from raiker.api.routes_instances import router as instances_router
 from raiker.api.routes_language import router as language_router
 from raiker.api.routes_memory import router as memory_router
@@ -34,6 +35,7 @@ from raiker.api.security import (
 )
 from raiker.runtime.attachments import MAX_ATTACHMENT_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
+from raiker.tasks.wakeup import SchedulerWakeup
 
 # Paths whose responses must not be buffered/redacted by RedactionMiddleware:
 # - /api/auth/session returns the owner's bearer token (must reach the client intact);
@@ -208,6 +210,17 @@ def create_app(
         from raiker.tasks.scheduler import TaskScheduler
 
         stop = asyncio.Event()
+        wakeup: SchedulerWakeup = app.state.scheduler_wakeup
+        # One pass at a time, whichever worker asked for it. Exactly-once
+        # resumption is enforced in the store by `claim_suspended_turn`, so this
+        # is not a correctness lock — it keeps a nudge and a tick from doing the
+        # same sweep twice and writing two identical "continuing" cards.
+        resuming = asyncio.Lock()
+
+        async def resume_approved(scheduler: TaskScheduler) -> None:
+            async with resuming:
+                await scheduler.resume_approved()
+
         async def tick() -> None:
             scheduler = TaskScheduler(app.state.workspace_root)
             while not stop.is_set():
@@ -219,19 +232,42 @@ def create_app(
                 # a failed due run must not stop approved work from finishing
                 # (BUG-25).
                 with suppress(Exception):
-                    await scheduler.resume_approved()
+                    await resume_approved(scheduler)
                 with suppress(Exception):
                     await scheduler.refresh_model_capacities()
                 with suppress(TimeoutError):
                     await asyncio.wait_for(stop.wait(), timeout=15)
+
+        async def continuations() -> None:
+            """BUG-39 — start an approved continuation the moment it is granted.
+
+            The tick above still sweeps every 15 seconds and is what recovers a
+            decision this worker never heard about (one made through another
+            process, or while this pass was already running). This worker exists
+            so the ordinary case — the owner grants an approval in the browser —
+            does not wait for that sweep.
+            """
+            scheduler = TaskScheduler(app.state.workspace_root)
+            while not stop.is_set():
+                if not await wakeup.wait(timeout=15):
+                    continue
+                if stop.is_set():
+                    return
+                with suppress(Exception):
+                    await resume_approved(scheduler)
+
         worker = asyncio.create_task(tick())
+        nudged = asyncio.create_task(continuations())
         try:
             yield
         finally:
             stop.set()
+            wakeup.request()
             worker.cancel()
-            with suppress(asyncio.CancelledError):
-                await worker
+            nudged.cancel()
+            for task in (worker, nudged):
+                with suppress(asyncio.CancelledError):
+                    await task
 
     app = FastAPI(
         title="Raiker API",
@@ -242,6 +278,11 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.workspace_root = Path(workspace_root).resolve()
+    # BUG-39 — created here rather than in the lifespan so a route can nudge the
+    # scheduler even in the tests and embedded hosts that never start one. With
+    # no worker waiting the nudge is simply a set flag nobody reads, which costs
+    # nothing and keeps the resolve path free of "is the host running?" branches.
+    app.state.scheduler_wakeup = SchedulerWakeup()
     app.state.instance_ui_dir = Path(ui_dir) if ui_dir is not None else None
     # Boot key material: ensure the internal app key exists (encrypts MFA seeds)
     # and load the connector vault key-file into the environment when the env var
@@ -269,6 +310,7 @@ def create_app(
     app.include_router(vault_router)
     app.include_router(settings_router)
     app.include_router(control_router)
+    app.include_router(host_router)
     app.include_router(dashboard_router)
     app.include_router(memory_router)
     app.include_router(prompts_router)

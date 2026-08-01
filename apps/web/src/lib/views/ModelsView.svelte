@@ -642,15 +642,20 @@
                     {/if}
                   </div>
                   {#if spendByProfile[p.profile_id] !== undefined}
+                    <!-- BUG-37 — a bar, not a meter: this is one provider's
+                         share of a comparison, so it carries no capacity tone.
+                         Same geometry as the context meter, different meaning,
+                         and both now come from one place. -->
                     <div
-                      class="meter-track"
+                      class="bar spend-bar"
+                      style={`--meter-value: ${spendByProfile[p.profile_id]}`}
                       role="progressbar"
                       aria-label={`${providerName(p.provider)} share of total API spend`}
                       aria-valuemin="0"
                       aria-valuemax="100"
                       aria-valuenow={spendByProfile[p.profile_id]}
                     >
-                      <span style={`width: ${spendByProfile[p.profile_id]}%`}></span>
+                      <span class="bar-fill" data-value={spendByProfile[p.profile_id]}></span>
                     </div>
                     <p class="usage-note">{spendByProfile[p.profile_id]}% of your total API spend{#if sourceNote(p.price_source, p.price_as_of)}&nbsp;· {sourceNote(p.price_source, p.price_as_of)}{/if}</p>
                   {:else if p.billable && (p.turns_used ?? 0) > 0}
@@ -950,8 +955,8 @@
   .usage-line strong { color:var(--text-1); }
   .usage-note { color:var(--text-3); font-size:0.72rem; margin:0.35rem 0 0; }
   .row-usage { color:var(--text-3); font-size:0.78rem; grid-column:1 / -1; }
-  .meter-track { background:var(--neutral-soft); border-radius:var(--r-pill); height:0.42rem; margin-top:0.35rem; overflow:hidden; }
-  .meter-track span { background:var(--accent); border-radius:inherit; display:block; height:100%; }
+  /* Geometry lives in the shared `.bar` primitive; this only places it. */
+  .spend-bar { margin-top:0.35rem; }
 
   /* ── Local: clean list rows ── */
   .local-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:0.5rem; }

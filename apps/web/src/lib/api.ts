@@ -18,6 +18,8 @@ import type {
   CredentialLifecycle,
   ConnectionsView,
   ConnectorStoreView,
+  HostActionResult,
+  HostStatusView,
   Diagnostics,
   DiagnosticsExport,
   EventEntry,
@@ -281,6 +283,15 @@ export const api = {
   capabilityGate: (capability: string) =>
     request<CapabilityGate>(`/api/capability-gates/${encodeURIComponent(capability)}`),
   runtimeMode: () => request<RuntimeMode>("/api/runtime-mode"),
+  // ── Host lifecycle (BUG-40) ──
+  // The menu-bar control's contract: what state the host is in, what background
+  // work is in flight, and the four actions the distribution design requires.
+  // Quit and Restart report waiting work first and only stop once confirmed.
+  host: () => request<HostStatusView>("/api/host"),
+  pauseHost: (reason?: string) => postJson<HostActionResult>("/api/host/pause", { reason: reason ?? null }),
+  resumeHost: () => postJson<HostActionResult>("/api/host/resume", {}),
+  quitHost: (confirm = false) => postJson<HostActionResult>("/api/host/quit", { confirm }),
+  restartHost: (confirm = false) => postJson<HostActionResult>("/api/host/restart", { confirm }),
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   models: () => request<ModelsView>("/api/models"),

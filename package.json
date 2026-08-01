@@ -10,6 +10,8 @@
     "preview": "npm --prefix apps/web run preview",
     "check": "npm --prefix apps/web run check",
     "lint": "npm --prefix apps/web run lint",
-    "test": "npm --prefix apps/web run test"
+    "test": "npm --prefix apps/web run test",
+    "test:e2e:mocked": "npm --prefix apps/web run test:e2e:mocked",
+    "test:e2e:live": "npm --prefix apps/web run test:e2e:live"
   }
 }

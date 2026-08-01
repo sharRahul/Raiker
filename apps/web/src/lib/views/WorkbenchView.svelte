@@ -178,7 +178,7 @@
 <section class="workbench" aria-labelledby="workbench-title">
   <div class="intro">
     <div>
-      <h2 id="workbench-title">{hasActivity ? "Welcome back" : "Welcome to your Work Dashboard"}</h2>
+      <h2 id="workbench-title" class="display">{hasActivity ? "Welcome back" : "Welcome to your Work Dashboard"}</h2>
       <p class="lead">{hasActivity
         ? `You have ${activeTasks.length} active item${activeTasks.length === 1 ? "" : "s"} and ${approvals?.length ?? 0} approval${approvals?.length === 1 ? "" : "s"}.`
         : "Start a conversation, create a project, or plan your first task."}</p>
@@ -267,7 +267,7 @@
           detail="Refresh to retry. No work was started or changed."
         />
       {:else if approvals === null || tasks === null}
-        <PageState state="loading" title="Loading status…" />
+        <PageState state="loading" title="Loading status…" lines={3} />
       {:else}
         <StatTile
           label="Approvals"
@@ -309,7 +309,10 @@
 <style>
   .workbench { display: grid; gap: var(--space-5); }
   .intro { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
-  .intro h2 { margin: 0.15rem 0; font-size: clamp(1.4rem, 3vw, 2rem); }
+  /* BUG-37 — the greeting is display type: Raiker speaking to the owner,
+     not a control label. Size, face and tracking come from the shared
+     `.display` rule so this page cannot drift from the spec. */
+  .intro h2 { margin: 0.15rem 0; }
   .lead { color: var(--text-2); max-width: 62ch; margin: 0; }
   .refresh-state { display: flex; align-items: center; gap: var(--space-2); color: var(--text-3); font-size: .78rem; }
   .columns {

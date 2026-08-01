@@ -1,7 +1,7 @@
 // Settings holds only supported preferences and security posture. Saves are
 // serialized through one queue, confirmed by the server, and rolled back to
 // the last server snapshot on failure — a failed write is never silent.
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SettingsView from "./SettingsView.svelte";
 
@@ -105,9 +105,27 @@ describe("supported-preferences settings", () => {
     render(SettingsView, { props: { principal: "alice" } });
     await fireEvent.click(screen.getByRole("button", { name: "Personalisation" }));
 
-    expect(await screen.findByLabelText("Layout spacing")).toHaveClass("settings-select");
-    expect(screen.getByLabelText("Font")).toHaveClass("settings-select");
-    expect(screen.getByText(/controls the density of lists, cards, and forms/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Font")).toHaveClass("settings-select");
+  });
+
+  // BUG-37 — density is a mode with a stated consequence and a preview of the
+  // row height it produces, not a "Layout spacing" dropdown whose effect an
+  // owner had to discover by choosing it and looking around.
+  it("offers density as three named modes, each saying what it does", async () => {
+    stubApi();
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Personalisation" }));
+
+    const group = await screen.findByRole("radiogroup", { name: "Density" });
+    for (const mode of ["Compact", "Comfortable", "Spacious"]) {
+      expect(within(group).getByRole("radio", { name: new RegExp(mode) })).toBeInTheDocument();
+    }
+    expect(screen.getByText(/more rows on screen/i)).toBeInTheDocument();
+    // Comfortable is the default when nothing has been saved.
+    expect(within(group).getByRole("radio", { name: /Comfortable/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
   });
 
   it("presents Display name as a structured, descriptive profile field", async () => {
@@ -118,5 +136,62 @@ describe("supported-preferences settings", () => {
     const input = await screen.findByLabelText("Display name");
     expect(input).toHaveClass("settings-input");
     expect(screen.getByText(/shown in greetings and account surfaces/i)).toBeInTheDocument();
+  });
+
+  // FIXED-85 — found while verifying BUG-37 live. The controls render before the
+  // settings read resolves, so a choice made in that window was overwritten by
+  // the arriving snapshot: the control showed the new value, the page stayed
+  // dirty, and Save wrote the old one back.
+  it("keeps a choice made while the settings read is still in flight", async () => {
+    let resolveSettings: ((value: unknown) => void) | undefined;
+    const putBodies: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        if (url.endsWith("/api/settings") && method === "PUT") {
+          putBodies.push(JSON.parse(String(init?.body)));
+          return new Response(JSON.stringify({ settings: {} }), { status: 200 });
+        }
+        if (url.endsWith("/api/settings")) {
+          // Held open, so the component renders before the read lands.
+          return new Promise((resolve) => {
+            resolveSettings = resolve;
+          });
+        }
+        return new Response(JSON.stringify({}), { status: 200 });
+      }),
+    );
+
+    render(SettingsView, { props: { principal: "alice" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Personalisation" }));
+    const group = await screen.findByRole("radiogroup", { name: "Density" });
+    await fireEvent.click(within(group).getByRole("radio", { name: /Compact/ }));
+
+    // The server's answer arrives *after* the choice, carrying the old value.
+    resolveSettings?.(
+      new Response(
+        JSON.stringify({
+          settings: { "personalisation.spacing": "comfortable" },
+          status: { vault: "configured", mfa_enrolled: false, username: "alice" },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    // Let the read's continuation run to completion before asserting: the
+    // overwrite this test is about happens in that continuation, so checking
+    // before it lands would pass against the very bug it exists to catch.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(within(group).getByRole("radio", { name: /Compact/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(putBodies).toHaveLength(1));
+    expect(putBodies[0]).toMatchObject({
+      settings: { "personalisation.spacing": "compact" },
+    });
   });
 });

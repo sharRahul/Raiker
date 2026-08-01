@@ -24,6 +24,11 @@ superseded guides, and screenshots are not maintained here.
 
 - [Build workspace](BUILD_WORKSPACE_SPEC.md): the coding surface, its Plan/Edit/Auto
   modes, repository references, and scheduled agents.
+- [Visual design](VISUAL_DESIGN_SPEC.md): the type scale, density modes, empty
+  and loading states, iconography, data-visual rules, and motion a new page is
+  built from.
+- [Desktop distribution](DESKTOP_DISTRIBUTION_DESIGN.md): installation, the
+  background host, and the lifecycle around `raiker-app`.
 - [Decision modes](DECISION_MODES_SPEC.md)
 - [Models](MODEL_RUNTIME_AND_LOCAL_INFERENCE.md)
 - [Tools and permissions](TOOLS_AND_PERMISSIONS_SPEC.md)

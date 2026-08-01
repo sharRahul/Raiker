@@ -87,8 +87,20 @@
   <div class="context-heading"><strong>Context window</strong>{#if percentLabel}<span>{percentLabel}</span>{/if}</div>
   {#if display}
     <div class="usage-figure"><strong>{number.format(effectiveUsed ?? 0)} tokens used</strong><span>of {number.format(effectiveWindow ?? 0)} available</span></div>
-    <div class="meter {exactPercent !== null && exactPercent >= 90 ? 'critical' : exactPercent !== null && exactPercent >= 75 ? 'warning' : ''}" role="progressbar" aria-label="Context used" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(exactPercent ?? 0)}>
-      <span style={`width: ${exactPercent ?? 0}%`}></span>
+    <!-- BUG-37 — the shared meter primitive rather than this component's own
+         bar. It is a proportion of a fixed capacity, which is exactly what a
+         meter means, and its tones now come from the same tokens the badge
+         beside it uses instead of a private `--raiker-teal` fallback. -->
+    <div
+      class="meter {exactPercent !== null && exactPercent >= 90 ? 'tone-danger' : exactPercent !== null && exactPercent >= 75 ? 'tone-warn' : ''}"
+      style={`--meter-value: ${exactPercent ?? 0}`}
+      role="progressbar"
+      aria-label="Context used"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow={Math.round(exactPercent ?? 0)}
+    >
+      <span class="meter-fill" data-value={Math.round(exactPercent ?? 0)}></span>
     </div>
     <div class="remaining"><span>{number.format(remaining ?? 0)} tokens remaining</span><span>{number.format(usage?.session_input_tokens ?? 0)} input · {number.format(usage?.session_output_tokens ?? 0)} output</span></div>
     <p class="reported">
@@ -147,9 +159,9 @@
   .context-heading { display:flex; justify-content:space-between; gap:1rem; color:var(--text-1); } .context-heading span { color:var(--text-2); font-size:.82rem; font-weight:650; }
   .usage-figure { display:grid; gap:.15rem; margin-top:1rem; } .usage-figure strong { font-size:1.2rem; color:var(--text-1); } .usage-figure span { color:var(--text-3); font-size:.82rem; }
   p { color:var(--text-3); margin:.75rem 0 0; font-size:.8rem; }
-  .meter { height:.5rem; overflow:hidden; margin-top:.75rem; border-radius:999px; background:var(--neutral-soft); }
-  .meter span { display:block; height:100%; min-width:2px; border-radius:inherit; background:var(--raiker-teal, #268d91); }
-  .meter.warning span { background:var(--warning); } .meter.critical span { background:var(--danger); }
+  /* Geometry and tone now come from the shared `.meter` primitive in app.css;
+     this only places it. */
+  .meter { margin-top:.75rem; }
   .remaining { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin-top:.7rem; color:var(--text-2); font-size:.76rem; }
   .reported { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem; } .capacity-source { color:var(--text-2); } .info { width:1rem; height:1rem; display:inline-grid; place-items:center; border:1px solid var(--border-strong); border-radius:50%; font-size:.65rem; color:var(--text-2); cursor:help; }
   .cost { margin:1.2rem -1.5rem -1.35rem; padding:.9rem 1.5rem; border-top:1px solid var(--border); border-radius:0 0 .75rem .75rem; background:var(--sunken); }

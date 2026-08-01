@@ -27,6 +27,20 @@ npm --prefix apps/web run lint
 npm --prefix apps/web run check
 npm --prefix apps/web run test
 npm --prefix apps/web run build
+npx --prefix apps/web playwright install --with-deps chromium
+npm --prefix apps/web run test:e2e:mocked
+```
+
+The mocked end-to-end suite runs against the build above and answers every API
+call from a fixture, so it needs no credential and no network. CI runs it too.
+The `live` suite is separate and deliberately not automated: it drives a running
+`raiker-web` holding real provider credentials, and is how the FIXED-* entries in
+[to be fixed](plans/TO_BE_FIXED.md) are evidenced.
+
+```powershell
+python apps/api/main.py --workspace <ws> --port 8765 --no-browser
+$env:RAIKER_LIVE_ANTHROPIC_KEY = "<key>"; $env:RAIKER_LIVE_WORKSPACE = "<ws>"
+npm --prefix apps/web run test:e2e:live
 ```
 
 Strict non-allow blocking, role revoke governed, and capability gate per action

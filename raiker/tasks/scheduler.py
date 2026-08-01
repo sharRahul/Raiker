@@ -25,6 +25,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from raiker.app.host import HostControl
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import (
     ClientMetadata,
@@ -53,6 +54,10 @@ class TaskScheduler:
 
     async def refresh_model_capacities(self) -> int:
         """Refresh due local-model facts on the resident host's 24-hour cadence."""
+        # Paused means no background work of any kind starts, and a capacity
+        # probe is background work that talks to a local runtime (BUG-40).
+        if HostControl(self.workspace_root).is_paused():
+            return 0
         owner = self.store.original_account_principal_id()
         if owner is None:
             return 0
@@ -179,6 +184,13 @@ class TaskScheduler:
             manager.fail_task(task_id, summary)
 
     async def run_due(self) -> int:
+        # BUG-40 — Pause means "start no new background work". A due task is new
+        # work, so a paused host leaves it in the queue rather than claiming it;
+        # it becomes due the moment the owner resumes. Continuing a run the owner
+        # already approved is deliberately *not* gated here: that work is already
+        # under way, and abandoning it would make Pause a way to lose a decision.
+        if HostControl(self.workspace_root).is_paused():
+            return 0
         tasks = self.store.claim_due_tasks(utc_now())
         for task in tasks:
             principal_id = task.session_id.removeprefix("sess_inbox_")

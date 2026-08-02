@@ -150,6 +150,40 @@ A skill grants no capability and Raiker executes nothing a skill ships.
 Installing and managing skills is owner-scoped CRUD (Extensions → Skills), not a
 governed execution path.
 
+## Model-facing loop tools
+
+| Tool Name | Descriptions | Permissions | Implemented |
+|---|---|---|---|
+| `update_plan` | Record or revise the agent's ordered plan for a conversation, one status per step | owner-scoped write of the model's own intent; no approval | Yes |
+| `spawn_subagent` | Delegate a bounded, read-only investigation and return only its findings | read-shaped; each delegated step is re-brokered | Yes, read-only |
+| `mcp__<server>__<tool>` | Call one tool on a connected MCP server | `mcp_connector_runtime` gate + decision mode + containment | Yes |
+
+`update_plan` is read-shaped at the policy layer because it executes nothing: it
+writes one owner-scoped row naming what the model intends to do next, which the
+workspace renders as a live checklist. Every step it names is governed again when
+it is actually attempted, so a plan grants no authority and creates no standing
+permission. It is fail-closed — a malformed plan is refused by name and the
+stored plan is left untouched.
+
+`spawn_subagent` is read-shaped for the same reason `connector_read` is: the
+subagent's steps are each re-brokered through the policy engine, gates and audit
+path, and only read-only, local, non-egress tools are delegable. A step naming a
+write, a command, a connector, an MCP tool, or a nested spawn is refused before
+the subagent is created. Its findings reach the calling model as untrusted data,
+never as instructions, and the audit trail keeps the contract, the steps, and the
+tools used rather than the content.
+
+A projected MCP tool is callable only while the `mcp_connector_runtime` gate is
+enabled **and** the decision mode permits it; a mode that would withhold every
+call projects no tools at all, so the model is never offered one the runtime
+would refuse. Extensions → MCP servers states which of those two conditions is
+unmet.
+
+Every tool advertised to a model must have a policy verdict: `PolicyEngine`
+hard-denies anything in neither `allowed_read_actions` nor
+`approval_required_actions`, so a tool present in the schema and absent from both
+is unreachable. `tests/test_policy_engine.py` asserts this invariant.
+
 Plugins and external integrations are never an authority bypass. A plugin or
 connector capability must be registered, policy-gated, and allowed by the owner
 before an executor can act.

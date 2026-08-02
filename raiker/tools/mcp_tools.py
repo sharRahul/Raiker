@@ -161,15 +161,43 @@ class McpToolService:
         mode = parse_decision_mode(persisted) if persisted else None
         return mode or DEFAULT_DECISION_MODE
 
+    def decision_mode(self) -> str:
+        """The owner's current decision mode for MCP, as a plain string."""
+        return str(self._mode().value)
+
+    def callable_now(self) -> tuple[bool, str]:
+        """Whether a projected tool could actually run right now, and why not.
+
+        The gate and the decision mode are two separate owner controls and both
+        must clear before a call executes. Answering them together is what lets
+        discovery keep its promise (never offer a tool the runtime would refuse)
+        *and* lets the MCP page state the exact reason a connected server's tools
+        are not reachable, instead of showing `connected · 2 tool(s)` beside a
+        model that can never call them.
+        """
+        from raiker.runtime.authority.decision_modes import DecisionMode, auto_requires_approval
+
+        if not self.gate_enabled():
+            return False, "mcp_gate_disabled"
+        mode = self._mode()
+        if mode == DecisionMode.DENY:
+            return False, "mcp_denied_by_decision_mode"
+        if mode == DecisionMode.ASK:
+            return False, "mcp_withheld_ask"
+        if mode == DecisionMode.AUTO and auto_requires_approval(_CALL_RISK):
+            return False, "mcp_withheld_auto"
+        return True, ""
+
     # ── Discovery ────────────────────────────────────────────────────────
     def available_servers(self) -> list[dict[str, Any]]:
         """Owner-scoped servers whose tools may be offered this turn.
 
         A gate that is off yields nothing: the model is never shown a tool the
-        runtime would refuse. Same for a server that never completed a handshake
-        or whose connection the monitor paused or killed.
+        runtime would refuse. Same for a decision mode that withholds every call,
+        for a server that never completed a handshake, and for one whose
+        connection the monitor paused or killed.
         """
-        if not self._principal_id or not self.gate_enabled():
+        if not self._principal_id or not self.callable_now()[0]:
             return []
         try:
             rows = self._store.list_mcp_servers(self._principal_id)
@@ -336,6 +364,51 @@ def mcp_tool_specs(
         return []
 
 
+def mcp_agent_access(
+    workspace_root: str | Path, store: SQLiteStore | None, principal_id: str | None
+) -> dict[str, Any]:
+    """Whether this owner's connected MCP tools are reachable by the agent.
+
+    BUG-12 made MCP tools callable; it left the owner with no way to *see* that
+    a connected server is still unreachable because the decision mode withholds
+    every call. This is the read behind that surface: gate state, decision mode,
+    how many tools are currently projected, and a reason code when none are.
+    """
+    if store is None or not principal_id:
+        return {
+            "gate_enabled": False,
+            "decision_mode": "ask",
+            "callable": False,
+            "reason_code": "mcp_gate_disabled",
+            "projected_tools": 0,
+            "connected_servers": 0,
+        }
+    service = McpToolService(workspace_root, store, principal_id=principal_id)
+    gate_enabled = service.gate_enabled()
+    callable_now, reason = service.callable_now()
+    specs = service.tool_specs() if callable_now else []
+    connected = 0
+    if gate_enabled:
+        try:
+            connected = sum(
+                1
+                for row in store.list_mcp_servers(principal_id)
+                if str(row.get("status")) == _CONNECTED_STATUS
+                and str(row.get("monitor_state") or _ACTIVE_MONITOR_STATE) == _ACTIVE_MONITOR_STATE
+                and row.get("tools")
+            )
+        except Exception:  # noqa: BLE001 — a broken read reports nothing connected
+            connected = 0
+    return {
+        "gate_enabled": gate_enabled,
+        "decision_mode": service.decision_mode(),
+        "callable": callable_now,
+        "reason_code": reason,
+        "projected_tools": len(specs),
+        "connected_servers": connected,
+    }
+
+
 def mcp_call(
     workspace_root: str | Path,
     name: str,
@@ -358,6 +431,7 @@ __all__ = [
     "MCP_TOOL_PREFIX",
     "McpToolService",
     "is_mcp_tool",
+    "mcp_agent_access",
     "mcp_call",
     "mcp_tool_name",
     "mcp_tool_specs",

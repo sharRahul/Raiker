@@ -23,10 +23,18 @@ const EVENT_PHASE: Record<string, PhaseId> = {
   context_gathered: "gather",
   plan_created: "plan",
   plan_skipped: "plan",
+  // B6 — the agent's own checklist. It belongs in the plan phase whether it was
+  // written this turn or carried in from the last one.
+  agent_plan_updated: "plan",
+  agent_plan_replayed: "plan",
   model_request_started: "act",
   model_request_completed: "act",
   model_request_failed: "act",
   model_tool_call_rejected: "act",
+  model_tool_calls_dropped: "act",
+  // B7 — a delegated read-only investigation. Metadata only: the findings go to
+  // the model, never to the transcript.
+  subagent_completed: "act",
   verification_started: "verify",
   verification_completed: "verify",
 };
@@ -86,6 +94,16 @@ export function summarizeEvent(ev: StreamEvent): string {
       return "Plan created.";
     case "plan_skipped":
       return "No plan required for this turn.";
+    case "agent_plan_updated":
+      return `Plan updated: ${str(p.completed)} of ${str(p.total)} step(s) done${p.current_step ? ` — now ${str(p.current_step)}` : ""}.`;
+    case "agent_plan_replayed":
+      return "The standing plan for this conversation was carried into the turn.";
+    case "subagent_completed": {
+      const tools = Array.isArray(p.tools_used) ? p.tools_used.join(", ") : "";
+      return `Subagent ${str(p.name) || "run"} finished ${str(p.steps_executed)} read-only step(s)${tools ? ` (${tools})` : ""}.`;
+    }
+    case "model_tool_calls_dropped":
+      return `${str(p.accepted)} of ${str(p.proposed)} tool call(s) accepted — ${str(p.reason)}.`;
     case "model_request_started":
       return `Model request started (${str(p.provider)} / ${str(p.model)}).`;
     case "model_request_completed":

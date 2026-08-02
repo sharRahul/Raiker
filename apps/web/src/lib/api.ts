@@ -1,4 +1,5 @@
 import type {
+  AgentPlan,
   AgentResponse,
   ApprovalDetailView,
   ApprovalView,
@@ -30,6 +31,7 @@ import type {
   InterruptRequestBody,
   InstanceLaunchResult,
   InterruptResult,
+  McpAgentAccess,
   McpServer,
   McpSession,
   McpFinding,
@@ -284,6 +286,10 @@ export const api = {
   // ── Read-only governed views ──
   sessionContextUsage: (sessionId: string) =>
     request<ContextUsage>(`/api/sessions/${encodeURIComponent(sessionId)}/context-usage`),
+  // B6 — the agent's standing plan for one conversation, so a reload or a
+  // second tab picks the checklist back up instead of starting blank.
+  sessionPlan: (sessionId: string) =>
+    request<AgentPlan>(`/api/sessions/${encodeURIComponent(sessionId)}/plan`),
   capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),
   capabilityGate: (capability: string) =>
     request<CapabilityGate>(`/api/capability-gates/${encodeURIComponent(capability)}`),
@@ -325,6 +331,9 @@ export const api = {
   // (a disabled gate returns 403 disabled_by_capability_gate); rename and
   // delete are human-only owner-scoped operations.
   mcpServers: () => request<McpServer[]>("/api/mcp/servers"),
+  // Whether a connected server's tools can actually be called in a turn. The
+  // handshake and the agent's reach are separate facts, so the page states both.
+  mcpAgentAccess: () => request<McpAgentAccess>("/api/mcp/agent-access"),
   createMcpServer: (name: string, template: string) =>
     postJson<{ ok: boolean; server_id: string | null; name: string | null }>(
       "/api/mcp/servers",

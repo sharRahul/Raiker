@@ -61,6 +61,11 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
     return AuthMiddleware(ws).authenticate(request)
 
 
+def _ws(request: Request) -> str | Path:
+    ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
+    return ws
+
+
 @router.put("/api/sessions/{session_id}/command-grant")
 def put_session_command_grant(
     session_id: str,
@@ -189,6 +194,43 @@ async def list_mcp_servers(
     another account's servers.
     """
     return serialize_dto(_service(request).list_mcp_servers(auth_data[0].principal_id))
+
+
+@router.get("/api/mcp/agent-access")
+async def get_mcp_agent_access(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Whether this owner's connected MCP tools can actually be called in a turn.
+
+    Two owner controls stand between a connected server and the model — the
+    capability gate and the decision mode — and until now the MCP page reported
+    only the handshake. A server could read `connected · 2 tool(s)` while every
+    call was withheld, which is a claim the product could not keep.
+    """
+    from raiker.tools.mcp_tools import mcp_agent_access
+
+    principal_id = auth_data[0].principal_id
+    return mcp_agent_access(_ws(request), SQLiteStore(_ws(request)), principal_id)
+
+
+@router.get("/api/sessions/{session_id}/plan")
+async def get_session_plan(
+    session_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """The agent's standing plan for one conversation (B6), or an empty plan.
+
+    Owner-scoped: the row is keyed by (session, principal), so one account can
+    never read another's plan. Read-only — a plan is written by the model
+    through the governed `update_plan` tool, never by this surface.
+    """
+    from raiker.runtime.agent_plan import load_plan
+
+    principal_id = auth_data[0].principal_id
+    plan = load_plan(SQLiteStore(_ws(request)), session_id, principal_id)
+    return plan if plan is not None else {"session_id": session_id, "steps": []}
 
 
 def _mcp_result(result: Any) -> dict[str, Any]:

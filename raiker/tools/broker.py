@@ -87,6 +87,10 @@ _CONTENT_RESULT_TOOLS = frozenset(
     {
         "consult_advisor", "github_read", "gmail_read", "gcal_read", "slack_read",
         "connector_read", "run_command",
+        # B7 — a subagent's digest is workspace content it read on the parent's
+        # behalf. It flows to the calling model and nowhere else; the audit
+        # trail keeps the contract, the steps, and the tools used.
+        "spawn_subagent",
     }
 )
 _CONTENT_RESULT_FIELDS = ("answer", "content")
@@ -247,7 +251,62 @@ class ToolBroker:
             "assign_session_project": self._assign_session_project,
             "create_document": self._create_document,
             "run_command": self._run_command,
+            "update_plan": self._update_plan,
+            "spawn_subagent": self._spawn_subagent,
         }
+
+    def _update_plan(
+        self, args: dict[str, Any], context: ToolExecutionContext
+    ) -> dict[str, Any]:
+        """Record this conversation's plan (B6).
+
+        Owner-scoped and fail-closed: a malformed plan is refused with a named
+        reason and the stored plan is left exactly as it was, because replacing
+        a good spine with half of one is worse than refusing.
+        """
+        from raiker.runtime.agent_plan import (
+            PlanValidationError,
+            normalize_steps,
+            save_plan,
+        )
+
+        if self.store is None:
+            return {"status": "failed", "error": {"type": "plan_store_unavailable"}}
+        owner = self.owner_scope or context.principal_id
+        try:
+            steps = normalize_steps(args.get("steps"))
+        except PlanValidationError as exc:
+            return {"status": "failed", "error": {"type": exc.reason}}
+        plan = save_plan(
+            self.store,
+            session_id=context.session_id,
+            principal_id=owner,
+            turn_id=context.turn_id,
+            steps=steps,
+        )
+        return {"status": "success", "plan": plan}
+
+    def _spawn_subagent(
+        self, args: dict[str, Any], context: ToolExecutionContext
+    ) -> dict[str, Any]:
+        """Run one bounded, read-only subagent for the model (B7).
+
+        The subagent's own steps are re-brokered individually, so nothing here
+        widens authority; what this adds is the *digest*, which keeps a wide
+        search out of the parent turn's context.
+        """
+        from raiker.tools.subagent_tools import spawn_subagent
+
+        if self.store is None:
+            return {"status": "failed", "error": {"type": "subagent_store_unavailable"}}
+        return spawn_subagent(
+            self.workspace_root,
+            args,
+            store=self.store,
+            principal_id=context.principal_id,
+            session_id=context.session_id,
+            turn_id=context.turn_id,
+        )
 
     def _run_command(
         self, args: dict[str, Any], context: ToolExecutionContext

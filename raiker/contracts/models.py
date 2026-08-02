@@ -64,6 +64,20 @@ EVENT_TYPES = {
     "retrieval_augmentation",
     "plan_created",
     "plan_skipped",
+    # B6 — the agent's own plan for the work. `agent_plan_updated` carries the
+    # ordered steps the model wrote with `update_plan`, which is what the live
+    # checklist renders; `agent_plan_replayed` records that a standing plan was
+    # carried into a later turn (character count only). The steps are the
+    # model's own short statements of intent, never workspace content.
+    "agent_plan_updated",
+    "agent_plan_replayed",
+    # B7 — a bounded, read-only subagent finished. Metadata only: its name, its
+    # contract id, the steps it ran and the read-only tools it used. The
+    # findings themselves reach the calling model and nothing else.
+    "subagent_completed",
+    # B4 — tool calls a turn proposed but did not run, with the counts and the
+    # boundary that stopped them (budget, approval, or policy).
+    "model_tool_calls_dropped",
     "action_proposed",
     "action_validated",
     "policy_decision",

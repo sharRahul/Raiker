@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import McpView from "./McpView.svelte";
 import { makeGate, stubFetch } from "../test-helpers";
-import type { McpServer } from "../apiTypes";
+import type { McpAgentAccess, McpServer } from "../apiTypes";
 
 function server(partial: Partial<McpServer> = {}): McpServer {
   return {
@@ -30,11 +30,24 @@ const ENABLED_GATES = [
   makeGate({ capability: "mcp_connector_runtime", runtime_enabled: true }),
 ];
 
-function monitorRoutes() {
+function access(partial: Partial<McpAgentAccess> = {}): McpAgentAccess {
+  return {
+    gate_enabled: true,
+    decision_mode: "allow",
+    callable: true,
+    reason_code: "",
+    projected_tools: 2,
+    connected_servers: 1,
+    ...partial,
+  };
+}
+
+function monitorRoutes(agentAccess: McpAgentAccess = access()) {
   return {
     "GET /api/mcp/servers/mcp_1/sessions": [],
     "GET /api/mcp/servers/mcp_1/findings": [],
     "GET /api/notifications": [],
+    "GET /api/mcp/agent-access": agentAccess,
   };
 }
 
@@ -181,5 +194,56 @@ describe("McpView", () => {
       expect.stringContaining("/api/mcp/servers/mcp_1/resume"),
       expect.objectContaining({ method: "POST" }),
     ));
+  });
+
+  // B8 — connecting a server and the agent being able to call it are two
+  // different facts. The page used to state only the first, so a withheld
+  // server read `Connected` beside tools nothing could reach.
+  it("says the connected tools are callable when they really are", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [server()],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    await waitFor(() =>
+      expect(screen.getByText(/available to Raiker in Chat and Build/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Callable by Raiker")).toBeInTheDocument();
+  });
+
+  it("names the decision mode when a connected server's tools are withheld", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [server()],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(
+        access({
+          decision_mode: "ask",
+          callable: false,
+          reason_code: "mcp_withheld_ask",
+          projected_tools: 0,
+        }),
+      ),
+    });
+    render(McpView);
+    await waitFor(() =>
+      expect(screen.getByText(/withheld from every turn/)).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/the MCP decision mode is/)).toBeInTheDocument();
+    // The card agrees with the banner rather than claiming the tools work.
+    expect(screen.getByText("Not callable yet — see above")).toBeInTheDocument();
+  });
+
+  it("stays usable when the reachability read fails", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [server()],
+      "GET /api/capability-gates": ENABLED_GATES,
+      "GET /api/mcp/servers/mcp_1/sessions": [],
+      "GET /api/mcp/servers/mcp_1/findings": [],
+      "GET /api/notifications": [],
+    });
+    render(McpView);
+    await waitFor(() => expect(screen.getByText("echo-server")).toBeInTheDocument());
+    expect(screen.queryByText(/withheld from every turn/)).not.toBeInTheDocument();
   });
 });

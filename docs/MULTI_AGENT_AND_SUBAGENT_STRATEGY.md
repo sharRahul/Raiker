@@ -5,6 +5,20 @@
 
 Raiker supports subagents and coordinated multi-agent teams through phase-scheduled implementation. The design is fully specified now; phase numbers control when behaviour is wired, not whether behaviour is defined.
 
+**Implemented slice (B7, FIXED-95).** A model may now spawn one bounded subagent
+for itself with the `spawn_subagent` tool. It is the narrowest useful reading of
+the design above: a caller-supplied list of **read-only** steps, run in process
+under the subagent's own principal and persisted contract, with the depth, step,
+tool-call, wall-clock and token budgets this document specifies. Only local,
+non-egress read tools are delegable; a write, a command, a connector, an MCP tool
+or a nested spawn is refused before the subagent is created, so the "cannot spawn
+a child unless allowed" rule holds by construction rather than by policy check.
+What comes back to the parent is a **bounded digest** framed as untrusted data —
+the point of delegating is that the raw output never enters the parent's context —
+while the audit trail keeps the contract, the steps, and the tools used. Model-
+driven recursion, side questions, and independently-modelled team members remain
+specified and not wired.
+
 Subagents are useful for specialised work, but they increase risk, cost, complexity, and drift. They must be bounded by contracts, permissions, event logs, and explicit task ownership.
 
 ---

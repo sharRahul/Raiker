@@ -43,6 +43,16 @@ class StaticPolicyConfig:
                 "connector_read",
                 "create_document",
                 "run_command",
+                # B6 — recording the agent's plan writes one owner-scoped row of
+                # the model's own intentions. It executes nothing, so it is
+                # read-shaped here; every step it names is governed when it is
+                # actually attempted.
+                "update_plan",
+                # B7 — spawning a bounded subagent. Read-shaped for the same
+                # reason `connector_read` is: the subagent's steps are each
+                # re-brokered through this engine, and its delegable tool set is
+                # read-only with no egress, so the spawn adds no authority.
+                "spawn_subagent",
                 "user_create",
                 "user_deactivate",
                 "role_create",
@@ -80,6 +90,20 @@ class StaticPolicyConfig:
             # runs only after the governed path clears.
             "mcp_server_create", "mcp_connect", "mcp_list_tools", "mcp_call_tool",
             "subagents", "multi_agent_teams",
+            # Found while implementing B6/B7: both tools were advertised to the
+            # model and both were hard-denied here as `unknown_or_denied_tool`,
+            # because neither name appeared in either set. They mutate owner
+            # data, so they belong on the approval path they were built for.
+            "create_task", "assign_session_project",
+            # Same finding, same cause: the *tool names* the model proposes.
+            # `remote_execution_cap` / `cloud_execution_cap` below are the
+            # capability names the runtime authority routes on, which is a
+            # different vocabulary — so a model-proposed `remote_execute` fell
+            # through to `unknown_or_denied_tool` and never reached the approval
+            # the broker already knew how to raise for it. The capability gate,
+            # the owner profile, the credential reference and the cost ceiling
+            # are all still in front of any actual execution.
+            "remote_execute", "cloud_execute",
             "email_runtime", "calendar_runtime", "reminder_runtime",
             "finance_runtime", "investment_runtime", "medical_runtime",
             "pregnancy_baby_runtime", "cctv_runtime", "home_security_runtime",

@@ -17,6 +17,10 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 | `model_price_override_recorded` | An administrator set a model's price, with the exact provider and model id and their stated reason. The rate itself lives in the effective-dated price registry |
 | `model_price_override_cleared` | An administrator withdrew a price override, returning the model to its published or documented rate |
 | `model_price_synchronised` | A provider's prices were refreshed into the registry (provider and counts only) |
+| `agent_plan_updated` | The agent recorded or revised its plan for a conversation with `update_plan` — the ordered steps and their statuses, which are the model's own short statements of intent, never workspace content |
+| `agent_plan_replayed` | A conversation's standing plan was carried into a later turn as context (character count only) |
+| `subagent_completed` | A bounded, read-only subagent finished — its name, contract id, steps run, and the read-only tools it used. The findings reach the calling model and nothing else |
+| `model_tool_calls_dropped` | Tool calls a turn proposed but did not run, with proposed/accepted/dropped counts and the boundary that stopped them (budget, approval, or policy) |
 | `tool_started` | A governed executor started work |
 | `tool_completed` | A governed executor completed work |
 | `tool_failed` | A governed executor failed safely |
@@ -45,6 +49,13 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 | `phase3.remote_container_cloud_readiness.metadata_created` | Remote/container/cloud readiness metadata was created |
 | `phase3.remote_container_cloud_readiness.summary_viewed` | A local readiness summary was viewed |
 | `phase3.remote_container_cloud_readiness.exported` | A redacted readiness export was produced |
+
+Every event type a runtime component emits must be declared in
+`raiker/contracts/models.py::EVENT_TYPES`. `AgentEvent` validates against that
+set and raises inside the turn otherwise, which surfaces as a failed turn rather
+than a missing log line — so an undeclared event is a live defect, not a
+documentation gap. `tests/test_agent_plan_and_subagents.py` scans every emitted
+literal against the declared set.
 
 Event records are append-style local audit evidence, not tamper-proof logging.
 Approval resolution alone does not emit execution events because it is

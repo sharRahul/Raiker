@@ -68,4 +68,4 @@ filterable by session and event type.
   alongside real conversations (BUG-10).
 - Creating a task by asking for one in Chat is specified but not shipped — the
   governed `create_task` tool exists, the conversational flow around it does
-  not. See `docs/superpowers/plans/2026-07-26-chat-tasks-and-project-assignment.md`.
+  not.

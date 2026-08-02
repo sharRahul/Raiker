@@ -64,13 +64,15 @@ describe("TasksView", () => {
     ]);
   });
 
-  it("explains that schedules resolve the global model when they run", async () => {
-    stubFetch({ "GET /api/tasks": [], "GET /api/models": { profiles: [], chat_profiles: [] } });
+  it("lets a schedule retain an exact configured model", async () => {
+    stubFetch({ "GET /api/tasks": [], "GET /api/models": { profiles: [], chat_profiles: [
+      { profile_id: "anthropic", provider: "anthropic", model: "haiku", selected: true, configured: true },
+    ] } });
     render(TasksView);
     await screen.findByText("No work queued");
     await fireEvent.click(screen.getByRole("button", { name: "Schedule once" }));
-    expect(screen.getByText(/uses the global model active when this run begins/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /model for this turn/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Model for each run")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /model for this turn: haiku/i })).toBeInTheDocument();
   });
 
   it("shows a route-level loading state while tasks are fetched", async () => {

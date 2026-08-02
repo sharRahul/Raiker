@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
@@ -552,9 +551,12 @@
               <div class="local-row" class:selected={p.selected} class:picker-open={pickerFor === p.profile_id}>
                 <span class="row-logo"><ProviderLogo provider={p.provider} size={28} /></span>
                 <div class="row-main">
+                  <!-- No "selected" badge here. A provider row is highlighted when
+                       it is the one serving turns, but labelling it "selected"
+                       read as "only this provider is available", which is false —
+                       every configured provider stays usable. -->
                   <div class="row-title">
                     <h3>{providerName(p.provider)}</h3>
-                    {#if p.selected}<Badge variant="active" label="selected" />{/if}
                   </div>
                   <p class="row-model">
                     {#if p.model === "<model>"}<span class="model-unpinned">model chosen at selection</span>{:else}<code>{modelName(p.model)}</code>{/if}
@@ -614,9 +616,7 @@
               <article class="provider-card" class:selected={p.selected} class:connected={p.connection_configured}>
                 <div class="pc-head">
                   <span class="pc-logo"><ProviderLogo provider={p.provider} size={34} /></span>
-                  <div class="pc-title"><h3>{providerName(p.provider)}</h3>
-                    {#if p.selected}<Badge variant="active" label="selected" />{/if}
-                  </div>
+                  <div class="pc-title"><h3>{providerName(p.provider)}</h3></div>
                 </div>
                 <p class="pc-model">
                   {#if p.model === "<model>"}<span class="model-unpinned">no model pinned</span>{:else}<code>{modelName(p.model)}</code>{/if}

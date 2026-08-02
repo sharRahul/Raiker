@@ -61,6 +61,7 @@
   import ComposerAttach from "../components/ComposerAttach.svelte";
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
+  import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
   import { thinkingSteps } from "../chatPresentation";
@@ -857,6 +858,7 @@
     >
       <div class="composer-card">
         <ComposerChips store={attachStore} disabled={streaming} />
+        <SkillLinkNotice text={promptText} />
         <label for="build-prompt" class="sr-only">Describe the change</label>
         <div class="composer-upper">
           <textarea

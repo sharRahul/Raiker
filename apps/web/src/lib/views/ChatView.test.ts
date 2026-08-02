@@ -185,6 +185,24 @@ describe("ChatView streaming transcript", () => {
     expect(streamPromptMock).toHaveBeenCalledOnce();
   });
 
+  it("places Raiker's greeting reaction on the user's message", async () => {
+    stubFetch(MODELS_ROUTE);
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("Hello! How can I help?") } as StreamEvent);
+      },
+    );
+
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "Hello Raiker" } });
+    await fireEvent.keyDown(box, { key: "Enter" });
+
+    const reaction = await screen.findByLabelText("Raiker reacted with Waving hand");
+    expect(reaction.closest(".message-group-user")).not.toBeNull();
+    expect(reaction.closest(".message-group-raiker")).toBeNull();
+  });
+
   it("keeps model runtime metadata out of the conversation", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockImplementation(

@@ -42,7 +42,7 @@ export const HUB_TABS: Record<string, string[]> = {
   // lives in: connect and choose a provider, decide what serves a turn when the
   // first choice cannot, see what it costs, or read the off-machine posture.
   models: ["providers", "routing", "pricing", "posture"],
-  extensions: ["connectors", "mcp", "plugins", "channels"],
+  extensions: ["connectors", "mcp", "skills", "plugins", "channels"],
   observe: ["overview", "sessions", "activity", "checkpoints", "diagnostics", "work", "notifications"],
 };
 

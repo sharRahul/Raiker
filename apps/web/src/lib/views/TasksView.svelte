@@ -125,7 +125,7 @@
         ...((cadence === "once" || cadence === "daily") ? { scheduled_at: new Date(scheduledAt).toISOString() } : {}),
         ...(cadence === "daily" ? { recurrence: "daily" } : cadence === "background" ? { recurrence: "background" } : {}),
         ...(projectId ? { project_id: projectId } : {}),
-        ...(cadence === "now" && modelProfile && model ? { model_profile: modelProfile, model } : {}),
+        ...(modelProfile && model ? { model_profile: modelProfile, model } : {}),
         ...(attachments ? { attachments } : {}),
       });
       title = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; scheduledAt = ""; modelProfile = ""; model = "";
@@ -217,11 +217,7 @@
     <ComposerChips store={attachStore} disabled={creating} />
     <ComposerAttachPanel store={attachStore} disabled={creating} idPrefix="task" />
     <div class="fields"><label>Parent work<select class="select" aria-label="Parent work" bind:value={parentTaskId}><option value="">No parent — top-level work</option>{#each tasks ?? [] as task (task.task_id)}<option value={task.task_id}>{task.title}</option>{/each}</select></label><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>{#if cadence === "once" || cadence === "daily"}<label>Start time<input class="input" aria-label="Start time" type="datetime-local" bind:value={scheduledAt} required /></label>{/if}</div>
-    {#if cadence === "now"}
-      <div class="task-model"><span>Task model</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model /><ExecutionEnvironmentBadge /><ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} /></div>
-    {:else}
-      <p class="schedule-model-note">Uses the global model active when this run begins.</p>
-    {/if}
+    <div class="task-model"><span>{cadence === "now" ? "Task model" : "Model for each run"}</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model /><ExecutionEnvironmentBadge /><ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} /></div>
     <button class="btn btn-primary" disabled={creating || attachStore.uploading || !title.trim() || !objective.trim() || ((cadence === "once" || cadence === "daily") && !scheduledAt)}>{creating ? "Saving…" : attachStore.uploading ? "Uploading…" : cadence === "background" ? "Start background agent" : cadence === "daily" ? "Create daily routine" : cadence === "once" ? "Schedule task" : "Create task"}</button>
   </form>
 

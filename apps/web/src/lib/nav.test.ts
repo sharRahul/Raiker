@@ -66,7 +66,7 @@ describe("nav model", () => {
       "models",
       "extensions",
     ]);
-    expect(HUB_TABS.extensions).toEqual(["connectors", "mcp", "plugins", "channels"]);
+    expect(HUB_TABS.extensions).toEqual(["connectors", "mcp", "skills", "plugins", "channels"]);
   });
 
   it("keeps every governed surface reachable from the nav", () => {

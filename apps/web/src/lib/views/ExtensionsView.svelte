@@ -12,6 +12,7 @@
   import { onMount } from "svelte";
   import ConnectionsView from "./ConnectionsView.svelte";
   import McpView from "./McpView.svelte";
+  import SkillsView from "./SkillsView.svelte";
   import LifecycleTrack from "../components/LifecycleTrack.svelte";
   import PageState from "../components/PageState.svelte";
   import SidePanel from "../components/SidePanel.svelte";
@@ -45,6 +46,7 @@
     label: {
       connectors: "Connectors",
       mcp: "MCP servers",
+      skills: "Skills",
       plugins: "Plugins",
       channels: "Channels",
     }[id] as string,
@@ -302,6 +304,10 @@
 {:else if tab === "mcp"}
   <div id="panel-mcp" role="tabpanel" aria-labelledby="tab-mcp">
     <McpView />
+  </div>
+{:else if tab === "skills"}
+  <div id="panel-skills" role="tabpanel" aria-labelledby="tab-skills">
+    <SkillsView />
   </div>
 {:else if tab === "plugins"}
   <div id="panel-plugins" role="tabpanel" aria-labelledby="tab-plugins">

@@ -22,7 +22,7 @@ from raiker.tools.broker import ToolBroker
 DELEGABLE_TOOLS: frozenset[str] = frozenset({
     "read_file", "list_directory", "glob", "grep", "stat_path", "diff_files",
     "git_status", "git_diff", "git_log", "memory_search", "memory_list", "memory_get",
-    "vector_get",
+    "vector_get", "skill_load",
 })
 
 # A subagent may only *propose* these mutations. The broker parks them in the

@@ -78,6 +78,26 @@ describe("ModelsView state grammar", () => {
     ));
   });
 
+  // A "selected" chip on the provider card read as "only this provider is
+  // selected", i.e. that the others had been turned off. They had not — every
+  // configured provider stays usable, and a per-chat picker can still choose
+  // one. The row keeps its highlight; the misleading label is gone.
+  it("does not label a provider as selected", async () => {
+    const anthropic = profile({ profile_id: "anthropic", provider: "anthropic", model: "opus", configured: true });
+    const ollama = profile({ profile_id: "ollama", provider: "ollama", model: "gemma4:31b-cloud", configured: true, selected: true });
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [anthropic, ollama],
+        chat_profiles: [anthropic, ollama],
+        current_profile_id: "ollama",
+        current_model: "gemma4:31b-cloud",
+      }),
+    });
+    render(ModelsView);
+    await screen.findByRole("combobox", { name: "Global model" });
+    expect(screen.queryByText("selected")).not.toBeInTheDocument();
+  });
+
   it("shows the discovered local context capacity and its source", async () => {
     stubFetch({
       "GET /api/models": models({

@@ -2196,3 +2196,44 @@ TASK_ATTACHMENTS_MIGRATION_ID = "RAIKER-1034-task-attachments"
 TASK_ATTACHMENTS_SQL = """
 ALTER TABLE tasks ADD COLUMN attachments_json TEXT NOT NULL DEFAULT '[]';
 """
+
+
+# Installed skills (SKILL.md documents and *.skill bundles the owner added).
+#
+# A skill is instruction text, never code Raiker runs, so the row holds the
+# validated document, the original archive when one was uploaded, and the four
+# facts the Skills tab reports: where it came from, what it hashes to, whether
+# it is active, and when it last changed. Unique per (owner, name) so importing
+# the same skill twice refreshes one row rather than accumulating duplicates.
+SKILLS_MIGRATION_ID = "RAIKER-1035-installed-skills"
+SKILLS_SQL = """
+CREATE TABLE IF NOT EXISTS skills (
+  skill_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  version TEXT,
+  source TEXT NOT NULL,
+  source_ref TEXT,
+  checksum TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  skill_md TEXT NOT NULL,
+  bundle BLOB,
+  files_json TEXT NOT NULL DEFAULT '[]',
+  byte_size INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_owner_name ON skills(principal_id, name);
+CREATE INDEX IF NOT EXISTS idx_skills_owner ON skills(principal_id, created_at DESC);
+
+-- Which shipped skills this owner has already been offered. Without it, seeding
+-- would reinstall a built-in the owner deliberately deleted, every time the
+-- Skills tab was opened.
+CREATE TABLE IF NOT EXISTS skill_seeds (
+  principal_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  seeded_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, name)
+);
+"""

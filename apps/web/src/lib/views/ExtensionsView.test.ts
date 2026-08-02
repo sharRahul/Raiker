@@ -183,6 +183,13 @@ describe("ExtensionsView", () => {
     ).toBeInTheDocument();
   });
 
+  it("mounts the Skills tab as its own destination", async () => {
+    stubFetch({ "GET /api/skills": { skills: [] } });
+    render(ExtensionsView, { props: { tab: "skills" } });
+    expect(await screen.findByRole("heading", { name: "Skills" })).toBeInTheDocument();
+    expect(screen.getByText(/grants no capability, opens no gate/i)).toBeInTheDocument();
+  });
+
   it("exposes each tab through the ARIA tabs pattern", async () => {
     stubFetch(overview([]));
     render(ExtensionsView, { props: { tab: "connectors" } });
@@ -196,5 +203,6 @@ describe("ExtensionsView", () => {
       "aria-selected",
       "false",
     );
+    expect(screen.getByRole("tab", { name: "Skills" })).toHaveAttribute("aria-selected", "false");
   });
 });

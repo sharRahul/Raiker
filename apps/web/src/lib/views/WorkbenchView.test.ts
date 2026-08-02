@@ -211,12 +211,24 @@ describe("WorkbenchView", () => {
     window.removeEventListener("raiker:build-compose", composed);
   });
 
-  it("keeps Schedule on the global model resolved at run time", async () => {
+  it("hands Schedule its own exact provider and model choice", async () => {
+    vi.useFakeTimers();
     stubFetch(routes());
+    const composed = vi.fn();
+    window.addEventListener("raiker:task-compose", composed);
     render(WorkbenchView);
     await fireEvent.click(await screen.findByRole("tab", { name: "Schedule" }));
-    expect(screen.getByText(/global at run time/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /model for this turn/i })).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /model for this turn: qwen/i })).toBeInTheDocument();
+    await fireEvent.input(screen.getByLabelText(/what would you like raiker to do/i), { target: { value: "Run later" } });
+    await fireEvent.input(screen.getByLabelText(/scheduled start time/i), { target: { value: "2026-08-03T09:30" } });
+    await fireEvent.click(screen.getByRole("button", { name: /review schedule/i }));
+    vi.runAllTimers();
+    expect((composed.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
+      cadence: "once",
+      profileId: LOCAL_PROFILE.profile_id,
+      model: LOCAL_PROFILE.model,
+    });
+    window.removeEventListener("raiker:task-compose", composed);
   });
 
   it("keeps the start control disabled until something is written", async () => {

@@ -132,6 +132,24 @@ Approval remains metadata-only for every other capability.
 /whoami
 ```
 
+## Model-facing skill read
+
+| Tool Name | Descriptions | Permissions | Implemented |
+|---|---|---|---|
+| `skill_load` | Read one installed, active skill's instructions by name, or one file from its bundle via the optional `file` argument | owner-scoped read; no approval | Yes, read-only |
+
+`skill_load` is a read like `memory_get`: it returns the owner's own stored
+instruction document to the calling model and mutates nothing. It is
+owner-scoped, refuses a deactivated skill so turning one off actually withholds
+it, and resolves a requested bundle file against the archive's own listing so a
+model-supplied name cannot escape the bundle. Only the skill *index* — one line
+per active skill — enters a turn's system context; bodies and bundled references
+load through this tool on the turns that need them.
+
+A skill grants no capability and Raiker executes nothing a skill ships.
+Installing and managing skills is owner-scoped CRUD (Extensions → Skills), not a
+governed execution path.
+
 Plugins and external integrations are never an authority bypass. A plugin or
 connector capability must be registered, policy-gated, and allowed by the owner
 before an executor can act.

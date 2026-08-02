@@ -255,8 +255,13 @@ class TestReads:
         assert response.json()["model_profile"] == "ollama-local-openai-compatible"
         assert response.json()["model"] == "gemma4:31b-cloud"
 
-    def test_schedule_rejects_a_pinned_model(self, client: TestClient) -> None:
+    def test_schedule_keeps_its_independent_model_choice(
+        self, client: TestClient, app: FastAPI
+    ) -> None:
         token = _token(client)
+        SQLiteStore(app.state.workspace_root).save_configured_model(
+            "principal_owner", "ollama-local-openai-compatible", "gemma4:31b-cloud"
+        )
         response = client.post(
             "/api/tasks",
             headers=_auth_headers(token),
@@ -269,8 +274,9 @@ class TestReads:
             },
         )
 
-        assert response.status_code == 422
-        assert response.json()["detail"]["reason_code"] == "scheduled_task_uses_global_model"
+        assert response.status_code == 201, response.text
+        assert response.json()["model_profile"] == "ollama-local-openai-compatible"
+        assert response.json()["model"] == "gemma4:31b-cloud"
 
     def test_brain_returns_only_stored_work_relationships(self, client: TestClient) -> None:
         token = _token(client)

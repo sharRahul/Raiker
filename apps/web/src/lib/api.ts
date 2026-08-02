@@ -57,6 +57,9 @@ import type {
   SessionAttachmentsView,
   SessionDetail,
   SessionSummary,
+  SkillMutationResult,
+  SkillVerification,
+  SkillView,
   StandingGrant,
   StreamEvent,
   TaskView,
@@ -585,6 +588,39 @@ export const api = {
   // goes through the governed approval path.
   checkpointRestorePlan: (id: string) =>
     request<RestorePlan>(`/api/checkpoints/${encodeURIComponent(id)}/restore-plan`),
+  // ── Installed skills (Extensions → Skills) ───────────────────────────
+  // A skill is instruction text the owner installs; it grants no capability and
+  // runs nothing. `verifySkillUrl` reads a linked document and reports what it
+  // is without storing it, so Chat and Build can offer an informed import.
+  skills: () => request<{ skills: SkillView[] }>("/api/skills").then((body) => body.skills),
+  uploadSkill: (filename: string, data_base64: string) =>
+    postJson<SkillMutationResult>("/api/skills", { filename, data_base64 }),
+  verifySkillUrl: (url: string) => postJson<SkillVerification>("/api/skills/verify", { url }),
+  importSkillUrl: (url: string) => postJson<SkillMutationResult>("/api/skills/import", { url }),
+  buildSkill: (name: string, description: string, body: string) =>
+    postJson<SkillMutationResult>("/api/skills/build", { name, description, body }),
+  renameSkill: (id: string, name: string) =>
+    request<{ ok: boolean; skill_id: string; name: string }>(`/api/skills/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
+  setSkillActive: (id: string, active: boolean) =>
+    request<{ ok: boolean; skill_id: string; active: boolean }>(
+      `/api/skills/${encodeURIComponent(id)}/active`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active }),
+      },
+    ),
+  downloadSkill: (id: string) =>
+    requestBlob(`/api/skills/${encodeURIComponent(id)}/download`),
+  deleteSkill: (id: string) =>
+    request<{ ok: boolean; skill_id: string }>(`/api/skills/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
+
   extensions: () => request<ExtensionsOverview>("/api/extensions"),
   projectFiles: (id: string) =>
     request<ProjectFilesView>(`/api/projects/${encodeURIComponent(id)}/files`),

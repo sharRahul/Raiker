@@ -2859,11 +2859,8 @@ class DashboardService:
         """
         if recurrence is not None and recurrence not in TASK_RECURRENCES:
             raise ValueError(f"invalid_recurrence:{recurrence}")
-        is_schedule = scheduled_at is not None or recurrence is not None
         if bool(model_profile) != bool(model):
             raise ValueError("task_model_pair_required")
-        if is_schedule and model_profile:
-            raise ValueError("scheduled_task_uses_global_model")
         if model_profile and model:
             try:
                 profile = ModelProfileRegistry.load().resolve_profile_id(model_profile)

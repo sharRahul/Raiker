@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StreamEvent } from "./apiTypes";
-import { reactionForResponse, thinkingSteps } from "./chatPresentation";
+import { reactionForPrompt, thinkingSteps } from "./chatPresentation";
 
 describe("chat presentation", () => {
   it("turns recognised lifecycle events into safe conversational thinking steps", () => {
@@ -17,14 +17,14 @@ describe("chat presentation", () => {
     ]);
   });
 
-  it("adds one warm reaction when Raiker's response signals appreciation", () => {
-    expect(reactionForResponse("You're welcome — happy to help!")).toEqual({
-      emoji: "❤️",
-      label: "Heart",
+  it("adds Raiker's reaction to the user's greeting", () => {
+    expect(reactionForPrompt("Hello Raiker")).toEqual({
+      emoji: "👋",
+      label: "Waving hand",
     });
   });
 
-  it("does not attach a reaction to a neutral factual response", () => {
-    expect(reactionForResponse("Paris is the capital of France.")).toBeNull();
+  it("does not attach a reaction to a neutral user prompt", () => {
+    expect(reactionForPrompt("What is the capital of France?")).toBeNull();
   });
 });

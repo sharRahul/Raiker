@@ -257,6 +257,8 @@ from raiker.storage.migrations import (
     SESSION_ORIGIN_SQL,
     SESSION_TAGS_MIGRATION_ID,
     SESSION_TAGS_SQL,
+    SKILLS_MIGRATION_ID,
+    SKILLS_SQL,
     STANDING_GRANTS_MIGRATION_ID,
     STANDING_GRANTS_SQL,
     SUBAGENT_BUDGETS_MIGRATION_ID,
@@ -810,6 +812,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 TASK_ATTACHMENTS_MIGRATION_ID, TASK_ATTACHMENTS_SQL, connection
             )
+            self._apply_migration(SKILLS_MIGRATION_ID, SKILLS_SQL, connection)
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -1977,6 +1980,161 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                    SET monitor_state = ?, paused_reason = ?, paused_at = ?
                    WHERE server_id = ? AND principal_id = ?""",
                 (monitor_state, paused_reason, paused_at, server_id, principal_id),
+            )
+            return cursor.rowcount > 0
+
+    # ── Installed skills (SKILL.md documents and *.skill bundles) ────────────
+
+    @staticmethod
+    def _skill_row(row: sqlite3.Row | None) -> dict[str, Any] | None:
+        if row is None:
+            return None
+        data = dict(row)
+        raw = data.get("files_json")
+        try:
+            data["files"] = json.loads(raw) if isinstance(raw, str) else []
+        except (TypeError, ValueError):
+            data["files"] = []
+        data["active"] = bool(data.get("active", 0))
+        return data
+
+    def upsert_skill(
+        self,
+        *,
+        skill_id: str,
+        principal_id: str,
+        name: str,
+        description: str,
+        checksum: str,
+        skill_md: str,
+        source: str,
+        source_ref: str | None = None,
+        version: str | None = None,
+        bundle: bytes | None = None,
+        files: list[str] | None = None,
+        byte_size: int = 0,
+        active: bool = True,
+    ) -> str:
+        """Insert or refresh one owner-scoped skill, keyed by ``(owner, name)``.
+
+        Re-importing the same skill replaces the stored document in place — its
+        ``skill_id``, its created-at, and the owner's active/inactive choice all
+        survive the refresh, so an update never silently re-enables a skill the
+        owner had turned off.
+        """
+        now = utc_now()
+        with self.connect() as connection:
+            existing = connection.execute(
+                "SELECT skill_id, created_at, active FROM skills WHERE principal_id = ? AND name = ?",
+                (principal_id, name),
+            ).fetchone()
+            resolved_id = str(existing["skill_id"]) if existing else skill_id
+            created_at = str(existing["created_at"]) if existing else now
+            resolved_active = bool(existing["active"]) if existing else active
+            connection.execute(
+                """INSERT OR REPLACE INTO skills
+                   (skill_id, principal_id, name, description, version, source, source_ref,
+                    checksum, active, skill_md, bundle, files_json, byte_size,
+                    created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    resolved_id,
+                    principal_id,
+                    name,
+                    description,
+                    version,
+                    source,
+                    source_ref,
+                    checksum,
+                    1 if resolved_active else 0,
+                    skill_md,
+                    bundle,
+                    json.dumps(list(files or [])),
+                    int(byte_size),
+                    created_at,
+                    now,
+                ),
+            )
+        return resolved_id
+
+    def list_skills(self, principal_id: str) -> list[dict[str, Any]]:
+        """Owner-scoped list, newest first. Bundles are excluded — the archive is
+        only read on an explicit download."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT skill_id, principal_id, name, description, version, source,
+                          source_ref, checksum, active, skill_md, files_json, byte_size,
+                          created_at, updated_at
+                   FROM skills WHERE principal_id = ? ORDER BY created_at DESC""",
+                (principal_id,),
+            ).fetchall()
+        return [row for row in (self._skill_row(r) for r in rows) if row is not None]
+
+    def get_skill(self, skill_id: str, principal_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM skills WHERE skill_id = ? AND principal_id = ?",
+                (skill_id, principal_id),
+            ).fetchone()
+        return self._skill_row(row)
+
+    def get_skill_by_name(self, principal_id: str, name: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM skills WHERE principal_id = ? AND name = ?",
+                (principal_id, name),
+            ).fetchone()
+        return self._skill_row(row)
+
+    def rename_skill(self, skill_id: str, principal_id: str, name: str) -> bool:
+        """Owner-scoped rename. False when the row is missing, owned by another
+        principal, or the new name is already taken by another of the owner's
+        skills (names are the prompt handle, so they stay unique per owner)."""
+        with self.connect() as connection:
+            clash = connection.execute(
+                "SELECT 1 FROM skills WHERE principal_id = ? AND name = ? AND skill_id != ?",
+                (principal_id, name, skill_id),
+            ).fetchone()
+            if clash is not None:
+                return False
+            cursor = connection.execute(
+                "UPDATE skills SET name = ?, updated_at = ? WHERE skill_id = ? AND principal_id = ?",
+                (name, utc_now(), skill_id, principal_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_skill_active(self, skill_id: str, principal_id: str, active: bool) -> bool:
+        """Owner-scoped activate/deactivate. A deactivated skill stays stored but
+        is withheld from every turn's context."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE skills SET active = ?, updated_at = ? WHERE skill_id = ? AND principal_id = ?",
+                (1 if active else 0, utc_now(), skill_id, principal_id),
+            )
+            return cursor.rowcount > 0
+
+    def seeded_skill_names(self, principal_id: str) -> set[str]:
+        """Shipped skills this owner has already been offered, installed or not."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT name FROM skill_seeds WHERE principal_id = ?", (principal_id,)
+            ).fetchall()
+        return {str(row["name"]) for row in rows}
+
+    def record_skill_seed(self, principal_id: str, name: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO skill_seeds (principal_id, name, seeded_at) VALUES (?, ?, ?)",
+                (principal_id, name, utc_now()),
+            )
+
+    def delete_skill(self, skill_id: str, principal_id: str) -> bool:
+        """Owner-scoped delete. False when the row is missing or owned by another
+        principal (isolation)."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM skills WHERE skill_id = ? AND principal_id = ?",
+                (skill_id, principal_id),
             )
             return cursor.rowcount > 0
 

@@ -479,6 +479,21 @@ def test_running_raiker_app_with_no_command_still_means_start(tmp_path: Path) ->
     assert args.port == 8765
 
 
+def test_common_options_work_before_or_after_a_subcommand(tmp_path: Path) -> None:
+    """A subparser must not erase a workspace already parsed by the root."""
+    from apps.api.launcher import build_parser
+
+    before = build_parser().parse_args(
+        ["--workspace", str(tmp_path), "--port", "8877", "service", "install"]
+    )
+    after = build_parser().parse_args(
+        ["service", "install", "--workspace", str(tmp_path), "--port", "8877"]
+    )
+
+    assert before.workspace == after.workspace == str(tmp_path)
+    assert before.port == after.port == 8877
+
+
 # ── helpers ──────────────────────────────────────────────────────────────
 
 

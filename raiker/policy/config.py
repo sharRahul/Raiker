@@ -24,6 +24,9 @@ class StaticPolicyConfig:
                 "memory_search",
                 "memory_list",
                 "memory_get",
+                # Reading an installed skill is a local, owner-scoped read of
+                # the owner's own instruction document. Nothing is executed.
+                "skill_load",
                 "vector_get",
                 # The consult itself is gated inside the tool (advisor gate +
                 # decision mode + provider policy); the proposal is read-shaped.

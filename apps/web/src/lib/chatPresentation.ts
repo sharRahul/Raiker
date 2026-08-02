@@ -31,7 +31,7 @@ export function thinkingSteps(events: StreamEvent[]): string[] {
   return [...new Set(steps)];
 }
 
-export function reactionForResponse(answer: string): ChatReaction | null {
-  if (answer.trim() === "") return null;
-  return REACTIONS.find(({ pattern }) => pattern.test(answer))?.reaction ?? null;
+export function reactionForPrompt(prompt: string): ChatReaction | null {
+  if (prompt.trim() === "") return null;
+  return REACTIONS.find(({ pattern }) => pattern.test(prompt))?.reaction ?? null;
 }

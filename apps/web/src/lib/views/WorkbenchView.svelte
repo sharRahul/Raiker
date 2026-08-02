@@ -64,6 +64,8 @@
   let buildModel = $state("");
   let taskProfile = $state("");
   let taskModel = $state("");
+  let scheduleProfile = $state("");
+  let scheduleModel = $state("");
   let updatedAt = $state<Date | null>(null);
 
   const activeTasks = $derived(
@@ -74,10 +76,10 @@
   );
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
   const chosenProfile = $derived(
-    workMode === "chat" ? chatProfile : workMode === "build" ? buildProfile : workMode === "task" ? taskProfile : "",
+    workMode === "chat" ? chatProfile : workMode === "build" ? buildProfile : workMode === "task" ? taskProfile : scheduleProfile,
   );
   const chosenModel = $derived(
-    workMode === "chat" ? chatModel : workMode === "build" ? buildModel : workMode === "task" ? taskModel : "",
+    workMode === "chat" ? chatModel : workMode === "build" ? buildModel : workMode === "task" ? taskModel : scheduleModel,
   );
   const effectiveModel = $derived(
     profiles.find((profile) => profile.profile_id === chosenProfile && profile.model === chosenModel) ?? selectedProfile,
@@ -132,8 +134,8 @@
           text,
           cadence: workMode === "schedule" ? "once" : "now",
           scheduledAt: workMode === "schedule" ? scheduleAt : "",
-          profileId: workMode === "task" ? effectiveModel.profile_id : null,
-          model: workMode === "task" ? effectiveModel.model : null,
+          profileId: effectiveModel.profile_id,
+          model: effectiveModel.model,
           attachments,
         },
       })), 0);
@@ -211,7 +213,7 @@
             <div class="scope-fact"><span class="field-label">Start as</span><p>{workMode === "build" ? "A new build conversation" : workMode === "task" ? "A task run" : "A scheduled run"}</p></div>
           {/if}
           <div class="scope-fact"><span class="field-label">Project</span><p>{activeProject?.name ?? "No project"}</p></div>
-          <div><span class="field-label">Model</span>{#if workMode === "chat"}<ModelPicker {profiles} {selectedProfile} bind:profileId={chatProfile} bind:model={chatModel} />{:else if workMode === "build"}<ModelPicker {profiles} {selectedProfile} bind:profileId={buildProfile} bind:model={buildModel} />{:else if workMode === "task"}<ModelPicker {profiles} {selectedProfile} bind:profileId={taskProfile} bind:model={taskModel} />{:else}<p class="global-model">Global at run time — {selectedProfile?.model ?? "not selected"}</p>{/if}</div>
+          <div><span class="field-label">Model</span>{#if workMode === "chat"}<ModelPicker {profiles} {selectedProfile} bind:profileId={chatProfile} bind:model={chatModel} />{:else if workMode === "build"}<ModelPicker {profiles} {selectedProfile} bind:profileId={buildProfile} bind:model={buildModel} />{:else if workMode === "task"}<ModelPicker {profiles} {selectedProfile} bind:profileId={taskProfile} bind:model={taskModel} />{:else}<ModelPicker {profiles} {selectedProfile} bind:profileId={scheduleProfile} bind:model={scheduleModel} />{/if}</div>
         </div>
         {#if effectiveModel === null}<p class="model-error" role="alert"><strong>A model is required before work can start.</strong> <a href="#/models">Choose a model</a> or ask an administrator.</p>{/if}
         <details class="governed"><summary><Icon name="shield" size={14} /> Governed execution</summary><p>Raiker requests your approval before restricted external actions. Project boundaries and connected-tool policies still apply.</p></details>

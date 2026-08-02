@@ -174,6 +174,18 @@ EVENT_TYPES = {
     # payload is redacted metadata only (name, transport, host) — never a token.
     "mcp_connection_added",
     "mcp_connection_removed",
+    # Installed-skill lifecycle. A skill is instruction text, so these record
+    # what the owner installed, renamed, turned on or off, and removed — the
+    # payload is metadata (name, source, checksum, sizes), never the document.
+    # `skills_indexed` records how many active skills a turn advertised.
+    "skill_installed",
+    "skill_imported",
+    "skill_built",
+    "skill_renamed",
+    "skill_activated",
+    "skill_deactivated",
+    "skill_deleted",
+    "skills_indexed",
     # A repository reference was connected to, or removed from, the Build
     # workspace: a workspace-contained local subpath, or a GitHub `owner/repo`
     # coordinate. The payload is the reference only — never a credential — and
@@ -364,6 +376,7 @@ TOOLS = {
     "memory_forget",
     "memory_list",
     "memory_get",
+    "skill_load",
     "shell",
 }
 POLICY_DECISIONS = {"allow", "deny", "needs_approval", "allow_managed"}

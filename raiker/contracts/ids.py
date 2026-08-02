@@ -72,6 +72,8 @@ _PREFIXES = {
     "dep_",
     "pg_",
     "skc_",
+    # An installed skill: a validated SKILL.md document, or a *.skill bundle.
+    "skl_",
     "ra_",
     "rm_",
     "rtn_",

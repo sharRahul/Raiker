@@ -16,6 +16,49 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
+### Windows PowerShell
+
+The editable package-install step above installs `raiker-app` into the virtual
+environment. Activate that environment before running the command:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+raiker-app --print-paths
+```
+
+If PowerShell reports that `raiker-app` is not recognized, either the virtual
+environment is not active or the package was not installed into it. From the
+Raiker repository, reinstall it and try again:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python.exe -m pip install -e ".[dev]"
+Get-Command raiker-app
+raiker-app
+```
+
+You can also invoke the installed executable directly without activating the
+environment:
+
+```powershell
+.\.venv\Scripts\raiker-app.exe
+```
+
+If reinstalling reports `WinError 32` for `raiker-app.exe`, a running Raiker
+host is holding the Windows entry point open. Stop that instance, reinstall,
+and start it again:
+
+```powershell
+raiker-app quit --workspace .
+python.exe -m pip install -e ".[dev]"
+raiker-app --workspace .
+```
+
+If the failed reinstall has already made `raiker-app` unavailable, close the
+running Raiker process from Task Manager and rerun the `pip install` command.
+The `ModuleNotFoundError: No module named 'apps'` message after this failure is
+a consequence of the interrupted editable install, not a separate problem.
+
 Build the dashboard once (and again after any UI change):
 
 ```bash
@@ -26,11 +69,32 @@ npm --prefix apps/web run build
 ## Run
 
 ```bash
+raiker-app --workspace .
+```
+
+`raiker-app` is the primary application command. It starts Raiker on loopback
+and opens the dashboard in your default browser. Passing `--workspace .` keeps
+runtime state in `.raiker/` inside the repository. Use the same workspace for
+every lifecycle command, including background startup:
+
+```bash
+raiker-app --workspace . service install
+raiker-app service status --workspace .
+raiker-app status --workspace .
+```
+
+Run `raiker-app --help` for pause, resume, quit, service, and uninstall
+commands.
+
+For explicit server control without the application lifecycle wrapper, use
+`raiker-web`:
+
+```bash
 raiker-web --workspace . --no-browser
 ```
 
-Raiker binds `127.0.0.1:8765` and serves both the API and the built SPA. Open
-<http://127.0.0.1:8765>.
+It binds `127.0.0.1:8765` by default and serves both the API and the built SPA.
+Open <http://127.0.0.1:8765>.
 
 Useful flags:
 

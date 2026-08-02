@@ -76,6 +76,37 @@ an error. Authorisation is re-checked against the caller at read time — owning
 memory is not owning its source — and `not_authorized` reveals nothing about
 whether the source exists.
 
+The skill routes (`GET|POST /api/skills`, `POST /api/skills/verify`,
+`POST /api/skills/import`, `POST /api/skills/build`,
+`GET /api/skills/{skill_id}/download`, `PUT /api/skills/{skill_id}`,
+`PUT /api/skills/{skill_id}/active`, `DELETE /api/skills/{skill_id}`) are
+owner-scoped CRUD over validated instruction documents. A skill adds no
+capability and executes nothing, so these are not a governed runtime path — but
+each carries its own contract:
+
+* **Upload** takes a base64 `SKILL.md` or `*.skill` and validates before storage
+  (extension allowlist, 2 MB bundle cap, frontmatter contract, archive-member
+  safety). Refusals answer `422` with a stable `reason_code`
+  (`skill_missing_description`, `skill_invalid_name`, `skill_unsafe_member_path`,
+  `skill_too_large`, …); `400` means the base64 itself was unreadable.
+* **Verify** fetches a linked document through the sandbox egress boundary
+  against the published-skill host allowlist and reports the document's real
+  name, description, checksum, and whether that name is already installed —
+  storing nothing. **Import** does the same and stores. An unsupported host is
+  `skill_unsupported_source` *before* any request is made; a `.skill` archive URL
+  is `skill_archive_url_unsupported`, because that path is deliberately
+  text-only.
+* **List** returns metadata and the owner's active choice, never the stored
+  document or archive. **Download** returns an uploaded archive byte-for-byte,
+  or packs a bare document into `<name>.skill` on demand.
+* Re-installing under an existing name refreshes that row in place and preserves
+  its `skill_id`, its created-at, and the owner's active/inactive choice, so an
+  update never silently re-enables a skill the owner turned off.
+* A row belonging to another principal answers `404`, the same as a missing one.
+
+Every mutation appends a `skill_*` event carrying metadata only — name, source,
+checksum, sizes — never the document text.
+
 A persisted principal is resolved for each authenticated request. The durable
 `runtime_mode_state` (one runtime, `raiker_runtime`, whose `status` is `active`
 or `disabled`) and `capability_gate_state` records are the source of

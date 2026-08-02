@@ -30,7 +30,7 @@ manifest, pairing, or managed policy.
 |---|---|---|---|---|---|
 | **Tools** | New actions the agent can take | Tool broker registry | Broker → policy → (approval) → execute | ✅ built-in tools real; plugin tools planned | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
 | **Hooks** | Logic at lifecycle points (pre/post tool, session, prompt) | Hook config (scoped) | Hook dispatcher with bounded decision authority | ✅ implemented (`builtin`+`command`); `http`/`mcp_tool`/`prompt`/`agent` deferred | `docs/HOOKS_SPEC.md`, `raiker/hooks/` |
-| **Skills** | Reusable prompt-driven procedures (`/name`) | Skill manifest / frontmatter | Run through the agent loop, not a new tool | 📘 spec (tied to self-improvement) | `docs/SELF_IMPROVEMENT_MODEL.md`, `docs/PLUGIN_SYSTEM_SPEC.md` |
+| **Skills** | Reusable instruction documents (`SKILL.md`, `*.skill`) | Frontmatter validated on install; owner-scoped store | Indexed into the turn; body read through the governed `skill_load` tool | ✅ implemented (`raiker/skills/`, Extensions → Skills) | `docs/guide/extensions-and-mcp.md`, `docs/SELF_IMPROVEMENT_MODEL.md` |
 | **Plugins** | Bundles of tools + hooks + skills + channels + servers | Plugin manifest + permission diff | Components register through their own surfaces; nothing auto-executes | 🔒 manifest validation only | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` |
 | **Channels** | New interfaces/transports (chat, webhook, voice) | Connector profile + pairing | Inbound normalises to `ChannelMessageEnvelope` → gateway → same runtime | 🔒 registry only, no transport | `docs/CHANNELS_SPEC.md` |
 
@@ -109,7 +109,24 @@ plan with execution disabled).
 - **Hooks:** **implemented** (`raiker/hooks/`) — `builtin` + `command` handlers, scoped config,
   decision authority, and lifecycle dispatch wired through the broker and gateway. `http`,
   `mcp_tool`, `prompt`, and `agent` handlers are deferred until their gated surfaces exist.
-- **Skills:** specified via `docs/SELF_IMPROVEMENT_MODEL.md`; no runtime yet.
+- **Skills:** **implemented** (`raiker/skills/`, `raiker/api/routes_skills.py`, Extensions →
+  Skills). A skill is instruction text, never code Raiker executes, which is why it is the one
+  surface with no capability gate of its own: it cannot add authority, so there is nothing to
+  gate. What it *can* do is influence a turn, so the boundaries that exist are about integrity
+  and scope rather than execution:
+  - **Validation before storage.** `raiker/skills/package.py` is the trust boundary for an
+    uploaded file. It parses frontmatter without a real deserializer, and rejects absolute
+    members, parent-directory escapes, symlinks, oversized entries, and zip bombs before a byte
+    is written. Nothing in that module imports, runs, or evaluates what it reads.
+  - **Owner scope.** Every read and mutation is keyed to the installing principal, and
+    mutations are human-only. One owner's skill is invisible to another.
+  - **Egress.** Import reaches only the published-skill hosts, through the existing sandbox
+    egress boundary, against this module's own allowlist rather than a model-supplied one.
+  - **Withholding is real.** A deactivated skill is absent from the turn index *and* refused by
+    `skill_load`, so turning one off withholds it rather than hiding it.
+  - **Progressive disclosure.** Only the index (one line per active skill) enters a turn. The
+    body, and any one bundled file, are read on demand through the broker like any other
+    governed read — so they appear in the tool-action record and the event log.
 
-The remaining piece to complete this model is a skills runtime; like hooks, it must register
-through — and be gated by — the existing broker/policy/event infrastructure.
+The remaining pieces to complete this model are plugin execution and channel transport; both
+must register through — and be gated by — the existing broker/policy/event infrastructure.

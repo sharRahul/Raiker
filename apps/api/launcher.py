@@ -212,15 +212,25 @@ def _resolve_ui_dir() -> Path | None:
     return None
 
 
-def _add_common(parser: argparse.ArgumentParser) -> None:
-    """The two options every subcommand needs to talk about the same host."""
+def _add_common(parser: argparse.ArgumentParser, *, preserve_parent: bool = False) -> None:
+    """The two options every subcommand needs to talk about the same host.
+
+    Subparsers accept these options so either CLI order is natural. Their
+    absent defaults must not overwrite values already parsed by the root
+    parser, though: ``raiker-app --workspace X service install`` and
+    ``raiker-app service install --workspace X`` must name the same instance.
+    """
+    default = argparse.SUPPRESS if preserve_parent else None
     parser.add_argument(
         "--workspace",
-        default=None,
+        default=default,
         help="Where Raiker keeps its data (default: this platform's application-data directory).",
     )
     parser.add_argument(
-        "--port", type=int, default=DEFAULT_PORT, help=f"Preferred port (default: {DEFAULT_PORT})."
+        "--port",
+        type=int,
+        default=argparse.SUPPRESS if preserve_parent else DEFAULT_PORT,
+        help=f"Preferred port (default: {DEFAULT_PORT}).",
     )
 
 
@@ -247,17 +257,17 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
 
     status = sub.add_parser("status", help="Report whether the host is running, paused, or stopped.")
-    _add_common(status)
+    _add_common(status, preserve_parent=True)
 
     pause = sub.add_parser("pause", help="Stop starting new background work.")
-    _add_common(pause)
+    _add_common(pause, preserve_parent=True)
     pause.add_argument("--reason", default=None, help="Why, recorded alongside the pause.")
 
     resume = sub.add_parser("resume", help="Start scheduled background work again.")
-    _add_common(resume)
+    _add_common(resume, preserve_parent=True)
 
     quit_parser = sub.add_parser("quit", help="Stop the host, reporting waiting work first.")
-    _add_common(quit_parser)
+    _add_common(quit_parser, preserve_parent=True)
     quit_parser.add_argument(
         "--force", action="store_true", help="Stop even when background work is in flight."
     )
@@ -265,7 +275,7 @@ def build_parser() -> argparse.ArgumentParser:
     service = sub.add_parser(
         "service", help="Register the host to start in the background with this platform."
     )
-    _add_common(service)
+    _add_common(service, preserve_parent=True)
     service.add_argument("action", choices=("install", "status", "uninstall"))
     service.add_argument(
         "--no-activate",
@@ -298,7 +308,7 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("--channel-name", default="stable", help="Channel name (default: stable).")
 
     remove = sub.add_parser("uninstall", help="State what removing Raiker takes, and take it.")
-    _add_common(remove)
+    _add_common(remove, preserve_parent=True)
     remove.add_argument(
         "--data",
         choices=("keep", "export", "erase"),

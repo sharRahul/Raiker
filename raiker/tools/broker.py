@@ -42,6 +42,7 @@ from raiker.tools.memory_tools import (
     memory_search,
 )
 from raiker.tools.search import glob, grep
+from raiker.tools.skill_tools import skill_load
 from raiker.tools.vector_tools import vector_get
 
 if TYPE_CHECKING:
@@ -181,6 +182,12 @@ class ToolBroker:
             "memory_get": lambda args: memory_get(
                 self.workspace_root,
                 str(args.get("memory_id", "")),
+                owner_principal_id=self.owner_scope,
+            ),
+            "skill_load": lambda args: skill_load(
+                self.workspace_root,
+                str(args.get("name", "")),
+                file=str(args["file"]) if args.get("file") else None,
                 owner_principal_id=self.owner_scope,
             ),
             "vector_get": lambda args: vector_get(

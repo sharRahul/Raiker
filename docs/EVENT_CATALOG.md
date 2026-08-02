@@ -31,6 +31,14 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 | `task_completed` | A task finished; the payload carries its summary |
 | `task_failed` | A task ended in failure; the payload always states a reason, substituting a stated one when the run left none |
 | `task_cancelled` | A task was stopped at a safe boundary, with the reason it was stopped |
+| `skill_installed` | A skill was uploaded and stored (name, source, checksum, byte size, file count — never the document) |
+| `skill_imported` | A skill was fetched from a verified link and stored; the payload names the raw URL it came from |
+| `skill_built` | A skill was authored in Raiker and stored, held to the same validation as an upload |
+| `skill_renamed` | An installed skill's name — its prompt handle — was changed |
+| `skill_activated` | A skill was turned on, so its index entry reaches turns again |
+| `skill_deactivated` | A skill was turned off; it stays stored and is withheld from every turn |
+| `skill_deleted` | A skill's stored document was removed from the workspace |
+| `skills_indexed` | A turn advertised the owner's active skills to the model (count and names only — bodies are loaded on demand by `skill_load`) |
 | `checkpoint_created` | The gateway recorded a turn checkpoint |
 | `turn_closed` | The gateway finalised a turn |
 | `phase3.external_channels_notifications.readiness.metadata_defined` | External-channel readiness metadata was defined; runtime dispatch events are introduced only with a governed executor |

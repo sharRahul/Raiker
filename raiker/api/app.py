@@ -26,6 +26,7 @@ from raiker.api.routes_language import router as language_router
 from raiker.api.routes_memory import router as memory_router
 from raiker.api.routes_prompts import router as prompts_router
 from raiker.api.routes_settings import router as settings_router
+from raiker.api.routes_skills import router as skills_router
 from raiker.api.routes_updates import router as updates_router
 from raiker.api.routes_vault import router as vault_router
 from raiker.api.security import (
@@ -36,6 +37,7 @@ from raiker.api.security import (
 )
 from raiker.runtime.attachments import MAX_ATTACHMENT_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
+from raiker.skills.package import MAX_BUNDLE_BYTES as MAX_SKILL_BUNDLE_BYTES
 from raiker.tasks.wakeup import SchedulerWakeup
 
 # Paths whose responses must not be buffered/redacted by RedactionMiddleware:
@@ -305,7 +307,12 @@ def create_app(
     app.add_middleware(
         MaxBodySizeMiddleware,
         max_bytes=max_body_bytes,
-        path_overrides={"/api/attachments": (MAX_ATTACHMENT_BYTES * 4) // 3 + 4096},
+        path_overrides={
+            "/api/attachments": (MAX_ATTACHMENT_BYTES * 4) // 3 + 4096,
+            # A skill upload is a base64 `*.skill` archive, capped far tighter
+            # than an attachment (2 MB of bundle) but still above the default.
+            "/api/skills": (MAX_SKILL_BUNDLE_BYTES * 4) // 3 + 4096,
+        },
     )
     app.add_middleware(RateLimitMiddleware, max_requests=rate_limit_per_minute, window_seconds=60.0)
     app.add_middleware(SecurityHeadersMiddleware, hsts=hsts)
@@ -323,6 +330,7 @@ def create_app(
     app.include_router(approvals_router)
     app.include_router(channels_router)
     app.include_router(connectors_router)
+    app.include_router(skills_router)
     app.include_router(language_router)
     # Serve the built local web dashboard (apps/web/dist) from the same loopback origin, so the
     # dashboard launches with one command and the SPA's relative /api paths resolve directly.

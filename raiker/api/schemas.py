@@ -234,6 +234,50 @@ class UploadAttachmentRequest(BaseModel):
     data_base64: str
 
 
+class UploadSkillRequest(BaseModel):
+    """One base64-encoded ``SKILL.md`` or ``*.skill`` upload.
+
+    Validation is fail-closed server-side (extension allowlist, size caps,
+    frontmatter contract, archive-member safety); ``extra="forbid"`` rejects
+    unknown fields.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    filename: str
+    data_base64: str
+
+
+class SkillUrlRequest(BaseModel):
+    """A published skill's URL, to verify or to import."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+
+
+class BuildSkillRequest(BaseModel):
+    """A skill Raiker authored: the name, the trigger description, the body."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    description: str
+    body: str
+
+
+class RenameSkillRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+
+
+class SetSkillActiveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    active: bool
+
+
 class BrainSourceRequest(BaseModel):
     """An explicit file or folder already placed inside this Raiker workspace."""
 

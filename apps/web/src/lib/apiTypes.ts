@@ -66,6 +66,46 @@ export interface McpServer {
   paused_at: string | null;
 }
 
+/**
+ * One installed skill. `active` is the owner's own switch: an inactive skill
+ * stays stored and is withheld from every turn. The stored document is never
+ * carried in a list — it is read on an explicit download or by the runtime.
+ */
+export interface SkillView {
+  skill_id: string;
+  name: string;
+  description: string;
+  version: string | null;
+  source: "upload" | "url" | "builtin" | "built";
+  source_ref: string | null;
+  checksum: string;
+  active: boolean;
+  files: string[];
+  file_count: number;
+  byte_size: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** What a linked skill turned out to be, reported before anything is stored. */
+export interface SkillVerification {
+  ok: boolean;
+  verified: boolean;
+  name: string;
+  description: string;
+  version: string | null;
+  checksum: string;
+  byte_size: number;
+  source_url: string;
+  already_installed: boolean;
+}
+
+export interface SkillMutationResult {
+  ok: boolean;
+  skill_id: string;
+  skill?: SkillView;
+}
+
 export interface McpSession {
   session_row_id: string;
   server_id: string;

@@ -33,10 +33,11 @@
   import ComposerAttach from "../components/ComposerAttach.svelte";
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
+  import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, relativeTime } from "../format";
-  import { reactionForResponse, thinkingSteps } from "../chatPresentation";
+  import { reactionForPrompt, thinkingSteps } from "../chatPresentation";
   import { chatProfiles, refreshModels } from "../models.svelte";
 
   interface ChatTurn {
@@ -867,7 +868,7 @@
     {#each turns as turn (turn.id)}
       {@const answer = answerText(turn)}
       {@const thinking = thinkingSteps(turn.events)}
-      {@const reaction = reactionForResponse(answer)}
+      {@const reaction = reactionForPrompt(turn.prompt)}
       {@const uploadedAttachments = turn.attachments.filter((a) => a.source !== "generated")}
       {@const generatedFiles = turn.attachments.filter((a) => a.source === "generated")}
       <div class="turn">
@@ -875,6 +876,9 @@
           <div class="message-bubble message-bubble-user">
           <p class="bubble-text">{turn.prompt}</p>
           </div>
+          {#if !turn.streaming && reaction}
+            <span class="reaction" aria-label={`Raiker reacted with ${reaction.label}`}>{reaction.emoji}</span>
+          {/if}
           {#if uploadedAttachments.length > 0}
             <div class="turn-attachments">
               {#each uploadedAttachments as a, i (a.attachmentId ?? a.path ?? i)}
@@ -1121,9 +1125,6 @@
             </div>
           {/if}
 
-          {#if !turn.streaming && reaction}
-            <span class="reaction" aria-label={`Raiker reacted with ${reaction.label}`}>{reaction.emoji}</span>
-          {/if}
         </div>
       </div>
     {/each}
@@ -1138,6 +1139,7 @@
   >
     <div class="composer-card">
       <ComposerChips store={attachStore} disabled={streaming} />
+      <SkillLinkNotice text={promptText} />
 
       <label for="prompt-input" class="sr-only">Prompt</label>
       <div class="composer-upper">

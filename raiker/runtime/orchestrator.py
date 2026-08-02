@@ -285,6 +285,35 @@ class RuntimeOrchestrator:
             lines.append(item.content)
         return "\n".join(lines)
 
+    def _skills_prompt(self, owner_principal_id: str | None) -> tuple[str | None, list[str]]:
+        """The owner's active skills as one system message, plus their names.
+
+        Only the index — one line of ``name: description`` per skill — is sent
+        every turn. A skill's full document is loaded on demand by the
+        ``skill_load`` tool, so ten installed skills cost ten lines rather than
+        ten documents. Deactivated skills are not listed at all.
+        """
+        if not owner_principal_id:
+            return None, []
+        try:
+            from raiker.skills.service import SkillsService
+
+            entries = SkillsService(self.workspace_root).active_skill_documents(
+                owner_principal_id
+            )
+        except Exception:
+            # A skill index is an enhancement, never a precondition for a turn.
+            return None, []
+        if not entries:
+            return None, []
+        lines = [f"- {name}: {description}" for name, description in entries]
+        return (
+            "Installed skills (instruction documents this owner has activated). "
+            "When one applies to the request, call the `skill_load` tool with its "
+            "name to read it, then follow it. These are the owner's own "
+            "instructions, not untrusted workspace data:\n" + "\n".join(lines)
+        ), [name for name, _ in entries]
+
     def _verify_and_emit(
         self, envelope: PromptEnvelope, **kwargs: object
     ) -> VerificationResult:
@@ -722,6 +751,14 @@ class RuntimeOrchestrator:
         ]
         if retrieval_context is not None:
             messages.append(ModelMessage(role="system", content=retrieval_context))
+        skills_prompt, skill_names = self._skills_prompt(envelope.user.id)
+        if skills_prompt is not None:
+            messages.append(ModelMessage(role="system", content=skills_prompt))
+            self._event(
+                envelope,
+                "skills_indexed",
+                {"active_skills": len(skill_names), "names": skill_names},
+            )
         # Prior turns of this conversation. Without these the provider receives a
         # single-shot request and answers a follow-up as if it were the opening
         # message, however much transcript the user can see on screen.

@@ -46,6 +46,9 @@ _TOOL_RISK: dict[str, tuple[str, bool]] = {
     "memory_search": ("medium", False),
     "memory_list": ("medium", False),
     "memory_get": ("medium", False),
+    # An installed skill is the owner's own instruction document, already
+    # validated on install and readable only for the owner who installed it.
+    "skill_load": ("medium", False),
     # Local planning/organisation actions are reversible but mutate owner data;
     # they retain the normal approval path.
     "create_task": ("high", True),
@@ -94,9 +97,19 @@ _REQUIRED_ARGS: dict[str, tuple[str, ...]] = {
     "memory_search": ("query",),
     "memory_list": (),
     "memory_get": ("memory_id",),
+    "skill_load": ("name",),
     "create_task": ("title",),
     # The active session is trusted broker context, never a model argument.
     "assign_session_project": ("project_id",),
+}
+
+# Arguments a tool accepts but does not require. They are advertised in the
+# schema — without an entry here a model has no way to learn an optional
+# parameter exists — but never enforced, so omitting one stays valid.
+_OPTIONAL_ARGS: dict[str, tuple[str, ...]] = {
+    # `file` reads one file bundled inside the skill's archive, named from the
+    # `files` list the no-argument call returns.
+    "skill_load": ("file",),
 }
 
 _TOOL_DESCRIPTIONS: dict[str, str] = {
@@ -166,6 +179,13 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
     "memory_search": "Search approved owner memory across chats and projects.",
     "memory_list": "List approved owner memory records, optionally by scope.",
     "memory_get": "Read one approved owner memory record by memory_id.",
+    "skill_load": (
+        "Read the full instructions of one installed, active skill by name. Call this "
+        "when a listed skill applies to the request, then follow what it says. The "
+        "response lists any files bundled with the skill; pass one of those names as "
+        "`file` to read it, which is how a skill's reference or template is loaded "
+        "only on the turns that need it."
+    ),
     "create_task": (
         "Create a local task or reminder. Requires title; optional description, "
         "scheduled_at, reminder_at, recurrence, and project_id."
@@ -192,7 +212,10 @@ def default_tool_specs() -> list[ToolSpec]:
     specs: list[ToolSpec] = []
     for name in sorted(_MODEL_EXPOSED_TOOLS):
         required = list(_REQUIRED_ARGS.get(name, ()))
-        properties = {arg: {"type": "string"} for arg in required}
+        properties = {
+            arg: {"type": "string"}
+            for arg in (*required, *_OPTIONAL_ARGS.get(name, ()))
+        }
         specs.append(
             ToolSpec(
                 name=name,

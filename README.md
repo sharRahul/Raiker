@@ -25,8 +25,10 @@ python -m pip install -e ".[dev]"
 npm --prefix apps/web ci
 npm --prefix apps/web run build
 
-raiker-app                              # detects your OS, opens your browser
+raiker-app                              # detects your OS and opens your browser
 ```
+
+## `raiker-app` command
 
 `raiker-app` is the application entry point. It keeps its data where your
 platform expects an application to (`%LOCALAPPDATA%\Raiker` on Windows,
@@ -36,6 +38,9 @@ opens your default browser. If a Raiker is already running it opens that one
 rather than starting a second host over the same encrypted workspace. Run
 `raiker-app --print-paths` to see what it resolved.
 
+Installation and PowerShell command-not-found help are in
+[Getting started](docs/guide/getting-started.md#install).
+
 Subcommands cover the rest of the host's life. Bare `raiker-app` still means
 "start Raiker", so a desktop shortcut is unaffected:
 
@@ -44,10 +49,13 @@ raiker-app service install    # start in the background at sign-in, using your
                               # platform's own service manager: launchd on
                               # macOS, systemd --user on Linux, the Startup
                               # folder on Windows
+raiker-app service status     # show whether background startup is registered
+raiker-app service uninstall  # remove background startup registration
 raiker-app status             # running / paused / needs attention / stopped,
                               # and what background work is in flight
-raiker-app pause              # stop starting new background work; a run you
-raiker-app resume             # have already approved still finishes
+raiker-app pause              # stop starting new background work; already
+                              # approved work is allowed to finish
+raiker-app resume             # resume scheduled background work
 raiker-app quit               # stop the host, reporting waiting work first
 raiker-app uninstall          # print exactly what removal takes and what it
                               # keeps; add --yes to carry it out, and
@@ -56,6 +64,16 @@ raiker-app update             # what this build is: signed release, unsigned
                               # build, or source checkout. Add --check to ask
                               # the pinned channel, --apply to install what it
                               # offers, --rollback VERSION to go back
+```
+
+To keep project-local data in the repository workspace instead of the default
+platform data directory, pass `--workspace` consistently. Options work before
+or after the subcommand:
+
+```powershell
+raiker-app --workspace .
+raiker-app --workspace . service install
+raiker-app service status --workspace .
 ```
 
 The same controls are in the app: the **Host** control in the top bar reports
@@ -182,7 +200,11 @@ Highlights, each verified against a live instance:
   sequence with no silent hosted fallback; and per-provider token and API-cost
   accounting with each figure's source named.
 - **Extensions** — governed service connectors and Model Context Protocol
-  servers you can build, connect, monitor, and contain.
+  servers you can build, connect, monitor, and contain, plus **Skills**:
+  `SKILL.md` documents and `*.skill` bundles you upload, import from a
+  verified GitHub link, build in place, activate or deactivate, download, and
+  delete. A skill adds instructions only — it grants no capability and opens
+  no gate.
 - **Observability** — an append-only audit log, metadata-only checkpoints, and
   an honest readiness report derived from stored state, never a probe.
 

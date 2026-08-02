@@ -47,6 +47,10 @@ include = ["raiker*", "apps*"]
 
 [tool.setuptools.package-data]
 "raiker.config" = ["*.json"]
+# The skills Raiker ships live as reviewable directories in the source tree and
+# are packed into a *.skill bundle at install time, so every file in one has to
+# travel in the wheel — not just the SKILL.md.
+"raiker.skills" = ["builtin/*/SKILL.md", "builtin/*/*/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

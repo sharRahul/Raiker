@@ -10,11 +10,20 @@
   // interrupt — is what the owner actually needs and does not have to wait for
   // a signed installer to get. "Open Raiker" is the one tray action with no
   // meaning here: you are already looking at it.
+  //
+  // BUG-44 adds the other half of "understand whether it is running": what
+  // *this* Raiker is. A signed release from a channel, an unsigned test build,
+  // or a source checkout — read from the record the build wrote inside the
+  // artifact, so the panel cannot claim provenance the installation does not
+  // have. Applying an update is deliberately not offered here: replacing the
+  // tree this process runs from, from this process, is the wrong place for it.
   import Icon from "./Icon.svelte";
   import { api, ApiError } from "../api";
-  import type { HostStatusView } from "../apiTypes";
+  import type { HostStatusView, UpdateStatusView } from "../apiTypes";
 
   let host = $state<HostStatusView | null>(null);
+  let build = $state<UpdateStatusView | null>(null);
+  let checking = $state(false);
   let open = $state(false);
   let busy = $state(false);
   let notice = $state<string | null>(null);
@@ -39,6 +48,48 @@
       // control is concerned — but the page is still up, so say the honest
       // thing rather than blanking the control.
       host = null;
+    }
+    try {
+      // A local read: provenance, the pinned channel, and retained recovery
+      // points. It makes no outbound request, which is why it can run on open.
+      build = await api.hostUpdate();
+    } catch {
+      build = null;
+    }
+  }
+
+  // What the build line says, and how loudly. "Unsigned" is a warning because a
+  // build nobody signed is a build nobody can vouch for; a source checkout is
+  // neutral because that is simply what development looks like.
+  const BUILD_TONES: Record<string, string> = {
+    source_checkout: "neutral",
+    no_channel: "neutral",
+    unsigned_build: "warn",
+    up_to_date: "ok",
+    available: "warn",
+    unreachable: "warn",
+  };
+  const buildTone = $derived(BUILD_TONES[build?.state ?? ""] ?? "neutral");
+  const buildLabel = $derived(
+    build === null
+      ? "unknown"
+      : build.installation.packaged
+        ? build.installation.signed
+          ? "signed release"
+          : "unsigned build"
+        : "source checkout",
+  );
+
+  async function checkForUpdates() {
+    checking = true;
+    notice = null;
+    try {
+      build = await api.checkHostUpdate();
+      notice = build.message;
+    } catch {
+      notice = "The update check could not be carried out.";
+    } finally {
+      checking = false;
     }
   }
 
@@ -153,6 +204,51 @@
         {/if}
       </div>
 
+      <!-- BUG-44 — what this installation is. Never a claim the record does
+           not support: no record means "source checkout", stated plainly. -->
+      <div class="build" aria-label="Install and updates">
+        <h4>Install &amp; updates</h4>
+        {#if build === null}
+          <p class="quiet">This build could not be identified.</p>
+        {:else}
+          <dl class="property-list">
+            <dt>This build</dt>
+            <dd>
+              <span class={`state-pill tone-${buildTone}`}>{buildLabel}</span>
+              <span class="mono build-version">
+                {build.installation.version}{build.installation.target ? ` · ${build.installation.target}` : ""}
+              </span>
+            </dd>
+            <dt>Update channel</dt>
+            <dd>
+              {build.channel
+                ? `${build.channel.channel} · ${build.channel.url}`
+                : "Not configured — Raiker contacts no update service."}
+            </dd>
+            {#if build.recovery_points.length > 0}
+              <dt>Roll back to</dt>
+              <dd>{build.recovery_points.map((point) => point.version).join(", ")}</dd>
+            {/if}
+          </dl>
+          <p class="quiet build-message">{build.message}</p>
+          {#if build.available}
+            <p class="confirm" role="status">
+              Version {build.available.version} is available. Install it with
+              <code>raiker-app update --apply</code> — an update replaces the files this
+              host is running from, so it is applied from outside it.
+            </p>
+          {/if}
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm check-updates"
+            disabled={checking}
+            onclick={() => checkForUpdates()}
+          >
+            <Icon name="refresh" size={14} /> {checking ? "Checking…" : "Check for updates"}
+          </button>
+        {/if}
+      </div>
+
       {#if confirming}
         <p class="confirm" role="alert">
           {confirming === "quit" ? "Quitting" : "Restarting"} now would interrupt the work above.
@@ -216,7 +312,13 @@
   .state-pill.tone-danger { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); }
   .detail, .quiet, .foot { margin: 0; color: var(--text-2); font-size: 0.8rem; }
   .foot { color: var(--text-3); font-size: 0.72rem; }
-  .work h4 { margin: 0 0 0.35rem; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); }
+  .work h4, .build h4 { margin: 0 0 0.35rem; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); }
+  .build { display: grid; gap: 0.4rem; border-top: 1px solid var(--border); padding-top: var(--space-3); }
+  .build dd { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+  .build-version { font-size: 0.74rem; color: var(--text-2); }
+  .build-message { font-size: 0.76rem; }
+  .build code { font-size: 0.72rem; }
+  .check-updates { justify-self: start; }
   .work ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
   .work li { display: grid; gap: 0.1rem; font-size: 0.8rem; }
   .work li span { color: var(--text-2); font-size: 0.74rem; }

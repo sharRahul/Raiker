@@ -26,6 +26,7 @@ from raiker.api.routes_language import router as language_router
 from raiker.api.routes_memory import router as memory_router
 from raiker.api.routes_prompts import router as prompts_router
 from raiker.api.routes_settings import router as settings_router
+from raiker.api.routes_updates import router as updates_router
 from raiker.api.routes_vault import router as vault_router
 from raiker.api.security import (
     MaxBodySizeMiddleware,
@@ -314,6 +315,7 @@ def create_app(
     app.include_router(settings_router)
     app.include_router(control_router)
     app.include_router(host_router)
+    app.include_router(updates_router)
     app.include_router(dashboard_router)
     app.include_router(memory_router)
     app.include_router(prompts_router)

@@ -80,3 +80,20 @@ so every figure shown is the honest-gap path rather than a live model turn.
 The Models page is split by action category — Providers, Routing, Pricing,
 Posture — so each panel is one errand and a shareable location
 (`#/models?tab=pricing`).
+
+`197`–`200` are the live evidence for FIXED-92 and FIXED-93, captured on
+**2026-08-02** by
+[`apps/web/e2e/bug-44-47-live.spec.ts`](../../../apps/web/e2e/bug-44-47-live.spec.ts)
+against two real `raiker-web` hosts. `197` and `198` come from a source checkout
+holding an owner-entered Anthropic credential that answered a live
+`claude-haiku-4-5-20251001` turn in the same run. `200` comes from a host started
+**from inside a release artifact** built by `raiker-release`, with `PYTHONPATH`
+and `RAIKER_INSTALL_ROOT` pointing at the extracted payload, so the code
+answering is the artifact's own copy.
+
+| File | Records |
+|---|---|
+| `197-BUG-47-local-result-under-ollama-live.png` | The Ollama row holding its own test result, and the llama.cpp and LM Studio rows holding none |
+| `198-BUG-47-hosted-cards-keep-their-own-live.png` | Anthropic's own result under Anthropic; OpenAI, Gemini and OpenRouter unaffected |
+| `199-BUG-44-source-checkout-live.png` | Host control → Install & updates on a source checkout: no signature claimed, no channel configured, no outbound request |
+| `200-BUG-44-packaged-unsigned-build-live.png` | The same panel on a host running from a real release artifact: `0.1.0 · linux-x86_64`, reported as an **unsigned build** because that build did not run platform signing |

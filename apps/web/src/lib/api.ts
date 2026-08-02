@@ -20,6 +20,8 @@ import type {
   ConnectorStoreView,
   HostActionResult,
   HostStatusView,
+  UpdateCheckResult,
+  UpdateStatusView,
   Diagnostics,
   DiagnosticsExport,
   EventEntry,
@@ -292,6 +294,12 @@ export const api = {
   resumeHost: () => postJson<HostActionResult>("/api/host/resume", {}),
   quitHost: (confirm = false) => postJson<HostActionResult>("/api/host/quit", { confirm }),
   restartHost: (confirm = false) => postJson<HostActionResult>("/api/host/restart", { confirm }),
+  // ── Install provenance and the signed update channel (BUG-44) ──
+  // The read is local only: opening the panel must never be a way to cause an
+  // outbound request. The check is the one that asks, and only when the owner
+  // has pinned a channel.
+  hostUpdate: () => request<UpdateStatusView>("/api/host/update"),
+  checkHostUpdate: () => postJson<UpdateCheckResult>("/api/host/update/check", {}),
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   models: () => request<ModelsView>("/api/models"),

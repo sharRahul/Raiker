@@ -100,6 +100,23 @@ round trip; the signal that continues it is covered by
 `tests/test_api_host.py`. The credential was entered through the product UI and
 is not stored in the repository or test artifacts.
 
+FIXED-92 and FIXED-93 were verified on **2026-08-02** against two running
+`raiker-web` hosts. The first is a source checkout holding an owner-entered
+Anthropic credential and answering a live `claude-haiku-4-5-20251001` turn; the
+second was started **from inside a release artifact** this change's pipeline
+built, with `PYTHONPATH` and `RAIKER_INSTALL_ROOT` pointing at the extracted
+payload, so the code answering is the artifact's own copy and the provenance it
+reports comes from the `installation.json` that build wrote. The live scenario is
+[`e2e/bug-44-47-live.spec.ts`](../../apps/web/e2e/bug-44-47-live.spec.ts), and
+its screenshots are `working/197-*` through `working/200-*`. The same run
+executes the release commands `.github/workflows/release.yml` runs — the signed
+channel index, the verification an installed Raiker performs, the packaging smoke
+test, and the native `.deb` — because a browser cannot screenshot `dpkg-deb` but
+a run either produces a verifiable release or it does not. That artifact was
+built **without platform signing**, and every surface says so; the credential was
+entered through the product UI and is not stored in the repository or test
+artifacts.
+
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | FIXED-01 | High | Models | Fixed |
@@ -189,13 +206,16 @@ is not stored in the repository or test artifacts.
 | FIXED-85 | Medium | Settings / concurrent load | Fixed (found while verifying BUG-37) |
 | FIXED-86 | Low | Design system / visual language | Fixed (was BUG-37) |
 | FIXED-87 | Low | Scheduler / continuation latency | Fixed (was BUG-39) |
-| FIXED-88 | Medium | Distribution / host lifecycle | Fixed (was BUG-40, less packaging — see BUG-44) |
+| FIXED-88 | Medium | Distribution / host lifecycle | Fixed (was BUG-40, less packaging — closed by FIXED-92) |
 | FIXED-89 | Low | Web / e2e regression suite | Fixed (was BUG-41) |
 | FIXED-90 | Medium | Terminal / approval execution | Fixed (was BUG-32) |
-| BUG-44 | Medium | Distribution / signed installers and updates | Open (split out of BUG-40) |
+| FIXED-92 | Medium | Distribution / release pipeline and signed updates | Fixed (was BUG-44, less the wizard and tray — see BUG-48) |
 | FIXED-91 | Low | Storage / per-request key derivation | Fixed (was BUG-45) |
 | BUG-46 | Medium | Storage / Windows locked memory | Open (found while verifying FIXED-91) |
-| BUG-47 | Low | Models / provider test feedback | Open (found during live verification) |
+| FIXED-93 | Low | Models / provider test feedback | Fixed (was BUG-47) |
+| BUG-48 | Medium | Distribution / setup wizard and native tray | Open (split out of BUG-44) |
+| BUG-49 | Low | CI / release workflow action pinning | Open (found while building the release workflow) |
+| BUG-50 | Medium | Storage / connection cache holds every workspace open | Open (found while verifying FIXED-92) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
 
@@ -3064,7 +3084,7 @@ cross-thread path, and the Chat/scheduled scoping) and
 ## FIXED-88 — `raiker-app` installs, registers, controls and removes itself *(was BUG-40)*
 
 **Status: fixed in this change for the lifecycle; the signed-installer and
-signed-update rows are split out as BUG-44.**
+signed-update rows were split out as BUG-44, and are closed by FIXED-92.**
 
 **Observed.** FIXED-66 made Raiker *start* like an application once Python and
 the package were present. Everything around that start was unimplemented:
@@ -3126,7 +3146,7 @@ says so rather than exiting and leaving a dead URL. When Raiker *is* registered,
 the process exits 75, a status both `launchd` and the generated `systemd` unit
 are configured to restart on.
 
-**What is deliberately not done, and is now BUG-44:** signed installers
+**What was deliberately not done, became BUG-44, and is now FIXED-92:** signed installers
 (`.dmg`/`.pkg`, `.msi`, AppImage, `.deb`) and the signed-update channel with
 atomic migration and rollback. Both need code-signing identities and per-OS
 release runners; neither can be honestly built from a source checkout, and an
@@ -3140,7 +3160,8 @@ second, informed press before it stops. Uninstall states exactly what will be
 removed and what will be kept before it removes anything.
 
 The control is in the top bar rather than the OS tray: a native tray needs a
-packaged, signed binary per platform (BUG-44), and the behaviour an owner
+packaged, signed binary per platform (BUG-44, now FIXED-92 for the build
+and BUG-48 for the tray itself), and the behaviour an owner
 actually needs — an honest state, in-flight work named, and a quit that says what
 it would interrupt — should not wait for that. "Open Raiker" is the one tray
 action with no meaning in-app: you are already looking at it.
@@ -3188,54 +3209,223 @@ green on every pull request that touches `apps/web/`.
 
 ---
 
-## BUG-44 — Raiker has no signed installer and no signed update channel
+## FIXED-92 — A manually-triggered release pipeline, and a signed update channel *(was BUG-44)*
 
-**Status: open; split out of BUG-40 (see FIXED-88).**
+**Status: fixed in this change for the release pipeline and the update channel;
+the first-run wizard and the native tray icon are split out as BUG-48.**
 
-**Observed.** FIXED-88 implements the lifecycle around the host — background
-registration, pause, restart, quit with waiting work stated, and a removal that
-says what it takes. What it does not implement is the two rows of
-`docs/DESKTOP_DISTRIBUTION_DESIGN.md` that cannot be built from a source
-checkout: the **Install** row's *"Install signed application files only"* and the
+**Observed.** FIXED-88 implemented the lifecycle around the host but not the two
+rows of `docs/DESKTOP_DISTRIBUTION_DESIGN.md` that a source checkout cannot
+build: the **Install** row's *"Install signed application files only"* and the
 **Update** row's *"verify signature, back up before migration, migrate
-atomically, and retain a rollback path on failure"*.
+atomically, and retain a rollback path on failure"*. `raiker/app/update.py` held
+the second row's security boundary and nothing published anything for it to
+verify. There was also no way for a running Raiker to say what it was: the
+product could not distinguish a release from a checkout, so it could not have
+told the truth about either.
 
-Both need artefacts the repository does not and should not contain: an Apple
-Developer ID and notarisation credentials, an Authenticode certificate, and
-per-OS release runners to build and sign on. `raiker-app` therefore still assumes
-Python and the package are present, and the first-run experience still requires a
-terminal — which the design's release bar explicitly rules out.
+**Fix.** The release, split into the part that can be tested anywhere and the
+part that can only exist on a runner.
 
-A native tray/menu-bar icon belongs here too rather than with the control it
-would open: it needs the same packaged, signed binary per platform. The control's
-*behaviour* — state, in-flight work, Pause/Restart/Quit — already ships in the
-top bar (FIXED-88).
+`raiker/app/release.py` owns every decision: the four targets and the signing
+identity each one requires, held as data so the workflow, the tests and the
+product read one list; a **reproducible** payload build — sorted entries, one
+fixed timestamp from `SOURCE_DATE_EPOCH`, normalised modes, caches excluded — so
+building twice from one commit produces one digest; the schema-1 manifest that
+is *exactly* the four fields `apply_signed_update` accepts; and the signed
+channel index that maps each target to its artifact, digest, manifest and
+signature. `raiker-release build|channel|verify` is the CLI the workflow calls,
+which is what makes `tests/test_release_pipeline.py` a test of the pipeline
+rather than of a script beside it.
 
-**Required fix.** A release pipeline producing signed, reproducible artifacts for
-macOS (Apple Silicon and Intel), Windows 10/11, and Linux (AppImage and `.deb`),
-each bundling the service, the web assets, and the platform-compatible native
-dependencies — `sqlcipher3-wheels` in particular needs a packaging test on every
-target, because development-machine success is not evidence. Then a signed update
-channel that verifies before it migrates, creates a verified recovery point
-first, migrates atomically, and can roll back. Then the setup wizard the design
-describes, and a native tray icon that opens the control that already exists.
+`.github/workflows/release.yml` is `workflow_dispatch` only — a release is a
+deliberate act, and a pipeline that could publish from a push eventually
+publishes something nobody chose. Per target, on that target's own runner, it
+resolves that platform's wheels (`sqlcipher3-wheels` above all), builds the
+payload, **builds it a second time and compares digests**, runs
+`scripts/packaging_smoke_test.py`, and builds the native installer with the
+platform's own tool (`pkgbuild`, WiX, `dpkg-deb`, `appimagetool`) via
+`scripts/build_installer.py`. The channel job then rebuilds and signs the index
+and runs `raiker-release verify` — *the same verification an installed Raiker
+performs* — so a release its own updater would refuse never leaves the workflow.
 
-**UI when closed.** A non-technical owner installs Raiker from a signed
-installer, creates a private instance, connects or defers a model, and updates it
-— without Python, Node, a terminal, or an environment variable. An update that
-fails leaves the previous version running on its own data.
+**The honesty rule, which is the part that matters.** `signing: require` is the
+default and **fails** a target whose identity secrets are absent. `signing: skip`
+is the only other option: it produces artifacts named `-unsigned`, records
+`signing.applied = false` in the `installation.json` *inside* the artifact, and
+is refused by the publish job. There is nothing in between, and no path produces
+a file that looks like a release without being one.
 
-**Progress in this change (still open).** `raiker/app/update.py` implements the
-platform-independent security boundary the future channel must call: an
-Ed25519-signed, schema-pinned manifest; artifact-name and SHA-256 verification;
-path- and symlink-safe archive staging; a retained recovery copy made before
-migration; migration against staging only; and sibling-directory replacement
-that restores the previous installation if the atomic swap fails. Tampered
-artifacts and failed migrations are regression-tested in
-`tests/test_signed_updates.py`. This does **not** turn BUG-44 green: the checkout
-still has no Apple notarisation identity, Authenticode certificate, native
-installer jobs, setup wizard, or native tray binary, so it still cannot publish
-the signed per-platform artifacts the required fix names.
+The channel, in `raiker/app/update.py` and `raiker/app/updater.py`: a
+signature-verified index, an entry for *this* target or a refusal, a version that
+must be strictly newer (a downgrade is "no update", never an install), an
+artifact whose build never ran platform signing refused outright, bounded
+downloads, and then `apply_signed_update` — which verifies again, copies the
+current version to its recovery point, migrates only in staging, and swaps by
+rename. `roll_back()` restores a retained version with the same two-rename shape,
+so a rollback cannot be the thing that leaves an owner with no installation.
+
+`raiker/app/installation.py` is where provenance stops being assumed. It reads
+the record the build wrote, and **every way that can fail — absent, unparsable,
+an unknown schema, an unknown target — reports an unsigned source installation**.
+Nothing reads the absence of evidence as a signature.
+
+**What this change does *not* do, stated plainly.** No signed artifact has been
+produced, because this repository holds no Apple Developer ID, no notarisation
+credentials, and no Authenticode certificate. The pipeline refuses rather than
+pretends. The first-run setup wizard and the native tray icon are BUG-48.
+
+**UI when closed.** The Host control's **Install & updates** section says what
+this Raiker is — *signed release*, *unsigned build*, or *source checkout* with
+its version and target — names the pinned update channel or says that none is
+configured and that Raiker therefore contacts no update service, lists the
+versions available to roll back to, and offers **Check for updates**. Opening it
+makes no outbound request; the check is the only thing that asks, and on a source
+checkout it refuses locally without one. Applying an update is deliberately not a
+button: it replaces the files the host is running from, so the panel names
+`raiker-app update --apply` instead.
+
+Regressions: `tests/test_release_pipeline.py` (the matrix, reproducibility, the
+payload contents, an unsigned build's three separate admissions, the manifest the
+updater accepts, and the whole CLI end to end including a tampered artifact),
+`tests/test_signed_updates.py` (channel selection, downgrade refusal, tampering,
+unsigned refusal, path-shaped artifact names, rollback),
+`tests/test_installation_provenance.py` (every way provenance can be missing or
+damaged, channel pinning, artifact-URL confinement, a check that never fetches on
+a checkout, and the CLI), `tests/test_api_updates.py` (authentication, the
+local-only status read, the matrix, and the channel reported without its key),
+and `apps/web/src/lib/components/HostControl.test.ts`.
+
+Live evidence:
+[`working/199-BUG-44-source-checkout-live.png`](screenshots/working/199-BUG-44-source-checkout-live.png)
+and
+[`working/200-BUG-44-packaged-unsigned-build-live.png`](screenshots/working/200-BUG-44-packaged-unsigned-build-live.png).
+The second is a `raiker-web` started **from inside a release artifact** this
+pipeline built — `PYTHONPATH` and `RAIKER_INSTALL_ROOT` both pointing at the
+extracted payload, so the code answering is the artifact's copy — reporting
+`0.1.0 · linux-x86_64` as an **unsigned build**, read from the record that build
+wrote.
+
+---
+
+## FIXED-93 — A provider test result appears only under the provider that ran it *(was BUG-47)*
+
+**Status: fixed in this change.**
+
+**Observed.** Models → Ollama → **Test** correctly contacted the local Ollama
+service and reported nine models, but the success message appeared beneath the
+Anthropic and OpenRouter cards instead of beneath Ollama. The provider connection
+and model selection were correct; only the feedback placement was wrong.
+
+**Root cause, and why it read as *duplication*.** `ModelsView.svelte` held one
+`testResult` string for the whole page and rendered it under *every* hosted card
+whose connection was configured. The local rows — where Ollama lives — had a
+**Test** button and no place to render a result at all. So one test produced N
+messages, none of them attached to the provider that ran it.
+
+**Fix.** Transient test state is keyed by profile id: `testResults[profile_id]`
+for the answer and `testing[profile_id]` for the in-flight flag, so one provider
+being tested no longer disables another's button either. Each card and each local
+row renders only its own entry, tagged `data-test-result="<profile_id>"`.
+
+And every result now **names its provider**. The old text reused the model
+picker's note, which says an anonymous *"Provider unreachable — type a model id
+if you know it."* That is fine inside a picker you just opened and is exactly
+what made the misplacement invisible: nothing in the sentence contradicted the
+card above it. `testNote()` produces *"Ollama could not be reached…"*,
+*"Anthropic responded and exposed 11 models."*, and so on, so a result under the
+wrong card would now argue with the card it sits under.
+
+**UI when closed.** Testing Ollama shows one result, beneath Ollama. Hosted cards
+keep their own independent status and never repeat another provider's.
+
+Regressions: `apps/web/src/lib/views/ModelsView.test.ts` — two connected
+providers with one tested (the message occurs exactly once, inside that
+provider's row, and not inside the hosted card), both tested (two independent
+results, neither overwritten nor duplicated), and an unreachable provider named
+in its own failure. Live evidence:
+[`working/197-BUG-47-local-result-under-ollama-live.png`](screenshots/working/197-BUG-47-local-result-under-ollama-live.png)
+and
+[`working/198-BUG-47-hosted-cards-keep-their-own-live.png`](screenshots/working/198-BUG-47-hosted-cards-keep-their-own-live.png).
+
+---
+
+## BUG-48 — There is still no setup wizard and no native tray icon
+
+**Status: open; split out of BUG-44 (see FIXED-92).**
+
+**Observed.** FIXED-92 makes a signed release buildable and an update
+verifiable, and FIXED-88 put the tray control's *behaviour* in the top bar. Two
+rows of `docs/DESKTOP_DISTRIBUTION_DESIGN.md` are still specification. The
+**First-run experience** section describes a wizard that creates the instance,
+selects or defers a model, explains local/hosted privacy and tests the
+connection, chooses a backup target, and then opens the workspace — none of it
+exists as a guided flow; a new owner meets the login screen and finds the rest.
+And the tray/menu-bar icon itself needs a packaged binary with a platform GUI
+toolkit, which no artifact currently contains.
+
+**Required fix.** A first-run wizard in the web app, entered automatically on an
+instance that has never completed setup, whose every step is skippable and whose
+model step can defer. Then a native tray/menu-bar binary per platform, bundled
+into the installers FIXED-92 builds, whose only unique action is **Open Raiker**
+— every other action already exists in the Host control and must call the same
+`/api/host/*` routes rather than growing a second implementation.
+
+**UI when closed.** A non-technical owner installs Raiker, is walked through
+creating an instance and connecting or deferring a model without ever seeing a
+terminal, and afterwards finds Raiker in the tray/menu bar with its state and
+Pause / Restart / Quit.
+
+---
+
+## BUG-49 — Two release-workflow actions are pinned by tag, not by digest
+
+**Status: open; found while building `.github/workflows/release.yml`.**
+
+**Observed.** Every other action in this repository is pinned to a commit SHA.
+`actions/upload-artifact` and `actions/download-artifact` in
+`.github/workflows/release.yml` are pinned to `@v4`, because the commit digests
+could not be resolved from the environment the workflow was written in. A tag is
+mutable: whoever controls it can change what those steps run, and those steps
+handle the release artifacts.
+
+**Required fix.** Resolve both actions' commit digests and pin them, with the
+version in a comment beside each, exactly as `actions/checkout`,
+`actions/setup-python` and `actions/setup-node` are pinned. Then check no other
+workflow has acquired a tag pin.
+
+**UI when closed.** None — this is supply-chain hygiene for the pipeline that
+produces what owners install.
+
+---
+
+## BUG-50 — The SQLCipher connection cache never lets a workspace go
+
+**Status: open; found while verifying FIXED-92.**
+
+**Observed.** Running the whole Python suite in one process fails with
+`OSError: [Errno 24] Too many open files` on a host whose `ulimit -n` is 4096;
+splitting it into four passes it. A direct probe shows why: opening 50 distinct
+workspaces raises the process's open descriptors from 4 to 154, and none are
+released.
+
+**Root cause.** FIXED-91 caches one keyed SQLCipher connection per resolved
+workspace and worker thread, which is exactly right for the repeated-reads
+problem it solved. It has explicit invalidation (shutdown, uninstall, a closed
+handle) but no eviction: the cache is keyed by workspace and grows without
+bound. A test session opens hundreds of temporary workspaces; so, more slowly,
+does a long-lived host serving many instances, each of which is its own
+workspace.
+
+**Required fix.** Bound the cache — least-recently-used eviction with an explicit
+limit, or release a workspace's handle once nothing holds it — and add a
+regression that opens far more workspaces than the limit and asserts the
+descriptor count stays bounded. Keep FIXED-91's property intact: repeated stores
+on one workspace and worker must still pay key derivation once.
+
+**UI when closed.** No user-visible change under normal use. A host that has
+served many instances for a long time keeps working instead of eventually
+failing to open files, and the full test suite runs in one process again.
 
 ---
 
@@ -3299,26 +3489,6 @@ test proves key pages are locked.
 **UI when closed.** Settings → Security reports database encryption and locked
 memory separately. A host whose key pages cannot be locked says **Degraded** and
 links to the precise remediation; a healthy host says **Locked in memory**.
-
----
-
-## BUG-47 — A provider test result appears under unrelated provider cards
-
-**Status: open; found during the 2026-08-01 Playwright live run.**
-
-**Observed.** Models → Ollama → **Test** correctly contacted the local Ollama
-service and reported nine models, but the success message, *"Ollama responded
-and exposed 9 models"*, appeared beneath the Anthropic and OpenRouter cards
-instead of remaining attached to the Ollama card. The provider connection and
-model selection were correct; only the feedback placement was wrong.
-
-**Required fix.** Key transient test state by provider/profile id and render it
-inside only the card that initiated the request. Add a component regression
-that tests two connected providers, runs one provider's test, and proves the
-message occurs exactly once under that provider.
-
-**UI when closed.** Testing Ollama shows one result beneath Ollama. Hosted cards
-retain their own independent status and never repeat another provider's result.
 
 ---
 

@@ -117,8 +117,15 @@
   let signInAdvanced = $state(false);
   let signInSaving = $state(false);
   let signInError = $state<string | null>(null);
-  let testFor = $state<string | null>(null);
-  let testResult = $state<string | null>(null);
+  // BUG-47 — one provider being tested must not disable, or answer for, any
+  // other. Both the in-flight flag and the result are per profile id.
+  let testing = $state<Record<string, true>>({});
+  // BUG-47 — a test result belongs to the provider that asked for it. Holding
+  // one string for the whole view made *"Ollama responded and exposed 9
+  // models"* appear beneath every connected card, which reads as three
+  // providers answering when one did. Keyed by profile id, a card renders only
+  // its own result and hosted cards keep their independent status.
+  let testResults = $state<Record<string, string>>({});
   let detailsFor = $state<ModelProfile | null>(null);
   // Governed refusals are policy outcomes, not faults. Hold the reason code so
   // the dialog can render the control that unblocks it instead of a bare code.
@@ -188,19 +195,42 @@
     }
   }
 
-  async function testConnection(profile: ModelProfile) {
-    testFor = profile.profile_id;
-    testResult = null;
-    try {
-      const result = await api.providerModels(profile.profile_id);
-      testResult = result.status === "available"
-        ? `${providerName(profile.provider)} responded and exposed ${result.models.length} model${result.models.length === 1 ? "" : "s"}.`
-        : pickerNote(result);
-    } catch {
-      testResult = "Raiker could not reach this provider.";
-    } finally {
-      testFor = null;
+  function without<T>(map: Record<string, T>, key: string): Record<string, T> {
+    return Object.fromEntries(Object.entries(map).filter(([id]) => id !== key));
+  }
+
+  // BUG-47 — every test result names the provider it came from. The picker's
+  // note can be anonymous because it renders inside an open picker you just
+  // opened; a test result sits among other providers' cards, and an anonymous
+  // "Provider unreachable" is exactly what made the misplacement invisible.
+  function testNote(profile: ModelProfile, list: ProviderModelList): string {
+    const name = providerName(profile.provider);
+    switch (list.status) {
+      case "available":
+        return `${name} responded and exposed ${list.models.length} model${list.models.length === 1 ? "" : "s"}.`;
+      case "policy_denied":
+        return `${name}'s model list was denied by provider policy — enable its gate first.`;
+      case "unsupported":
+        return `${name} does not support model listing. Type a model id instead.`;
+      default:
+        return `${name} could not be reached. Check that it is running and reachable from this device.`;
     }
+  }
+
+  async function testConnection(profile: ModelProfile) {
+    const id = profile.profile_id;
+    testing = { ...testing, [id]: true };
+    // Clear this provider's previous answer only. Another card's result is
+    // that card's state and is not this test's to discard.
+    testResults = without(testResults, id);
+    let message: string;
+    try {
+      message = testNote(profile, await api.providerModels(id));
+    } catch {
+      message = `Raiker could not reach ${providerName(profile.provider)}.`;
+    }
+    testing = without(testing, id);
+    testResults = { ...testResults, [id]: message };
   }
 
   async function openPicker(profileId: string) {
@@ -569,13 +599,19 @@
                 </div>
                 <div class="row-usage"><span>{usageLine(p)}</span></div>
                 <div class="row-actions">
-                  <button type="button" class="btn btn-ghost btn-sm" onclick={() => void testConnection(p)} disabled={testFor === p.profile_id}>{testFor === p.profile_id ? "Testing…" : "Test"}</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick={() => void testConnection(p)} disabled={testing[p.profile_id] === true}>{testing[p.profile_id] === true ? "Testing…" : "Test"}</button>
                   <button type="button" class="btn btn-ghost btn-sm" onclick={() => detailsFor = p}>Details</button>
                   <button type="button" class="btn btn-ghost btn-sm" onclick={() => void openPicker(p.profile_id)} aria-expanded={pickerFor === p.profile_id}>{p.model === "<model>" ? "Choose model…" : "Change model…"}</button>
                   {#if !p.selected && p.model !== "<model>"}
                     <button type="button" class="btn btn-sm" onclick={() => void select(p.profile_id)} disabled={selecting}>Select</button>
                   {/if}
                 </div>
+                <!-- BUG-47 — the local row that ran the test is where its
+                     answer belongs. Without this the result had nowhere to go
+                     here and surfaced under the hosted cards instead. -->
+                {#if testResults[p.profile_id]}
+                  <p class="test-result row-test-result" role="status" data-test-result={p.profile_id}>{testResults[p.profile_id]}</p>
+                {/if}
                 {#if pickerFor === p.profile_id}
                   <div class="picker local-picker-inline">
                     {#if pickerLoading}
@@ -668,7 +704,7 @@
                     <button type="button" class="btn btn-primary btn-sm pc-connect" onclick={() => openSignIn(p.profile_id)} style={`--brand:${b.tint}`}>Connect</button>
                   {:else}
                     <button type="button" class="btn btn-ghost btn-sm" onclick={() => openSignIn(p.profile_id)}>Reconnect</button>
-                    <button type="button" class="btn btn-ghost btn-sm" onclick={() => void testConnection(p)} disabled={testFor === p.profile_id}>{testFor === p.profile_id ? "Testing…" : "Test"}</button>
+                    <button type="button" class="btn btn-ghost btn-sm" onclick={() => void testConnection(p)} disabled={testing[p.profile_id] === true}>{testing[p.profile_id] === true ? "Testing…" : "Test"}</button>
                   {/if}
                   <button type="button" class="btn btn-ghost btn-sm" onclick={() => void openPicker(p.profile_id)} aria-expanded={pickerFor === p.profile_id}>{p.model === "<model>" ? "Choose model…" : "Change model…"}</button>
                   {#if p.connection_configured && !p.selected && p.model !== "<model>"}
@@ -676,8 +712,8 @@
                   {/if}
                   <button type="button" class="btn btn-ghost btn-sm" onclick={() => detailsFor = p}>Details</button>
                 </div>
-                {#if testResult && testFor === null && p.connection_configured}
-                  <p class="test-result" role="status">{testResult}</p>
+                {#if testResults[p.profile_id]}
+                  <p class="test-result" role="status" data-test-result={p.profile_id}>{testResults[p.profile_id]}</p>
                 {/if}
 
                 {#if pickerFor === p.profile_id}
@@ -1001,6 +1037,9 @@
   .picker-actions { display:flex; gap:0.4rem; }
   .picker-error { font-size:0.78rem; margin:0; }
   .test-result { color:var(--text-2); font-size:0.76rem; margin:0.3rem 0 0; }
+  /* The local rows are a wrapping flex row; a result needs the full width to
+     sit under the row that produced it rather than beside its actions. */
+  .row-test-result { width:100%; }
 
   /* ── Sign-in modal ── */
   .signin-overlay { align-items:center; background:color-mix(in srgb, #000 55%, transparent); display:flex; inset:0; justify-content:center; padding:var(--space-4); position:fixed; z-index:40; }

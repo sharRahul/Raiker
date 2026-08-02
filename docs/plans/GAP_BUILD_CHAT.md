@@ -38,6 +38,9 @@ and are compatible with it:
 | B3 | BUILD | TIER 0 | Complete |
 | B4 | BUILD | TIER 1 | Complete |
 | B5 | BUILD | TIER 1 | Complete |
+| B6 | BUILD | TIER 1 | Complete |
+| B7 | BUILD | TIER 1 | Complete |
+| B8 | BUILD | TIER 1 | Complete |
 | C1 | BUILD | TIER 0 | Complete |
 | C2 | BUILD | TIER 0 | Complete |
 | C3 | BUILD | TIER 0 | Complete |
@@ -132,22 +135,37 @@ workspace as cwd and a wall-clock cap. Anything outside the grant falls back to
 the approval-gated shell path. Granted commands execute in a no-network,
 resource-bounded container and never fall back to the host.
 
-**B6. No task/plan state across the loop.** Nothing tracks what the agent
-intends to do next, so a long change has no visible spine and no recovery point
-after a failure. **Work:** a lightweight, model-visible plan structure (ordered
-steps with a status each), rendered in Build as a live checklist. `raiker/tasks`
-already stores tasks; this is a turn-scoped sibling, not a scheduled task.
+**B6. No task/plan state across the loop.** ✅ **Done — see FIXED-94.**
+`update_plan` writes an ordered checklist — one status per step, at most one
+`in_progress` — into an owner-scoped, session-keyed row that outlives the turn.
+It is streamed live as `agent_plan_updated` and rendered as a checklist above the
+transcript in **both** Chat and Build, and it is re-injected into every later
+turn (`agent_plan_replayed`), which is what makes it a recovery point rather than
+a progress bar. Validation is fail-closed and names every rejection, so a
+malformed plan never replaces a good one. It grants nothing: every step it names
+is governed again when it is actually attempted.
 
-**B7. No subagents at the model's disposal.** `raiker/agents/subagents.py`
-implements bounded subagent contracts, and `raiker/agents/orchestration.py`
-already defines a narrower tool set for them, but no spawn tool is exposed in
-`_MODEL_EXPOSED_TOOLS`. **Work:** expose a governed `spawn_subagent` (bounded
-tokens, tool subset, no egress widening, results returned as untrusted data) so
-wide searches stop consuming the main context.
+**B7. No subagents at the model's disposal.** ✅ **Done — see FIXED-95.**
+`spawn_subagent` runs a bounded, read-only investigation under its own principal
+and contract and returns a bounded digest, so a wide search no longer sits in the
+parent's context for the rest of the conversation. Only read-only, local,
+non-egress tools are delegable; a write, a command, a connector, an MCP tool or a
+nested spawn is refused before the subagent is created, with the offending tool
+named. Every step is re-brokered through the same policy engine and gates, and
+the findings reach the calling model as untrusted data and the audit trail as
+counts.
 
-**B8. MCP tools are unreachable.** See BUG-12 - review codebase and live test before 
-marking this complete — connected servers are a monitoring surface only. 
-Every third-party capability the ecosystem offers is therefore unavailable to Build.
+**B8. MCP tools are unreachable.** ✅ **Complete — see FIXED-17 and FIXED-96.**
+FIXED-17 made a connected server's tools callable as `mcp__<server>__<tool>`.
+Reviewing this entry against the running product found the *surface* had not
+caught up, and FIXED-96 closes that: discovery now answers the capability gate
+and the decision mode together, so a mode that would withhold every call projects
+nothing instead of offering the model a tool the runtime would refuse; and
+Extensions → MCP servers states whether the agent can actually call a connected
+server, names the exact reason when it cannot, and links to the control that
+changes it. Verified live end to end — withheld, then raised, then a real
+`mcp__echo__echo` call answering in Chat with the payload kept out of the audit
+trail.
 
 ### Tier 2 — what the agent can see
 
@@ -231,13 +249,52 @@ The local container slice is implemented; remote and cloud execution remain sepa
 Owner-granted B5 commands now use the same Docker boundary principles with
 networking disabled and fail closed when its approved image is unavailable.
 
+### Found while closing B6, B7 and B8
+
+Three defects surfaced during this work that are not gaps — they are things that
+were already broken, in the same class as the gaps around them: a capability the
+product advertised and could not deliver. All are recorded in
+`docs/plans/TO_BE_FIXED.md`; the first two are fixed, the third is open.
+
+**A declared-event gap silently killed turns (FIXED-97).** `AgentEvent`
+validates `event_type` against a fixed set and raises inside the streaming turn
+otherwise, surfacing as *stream ended* with no stated cause. B4's own
+`model_tool_calls_dropped` — the event that proves no tool call disappeared
+without a record — had shipped undeclared, so **any turn that actually dropped a
+call died at the moment it tried to say so.** The unit tests missed it because
+they assert on results rather than on the durable log; a static scan of every
+emitted event type against the declared set now guards it.
+
+**Four advertised tools had no policy verdict (FIXED-98).** `PolicyEngine.review`
+hard-denies anything in neither policy set. `create_task`,
+`assign_session_project`, `remote_execute` and `cloud_execute` were all in the
+model's advertised schema and in neither set, so each was answered
+`unknown_or_denied_tool` rather than reaching the approval it was built for. The
+remote/cloud pair is the more instructive one: the policy sets listed the
+*capability* names (`remote_execution_cap`) while the model proposes *tool* names
+(`remote_execute`), and nothing held the two vocabularies together. A test now
+asserts the invariant directly — no model-exposed tool may fall through to a
+hard deny.
+
+**`denied_actions` is dead policy configuration (BUG-51, open).**
+`StaticPolicyConfig.denied_actions` is read by nothing and lists `write_file`,
+`edit_file` and `web_fetch` among others. A reviewer auditing the policy layer
+would reasonably read it as a hard block that does not exist. Either delete it or
+make it authoritative; a third policy set that looks load-bearing and is not is
+an auditability defect in its own right.
+
+**The pattern.** Each is the same failure mode the gaps themselves describe: two
+lists that have to agree — schema and policy, emitted events and declared
+events, configured denials and enforced ones — with nothing holding them
+together. Each is now held together by a test rather than by care.
+
 ### Suggested order
 
 B1 → B2 → B3 make Build an agent. **B1, B2, and B3's defined core scope are
 now landed**: an approved change is really made, the turn continues through
 it, and B3 uses strict, hunk-level editing instead of a whole-file rewrite.
-B3's multi-file patch transaction has landed. B4–B6 make
-the loop efficient. B13–B16 make the result
+B3's multi-file patch transaction has landed. **B4–B8 are now complete**, so the
+loop is efficient, legible, and reaches the ecosystem. B13–B16 make the result
 reviewable. Everything else is depth. B20 is a *policy* decision before it is an
 engineering one and belongs to the owner, not to an implementer.
 
@@ -327,8 +384,11 @@ result into the response and render an inline, clickable provenance chip.
 **C7. No web access.** As B12 — the assistant cannot look anything up. For a
 work assistant this is the difference between answering and guessing.
 
-**C8. MCP tools unreachable.** As BUG-12/B8. Every connector the owner adds
-through the ecosystem stays a monitoring entry.
+**C8. MCP tools unreachable.** ✅ **Done — as B8 (FIXED-17, FIXED-96).** A
+connected server's tools are callable in Chat under the same gate, decision mode,
+containment and audit path, and the Extensions page states whether the agent can
+reach them. Verified live: the model called `mcp__echo__echo` in Chat and quoted
+its answer back.
 
 **C9. No skills or reusable procedures.** `raiker/skills/` holds a candidate
 store and nothing else; `docs/SELF_IMPROVEMENT_MODEL.md` describes procedural

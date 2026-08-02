@@ -2237,3 +2237,31 @@ CREATE TABLE IF NOT EXISTS skill_seeds (
   PRIMARY KEY (principal_id, name)
 );
 """
+
+
+# B6 — the agent's own plan for the work in front of it.
+#
+# `raiker/tasks` already stores tasks the owner scheduled; this is the sibling
+# that exists *inside* a conversation: an ordered list of short steps, each with
+# a status, that the model writes with `update_plan` and the workspace renders
+# as a live checklist. One row per session, replaced whole on every update —
+# the plan is the current intent, not a history, and the durable event log
+# already carries how it changed.
+#
+# It is scoped to a principal as well as a session so a plan can never be read
+# across accounts, and it survives a turn: a long change keeps its spine after
+# an approval parks the turn, after a failure, and after a reload.
+AGENT_PLANS_MIGRATION_ID = "RAIKER-1036-agent-plans"
+AGENT_PLANS_SQL = """
+CREATE TABLE IF NOT EXISTS agent_plans (
+  session_id TEXT NOT NULL,
+  principal_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  steps_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (session_id, principal_id)
+);
+CREATE INDEX IF NOT EXISTS idx_agent_plans_owner
+  ON agent_plans(principal_id, updated_at DESC);
+"""

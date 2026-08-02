@@ -424,7 +424,9 @@ from the session `⋯` menu. `73-`, `74-`.
 | Can you convert markdown to PDF in one click? | **Not from the chat transcript** — transcript export/print controls were removed; generated PDF files open in the right-hand inspector when supported (FIXED-19) |
 | Do the different task types work? | **Yes** — all four create, schedule, and run |
 | Can you set an API key from the web app? | **Yes** — Connect, paste, done. No gate, allowlist, or vault-key setup first (FIXED-05) |
-| Does the MCP server work? | **Yes** — create/connect/monitor, and its tools are callable from Chat under the owner's decision mode (FIXED-17) |
+| Does the MCP server work? | **Yes** — create/connect/monitor, and its tools are callable from Chat and Build under the owner's decision mode (FIXED-17). The MCP page now also states whether the agent can reach a connected server, and names the exact control to change when it cannot (FIXED-96) |
+| Can you see what the agent plans to do? | **Yes** — a live checklist above the transcript in Chat and Build, written by the model with `update_plan` and carried into later turns (FIXED-94) |
+| Can the agent search without flooding the conversation? | **Yes** — `spawn_subagent` runs a bounded, read-only investigation and returns only its findings (FIXED-95) |
 | Do Permissions / Capabilities work? | **Yes** — all 62 gates, four decision modes, step-up enforced |
 
 ---

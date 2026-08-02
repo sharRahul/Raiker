@@ -48,6 +48,48 @@ export interface RuntimeReadiness {
 // (see raiker/control/dashboard.py::McpServerView). `command` is argv for a
 // local server; remote credentials are represented only by `auth_ref`.
 // `tools` are the names discovered by the last successful handshake.
+/**
+ * Whether this owner's connected MCP tools can actually be called in a turn.
+ *
+ * Two owner controls stand between a connected server and the model — the
+ * capability gate and the per-capability decision mode — so `connected` on a
+ * server card is not the same claim as "the agent can use this".
+ */
+export interface McpAgentAccess {
+  gate_enabled: boolean;
+  decision_mode: string;
+  /** True only when a projected MCP tool would really run this turn. */
+  callable: boolean;
+  /** Empty when callable; otherwise the exact runtime reason it is not. */
+  reason_code: string;
+  projected_tools: number;
+  connected_servers: number;
+}
+
+/**
+ * One step of the agent's plan for a conversation (B6). Written by the model
+ * through the governed `update_plan` tool; at most one step is `in_progress`.
+ */
+export interface AgentPlanStep {
+  title: string;
+  status: "pending" | "in_progress" | "completed" | "blocked";
+  note?: string;
+}
+
+export interface AgentPlan {
+  session_id: string;
+  steps: AgentPlanStep[];
+  turn_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  total?: number;
+  completed?: number;
+  in_progress?: number;
+  pending?: number;
+  blocked?: number;
+  current_step?: string;
+}
+
 export interface McpServer {
   server_id: string;
   name: string;

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -209,7 +210,16 @@ class SubagentRunner:
         principal_id: str,
         session_id: str = "",
         turn_id: str | None = None,
+        result_sink: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> OrchestrationOutcome:
+        """Run *spec*'s steps; ``result_sink`` receives each successful result.
+
+        The sink exists for B7. :class:`OrchestrationOutcome` is metadata-only on
+        purpose — it is placed verbatim in an ``action_executed`` event payload —
+        so a caller that needs the *findings* (the point of delegating a wide
+        search) takes them through an in-process callback that never touches the
+        audit trail, exactly as the MCP executor's ``content_sink`` does.
+        """
         subagent_id = new_id("sba_")
         now = utc_now()
         eff_depth = min(spec.max_depth, MAX_SUBAGENT_DEPTH)
@@ -328,6 +338,8 @@ class SubagentRunner:
                 return finish("failed", False,
                               f"subagent_step_failed:{step.tool_name}",
                               "A subagent step failed safely; the subagent stopped.", executed)
+            if result_sink is not None and result.output is not None:
+                result_sink(step.tool_name, result.output)
             # C1: accrue the (estimated) token cost and fail closed if the step
             # pushed the subagent over its token budget.
             tokens += estimate_step_tokens(step.tool_name, step.arguments)

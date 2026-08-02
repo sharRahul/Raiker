@@ -4,7 +4,14 @@
   import NotificationCenter from "../components/NotificationCenter.svelte";
   import { api, ApiError } from "../api";
   import { runtimeBlock } from "../capabilityModel";
-  import type { CapabilityGate, McpFinding, McpServer, McpSession, Notification } from "../apiTypes";
+  import type {
+    CapabilityGate,
+    McpAgentAccess,
+    McpFinding,
+    McpServer,
+    McpSession,
+    Notification,
+  } from "../apiTypes";
 
   // Reviewed server templates the builder can generate. `id` is the backend
   // template key; `label` is the plain-English name shown to the user. Kept in
@@ -30,6 +37,11 @@
   let sessions = $state<Record<string, McpSession[]>>({});
   let findings = $state<Record<string, McpFinding[]>>({});
   let notifications = $state<Notification[]>([]);
+  // B8 — connecting a server and the agent being able to *use* it are two
+  // different facts. The page used to report only the first, so a server could
+  // read `connected · 2 tool(s)` while every call was withheld by the decision
+  // mode. This is the second fact, read from the runtime rather than inferred.
+  let agentAccess = $state<McpAgentAccess | null>(null);
 
   const builderEnabled = $derived(
     gates.find((g) => g.capability === "mcp_builder_runtime")?.runtime_enabled ?? false,
@@ -47,6 +59,31 @@
     ].filter((block) => block.kind !== "none"),
   );
 
+  /** Plain English for the exact runtime reason MCP tools are not reachable. */
+  const accessBlock = $derived.by(() => {
+    if (agentAccess === null || agentAccess.callable) return null;
+    if (agentAccess.reason_code === "mcp_gate_disabled") {
+      return {
+        text: "Raiker cannot call any MCP tool: the MCP connector capability is not enabled at runtime level.",
+        action: "Enable it in",
+      };
+    }
+    if (agentAccess.reason_code === "mcp_denied_by_decision_mode") {
+      return {
+        text: "MCP tool calls are set to Deny, so a connected server stays a monitoring entry.",
+        action: "Change the decision mode in",
+      };
+    }
+    return {
+      text:
+        `Connected MCP tools are withheld from every turn: the MCP decision mode is ` +
+        `“${agentAccess.decision_mode}”, which holds a tool call for a decision that a running turn ` +
+        "cannot wait for. Set it to Always allow (or Let Raiker decide with a low-risk floor) to let " +
+        "the agent call them.",
+      action: "Change the decision mode in",
+    };
+  });
+
   function reason(e: unknown): string {
     if (e instanceof ApiError) {
       if (e.reasonCode === "disabled_by_capability_gate")
@@ -59,9 +96,14 @@
   async function load() {
     error = null;
     try {
-      const [list, gateList] = await Promise.all([api.mcpServers(), api.capabilityGates()]);
+      const [list, gateList, access] = await Promise.all([
+        api.mcpServers(),
+        api.capabilityGates(),
+        api.mcpAgentAccess().catch(() => null),
+      ]);
       servers = list;
       gates = gateList;
+      agentAccess = access;
       if (list.length) {
         const [details, notes] = await Promise.all([
           Promise.all(list.map(async (server) => ({
@@ -208,6 +250,26 @@
   </div>
 {/each}
 
+{#if accessBlock}
+  <div class="notice notice-warn" role="status">
+    <Icon name="warning" size={16} />
+    <span>
+      {accessBlock.text}
+      {accessBlock.action}
+      <a href="#/capabilities">Capabilities</a>.
+    </span>
+  </div>
+{:else if agentAccess?.callable && agentAccess.projected_tools > 0}
+  <div class="notice notice-ok" role="status">
+    <Icon name="check" size={15} />
+    <span>
+      {agentAccess.projected_tools}
+      {agentAccess.projected_tools === 1 ? "tool is" : "tools are"} available to Raiker in Chat and Build
+      as <code>mcp__server__tool</code>. Every call is still policy-reviewed, monitored, and audited.
+    </span>
+  </div>
+{/if}
+
 {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
 {#if notice}<div class="notice notice-ok"><Icon name="check" size={15} /> {notice}</div>{/if}
 <NotificationCenter {notifications} />
@@ -281,6 +343,15 @@
           <span class="tools-label">Tools ({s.tool_count})</span>
           {#if s.tools.length}
             {#each s.tools as tool (tool)}<span class="chip">{tool}</span>{/each}
+            <!-- The one thing the card could not previously say: whether the
+                 agent can actually call these. -->
+            {#if s.status === "connected" && s.monitor_state === "active"}
+              <span class="reach" class:ok={agentAccess?.callable === true}>
+                {agentAccess?.callable === true
+                  ? "Callable by Raiker"
+                  : "Not callable yet — see above"}
+              </span>
+            {/if}
           {:else}
             <span class="muted">Run Test to discover this server's tools.</span>
           {/if}
@@ -339,6 +410,9 @@
   .tools-label { font-size: 0.72rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
   .chip { font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); }
   .muted { color: var(--text-3); font-size: 0.8rem; }
+  .reach { font-size: .72rem; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--warn-soft, var(--sunken)); color: var(--warn); border: 1px solid var(--border); }
+  .reach.ok { background: var(--ok-soft, var(--sunken)); color: var(--ok); }
+  .notice code { font-family: var(--font-mono); font-size: 0.78rem; background: var(--sunken); padding: 0.05rem 0.35rem; border-radius: 4px; }
   .loading, .empty { padding: 2.5rem; text-align: center; color: var(--text-3); }
   .empty { border: 1px dashed var(--border); border-radius: var(--r-sm); }
   @media (max-width: 640px) {

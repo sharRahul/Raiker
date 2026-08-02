@@ -51,6 +51,8 @@ from raiker.contracts.models import (
 )
 from raiker.models.session_state import ModelSessionState
 from raiker.storage.migrations import (
+    AGENT_PLANS_MIGRATION_ID,
+    AGENT_PLANS_SQL,
     API_SESSIONS_MIGRATION_ID,
     API_SESSIONS_SQL,
     ATTACHMENT_STORE_MIGRATION_ID,
@@ -813,6 +815,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 TASK_ATTACHMENTS_MIGRATION_ID, TASK_ATTACHMENTS_SQL, connection
             )
             self._apply_migration(SKILLS_MIGRATION_ID, SKILLS_SQL, connection)
+            self._apply_migration(AGENT_PLANS_MIGRATION_ID, AGENT_PLANS_SQL, connection)
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -3149,6 +3152,49 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (approval_id,),
             )
         return cursor.rowcount == 1
+
+    # ── agent plan (B6 — the turn's visible spine) ────────────────────────────
+
+    def save_agent_plan(
+        self, *, session_id: str, principal_id: str, turn_id: str, steps_json: str
+    ) -> str:
+        """Replace this conversation's plan with *steps_json*; returns ``updated_at``.
+
+        The plan is current intent, not a history, so one row per
+        (session, principal) is replaced whole. ``created_at`` is preserved
+        across updates so the workspace can say how long the plan has stood.
+        """
+        now = utc_now()
+        with self.connect() as connection:
+            existing = connection.execute(
+                "SELECT created_at FROM agent_plans WHERE session_id = ? AND principal_id = ?",
+                (session_id, principal_id),
+            ).fetchone()
+            created_at = str(existing["created_at"]) if existing is not None else now
+            connection.execute(
+                """INSERT OR REPLACE INTO agent_plans
+                   (session_id, principal_id, turn_id, steps_json, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (session_id, principal_id, turn_id, steps_json, created_at, now),
+            )
+        return now
+
+    def load_agent_plan(self, session_id: str, principal_id: str) -> dict[str, Any] | None:
+        """This conversation's plan, or None. Owner-scoped: never cross-account."""
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM agent_plans WHERE session_id = ? AND principal_id = ?",
+                (session_id, principal_id),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def clear_agent_plan(self, session_id: str, principal_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM agent_plans WHERE session_id = ? AND principal_id = ?",
+                (session_id, principal_id),
+            )
+            return cursor.rowcount > 0
 
     # ── suspended turns (B2 — resume the same turn after an approval) ─────────
 

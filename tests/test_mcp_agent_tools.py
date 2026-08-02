@@ -32,6 +32,7 @@ from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.mcp_tools import (
     McpToolService,
     is_mcp_tool,
+    mcp_agent_access,
     mcp_tool_name,
     mcp_tool_specs,
     parse_mcp_tool_name,
@@ -145,7 +146,9 @@ class TestProjectedToolNames:
     def test_a_server_named_with_the_separator_is_not_projected(
         self, workspace: Path, store: SQLiteStore
     ) -> None:
-        _enable_gate(workspace, store)
+        # Allowing mode as well as the gate, so an empty projection can only be
+        # the separator rule rather than a withholding decision mode.
+        _allow(_enable_gate(workspace, store))
         store.create_mcp_server(
             server_id=new_id("mcp_"),
             principal_id=_OWNER,
@@ -196,20 +199,38 @@ class TestDiscoveryIsFailClosed:
         _connected_echo_server(workspace, store)
         assert mcp_tool_specs(workspace, store, _OWNER) == []
 
-    def test_an_enabled_gate_projects_the_discovered_tools(
+    def test_an_enabled_gate_and_an_allowing_mode_project_the_discovered_tools(
         self, workspace: Path, store: SQLiteStore
     ) -> None:
         _connected_echo_server(workspace, store)
-        _enable_gate(workspace, store)
+        _allow(_enable_gate(workspace, store))
         names = {spec.name for spec in mcp_tool_specs(workspace, store, _OWNER)}
         assert "mcp__echo__echo" in names
         spec = next(s for s in mcp_tool_specs(workspace, store, _OWNER) if s.name == "mcp__echo__echo")
         assert "untrusted external data" in spec.description
 
+    @pytest.mark.parametrize("mode", ["ask", "auto", "deny"])
+    def test_a_withholding_decision_mode_offers_nothing(
+        self, workspace: Path, store: SQLiteStore, mode: str
+    ) -> None:
+        """B8 — discovery keeps the promise the module docstring makes.
+
+        The gate and the decision mode are two separate owner controls. With the
+        gate on but the mode still withholding (``ask`` is the default, ``auto``
+        withholds a medium-risk call, ``deny`` refuses outright), every call
+        would be refused — so the tool is not offered at all, rather than dangled
+        in front of a model that can only be told no.
+        """
+        _connected_echo_server(workspace, store)
+        ctrl = _enable_gate(workspace, store)
+        result = ctrl.set_capability_decision_mode(_CAP, mode, _OWNER, "test")
+        assert result.ok, result.reason_code
+        assert mcp_tool_specs(workspace, store, _OWNER) == []
+
     def test_a_server_that_never_connected_offers_nothing(
         self, workspace: Path, store: SQLiteStore
     ) -> None:
-        _enable_gate(workspace, store)
+        _allow(_enable_gate(workspace, store))
         store.create_mcp_server(
             server_id=new_id("mcp_"),
             principal_id=_OWNER,
@@ -225,14 +246,14 @@ class TestDiscoveryIsFailClosed:
         self, workspace: Path, store: SQLiteStore, state: str
     ) -> None:
         _connected_echo_server(workspace, store)
-        _enable_gate(workspace, store)
+        _allow(_enable_gate(workspace, store))
         server = store.list_mcp_servers(_OWNER)[0]
         store.set_mcp_monitor_state(str(server["server_id"]), _OWNER, state)
         assert mcp_tool_specs(workspace, store, _OWNER) == []
 
     def test_another_account_sees_no_tools(self, workspace: Path, store: SQLiteStore) -> None:
         _connected_echo_server(workspace, store)
-        _enable_gate(workspace, store)
+        _allow(_enable_gate(workspace, store))
         assert mcp_tool_specs(workspace, store, "principal_someone_else") == []
 
 
@@ -417,3 +438,55 @@ class TestBrokerRoutesProjectedTools:
         assert result.status == "denied"
         assert result.error is not None
         assert result.error["type"] == "mcp_withheld_ask"
+
+
+# ── B8: the owner can see whether the agent can actually reach these tools ────
+
+
+class TestAgentReachabilityIsVisible:
+    """The MCP page reported the handshake and stopped there.
+
+    A server could read `connected · 2 tool(s)` while every call was withheld by
+    the decision mode, which is a claim the product could not keep. These cover
+    the read behind the surface that now states the second fact.
+    """
+
+    def test_a_disabled_gate_reports_itself(self, workspace: Path, store: SQLiteStore) -> None:
+        _connected_echo_server(workspace, store)
+        access = mcp_agent_access(workspace, store, _OWNER)
+        assert access["callable"] is False
+        assert access["reason_code"] == "mcp_gate_disabled"
+        assert access["projected_tools"] == 0
+
+    def test_an_enabled_gate_with_the_default_mode_reports_the_withholding(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        _connected_echo_server(workspace, store)
+        _enable_gate(workspace, store)
+        access = mcp_agent_access(workspace, store, _OWNER)
+        assert access["gate_enabled"] is True
+        assert access["decision_mode"] == "ask"
+        assert access["callable"] is False
+        assert access["reason_code"] == "mcp_withheld_ask"
+        # The server *is* connected — that is exactly why the distinction matters.
+        assert access["connected_servers"] == 1
+        assert access["projected_tools"] == 0
+
+    def test_an_allowing_mode_reports_the_tools_the_agent_can_call(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        _connected_echo_server(workspace, store)
+        _allow(_enable_gate(workspace, store))
+        access = mcp_agent_access(workspace, store, _OWNER)
+        assert access["callable"] is True
+        assert access["reason_code"] == ""
+        assert access["projected_tools"] >= 1
+
+    def test_another_account_is_told_nothing_about_this_owners_servers(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        _connected_echo_server(workspace, store)
+        _allow(_enable_gate(workspace, store))
+        access = mcp_agent_access(workspace, store, "principal_someone_else")
+        assert access["projected_tools"] == 0
+        assert access["connected_servers"] == 0

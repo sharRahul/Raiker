@@ -78,7 +78,10 @@ export type IconName =
   // BUG-23 — the code-block copy action, as a glyph rather than a word.
   | "copy"
   // BUG-27 — opening the exact passage a memory or a file came from.
-  | "quote";
+  | "quote"
+  // An unstarted plan step: an empty ring, deliberately the quietest glyph in
+  // the set so a checklist reads by its *completed* marks rather than its gaps.
+  | "circle";
 
 // Each icon is one or more SVG path `d` strings (stroke, round caps).
 export const ICON_PATHS: Record<IconName, string[]> = {
@@ -176,6 +179,7 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   folder: ["M3 6.5a1 1 0 0 1 1-1h4.5l2 2.5H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11Z"],
   panel: ["M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z", "M15 5v14"],
   clock: ["M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17Z", "M12 7.5V12l3 2"],
+  circle: ["M12 4.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Z"],
   play: ["M8 5.5 18 12 8 18.5V5.5Z"],
   eye: [
     "M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z",

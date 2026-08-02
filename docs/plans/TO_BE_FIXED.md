@@ -216,8 +216,14 @@ artifacts.
 | BUG-48 | Medium | Distribution / setup wizard and native tray | Open (split out of BUG-44) |
 | BUG-49 | Low | CI / release workflow action pinning | Open (found while building the release workflow) |
 | BUG-50 | Medium | Storage / connection cache holds every workspace open | Open (found while verifying FIXED-92) |
-| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B4 complete; 17 items remain) |
-| GAP-CHAT | — | Chat — work-assistant parity | Analysis (15 items remain) |
+| BUG-51 | Low | Policy / dead `denied_actions` configuration | Open (found while implementing B6/B7) |
+| FIXED-94 | High | Build / turn plan state | Fixed (was B6) |
+| FIXED-95 | High | Build / model-spawned subagents | Fixed (was B7) |
+| FIXED-96 | Medium | Extensions / MCP agent reachability | Fixed (B8 review; found the surface was silent) |
+| FIXED-97 | High | Runtime / undeclared event types | Fixed (found during B6 live testing; B4's drop evidence killed the turn) |
+| FIXED-98 | High | Policy / advertised tools with no verdict | Fixed (found while implementing B6/B7) |
+| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8 complete; 12 items remain) |
+| GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
 ---
 
@@ -3489,6 +3495,235 @@ test proves key pages are locked.
 **UI when closed.** Settings → Security reports database encryption and locked
 memory separately. A host whose key pages cannot be locked says **Degraded** and
 links to the precise remediation; a healthy host says **Locked in memory**.
+
+---
+
+## FIXED-94 — Build had no plan for the work in front of it *(was B6)*
+
+**Status: fixed in this change.**
+
+**Observed.** Build ran a genuine agentic loop with nothing tracking what it
+intended to do next. On a change of any length the transcript looked identical
+whether the agent was on step two or step nine, and a failure at step six left
+neither the model nor the owner with a statement of what the remaining steps
+were. `raiker/tasks` stores work the owner *scheduled*; nothing existed for the
+work a turn set itself.
+
+**Fix applied.** A turn-written, session-scoped plan — ordered steps, one status
+each — with four seams:
+
+* **The tool.** `update_plan` (`raiker/models/tool_call_validation.py`,
+  `raiker/tools/broker.py::_update_plan`) takes the complete plan and replaces
+  the stored one. Validation is fail-closed and names every rejection
+  (`raiker/runtime/agent_plan.py`): a step with no title, an unknown status, more
+  than 20 steps, or a second `in_progress` step is refused and the previously
+  stored plan is left untouched, because half a spine is worse than the one that
+  was already there. At most one step may be `in_progress`, so "what is happening
+  right now" always has exactly one answer.
+* **Persistence.** One owner-scoped row per session (`agent_plans`,
+  `RAIKER-1036-agent-plans`), keyed by (session, principal) so a plan is never
+  readable across accounts. A stored row that no longer parses reads as *no
+  plan* rather than raising — a recovery aid must never be able to stop a turn.
+* **Recovery.** The plan is re-injected into every later turn of the
+  conversation as a system message (`agent_plan_replayed`), so it survives an
+  approval parking the turn, a failed step, and a new prompt. This is what makes
+  it a recovery point rather than a progress bar.
+* **The surface.** `agent_plan_updated` is streamed as a lifecycle event
+  carrying the steps, and `PlanChecklist.svelte` renders it live above the
+  transcript in **both** Chat and Build — the tool is model-visible in either, so
+  a Chat that silently stored a plan would be exactly the invisible surface this
+  document exists to prevent. `GET /api/sessions/{id}/plan` re-reads it for a
+  second tab. The checklist is a statement, not a control: its only button
+  collapses the card, because an ungoverned edit would make the checklist
+  disagree with what the runtime actually holds.
+
+It grants nothing. A plan runs nothing and schedules nothing; every step it
+names still reaches the broker, the policy engine, and the approval path exactly
+as if the plan did not exist.
+
+**Live evidence.** `e2e/plan-subagent-mcp-live.spec.ts` against
+`claude-haiku-4-5-20251001` holding a real credential: the model writes a plan,
+the checklist shows `1 of 3 done` with the progress bar at 33; a second turn
+advances it to `2 of 3`; and a third turn that calls **no tool** lists the steps
+and their statuses back, which it can only do from the re-injected plan.
+Screenshots `working/b6-build-live-plan-checklist.png`,
+`b6-build-live-plan-advanced.png`, `b6-build-live-plan-recovered.png`.
+
+**UI when closed.** A `PLAN` card above the transcript with each step's status
+named in text as well as marked by glyph and colour, a completed-over-total
+count, a progress bar, and a collapsed line naming the current step.
+
+---
+
+## FIXED-95 — The model could not delegate a wide search *(was B7)*
+
+**Status: fixed in this change.**
+
+**Observed.** `raiker/agents/orchestration.py` already implemented bounded,
+governed subagents — depth, step, tool-call, wall-clock and token budgets, a
+read-only delegable tool set, and a persisted contract — and nothing exposed
+them to a model. Every wide search therefore ran in the main context: fifty
+greps and their fifty results, sitting in the turn for the rest of the
+conversation.
+
+**Fix applied.** `spawn_subagent` (`raiker/tools/subagent_tools.py`). The parent
+hands over an objective and a bounded list of read-only steps; the subagent runs
+them under its own principal and its own contract and returns a **bounded
+digest** rather than the raw transcript.
+
+What it cannot do, each enforced rather than asked for:
+
+* **Widen authority.** Only `SPAWNABLE_TOOLS` — read-only, local, no egress —
+  may be delegated. A step naming a write, a shell command, a connector, an MCP
+  tool, or `spawn_subagent` itself is refused before the subagent is created,
+  with the offending tool named. There is no argument that relaxes this.
+* **Escape governance.** Every step still runs through the same `ToolBroker`,
+  policy engine, capability gates and audit path as a step the parent ran itself.
+* **Recurse.** `spawn_subagent` is not delegable, and the depth budget is a
+  second floor under that.
+* **Speak with authority.** The digest reaches the calling model framed as
+  untrusted data — it is the output of tools reading files the model did not
+  choose, and treating it as instructions is the classic indirect-injection path
+  (OWASP LLM01).
+
+The findings travel through an in-process sink, exactly as the MCP executor's
+`content_sink` does, so `OrchestrationOutcome` stays metadata-only and the
+`action_executed`/broker events keep counts, contract ids and tool names while
+the content reaches the model and nothing else.
+
+**Live evidence.** The model delegated a two-step workspace inventory and the
+transcript recorded *Subagent workspace inventory finished 2 read-only step(s)
+(glob, list_directory)* without the raw listings entering it. Screenshot
+`working/b7-build-live-subagent.png`.
+
+**UI when closed.** A first-class line in the turn's governance disclosure
+naming the subagent, how many read-only steps it ran, and which tools it used.
+
+---
+
+## FIXED-96 — A connected MCP server did not say whether the agent could use it *(B8 review)*
+
+**Status: fixed in this change.**
+
+**Observed.** FIXED-17 made a connected server's tools callable. Reviewing B8
+against the running product showed the *surface* had not caught up: two owner
+controls stand between a connected server and the model — the capability gate
+and the per-capability decision mode — and the MCP page reported only the
+handshake. A server read `connected · 2 tool(s)` beside a model that could never
+call one, because the decision mode's default `ask` withholds. Worse,
+`McpToolService.available_servers` checked only the gate, so those tools were
+*advertised* to the model and then refused at call time — contradicting the
+module's own promise that "the model is never offered a tool the runtime would
+refuse".
+
+**Fix applied.**
+
+* **Discovery keeps its promise.** `callable_now()` answers the gate and the
+  decision mode together, and `available_servers()` uses it, so a mode that
+  would withhold every call projects nothing rather than dangling a tool in
+  front of a model that can only be told no.
+* **The page states the second fact.** `GET /api/mcp/agent-access` reports gate
+  state, decision mode, how many tools are currently projected, and a reason
+  code when none are. Extensions → MCP servers turns that into either a banner
+  naming the exact reason and linking to Permissions, or a confirmation that *N*
+  tools are available as `mcp__server__tool` — and each connected card carries
+  the matching **Callable by Raiker** / **Not callable yet** chip so a card can
+  no longer disagree with the runtime. A failed reachability read leaves the
+  page exactly as usable as before rather than claiming either state.
+
+This follows the security posture rather than fighting it: nothing new is
+blocked, the owner's own control is named, and the remedy is one link away.
+
+**Live evidence.** With the connector gate enabled and the mode left at its
+default, the page said the tools were withheld and the card said *Not callable
+yet*; raising the mode to Allow flipped both; and the model then called
+`mcp__echo__echo` for real, with the audit trail keeping `arguments_length: 23`
+and `content_redacted: true` rather than the payload. Screenshots
+`working/b8-mcp-live-withheld.png`, `b8-mcp-live-callable.png`,
+`b8-mcp-live-tool-call.png`.
+
+**UI when closed.** As described above.
+
+---
+
+## FIXED-97 — An event the runtime emitted but never declared killed the turn
+
+**Status: fixed in this change; found during B6 live testing.**
+
+**Observed.** B6's first live turn ended as *stream ended* with no stated cause.
+`AgentEvent` validates `event_type` against `contracts/models.py::EVENT_TYPES`
+and raises `ContractValidationError` otherwise — inside the streaming turn,
+where it surfaces to the user as a failed task and to the log as one buried
+ASGI traceback.
+
+**The pre-existing half.** `model_tool_calls_dropped` — B4's (FIXED-39) whole
+evidence mechanism, the event that proves no tool call disappeared without a
+record — had shipped undeclared. Any turn that actually dropped a call died at
+the exact moment it tried to say so. The unit tests never caught it because they
+assert on results rather than on the durable log.
+
+**Fix applied.** `agent_plan_updated`, `agent_plan_replayed`,
+`subagent_completed` and `model_tool_calls_dropped` are declared, and
+`tests/test_agent_plan_and_subagents.py::TestEveryEmittedEventIsDeclared`
+statically scans every literal event type the runtime emits against the declared
+set, so the next one cannot ship silently.
+
+**UI when closed.** Turns that emit these events complete normally, and the
+governance disclosure carries plain-English lines for each.
+
+---
+
+## FIXED-98 — Tools were advertised to the model that policy always denied
+
+**Status: fixed in this change; found while implementing B6/B7.**
+
+**Observed.** `PolicyEngine.review` ends in a hard `unknown_or_denied_tool` deny
+for any tool in neither `allowed_read_actions` nor `approval_required_actions`.
+Four tools already in the model's advertised schema were in neither:
+
+* `create_task` and `assign_session_project` — both proposed by the model,
+  both answered with a deny rather than the approval they were built for;
+* `remote_execute` and `cloud_execute` — the *tool* names the model proposes,
+  while `remote_execution_cap` / `cloud_execution_cap` (which were listed) are
+  the *capability* names the runtime authority routes on. Two vocabularies, and
+  the tool half was missing, so a proposal never reached the approval the broker
+  already knew how to raise for it.
+
+**Fix applied.** All four are registered on the path they were designed for:
+`create_task`, `assign_session_project`, `remote_execute` and `cloud_execute` on
+the approval path; `update_plan` and `spawn_subagent` read-shaped, for the same
+reason `connector_read` is. Nothing is loosened — the capability gate, owner
+profile, credential reference and cost ceiling all still stand in front of any
+actual remote or cloud execution. `tests/test_policy_engine.py` now asserts the
+invariant directly: **no model-exposed tool may fall through to
+`unknown_or_denied_tool`.**
+
+**Found and not fixed here.** `StaticPolicyConfig.denied_actions` is dead
+configuration — nothing reads it — and it lists `write_file` and `edit_file`,
+which would be alarming if it were live. Removing it is a separate cleanup with
+a wider blast radius than this change should carry; it is recorded as BUG-51.
+
+**UI when closed.** A model-proposed task, project assignment, or remote command
+raises a decision in Approvals instead of failing with a policy denial.
+
+---
+
+## BUG-51 — `denied_actions` is dead policy configuration
+
+**Status: open; found while implementing B6/B7.**
+
+**Observed.** `raiker/policy/config.py::StaticPolicyConfig.denied_actions` is
+never read by `PolicyEngine` or anything else. It lists `write_file`,
+`edit_file`, `delete_file`, `network_request`, `web_fetch`, `plugin_execute`,
+`remote_execute`, `process` and `network` — a set that reads like a hard block
+and enforces nothing. A reviewer auditing the policy layer would reasonably
+conclude that file writes are denied outright.
+
+**Required fix.** Either delete the field, or make it authoritative and
+reconcile it with `approval_required_actions` (which currently governs those
+same tools). Do not leave a third policy set that looks load-bearing and is not.
+
+**UI when closed.** No user-visible change; this is an auditability defect.
 
 ---
 

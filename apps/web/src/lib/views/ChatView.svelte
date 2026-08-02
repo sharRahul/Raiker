@@ -21,6 +21,7 @@
     type ResumeWatcher,
   } from "../approvalResume";
   import type {
+    AgentPlan,
     AgentResponse,
     AttachmentPreview,
     ContextUsage,
@@ -33,10 +34,12 @@
   import ComposerAttach from "../components/ComposerAttach.svelte";
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
+  import PlanChecklist from "../components/PlanChecklist.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, relativeTime } from "../format";
+  import { hasSteps, planFromEvent } from "../agentPlan";
   import { reactionForPrompt, thinkingSteps } from "../chatPresentation";
   import { chatProfiles, refreshModels } from "../models.svelte";
 
@@ -544,12 +547,15 @@
             // existing right-hand inspector, without exposing the workspace.
             void restoreAttachmentChips(event.response.session_id);
             if (contextOpen) void refreshContextUsage();
+            if (plan === null) void loadPlan();
             window.dispatchEvent(new Event("raiker:chats-changed"));
           } else if (event.kind === "error") {
             turn.error = event.text || "An error occurred.";
             turn.events = [...turn.events, event];
           } else {
             turn.events = [...turn.events, event];
+            const streamed = planFromEvent(event);
+            if (streamed !== null) plan = streamed;
           }
           void scrollToEnd();
         },
@@ -593,6 +599,27 @@
     releaseThumbnails();
     turns = [];
     sessionId = null;
+    plan = null;
+  }
+
+  // B6 — the same plan checklist Build shows. The `update_plan` tool is
+  // model-visible in every conversation, so a plan written here needs the same
+  // surface: a Chat that silently stored one would be exactly the invisible
+  // product surface the backlog exists to prevent.
+  let plan = $state<AgentPlan | null>(null);
+  let planCollapsed = $state(false);
+
+  async function loadPlan() {
+    if (sessionId === null) {
+      plan = null;
+      return;
+    }
+    try {
+      const stored = await api.sessionPlan(sessionId);
+      plan = hasSteps(stored) ? stored : null;
+    } catch {
+      plan = null;
+    }
   }
 
   function releaseThumbnails() {
@@ -698,6 +725,8 @@
           turn.error = event.text || "The continuation reported an error.";
         } else {
           turn.events = [...turn.events, event];
+          const streamed = planFromEvent(event);
+          if (streamed !== null) plan = streamed;
         }
         void scrollToEnd();
       });
@@ -850,6 +879,12 @@
     </div>
   </header>
   {#if exportNotice}<span class="export-notice" role="status" aria-live="polite">{exportNotice}</span>{/if}
+  {#if plan !== null}
+    <div class="plan-slot">
+      <PlanChecklist {plan} bind:collapsed={planCollapsed} />
+    </div>
+  {/if}
+
   <div class="thread" bind:this={scrollEl}>
     {#if historyError !== null}
       <p class="error-line" role="alert">{historyError}</p>
@@ -1386,6 +1421,10 @@
   }
   /* Below the split breakpoint the inspector is a sheet over the conversation
      (see FileInspector.svelte), so the grid stays single-column. */
+  .plan-slot {
+    flex: 0 0 auto;
+    margin-bottom: var(--space-3);
+  }
   .thread {
     flex: 1;
     /* Without this the thread refuses to shrink below its content and never

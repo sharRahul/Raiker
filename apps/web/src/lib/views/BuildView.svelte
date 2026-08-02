@@ -28,6 +28,7 @@
   import ContextRing from "../components/ContextRing.svelte";
   import Markdown from "../components/Markdown.svelte";
   import RepoConnector from "../components/RepoConnector.svelte";
+  import PlanChecklist from "../components/PlanChecklist.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
   import {
@@ -37,6 +38,7 @@
     type ResumeWatcher,
   } from "../approvalResume";
   import type {
+    AgentPlan,
     AgentResponse,
     ApprovalView,
     CodeRepo,
@@ -56,6 +58,7 @@
     type BuildMode,
   } from "../buildModes";
   import { humanize, relativeTime } from "../format";
+  import { hasSteps, planFromEvent } from "../agentPlan";
   import { approvalBadge } from "../statusMaps";
   import AttachmentCard from "../components/AttachmentCard.svelte";
   import ComposerAttach from "../components/ComposerAttach.svelte";
@@ -160,6 +163,29 @@
 
   // ── Side rail ────────────────────────────────────────────────────────
   let railOpen = $state(false);
+
+  // ── The agent's plan (B6) ────────────────────────────────────────────
+  // A long change had no visible spine: the transcript looked identical on
+  // step two and step nine. The checklist is the model's own `update_plan`
+  // output, updated live from the stream and re-read on load so a reload or a
+  // second tab does not start blank.
+  let plan = $state<AgentPlan | null>(null);
+  let planCollapsed = $state(false);
+
+  async function loadPlan() {
+    if (sessionId === null) {
+      plan = null;
+      return;
+    }
+    try {
+      const stored = await api.sessionPlan(sessionId);
+      plan = hasSteps(stored) ? stored : null;
+    } catch {
+      // A plan is context, never a precondition: failing to read one leaves
+      // the workspace exactly as usable as it was before B6.
+      plan = null;
+    }
+  }
 
   // ── Project assignment ───────────────────────────────────────────────
   // A chat can be filed into a project before it exists as a session. The
@@ -348,11 +374,14 @@
             turn.response = event.response;
             sessionId = event.response.session_id;
             if (contextOpen) void refreshContextUsage();
+            if (plan === null) void loadPlan();
             window.dispatchEvent(new Event("raiker:chats-changed"));
             void applyPendingProject();
             void loadApprovals();
           } else {
             turn.events = [...turn.events, event];
+            const streamed = planFromEvent(event);
+            if (streamed !== null) plan = streamed;
           }
           void scrollToEnd();
         },
@@ -405,6 +434,8 @@
           void loadApprovals();
         } else {
           turn.events = [...turn.events, event];
+          const streamed = planFromEvent(event);
+          if (streamed !== null) plan = streamed;
         }
         void scrollToEnd();
       });
@@ -481,6 +512,7 @@
     turns = [];
     sessionId = null;
     approvals = [];
+    plan = null;
     promptEl?.focus();
   }
 
@@ -693,6 +725,15 @@
         onchanged={loadRepos}
         onclose={() => (reposOpen = false)}
       />
+    {/if}
+
+    {#if plan !== null}
+      <!-- B6 — the plan sits above the transcript rather than inside a turn:
+           it is the conversation's spine, not one turn's output, and it has to
+           stay visible while the thread scrolls under it. -->
+      <div class="plan-slot">
+        <PlanChecklist {plan} bind:collapsed={planCollapsed} />
+      </div>
     {/if}
 
     <div class="thread" bind:this={scrollEl}>
@@ -1184,6 +1225,10 @@
   }
 
 
+  .plan-slot {
+    flex: 0 0 auto;
+    margin-bottom: var(--space-3);
+  }
   .thread {
     flex: 1;
     min-height: 0;

@@ -283,6 +283,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write the definition without asking the service manager to load it now.",
     )
 
+    # BUG-44 — updating from outside the running host. Applying an update
+    # replaces the tree the host is executing from, which is not something a
+    # request that host is serving should do, so this lives here and the web
+    # app's panel points at it.
+    update = sub.add_parser("update", help="Report this build, and check or apply signed updates.")
+    _add_common(update)
+    update.add_argument(
+        "--check", action="store_true", help="Ask the pinned channel whether a newer release exists."
+    )
+    update.add_argument(
+        "--apply", action="store_true", help="Download and install the offered release."
+    )
+    update.add_argument(
+        "--rollback",
+        default=None,
+        metavar="VERSION",
+        help="Restore a retained recovery point by its version.",
+    )
+    update.add_argument("--channel-url", default=None, help="Pin the signed channel index URL.")
+    update.add_argument(
+        "--channel-key", default=None, help="Pin the hex Ed25519 public key that signs it."
+    )
+    update.add_argument("--channel-name", default="stable", help="Channel name (default: stable).")
+
     remove = sub.add_parser("uninstall", help="State what removing Raiker takes, and take it.")
     _add_common(remove, preserve_parent=True)
     remove.add_argument(
@@ -396,6 +420,8 @@ def _run_command(args: argparse.Namespace) -> int:
         return _command_quit(workspace, force=args.force)
     if args.command == "service":
         return _command_service(workspace, args.port, args.action, activate=not args.no_activate)
+    if args.command == "update":
+        return _command_update(workspace, args)
     return _command_uninstall(workspace, args)
 
 
@@ -461,6 +487,102 @@ def _command_service(workspace: Path, port: int, action: str, *, activate: bool)
     if action == "install":
         print(f"[raiker] {plan.note}")
     return 0 if result.ok else 2
+
+
+def _command_update(workspace: Path, args: argparse.Namespace) -> int:
+    """Report what this build is, and act on the channel only when asked.
+
+    The default — no flags — prints provenance and does nothing else, because
+    "what am I running" is the question asked most often and the one that must
+    never cost an outbound request.
+    """
+    from raiker.app.installation import (
+        detect_installation,
+        read_channel_config,
+        record_check,
+        update_status,
+        write_channel_config,
+    )
+    from raiker.app.update import UpdateError, recovery_points, roll_back
+    from raiker.app.updater import check_for_update, download_and_apply
+
+    if args.channel_url or args.channel_key:
+        if not (args.channel_url and args.channel_key):
+            print("[raiker] Pin both --channel-url and --channel-key.", file=sys.stderr)
+            return 2
+        try:
+            config = write_channel_config(
+                workspace,
+                url=args.channel_url,
+                public_key=args.channel_key,
+                channel=args.channel_name,
+            )
+        except UpdateError as error:
+            print(f"[raiker] Refused: {error}", file=sys.stderr)
+            return 2
+        print(f"[raiker] Update channel pinned: {config.channel} at {config.url}")
+
+    install = detect_installation()
+    print(f"[raiker] version {install.version} · {install.target or 'source checkout'}")
+    print(
+        "[raiker] signed release"
+        if install.signed
+        else "[raiker] unsigned build — automatic updates refuse unsigned artifacts"
+    )
+    if install.note:
+        print(f"[raiker] {install.note}")
+
+    if args.rollback:
+        points = {point.version: point for point in recovery_points(_recovery_root(workspace))}
+        point = points.get(args.rollback)
+        if point is None:
+            print(f"[raiker] No recovery point for {args.rollback}.", file=sys.stderr)
+            for known in points:
+                print(f"[raiker]   available: {known}")
+            return 2
+        try:
+            roll_back(install_root=install.install_root, recovery_point=point.path)
+        except UpdateError as error:
+            print(f"[raiker] Rollback refused: {error}", file=sys.stderr)
+            return 2
+        print(f"[raiker] Restored {args.rollback} from {point.path}.")
+        return 0
+
+    if not (args.check or args.apply):
+        status = update_status(workspace, installation=install)
+        print(f"[raiker] {status.state}: {status.message}")
+        for point in status.recovery:
+            print(f"[raiker]   recovery point {point.version} ({point.files} files)")
+        return 0
+
+    status = check_for_update(workspace, installation=install)
+    if status.checked_at is not None:
+        record_check(workspace, status)
+    print(f"[raiker] {status.state}: {status.message}")
+    if not args.apply or status.state != "available":
+        return 0 if status.state != "unreachable" else 2
+
+    pinned = read_channel_config(workspace)
+    if pinned is None:  # pragma: no cover - unreachable while state is "available"
+        print("[raiker] No update channel is configured.", file=sys.stderr)
+        return 2
+    try:
+        result = download_and_apply(
+            workspace, status=status, config=pinned, install_root=install.install_root
+        )
+    except UpdateError as error:
+        print(f"[raiker] Update refused: {error}", file=sys.stderr)
+        print("[raiker] Nothing about this installation was changed.", file=sys.stderr)
+        return 2
+    print(f"[raiker] Installed {result.version}. Previous version kept at {result.recovery_point}.")
+    print("[raiker] Restart the host to run it: raiker-app quit && raiker-app")
+    return 0
+
+
+def _recovery_root(workspace: Path) -> Path:
+    from raiker.app.installation import recovery_root
+
+    return recovery_root(workspace)
 
 
 def _command_uninstall(workspace: Path, args: argparse.Namespace) -> int:

@@ -1,0 +1,499 @@
+# BUG-44 — the signed release, as a workflow you start on purpose.
+#
+# Everything the release *decides* lives in `raiker/app/release.py` and is
+# covered by `tests/test_release_pipeline.py`; this file is the part that can
+# only exist here — a machine of each target OS, and the signing identities.
+#
+# It is `workflow_dispatch` only. A release is a deliberate act, and a pipeline
+# that could publish from a push is a pipeline that will eventually publish
+# something nobody chose to.
+#
+# **The honesty rule.** `signing: require` is the default and fails a target
+# whose identity secrets are absent, rather than producing an artifact that
+# looks like a release. `signing: skip` is the way to exercise the pipeline
+# without identities: it produces artifacts named `-unsigned`, records
+# `signing.applied = false` inside them so the installed product says so, and
+# refuses to publish. Nothing in between.
+#
+# One deviation from this repository's convention, stated rather than hidden:
+# `actions/upload-artifact` and `actions/download-artifact` are pinned to their
+# major tag instead of a commit SHA, because the commit digests could not be
+# resolved from the environment this file was written in. Pin them to SHAs the
+# way every other action here is pinned (tracked as BUG-49).
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, exactly X.Y.Z"
+        required: true
+        type: string
+      channel:
+        description: "Update channel the index is published under"
+        default: stable
+        type: choice
+        options: [stable, beta]
+      signing:
+        description: "require = fail without identities; skip = unsigned test build that cannot publish"
+        default: require
+        type: choice
+        options: [require, skip]
+      publish:
+        description: "Create a draft GitHub release from the signed artifacts"
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "22"
+
+jobs:
+  # ── 1. Is this release even coherent, and what does it consist of? ──────
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      source_date_epoch: ${{ steps.stamp.outputs.epoch }}
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Python
+        # actions/setup-python v6.2.0 (Node 24 runtime)
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install package
+        run: python -m pip install -e .
+      - name: Refuse a version the updater could not compare
+        run: |
+          python - <<'PY'
+          import os, sys
+          from raiker.app.update import UpdateError, version_key
+          version = os.environ["VERSION"]
+          try:
+              version_key(version)
+          except UpdateError as exc:
+              sys.exit(f"refused: {version!r} is not X.Y.Z ({exc})")
+          print(f"releasing {version}")
+          PY
+        env:
+          VERSION: ${{ inputs.version }}
+      - name: Refuse to publish an unsigned build
+        if: inputs.publish && inputs.signing == 'skip'
+        run: |
+          echo "refused: signing=skip produces unsigned artifacts, which must never be published." >&2
+          exit 1
+      - name: Read the target matrix from the code that owns it
+        id: matrix
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from raiker.app.release import TARGETS
+          include = [
+              {"target": t.target_id, "runner": t.runner, "os": t.os_name, "arch": t.arch}
+              for t in TARGETS
+          ]
+          print("matrix=" + json.dumps({"include": include}))
+          PY
+      # One clock for every runner in the matrix. Without it each target stamps
+      # itself with its own wall time and the artifacts stop being reproducible.
+      - name: Pin the build clock to the commit
+        id: stamp
+        run: echo "epoch=$(git log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
+
+  # ── 2. The web assets, built once ──────────────────────────────────────
+  # Platform-independent, so building them per target would only be four
+  # chances for four runners to produce four different bundles.
+  web:
+    name: Web assets
+    runs-on: ubuntu-latest
+    needs: plan
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Node
+        # actions/setup-node v5.0.0 (Node 24 runtime)
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: apps/web
+      - name: Build
+        run: npm run build
+        working-directory: apps/web
+      - name: Upload
+        # Tag-pinned rather than SHA-pinned; see the note at the top of this file.
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-assets
+          path: apps/web/dist
+          retention-days: 7
+
+  # ── 3. One artifact per target, built and tested on that target ────────
+  build:
+    name: ${{ matrix.target }}
+    needs: [plan, web]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.plan.outputs.source_date_epoch }}
+      # `secrets` is not a context a step-level `if` can read, and a step cannot
+      # test its own `env`. Deciding at job level whether each identity exists is
+      # the one formulation that works — and it never exposes the secret itself.
+      HAS_APPLE_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE != '' }}
+      HAS_AUTHENTICODE: ${{ secrets.WINDOWS_AUTHENTICODE_CERTIFICATE != '' }}
+      HAS_LINUX_KEY: ${{ secrets.LINUX_PACKAGE_SIGNING_KEY != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install package
+        run: python -m pip install -e .
+      - name: Download web assets
+        # Tag-pinned rather than SHA-pinned; see the note at the top of this file.
+        uses: actions/download-artifact@v4
+        with:
+          name: web-assets
+          path: web-dist
+
+      # The distribution design is explicit that native dependencies need a
+      # packaging test on every target. Resolving them here, on the target's own
+      # runner, is what makes the artifact installable without a network — and
+      # what makes a failure attributable to the platform it happened on.
+      - name: Resolve this platform's wheels
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip wheel . --wheel-dir wheels
+      - name: Assert the encrypted-database wheel is this platform's
+        shell: bash
+        run: |
+          ls wheels/ | grep -i sqlcipher3 || {
+            echo "refused: no sqlcipher3 wheel resolved for ${{ matrix.target }}" >&2
+            exit 1
+          }
+
+      # Each installer format needs that platform's own packaging tool. macOS
+      # has `pkgbuild` and Debian has `dpkg-deb` already; these two do not ship
+      # on their runners.
+      - name: Install the WiX toolset
+        if: matrix.os == 'windows'
+        run: dotnet tool install --global wix
+      - name: Install appimagetool
+        if: matrix.os == 'linux'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/appimagetool" \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x "$RUNNER_TEMP/appimagetool"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      # ── platform signing, when an identity exists ───────────────────────
+      # Each block is skipped without its secrets. `signing: require` then fails
+      # the target at the gate below rather than shipping something unsigned.
+      - name: Import the Apple Developer ID identity
+        id: apple
+        if: matrix.os == 'macos' && env.HAS_APPLE_IDENTITY == 'true'
+        env:
+          APPLE_CERT: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/release.keychain-db"
+          KEYCHAIN_PASSWORD="$(python -c 'import secrets;print(secrets.token_hex(16))')"
+          echo "$APPLE_CERT" | base64 --decode > "$RUNNER_TEMP/identity.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 900 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/identity.p12" -k "$KEYCHAIN" \
+            -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/productsign
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN" login.keychain-db
+          rm -f "$RUNNER_TEMP/identity.p12"
+          echo "available=true" >> "$GITHUB_OUTPUT"
+      - name: Check for an Authenticode identity
+        id: authenticode
+        if: matrix.os == 'windows' && env.HAS_AUTHENTICODE == 'true'
+        shell: bash
+        env:
+          WINDOWS_CERT: ${{ secrets.WINDOWS_AUTHENTICODE_CERTIFICATE }}
+        run: |
+          echo "$WINDOWS_CERT" | base64 --decode > "$RUNNER_TEMP/authenticode.pfx"
+          echo "available=true" >> "$GITHUB_OUTPUT"
+      - name: Check for a Linux package signing key
+        id: gpg
+        if: matrix.os == 'linux' && env.HAS_LINUX_KEY == 'true'
+        env:
+          LINUX_KEY: ${{ secrets.LINUX_PACKAGE_SIGNING_KEY }}
+        run: |
+          echo "$LINUX_KEY" | base64 --decode | gpg --batch --import
+          echo "available=true" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse to build an unsigned artifact when signing was required
+        if: >-
+          inputs.signing == 'require'
+          && steps.apple.outputs.available != 'true'
+          && steps.authenticode.outputs.available != 'true'
+          && steps.gpg.outputs.available != 'true'
+        run: |
+          echo "refused: ${{ matrix.target }} has no signing identity configured." >&2
+          echo "Add its secrets, or run this workflow with signing = skip to" >&2
+          echo "produce an explicitly unsigned test build that cannot publish." >&2
+          exit 1
+
+      - name: Record whether this build is signed
+        id: signed
+        shell: bash
+        run: |
+          if [ "${{ steps.apple.outputs.available }}" = "true" ] \
+            || [ "${{ steps.authenticode.outputs.available }}" = "true" ] \
+            || [ "${{ steps.gpg.outputs.available }}" = "true" ]; then
+            echo "flag=--signed" >> "$GITHUB_OUTPUT"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=" >> "$GITHUB_OUTPUT"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build the payload artifact
+        shell: bash
+        env:
+          RAIKER_RELEASE_SIGNING_KEY: ${{ secrets.RAIKER_RELEASE_SIGNING_KEY }}
+        run: |
+          raiker-release build \
+            --version "${{ inputs.version }}" \
+            --target "${{ matrix.target }}" \
+            --channel "${{ inputs.channel }}" \
+            --out dist \
+            --source-root . \
+            --web-assets web-dist \
+            --wheel-dir wheels \
+            --commit "$GITHUB_SHA" \
+            ${{ steps.signed.outputs.flag }}
+
+      # A release that cannot be rebuilt cannot be checked. Building twice from
+      # one checkout and comparing digests is the cheapest possible proof that
+      # the build depends on its inputs and nothing else.
+      - name: Prove the build is reproducible
+        shell: bash
+        env:
+          RAIKER_RELEASE_SIGNING_KEY: ${{ secrets.RAIKER_RELEASE_SIGNING_KEY }}
+        run: |
+          raiker-release build \
+            --version "${{ inputs.version }}" \
+            --target "${{ matrix.target }}" \
+            --channel "${{ inputs.channel }}" \
+            --out dist-again \
+            --source-root . \
+            --web-assets web-dist \
+            --wheel-dir wheels \
+            --commit "$GITHUB_SHA" \
+            ${{ steps.signed.outputs.flag }}
+          python - <<'PY'
+          import hashlib, pathlib, sys
+          first = sorted(pathlib.Path("dist").glob("raiker-*.zip"))[0]
+          second = pathlib.Path("dist-again") / first.name
+          a = hashlib.sha256(first.read_bytes()).hexdigest()
+          b = hashlib.sha256(second.read_bytes()).hexdigest()
+          if a != b:
+              sys.exit(f"refused: not reproducible\n  {a}\n  {b}")
+          print(f"reproducible: {a}")
+          PY
+          rm -rf dist-again
+
+      - name: Packaging smoke test on this target
+        shell: bash
+        run: |
+          for artifact in dist/raiker-*.zip; do
+            python scripts/packaging_smoke_test.py --artifact "$artifact"
+          done
+
+      - name: Build the native installer
+        shell: bash
+        run: |
+          for artifact in dist/raiker-*.zip; do
+            python scripts/build_installer.py --artifact "$artifact" --out installers
+          done
+
+      - name: Sign the macOS package
+        if: steps.apple.outputs.available == 'true'
+        env:
+          IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID_IDENTITY }}
+          NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_KEY: ${{ secrets.APPLE_NOTARY_PRIVATE_KEY }}
+        run: |
+          echo "$NOTARY_KEY" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          for package in installers/*.pkg; do
+            productsign --sign "$IDENTITY" "$package" "$package.signed"
+            mv "$package.signed" "$package"
+            xcrun notarytool submit "$package" --wait \
+              --issuer "$NOTARY_ISSUER" --key-id "$NOTARY_KEY_ID" \
+              --key "$RUNNER_TEMP/notary.p8"
+            xcrun stapler staple "$package"
+          done
+          rm -f "$RUNNER_TEMP/notary.p8"
+
+      - name: Sign the Windows installer
+        if: steps.authenticode.outputs.available == 'true'
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_AUTHENTICODE_PASSWORD }}
+        run: |
+          $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match 'x64' } | Select-Object -First 1).FullName
+          Get-ChildItem installers\*.msi | ForEach-Object {
+            & $signtool sign /f "$env:RUNNER_TEMP\authenticode.pfx" /p $env:WINDOWS_CERT_PASSWORD `
+              /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $_.FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Sign the Linux packages
+        if: steps.gpg.outputs.available == 'true'
+        env:
+          KEY_PASSWORD: ${{ secrets.LINUX_PACKAGE_SIGNING_KEY_PASSWORD }}
+        run: |
+          for package in installers/*.deb installers/*.AppImage; do
+            [ -e "$package" ] || continue
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$KEY_PASSWORD" \
+              --detach-sign --armor "$package"
+          done
+
+      - name: Upload this target's artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: |
+            dist/raiker-*.zip
+            dist/raiker-*.manifest.json
+            dist/raiker-*.manifest.json.sig
+            installers/*.deb
+            installers/*.AppImage
+            installers/*.pkg
+            installers/*.msi
+            installers/*.asc
+            installers/installers.json
+          if-no-files-found: error
+          retention-days: 7
+
+  # ── 4. The channel index, signed once over every target ────────────────
+  channel:
+    name: Channel index
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install package
+        run: python -m pip install -e .
+      - name: Collect every target's artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: collected
+      - name: Flatten into one release directory
+        run: |
+          mkdir -p dist
+          find collected -type f \( -name 'raiker-*' -o -name '*.deb' -o -name '*.AppImage' \
+            -o -name '*.pkg' -o -name '*.msi' -o -name '*.asc' \) -exec cp {} dist/ \;
+          ls -la dist
+      - name: Refuse an incomplete release
+        run: |
+          python - <<'PY'
+          import pathlib, sys
+          from raiker.app.release import TARGETS
+          names = [p.name for p in pathlib.Path("dist").glob("raiker-*.zip")]
+          missing = [t.target_id for t in TARGETS if not any(t.target_id in n for n in names)]
+          if missing:
+              sys.exit("refused: no artifact for " + ", ".join(missing))
+          print("every target is present: " + ", ".join(sorted(names)))
+          PY
+      - name: Build and sign the channel index
+        env:
+          RAIKER_RELEASE_SIGNING_KEY: ${{ secrets.RAIKER_RELEASE_SIGNING_KEY }}
+        run: |
+          if [ -z "$RAIKER_RELEASE_SIGNING_KEY" ]; then
+            echo "refused: RAIKER_RELEASE_SIGNING_KEY is not configured, so the" >&2
+            echo "channel index cannot be signed and an installed Raiker would" >&2
+            echo "have nothing to verify." >&2
+            exit 1
+          fi
+          raiker-release channel \
+            --version "${{ inputs.version }}" \
+            --channel "${{ inputs.channel }}" \
+            --dir dist
+      # The same verification an installed Raiker performs, run here, so a
+      # release that its own updater would refuse never leaves this workflow.
+      - name: Verify the release the way the product will
+        env:
+          RAIKER_RELEASE_SIGNING_KEY: ${{ secrets.RAIKER_RELEASE_SIGNING_KEY }}
+        run: raiker-release verify --dir dist --channel "${{ inputs.channel }}"
+      - name: Publish the release public key alongside it
+        env:
+          RAIKER_RELEASE_SIGNING_KEY: ${{ secrets.RAIKER_RELEASE_SIGNING_KEY }}
+        run: |
+          python - <<'PY' > dist/release-public-key.txt
+          import os
+          from raiker.app.release import public_key_of
+          print(public_key_of(bytes.fromhex(os.environ["RAIKER_RELEASE_SIGNING_KEY"])).hex())
+          PY
+          echo "pin with: raiker-app update --channel-url <url> --channel-key $(cat dist/release-public-key.txt)"
+      - name: Upload the signed channel
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-channel
+          path: dist
+          if-no-files-found: error
+          retention-days: 30
+
+  # ── 5. Publishing, only when asked and only when signed ────────────────
+  publish:
+    name: Draft release
+    needs: [plan, channel]
+    if: inputs.publish && inputs.signing == 'require'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Collect the signed channel
+        uses: actions/download-artifact@v4
+        with:
+          name: release-channel
+          path: dist
+      # `gh` ships on the runner, so the draft needs no third-party action.
+      - name: Create the draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Signed release artifacts for macOS (Apple Silicon and Intel),
+          Windows 10/11, and Linux.
+
+          Each artifact carries an `installation.json` recording the target it was
+          built for and that platform signing was applied, and is covered by an
+          Ed25519-signed manifest binding its filename and SHA-256. The channel
+          index is signed over the same key; pin it with:
+
+              raiker-app update --channel-url <index url> --channel-key <key>
+
+          The key is published beside the artifacts as `release-public-key.txt`.
+          NOTES
+          gh release create "v${{ inputs.version }}" dist/* \
+            --draft --title "Raiker ${{ inputs.version }}" --notes-file notes.md

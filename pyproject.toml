@@ -37,6 +37,10 @@ raiker-app = "apps.api.launcher:main"
 # The service entry point, unchanged: explicit workspace, explicit port, and the
 # deliberate --allow-public path for reaching Raiker from another machine.
 raiker-web = "apps.api.main:main"
+# The release build (BUG-44). `.github/workflows/release.yml` calls this on each
+# target's own runner; keeping it a console script rather than `python -m` keeps
+# the import of `raiker.app` from happening twice.
+raiker-release = "raiker.app.release:main"
 
 [tool.setuptools.packages.find]
 include = ["raiker*", "apps*"]

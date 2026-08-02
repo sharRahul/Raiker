@@ -60,6 +60,10 @@ raiker-app quit               # stop the host, reporting waiting work first
 raiker-app uninstall          # print exactly what removal takes and what it
                               # keeps; add --yes to carry it out, and
                               # --data keep|export|erase per instance
+raiker-app update             # what this build is: signed release, unsigned
+                              # build, or source checkout. Add --check to ask
+                              # the pinned channel, --apply to install what it
+                              # offers, --rollback VERSION to go back
 ```
 
 To keep project-local data in the repository workspace instead of the default
@@ -73,9 +77,22 @@ raiker-app service status --workspace .
 ```
 
 The same controls are in the app: the **Host** control in the top bar reports
-the state, names what a quit would interrupt, and offers Pause, Restart and
-Quit. Signed installers and a signed update channel are not built yet — see
-`docs/DESKTOP_DISTRIBUTION_DESIGN.md` and BUG-44 in
+the state, names what a quit would interrupt, offers Pause, Restart and Quit,
+and — under **Install & updates** — says what this build is and whether an
+update channel is pinned. Opening it makes no outbound request; Raiker contacts
+no update service until you pin one.
+
+Releases are built by `.github/workflows/release.yml`, started deliberately from
+the Actions tab. It builds a reproducible payload per platform on that
+platform's own runner, proves it rebuilds to the same bytes, runs an
+encrypted-database packaging test there, builds that platform's installer, and
+signs the channel index the updater verifies. **It refuses to build without
+code-signing identities** rather than producing something that looks like a
+release; run it with `signing: skip` to exercise the pipeline and you get
+artifacts named `-unsigned` that the product itself calls unsigned and that the
+publish job will not release. No signed artifact has been published yet. The
+first-run wizard and a native tray icon are still to come — see
+`docs/DESKTOP_DISTRIBUTION_DESIGN.md` and BUG-48 in
 [to be fixed](docs/plans/TO_BE_FIXED.md).
 
 `raiker-web` remains the service entry point for an explicit workspace and port,

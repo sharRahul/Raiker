@@ -1208,3 +1208,79 @@ export interface HostActionResult extends HostStatusView {
   stopping?: boolean;
   restarting?: boolean;
 }
+
+// BUG-44 — what this installation is, and whether it can update itself. Every
+// field here is read from the build that produced the installation rather than
+// configured afterwards, and all of them can honestly be "nothing": a source
+// checkout is `packaged: false, signed: false` and says so.
+export interface InstallationView {
+  version: string;
+  target: string | null;
+  packaged: boolean;
+  signed: boolean;
+  channel: string | null;
+  commit: string | null;
+  built_at: string | null;
+  installer_formats: string[];
+  install_root: string;
+  note: string;
+}
+
+export interface UpdateChannelView {
+  url: string;
+  channel: string;
+  public_key_fingerprint: string;
+}
+
+export interface AvailableUpdateView {
+  channel: string;
+  version: string;
+  target: string;
+  artifact: string;
+  sha256: string;
+  signed: boolean;
+  released_at: string;
+}
+
+export interface RecoveryPointView {
+  version: string;
+  path: string;
+  files: number;
+  bytes: number;
+}
+
+export interface ReleaseTargetView {
+  target_id: string;
+  os: string;
+  arch: string;
+  runner: string;
+  installer_formats: string[];
+  signing: { tool: string; secrets: string[]; note: string };
+}
+
+export interface UpdateStatusView {
+  state:
+    | "source_checkout"
+    | "no_channel"
+    | "unsigned_build"
+    | "up_to_date"
+    | "available"
+    | "unreachable";
+  message: string;
+  installation: InstallationView;
+  channel: UpdateChannelView | null;
+  available: AvailableUpdateView | null;
+  recovery_points: RecoveryPointView[];
+  checked_at: string | null;
+  targets: ReleaseTargetView[];
+  last_check: {
+    state: string;
+    message: string;
+    available_version: string | null;
+    checked_at: string | null;
+  } | null;
+}
+
+export interface UpdateCheckResult extends UpdateStatusView {
+  ok: boolean;
+}

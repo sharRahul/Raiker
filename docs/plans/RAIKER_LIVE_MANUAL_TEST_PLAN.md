@@ -132,8 +132,11 @@ through their Connect dialogs. Ollama discovered nine models, selected
 `gemma4:31b-cloud` globally, and returned the exact requested live reply.
 Evidence: `working/194-live-gemma4-31b-cloud-turn.png`. The Ollama connectivity
 message was duplicated under unrelated hosted-provider cards; configured-state
-evidence is `working/195-live-provider-setup.png`, and the placement defect is
-tracked as BUG-47.
+evidence is `working/195-live-provider-setup.png`. That placement defect was
+tracked as BUG-47 and is fixed (FIXED-93): a test result is now keyed by profile
+id, rendered only inside the card or row that ran it, and names its own provider.
+Evidence: `working/197-BUG-47-local-result-under-ollama-live.png` and
+`working/198-BUG-47-hosted-cards-keep-their-own-live.png`.
 
 ### 5.2 Does a new chat appear on the left?
 

@@ -507,3 +507,128 @@ describe("ModelsView action-category tabs", () => {
     expect(window.location.hash).toBe("#/models?tab=pricing");
   });
 });
+
+// BUG-47 — a provider test answers for the provider that ran it and no other.
+// The reported defect was Ollama's *"responded and exposed 9 models"* appearing
+// beneath the Anthropic and OpenRouter cards: the view held one result string
+// for every card, and the local row that started the test had nowhere to show
+// it at all. Two connected providers, one test, one message, in the right place.
+describe("ModelsView provider test feedback", () => {
+  const ollama = () =>
+    profile({
+      profile_id: "ollama-local-openai-compatible",
+      provider: "ollama",
+      model: "gemma4:31b-cloud",
+      connection_configured: true,
+    });
+  const anthropic = () =>
+    profile({
+      profile_id: "anthropic-hosted",
+      provider: "anthropic",
+      model: "claude-haiku-4-5-20251001",
+      requires_network: true,
+      off_machine: true,
+      local_only: false,
+      endpoint_kind: "hosted",
+      connection_configured: true,
+    });
+
+  it("shows one provider's result only under that provider", async () => {
+    stubFetch({
+      "GET /api/models": models({ profiles: [ollama(), anthropic()] }),
+      "GET /api/models/ollama-local-openai-compatible/provider-models": {
+        profile_id: "ollama-local-openai-compatible",
+        provider: "ollama",
+        status: "available",
+        reason_code: null,
+        models: ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+      },
+    });
+    render(ModelsView);
+
+    const tests = await screen.findAllByRole("button", { name: "Test" });
+    expect(tests).toHaveLength(2);
+    await fireEvent.click(tests[0]);
+
+    const message = "Ollama responded and exposed 9 models.";
+    await waitFor(() => expect(screen.getAllByText(message)).toHaveLength(1));
+    // Attached to Ollama, and nowhere near Anthropic's card.
+    const result = screen.getByText(message);
+    expect(result).toHaveAttribute("data-test-result", "ollama-local-openai-compatible");
+    expect(result.closest(".local-row")).not.toBeNull();
+    expect(
+      within(document.querySelector("article.provider-card") as HTMLElement).queryByText(message),
+    ).toBeNull();
+  });
+
+  it("keeps each provider's result independent when both are tested", async () => {
+    stubFetch({
+      "GET /api/models": models({ profiles: [ollama(), anthropic()] }),
+      "GET /api/models/ollama-local-openai-compatible/provider-models": {
+        profile_id: "ollama-local-openai-compatible",
+        provider: "ollama",
+        status: "available",
+        reason_code: null,
+        models: ["a"],
+      },
+      "GET /api/models/anthropic-hosted/provider-models": {
+        profile_id: "anthropic-hosted",
+        provider: "anthropic",
+        status: "available",
+        reason_code: null,
+        models: ["claude-haiku-4-5-20251001", "claude-opus-4-5"],
+      },
+    });
+    render(ModelsView);
+
+    const tests = await screen.findAllByRole("button", { name: "Test" });
+    await fireEvent.click(tests[0]);
+    await waitFor(() =>
+      expect(screen.getByText("Ollama responded and exposed 1 model.")).toBeTruthy(),
+    );
+    await fireEvent.click(screen.getAllByRole("button", { name: "Test" })[1]);
+    await waitFor(() =>
+      expect(screen.getByText("Anthropic responded and exposed 2 models.")).toBeTruthy(),
+    );
+
+    // Testing the second provider does not overwrite or duplicate the first.
+    expect(screen.getAllByText("Ollama responded and exposed 1 model.")).toHaveLength(1);
+    expect(screen.getAllByText("Anthropic responded and exposed 2 models.")).toHaveLength(1);
+    expect(
+      screen.getByText("Anthropic responded and exposed 2 models."),
+    ).toHaveAttribute("data-test-result", "anthropic-hosted");
+  });
+
+  it("names the provider it could not reach, so a failure is attributable too", async () => {
+    stubFetch({ "GET /api/models": models({ profiles: [ollama(), anthropic()] }) });
+    render(ModelsView);
+
+    const tests = await screen.findAllByRole("button", { name: "Test" });
+    await fireEvent.click(tests[1]);
+    await waitFor(() =>
+      expect(screen.getByText("Raiker could not reach Anthropic.")).toBeTruthy(),
+    );
+    expect(screen.queryByText("Raiker could not reach Ollama.")).toBeNull();
+  });
+
+  it("names the provider in an unreachable answer, not only in a successful one", async () => {
+    // An anonymous "Provider unreachable" is what let a misplaced result go
+    // unnoticed: nothing in the sentence contradicted the card above it.
+    stubFetch({
+      "GET /api/models": models({ profiles: [ollama(), anthropic()] }),
+      "GET /api/models/ollama-local-openai-compatible/provider-models": {
+        profile_id: "ollama-local-openai-compatible",
+        provider: "ollama",
+        status: "unavailable",
+        reason_code: "provider_unreachable",
+        models: [],
+      },
+    });
+    render(ModelsView);
+
+    await fireEvent.click((await screen.findAllByRole("button", { name: "Test" }))[0]);
+    const result = await screen.findByText(/^Ollama could not be reached\./);
+    expect(result).toHaveAttribute("data-test-result", "ollama-local-openai-compatible");
+    expect(result.closest(".local-row")).not.toBeNull();
+  });
+});

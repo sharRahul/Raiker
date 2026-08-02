@@ -11,11 +11,11 @@ import base64
 import io
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from httpx import Response
 
 from raiker.api.app import create_app
 from raiker.cli.principal_resolver import bootstrap_owner
@@ -56,9 +56,11 @@ def headers(client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {resp.json()['token']}"}
 
 
+# `Any`, matching the rest of the suite: TestClient returns whichever httpx
+# the environment resolved, and both are installed in CI.
 def _upload(
     client: TestClient, headers: dict[str, str], filename: str, data: bytes
-) -> Response:
+) -> Any:
     return client.post(
         "/api/skills",
         headers=headers,

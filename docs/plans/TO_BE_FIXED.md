@@ -117,6 +117,19 @@ built **without platform signing**, and every surface says so; the credential wa
 entered through the product UI and is not stored in the repository or test
 artifacts.
 
+FIXED-99 was verified on **2026-08-03** against a running `raiker-web` whose
+model is a local OpenAI-compatible stub rather than a hosted provider, for the
+reason ADD-02's run states: what this entry changes is how the runtime handles
+one specific batch shape, and a hosted model does not reliably emit the same
+batch twice. Everything downstream of the stub — orchestrator, broker, policy
+engine, approvals inbox, suspended-turn store and resume endpoints — is the
+shipped product. The live scenario is
+[`e2e/bug-52-first-pass-denial-live.spec.ts`](../../apps/web/e2e/bug-52-first-pass-denial-live.spec.ts),
+and its screenshots are `working/bug-52-*`. It drives both shapes the entry
+names: a read-only batch whose refused first call no longer ends the turn, and a
+batch whose refused first call is followed by two writes, which now reaches
+**decision 2 of 3** and then **decision 3 of 3** instead of dropping both.
+
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | FIXED-01 | High | Models | Fixed |
@@ -217,12 +230,15 @@ artifacts.
 | FIXED-96 | Medium | Extensions / MCP agent reachability | Fixed (B8 review; found the surface was silent) |
 | FIXED-97 | High | Runtime / undeclared event types | Fixed (found during B6 live testing; B4's drop evidence killed the turn) |
 | FIXED-98 | High | Policy / advertised tools with no verdict | Fixed (found while implementing B6/B7) |
+| FIXED-99 | Medium | Runtime / batched policy refusal | Fixed (was BUG-52) |
 | BUG-46 | Medium | Storage / Windows locked memory | Open (found while verifying FIXED-91) |
 | BUG-48 | Medium | Distribution / setup wizard and native tray | Open (split out of BUG-44) |
 | BUG-49 | Low | CI / release workflow action pinning | Open (found while building the release workflow) |
 | BUG-50 | Medium | Storage / connection cache holds every workspace open | Open (found while verifying FIXED-92) |
 | BUG-51 | Low | Policy / dead `denied_actions` configuration | Open (found while implementing B6/B7) |
-| BUG-52 | Medium | Runtime / first-pass denial drops the rest of its batch | Open (found while implementing ADD-02) |
+| BUG-53 | Low | Chat / multi-call answer text runs together | Open (found while verifying FIXED-99) |
+| BUG-54 | Medium | Web e2e / the live stub model is not in the repository | Open (found while writing FIXED-99's live scenario) |
+| BUG-55 | Low | Chat / a disabled transcript block reads as live code | Open (found while verifying FIXED-99) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8 complete; 12 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -3608,6 +3624,86 @@ raises a decision in Approvals instead of failing with a policy denial.
 
 ---
 
+## FIXED-99 — A policy refusal in a *fresh* batch dropped the calls behind it *(was BUG-52)*
+
+**Status: fixed in this change.**
+
+**Observed.** ADD-02 made an approval boundary queue the rest of the model's
+batch, and made a refusal *inside* that queue skip its own call and continue. A
+refusal in the batch's **first pass** did neither. In
+`raiker/runtime/orchestrator.py::_arun_agent_loop`, a `deny` at index *k* of a
+fresh batch set `status = "denied"`, ended the turn, and emitted
+`model_tool_calls_dropped` for calls *k+1…n*. The same refusal therefore produced
+two different outcomes depending only on whether the owner happened to have made
+a decision earlier in the same batch — which is not a rule anyone can reason
+about, least of all the model, which was told "denied" and left to guess how much
+of what it asked for that covered.
+
+**Reproduce.** Have the model propose `[read_file(../escape.md),
+write_file(one.md), write_file(three.md)]` in one batch, with no approval ahead
+of the refusal. The turn ended at the refused read and both writes were dropped.
+Move an approval-bearing call in front of the same refused read and it was
+skipped while the calls behind it were still offered for a decision.
+
+**Root cause.** Two places decided what a non-`allow` verdict meant, and they
+disagreed. The serial execution loop broke on `decision != "allow"`, so nothing
+after a refusal was ever brokered; the walk that followed then treated the first
+non-`allow` call as *the* boundary, queueing its remainder only when the verdict
+was `needs_approval`. The queue drain added by ADD-02 had the right rule and was
+unreachable from the first pass.
+
+**Fix applied.** The first pass now walks the batch the way the queue does.
+
+* **Only an approval stops the batch.** The serial loop breaks on
+  `needs_approval` alone, so a call after a refusal is brokered and governed on
+  its own terms rather than dying with the one in front of it.
+* **A refusal is answered against its own call.** It is reported with the same
+  `queued_denial_outcome` payload the drained queue already used — the one that
+  names the tool and says explicitly that the other calls in the batch were
+  decided separately — and the batch carries on.
+* **Executed results and refusals go back together.** One assistant message
+  names every call that reached an outcome and one tool message answers each, in
+  the order the model proposed them, so the next model call sees exactly which of
+  its calls ran and which policy would not run.
+* **`denied` is reserved for a batch with nothing left.** A batch in which every
+  call was refused still ends the turn as `denied` with the same message, so the
+  long-standing single-refusal behaviour is unchanged. A refused call never
+  becomes the turn's `last_result`, so it cannot make a turn that went on to
+  answer correctly read as failed.
+* **Nothing is dropped at a policy boundary.** `model_tool_calls_dropped` is now
+  emitted only for calls that genuinely will not run — the tool-call budget.
+
+**Also added here: the refusal is now visible.** `policy_decision` is written by
+the broker and is durable-only, so before this the only thing that told a
+watching owner a call had been refused was the turn ending on it. A new streamed
+`model_tool_call_refused` event (tool name and governed reason codes; no
+arguments, no workspace content) carries it into the transcript, where Build
+renders it in its governance disclosure and Chat renders a **Policy refused one
+call in this turn** card naming the tool and its reasons. Without it, closing this
+entry would have traded a turn that stopped for a call that silently disappeared.
+
+**Evidence.** `tests/test_batched_approval_queue.py::TestAFirstPassDenialSkipsOnlyItsOwnCall`
+covers the read behind a refusal still running and still reaching the model, the
+refusal's narrow wording, the batch carrying on to its next decision, the parked
+conversation stating the refusal without spending budget on it, the symmetry the
+defect broke (the same refusal either side of a decision), and the two cases that
+must not change — an all-refused batch and a single refused call. The live
+scenario is
+[`e2e/bug-52-first-pass-denial-live.spec.ts`](../../apps/web/e2e/bug-52-first-pass-denial-live.spec.ts);
+its screenshots are `working/bug-52-*`.
+
+**Found and not fixed here.** Three things this work surfaced are recorded as
+BUG-53 (a multi-call turn's answer text runs together in Chat), BUG-54 (the live
+stub model both batch scenarios depend on is not in the repository), and BUG-55
+(ninety lines of the Chat transcript, including a second approval card with
+different copy, are disabled behind `{#if false}`).
+
+**UI when closed.** A batch containing one refused call reports that call as
+refused and still presents the rest, in Chat and in Approvals, exactly as it does
+when the refusal falls after an approval.
+
+---
+
 ## BUG-46 — SQLCipher cannot lock key-bearing pages on this Windows host
 
 **Status: open; found while verifying FIXED-91.**
@@ -3729,39 +3825,87 @@ same tools). Do not leave a third policy set that looks load-bearing and is not.
 
 ---
 
-## BUG-52 — A policy denial in a *fresh* batch still drops the calls behind it
+## BUG-53 — A multi-call turn's answer text runs together in Chat
 
-**Status: open; found while implementing ADD-02.**
+**Status: open; found while verifying FIXED-99.**
 
-**Observed.** ADD-02 made an approval boundary queue the rest of the model's
-batch, and made a denial *inside* that queue skip its own call and continue. A
-denial in the batch's first pass does neither. In
-`raiker/runtime/orchestrator.py::_arun_agent_loop`, a `deny` at index *k* of a
-fresh batch sets `status = "denied"`, ends the turn, and emits
-`model_tool_calls_dropped` for calls *k+1…n* — the pre-ADD-02 behaviour. So the
-same refusal produces two different outcomes depending only on whether the owner
-happened to have made a decision earlier in the same batch.
+**Observed.** A turn in which the model speaks more than once — every turn that
+calls a tool and then answers — renders as one unbroken paragraph with no space
+between the two utterances:
 
-**Reproduction.** Have the model propose `[write_file, read_file(../outside),
-write_file]` in one batch with no approval ahead of the denial. The turn ends at
-the refused read and the third call is dropped. Move an approval-bearing call in
-front of it and the same refused read is skipped while the third call is offered
-for a decision (`tests/test_batched_approval_queue.py::
-TestTheQueueIsDrainedOnResume::test_a_policy_refusal_inside_the_queue_skips_only_its_own_call`).
+> Reading ../escape.md and listing the workspace.I could not read ../escape.md —
+> policy refused that one call…
 
-**Why it was left.** Ending the turn on a first-pass denial is long-standing,
-separately tested behaviour that surfaces as a `denied` turn status in Chat and
-Build. Changing it is a behavioural change to a path ADD-02 does not touch, and
-doing it silently inside this change would have been worse than recording it.
+`working/bug-52-chat-refusal-does-not-end-the-turn.png` shows it.
 
-**Required fix.** Make the first pass behave like the queue: report the refusal
-against its own call and continue the batch, reserving the `denied` turn status
-for a batch in which nothing else remains. Keep `model_tool_calls_dropped` for
-calls that genuinely will not run.
+**Root cause.** `collectText` in `apps/web/src/lib/turnPhases.ts` joins every
+streamed `text_delta` with `""`, which is right *within* one model response and
+wrong *between* two of them: the deltas of the second response begin a new
+sentence, and nothing marks the seam.
 
-**UI when closed.** A batch containing one refused call reports that call as
-refused and still presents the rest, in Chat and in Approvals, exactly as it does
-today when the refusal falls after an approval.
+**Required fix.** Separate the text of successive model responses in a turn —
+either by paragraph, matching how the model itself wrote them, or by carrying a
+response boundary through the stream so `collectText` can break on it. Do not
+insert whitespace blindly between deltas; inside one response that would break
+words in the middle.
+
+**UI when closed.** A turn that reads a file and then answers reads as two
+statements rather than one run-on sentence, in Chat and in Build.
+
+---
+
+## BUG-54 — The live end-to-end stub model is not in the repository
+
+**Status: open; found while writing FIXED-99's live scenario.**
+
+**Observed.** Two live specs —
+[`e2e/add-02-batched-approval-queue-live.spec.ts`](../../apps/web/e2e/add-02-batched-approval-queue-live.spec.ts)
+and [`e2e/bug-52-first-pass-denial-live.spec.ts`](../../apps/web/e2e/bug-52-first-pass-denial-live.spec.ts)
+— name `python <scratch>/stub_model.py` as a prerequisite. That file exists only
+in the scratch directory of the session that wrote each spec, so neither
+scenario can be re-run by anyone else, and the exact batch each one asserts on
+is recorded nowhere but in prose.
+
+**Why it matters.** These two specs are the evidence behind ADD-02 and FIXED-99.
+Evidence that cannot be reproduced is a claim. Every other live spec drives a
+real provider the reader can also connect; these two do not, and the thing that
+replaces the provider is missing.
+
+**Required fix.** Commit the stub under `apps/web/e2e/` (or `scripts/`) as a
+checked-in fixture with its own README line, and point both specs at it by
+repository path. It is a local, loopback-only HTTP server with no credential and
+no network, so it introduces no new boundary — it is the *input* to the run, and
+it belongs beside the specs that depend on it.
+
+**UI when closed.** None — this is reproducibility of the evidence behind two
+entries in this document.
+
+---
+
+## BUG-55 — A disabled block in the Chat transcript reads as live code
+
+**Status: open; found while verifying FIXED-99.**
+
+**Observed.** `apps/web/src/lib/views/ChatView.svelte` wraps roughly ninety lines
+of the transcript — a phase line, an answer paragraph, an error line, a response
+metadata row and a **complete second approval card** — in `{#if false}`. All of
+it is dead. The live approval card is a separate, later block, and the two say
+different things: the disabled one tells the owner to "Review it in the Approvals
+inbox", while the live one carries the batch position, the cross-tab resume state
+and the **Continue now** control.
+
+**Why it matters.** Someone changing the approval copy will reasonably edit the
+first card they find and see no change in the product; a reviewer auditing what
+Chat tells an owner about a governed action will read the wrong text. It is the
+same failure mode as BUG-51 — configuration that looks load-bearing and is not.
+
+**Required fix.** Delete the disabled block, or, where a fragment is genuinely
+being kept for a planned redesign, move it out of the component and say so.
+Nothing that renders governance copy should exist twice with two different
+wordings.
+
+**UI when closed.** No user-visible change; this is a maintainability and
+auditability defect.
 
 ---
 

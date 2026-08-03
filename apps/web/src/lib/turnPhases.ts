@@ -35,6 +35,10 @@ const EVENT_PHASE: Record<string, PhaseId> = {
   // ADD-02 — calls held behind an approval boundary. Still the act phase: they
   // are work this turn will do, not work it abandoned.
   model_tool_calls_queued: "act",
+  // BUG-52 — one call of a batch policy refused while the rest carried on. The
+  // turn no longer ends on it, so this is the only thing in the transcript that
+  // says the call was asked for and refused.
+  model_tool_call_refused: "act",
   // B7 — a delegated read-only investigation. Metadata only: the findings go to
   // the model, never to the transcript.
   subagent_completed: "act",
@@ -117,6 +121,11 @@ export function summarizeEvent(ev: StreamEvent): string {
       return `Model request failed safely: ${str(p.safe_error_code) || str(p.finish_reason)}.`;
     case "model_tool_call_rejected":
       return `Tool call rejected: ${str(p.tool_name)} — ${str(p.reason)}.`;
+    case "model_tool_call_refused": {
+      const reasons = Array.isArray(p.reasons) ? p.reasons.join(", ") : str(p.reasons);
+      // "Refused" rather than "denied": the call was refused, the turn was not.
+      return `Policy refused ${str(p.tool_name)}${reasons ? ` — ${reasons}` : ""}. The other calls in this batch were decided separately.`;
+    }
     case "verification_started":
       return "Verification started.";
     case "verification_completed":

@@ -40,7 +40,7 @@
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, relativeTime } from "../format";
   import { hasSteps, planFromEvent } from "../agentPlan";
-  import { reactionForPrompt, thinkingSteps } from "../chatPresentation";
+  import { reactionForPrompt, refusedCalls, thinkingSteps } from "../chatPresentation";
   import { chatProfiles, refreshModels } from "../models.svelte";
 
   interface ChatTurn {
@@ -903,6 +903,7 @@
     {#each turns as turn (turn.id)}
       {@const answer = answerText(turn)}
       {@const thinking = thinkingSteps(turn.events)}
+      {@const refused = refusedCalls(turn.events)}
       {@const reaction = reactionForPrompt(turn.prompt)}
       {@const uploadedAttachments = turn.attachments.filter((a) => a.source !== "generated")}
       {@const generatedFiles = turn.attachments.filter((a) => a.source === "generated")}
@@ -1109,6 +1110,35 @@
 
           {#if turn.error !== null}
             <p class="error-line" role="alert">{turn.error}</p>
+          {/if}
+
+          {#if refused.length > 0}
+            <!-- BUG-52 — a refusal now ends its own call rather than the turn,
+                 so the turn goes on to answer. Said here because a refusal the
+                 owner is never told about is a call that silently disappeared:
+                 the model asked for it, policy would not run it, and everything
+                 else in the batch was decided on its own terms. -->
+            <div class="refusal-card">
+              <p class="refusal-title">
+                <Icon name="shield" size={15} />
+                {refused.length === 1
+                  ? "Policy refused one call in this turn"
+                  : `Policy refused ${refused.length} calls in this turn`}
+              </p>
+              <ul class="refusal-list">
+                {#each refused as call, i (i)}
+                  <li>
+                    <strong>{humanize(call.toolName)}</strong>{call.reasons.length > 0
+                      ? ` — ${call.reasons.join(", ")}`
+                      : ""}
+                  </li>
+                {/each}
+              </ul>
+              <p class="refusal-note">
+                Nothing ran for {refused.length === 1 ? "it" : "them"}. The rest of this turn was
+                decided separately.
+              </p>
+            </div>
           {/if}
 
           {#if turn.response?.status === "needs_approval" && turn.response.approval}
@@ -1648,6 +1678,35 @@
     align-items: center;
     gap: var(--space-2);
     flex-wrap: wrap;
+  }
+  /* BUG-52 — a refusal, not a request. It carries no action because there is
+     nothing for the owner to decide: the call did not run and the turn moved on.
+     Danger rather than warn so it does not read as another pending decision. */
+  .refusal-card {
+    margin-top: 0.65rem;
+    border: 1px solid var(--danger-border);
+    background: var(--danger-soft);
+    border-radius: var(--r-sm);
+    padding: 0.65rem 0.85rem;
+  }
+  .refusal-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 650;
+    font-size: 0.86rem;
+    margin: 0 0 0.3rem;
+    color: var(--danger);
+  }
+  .refusal-list {
+    margin: 0 0 0.3rem;
+    padding-left: 1.1rem;
+    font-size: 0.85rem;
+  }
+  .refusal-note {
+    font-size: 0.76rem;
+    color: var(--text-2);
+    margin: 0;
   }
   /* A turn that is picking itself up again reads as progress, not as a warning
      still waiting on the owner. */

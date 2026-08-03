@@ -176,7 +176,11 @@ resume walks it:
   against that call and the queue continues (`DENIED → POLICY_REVIEWED` is now a
   legal runtime transition, because a refusal inside a batch ends a call rather
   than a turn). The model is told which call was refused so it does not read the
-  refusal as covering the ones still to come.
+  refusal as covering the ones still to come. This change left that rule applying
+  only *inside the queue* — a refusal in the batch's first pass still ended the
+  turn — and recorded the asymmetry as BUG-52; **FIXED-99 has since closed it**,
+  so the first pass and the queue now behave identically and the refusal is
+  streamed to the transcript as `model_tool_call_refused`.
 
 **Governed outcome.** Approvals says **Decision 2 of 3** on the row and in the
 review pane; resolving one says how many calls are still queued behind it; and

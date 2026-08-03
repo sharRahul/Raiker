@@ -31,6 +31,34 @@ export function thinkingSteps(events: StreamEvent[]): string[] {
   return [...new Set(steps)];
 }
 
+export interface RefusedCall {
+  toolName: string;
+  reasons: string[];
+}
+
+/**
+ * The calls policy refused during a turn, in the order they were refused (BUG-52).
+ *
+ * A refusal used to end the turn, so "denied" plus a reason was the whole story
+ * Chat had to tell. Now that a refusal ends only its own call and the batch
+ * carries on, the turn finishes normally — and without this the transcript would
+ * show a call proposed and simply never answered.
+ */
+export function refusedCalls(events: StreamEvent[]): RefusedCall[] {
+  const calls: RefusedCall[] = [];
+  for (const event of events) {
+    if (event.kind !== "lifecycle" || event.event_type !== "model_tool_call_refused") continue;
+    const payload = event.payload ?? {};
+    const toolName = typeof payload.tool_name === "string" ? payload.tool_name : "";
+    if (toolName === "") continue;
+    const reasons = Array.isArray(payload.reasons)
+      ? payload.reasons.filter((reason): reason is string => typeof reason === "string")
+      : [];
+    calls.push({ toolName, reasons });
+  }
+  return calls;
+}
+
 export function reactionForPrompt(prompt: string): ChatReaction | null {
   if (prompt.trim() === "") return null;
   return REACTIONS.find(({ pattern }) => pattern.test(prompt))?.reaction ?? null;

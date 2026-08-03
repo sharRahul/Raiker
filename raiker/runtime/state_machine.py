@@ -39,7 +39,10 @@ VALID_TRANSITIONS = {
     "POLICY_REVIEWED": {"EXECUTING", "WAITING_FOR_APPROVAL", "DENIED", "RESPONDING"},
     "EXECUTING": {"OBSERVING"},
     "WAITING_FOR_APPROVAL": {"RESPONDING"},
-    "DENIED": {"RESPONDING"},
+    # DENIED -> POLICY_REVIEWED is ADD-02: a policy refusal inside a batched turn
+    # ends that *call*, not the turn. The queue behind it still holds decisions
+    # the owner has a right to make, so the loop reviews the next one.
+    "DENIED": {"RESPONDING", "POLICY_REVIEWED"},
     "OBSERVING": {"VERIFYING"},
     # VERIFYING -> POLICY_REVIEWED enables the bounded model-driven multi-tool loop.
     "VERIFYING": {"RESPONDING", "POLICY_REVIEWED"},

@@ -798,6 +798,11 @@ export interface ApprovalView {
   executes_action: boolean; // true only for an approved, single-use connector write intent
   critical: boolean; // server-supplied: needs elevated, human-only lifecycle
   resolved_by: string | null;
+  // ADD-02 — where this decision sits in the batch of tool calls its turn
+  // proposed. 1 / 1 for an ordinary approval; 2 / 3 means two more decisions are
+  // queued behind this one on the same turn.
+  queue_position: number;
+  queue_total: number;
 }
 
 // raiker/control/dashboard.py ApprovalDetailView.to_dict()
@@ -843,7 +848,15 @@ export interface ResolveApprovalResult {
     output_redacted?: boolean;
   };
   // B2 — whether a turn was parked on this approval and can now pick up again.
-  resume?: { resumable: boolean; session_id?: string; turn_id?: string };
+  // ADD-02 adds the batch counters and how many calls the resume still owes.
+  resume?: {
+    resumable: boolean;
+    session_id?: string;
+    turn_id?: string;
+    queue_position?: number;
+    queue_total?: number;
+    queued_calls?: number;
+  };
 }
 
 export interface ResolveCriticalApprovalResult {
@@ -869,6 +882,11 @@ export interface ApprovalInfo {
   // True when the turn's working state was parked, so resolving this approval
   // continues the same turn rather than costing a re-prompt.
   resumable?: boolean;
+  // ADD-02 — the batch this decision belongs to, and how many of its calls are
+  // still queued behind it.
+  queue_position?: number;
+  queue_total?: number;
+  queued_calls?: number;
 }
 
 // raiker.contracts.models.AgentResponse.to_dict()

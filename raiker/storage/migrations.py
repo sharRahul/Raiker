@@ -2025,6 +2025,30 @@ CREATE INDEX IF NOT EXISTS idx_suspended_turns_status
 """
 
 
+# ADD-02 — the rest of the model's batch, parked with the turn.
+#
+# B2 parked one call. A model that proposes three mutations in one batch has two
+# more waiting behind the first approval, and dropping them meant the owner
+# decided one action while the other two disappeared with an event and no way
+# back. These three columns are the queue:
+#
+# `pending_calls_json` is the ordered remainder — the calls after the parked one,
+# each `{call_id, tool_name, arguments}` — replayed one at a time on resume, each
+# re-checked against its own decision mode rather than inheriting the first
+# decision. `queue_position` and `queue_total` place the parked call inside the
+# batch it came from, which is what lets Approvals say "decision 2 of 3" instead
+# of presenting an isolated action.
+#
+# Defaults describe the pre-ADD-02 world exactly: a row written before this
+# migration is a single call, at position 1 of 1, with nothing queued behind it.
+SUSPENDED_TURN_QUEUE_MIGRATION_ID = "RAIKER-1036-suspended-turn-queue"
+SUSPENDED_TURN_QUEUE_SQL = """
+ALTER TABLE suspended_turns ADD COLUMN pending_calls_json TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE suspended_turns ADD COLUMN queue_position INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE suspended_turns ADD COLUMN queue_total INTEGER NOT NULL DEFAULT 1;
+"""
+
+
 # BUG-07 — the file inspector's authorization record.
 #
 # An uploaded attachment is owned by a principal, but "this account may read

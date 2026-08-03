@@ -108,6 +108,36 @@ describe("ChatView — cross-tab approval continuation (BUG-24)", () => {
     expect(screen.getByRole("link", { name: "Review approval" })).toBeInTheDocument();
   });
 
+  // ADD-02 — a turn that proposed a batch asks for more than one decision. The
+  // transcript carries the runtime's own statement of which one this is, so the
+  // owner reads three approvals as one plan rather than as the agent proposing
+  // the same thing three times.
+  it("carries the batch position the runtime stated into the transcript", async () => {
+    stubFetch(baseRoutes());
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+        onEvent({
+          kind: "final", text: "", event_type: "", payload: {},
+          response: {
+            ...PARKED,
+            approval: {
+              ...PARKED.approval,
+              message: "Approval required — decision 2 of 3 in this batch.",
+              queue_position: 2,
+              queue_total: 3,
+              queued_calls: 1,
+            },
+          } as AgentResponse,
+        });
+      },
+    );
+    render(ChatView, {});
+    await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Write three" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText(/decision 2 of 3 in this batch/i)).toBeInTheDocument();
+  });
+
   it("flips to Approved — continuing… and streams the resumption, without a reload", async () => {
     stubFetch(baseRoutes({ "GET /api/approvals/resumable": { session_id: "sess_1", turns: [RESUMABLE] } }));
     let resolveStream: (() => void) | undefined;

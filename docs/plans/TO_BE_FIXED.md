@@ -222,6 +222,7 @@ artifacts.
 | BUG-49 | Low | CI / release workflow action pinning | Open (found while building the release workflow) |
 | BUG-50 | Medium | Storage / connection cache holds every workspace open | Open (found while verifying FIXED-92) |
 | BUG-51 | Low | Policy / dead `denied_actions` configuration | Open (found while implementing B6/B7) |
+| BUG-52 | Medium | Runtime / first-pass denial drops the rest of its batch | Open (found while implementing ADD-02) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8 complete; 12 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -3725,6 +3726,42 @@ reconcile it with `approval_required_actions` (which currently governs those
 same tools). Do not leave a third policy set that looks load-bearing and is not.
 
 **UI when closed.** No user-visible change; this is an auditability defect.
+
+---
+
+## BUG-52 — A policy denial in a *fresh* batch still drops the calls behind it
+
+**Status: open; found while implementing ADD-02.**
+
+**Observed.** ADD-02 made an approval boundary queue the rest of the model's
+batch, and made a denial *inside* that queue skip its own call and continue. A
+denial in the batch's first pass does neither. In
+`raiker/runtime/orchestrator.py::_arun_agent_loop`, a `deny` at index *k* of a
+fresh batch sets `status = "denied"`, ends the turn, and emits
+`model_tool_calls_dropped` for calls *k+1…n* — the pre-ADD-02 behaviour. So the
+same refusal produces two different outcomes depending only on whether the owner
+happened to have made a decision earlier in the same batch.
+
+**Reproduction.** Have the model propose `[write_file, read_file(../outside),
+write_file]` in one batch with no approval ahead of the denial. The turn ends at
+the refused read and the third call is dropped. Move an approval-bearing call in
+front of it and the same refused read is skipped while the third call is offered
+for a decision (`tests/test_batched_approval_queue.py::
+TestTheQueueIsDrainedOnResume::test_a_policy_refusal_inside_the_queue_skips_only_its_own_call`).
+
+**Why it was left.** Ending the turn on a first-pass denial is long-standing,
+separately tested behaviour that surfaces as a `denied` turn status in Chat and
+Build. Changing it is a behavioural change to a path ADD-02 does not touch, and
+doing it silently inside this change would have been worse than recording it.
+
+**Required fix.** Make the first pass behave like the queue: report the refusal
+against its own call and continue the batch, reserving the `denied` turn status
+for a batch in which nothing else remains. Keep `model_tool_calls_dropped` for
+calls that genuinely will not run.
+
+**UI when closed.** A batch containing one refused call reports that call as
+refused and still presents the rest, in Chat and in Approvals, exactly as it does
+today when the refusal falls after an approval.
 
 ---
 

@@ -850,6 +850,11 @@ class ApprovalView:
     # Critical approvals use the elevated, human-only RuntimeAuthority lifecycle.
     critical: bool = False
     resolved_by: str | None = None
+    # ADD-02 — where this decision sits in the batch of tool calls the turn
+    # proposed. 1 of 1 for an ordinary single-call approval; "2 of 3" tells the
+    # owner two more decisions are queued behind this one on the same turn.
+    queue_position: int = 1
+    queue_total: int = 1
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -1383,10 +1388,16 @@ class DashboardService:
             for row in self.store.list_event_index(limit=250)
             if str(row.get("session_id", "")) in session_ids
         ]
-        approvals = [
-            self._approval_view(row)
+        approval_rows = [
+            row
             for row in self.store.list_approvals()
             if str(row.get("session_id", "")) in session_ids
+        ]
+        approval_queue = self.store.suspended_turn_queue_positions(
+            [str(row.get("approval_id", "")) for row in approval_rows]
+        )
+        approvals = [
+            self._approval_view(row, queue=approval_queue) for row in approval_rows
         ]
         subagents = [
             row for row in self.store.list_subagent_contracts()
@@ -2941,12 +2952,15 @@ class DashboardService:
         user_id: str | None = None,
         principal_id: str | None = None,
     ) -> list[ApprovalView]:
-        return [
-            self._approval_view(row)
-            for row in self.store.list_approvals(
-                status=status, user_id=user_id, principal_id=principal_id
-            )
-        ]
+        rows = self.store.list_approvals(
+            status=status, user_id=user_id, principal_id=principal_id
+        )
+        # ADD-02 — one join for the whole page rather than a query per row, so a
+        # batched turn's approvals can each say which decision they are.
+        positions = self.store.suspended_turn_queue_positions(
+            [str(row.get("approval_id", "")) for row in rows]
+        )
+        return [self._approval_view(row, queue=positions) for row in rows]
 
     def get_approval(
         self,
@@ -4309,11 +4323,16 @@ class DashboardService:
         return max(0, int(delta.total_seconds()))
 
     @classmethod
-    def _approval_view(cls, row: dict[str, Any]) -> ApprovalView:
+    def _approval_view(
+        cls, row: dict[str, Any], *, queue: dict[str, tuple[int, int]] | None = None
+    ) -> ApprovalView:
         tool_name = str(row.get("tool_name", ""))
         status = str(row.get("status", ""))
         created_at = str(row.get("created_at", ""))
         expires_at = str(row.get("expires_at", "")) or None
+        # An approval with no parked turn behind it is a batch of one, which is
+        # what the defaults say.
+        queue_position, queue_total = (queue or {}).get(str(row["approval_id"]), (1, 1))
         return ApprovalView(
             approval_id=str(row["approval_id"]),
             action_id=str(row.get("action_id", "")),
@@ -4330,6 +4349,8 @@ class DashboardService:
             is_expired=status == "pending" and bool(expires_at and utc_now() > expires_at),
             critical=bool(row.get("critical")),
             resolved_by=(str(row["approved_by"]) if row.get("approved_by") else None),
+            queue_position=queue_position,
+            queue_total=queue_total,
         )
 
     def _approval_detail(
@@ -4337,7 +4358,10 @@ class DashboardService:
     ) -> ApprovalDetailView:
         from raiker.approvals.execution import ApprovalExecutionBridge
 
-        view = self._approval_view(row)
+        approval_id = str(row["approval_id"])
+        view = self._approval_view(
+            row, queue=self.store.suspended_turn_queue_positions([approval_id])
+        )
         try:
             raw_args = json.loads(str(row.get("arguments_json", "{}")))
         except (ValueError, TypeError):

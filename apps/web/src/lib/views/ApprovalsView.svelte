@@ -5,7 +5,7 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, auth, getToken, setToken, ApiError } from "../api";
-  import { publishApprovalResolved } from "../approvalResume";
+  import { alreadyResumedElsewhere, publishApprovalResolved } from "../approvalResume";
   import type { ApprovalDetailView, ApprovalView } from "../apiTypes";
   import { approvalBadge } from "../statusMaps";
   import { capabilityLabel } from "../capabilityModel";
@@ -39,7 +39,13 @@
   // B2 — a decision closes the tool call the model was waiting on, so the turn
   // it parked can pick up from here. Offered rather than automatic: the inbox is
   // not the transcript, and continuing is the owner's call.
-  let resumable = $state<{ approval_id: string; session_id: string } | null>(null);
+  let resumable = $state<{
+    approval_id: string;
+    session_id: string;
+    // ADD-02 — how many calls of the same batch are still queued behind this
+    // decision, so the banner can say what continuing will actually do.
+    queued_calls: number;
+  } | null>(null);
   let resumeBusy = $state(false);
 
   const orderedApprovals = $derived.by(() => {
@@ -99,7 +105,11 @@
       };
       resumable =
         result.resume?.resumable && result.resume.session_id
-          ? { approval_id: result.approval_id, session_id: result.resume.session_id }
+          ? {
+              approval_id: result.approval_id,
+              session_id: result.resume.session_id,
+              queued_calls: result.resume.queued_calls ?? 0,
+            }
           : null;
       // BUG-24 — the inbox is where most decisions are actually made, so this is
       // the broadcast that matters most: a Chat or Build tab showing the turn
@@ -129,9 +139,32 @@
     resumeBusy = true;
     try {
       const response = await api.resumeAfterApproval(resumable.approval_id);
-      notice = { kind: "ok", text: `The agent continued the turn: ${response.message}` };
+      // ADD-02 — a continuation can stop on the *next* call of the same batch.
+      // Saying so, and reloading the inbox so that decision is actually here,
+      // is what makes walking a batch a single flow rather than a hunt for a
+      // row that appeared while the owner was reading a success message.
+      const next = response.status === "needs_approval" ? response.approval : null;
+      notice = {
+        kind: "ok",
+        text: next
+          ? `The agent continued the turn and stopped on the next call in the batch: ${next.message}`
+          : `The agent continued the turn: ${response.message}`,
+      };
       resumable = null;
+      selected = null;
+      await load();
     } catch (e) {
+      // BUG-24 / ADD-02 — losing the race to continue is a *success*: the turn
+      // ran, just not from this button. Walking a batch makes that race routine
+      // rather than rare, so reporting it as an error would mean the owner sees
+      // a red failure for every decision that the conversation itself picked up.
+      if (e instanceof ApiError && alreadyResumedElsewhere(e.reasonCode)) {
+        notice = { kind: "ok", text: "The turn was continued in another tab." };
+        resumable = null;
+        selected = null;
+        await load();
+        return;
+      }
       const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
       notice = {
         kind: "error",
@@ -220,6 +253,11 @@
     <span>
       A turn was waiting on this decision. Continuing picks it up where it stopped, so the agent keeps
       what it had already worked out.
+      {#if resumable.queued_calls > 0}
+        {resumable.queued_calls === 1
+          ? "1 more call from the same batch is queued behind it and will need its own decision."
+          : `${resumable.queued_calls} more calls from the same batch are queued behind it, each needing its own decision.`}
+      {/if}
     </span>
     <span class="resume-actions">
       <button type="button" class="btn btn-primary btn-sm" onclick={resumeTurn} disabled={resumeBusy}>
@@ -286,7 +324,14 @@
       <tbody>
         {#each orderedApprovals as a (a.approval_id)}
           <tr>
-            <td>{humanize(a.tool_name)}</td>
+            <td>
+              {humanize(a.tool_name)}
+              {#if a.queue_total > 1}
+                <span class="queue-chip" title="This turn proposed {a.queue_total} tool calls; the rest are queued behind this decision.">
+                  Decision {a.queue_position} of {a.queue_total}
+                </span>
+              {/if}
+            </td>
             <td>{capabilityLabel(a.capability)}</td>
             <td><Badge variant={a.risk_level === "critical" || a.risk_level === "high" ? "blocked" : "metadata-only"} label={a.risk_level} /></td>
             <td><Badge variant={approvalBadge(a.is_expired ? "expired" : a.status)} label={a.is_expired ? "expired" : a.status} /></td>
@@ -326,6 +371,15 @@
       <div><dt>Risk</dt><dd>{selected.approval.risk_level}</dd></div>
       <div><dt>Session</dt><dd><a class="mono" href={`#/sessions?session=${encodeURIComponent(selected.approval.session_id)}`}>View session</a></dd></div>
       <div><dt>Requested</dt><dd>{relativeTime(selected.approval.created_at)}</dd></div>
+      {#if selected.approval.queue_total > 1}
+        <div>
+          <dt>Batch</dt>
+          <dd>
+            Decision {selected.approval.queue_position} of {selected.approval.queue_total} —
+            the calls after it are queued on this turn and each gets its own decision.
+          </dd>
+        </div>
+      {/if}
       {#if selected.approval.expires_at}
         <div><dt>Expires</dt><dd>{formatTimestamp(selected.approval.expires_at)}</dd></div>
       {/if}
@@ -441,6 +495,20 @@
 {/if}
 
 <style>
+  /* ADD-02 — a batched turn's approvals sit next to unbatched ones in the same
+     list, so the position has to read at a glance without shouting: this is
+     context for the decision, not a second risk signal. */
+  .queue-chip {
+    display: inline-block;
+    margin-left: var(--space-2);
+    padding: 1px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    background: var(--sunken);
+    color: var(--text-2);
+    font-size: var(--text-2xs);
+    white-space: nowrap;
+  }
   .head-row {
     display: flex;
     align-items: flex-start;

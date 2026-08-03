@@ -97,3 +97,18 @@ answering is the artifact's own copy.
 | `198-BUG-47-hosted-cards-keep-their-own-live.png` | Anthropic's own result under Anthropic; OpenAI, Gemini and OpenRouter unaffected |
 | `199-BUG-44-source-checkout-live.png` | Host control → Install & updates on a source checkout: no signature claimed, no channel configured, no outbound request |
 | `200-BUG-44-packaged-unsigned-build-live.png` | The same panel on a host running from a real release artifact: `0.1.0 · linux-x86_64`, reported as an **unsigned build** because that build did not run platform signing |
+
+`bug-50-*` are the live evidence for FIXED-100, captured on **2026-08-03** by
+[`apps/web/e2e/bug-50-connection-cache-live.spec.ts`](../../../apps/web/e2e/bug-50-connection-cache-live.spec.ts)
+against a running `raiker-web` made to serve 30 further instance workspaces
+through `POST /api/instances` — the endpoint behind the login screen's instance
+form. FIXED-100 bounds a connection cache, so its real measurement is the host
+process's descriptor count rather than anything a browser can show; what these
+record is the claim beside it, that a host which has served many instances is
+unchanged for the owner using it.
+
+| File | Records |
+|---|---|
+| `bug-50-host-before-many-instances.png` | The owner's Workbench on the host before it serves any of them |
+| `bug-50-instance-creation-surface.png` | The login screen's instance form — the product surface behind the endpoint the run drives |
+| `bug-50-host-after-many-instances.png` | The same Workbench after 30 more instance workspaces: every route still rendering, 0 console errors, status resolved from the database the cache was evicting around |

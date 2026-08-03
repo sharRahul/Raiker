@@ -428,6 +428,15 @@ npm run build     # exit 0
   The bundled build lacks FTS5, so Raiker uses encrypted FTS4 and deterministic
   recency ordering. Legacy plaintext databases are converted once and the
   transient plaintext source is removed after success.
+- SQLCipher derives its key when a connection is opened, so `raiker/storage/sqlite.py`
+  keeps one keyed connection per workspace and worker thread rather than paying
+  that per short-lived `SQLiteStore`. The cache is bounded and least-recently-used
+  (`RAIKER_SQLITE_CONNECTION_CACHE_LIMIT`, default 8 per thread, with a
+  process-wide ceiling of eight threads' worth): without a bound it grew with
+  every distinct workspace the process ever touched and eventually ran the host
+  out of file descriptors. A thread only ever closes a handle it owns, or one
+  whose owning thread has exited — `connect` has no release point, so another
+  live worker's handle may be mid-query.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

@@ -130,6 +130,20 @@ names: a read-only batch whose refused first call no longer ends the turn, and a
 batch whose refused first call is followed by two writes, which now reaches
 **decision 2 of 3** and then **decision 3 of 3** instead of dropping both.
 
+FIXED-100 was verified on **2026-08-03** against **two** running `raiker-web`
+hosts on the same machine — one built from this change, one from the commit
+before it — because what this entry claims is a *difference* between them, and a
+single host can only show one side of it. Both were driven through the product's
+own instance surface, and the descriptor counts below were read from
+`/proc/<pid>/fd` of the two host processes. The live scenario is
+[`e2e/bug-50-connection-cache-live.spec.ts`](../../apps/web/e2e/bug-50-connection-cache-live.spec.ts),
+and its screenshots are `working/bug-50-*`. Its final test drives a hosted turn
+and is the only part that needs a provider credential; **it skipped in this run**
+— the key supplied for the session was rejected by Anthropic itself
+(`authentication_error: API key is invalid`), which is a fact about the
+credential and not about the host. Nothing else in the file depends on a model,
+because what FIXED-100 changes sits below the model entirely.
+
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | FIXED-01 | High | Models | Fixed |
@@ -231,14 +245,15 @@ batch whose refused first call is followed by two writes, which now reaches
 | FIXED-97 | High | Runtime / undeclared event types | Fixed (found during B6 live testing; B4's drop evidence killed the turn) |
 | FIXED-98 | High | Policy / advertised tools with no verdict | Fixed (found while implementing B6/B7) |
 | FIXED-99 | Medium | Runtime / batched policy refusal | Fixed (was BUG-52) |
+| FIXED-100 | Medium | Storage / connection cache holds every workspace open | Fixed (was BUG-50) |
 | BUG-46 | Medium | Storage / Windows locked memory | Open (found while verifying FIXED-91) |
 | BUG-48 | Medium | Distribution / setup wizard and native tray | Open (split out of BUG-44) |
 | BUG-49 | Low | CI / release workflow action pinning | Open (found while building the release workflow) |
-| BUG-50 | Medium | Storage / connection cache holds every workspace open | Open (found while verifying FIXED-92) |
 | BUG-51 | Low | Policy / dead `denied_actions` configuration | Open (found while implementing B6/B7) |
 | BUG-53 | Low | Chat / multi-call answer text runs together | Open (found while verifying FIXED-99) |
 | BUG-54 | Medium | Web e2e / the live stub model is not in the repository | Open (found while writing FIXED-99's live scenario) |
 | BUG-55 | Low | Chat / a disabled transcript block reads as live code | Open (found while verifying FIXED-99) |
+| BUG-56 | Low | Tests / a shipped-skill check breaks after `compileall` | Open (found while verifying FIXED-100) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8 complete; 12 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -3704,6 +3719,90 @@ when the refusal falls after an approval.
 
 ---
 
+## FIXED-100 — The SQLCipher connection cache never let a workspace go *(was BUG-50)*
+
+**Status: fixed in this change.**
+
+**Observed.** Running the whole Python suite in one process failed with
+`INTERNALERROR> OSError: [Errno 24] Too many open files` on a host whose
+`ulimit -n` is 4096; splitting it into four passes it. A direct probe showed why:
+opening 50 distinct workspaces raised the process's open descriptors from 4 to
+154, and none were released.
+
+**Root cause.** FIXED-91 caches one keyed SQLCipher connection per resolved
+workspace and worker thread, which is exactly right for the repeated-reads
+problem it solved — SQLCipher derives its key when a connection is opened, and
+API routes construct short-lived `SQLiteStore` objects. It had explicit
+invalidation (shutdown, uninstall, a closed handle) but **no eviction**: the
+cache was keyed by workspace and grew without bound. A test session opens
+hundreds of temporary workspaces; so, more slowly, does a long-lived host serving
+many instances, each of which is its own workspace.
+
+**Fix applied.** `_CONNECTIONS` in `raiker/storage/sqlite.py` is an `OrderedDict`
+held least-recently-used first, and `connect` moves a hit to the end and then
+trims. Three properties hold it together:
+
+* **A thread only ever closes a handle it owns**, or one whose owning thread has
+  exited. `connect` has no release point, so a cached connection may be mid-query
+  in the thread that owns it; closing another live worker's handle would be a
+  use-after-close. Reaping an exited thread's handles is what stops the bound
+  drifting upwards with thread churn.
+* **The bound is process-wide, not per thread.** Self-eviction alone would let a
+  request threadpool multiply the bound by its worker count, which is precisely
+  the "host serving many instances" case. The allowance a thread gives itself is
+  the per-thread limit **or** the process ceiling shared between the threads
+  currently holding connections, whichever is smaller.
+* **FIXED-91's property is intact.** Repeated stores on one workspace and worker
+  still pay key derivation once — a workspace in use is the most recently used
+  entry and is never the one evicted.
+
+The per-thread limit is 8, overridable with
+`RAIKER_SQLITE_CONNECTION_CACHE_LIMIT`; the process ceiling is eight threads'
+worth of that. Both are readable at runtime through `connection_cache_limit()`
+and `connection_cache_ceiling()`, and `cached_connection_count()` reports what is
+actually held.
+
+**Evidence.** `tests/test_sqlite_connection_cache.py` keeps the two FIXED-91
+tests and adds five: far more workspaces than the limit leave both the cache and
+the process's descriptor count bounded; a workspace still in use survives the
+eviction while the stalest one goes, and never re-derives its key; eight worker
+threads touching 48 workspaces between them stay under the process ceiling rather
+than under eight separate per-thread ones; an exited thread's handle is reaped;
+and a live thread's handle is never closed by another thread's eviction — it is
+still usable afterwards. **The full suite now runs in one process again**, which
+is the symptom this entry opened with.
+
+Live, against two running hosts each serving 30 instance workspaces created
+through `POST /api/instances` — the shipped endpoint behind the login screen's
+instance form — and each measured from the same starting point:
+
+| Host | Descriptors before | After 30 instances |
+|---|---|---|
+| The commit before this change | 10 | **100** |
+| This change | 10 | **34** |
+
+A third measurement made the point the table cannot: the same fixed host, asked
+to serve *another* 30 instances on top of the 30 it had already served, went from
+43 descriptors to 40. The cost stops tracking the number of workspaces the
+process has ever opened.
+
+**Found and not fixed here.** `python -m compileall raiker apps tests` — a
+command this repository's own CI runs — leaves `__pycache__` directories inside
+the shipped skill folders, after which
+`tests/test_skills.py::TestShippedSkills::test_bundled_files_are_linked_from_the_body`
+fails on a compiled artefact it was never meant to see. Recorded as BUG-56.
+
+**UI when closed.** No user-visible change under normal use, and the live run
+holds that claim to its word: after the host served 30 more instance workspaces,
+every route of the owner's own workspace still rendered with **0 console
+errors** and its dashboard status still resolved out of the database the cache
+had been evicting around. `working/bug-50-host-before-many-instances.png` and
+`working/bug-50-host-after-many-instances.png` are that host on either side of
+it. A host that has served many instances for a long time keeps working instead
+of eventually failing to open files.
+
+---
+
 ## BUG-46 — SQLCipher cannot lock key-bearing pages on this Windows host
 
 **Status: open; found while verifying FIXED-91.**
@@ -3773,36 +3872,6 @@ workflow has acquired a tag pin.
 
 **UI when closed.** None — this is supply-chain hygiene for the pipeline that
 produces what owners install.
-
----
-
-## BUG-50 — The SQLCipher connection cache never lets a workspace go
-
-**Status: open; found while verifying FIXED-92.**
-
-**Observed.** Running the whole Python suite in one process fails with
-`OSError: [Errno 24] Too many open files` on a host whose `ulimit -n` is 4096;
-splitting it into four passes it. A direct probe shows why: opening 50 distinct
-workspaces raises the process's open descriptors from 4 to 154, and none are
-released.
-
-**Root cause.** FIXED-91 caches one keyed SQLCipher connection per resolved
-workspace and worker thread, which is exactly right for the repeated-reads
-problem it solved. It has explicit invalidation (shutdown, uninstall, a closed
-handle) but no eviction: the cache is keyed by workspace and grows without
-bound. A test session opens hundreds of temporary workspaces; so, more slowly,
-does a long-lived host serving many instances, each of which is its own
-workspace.
-
-**Required fix.** Bound the cache — least-recently-used eviction with an explicit
-limit, or release a workspace's handle once nothing holds it — and add a
-regression that opens far more workspaces than the limit and asserts the
-descriptor count stays bounded. Keep FIXED-91's property intact: repeated stores
-on one workspace and worker must still pay key derivation once.
-
-**UI when closed.** No user-visible change under normal use. A host that has
-served many instances for a long time keeps working instead of eventually
-failing to open files, and the full test suite runs in one process again.
 
 ---
 
@@ -3906,6 +3975,35 @@ wordings.
 
 **UI when closed.** No user-visible change; this is a maintainability and
 auditability defect.
+
+---
+
+## BUG-56 — A shipped-skill check fails after `compileall`, which CI itself runs
+
+**Status: open; found while verifying FIXED-100.**
+
+**Observed.** Running `python -m compileall raiker apps tests` and then the test
+suite fails:
+
+> `AssertionError: algorithm-creator never references
+> scripts/__pycache__/oracle_check.cpython-311.pyc`
+
+**Root cause.** `tests/test_skills.py::TestShippedSkills::test_bundled_files_are_linked_from_the_body`
+walks each shipped skill folder with `rglob("*")` and asserts every file it finds
+is referenced from that skill's `SKILL.md` — a good rule, because a bundled file
+nothing points at never loads. It has no notion of build output, so a
+`__pycache__` directory beside a skill's `scripts/` is read as an unreferenced
+bundled file. `.github/workflows/ci.yml` runs `compileall` over the same three
+trees; it survives only because it runs it *after* `pytest`. A developer who runs
+the two in the other order sees a failure that has nothing to do with their
+change, in a test whose message points at a shipped skill.
+
+**Required fix.** Skip generated artefacts when walking a skill folder —
+`__pycache__` and compiled bytecode at minimum — so the check keeps asserting
+what it means to assert and stops depending on command order. Do not weaken the
+rule itself: an unreferenced *source* file in a skill bundle is still a defect.
+
+**UI when closed.** None — this is a test-suite reliability defect.
 
 ---
 

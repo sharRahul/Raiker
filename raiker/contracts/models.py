@@ -82,6 +82,12 @@ EVENT_TYPES = {
     # Counts and the parked call's place in its batch; the calls themselves are
     # parked with the turn and drained one decision at a time on resume.
     "model_tool_calls_queued",
+    # BUG-52 — one call in a batch policy refused while the rest of the batch
+    # carried on. Streamed, unlike the durable `policy_decision`, because a
+    # refusal that no longer ends the turn would otherwise leave the transcript
+    # silent about a call the model asked for and never got. Tool name and
+    # governed reason codes only; no arguments and no workspace content.
+    "model_tool_call_refused",
     "action_proposed",
     "action_validated",
     "policy_decision",

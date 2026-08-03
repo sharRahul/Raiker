@@ -37,4 +37,18 @@ describe("turnPhases", () => {
     expect(summarizeEvent(lifecycle("risk_classified", { risk_level: "high", requires_approval: true })))
       .toMatch(/high.*approval required/i);
   });
+
+  // BUG-52 — a refused call no longer ends the turn, so the transcript has to
+  // say the call was refused and say it narrowly. Without the second sentence a
+  // reader takes one refusal as a verdict on everything the batch asked for.
+  it("reports a per-call policy refusal as the act phase, scoped to that call", () => {
+    const refused = lifecycle("model_tool_call_refused", {
+      tool_name: "read_file",
+      reasons: ["path_outside_workspace"],
+    });
+    expect(phaseForEvent("model_tool_call_refused")).toBe("act");
+    expect(summarizeEvent(refused)).toBe(
+      "Policy refused read_file — path_outside_workspace. The other calls in this batch were decided separately.",
+    );
+  });
 });

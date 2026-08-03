@@ -500,6 +500,26 @@ class RuntimeOrchestrator:
             },
         )
 
+    def _refusal_event(
+        self, envelope: PromptEnvelope, action: ToolAction, decision: PolicyDecision
+    ) -> None:
+        """Say, in the transcript, that policy refused one call of a batch (BUG-52).
+
+        `policy_decision` is written by the broker and is durable-only, so before
+        this the only thing that told a watching owner a call had been refused was
+        the turn ending on it. Now that a refusal ends its own call and the batch
+        carries on, the turn does not end — and without this the transcript would
+        show a call proposed and simply never answered.
+
+        Names the tool and the governed reason codes; the arguments and any
+        workspace content stay out, exactly as they do for the queue events.
+        """
+        self._event(
+            envelope,
+            "model_tool_call_refused",
+            {"tool_name": action.tool_name, "reasons": list(decision.reasons)},
+        )
+
     def _verify_and_emit(
         self, envelope: PromptEnvelope, **kwargs: object
     ) -> VerificationResult:
@@ -1135,6 +1155,7 @@ class RuntimeOrchestrator:
                 # told which call was refused so it does not read the refusal as
                 # covering the ones still to come.
                 self._state(machine, envelope, "DENIED")
+                self._refusal_event(envelope, action, queued_decision)
                 self._verify_and_emit(
                     envelope, action=action, decision=queued_decision,
                     result=queued_result, started_action_ids=started_action_ids,
@@ -1258,46 +1279,97 @@ class RuntimeOrchestrator:
                 for action in actions:
                     execution = await execute_one(action)
                     executions.append(execution)
-                    if execution[1].decision != "allow":
+                    # BUG-52 — only an *approval* stops the batch here. A policy
+                    # refusal ends its own call, so the calls behind it are still
+                    # brokered and governed on their own terms rather than dying
+                    # with it.
+                    if execution[1].decision == "needs_approval":
                         break
             self._state(machine, envelope, "POLICY_REVIEWED")
+            # Every call in this batch that reached an outcome, in the order the
+            # model proposed it: an executed result or a per-call refusal. Kept as
+            # one list because provider tool protocols need a single assistant
+            # message naming these calls and one tool message answering each.
+            answered: list[tuple[ToolCallProposal, str, dict[str, Any]]] = []
             batch_results: list[tuple[ToolCallProposal, ToolAction, ToolResult, PolicyDecision]] = []
-            boundary_index = 0
-            action = actions[0]
-            proposal = proposals[0]
-            tool_result, decision = executions[0]
-            # Approval-bearing calls remain deliberately serial: stop at the first
-            # decision boundary instead of executing later mutations.
+            refusals: list[tuple[ToolCallProposal, ToolAction, ToolResult, PolicyDecision]] = []
+            boundary: (
+                tuple[int, ToolCallProposal, ToolAction, ToolResult, PolicyDecision] | None
+            ) = None
             for index, (candidate_action, execution) in enumerate(
                 zip(actions, executions, strict=False)
             ):
                 candidate_result, candidate_decision = execution
-                if candidate_decision.decision != "allow":
-                    action, proposal = candidate_action, proposals[index]
-                    tool_result, decision = candidate_result, candidate_decision
-                    boundary_index = index
-                    if (
-                        candidate_decision.decision != "needs_approval"
-                        and index + 1 < len(actions)
-                    ):
-                        # A policy denial still ends the turn, so the calls behind
-                        # it really are dropped. Only an approval boundary queues
-                        # its remainder (ADD-02) — the owner is about to make a
-                        # decision, and there is a turn to come back to.
-                        self._event(envelope, "model_tool_calls_dropped", {
-                            "proposed": len(actions), "accepted": index + 1,
-                            "dropped": len(actions) - index - 1,
-                            "reason": "approval_or_policy_boundary",
-                        })
+                if candidate_decision.decision == "needs_approval":
+                    # Approval-bearing calls remain deliberately serial: stop at
+                    # the first decision boundary instead of executing later
+                    # mutations, and queue the remainder (ADD-02).
+                    boundary = (
+                        index,
+                        proposals[index],
+                        candidate_action,
+                        candidate_result,
+                        candidate_decision,
+                    )
                     break
+                if candidate_decision.decision != "allow":
+                    # BUG-52 — a refusal is reported against its own call and the
+                    # batch carries on, exactly as it already did inside a drained
+                    # queue. The same refusal must not produce two different
+                    # outcomes depending only on whether the owner happened to have
+                    # made a decision earlier in the same batch.
+                    refusals.append(
+                        (proposals[index], candidate_action, candidate_result, candidate_decision)
+                    )
+                    answered.append((
+                        proposals[index],
+                        candidate_action.tool_name,
+                        queued_denial_outcome(
+                            tool_name=candidate_action.tool_name,
+                            reasons=list(candidate_decision.reasons),
+                        ),
+                    ))
+                    continue
                 batch_results.append(
                     (proposals[index], candidate_action, candidate_result, candidate_decision)
                 )
-            else:
-                boundary_index = len(actions) - 1
-                decision = executions[-1][1]
-            last_action, last_result = action, tool_result
-            if decision.decision == "needs_approval":
+                answered.append((
+                    proposals[index],
+                    candidate_action.tool_name,
+                    candidate_result.output or candidate_result.error or {},
+                ))
+            if refusals:
+                self._state(machine, envelope, "DENIED")
+                for _refused_proposal, refused_action, refused_result, refused_decision in refusals:
+                    self._refusal_event(envelope, refused_action, refused_decision)
+                    self._verify_and_emit(
+                        envelope, action=refused_action, decision=refused_decision,
+                        result=refused_result, started_action_ids=started_action_ids,
+                    )
+                if boundary is not None or batch_results:
+                    self._state(machine, envelope, "POLICY_REVIEWED")
+            # Only a call that actually ran becomes the turn's "last result": a
+            # refused call must not decide whether the whole turn reads as failed
+            # when the model goes on to answer perfectly well without it.
+            if batch_results:
+                last_action, last_result = batch_results[-1][1], batch_results[-1][2]
+            if boundary is None and not batch_results:
+                # Nothing else remains in this batch — every call in it was
+                # refused, so the turn itself is the refusal. This is the one case
+                # that keeps the long-standing `denied` turn status.
+                self._state(machine, envelope, "RESPONDING")
+                status = "denied"
+                denial_reasons: list[str] = []
+                for _p, _a, _r, refused_decision in refusals:
+                    denial_reasons.extend(
+                        reason
+                        for reason in refused_decision.reasons
+                        if reason not in denial_reasons
+                    )
+                message = f"Action denied by policy: {', '.join(denial_reasons)}"
+                break
+            if boundary is not None:
+                boundary_index, proposal, action, tool_result, decision = boundary
                 self._state(machine, envelope, "WAITING_FOR_APPROVAL")
                 self._verify_and_emit(
                     envelope,
@@ -1321,23 +1393,24 @@ class RuntimeOrchestrator:
                         result=done_result, started_action_ids=started_action_ids,
                     )
                 tool_calls_made += len(batch_results)
-                if batch_results:
+                # A call refused ahead of the boundary is answered here too, so the
+                # model resumes into a transcript that already states which of its
+                # own calls policy would not run (BUG-52).
+                if answered:
                     messages.append(
                         ModelMessage(
                             role="assistant",
                             content=response.text,
-                            tool_calls=tuple(item[0] for item in batch_results),
+                            tool_calls=tuple(item[0] for item in answered),
                         )
                     )
-                    for done_proposal, done_action, done_result, _decision in batch_results:
+                    for answered_proposal, answered_name, answered_payload in answered:
                         messages.append(
                             ModelMessage(
                                 role="tool",
-                                content=json.dumps(
-                                    done_result.output or done_result.error or {}
-                                ),
-                                tool_call_id=done_proposal.call_id,
-                                name=done_action.tool_name,
+                                content=json.dumps(answered_payload),
+                                tool_call_id=answered_proposal.call_id,
+                                name=answered_name,
                             )
                         )
                 # ADD-02 — the calls *behind* the boundary are queued, not dropped.
@@ -1362,7 +1435,7 @@ class RuntimeOrchestrator:
                         *messages,
                         ModelMessage(
                             role="assistant",
-                            content="" if batch_results else response.text,
+                            content="" if answered else response.text,
                             tool_calls=(proposal,),
                         ),
                     ],
@@ -1372,19 +1445,6 @@ class RuntimeOrchestrator:
                     queue_total=len(actions),
                 )
                 message = "Approval required for local action. No command was executed."
-                break
-            if decision.decision == "deny":
-                self._state(machine, envelope, "DENIED")
-                self._verify_and_emit(
-                    envelope,
-                    action=action,
-                    decision=decision,
-                    result=tool_result,
-                    started_action_ids=started_action_ids,
-                )
-                self._state(machine, envelope, "RESPONDING")
-                status = "denied"
-                message = f"Action denied by policy: {', '.join(decision.reasons)}"
                 break
 
             self._state(machine, envelope, "EXECUTING")
@@ -1404,20 +1464,23 @@ class RuntimeOrchestrator:
                     result=completed_result, started_action_ids=started_action_ids,
                 )
             tool_calls_made += len(batch_results)
+            # Executed results and per-call refusals go back together, in the order
+            # the model proposed them, so the next model call sees exactly which of
+            # its calls ran and which policy would not run (BUG-52).
             messages.append(
                 ModelMessage(
                     role="assistant",
                     content=response.text,
-                    tool_calls=tuple(item[0] for item in batch_results),
+                    tool_calls=tuple(item[0] for item in answered),
                 )
             )
-            for completed_proposal, completed_action, completed_result, _d in batch_results:
+            for answered_proposal, answered_name, answered_payload in answered:
                 messages.append(
                     ModelMessage(
                         role="tool",
-                        content=json.dumps(completed_result.output or completed_result.error or {}),
-                        tool_call_id=completed_proposal.call_id,
-                        name=completed_action.tool_name,
+                        content=json.dumps(answered_payload),
+                        tool_call_id=answered_proposal.call_id,
+                        name=answered_name,
                     )
                 )
             for pending in self._drain_sink():

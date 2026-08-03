@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StreamEvent } from "./apiTypes";
-import { reactionForPrompt, thinkingSteps } from "./chatPresentation";
+import { reactionForPrompt, refusedCalls, thinkingSteps } from "./chatPresentation";
 
 describe("chat presentation", () => {
   it("turns recognised lifecycle events into safe conversational thinking steps", () => {
@@ -26,5 +26,38 @@ describe("chat presentation", () => {
 
   it("does not attach a reaction to a neutral user prompt", () => {
     expect(reactionForPrompt("What is the capital of France?")).toBeNull();
+  });
+
+  // BUG-52 — a refused call no longer ends the turn, so Chat has to say it was
+  // refused. Order is the model's own proposal order: an owner reading two
+  // refusals needs them to line up with the calls they refused.
+  it("lists the calls policy refused, in the order they were refused", () => {
+    const events = [
+      { kind: "lifecycle", event_type: "intent_classified", payload: {} },
+      {
+        kind: "lifecycle",
+        event_type: "model_tool_call_refused",
+        payload: { tool_name: "read_file", reasons: ["path_outside_workspace"] },
+      },
+      {
+        kind: "lifecycle",
+        event_type: "model_tool_call_refused",
+        payload: { tool_name: "shell", reasons: ["capability_disabled", "no_grant"] },
+      },
+    ] as unknown as StreamEvent[];
+
+    expect(refusedCalls(events)).toEqual([
+      { toolName: "read_file", reasons: ["path_outside_workspace"] },
+      { toolName: "shell", reasons: ["capability_disabled", "no_grant"] },
+    ]);
+  });
+
+  it("ignores a refusal event that names no tool rather than rendering a blank row", () => {
+    const events = [
+      { kind: "lifecycle", event_type: "model_tool_call_refused", payload: { reasons: ["x"] } },
+      { kind: "lifecycle", event_type: "model_tool_call_refused", payload: { tool_name: "grep" } },
+    ] as unknown as StreamEvent[];
+
+    expect(refusedCalls(events)).toEqual([{ toolName: "grep", reasons: [] }]);
   });
 });

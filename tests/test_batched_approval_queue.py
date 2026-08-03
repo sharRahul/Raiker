@@ -10,6 +10,12 @@ These tests cover the queue that closes that: the remainder of the batch is
 parked with the turn, drained one call at a time on resume, re-governed per call
 rather than inheriting the first decision, and a refusal skips its own call
 instead of abandoning the ones behind it.
+
+BUG-52 extends the last of those rules to the batch's *first* pass, which ADD-02
+deliberately left alone: a policy refusal there ended the turn and dropped the
+calls behind it, so the same refusal produced two different outcomes depending
+only on whether the owner happened to have made a decision earlier in the same
+batch. `TestAFirstPassDenialSkipsOnlyItsOwnCall` covers that closure.
 """
 
 from __future__ import annotations
@@ -346,6 +352,195 @@ class TestTheQueueIsDrainedOnResume:
         # went on to do correctly.
         assert body["status"] == "completed"
         assert "outside the workspace" in body["message"]
+
+
+class TestAFirstPassDenialSkipsOnlyItsOwnCall:
+    """BUG-52 — a refusal ends its own call on the first pass too.
+
+    ADD-02 made a refusal *inside a drained queue* skip its own call and carry
+    on. A refusal in the batch's first pass did neither: it set the turn status
+    to `denied`, ended the turn, and emitted `model_tool_calls_dropped` for
+    everything behind it. Whether a model that proposed three calls got one or
+    three therefore depended on where the owner's earlier decision happened to
+    fall — which is not a rule anyone can reason about.
+    """
+
+    def test_a_refused_read_does_not_drop_the_reads_behind_it(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "notes.md").write_text("# Notes\n", encoding="utf-8")
+        router = ScriptedRouter([
+            ModelResponse(
+                text="Reading both.",
+                tool_calls=[_read("outside", "../escape.md"), _read("notes", "notes.md")],
+            ),
+            ModelResponse(text="The notes say: # Notes. The other path was refused."),
+        ])
+        orchestrator = _orchestrator(tmp_path, router)
+        envelope = _envelope("Read the escape hatch and the notes")
+
+        response = asyncio.run(orchestrator.ahandle(envelope))
+
+        # The refusal is about the first call. The second is a legitimate read
+        # that the policy engine allowed, and it must still run and still reach
+        # the model.
+        assert response.status == "completed"
+        types = _event_types(orchestrator, envelope.session_id)
+        assert "model_tool_calls_dropped" not in types
+        # And the owner is told. A refusal that no longer ends the turn would
+        # otherwise leave the transcript silent about a call the model asked for
+        # and never got.
+        assert "model_tool_call_refused" in types
+        answered = [m for m in router.seen_messages[1] if m.role == "tool"]
+        assert [m.tool_call_id for m in answered] == ["call_outside", "call_notes"]
+        assert json.loads(answered[0].content)["status"] == "denied"
+        assert "# Notes" in answered[1].content
+
+    def test_the_refusal_names_its_own_call_so_the_model_reads_it_narrowly(
+        self, tmp_path: Path
+    ) -> None:
+        (tmp_path / "notes.md").write_text("# Notes\n", encoding="utf-8")
+        router = ScriptedRouter([
+            ModelResponse(
+                text="Reading both.",
+                tool_calls=[_read("outside", "../escape.md"), _read("notes", "notes.md")],
+            ),
+            ModelResponse(text="Understood."),
+        ])
+        orchestrator = _orchestrator(tmp_path, router)
+        asyncio.run(orchestrator.ahandle(_envelope("Read both")))
+
+        refusal = json.loads(
+            next(
+                m for m in router.seen_messages[1]
+                if m.role == "tool" and m.tool_call_id == "call_outside"
+            ).content
+        )
+        # The same shape the drained queue already used: a model told only
+        # "denied" reasonably reads it as a verdict on everything it asked for.
+        assert refusal["executed"] is False
+        assert refusal["tool_name"] == "read_file"
+        assert refusal["reasons"]
+        assert "do not assume they were refused too" in refusal["note"]
+
+    def test_the_batch_carries_on_to_the_next_decision(self, tmp_path: Path) -> None:
+        router = ScriptedRouter([
+            ModelResponse(
+                text="Reading somewhere I should not, then writing twice.",
+                tool_calls=[
+                    _read("outside", "../escape.md"),
+                    _write("one", "# One\n"),
+                    _write("three", "# Three\n"),
+                ],
+            )
+        ])
+        orchestrator = _orchestrator(tmp_path, router)
+        envelope = _envelope("Read the escape hatch then write two files")
+
+        response = asyncio.run(orchestrator.ahandle(envelope))
+
+        # This is the case BUG-52 names: with no approval ahead of the denial,
+        # the turn used to end at the refused read and drop both writes. It now
+        # reaches the write's approval, with the third call queued behind it.
+        assert response.status == "needs_approval"
+        assert response.approval is not None
+        assert response.approval["tool_name"] == "write_file"
+        assert response.approval["queue_position"] == 2
+        assert response.approval["queue_total"] == 3
+        assert response.approval["queued_calls"] == 1
+        types = _event_types(orchestrator, envelope.session_id)
+        assert "model_tool_calls_queued" in types
+        assert "model_tool_calls_dropped" not in types
+        assert "model_tool_call_refused" in types
+
+    def test_the_parked_conversation_states_the_refusal(self, tmp_path: Path) -> None:
+        router = ScriptedRouter([
+            ModelResponse(
+                text="Reading somewhere I should not, then writing.",
+                tool_calls=[_read("outside", "../escape.md"), _write("one", "# One\n")],
+            )
+        ])
+        orchestrator = _orchestrator(tmp_path, router)
+        envelope = _envelope("Read the escape hatch then write")
+
+        response = asyncio.run(orchestrator.ahandle(envelope))
+
+        assert response.approval is not None
+        row = SQLiteStore(tmp_path).load_suspended_turn(
+            str(response.approval["approval_id"])
+        )
+        assert row is not None
+        parked = deserialize_messages(str(row["messages_json"]))
+        refusals = [m for m in parked if m.role == "tool"]
+        # A refused call that vanished from the parked transcript would resume
+        # the model into a conversation where it never asked, and it would ask
+        # again.
+        assert [m.tool_call_id for m in refusals] == ["call_outside"]
+        assert json.loads(refusals[0].content)["status"] == "denied"
+        # The refusal cost nothing against the tool budget: it never ran.
+        assert row["tool_calls_made"] == 0
+
+    def test_the_same_refusal_reads_the_same_either_side_of_a_decision(
+        self, tmp_path: Path
+    ) -> None:
+        # The defect in one assertion: an approval ahead of the refusal used to
+        # change what the refusal did to the calls behind it.
+        (tmp_path / "notes.md").write_text("# Notes\n", encoding="utf-8")
+        calls = [_read("outside", "../escape.md"), _read("notes", "notes.md")]
+        outcomes = []
+        for ordered in (calls, list(reversed(calls))):
+            router = ScriptedRouter([
+                ModelResponse(text="Reading.", tool_calls=list(ordered)),
+                ModelResponse(text="Done."),
+            ])
+            orchestrator = _orchestrator(tmp_path, router)
+            response = asyncio.run(orchestrator.ahandle(_envelope("Read them")))
+            outcomes.append((
+                response.status,
+                sorted(
+                    str(m.tool_call_id)
+                    for m in router.seen_messages[1]
+                    if m.role == "tool"
+                ),
+            ))
+        assert outcomes[0] == outcomes[1] == ("completed", ["call_notes", "call_outside"])
+
+    def test_a_batch_with_nothing_left_is_still_a_denied_turn(
+        self, tmp_path: Path
+    ) -> None:
+        router = ScriptedRouter([
+            ModelResponse(
+                text="Reading outside twice.",
+                tool_calls=[
+                    _read("outside", "../escape.md"),
+                    _read("elsewhere", "../../elsewhere.md"),
+                ],
+            )
+        ])
+        orchestrator = _orchestrator(tmp_path, router)
+        envelope = _envelope("Read outside the workspace")
+
+        response = asyncio.run(orchestrator.ahandle(envelope))
+
+        # Nothing else remained in the batch, so the refusal *is* the turn's
+        # outcome. This is the one case that keeps the long-standing `denied`
+        # status, and Chat and Build still show it.
+        assert response.status == "denied"
+        assert response.message.startswith("Action denied by policy: ")
+        assert "tool_started" not in _event_types(orchestrator, envelope.session_id)
+
+    def test_a_single_refused_call_is_unchanged(self, tmp_path: Path) -> None:
+        router = ScriptedRouter([
+            ModelResponse(
+                text="Reading outside.", tool_calls=[_read("outside", "../escape.md")]
+            )
+        ])
+        orchestrator = _orchestrator(tmp_path, router)
+
+        response = asyncio.run(orchestrator.ahandle(_envelope("Read outside")))
+
+        assert response.status == "denied"
+        assert response.message.startswith("Action denied by policy: ")
 
 
 class TestQueueMetadataReachesTheOwner:

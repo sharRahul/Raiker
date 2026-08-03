@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -232,7 +233,7 @@ class TestTheQueueIsDrainedOnResume:
         approval_id, _envelope_used = _park_turn(workspace, scripted_model)
         client = TestClient(create_app(workspace))
 
-        body: dict[str, object] = {}
+        body: dict[str, Any] = {}
         for expected_position in (1, 2, 3):
             resolved = client.post(
                 f"/api/approvals/{approval_id}/resolve",

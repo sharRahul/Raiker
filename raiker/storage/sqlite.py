@@ -4,8 +4,10 @@ import atexit
 import contextlib
 import hashlib
 import json
+import os
 import re
 import threading
+from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -284,8 +286,74 @@ from raiker.storage.migrations import (
 # per workspace and worker thread for the host lifetime instead. The connection
 # is never shared for query work across threads; ``check_same_thread=False`` only
 # allows shutdown/invalidation to close every worker's handle from one place.
-_CONNECTIONS: dict[tuple[Path, int], sqlite3.Connection] = {}
+#
+# BUG-50 — the cache is bounded and evicted least-recently-used. Without a bound
+# it grew with the number of *distinct* workspaces a process ever touches: a test
+# session opening temporary workspaces, or a long-lived host serving many
+# instances, kept every handle until exit and eventually ran out of file
+# descriptors.
+#
+# A thread only ever closes a handle it owns itself, or one whose owning thread
+# has exited. ``connect`` has no release point, so a cached connection may be
+# mid-query in the thread that owns it, and closing another live worker's handle
+# would be a use-after-close. Reaping an exited thread's handles is what keeps the
+# bound from drifting upwards with thread churn.
+#
+# Self-eviction alone would bound the cache only *per thread*, so a request
+# threadpool would multiply the bound by its worker count. The allowance a thread
+# gives itself is therefore the per-thread limit **or** the process ceiling shared
+# between the threads currently holding connections, whichever is smaller — a real
+# process-wide bound that still never touches another thread's handle.
+_CONNECTION_CACHE_LIMIT_ENV = "RAIKER_SQLITE_CONNECTION_CACHE_LIMIT"
+_DEFAULT_CONNECTION_CACHE_LIMIT = 8
+# The process ceiling, in worker-threads-worth of connections: eight threads each
+# holding the full per-thread limit is the most this process will cache.
+_CONNECTION_CACHE_CEILING_FACTOR = 8
+_CONNECTIONS: OrderedDict[tuple[Path, int], sqlite3.Connection] = OrderedDict()
 _CONNECTIONS_LOCK = threading.RLock()
+
+
+def connection_cache_limit() -> int:
+    """How many keyed connections one worker thread may hold open at once."""
+    raw = os.environ.get(_CONNECTION_CACHE_LIMIT_ENV, "").strip()
+    if raw:
+        with contextlib.suppress(ValueError):
+            declared = int(raw)
+            if declared > 0:
+                return declared
+    return _DEFAULT_CONNECTION_CACHE_LIMIT
+
+
+def connection_cache_ceiling() -> int:
+    """The most keyed connections this process will cache across all threads."""
+    return connection_cache_limit() * _CONNECTION_CACHE_CEILING_FACTOR
+
+
+def cached_connection_count() -> int:
+    """Cached connections held by this process, across every worker thread."""
+    with _CONNECTIONS_LOCK:
+        return len(_CONNECTIONS)
+
+
+def _evictable_locked(owner: int) -> list[sqlite3.Connection]:
+    """Handles this thread may close: its own stalest, plus any dead thread's.
+
+    Called with ``_CONNECTIONS_LOCK`` held; the caller closes what it returns
+    outside the lock, exactly as invalidation does.
+    """
+    live = {thread.ident for thread in threading.enumerate() if thread.ident is not None}
+    evicted: list[sqlite3.Connection] = []
+    orphans = [key for key in _CONNECTIONS if key[1] != owner and key[1] not in live]
+    for key in orphans:
+        evicted.append(_CONNECTIONS.pop(key))
+    owners = {key[1] for key in _CONNECTIONS} | {owner}
+    allowance = max(1, min(connection_cache_limit(), connection_cache_ceiling() // len(owners)))
+    # ``_CONNECTIONS`` is ordered least-recently-used first, so walking it in
+    # order drops this thread's stalest workspaces before its warm ones.
+    mine = [key for key in _CONNECTIONS if key[1] == owner]
+    for key in mine[: max(len(mine) - allowance, 0)]:
+        evicted.append(_CONNECTIONS.pop(key))
+    return evicted
 
 
 def invalidate_workspace_connections(workspace_root: str | Path) -> None:
@@ -359,12 +427,14 @@ class SQLiteStore:
         self.bootstrap()
 
     def connect(self) -> sqlite3.Connection:
-        cache_key = (self.paths.workspace_root, threading.get_ident())
+        owner = threading.get_ident()
+        cache_key = (self.paths.workspace_root, owner)
         with _CONNECTIONS_LOCK:
             connection = _CONNECTIONS.get(cache_key)
             if connection is not None:
                 try:
                     connection.execute("SELECT 1")
+                    _CONNECTIONS.move_to_end(cache_key)
                     return connection
                 except sqlite3.Error:
                     _CONNECTIONS.pop(cache_key, None)
@@ -376,8 +446,14 @@ class SQLiteStore:
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("PRAGMA busy_timeout = 5000")
+            # A fresh key, so this appends: the newest connection is the most
+            # recently used one and the last thing eviction would reach for.
             _CONNECTIONS[cache_key] = connection
-            return connection
+            evicted = _evictable_locked(owner)
+        for stale in evicted:
+            with contextlib.suppress(Exception):
+                stale.close()
+        return connection
 
     def bootstrap(self) -> None:
         self.paths.ensure()

@@ -301,7 +301,9 @@ class TestTurnReasoningEffort:
         )
         assert gateway.store.record_suspended_turn_outcome(approval_id, json.dumps({"status": "success"}))
 
-        restored, _messages, _calls = gateway._restore_suspended_turn(approval_id)  # noqa: SLF001
+        restored, _messages, _calls, _queue, _total = gateway._restore_suspended_turn(  # noqa: SLF001
+            approval_id
+        )
 
         assert restored.options.approval_mode == "manual"
         assert restored.options.reasoning_effort == "high"

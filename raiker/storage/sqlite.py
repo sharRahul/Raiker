@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -265,6 +266,8 @@ from raiker.storage.migrations import (
     STANDING_GRANTS_SQL,
     SUBAGENT_BUDGETS_MIGRATION_ID,
     SUBAGENT_BUDGETS_SQL,
+    SUSPENDED_TURN_QUEUE_MIGRATION_ID,
+    SUSPENDED_TURN_QUEUE_SQL,
     SUSPENDED_TURNS_MIGRATION_ID,
     SUSPENDED_TURNS_SQL,
     TASK_ATTACHMENTS_MIGRATION_ID,
@@ -782,6 +785,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 SUSPENDED_TURNS_MIGRATION_ID, SUSPENDED_TURNS_SQL, connection
+            )
+            self._apply_migration(
+                SUSPENDED_TURN_QUEUE_MIGRATION_ID, SUSPENDED_TURN_QUEUE_SQL, connection
             )
             self._apply_migration(
                 SESSION_ATTACHMENT_REFS_MIGRATION_ID, SESSION_ATTACHMENT_REFS_SQL, connection
@@ -3210,14 +3216,22 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """INSERT OR REPLACE INTO suspended_turns
                    (approval_id, session_id, turn_id, request_id, principal_id, action_id,
                     tool_name, call_id, prompt_text, messages_json, options_json, client_json,
-                    tool_calls_made, status, outcome_json, created_at, resumed_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'suspended', NULL, ?, NULL)""",
+                    tool_calls_made, status, outcome_json, created_at, resumed_at,
+                    pending_calls_json, queue_position, queue_total)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'suspended', NULL, ?, NULL,
+                           ?, ?, ?)""",
                 (
                     record["approval_id"], record["session_id"], record["turn_id"],
                     record["request_id"], record["principal_id"], record["action_id"],
                     record["tool_name"], record["call_id"], record["prompt_text"],
                     record["messages_json"], record["options_json"], record["client_json"],
                     int(record.get("tool_calls_made", 0)), utc_now(),
+                    # ADD-02 — the rest of the batch travels with the turn. A
+                    # caller that parks a single call writes the defaults, which
+                    # are exactly the pre-queue behaviour.
+                    str(record.get("pending_calls_json") or "[]"),
+                    int(record.get("queue_position", 1)),
+                    int(record.get("queue_total", 1)),
                 ),
             )
 
@@ -3250,7 +3264,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         No conversation state is returned — ids and metadata only.
         """
         query = (
-            "SELECT approval_id, session_id, turn_id, tool_name, outcome_json, created_at "
+            "SELECT approval_id, session_id, turn_id, tool_name, outcome_json, created_at, "
+            "queue_position, queue_total "
             "FROM suspended_turns WHERE principal_id = ? AND status = 'suspended' "
             "AND outcome_json IS NOT NULL"
         )
@@ -3268,7 +3283,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     ) -> list[dict[str, Any]]:
         """Metadata for unresolved parked turns, scoped to their owner (BUG-34)."""
         query = (
-            "SELECT approval_id, session_id, turn_id, tool_name, created_at "
+            "SELECT approval_id, session_id, turn_id, tool_name, created_at, "
+            "queue_position, queue_total "
             "FROM suspended_turns WHERE principal_id = ? AND status = 'suspended' "
             "AND outcome_json IS NULL"
         )
@@ -3280,6 +3296,38 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
+
+    def suspended_turn_queue_positions(
+        self, approval_ids: Sequence[str]
+    ) -> dict[str, tuple[int, int]]:
+        """Where each approval sits in the batch its turn parked on (ADD-02).
+
+        Approvals themselves know nothing about batching — an approval is one
+        action. The batch is a property of the parked turn, so this is the join
+        that lets the Approvals list say "decision 2 of 3" without teaching the
+        approvals table about tool-call queues. Metadata only: two integers, no
+        conversation state, and an approval with no parked turn is simply absent.
+        """
+        ids = [str(approval_id) for approval_id in approval_ids if approval_id]
+        if not ids:
+            return {}
+        positions: dict[str, tuple[int, int]] = {}
+        with self.connect() as connection:
+            # Chunked so a long pending list cannot exceed SQLite's variable limit.
+            for start in range(0, len(ids), 400):
+                chunk = ids[start : start + 400]
+                placeholders = ",".join("?" for _ in chunk)
+                rows = connection.execute(
+                    "SELECT approval_id, queue_position, queue_total FROM suspended_turns "
+                    f"WHERE approval_id IN ({placeholders})",
+                    chunk,
+                ).fetchall()
+                for row in rows:
+                    positions[str(row["approval_id"])] = (
+                        int(row["queue_position"] or 1),
+                        int(row["queue_total"] or 1),
+                    )
+        return positions
 
     def record_suspended_turn_outcome(self, approval_id: str, outcome_json: str) -> bool:
         """Attach the resolution outcome the model will see as its tool result.

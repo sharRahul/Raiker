@@ -21,6 +21,7 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 | `agent_plan_replayed` | A conversation's standing plan was carried into a later turn as context (character count only) |
 | `subagent_completed` | A bounded, read-only subagent finished — its name, contract id, steps run, and the read-only tools it used. The findings reach the calling model and nothing else |
 | `model_tool_calls_dropped` | Tool calls a turn proposed but did not run, with proposed/accepted/dropped counts and the boundary that stopped them (budget, approval, or policy) |
+| `model_tool_calls_queued` | Tool calls held behind an approval boundary rather than dropped, with proposed/queued counts and the parked call's place in its batch. The calls are parked with the turn and drained one decision at a time on resume |
 | `tool_started` | A governed executor started work |
 | `tool_completed` | A governed executor completed work |
 | `tool_failed` | A governed executor failed safely |

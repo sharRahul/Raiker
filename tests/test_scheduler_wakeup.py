@@ -189,6 +189,10 @@ def test_resolve_records_the_outcome_and_nudges_only_for_scheduled_work(
         "resumable": True,
         "session_id": store.session_id,
         "turn_id": "turn_1",
+        # ADD-02 — a parked turn with no batch behind it is a queue of one.
+        "queue_position": 1,
+        "queue_total": 1,
+        "queued_calls": 0,
     }
     assert json.loads(store.recorded[0]) == {"status": "approved"}
     assert wakeup.requests == (1 if session_prefix == "sess_inbox_" else 0)

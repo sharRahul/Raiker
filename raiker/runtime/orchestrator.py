@@ -4,6 +4,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
+from typing import Any
 
 from raiker.context.gatherer import ContextGatherer
 from raiker.context.models import ContextBundle
@@ -46,6 +47,7 @@ from raiker.runtime.model_usage import ModelUsageLedger
 from raiker.runtime.planner import SimplePlanner
 from raiker.runtime.retrieval import RetrievalAugmentor
 from raiker.runtime.state_machine import RuntimeStateMachine
+from raiker.runtime.turn_suspension import queued_denial_outcome
 from raiker.tools.broker import ToolBroker
 from raiker.tools.mcp_tools import mcp_tool_specs
 from raiker.verification.models import VerificationResult
@@ -64,6 +66,34 @@ _SYSTEM_PROMPT = (
     "When you need to search widely before you can act, delegate it with `spawn_subagent` so the "
     "raw output stays out of this conversation and you get the findings back."
 )
+
+
+def _queued_call_message(proposal: ToolCallProposal) -> ModelMessage:
+    """The assistant message that re-states one queued call (ADD-02).
+
+    Provider tool protocols require every tool result to answer a tool call in a
+    preceding assistant message. A queued call is drained after the batch it
+    arrived in has already been closed out, so it needs its own one-call
+    assistant message to answer against. The content is empty on purpose: the
+    model's prose belonged to the batch, and repeating it here would read as the
+    model having said it twice.
+    """
+    return ModelMessage(role="assistant", content="", tool_calls=(proposal,))
+
+
+def _queued_call_exchange(
+    proposal: ToolCallProposal, *, tool_name: str, payload: dict[str, Any]
+) -> list[ModelMessage]:
+    """One queued call and its outcome, as the pair the provider expects."""
+    return [
+        _queued_call_message(proposal),
+        ModelMessage(
+            role="tool",
+            content=json.dumps(payload),
+            tool_call_id=proposal.call_id,
+            name=tool_name,
+        ),
+    ]
 
 
 class RuntimeOrchestrator:
@@ -121,20 +151,31 @@ class RuntimeOrchestrator:
         proposal: ToolCallProposal,
         messages: list[ModelMessage],
         tool_calls_made: int,
+        pending_calls: list[ToolCallProposal] | None = None,
+        queue_position: int = 1,
+        queue_total: int = 1,
     ) -> bool:
-        """Park this turn's working state against *approval_id* (B2).
+        """Park this turn's working state against *approval_id* (B2, ADD-02).
 
         Returns whether the turn is resumable. Best-effort by design: a failure
         to park must never break the approval itself — the owner still gets their
         decision, they just have to re-prompt for the continuation, which is
         exactly the pre-B2 behaviour. Anything else would make a storage problem
         into a lost approval.
+
+        ADD-02: *pending_calls* is the rest of the batch the model proposed, and
+        *queue_position* / *queue_total* place this decision inside it. They ride
+        with the parked turn so the queue survives the pause — the owner may take
+        hours, close the tab, or restart the host between two decisions.
         """
         store = getattr(self.tool_broker, "store", None)
         if store is None or not approval_id:
             return False
         try:
-            from raiker.runtime.turn_suspension import serialize_messages
+            from raiker.runtime.turn_suspension import (
+                serialize_messages,
+                serialize_pending_calls,
+            )
 
             store.insert_suspended_turn({
                 "approval_id": approval_id,
@@ -163,6 +204,9 @@ class RuntimeOrchestrator:
                     "version": envelope.client.version,
                 }),
                 "tool_calls_made": tool_calls_made,
+                "pending_calls_json": serialize_pending_calls(list(pending_calls or [])),
+                "queue_position": queue_position,
+                "queue_total": queue_total,
             })
         except Exception as exc:
             self._event(
@@ -179,9 +223,81 @@ class RuntimeOrchestrator:
                 "tool_name": action.tool_name,
                 "suspended_messages": len(messages),
                 "tool_calls_made": tool_calls_made,
+                "queue_position": queue_position,
+                "queue_total": queue_total,
+                "queued_calls": len(pending_calls or []),
             },
         )
         return True
+
+    def _park_for_approval(
+        self,
+        envelope: PromptEnvelope,
+        *,
+        action: ToolAction,
+        proposal: ToolCallProposal,
+        decision: PolicyDecision,
+        result: ToolResult,
+        messages: list[ModelMessage],
+        tool_calls_made: int,
+        pending_calls: list[ToolCallProposal],
+        queue_position: int,
+        queue_total: int,
+    ) -> dict[str, object]:
+        """Park the turn and build the approval the client is shown (B2, ADD-02).
+
+        One place, because a batch parks twice — once when the model's first
+        mutation hits the boundary and again for every later call in the queue
+        that needs its own decision. Two constructions of the same payload would
+        eventually disagree about what the owner is being asked.
+        """
+        # `expected_effect` is the broker's own statement of what approving will
+        # do — metadata-only for most tools, a real, single write for a file
+        # mutation once the execution relay is enabled (BUG-06). Carried through
+        # so the transcript never has to guess.
+        proposal_output = result.output or {}
+        approval_id = str(proposal_output.get("approval_id", ""))
+        resumable = self._suspend_turn(
+            envelope,
+            approval_id=approval_id,
+            action=action,
+            proposal=proposal,
+            messages=messages,
+            tool_calls_made=tool_calls_made,
+            pending_calls=pending_calls,
+            queue_position=queue_position,
+            queue_total=queue_total,
+        )
+        batched = queue_total > 1
+        if resumable and batched:
+            note = (
+                f"Approval required — decision {queue_position} of {queue_total} in this "
+                "batch. The action was not executed. Resolving it continues this turn "
+                "with the calls still queued behind it."
+            )
+        elif resumable:
+            note = (
+                "Approval required. The action was not executed. Resolving it "
+                "continues this turn."
+            )
+        else:
+            note = "Approval required. The action was not executed."
+        return {
+            "action_id": action.action_id,
+            "approval_id": approval_id,
+            "tool_name": action.tool_name,
+            "arguments": action.arguments,
+            "risk_level": "high",
+            "reasons": decision.reasons,
+            "message": note,
+            "expected_effect": str(proposal_output.get("expected_effect", "")),
+            "resumable": resumable,
+            # ADD-02 — where this decision sits in the batch the model proposed,
+            # and how many of its calls are still waiting behind it.
+            "queue_position": queue_position,
+            "queue_total": queue_total,
+            "queued_calls": len(pending_calls),
+        }
 
     def _state(
         self, machine: RuntimeStateMachine, envelope: PromptEnvelope, new_state: str
@@ -871,8 +987,10 @@ class RuntimeOrchestrator:
         stream: bool,
         tool_calls_made: int = 0,
         approval_id: str = "",
+        pending_calls: list[ToolCallProposal] | None = None,
+        queue_total: int = 1,
     ) -> AsyncIterator[StreamEvent]:
-        """Continue a turn that was parked for an approval (B2).
+        """Continue a turn that was parked for an approval (B2, ADD-02).
 
         *messages* is the conversation exactly as it stood when the loop
         suspended, with the resolved tool result already appended by the caller.
@@ -880,6 +998,11 @@ class RuntimeOrchestrator:
         is the same turn picking up where it stopped, which is the whole point —
         re-prompting would discard the model's working state and re-pay for the
         context.
+
+        *pending_calls* is the rest of the batch the decision unblocked. The loop
+        drains it *before* it goes back to the model: those calls are what the
+        model already asked for, and asking it again would be paying twice for a
+        question it has already answered.
         """
         self._sink = [] if stream else None
         try:
@@ -895,6 +1018,7 @@ class RuntimeOrchestrator:
                     "approval_id": approval_id,
                     "replayed_messages": len(messages),
                     "tool_calls_made": tool_calls_made,
+                    "queued_calls": len(pending_calls or []),
                 },
             )
             async for event in self._arun_agent_loop(
@@ -903,6 +1027,8 @@ class RuntimeOrchestrator:
                 messages,
                 stream=stream,
                 tool_calls_made=tool_calls_made,
+                pending_calls=pending_calls,
+                queue_total=queue_total,
             ):
                 yield event
         finally:
@@ -916,6 +1042,8 @@ class RuntimeOrchestrator:
         *,
         stream: bool,
         tool_calls_made: int = 0,
+        pending_calls: list[ToolCallProposal] | None = None,
+        queue_total: int = 1,
     ) -> AsyncIterator[StreamEvent]:
         """The model → tool → model loop, shared by a fresh turn and a resumed one.
 
@@ -934,7 +1062,125 @@ class RuntimeOrchestrator:
         for pending in self._drain_sink():
             yield pending
 
-        while True:
+        # ADD-02 — a resumed turn owes the model the rest of the batch it already
+        # proposed before it owes it a new question. Draining happens here, ahead
+        # of the model call, so the queue is walked one decision at a time and a
+        # second approval parks the same turn again rather than starting a new one.
+        queue = list(pending_calls or [])
+        while queue:
+            proposal = queue.pop(0)
+            queue_position = max(1, queue_total - len(queue))
+            if tool_calls_made >= max_tool_calls:
+                self._event(envelope, "model_tool_calls_dropped", {
+                    "proposed": len(queue) + 1, "accepted": 0,
+                    "dropped": len(queue) + 1, "reason": "tool_call_budget",
+                })
+                queue.clear()
+                break
+            try:
+                action = validate_tool_call(proposal)
+            except ToolCallRejected as exc:
+                # A queued call that no longer validates is refused on its own and
+                # the queue carries on: one malformed call must not cost the owner
+                # the decisions they already made on the others.
+                self._event(
+                    envelope,
+                    "model_tool_call_rejected",
+                    {"tool_name": exc.tool_name, "reason": exc.reason},
+                )
+                messages.extend(
+                    _queued_call_exchange(
+                        proposal,
+                        tool_name=exc.tool_name or proposal.tool_name,
+                        payload={"status": "rejected", "executed": False, "reason": exc.reason},
+                    )
+                )
+                for pending in self._drain_sink():
+                    yield pending
+                continue
+            queued_result, queued_decision = self.tool_broker.execute(
+                action,
+                session_id=envelope.session_id,
+                turn_id=envelope.turn_id,
+                client=envelope.client,
+                approval_mode=envelope.options.approval_mode,
+            )
+            self._state(machine, envelope, "POLICY_REVIEWED")
+            if queued_decision.decision == "needs_approval":
+                self._state(machine, envelope, "WAITING_FOR_APPROVAL")
+                self._verify_and_emit(
+                    envelope, action=action, decision=queued_decision,
+                    result=queued_result, started_action_ids=started_action_ids,
+                )
+                self._state(machine, envelope, "RESPONDING")
+                status = "needs_approval"
+                approval = self._park_for_approval(
+                    envelope,
+                    action=action,
+                    proposal=proposal,
+                    decision=queued_decision,
+                    result=queued_result,
+                    messages=[*messages, _queued_call_message(proposal)],
+                    tool_calls_made=tool_calls_made,
+                    pending_calls=queue,
+                    queue_position=queue_position,
+                    queue_total=queue_total,
+                )
+                message = "Approval required for local action. No command was executed."
+                break
+            if queued_decision.decision == "deny":
+                # ADD-02's rule: a denial skips its own call, it does not abandon
+                # the batch. Nothing executed, so the turn goes straight to DENIED
+                # and the queue reviews the next call from there; the model is
+                # told which call was refused so it does not read the refusal as
+                # covering the ones still to come.
+                self._state(machine, envelope, "DENIED")
+                self._verify_and_emit(
+                    envelope, action=action, decision=queued_decision,
+                    result=queued_result, started_action_ids=started_action_ids,
+                )
+                messages.extend(
+                    _queued_call_exchange(
+                        proposal,
+                        tool_name=action.tool_name,
+                        payload=queued_denial_outcome(
+                            tool_name=action.tool_name, reasons=list(queued_decision.reasons)
+                        ),
+                    )
+                )
+                for pending in self._drain_sink():
+                    yield pending
+                continue
+            self._state(machine, envelope, "EXECUTING")
+            self._state(machine, envelope, "OBSERVING")
+            self._state(machine, envelope, "VERIFYING")
+            # Only a call that actually ran becomes the turn's "last result": a
+            # refused call must not decide whether the whole turn reads as failed
+            # when the model goes on to answer perfectly well without it.
+            last_action, last_result = action, queued_result
+            started_action_ids.add(action.action_id)
+            self._emit_plan_event(envelope, action, queued_result)
+            self._emit_subagent_event(envelope, action, queued_result)
+            self._verify_and_emit(
+                envelope, action=action, decision=queued_decision,
+                result=queued_result, started_action_ids=started_action_ids,
+            )
+            tool_calls_made += 1
+            messages.extend(
+                _queued_call_exchange(
+                    proposal,
+                    tool_name=action.tool_name,
+                    payload=queued_result.output or queued_result.error or {},
+                )
+            )
+            for pending in self._drain_sink():
+                yield pending
+
+        # `status is None` rather than `True`: a queue that parked on a second
+        # approval has already produced this turn's outcome, and going back to
+        # the model here would ask it to think past a decision the owner has not
+        # made yet.
+        while status is None:
             if stream and hasattr(self.model_router, "astream"):
                 response: ModelResponse | None = None
                 async for item in self._astream_model_call(envelope, messages):
@@ -1015,12 +1261,13 @@ class RuntimeOrchestrator:
                     if execution[1].decision != "allow":
                         break
             self._state(machine, envelope, "POLICY_REVIEWED")
-            batch_results: list[tuple[ToolCallProposal, ToolAction, ToolResult]] = []
+            batch_results: list[tuple[ToolCallProposal, ToolAction, ToolResult, PolicyDecision]] = []
+            boundary_index = 0
             action = actions[0]
             proposal = proposals[0]
             tool_result, decision = executions[0]
-            # Approval-bearing calls remain deliberately serial: park at the
-            # first decision boundary instead of executing later mutations.
+            # Approval-bearing calls remain deliberately serial: stop at the first
+            # decision boundary instead of executing later mutations.
             for index, (candidate_action, execution) in enumerate(
                 zip(actions, executions, strict=False)
             ):
@@ -1028,15 +1275,26 @@ class RuntimeOrchestrator:
                 if candidate_decision.decision != "allow":
                     action, proposal = candidate_action, proposals[index]
                     tool_result, decision = candidate_result, candidate_decision
-                    if index + 1 < len(actions):
+                    boundary_index = index
+                    if (
+                        candidate_decision.decision != "needs_approval"
+                        and index + 1 < len(actions)
+                    ):
+                        # A policy denial still ends the turn, so the calls behind
+                        # it really are dropped. Only an approval boundary queues
+                        # its remainder (ADD-02) — the owner is about to make a
+                        # decision, and there is a turn to come back to.
                         self._event(envelope, "model_tool_calls_dropped", {
                             "proposed": len(actions), "accepted": index + 1,
                             "dropped": len(actions) - index - 1,
                             "reason": "approval_or_policy_boundary",
                         })
                     break
-                batch_results.append((proposals[index], candidate_action, candidate_result))
+                batch_results.append(
+                    (proposals[index], candidate_action, candidate_result, candidate_decision)
+                )
             else:
+                boundary_index = len(actions) - 1
                 decision = executions[-1][1]
             last_action, last_result = action, tool_result
             if decision.decision == "needs_approval":
@@ -1050,48 +1308,69 @@ class RuntimeOrchestrator:
                 )
                 self._state(machine, envelope, "RESPONDING")
                 status = "needs_approval"
-                # `expected_effect` is the broker's own statement of what
-                # approving will do — metadata-only for most tools, a real,
-                # single write for a file mutation once the execution relay is
-                # enabled (BUG-06). Carried through so the transcript never has
-                # to guess.
-                proposal_output = tool_result.output or {}
-                approval_id = str(proposal_output.get("approval_id", ""))
-                # B2 — park the loop's working state against this approval, with
-                # the assistant message carrying the proposed call appended, so
-                # resolving the approval resumes *this* turn instead of costing
-                # the owner a re-prompt and the model its context.
-                resumable = self._suspend_turn(
+                # ADD-02 — the calls that ran *before* the boundary belong in the
+                # parked conversation. They really executed, so leaving them out
+                # would resume the model into a transcript where its own completed
+                # work never happened.
+                for _done_proposal, done_action, done_result, done_decision in batch_results:
+                    started_action_ids.add(done_action.action_id)
+                    self._emit_plan_event(envelope, done_action, done_result)
+                    self._emit_subagent_event(envelope, done_action, done_result)
+                    self._verify_and_emit(
+                        envelope, action=done_action, decision=done_decision,
+                        result=done_result, started_action_ids=started_action_ids,
+                    )
+                tool_calls_made += len(batch_results)
+                if batch_results:
+                    messages.append(
+                        ModelMessage(
+                            role="assistant",
+                            content=response.text,
+                            tool_calls=tuple(item[0] for item in batch_results),
+                        )
+                    )
+                    for done_proposal, done_action, done_result, _decision in batch_results:
+                        messages.append(
+                            ModelMessage(
+                                role="tool",
+                                content=json.dumps(
+                                    done_result.output or done_result.error or {}
+                                ),
+                                tool_call_id=done_proposal.call_id,
+                                name=done_action.tool_name,
+                            )
+                        )
+                # ADD-02 — the calls *behind* the boundary are queued, not dropped.
+                # The owner walks the batch one decision at a time and the queue
+                # survives the pause with the parked turn.
+                queued_calls = list(proposals[boundary_index + 1 :])
+                if queued_calls:
+                    self._event(envelope, "model_tool_calls_queued", {
+                        "proposed": len(actions),
+                        "queued": len(queued_calls),
+                        "queue_position": boundary_index + 1,
+                        "queue_total": len(actions),
+                        "reason": "approval_boundary",
+                    })
+                approval = self._park_for_approval(
                     envelope,
-                    approval_id=approval_id,
                     action=action,
                     proposal=proposal,
+                    decision=decision,
+                    result=tool_result,
                     messages=[
                         *messages,
                         ModelMessage(
                             role="assistant",
-                            content=response.text,
+                            content="" if batch_results else response.text,
                             tool_calls=(proposal,),
                         ),
                     ],
                     tool_calls_made=tool_calls_made,
+                    pending_calls=queued_calls,
+                    queue_position=boundary_index + 1,
+                    queue_total=len(actions),
                 )
-                approval = {
-                    "action_id": action.action_id,
-                    "approval_id": approval_id,
-                    "tool_name": action.tool_name,
-                    "arguments": action.arguments,
-                    "risk_level": "high",
-                    "reasons": decision.reasons,
-                    "message": (
-                        "Approval required. The action was not executed. Resolving it "
-                        "continues this turn."
-                        if resumable
-                        else "Approval required. The action was not executed."
-                    ),
-                    "expected_effect": str(proposal_output.get("expected_effect", "")),
-                    "resumable": resumable,
-                }
                 message = "Approval required for local action. No command was executed."
                 break
             if decision.decision == "deny":
@@ -1111,12 +1390,17 @@ class RuntimeOrchestrator:
             self._state(machine, envelope, "EXECUTING")
             self._state(machine, envelope, "OBSERVING")
             self._state(machine, envelope, "VERIFYING")
-            for _completed_proposal, completed_action, completed_result in batch_results:
+            for (
+                _completed_proposal,
+                completed_action,
+                completed_result,
+                completed_decision,
+            ) in batch_results:
                 started_action_ids.add(completed_action.action_id)
                 self._emit_plan_event(envelope, completed_action, completed_result)
                 self._emit_subagent_event(envelope, completed_action, completed_result)
                 self._verify_and_emit(
-                    envelope, action=completed_action, decision=decision,
+                    envelope, action=completed_action, decision=completed_decision,
                     result=completed_result, started_action_ids=started_action_ids,
                 )
             tool_calls_made += len(batch_results)
@@ -1127,7 +1411,7 @@ class RuntimeOrchestrator:
                     tool_calls=tuple(item[0] for item in batch_results),
                 )
             )
-            for completed_proposal, completed_action, completed_result in batch_results:
+            for completed_proposal, completed_action, completed_result, _d in batch_results:
                 messages.append(
                     ModelMessage(
                         role="tool",

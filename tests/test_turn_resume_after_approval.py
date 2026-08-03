@@ -165,9 +165,11 @@ class TestTurnIsParkedOnApproval:
         ]
         assert suspended
         payload = suspended[0]["payload"]
-        # Counts and ids only. The transcript stays in the encrypted store.
+        # Counts and ids only. The transcript stays in the encrypted store, and
+        # ADD-02's queue counters are counts too — never the queued arguments.
         assert set(payload) - {"client"} == {
-            "approval_id", "tool_name", "suspended_messages", "tool_calls_made"
+            "approval_id", "tool_name", "suspended_messages", "tool_calls_made",
+            "queue_position", "queue_total", "queued_calls",
         }
         assert "secret plan" not in json.dumps(suspended[0])
         assert "quarterly report" not in json.dumps(suspended[0])
@@ -293,6 +295,10 @@ class TestResumeAfterApproval:
             "resumable": True,
             "session_id": envelope.session_id,
             "turn_id": envelope.turn_id,
+            # ADD-02 — a single-call turn is a batch of one with nothing queued.
+            "queue_position": 1,
+            "queue_total": 1,
+            "queued_calls": 0,
         }
         assert (workspace / "report.md").read_text(encoding="utf-8") == "# Report\n"
 

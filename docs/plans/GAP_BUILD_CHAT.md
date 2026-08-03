@@ -125,8 +125,11 @@ checkpoint evidence under the same governed action.
 Every validated read-only proposal in a model response now runs concurrently
 and every result is returned under its matching call id in one provider-valid
 batch. Mutations remain serial and stop at the first approval or policy
-boundary. Budget- or boundary-deferred calls emit `model_tool_calls_dropped`
-with proposed/accepted/dropped counts, so no call disappears without evidence.
+boundary. Budget-deferred calls emit `model_tool_calls_dropped` with
+proposed/accepted/dropped counts, so no call disappears without evidence.
+ADD-02 has since closed the boundary half: the calls behind an approval are
+parked with the turn as an ordered queue (`model_tool_calls_queued`) and walked
+one decision at a time on resume, so they are deferred rather than dropped.
 
 **B5. Test/command feedback channel.** ✅ **Done — see FIXED-44 and FIXED-47.**
 A standing, expiring, revocable per-session

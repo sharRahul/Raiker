@@ -51,6 +51,9 @@ export interface ResumableTurn {
   tool_name: string;
   outcome_status: string;
   created_at: string;
+  // ADD-02 — which decision of its batch this turn parked on.
+  queue_position?: number;
+  queue_total?: number;
 }
 
 /** How often the fallback poll runs while a turn is parked. */

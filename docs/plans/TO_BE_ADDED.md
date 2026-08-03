@@ -62,7 +62,7 @@ that would put Raiker ahead of the field.
 | ID | Tier | Area | Status |
 |---|---|---|---|
 | ADD-01 | Tier 0 | Execution / container backend | Partly shipped (see FIXED-47) |
-| ADD-02 | Tier 0 | Runtime / tool queue and gates | Partly shipped (see FIXED-39) |
+| ADD-02 | Tier 0 | Runtime / tool queue and gates | Shipped |
 | ADD-03 | Tier 0 | Identity / agent attestation | Proposal |
 | ADD-04 | Tier 0 | Audit / transaction lineage | Proposal |
 | ADD-05 | Tier 1 | Skills / self-evaluation loop | Proposal |
@@ -134,8 +134,7 @@ profile is unavailable says so instead of silently running on the host.
 
 ## ADD-02 — A sequential tool queue with per-call approval gates
 
-**Status: largely shipped — see FIXED-39 and FIXED-97. This entry records the
-remainder.**
+**Status: shipped. Delivered by FIXED-39 (B4), FIXED-97, and this change.**
 
 **Today.** The original proposal described a runtime that dropped every tool call
 after the first without telling the model. That is no longer true. FIXED-39 (B4)
@@ -146,21 +145,58 @@ emit `model_tool_calls_dropped` with proposed/accepted/dropped counts, so no cal
 disappears without evidence — and FIXED-97 fixed the declared-event gap that made
 emitting that evidence kill the turn.
 
-**Missing.** The loop parks on the *first* approval boundary and resumes there
-(FIXED-09). It does not yet park, surface, and resume **per call** through a
-multi-call batch: a batch containing three mutations still stops at the first one
-rather than walking the owner through all three against a queue that survives the
-pause.
+**What was missing.** The loop parked on the *first* approval boundary and
+resumed there (FIXED-09). It did not park, surface, and resume **per call**
+through a multi-call batch: a batch containing three mutations stopped at the
+first one, dropped the other two with an event, and left the owner no way back to
+them except a re-prompt. A model that proposed three edits got one edit.
 
-**Work.** Give the suspended-turn record in `raiker/runtime/turn_suspension.py` an
-ordered pending-call queue rather than a single parked call, and have the
-Approvals resolution path advance the queue one decision at a time, re-checking
-the decision mode (Ask / Allow / Auto) for each. A denial should skip its own call
-and continue the queue, not abandon the batch.
+**What shipped.** The suspended turn now carries the rest of the batch, and the
+resume walks it:
 
-**Governed outcome.** Approvals shows "decision 2 of 3" for a batched turn with
-the exact parameters of each remaining call, and a denial reaches the model as a
-per-call refusal rather than ending the turn.
+* **The queue is parked with the turn.** `suspended_turns` gains
+  `pending_calls_json`, `queue_position` and `queue_total`
+  (`RAIKER-1036-suspended-turn-queue`), so the queue survives the pause — the
+  owner may take hours, close the tab, or restart the host between two decisions.
+  `raiker/runtime/turn_suspension.py` holds the serialisation, and an unreadable
+  queue drains to nothing rather than failing a resume and discarding a decision
+  the owner has already made.
+* **Calls before the boundary are kept, not lost.** Anything that really executed
+  ahead of the parked call now enters the parked conversation with its result and
+  its spent budget, so the model resumes into a transcript where its own completed
+  work happened.
+* **The remainder is queued, not dropped.** An approval boundary emits
+  `model_tool_calls_queued` (counts and position only); `model_tool_calls_dropped`
+  is now reserved for calls that genuinely will not run.
+* **The resume drains the queue before it calls the model.** Each queued call is
+  re-validated and re-governed on its own terms — its own decision mode, its own
+  policy review — and a call that needs approval parks the same turn again as the
+  next decision. The model is not asked again for a call it has already proposed.
+* **A refusal skips its own call.** A policy denial inside the queue is reported
+  against that call and the queue continues (`DENIED → POLICY_REVIEWED` is now a
+  legal runtime transition, because a refusal inside a batch ends a call rather
+  than a turn). The model is told which call was refused so it does not read the
+  refusal as covering the ones still to come.
+
+**Governed outcome.** Approvals says **Decision 2 of 3** on the row and in the
+review pane; resolving one says how many calls are still queued behind it; and
+continuing lands on the next decision of the same batch rather than on a new
+prompt. A denial reaches the model as a per-call refusal and the batch carries on.
+
+**Evidence.** `tests/test_batched_approval_queue.py` covers parking, queue
+ordering, the kept pre-boundary results, draining, per-call re-governance, the
+rejection and policy-refusal paths, and the migration defaults for rows written
+before the queue existed. The live scenario is
+[`e2e/add-02-batched-approval-queue-live.spec.ts`](../../apps/web/e2e/add-02-batched-approval-queue-live.spec.ts),
+whose screenshots are `working/add-02-*`. It drives a running `raiker-web` — its
+own orchestrator, broker, policy engine, approvals inbox, suspended-turn store
+and resume endpoints — with a **local OpenAI-compatible stub as the model**, not
+a hosted provider, because what ADD-02 changes is how the runtime handles a
+multi-mutation batch and a hosted model does not reliably emit the same batch
+twice. In that run the capability gate for file writes is off, so the decisions
+resolve metadata-only; a batch whose approvals really *write* is covered by
+`test_the_whole_batch_can_be_walked_to_the_end`, which asserts all three files on
+disk.
 
 ---
 

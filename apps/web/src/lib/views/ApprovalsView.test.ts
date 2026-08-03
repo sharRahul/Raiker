@@ -29,6 +29,14 @@ const DETAIL = {
   executes_on_approval: false,
 };
 
+// ADD-02 — the same approval as part of a three-call batch the turn parked on.
+const BATCHED = {
+  ...PENDING,
+  approval_id: "appr_batched",
+  queue_position: 2,
+  queue_total: 3,
+};
+
 const EXPIRED = {
   ...PENDING,
   expires_at: "2000-01-01T00:00:00Z",
@@ -370,6 +378,100 @@ describe("ApprovalsView", () => {
       "href",
       `#/sessions?session=${PENDING.session_id}`,
     );
+  });
+
+  // ADD-02 — a batched turn asks for several decisions on one turn. Without this
+  // the inbox shows three near-identical rows and the owner cannot tell whether
+  // the agent is proposing three things or proposing one thing three times.
+  it("says which decision of a batch each approval is", async () => {
+    stubFetch({ "GET /api/approvals": [BATCHED] });
+    render(ApprovalsView);
+
+    expect(await screen.findByText(/decision 2 of 3/i)).toBeInTheDocument();
+  });
+
+  it("does not label an ordinary single-call approval as part of a batch", async () => {
+    stubFetch({ "GET /api/approvals": [{ ...PENDING, queue_position: 1, queue_total: 1 }] });
+    render(ApprovalsView);
+
+    await screen.findByText("Write file");
+    expect(screen.queryByText(/decision 1 of 1/i)).not.toBeInTheDocument();
+  });
+
+  it("tells the owner how many calls the continuation still owes a decision", async () => {
+    stubFetch({
+      "GET /api/approvals": [BATCHED],
+      "GET /api/approvals/appr_batched": { ...DETAIL, approval: BATCHED },
+      "POST /api/approvals/appr_batched/resolve": {
+        approval_id: "appr_batched",
+        action_id: "act_1",
+        status: "approved",
+        executes_action: false,
+        reason: "approved via web UI",
+        resume: {
+          resumable: true,
+          session_id: "sess_abcdef123456",
+          turn_id: "turn_1",
+          queue_position: 2,
+          queue_total: 3,
+          queued_calls: 1,
+        },
+      },
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    // Both the list row and the open detail pane place the decision inside its
+    // batch, so the owner sees it whether or not they opened the review.
+    expect(screen.getAllByText(/decision 2 of 3/i)).toHaveLength(2);
+    await fireEvent.click(await screen.findByRole("button", { name: /approve \(record only\)/i }));
+
+    expect(
+      await screen.findByText(/1 more call from the same batch/i),
+    ).toBeInTheDocument();
+  });
+
+  // BUG-24 / ADD-02 — walking a batch means resolving and continuing over and
+  // over, so losing the race to the conversation's own watcher is routine. It is
+  // still a success: the turn ran.
+  it("reports a continuation that another tab already ran as a success", async () => {
+    stubFetch({
+      "GET /api/approvals": [BATCHED],
+      "GET /api/approvals/appr_batched": { ...DETAIL, approval: BATCHED },
+      "POST /api/approvals/appr_batched/resolve": {
+        approval_id: "appr_batched",
+        action_id: "act_1",
+        status: "approved",
+        executes_action: false,
+        reason: "approved via web UI",
+        resume: { resumable: true, session_id: "sess_abcdef123456", queued_calls: 1 },
+      },
+    });
+    // The resume is the one route that must fail: `stubFetch` only answers 200,
+    // so the conflict is layered on top of it.
+    const routed = globalThis.fetch as unknown as (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => Promise<Response>;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : String(input);
+      if (url.endsWith("/api/approvals/appr_batched/resume")) {
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({ detail: { reason_code: "suspended_turn_already_resumed" } }),
+        } as Response;
+      }
+      return routed(input, init);
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /approve \(record only\)/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /continue the turn/i }));
+
+    expect(await screen.findByText(/continued in another tab/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /continue the turn/i })).not.toBeInTheDocument();
   });
 
   it("requires fresh server-backed step-up before resolving a critical approval", async () => {

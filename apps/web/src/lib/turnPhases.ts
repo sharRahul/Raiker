@@ -32,6 +32,9 @@ const EVENT_PHASE: Record<string, PhaseId> = {
   model_request_failed: "act",
   model_tool_call_rejected: "act",
   model_tool_calls_dropped: "act",
+  // ADD-02 — calls held behind an approval boundary. Still the act phase: they
+  // are work this turn will do, not work it abandoned.
+  model_tool_calls_queued: "act",
   // B7 — a delegated read-only investigation. Metadata only: the findings go to
   // the model, never to the transcript.
   subagent_completed: "act",
@@ -104,6 +107,8 @@ export function summarizeEvent(ev: StreamEvent): string {
     }
     case "model_tool_calls_dropped":
       return `${str(p.accepted)} of ${str(p.proposed)} tool call(s) accepted — ${str(p.reason)}.`;
+    case "model_tool_calls_queued":
+      return `${str(p.queued)} of ${str(p.proposed)} tool call(s) queued behind decision ${str(p.queue_position)} of ${str(p.queue_total)}.`;
     case "model_request_started":
       return `Model request started (${str(p.provider)} / ${str(p.model)}).`;
     case "model_request_completed":

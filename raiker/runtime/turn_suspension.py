@@ -12,6 +12,10 @@ This module holds the two halves of the fix that are pure data:
   the encrypted store can hold, and back again, without losing tool-call
   identity (a `tool` message is only valid against the `assistant` message whose
   `tool_calls` carry the same `call_id`);
+* **the pending-call queue** (ADD-02) — the rest of the model's batch. A batch of
+  three mutations used to stop at the first one and drop the other two; the
+  queue parks them with the turn so the owner walks the whole batch one decision
+  at a time and a refusal skips its own call instead of ending the turn;
 * **the resolution outcome** — the tool result the model is handed when the turn
   resumes. Approved-and-executed replays the real executor result; approved but
   not executed, and rejected, are stated honestly so the model reacts to what
@@ -114,6 +118,82 @@ def deserialize_messages(raw: str) -> list[ModelMessage]:
     if not messages:
         raise TurnSuspensionError("suspended_turn_unreadable")
     return messages
+
+
+def serialize_pending_calls(calls: list[ToolCallProposal]) -> str:
+    """Serialise the rest of the model's batch so it survives the pause (ADD-02).
+
+    Only the three fields a call *is* — its id, its tool, and its arguments. A
+    queued call is re-validated and re-governed when it is drained, so nothing
+    about the earlier decision is carried forward with it; that is the point of
+    holding the proposal rather than a half-evaluated action.
+    """
+    return json.dumps(
+        [
+            {
+                "call_id": call.call_id,
+                "tool_name": call.tool_name,
+                "arguments": call.arguments,
+            }
+            for call in calls
+        ],
+        separators=(",", ":"),
+    )
+
+
+def deserialize_pending_calls(raw: str | None) -> list[ToolCallProposal]:
+    """Rebuild the queued calls. An unreadable queue drains to nothing.
+
+    Deliberately softer than :func:`deserialize_messages`: a conversation that
+    cannot be rebuilt makes the turn unresumable, but a queue that cannot be
+    rebuilt only costs the calls behind the decision the owner already made.
+    Failing the whole resume over it would throw away a real approval, so the
+    turn continues with an empty queue and the model asks again if it still
+    wants them.
+    """
+    if not raw:
+        return []
+    try:
+        payload = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(payload, list):
+        return []
+    calls: list[ToolCallProposal] = []
+    for entry in payload:
+        if not isinstance(entry, dict):
+            return []
+        try:
+            calls.append(
+                ToolCallProposal(
+                    call_id=str(entry.get("call_id", "")),
+                    tool_name=str(entry.get("tool_name", "")),
+                    arguments=dict(entry.get("arguments") or {}),
+                )
+            )
+        except Exception:  # ModelContractError and friends
+            return []
+    return calls
+
+
+def queued_denial_outcome(*, tool_name: str, reasons: list[str]) -> dict[str, Any]:
+    """The tool result for a queued call policy refused while draining (ADD-02).
+
+    A denial inside a batch skips its own call and the queue carries on, so the
+    model has to be able to tell "this one was refused" apart from "the turn
+    ended". Stated as a refusal of *this* call, naming the tool, so the model
+    does not read it as a verdict on the calls after it.
+    """
+    return {
+        "status": "denied",
+        "executed": False,
+        "tool_name": tool_name,
+        "reasons": reasons,
+        "note": (
+            "Policy refused this call, so it did not run. The other calls in this "
+            "batch were decided separately — do not assume they were refused too."
+        ),
+    }
 
 
 def approval_outcome(

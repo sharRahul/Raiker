@@ -22,7 +22,7 @@ from raiker.hooks.contracts import HookInput
 from raiker.hooks.dispatcher import HookDispatcher
 from raiker.hooks.registry import HooksRegistry
 from raiker.models.connections import get_model_connection
-from raiker.models.contracts import ModelMessage
+from raiker.models.contracts import ModelMessage, ToolCallProposal
 from raiker.models.policy_state import provider_runtime_policy_from_gates
 from raiker.models.registry import ModelProfileRegistry, RegistryError, profile_with_model
 from raiker.models.router import ModelRouter
@@ -30,7 +30,11 @@ from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.orchestrator import RuntimeOrchestrator
-from raiker.runtime.turn_suspension import TurnSuspensionError, deserialize_messages
+from raiker.runtime.turn_suspension import (
+    TurnSuspensionError,
+    deserialize_messages,
+    deserialize_pending_calls,
+)
 from raiker.sessions.manager import SessionManager
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
@@ -367,8 +371,8 @@ class AgentGateway:
 
     def _restore_suspended_turn(
         self, approval_id: str
-    ) -> tuple[PromptEnvelope, list[ModelMessage], int]:
-        """Rebuild the parked turn's envelope, conversation, and tool budget.
+    ) -> tuple[PromptEnvelope, list[ModelMessage], int, list[ToolCallProposal], int]:
+        """Rebuild the parked turn's envelope, conversation, budget, and queue.
 
         Raises :class:`TurnSuspensionError` when the row is missing, already
         claimed, unresolved, or unreadable — every one of which must fail closed
@@ -433,10 +437,21 @@ class AgentGateway:
                 max_tool_calls=int(options_raw.get("max_tool_calls", DEFAULT_MAX_TOOL_CALLS)),
             ),
         )
-        return envelope, messages, int(row.get("tool_calls_made", 0))
+        # ADD-02 — the rest of the batch this decision unblocked, in the order the
+        # model proposed it, plus how many decisions the batch holds so the next
+        # park can still say which one it is.
+        return (
+            envelope,
+            messages,
+            int(row.get("tool_calls_made", 0)),
+            deserialize_pending_calls(row.get("pending_calls_json")),
+            int(row.get("queue_total") or 1),
+        )
 
     async def aresume_after_approval(self, approval_id: str) -> AgentResponse:
-        envelope, messages, tool_calls_made = self._restore_suspended_turn(approval_id)
+        (
+            envelope, messages, tool_calls_made, pending_calls, queue_total
+        ) = self._restore_suspended_turn(approval_id)
         if not self.store.claim_suspended_turn(approval_id):
             raise TurnSuspensionError("suspended_turn_already_resumed")
         final: AgentResponse | None = None
@@ -447,6 +462,8 @@ class AgentGateway:
                 stream=False,
                 tool_calls_made=tool_calls_made,
                 approval_id=approval_id,
+                pending_calls=pending_calls,
+                queue_total=queue_total,
             ):
                 if event.kind == FINAL and event.response is not None:
                     final = event.response
@@ -464,7 +481,9 @@ class AgentGateway:
         surfaces it incrementally, so the continuation lands in the transcript
         the way the interrupted turn would have.
         """
-        envelope, messages, tool_calls_made = self._restore_suspended_turn(approval_id)
+        (
+            envelope, messages, tool_calls_made, pending_calls, queue_total
+        ) = self._restore_suspended_turn(approval_id)
         if not self.store.claim_suspended_turn(approval_id):
             raise TurnSuspensionError("suspended_turn_already_resumed")
         final: AgentResponse | None = None
@@ -475,6 +494,8 @@ class AgentGateway:
                 stream=True,
                 tool_calls_made=tool_calls_made,
                 approval_id=approval_id,
+                pending_calls=pending_calls,
+                queue_total=queue_total,
             ):
                 if event.kind == FINAL and event.response is not None:
                     final = event.response

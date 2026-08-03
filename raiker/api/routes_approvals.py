@@ -21,7 +21,11 @@ from raiker.gateway.agent_gateway import AgentGateway
 from raiker.runtime.authority.models import Principal
 from raiker.runtime.authority.router import RuntimeAuthority
 from raiker.runtime.connector_ecosystem import ConnectorInvoker
-from raiker.runtime.turn_suspension import TurnSuspensionError, approval_outcome
+from raiker.runtime.turn_suspension import (
+    TurnSuspensionError,
+    approval_outcome,
+    deserialize_pending_calls,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -81,6 +85,11 @@ def _record_resume_outcome(
         "resumable": True,
         "session_id": session_id,
         "turn_id": str(row["turn_id"]),
+        # ADD-02 — how many of the turn's calls this decision unblocks. A client
+        # that resumes and lands on another approval was told to expect it.
+        "queue_position": int(row.get("queue_position") or 1),
+        "queue_total": int(row.get("queue_total") or 1),
+        "queued_calls": len(deserialize_pending_calls(row.get("pending_calls_json"))),
     }
 
 
@@ -154,6 +163,10 @@ async def list_resumable_turns(
                 # or "Rejected" before the stream produces its first token.
                 "outcome_status": _outcome_status(row.get("outcome_json")),
                 "created_at": str(row.get("created_at") or ""),
+                # ADD-02 — which decision of the batch this was, so a tab that
+                # did not make it can say so before the stream starts.
+                "queue_position": int(row.get("queue_position") or 1),
+                "queue_total": int(row.get("queue_total") or 1),
             }
             for row in rows
         ],

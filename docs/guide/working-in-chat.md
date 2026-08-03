@@ -258,5 +258,4 @@ current reading is stale. Recording an override needs the runtime gate-manager
 role and a reason; both are kept with the rate.
 
 Automatic compaction at 90 % and weekly quota display remain specified but not
-shipped — see
-`docs/superpowers/plans/2026-07-26-chat-composer-context-controls.md`.
+shipped.

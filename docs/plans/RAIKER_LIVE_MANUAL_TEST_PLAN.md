@@ -20,21 +20,22 @@
 
 ## 0. Scope and sources
 
-This plan covers the whole shipped web surface, derived from
-`docs/superpowers/specs/` and `docs/superpowers/plans/`:
+This plan covers the whole shipped web surface. Each area below was derived from
+the design work that produced it; the designs themselves are no longer kept in
+the repository, so the promise each one made is restated here:
 
-| Source document | What it promises | Covered by |
+| Area | What it promises | Covered by |
 |---|---|---|
-| `2026-07-18-adaptive-navigation-design.md` | phone/tablet/desktop navigation | §9 |
-| `2026-07-26-conversational-chat-design.md` | bubbles, streaming labels, no governance metadata in Chat | §5 |
-| `2026-07-26-chat-composer-context-and-file-inspector-design.md` | configured-model selector, context meter, permission control, file inspector | §5.4–5.6 |
-| `2026-07-26-chat-tasks-and-project-assignment-design.md` | governed `create_task` / `assign_session_project` | §7 |
+| Adaptive navigation | phone/tablet/desktop navigation | §9 |
+| Conversational Chat | bubbles, streaming labels, no governance metadata in Chat | §5 |
+| Chat composer and file inspector | configured-model selector, context meter, permission control, file inspector | §5.4–5.6 |
+| Chat tasks and project assignment | governed `create_task` / `assign_session_project` | §7 |
 
-The two specs carry implementation notes stating that the file inspector,
-automatic 90 % compaction, provider usage/cost data, and the natural-language
-task/project flow are **specified but not shipped**. This plan verifies that
-claim rather than assuming it. (The file inspector has since shipped —
-FIXED-10; §5.6 now tests a working pane rather than its absence.)
+The composer and task designs both carried implementation notes stating that the
+file inspector, automatic 90 % compaction, provider usage/cost data, and the
+natural-language task/project flow were **specified but not shipped**. This plan
+verifies that claim rather than assuming it. (The file inspector has since
+shipped — FIXED-10; §5.6 now tests a working pane rather than its absence.)
 
 ---
 

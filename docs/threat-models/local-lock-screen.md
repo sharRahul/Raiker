@@ -1,7 +1,6 @@
 # Threat Model — Local-Owner Lock Screen
 
-Status: implemented (backend + login/MFA/vault UI). See the design at
-`docs/superpowers/specs/2026-07-12-local-lock-screen-system-overhaul-design.md`.
+Status: implemented (backend + login/MFA/vault UI).
 
 ## Purpose & scope
 

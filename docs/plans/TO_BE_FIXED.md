@@ -209,19 +209,19 @@ artifacts.
 | FIXED-88 | Medium | Distribution / host lifecycle | Fixed (was BUG-40, less packaging — closed by FIXED-92) |
 | FIXED-89 | Low | Web / e2e regression suite | Fixed (was BUG-41) |
 | FIXED-90 | Medium | Terminal / approval execution | Fixed (was BUG-32) |
-| FIXED-92 | Medium | Distribution / release pipeline and signed updates | Fixed (was BUG-44, less the wizard and tray — see BUG-48) |
 | FIXED-91 | Low | Storage / per-request key derivation | Fixed (was BUG-45) |
-| BUG-46 | Medium | Storage / Windows locked memory | Open (found while verifying FIXED-91) |
+| FIXED-92 | Medium | Distribution / release pipeline and signed updates | Fixed (was BUG-44, less the wizard and tray — see BUG-48) |
 | FIXED-93 | Low | Models / provider test feedback | Fixed (was BUG-47) |
-| BUG-48 | Medium | Distribution / setup wizard and native tray | Open (split out of BUG-44) |
-| BUG-49 | Low | CI / release workflow action pinning | Open (found while building the release workflow) |
-| BUG-50 | Medium | Storage / connection cache holds every workspace open | Open (found while verifying FIXED-92) |
-| BUG-51 | Low | Policy / dead `denied_actions` configuration | Open (found while implementing B6/B7) |
 | FIXED-94 | High | Build / turn plan state | Fixed (was B6) |
 | FIXED-95 | High | Build / model-spawned subagents | Fixed (was B7) |
 | FIXED-96 | Medium | Extensions / MCP agent reachability | Fixed (B8 review; found the surface was silent) |
 | FIXED-97 | High | Runtime / undeclared event types | Fixed (found during B6 live testing; B4's drop evidence killed the turn) |
 | FIXED-98 | High | Policy / advertised tools with no verdict | Fixed (found while implementing B6/B7) |
+| BUG-46 | Medium | Storage / Windows locked memory | Open (found while verifying FIXED-91) |
+| BUG-48 | Medium | Distribution / setup wizard and native tray | Open (split out of BUG-44) |
+| BUG-49 | Low | CI / release workflow action pinning | Open (found while building the release workflow) |
+| BUG-50 | Medium | Storage / connection cache holds every workspace open | Open (found while verifying FIXED-92) |
+| BUG-51 | Low | Policy / dead `denied_actions` configuration | Open (found while implementing B6/B7) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8 complete; 12 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -311,8 +311,8 @@ under a count-shaped key. Wired into `redact_event_payload`, `redact_response_bo
 and `assert_no_secrets_in_body`. Covered by `tests/test_token_count_redaction.py`.
 
 **Follow-on.** The estimate fallback and the missing cost data were addressed
-separately in FIXED-03 below; automatic 90 % compaction and weekly quota remain
-open in `docs/superpowers/plans/2026-07-26-chat-composer-context-controls.md`.
+separately in FIXED-03 below; automatic 90 % compaction and a weekly quota remain
+open and are not tracked by any entry in this document.
 
 ---
 
@@ -368,6 +368,62 @@ now pulled from the provider and the hardcoded value is gone.
 - **Cache reads are billed at the full input rate**, so a cached-heavy turn
   reads slightly high. Deliberate: over-estimating is the safe direction for a
   bill. Splitting the rate needs a per-provider cache-discount fact.
+
+---
+
+## FIXED-04 — Chat had no conversation memory at all *(was BUG-02, critical)*
+
+**Status: fixed in this change.**
+
+**Observed.** In a **single** chat:
+
+1. "Remember this codeword: MARIGOLD-42. Reply with just OK." → *"OK"*
+2. "What was the codeword I gave you?" → *"I don't have any record of you
+   providing me with a codeword in our conversation history. **This is the first
+   message in our current session.**"*
+
+Both bubbles are visible on screen. `not-working/BUG-02-no-conversation-memory.png`.
+
+**Root cause.** `raiker/runtime/orchestrator.py` (~line 510) builds the request
+as: system prompt, workspace-context system message, optional retrieval context,
+then **one** user message from `envelope.prompt.text`. Prior turns are persisted
+and rendered, but never sent to the provider. Every turn is a fresh single-shot
+request.
+
+**Impact.** Follow-up questions, iterative work, and clarification flows are all
+impossible. It also makes the context meter meaningless even once FIXED-02 lands
+— usage cannot grow if the transcript is never sent. And the
+`assign_session_project` / clarification flows in
+`2026-07-26-chat-tasks-and-project-assignment-design.md` cannot work without it.
+
+**Fix applied.** `raiker/runtime/conversation_history.py` rebuilds the prior
+completed exchanges from the persisted `turns` rows — the same rows the Chat view
+hydrates from, so what the model sees and what the user sees have one source —
+and the orchestrator appends them before the current prompt.
+
+- Only **completed** exchanges are replayed. A turn with no reply would put an
+  unanswered question in front of the model and skew the next response.
+- Bounded by the model's context window: half of a provider-reported capacity,
+  or a conservative default. When it will not all fit, the **oldest** exchanges
+  are dropped, because a follow-up depends on recent context.
+- Scoped to the session, so a new chat still starts genuinely empty.
+- Recorded as a `conversation_history_replayed` audit event carrying counts
+  only, never the transcript.
+
+Also raised: `close_turn` truncated the persisted reply to 500 characters, which
+silently truncated both the replayed history *and* the transcript the Chat view
+renders on resume. Now `TURN_SUMMARY_MAX_CHARS = 8000`.
+
+**Verified live** on a bare workspace: "Remember this codeword: MARIGOLD-42" then
+"What was the codeword?" → `MARIGOLD-42`. A separate new chat asked the same
+question replied `NONE`. `working/96-conversation-memory-fixed.png`,
+`working/97-cross-chat-isolation.png`. Covered by
+`tests/test_owner_consent_and_history.py`.
+
+**Caught during this fix:** the first implementation emitted an unregistered
+event type and killed the stream mid-turn — a direct violation of HANDOFF's
+"Add a typed event to `EVENT_TYPES` before emitting it". The event is now
+registered and documented in `docs/EVENT_CATALOG.md`.
 
 ---
 
@@ -428,62 +484,6 @@ an account that has configured nothing; a host belonging to no configured
 provider; a gate the owner explicitly disabled; another principal's connections;
 and every deferred dangerous domain. Approvals, audit, and the STOP switch are
 untouched.
-
----
-
-## FIXED-04 — Chat had no conversation memory at all *(was BUG-02, critical)*
-
-**Status: fixed in this change.**
-
-**Observed.** In a **single** chat:
-
-1. "Remember this codeword: MARIGOLD-42. Reply with just OK." → *"OK"*
-2. "What was the codeword I gave you?" → *"I don't have any record of you
-   providing me with a codeword in our conversation history. **This is the first
-   message in our current session.**"*
-
-Both bubbles are visible on screen. `not-working/BUG-02-no-conversation-memory.png`.
-
-**Root cause.** `raiker/runtime/orchestrator.py` (~line 510) builds the request
-as: system prompt, workspace-context system message, optional retrieval context,
-then **one** user message from `envelope.prompt.text`. Prior turns are persisted
-and rendered, but never sent to the provider. Every turn is a fresh single-shot
-request.
-
-**Impact.** Follow-up questions, iterative work, and clarification flows are all
-impossible. It also makes the context meter meaningless even once FIXED-02 lands
-— usage cannot grow if the transcript is never sent. And the
-`assign_session_project` / clarification flows in
-`2026-07-26-chat-tasks-and-project-assignment-design.md` cannot work without it.
-
-**Fix applied.** `raiker/runtime/conversation_history.py` rebuilds the prior
-completed exchanges from the persisted `turns` rows — the same rows the Chat view
-hydrates from, so what the model sees and what the user sees have one source —
-and the orchestrator appends them before the current prompt.
-
-- Only **completed** exchanges are replayed. A turn with no reply would put an
-  unanswered question in front of the model and skew the next response.
-- Bounded by the model's context window: half of a provider-reported capacity,
-  or a conservative default. When it will not all fit, the **oldest** exchanges
-  are dropped, because a follow-up depends on recent context.
-- Scoped to the session, so a new chat still starts genuinely empty.
-- Recorded as a `conversation_history_replayed` audit event carrying counts
-  only, never the transcript.
-
-Also raised: `close_turn` truncated the persisted reply to 500 characters, which
-silently truncated both the replayed history *and* the transcript the Chat view
-renders on resume. Now `TURN_SUMMARY_MAX_CHARS = 8000`.
-
-**Verified live** on a bare workspace: "Remember this codeword: MARIGOLD-42" then
-"What was the codeword?" → `MARIGOLD-42`. A separate new chat asked the same
-question replied `NONE`. `working/96-conversation-memory-fixed.png`,
-`working/97-cross-chat-isolation.png`. Covered by
-`tests/test_owner_consent_and_history.py`.
-
-**Caught during this fix:** the first implementation emitted an unregistered
-event type and killed the stream mid-turn — a direct violation of HANDOFF's
-"Add a typed event to `EVENT_TYPES` before emitting it". The event is now
-registered and documented in `docs/EVENT_CATALOG.md`.
 
 ---
 
@@ -827,9 +827,8 @@ batches and reports any call deferred at an approval boundary.
 
 **Observed.** An uploaded `sample.md` rendered as a chip inside the user bubble.
 It was not a `button`, had no `role`, and clicking it did nothing. There was no
-right-side pane and no overlay. Matched the implementation note then standing in
-`docs/superpowers/plans/2026-07-26-chat-file-inspector.md`: *"This feature is
-specified but not implemented."*
+right-side pane and no overlay. Matched the file inspector's own implementation
+note as it then stood: *"This feature is specified but not implemented."*
 
 **Why it needed more than an `onclick`.** The bytes were in the governed
 attachment store, but nothing in the system could answer *"may this conversation
@@ -1245,6 +1244,8 @@ rather than cosmetic.
 tool output is redacted in every direction — it now states exactly where the
 content goes and where it does not.
 
+---
+
 ## FIXED-18 — "Confirmation token" is explained in the step-up dialog *(was BUG-13)*
 
 **Status: fixed in this change.**
@@ -1317,6 +1318,21 @@ contains its stored record, name, type, and originating turn.
 
 ---
 
+## FIXED-21 — CI validation had stale import and typing debt
+
+**Status: fixed in this change.**
+
+**Observed.** The final CI-equivalent checks did not start clean: Ruff reported
+unsorted imports in the generated-file route and attachment-preview test, while
+mypy rejected the preview test's deliberately minimal envelope fixture.
+
+**Fix applied.** Imports now follow the repository's Ruff ordering. The preview
+test explicitly casts its two-field fixture to the envelope type expected by
+the existing helper, documenting that the test supplies only the fields its
+runtime path reads. Ruff and mypy now complete without findings.
+
+---
+
 ## FIXED-22 — Repeated file recording could duplicate a session artifact
 
 **Status: fixed in this change.**
@@ -1336,48 +1352,6 @@ does not remove existing artifacts automatically.
 `tests/test_approval_execution_wiring.py::TestApprovedWriteExecutes::test_new_file_is_copied_into_the_session_after_approval`
 records the same approval turn twice and asserts the session still contains one
 file.
-
----
-
-## FIXED-21 — CI validation had stale import and typing debt
-
-**Status: fixed in this change.**
-
-**Observed.** The final CI-equivalent checks did not start clean: Ruff reported
-unsorted imports in the generated-file route and attachment-preview test, while
-mypy rejected the preview test's deliberately minimal envelope fixture.
-
-**Fix applied.** Imports now follow the repository's Ruff ordering. The preview
-test explicitly casts its two-field fixture to the envelope type expected by
-the existing helper, documenting that the test supplies only the fields its
-runtime path reads. Ruff and mypy now complete without findings.
-
----
-
-## FIXED-26 — The cost-popover test asserts a different currency label than the UI *(was BUG-14)*
-
-**Status: fixed in this change.**
-
-**Observed.** `apps/web/src/lib/components/ContextMeterPopover.test.ts` expects
-`$0.0030`, while the rendered component displays `US$0.0030`. The full web test
-run therefore has one failure even though the focused BUG-13/FIXED-19 tests,
-type check, lint, and build pass.
-
-**Reproduction.** Run `npm --prefix apps/web run test --
-ContextMeterPopover.test.ts` on a runner whose default locale does not render
-USD as a bare dollar sign.
-
-**Root cause.** The component receives a locale from its caller, but this test
-relied on the test runner's implicit locale. Its expected label therefore did
-not describe the UI invocation it was meant to cover.
-
-**Fix applied.** Currency remains locale-aware. The component test now passes
-`en-GB` explicitly and asserts the rendered `US$` label; the formatter's
-separate `en-US` tests retain the `$` convention. The test no longer depends on
-the runner's locale.
-
-**Verification.** `npm.cmd --prefix apps/web run test --
-ContextMeterPopover.test.ts` passed all 7 tests on 2026-07-28.
 
 ---
 
@@ -1460,6 +1434,33 @@ this through `tests/test_build_workspace.py`.
 value enters repository records, audit events, or API responses. Filesystem
 resolution remains native-path safe; only the public, persisted coordinate is
 normalised.
+
+---
+
+## FIXED-26 — The cost-popover test asserts a different currency label than the UI *(was BUG-14)*
+
+**Status: fixed in this change.**
+
+**Observed.** `apps/web/src/lib/components/ContextMeterPopover.test.ts` expects
+`$0.0030`, while the rendered component displays `US$0.0030`. The full web test
+run therefore has one failure even though the focused BUG-13/FIXED-19 tests,
+type check, lint, and build pass.
+
+**Reproduction.** Run `npm --prefix apps/web run test --
+ContextMeterPopover.test.ts` on a runner whose default locale does not render
+USD as a bare dollar sign.
+
+**Root cause.** The component receives a locale from its caller, but this test
+relied on the test runner's implicit locale. Its expected label therefore did
+not describe the UI invocation it was meant to cover.
+
+**Fix applied.** Currency remains locale-aware. The component test now passes
+`en-GB` explicitly and asserts the rendered `US$` label; the formatter's
+separate `en-US` tests retain the `$` convention. The test no longer depends on
+the runner's locale.
+
+**Verification.** `npm.cmd --prefix apps/web run test --
+ContextMeterPopover.test.ts` passed all 7 tests on 2026-07-28.
 
 ---
 
@@ -1886,6 +1887,44 @@ cost** for local execution. Pricing remains independent from context capacity.
 
 Live browser evidence is recorded in
 [`screenshots/working/local-context-window-live.png`](screenshots/working/local-context-window-live.png).
+
+---
+
+## FIXED-51 — Force simulation rebuilt itself on every animation tick
+
+**Status: fixed in this change; found during live Playwright verification.**
+
+**Observed.** The first production-browser run remained on **Loading the
+knowledge graph…** after the API returned. Type-check, lint, and production
+build all passed because the defect was a reactive runtime feedback loop.
+
+**Root cause.** The Svelte effect that constructed the D3 simulation read
+`renderedNodes` to preserve positions. Every D3 tick then assigned
+`renderedNodes`, invalidated the effect, stopped the simulation, and constructed
+another simulation indefinitely.
+
+**Fix.** Node positions now live in a non-reactive keyed cache. Simulation ticks
+copy positions only into render state, so data/filter/force changes rebuild the
+simulation while ordinary ticks do not. The real FastAPI-served SPA now passes
+the Playwright route, interaction, and screenshot review.
+
+---
+
+## FIXED-52 — Knowledge Map initially bypassed Raiker's shared theme
+
+**Status: fixed in this change; found during visual review.**
+
+**Observed.** The first force-graph implementation hard-coded a dark palette
+across the whole Knowledge Map. It behaved like the requested graph view but
+did not feel like the light Raiker application shown in the baseline, and a
+single hard-coded replacement would have made the route ignore dark mode.
+
+**Fix.** The canvas, toolbar, overlays, inspector, source dialog, viewport
+controls, and settings panel now use Raiker's light visual language by default
+and explicit dark-theme overrides based on the shared design tokens. A new
+Playwright sweep visits all 23 application pages and hub tabs in both explicit
+themes, asserts different resolved token palettes, and reports zero console or
+page errors.
 
 ---
 
@@ -2524,44 +2563,6 @@ richer records with full keyboard and screen-reader access.
 
 ---
 
-## FIXED-51 — Force simulation rebuilt itself on every animation tick
-
-**Status: fixed in this change; found during live Playwright verification.**
-
-**Observed.** The first production-browser run remained on **Loading the
-knowledge graph…** after the API returned. Type-check, lint, and production
-build all passed because the defect was a reactive runtime feedback loop.
-
-**Root cause.** The Svelte effect that constructed the D3 simulation read
-`renderedNodes` to preserve positions. Every D3 tick then assigned
-`renderedNodes`, invalidated the effect, stopped the simulation, and constructed
-another simulation indefinitely.
-
-**Fix.** Node positions now live in a non-reactive keyed cache. Simulation ticks
-copy positions only into render state, so data/filter/force changes rebuild the
-simulation while ordinary ticks do not. The real FastAPI-served SPA now passes
-the Playwright route, interaction, and screenshot review.
-
----
-
-## FIXED-52 — Knowledge Map initially bypassed Raiker's shared theme
-
-**Status: fixed in this change; found during visual review.**
-
-**Observed.** The first force-graph implementation hard-coded a dark palette
-across the whole Knowledge Map. It behaved like the requested graph view but
-did not feel like the light Raiker application shown in the baseline, and a
-single hard-coded replacement would have made the route ignore dark mode.
-
-**Fix.** The canvas, toolbar, overlays, inspector, source dialog, viewport
-controls, and settings panel now use Raiker's light visual language by default
-and explicit dark-theme overrides based on the shared design tokens. A new
-Playwright sweep visits all 23 application pages and hub tabs in both explicit
-themes, asserts different resolved token palettes, and reports zero console or
-page errors.
-
----
-
 ## FIXED-70 — Owner-selected SSH and Daytona execution are governed *(was BUG-31)*
 
 **Status: fixed in this change; audited from FIXED-47 and B20.**
@@ -2583,46 +2584,6 @@ without silently falling back to remote execution.
 Remote, and Cloud environments with availability, health, isolation summary,
 cost/budget, last change, and role restrictions. Work composers show the
 selected environment and block start with actionable configuration guidance.
-
----
-
-## FIXED-90 — Terminal approval authenticates, previews, executes, and continues *(was BUG-32)*
-
-**Status: fixed in this change; audited from FIXED-08.**
-
-**Observed.** The terminal client's `/approve` can resolve metadata without an
-authenticated web session, so it cannot execute the bounded approval relay or
-resume work. Approval-gated `shell` likewise remains record-only.
-
-**Fix.** `/approvals`, `/approve`, and `/deny` now require a live control-session
-token in `RAIKER_API_TOKEN`. The token is looked up afresh for every decision, so
-revocation, expiry, scope, principal activity, and account ownership are checked
-before the approval is shown. `/approve <id>` is preview-only: it prints the
-immutable tool, risk, argv, workspace working directory, timeout, and output
-bound. Execution requires the approval id to be repeated exactly as
-`/approve <id> --confirm <id>`.
-
-`shell_execution` now enters the same narrow `ApprovalExecutionBridge` used by
-the web app. The relay still checks TTL and the immutable payload hash, claims
-the approval atomically, captures the approving session posture, and re-routes
-the target through its current capability gate, decision mode, policy, command
-allowlist, workspace containment, timeout, and output bound. The authority now
-returns the executor's bounded evidence instead of discarding it. Terminal and
-web history therefore show the same exit code, byte counts, bounded stdout and
-stderr, truncation state, and resolving principal. Secret-like output is
-redacted before it enters either the terminal response or durable history. If a
-turn is parked, the
-terminal records the outcome and claims the same exactly-once continuation; if
-none is attached it says so rather than implying a model resumed.
-
-Regressions: `tests/test_terminal_approval_execution.py`, the shell relay case in
-`tests/test_api_approvals.py`, and the approval-history component case in
-`apps/web/src/lib/views/ApprovalsView.test.ts`.
-
-**UI when closed.** The terminal prints an exact effect preview, requires an
-authenticated confirmation, then shows **Executing**, bounded output/result,
-and **Continuing turn** or a precise refusal. The web Approvals history records
-the terminal principal and identical execution evidence.
 
 ---
 
@@ -2730,6 +2691,58 @@ asserts the stable lifecycle order.
 
 **UI when closed.** Models always shows the newest capacity administration
 action first, including rapid set/clear changes made within one clock tick.
+
+---
+
+## FIXED-76 — The shipped model-profile copies and human review cadence stay in step *(was BUG-36)*
+
+**Status: fixed in this change; found while fixing BUG-21 (see FIXED-57).**
+
+**Observed.** `config/model-profiles.json` and `raiker/config/model-profiles.json`
+are separate files with the same content. `_read_config_text` prefers the
+workspace-relative path and falls back to the packaged resource, so the
+repository-root copy silently wins. An edit applied to only one of them appears
+to do nothing, with no error and no warning — which is exactly how a price
+correction could be believed applied while the runtime still charges the old
+rate.
+
+**Fix.** The repository validation suite compares the packaged resource byte for
+byte with the workspace default and fails when either copy moves alone. Both
+pricing blocks now carry `reviewed_at` and `review_interval_days`; the backend
+derives the due date and current/overdue state independently from provider-sync
+timestamps. Registry and component tests pin both the copy invariant and review
+state.
+
+**UI when closed.** Models → Pricing states when each shipped documented rate
+was last reviewed by a human, distinct from when it was last synchronised, and
+flags a rate whose review is overdue.
+
+---
+
+## FIXED-77 — Source coordinates identify the passage inside a turn *(was BUG-38)*
+
+**Status: fixed in this change; found while fixing BUG-27 (see FIXED-61).**
+
+**Observed.** A memory's stored provenance names `source_session_id` and
+`source_turn_id` and nothing finer. FIXED-61 therefore locates the passage by
+searching the source text for the memory's own words: exact while the text is
+unchanged, and honestly reported as `source_changed` when it is not — but a
+memory whose wording was normalised on the way into the store, or whose source
+was edited in a way that preserves meaning, reads as changed when it is not.
+
+**Fix.** Memory capture now stores UTF-8 byte start/end coordinates and the
+SHA-256 of the exact passage in provenance. Resolution checks the byte slice and
+hash first, then uses matching text only for legacy records or a changed slice.
+The returned `resolution_method` distinguishes `stored_coordinates` from
+`matching_text`; a changed coordinate can still resolve honestly through the
+fallback, while `source_changed` remains the terminal answer when neither
+method finds the passage. Multibyte and changed-coordinate regressions are in
+`tests/test_source_provenance.py`.
+
+**UI when closed.** A resolved passage states whether it was located by stored
+coordinates or by matching text, so an owner can tell a verified quotation from a
+best-effort one. `source_changed` is reserved for a source that genuinely no
+longer contains the passage.
 
 ---
 
@@ -2884,28 +2897,31 @@ test remains enforceable without weakening the general licensing policy.
 
 ---
 
-## FIXED-76 — The shipped model-profile copies and human review cadence stay in step *(was BUG-36)*
+## FIXED-85 — A settings choice made while the page was still loading was silently discarded
 
-**Status: fixed in this change; found while fixing BUG-21 (see FIXED-57).**
+**Status: fixed in this change; found while verifying FIXED-86 live.**
 
-**Observed.** `config/model-profiles.json` and `raiker/config/model-profiles.json`
-are separate files with the same content. `_read_config_text` prefers the
-workspace-relative path and falls back to the packaged resource, so the
-repository-root copy silently wins. An edit applied to only one of them appears
-to do nothing, with no error and no warning — which is exactly how a price
-correction could be believed applied while the runtime still charges the old
-rate.
+**Observed.** Settings renders its controls before `GET /api/settings` resolves.
+Choosing a density in that window updated the control, and then the arriving
+snapshot replaced the whole settings object — so the radio flipped back, the
+page stayed *dirty*, and pressing **Save changes** wrote the **old** value while
+reporting *All changes saved*. It reproduced reliably in the live suite whenever
+Settings was re-entered from another route: the choice was accepted on screen and
+the opposite value was persisted.
 
-**Fix.** The repository validation suite compares the packaged resource byte for
-byte with the workspace default and fails when either copy moves alone. Both
-pricing blocks now carry `reviewed_at` and `review_interval_days`; the backend
-derives the due date and current/overdue state independently from provider-sync
-timestamps. Registry and component tests pin both the copy invariant and review
-state.
+The window is small but the failure mode is the bad one: the owner is told their
+change was saved, and it was not.
 
-**UI when closed.** Models → Pricing states when each shipped documented rate
-was last reviewed by a human, distinct from when it was last synchronised, and
-flags a rate whose review is overdue.
+**Fix.** `load()` now treats the server snapshot as the base and reapplies the
+keys the owner has changed since the last confirmed snapshot on top of it.
+`serverSettings` still records what the server actually holds, so **Discard** and
+the failed-write rollback keep meaning exactly what they meant. The regression is
+`apps/web/src/lib/views/SettingsView.test.ts` — it holds the read open, makes a
+choice, then resolves the read with the old value, and fails against the previous
+code.
+
+**UI when closed.** A preference chosen the moment a Settings page opens is the
+preference that gets saved.
 
 ---
 
@@ -2986,61 +3002,6 @@ Live evidence: `working/186-visual-workbench-{light,dark}.png`,
 `working/189-visual-tasks-{light,dark}.png`, and
 [`working/190-BUG-37-density-compact-live.png`](screenshots/working/190-BUG-37-density-compact-live.png).
 The earlier token pass remains recorded at `working/133-*` and `working/134-*`.
-
----
-
-## FIXED-85 — A settings choice made while the page was still loading was silently discarded
-
-**Status: fixed in this change; found while verifying FIXED-86 live.**
-
-**Observed.** Settings renders its controls before `GET /api/settings` resolves.
-Choosing a density in that window updated the control, and then the arriving
-snapshot replaced the whole settings object — so the radio flipped back, the
-page stayed *dirty*, and pressing **Save changes** wrote the **old** value while
-reporting *All changes saved*. It reproduced reliably in the live suite whenever
-Settings was re-entered from another route: the choice was accepted on screen and
-the opposite value was persisted.
-
-The window is small but the failure mode is the bad one: the owner is told their
-change was saved, and it was not.
-
-**Fix.** `load()` now treats the server snapshot as the base and reapplies the
-keys the owner has changed since the last confirmed snapshot on top of it.
-`serverSettings` still records what the server actually holds, so **Discard** and
-the failed-write rollback keep meaning exactly what they meant. The regression is
-`apps/web/src/lib/views/SettingsView.test.ts` — it holds the read open, makes a
-choice, then resolves the read with the old value, and fails against the previous
-code.
-
-**UI when closed.** A preference chosen the moment a Settings page opens is the
-preference that gets saved.
-
----
-
-## FIXED-77 — Source coordinates identify the passage inside a turn *(was BUG-38)*
-
-**Status: fixed in this change; found while fixing BUG-27 (see FIXED-61).**
-
-**Observed.** A memory's stored provenance names `source_session_id` and
-`source_turn_id` and nothing finer. FIXED-61 therefore locates the passage by
-searching the source text for the memory's own words: exact while the text is
-unchanged, and honestly reported as `source_changed` when it is not — but a
-memory whose wording was normalised on the way into the store, or whose source
-was edited in a way that preserves meaning, reads as changed when it is not.
-
-**Fix.** Memory capture now stores UTF-8 byte start/end coordinates and the
-SHA-256 of the exact passage in provenance. Resolution checks the byte slice and
-hash first, then uses matching text only for legacy records or a changed slice.
-The returned `resolution_method` distinguishes `stored_coordinates` from
-`matching_text`; a changed coordinate can still resolve honestly through the
-fallback, while `source_changed` remains the terminal answer when neither
-method finds the passage. Multibyte and changed-coordinate regressions are in
-`tests/test_source_provenance.py`.
-
-**UI when closed.** A resolved passage states whether it was located by stored
-coordinates or by matching text, so an owner can tell a verified quotation from a
-best-effort one. `source_changed` is reserved for a source that genuinely no
-longer contains the passage.
 
 ---
 
@@ -3215,6 +3176,86 @@ green on every pull request that touches `apps/web/`.
 
 ---
 
+## FIXED-90 — Terminal approval authenticates, previews, executes, and continues *(was BUG-32)*
+
+**Status: fixed in this change; audited from FIXED-08.**
+
+**Observed.** The terminal client's `/approve` can resolve metadata without an
+authenticated web session, so it cannot execute the bounded approval relay or
+resume work. Approval-gated `shell` likewise remains record-only.
+
+**Fix.** `/approvals`, `/approve`, and `/deny` now require a live control-session
+token in `RAIKER_API_TOKEN`. The token is looked up afresh for every decision, so
+revocation, expiry, scope, principal activity, and account ownership are checked
+before the approval is shown. `/approve <id>` is preview-only: it prints the
+immutable tool, risk, argv, workspace working directory, timeout, and output
+bound. Execution requires the approval id to be repeated exactly as
+`/approve <id> --confirm <id>`.
+
+`shell_execution` now enters the same narrow `ApprovalExecutionBridge` used by
+the web app. The relay still checks TTL and the immutable payload hash, claims
+the approval atomically, captures the approving session posture, and re-routes
+the target through its current capability gate, decision mode, policy, command
+allowlist, workspace containment, timeout, and output bound. The authority now
+returns the executor's bounded evidence instead of discarding it. Terminal and
+web history therefore show the same exit code, byte counts, bounded stdout and
+stderr, truncation state, and resolving principal. Secret-like output is
+redacted before it enters either the terminal response or durable history. If a
+turn is parked, the
+terminal records the outcome and claims the same exactly-once continuation; if
+none is attached it says so rather than implying a model resumed.
+
+Regressions: `tests/test_terminal_approval_execution.py`, the shell relay case in
+`tests/test_api_approvals.py`, and the approval-history component case in
+`apps/web/src/lib/views/ApprovalsView.test.ts`.
+
+**UI when closed.** The terminal prints an exact effect preview, requires an
+authenticated confirmation, then shows **Executing**, bounded output/result,
+and **Continuing turn** or a precise refusal. The web Approvals history records
+the terminal principal and identical execution evidence.
+
+---
+
+## FIXED-91 — A worker pays SQLCipher key derivation once per workspace *(was BUG-45)*
+
+**Status: fixed in this change; found while verifying FIXED-86.**
+
+**Observed.** The visual audit walks all 17 routes at four widths in two themes —
+136 page loads, each firing its own reads. Two things happened. First, the
+default 120/min per-IP rate limit refused most of it, which is the limit doing
+exactly its job. Second, with the limit raised for the audit, the host stayed
+slow for a minute or more *after* the sweep finished: routes that normally render
+instantly sat on `Loading …`, and the sweep itself had already moved on.
+
+The cause is that every API request opens a fresh `SQLiteStore`, and every
+SQLCipher connection pays a full key derivation before it can read a row. A
+burst of a thousand cheap reads therefore queues a large amount of KDF work that
+drains long after the requests that caused it. Nothing is incorrect and nothing
+is lost — it is latency, and only under a load no person generates — but it is
+the shape of problem that becomes a real one the moment a page fans out.
+
+**Fix.** `SQLiteStore.connect()` now caches one keyed SQLCipher connection per
+resolved workspace and worker thread. Short-lived store objects on the same API
+worker reuse it, so the worker pays key derivation on first use instead of on
+every route. Query work is never shared between workers. `check_same_thread` is
+disabled only so the host's shutdown path can close every worker handle from one
+place.
+
+The cache has explicit invalidation rather than relying on garbage collection:
+the FastAPI lifespan closes the workspace at shutdown, uninstall invalidates it
+before export/erase/rename, a closed handle is detected and re-keyed on its next
+read, and process exit closes anything left. Encryption remains SQLCipher with
+the same app key and foreign-key/busy-timeout setup. Regressions in
+`tests/test_sqlite_connection_cache.py` prove repeated stores open one keyed
+connection and invalidation forces exactly one fresh key derivation; the existing
+SQLCipher and lifecycle suites cover encryption and removal compatibility.
+
+**UI when closed.** No user-visible change under normal use; a page that fans out
+across several reads renders as quickly as one that makes a single read, and a
+burst does not leave the next page waiting behind it.
+
+---
+
 ## FIXED-92 — A manually-triggered release pipeline, and a signed update channel *(was BUG-44)*
 
 **Status: fixed in this change for the release pipeline and the update channel;
@@ -3353,148 +3394,6 @@ in its own failure. Live evidence:
 [`working/197-BUG-47-local-result-under-ollama-live.png`](screenshots/working/197-BUG-47-local-result-under-ollama-live.png)
 and
 [`working/198-BUG-47-hosted-cards-keep-their-own-live.png`](screenshots/working/198-BUG-47-hosted-cards-keep-their-own-live.png).
-
----
-
-## BUG-48 — There is still no setup wizard and no native tray icon
-
-**Status: open; split out of BUG-44 (see FIXED-92).**
-
-**Observed.** FIXED-92 makes a signed release buildable and an update
-verifiable, and FIXED-88 put the tray control's *behaviour* in the top bar. Two
-rows of `docs/DESKTOP_DISTRIBUTION_DESIGN.md` are still specification. The
-**First-run experience** section describes a wizard that creates the instance,
-selects or defers a model, explains local/hosted privacy and tests the
-connection, chooses a backup target, and then opens the workspace — none of it
-exists as a guided flow; a new owner meets the login screen and finds the rest.
-And the tray/menu-bar icon itself needs a packaged binary with a platform GUI
-toolkit, which no artifact currently contains.
-
-**Required fix.** A first-run wizard in the web app, entered automatically on an
-instance that has never completed setup, whose every step is skippable and whose
-model step can defer. Then a native tray/menu-bar binary per platform, bundled
-into the installers FIXED-92 builds, whose only unique action is **Open Raiker**
-— every other action already exists in the Host control and must call the same
-`/api/host/*` routes rather than growing a second implementation.
-
-**UI when closed.** A non-technical owner installs Raiker, is walked through
-creating an instance and connecting or deferring a model without ever seeing a
-terminal, and afterwards finds Raiker in the tray/menu bar with its state and
-Pause / Restart / Quit.
-
----
-
-## BUG-49 — Two release-workflow actions are pinned by tag, not by digest
-
-**Status: open; found while building `.github/workflows/release.yml`.**
-
-**Observed.** Every other action in this repository is pinned to a commit SHA.
-`actions/upload-artifact` and `actions/download-artifact` in
-`.github/workflows/release.yml` are pinned to `@v4`, because the commit digests
-could not be resolved from the environment the workflow was written in. A tag is
-mutable: whoever controls it can change what those steps run, and those steps
-handle the release artifacts.
-
-**Required fix.** Resolve both actions' commit digests and pin them, with the
-version in a comment beside each, exactly as `actions/checkout`,
-`actions/setup-python` and `actions/setup-node` are pinned. Then check no other
-workflow has acquired a tag pin.
-
-**UI when closed.** None — this is supply-chain hygiene for the pipeline that
-produces what owners install.
-
----
-
-## BUG-50 — The SQLCipher connection cache never lets a workspace go
-
-**Status: open; found while verifying FIXED-92.**
-
-**Observed.** Running the whole Python suite in one process fails with
-`OSError: [Errno 24] Too many open files` on a host whose `ulimit -n` is 4096;
-splitting it into four passes it. A direct probe shows why: opening 50 distinct
-workspaces raises the process's open descriptors from 4 to 154, and none are
-released.
-
-**Root cause.** FIXED-91 caches one keyed SQLCipher connection per resolved
-workspace and worker thread, which is exactly right for the repeated-reads
-problem it solved. It has explicit invalidation (shutdown, uninstall, a closed
-handle) but no eviction: the cache is keyed by workspace and grows without
-bound. A test session opens hundreds of temporary workspaces; so, more slowly,
-does a long-lived host serving many instances, each of which is its own
-workspace.
-
-**Required fix.** Bound the cache — least-recently-used eviction with an explicit
-limit, or release a workspace's handle once nothing holds it — and add a
-regression that opens far more workspaces than the limit and asserts the
-descriptor count stays bounded. Keep FIXED-91's property intact: repeated stores
-on one workspace and worker must still pay key derivation once.
-
-**UI when closed.** No user-visible change under normal use. A host that has
-served many instances for a long time keeps working instead of eventually
-failing to open files, and the full test suite runs in one process again.
-
----
-
-## FIXED-91 — A worker pays SQLCipher key derivation once per workspace *(was BUG-45)*
-
-**Status: fixed in this change; found while verifying FIXED-86.**
-
-**Observed.** The visual audit walks all 17 routes at four widths in two themes —
-136 page loads, each firing its own reads. Two things happened. First, the
-default 120/min per-IP rate limit refused most of it, which is the limit doing
-exactly its job. Second, with the limit raised for the audit, the host stayed
-slow for a minute or more *after* the sweep finished: routes that normally render
-instantly sat on `Loading …`, and the sweep itself had already moved on.
-
-The cause is that every API request opens a fresh `SQLiteStore`, and every
-SQLCipher connection pays a full key derivation before it can read a row. A
-burst of a thousand cheap reads therefore queues a large amount of KDF work that
-drains long after the requests that caused it. Nothing is incorrect and nothing
-is lost — it is latency, and only under a load no person generates — but it is
-the shape of problem that becomes a real one the moment a page fans out.
-
-**Fix.** `SQLiteStore.connect()` now caches one keyed SQLCipher connection per
-resolved workspace and worker thread. Short-lived store objects on the same API
-worker reuse it, so the worker pays key derivation on first use instead of on
-every route. Query work is never shared between workers. `check_same_thread` is
-disabled only so the host's shutdown path can close every worker handle from one
-place.
-
-The cache has explicit invalidation rather than relying on garbage collection:
-the FastAPI lifespan closes the workspace at shutdown, uninstall invalidates it
-before export/erase/rename, a closed handle is detected and re-keyed on its next
-read, and process exit closes anything left. Encryption remains SQLCipher with
-the same app key and foreign-key/busy-timeout setup. Regressions in
-`tests/test_sqlite_connection_cache.py` prove repeated stores open one keyed
-connection and invalidation forces exactly one fresh key derivation; the existing
-SQLCipher and lifecycle suites cover encryption and removal compatibility.
-
-**UI when closed.** No user-visible change under normal use; a page that fans out
-across several reads renders as quickly as one that makes a single read, and a
-burst does not leave the next page waiting behind it.
-
----
-
-## BUG-46 — SQLCipher cannot lock key-bearing pages on this Windows host
-
-**Status: open; found while verifying FIXED-91.**
-
-**Observed.** The Windows SQLCipher wheel repeatedly reports
-`sqlcipher_mlock: VirtualLock() returned 0 LastError=1453` while opening test
-workspaces. Database encryption, reads, writes, and key-cache invalidation all
-pass, so this is not an at-rest confidentiality or correctness failure. It does
-mean SQLCipher could not prove that key-bearing memory stayed out of the page
-file on this host.
-
-**Required fix.** Reproduce on clean supported Windows 10 and 11 runners, record
-the installed wheel/SQLite build and process memory-lock limits, and either ship
-a SQLCipher build whose secure-memory lock succeeds or surface a durable degraded
-posture with an actionable platform remedy. Do not suppress the warning unless a
-test proves key pages are locked.
-
-**UI when closed.** Settings → Security reports database encryption and locked
-memory separately. A host whose key pages cannot be locked says **Degraded** and
-links to the precise remediation; a healthy host says **Locked in memory**.
 
 ---
 
@@ -3705,6 +3604,108 @@ a wider blast radius than this change should carry; it is recorded as BUG-51.
 
 **UI when closed.** A model-proposed task, project assignment, or remote command
 raises a decision in Approvals instead of failing with a policy denial.
+
+---
+
+## BUG-46 — SQLCipher cannot lock key-bearing pages on this Windows host
+
+**Status: open; found while verifying FIXED-91.**
+
+**Observed.** The Windows SQLCipher wheel repeatedly reports
+`sqlcipher_mlock: VirtualLock() returned 0 LastError=1453` while opening test
+workspaces. Database encryption, reads, writes, and key-cache invalidation all
+pass, so this is not an at-rest confidentiality or correctness failure. It does
+mean SQLCipher could not prove that key-bearing memory stayed out of the page
+file on this host.
+
+**Required fix.** Reproduce on clean supported Windows 10 and 11 runners, record
+the installed wheel/SQLite build and process memory-lock limits, and either ship
+a SQLCipher build whose secure-memory lock succeeds or surface a durable degraded
+posture with an actionable platform remedy. Do not suppress the warning unless a
+test proves key pages are locked.
+
+**UI when closed.** Settings → Security reports database encryption and locked
+memory separately. A host whose key pages cannot be locked says **Degraded** and
+links to the precise remediation; a healthy host says **Locked in memory**.
+
+---
+
+## BUG-48 — There is still no setup wizard and no native tray icon
+
+**Status: open; split out of BUG-44 (see FIXED-92).**
+
+**Observed.** FIXED-92 makes a signed release buildable and an update
+verifiable, and FIXED-88 put the tray control's *behaviour* in the top bar. Two
+rows of `docs/DESKTOP_DISTRIBUTION_DESIGN.md` are still specification. The
+**First-run experience** section describes a wizard that creates the instance,
+selects or defers a model, explains local/hosted privacy and tests the
+connection, chooses a backup target, and then opens the workspace — none of it
+exists as a guided flow; a new owner meets the login screen and finds the rest.
+And the tray/menu-bar icon itself needs a packaged binary with a platform GUI
+toolkit, which no artifact currently contains.
+
+**Required fix.** A first-run wizard in the web app, entered automatically on an
+instance that has never completed setup, whose every step is skippable and whose
+model step can defer. Then a native tray/menu-bar binary per platform, bundled
+into the installers FIXED-92 builds, whose only unique action is **Open Raiker**
+— every other action already exists in the Host control and must call the same
+`/api/host/*` routes rather than growing a second implementation.
+
+**UI when closed.** A non-technical owner installs Raiker, is walked through
+creating an instance and connecting or deferring a model without ever seeing a
+terminal, and afterwards finds Raiker in the tray/menu bar with its state and
+Pause / Restart / Quit.
+
+---
+
+## BUG-49 — Two release-workflow actions are pinned by tag, not by digest
+
+**Status: open; found while building `.github/workflows/release.yml`.**
+
+**Observed.** Every other action in this repository is pinned to a commit SHA.
+`actions/upload-artifact` and `actions/download-artifact` in
+`.github/workflows/release.yml` are pinned to `@v4`, because the commit digests
+could not be resolved from the environment the workflow was written in. A tag is
+mutable: whoever controls it can change what those steps run, and those steps
+handle the release artifacts.
+
+**Required fix.** Resolve both actions' commit digests and pin them, with the
+version in a comment beside each, exactly as `actions/checkout`,
+`actions/setup-python` and `actions/setup-node` are pinned. Then check no other
+workflow has acquired a tag pin.
+
+**UI when closed.** None — this is supply-chain hygiene for the pipeline that
+produces what owners install.
+
+---
+
+## BUG-50 — The SQLCipher connection cache never lets a workspace go
+
+**Status: open; found while verifying FIXED-92.**
+
+**Observed.** Running the whole Python suite in one process fails with
+`OSError: [Errno 24] Too many open files` on a host whose `ulimit -n` is 4096;
+splitting it into four passes it. A direct probe shows why: opening 50 distinct
+workspaces raises the process's open descriptors from 4 to 154, and none are
+released.
+
+**Root cause.** FIXED-91 caches one keyed SQLCipher connection per resolved
+workspace and worker thread, which is exactly right for the repeated-reads
+problem it solved. It has explicit invalidation (shutdown, uninstall, a closed
+handle) but no eviction: the cache is keyed by workspace and grows without
+bound. A test session opens hundreds of temporary workspaces; so, more slowly,
+does a long-lived host serving many instances, each of which is its own
+workspace.
+
+**Required fix.** Bound the cache — least-recently-used eviction with an explicit
+limit, or release a workspace's handle once nothing holds it — and add a
+regression that opens far more workspaces than the limit and asserts the
+descriptor count stays bounded. Keep FIXED-91's property intact: repeated stores
+on one workspace and worker must still pay key derivation once.
+
+**UI when closed.** No user-visible change under normal use. A host that has
+served many instances for a long time keeps working instead of eventually
+failing to open files, and the full test suite runs in one process again.
 
 ---
 

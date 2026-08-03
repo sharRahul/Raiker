@@ -358,8 +358,8 @@ remembering.
 
 ### Tier 1 — working with the owner's material
 
-**C4. File inspector — done for attachments and generated files.** FIXED-10 shipped Tasks 1–2 of
-`docs/superpowers/plans/2026-07-26-chat-file-inspector.md`: chips are buttons and
+**C4. File inspector — done for attachments and generated files.** FIXED-10
+shipped the first two tasks of the chat file inspector: chips are buttons and
 open a session-authorized, view-only pane, reusing the sanitising renderer from
 FIXED-06 for the Markdown case. FIXED-19 and FIXED-20 record a supported,
 newly generated file against its exact session and turn so it uses that same

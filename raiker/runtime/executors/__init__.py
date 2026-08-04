@@ -31,6 +31,10 @@ from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.runtime.executors.tier1_checkpoint import CheckpointRestoreExecutor
 from raiker.runtime.executors.tier1_files import FileWriteExecutor, PatchApplyExecutor
 from raiker.runtime.executors.tier1_memory import MemoryForgetExecutor, MemoryWriteExecutor
+from raiker.runtime.executors.tier1_tasks import (
+    ProjectAssignmentExecutor,
+    TaskManagementExecutor,
+)
 from raiker.runtime.executors.tier2_shell import ProcessExecutor, ShellExecutor
 from raiker.runtime.executors.tier2_web import NetworkExecutor, WebFetchExecutor
 from raiker.runtime.executors.tier3_core import (
@@ -69,6 +73,7 @@ __all__ = [
     "REAL_EXECUTOR_CAPABILITIES", "build_default_executor_registry",
     "ApprovalExecutionRelay", "CheckpointRestoreExecutor", "FileWriteExecutor", "PatchApplyExecutor",
     "MemoryWriteExecutor", "MemoryForgetExecutor",
+    "TaskManagementExecutor", "ProjectAssignmentExecutor",
     "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "NetworkExecutor",
     "GraphIndexingExecutor", "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
     "SubagentExecutor", "MultiAgentTeamExecutor",
@@ -112,6 +117,11 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # checkpoint using B1 pre-image blobs; writes its own pre-image first, so a
     # restore is itself reversible. Approval-required governed mutation.
     "checkpoint_restore_execution",
+    # BUG-62 — the two local planning mutations an approval carries out. A task
+    # row and a project label are owner-scoped, reversible, and never leave the
+    # machine, so approving one performs it rather than recording it.
+    "task_management_runtime",
+    "project_assignment_runtime",
     # Tier 2 — sandboxed local execution / allowlisted egress
     "shell_execution",
     "process_execution",
@@ -214,6 +224,8 @@ def build_default_executor_registry(
     registry.register("checkpoint_restore_execution", CheckpointRestoreExecutor(ws, store))
     registry.register("memory_write_execution", MemoryWriteExecutor(ws, store))
     registry.register("memory_forget_execution", MemoryForgetExecutor(ws))
+    registry.register("task_management_runtime", TaskManagementExecutor(ws, store))
+    registry.register("project_assignment_runtime", ProjectAssignmentExecutor(ws, store))
     registry.register("shell_execution", ShellExecutor(ws))
     registry.register("process_execution", ProcessExecutor(ws))
     registry.register("web_fetch", WebFetchExecutor(ws))

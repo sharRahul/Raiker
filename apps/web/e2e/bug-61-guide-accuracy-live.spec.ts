@@ -224,7 +224,7 @@ test("tasks-and-projects — a task run does not appear in RECENT CHATS", async 
   await page.screenshot({ path: join(SHOTS, "bug-61-task-not-in-recents.png"), fullPage: true });
 });
 
-test("tasks-and-projects — asking for a task in Chat creates one", async () => {
+test("tasks-and-projects — asking for a task in Chat raises a real decision", async () => {
   test.setTimeout(300_000);
   // The one line the guide carried on trust: "Creating a task by asking for one
   // in Chat is specified but not shipped — the governed create_task tool exists,
@@ -245,14 +245,18 @@ test("tasks-and-projects — asking for a task in Chat creates one", async () =>
   await page.screenshot({ path: join(SHOTS, "bug-61-chat-created-task.png"), fullPage: true });
 
   // How far the flow actually goes is the part the guide has to state, so it is
-  // read off the product rather than assumed. `create_task` is not in
-  // `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`), so approving it
-  // records the decision and creates nothing. The guide says exactly that.
+  // read off the product rather than assumed. When BUG-61 was written it stopped
+  // at the decision: `create_task` was not in `EXECUTABLE_ON_APPROVAL`, so
+  // approving it recorded a decision and created nothing. FIXED-106 closed that,
+  // and the reachable end of the flow — with `task_management_runtime` still off,
+  // as it is on a fresh instance — is the honest record-only answer, stated
+  // before the owner decides.
   await row.getByRole("button", { name: "Review" }).click();
   await expect(page.getByRole("heading", { name: /Review Create task/i })).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByRole("button", { name: /^Approve/ }).click();
+  await expect(page.getByRole("main")).toContainText(/does NOT execute the action/i);
+  await page.getByRole("button", { name: "Approve (record only)" }).click();
   await expect(page.getByText(/was NOT executed \(metadata-only\)/i)).toBeVisible({
     timeout: 60_000,
   });
@@ -261,7 +265,8 @@ test("tasks-and-projects — asking for a task in Chat creates one", async () =>
     fullPage: true,
   });
 
-  // And the task really is not there.
+  // And with the capability off, the task really is not there. Turning it on is
+  // one control away — `bug-62-task-approval-executes-live.spec.ts` drives that.
   await page.goto(`${BASE}/#/tasks`);
   await expect(page.getByRole("heading", { name: "Plan work" })).toBeVisible({ timeout: 30_000 });
   await expect(

@@ -29,7 +29,13 @@
   let detailError = $state<string | null>(null);
   let decisionReason = $state("");
   let busy = $state(false);
-  let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
+  // BUG-62 — an executed action whose result is a row rather than a file carries
+  // a receipt, so the notice can point at the thing that now exists.
+  let notice = $state<{
+    kind: "ok" | "error";
+    text: string;
+    link?: { href: string; label: string };
+  } | null>(null);
   let criticalDecision = $state<"approve" | "deny" | null>(null);
   let criticalReason = $state("");
   let criticalPassword = $state("");
@@ -95,13 +101,19 @@
         approve,
         reason: decisionReason.trim() || (approve ? "approved via web UI" : "denied via web UI"),
       });
+      const receipt = result.execution?.receipt;
       notice = {
         kind: "ok",
         text: result.executes_action
           ? result.execution?.path
             ? `Executed once — wrote ${result.execution.path}. The previous contents were checkpointed.`
-            : `Executed once: ${result.status}.`
+            : receipt
+              ? `Executed once — “${receipt.title}” now exists.`
+              : `Executed once: ${result.status}.`
           : `Recorded: ${result.status}. The action was NOT executed (metadata-only).`,
+        ...(result.executes_action && receipt
+          ? { link: { href: receipt.href, label: receipt.label } }
+          : {}),
       };
       resumable =
         result.resume?.resumable && result.resume.session_id
@@ -245,7 +257,12 @@
 </div>
 
 {#if notice}
-  <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+  <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">
+    {notice.text}
+    {#if notice.link}
+      <a href={notice.link.href}>{notice.link.label}</a>
+    {/if}
+  </p>
 {/if}
 
 {#if resumable !== null}

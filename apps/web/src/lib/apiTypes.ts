@@ -835,7 +835,7 @@ export interface ResolveApprovalResult {
   executes_action: boolean;
   reason: string;
   connector_result?: Record<string, unknown>;
-  // Present when an approved file mutation was carried out by the execution relay.
+  // Present when an approved mutation was carried out by the execution relay.
   execution?: {
     capability: string;
     path: string | null;
@@ -846,6 +846,10 @@ export interface ResolveApprovalResult {
     stderr?: string;
     truncated?: boolean;
     output_redacted?: boolean;
+    // BUG-62 — where the executed action landed, for capabilities whose result
+    // is a row rather than a file: the task that now exists, the project a
+    // conversation was moved into.
+    receipt?: { kind: string; title: string; href: string; label: string };
   };
   // B2 — whether a turn was parked on this approval and can now pick up again.
   // ADD-02 adds the batch counters and how many calls the resume still owes.

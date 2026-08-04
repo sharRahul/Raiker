@@ -591,7 +591,10 @@
         : result.executes_action
           ? result.execution?.path
             ? `Applied once — wrote ${result.execution.path}. The previous contents were checkpointed.`
-            : "Applied once, under a fresh capability, policy and posture check."
+            : // BUG-62 — a capability whose result is a row, not a file, names it.
+              result.execution?.receipt
+              ? `Applied once — “${result.execution.receipt.title}” now exists. ${result.execution.receipt.label}.`
+              : "Applied once, under a fresh capability, policy and posture check."
           : "Decision recorded. Raiker re-governs the action before anything runs.";
       await loadApprovals();
       // BUG-24 — tell every other tab of this browser immediately, so a Chat

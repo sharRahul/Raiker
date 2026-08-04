@@ -35,7 +35,10 @@ The composer and task designs both carried implementation notes stating that the
 file inspector, automatic 90 % compaction, provider usage/cost data, and the
 natural-language task/project flow were **specified but not shipped**. This plan
 verifies that claim rather than assuming it. (The file inspector has since
-shipped — FIXED-10; §5.6 now tests a working pane rather than its absence.)
+shipped — FIXED-10; §5.6 now tests a working pane rather than its absence. The
+natural-language task flow has since shipped too — FIXED-106: asking in Chat
+raises a **Create task** approval that, once *Task creation* is on in
+Permissions, really creates the task.)
 
 ---
 

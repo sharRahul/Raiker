@@ -227,6 +227,11 @@ class ApprovalExecutionRelay:
             requires_approval=False,
             session_id=action.session_id,
             turn_id=action.turn_id,
+            # BUG-62 — the conversation that proposed the action, carried across
+            # from the approval row. The executing session is the inbox's, so a
+            # capability whose subject is the proposing chat has to be told which
+            # one it was; it is read from the approval rather than from the model.
+            origin_session_id=str(approval.get("session_id") or ""),
             # F7 — carry a live human's critical confirmation (issued only by
             # `resolve_critical_approval`) onto the re-governed target, so a
             # human-approved critical action clears the deny floor while still

@@ -112,6 +112,8 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   patch_apply_execution: "Workspace",
   memory_write_execution: "Workspace",
   memory_forget_execution: "Workspace",
+  task_management_runtime: "Workspace",
+  project_assignment_runtime: "Workspace",
   semantic_memory_writes: "Workspace",
   semantic_memory_review_queue: "Workspace",
   graph_codemap_indexing: "Workspace",
@@ -384,6 +386,14 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
   memory_forget_execution: {
     label: "Memory forget",
     description: "Delete durable memories through the governed broker.",
+  },
+  task_management_runtime: {
+    label: "Task creation",
+    description: "Create a task in Tasks when you approve one the agent proposed.",
+  },
+  project_assignment_runtime: {
+    label: "Project assignment",
+    description: "Move a conversation into a project when you approve the move.",
   },
   approval_execution_relay: {
     label: "Approval execution relay",

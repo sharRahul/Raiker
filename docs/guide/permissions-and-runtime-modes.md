@@ -64,11 +64,11 @@ still resolves to the single runtime rather than failing.
 
 ## Capability gates
 
-**Permissions** lists all 62 gates, grouped:
+**Permissions** lists all 64 gates, grouped:
 
 | Group | Examples |
 |---|---|
-| Workspace | Audit export, File writes, Memory store/forget, Patch apply, Semantic memory, Vector embeddings, Graph indexing |
+| Workspace | Audit export, File writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
 | Local execution | Shell commands, Processes, Container execution, Subagents, Multi-agent teams |
 | Network | Network requests, Web fetch, External channels, Channel approval relay |
 | Models | Hosted models, Home-lab models, Advisor model, Provider embeddings |
@@ -93,11 +93,16 @@ MCP) require all three of:
 ### Capabilities with no enable path
 
 Some capabilities show no **Turn on** at all: CCTV, finance, medical,
-pregnancy/baby, home security, hardware operation, and checkpoint-restore
-execution. These are **deferred**, not merely gated — no governed executor
-exists, so the runtime refuses to pretend one does. SSH remote and Daytona
-cloud execution instead require an owner-configured profile, their dedicated
-capability gate, and approval for each action.
+pregnancy/baby, home security, and hardware operation. These are **deferred**,
+not merely gated — no governed executor exists, so the runtime refuses to pretend
+one does. SSH remote and Daytona cloud execution instead require an
+owner-configured profile, their dedicated capability gate, and approval for each
+action.
+
+**Checkpoint restore** used to be listed here and is not deferred: it has had a
+real executor since Workstream B, and it was unenableable only because it had no
+entry in the activation registry — a block with no requirement to satisfy. That
+entry landed with **FIXED-106**, so it turns on like any other Tier-1 capability.
 Observability → Diagnostics lists them under *"Disabled / deferred
 capabilities"*.
 
@@ -166,13 +171,22 @@ gates, not assumed:
   session), the previous file contents are checkpointed first so it can be
   rewound, and the response carries `executes_action: true`. Writes into
   `.raiker/` or `.git/` are refused outright.
-- **Approve (record only).** Everything else — shell, network, process, and any
-  capability outside that pair — records your decision and executes nothing. The
+- **Approve and create it once.** A proposed task (`create_task`) or a proposed
+  move of the conversation into a project (`assign_session_project`) is carried
+  out the same way, under `task_management_runtime` and
+  `project_assignment_runtime` — both listed in Permissions under **Workspace**
+  as *Task creation* and *Project assignment*. Each is a local, reversible,
+  owner-scoped row rather than a file, so the notice names what it creates
+  instead of promising a checkpointed diff, and the inbox links to the result.
+- **Approve (record only).** Everything else — network, process, and any
+  capability outside that set — records your decision and executes nothing. The
   response carries `executes_action: false`.
 
-Disabling either capability in Permissions returns file approvals to
-record-only, and the detail view says so. A **critical** approval never takes
-either path: it uses the human-only, step-up-verified critical lifecycle.
+Disabling any of these capabilities in Permissions returns its approvals to
+record-only, and the detail view says so **before** you decide — the button reads
+**Approve (record only)** rather than **Approve and execute once**. A **critical**
+approval never takes either path: it uses the human-only, step-up-verified
+critical lifecycle.
 
 Either way, **your decision continues the work.** The turn that proposed the
 action keeps its place: resolving the approval hands the model the real result —

@@ -282,6 +282,10 @@ async def resolve_approval(
                         "stderr",
                         "truncated",
                         "output_redacted",
+                        # BUG-62 — where the thing the owner just approved now
+                        # lives, so the surface that took the decision can link
+                        # to it instead of saying only that it ran.
+                        "receipt",
                     )
                     if key in execution.artifacts
                 },

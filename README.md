@@ -9,7 +9,7 @@ Raiker is a local-first AI-agent runtime. Every model interaction and tool
 action passes through policy, capability gates, approvals, and audit records, so
 local automation stays under your control.
 
-The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-app` (or `raiker-web` for explicit service control), the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed. Approved SSH and Daytona actions likewise execute once through their dedicated governed executors; other approvals remain decision-only. Durable memory mutation is broker-governed, and strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
+The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-app` (or `raiker-web` for explicit service control), the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed. Approved local `shell`, SSH and Daytona actions likewise execute once through their dedicated governed executors; other approvals remain decision-only. Durable memory mutation is broker-governed, and strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
 
 ## Quick start
 
@@ -162,8 +162,10 @@ approval execution relay — re-governed at execution time, with the previous
 contents checkpointed so it can be rewound, and never into `.raiker/` or
 `.git/`. Approved **SSH remote** and **Daytona cloud** actions execute once
 through bounded, owner-selected profiles with fresh policy, posture, credential,
-host-key, and cost-ceiling checks. Other shell, network, and process approvals
-record the decision and execute nothing. Disabling either the
+host-key, and cost-ceiling checks, and an approved local **shell** command runs
+once against an allowlist, inside the workspace, under a timeout and an output
+bound, with secret-like output redacted before it is recorded. Network and
+process approvals record the decision and execute nothing. Disabling either the
 `approval_execution_relay` or
 `file_write_execution` capability returns file approvals to record-only, and a
 critical approval always uses the human-only, step-up-verified lifecycle
@@ -213,18 +215,38 @@ plus drawer to 1023 px, and the full sidebar at 1024 px and above.
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-07-27:
+Raiker's documentation does not run ahead of its code. As of 2026-08-04:
 
-- **Approved shell, network, and process actions still do not run** — approval
-  resolution executes file changes only. This is deliberate, not an oversight:
-  a file write is local, checkpointed, and reversible, and the other three are
-  not. Resolving any of them still continues the parked turn, with an honest
+- **Approved network and process actions still do not run** — approval
+  resolution executes file changes and patches, bounded local `shell` commands,
+  and the owner-configured SSH and Daytona profiles. `network` and `process`
+  keep metadata-only resolution. This is deliberate, not an oversight: a file
+  write is checkpointed and reversible, and a shell command is allowlisted,
+  workspace-contained, time- and output-bounded, and captured; those two are
+  neither. Resolving one still continues the parked turn, with an honest
   "approved, but not executed" result the agent can react to.
-- **A model proposing several tool calls at once gets one of them.** The
-  orchestrator takes the first and drops the rest without telling the model.
-- **Build patching is intentionally strict.** Exact edits require exactly one
-  `old_text` match; unified patches are one existing text file, all hunks must
-  match, and multi-file/create-delete/fuzzy/partial patches are rejected.
+- **A batch of tool calls runs in parallel only when nothing in it needs a
+  decision.** Every validated read-only call in a batch is executed
+  concurrently; the moment one call in the same batch requires approval, the
+  whole batch is walked serially and pauses at that call. Nothing behind the
+  pause is lost — the remainder is parked with the turn and re-governed one
+  decision at a time when you resume — but a batch containing three edits is
+  three decisions, not one.
+- **Build patching is strict about matching, not about scope.** One unified
+  diff may cover several files, including creates and deletes, and it is
+  applied as a single approval and a single reversible change set. What stays
+  strict is the match: exact edits require exactly one `old_text` match, every
+  hunk must match its context exactly and unambiguously, a section that edits or
+  deletes must name a text file that already exists inside the workspace and one
+  that creates must name a path that does not, and a patch naming the same file
+  twice is rejected before anything is written. There is no fuzzy or partial
+  application — one bad hunk fails the whole proposal.
+- **The agent reaches the web only where you have allowed it, and cannot search
+  at all until you configure a provider.** `web_fetch` is gated by its own
+  capability, withholds by default at `ask`, and fetches nothing while
+  `RAIKER_WEB_EGRESS_ALLOWLIST` is empty. `web_search` answers the same gate,
+  but Raiker ships no search endpoint: it reports `web_search_not_configured`
+  until you point it at one.
 - Automatic context compaction at 90 % and weekly quota display are specified
   but not shipped. The view-only file inspector is shipped.
 - **Shipped list prices are unverified defaults.** `config/model-profiles.json`
@@ -233,8 +255,12 @@ Raiker's documentation does not run ahead of its code. As of 2026-07-27:
   pricing page and override anything that has moved; an unpriced model reports
   its cost as unknown rather than as zero.
 
-Each is written up with a reproduction and a proposed fix in
-[docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md).
+Where one of these is tracked as work rather than a deliberate boundary, it is
+written up with a reproduction and a proposed fix in
+[docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md). The entries that closed
+the older limits this section used to list are FIXED-34, FIXED-39, FIXED-90,
+FIXED-99 and FIXED-101 there, and
+[ADD-02](docs/plans/TO_BE_ADDED.md) in the companion document.
 
 ## Documentation
 

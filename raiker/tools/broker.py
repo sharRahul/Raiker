@@ -44,6 +44,7 @@ from raiker.tools.memory_tools import (
 from raiker.tools.search import glob, grep
 from raiker.tools.skill_tools import skill_load
 from raiker.tools.vector_tools import vector_get
+from raiker.tools.web_tools import web_fetch, web_search
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -87,6 +88,10 @@ _CONTENT_RESULT_TOOLS = frozenset(
     {
         "consult_advisor", "github_read", "gmail_read", "gcal_read", "slack_read",
         "connector_read", "run_command",
+        # B12/C7 — a fetched page and a search result set are outside content the
+        # agent read on the owner's behalf. They flow to the calling model as
+        # untrusted data; the audit trail keeps the URL, the query and the sizes.
+        "web_fetch", "web_search",
         # B7 — a subagent's digest is workspace content it read on the parent's
         # behalf. It flows to the calling model and nowhere else; the audit
         # trail keeps the contract, the steps, and the tools used.
@@ -232,6 +237,19 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("resource", "")),
                 str(args.get("channel", "")),
+                store=self.store,
+                principal_id=self.principal_id,
+            ),
+            "web_fetch": lambda args: web_fetch(
+                self.workspace_root,
+                str(args.get("url", "")),
+                store=self.store,
+                principal_id=self.principal_id,
+            ),
+            "web_search": lambda args: web_search(
+                self.workspace_root,
+                str(args.get("query", "")),
+                args.get("max_results", 5),
                 store=self.store,
                 principal_id=self.principal_id,
             ),

@@ -36,6 +36,7 @@
   import ComposerChips from "../components/ComposerChips.svelte";
   import PlanChecklist from "../components/PlanChecklist.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
+  import TurnControl from "../components/TurnControl.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, relativeTime } from "../format";
@@ -76,6 +77,9 @@
   // reports nothing leaves the owner guessing whether it worked.
   let exportNotice = $state<string | null>(null);
   let streaming = $state(false);
+  // B17/C13 — whether the owner has already asked this turn to stop. Held here
+  // rather than inside the control so a new turn always starts un-stopped.
+  let stopping = $state(false);
   // Reuse one session across turns so the governed conversation stays continuous.
   let sessionId = $state<string | null>(null);
   // Provider-reported usage and API cost for this conversation. Null until the
@@ -516,6 +520,7 @@
     promptText = "";
     attachStore.clear();
     streaming = true;
+    stopping = false;
     void scrollToEnd();
     try {
       await streamPrompt(
@@ -556,6 +561,12 @@
             turn.events = [...turn.events, event];
             const streamed = planFromEvent(event);
             if (streamed !== null) plan = streamed;
+          }
+          // B17/C13 — a brand-new chat learns its own session id from the first
+          // streamed chunk, which is what lets Stop and steer reach this very
+          // turn instead of only the ones after it.
+          if (sessionId === null && typeof event.session_id === "string" && event.session_id !== "") {
+            sessionId = event.session_id;
           }
           void scrollToEnd();
         },
@@ -1043,6 +1054,16 @@
             {/if}
           {/if}
 
+          <!-- B17/C13 — a turn the owner stopped says so. Without this the
+               transcript just ends early and the owner is left wondering whether
+               Raiker stopped or broke. -->
+          {#if !turn.streaming && turn.response?.status === "stopped"}
+            <p class="stopped-line" role="status">
+              Stopped at your request — this turn ended at a safe boundary and kept what it had
+              already done.
+            </p>
+          {/if}
+
           {#if answer !== ""}
             <div class="message-bubble message-bubble-raiker">
               <Markdown text={answer} />
@@ -1243,6 +1264,15 @@
 
       {#if attachOpen}
         <ComposerAttachPanel store={attachStore} disabled={streaming} idPrefix="chat" />
+      {/if}
+
+      {#if streaming}
+        <!-- B17/C13 — while a turn is running the composer's job changes: it is
+             no longer where the next question is written, it is where this turn
+             is stopped or corrected. -->
+        <div class="composer-bar">
+          <TurnControl sessionId={sessionId} bind:stopping />
+        </div>
       {/if}
 
       <div class="composer-bar">
@@ -1507,6 +1537,11 @@
   .artifact-copy p { margin: 0.15rem 0 0; color: var(--text-2); font-size: 0.8rem; }
   .artifact-heading { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .artifact-heading strong { overflow-wrap: anywhere; }
+  .stopped-line {
+    margin: 0 0 0.4rem;
+    font-size: 0.82rem;
+    color: var(--text-2);
+  }
   .artifact-status {
     border-radius: 999px; padding: 0.1rem 0.45rem; color: var(--ok);
     background: var(--ok-soft); font-size: 0.7rem; font-weight: 700;

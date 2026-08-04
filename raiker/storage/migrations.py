@@ -2289,3 +2289,32 @@ CREATE TABLE IF NOT EXISTS agent_plans (
 CREATE INDEX IF NOT EXISTS idx_agent_plans_owner
   ON agent_plans(principal_id, updated_at DESC);
 """
+
+
+# B17 / C13 — the owner's two controls over a turn that is already running.
+#
+# `POST /api/interrupts` has always been able to cancel a *task*; a live Chat or
+# Build turn also needs somewhere to leave an instruction the running loop will
+# find at its next safe boundary. That is what this table is: one row per
+# (session, principal), holding a stop request and/or an ordered list of steer
+# messages the owner typed while the turn was streaming.
+#
+# It is durable rather than in-process on purpose. The request that asks for the
+# stop and the loop that honours it need not share a worker, and an owner who
+# hits Stop must not depend on which process answered them.
+#
+# It grants nothing: a stop only ends a turn early, and a steer is the owner's
+# own words entering their own conversation as a user message. Everything the
+# model does after reading one is governed exactly as it was before.
+TURN_CONTROLS_MIGRATION_ID = "RAIKER-1037-turn-controls"
+TURN_CONTROLS_SQL = """
+CREATE TABLE IF NOT EXISTS turn_controls (
+  session_id TEXT NOT NULL,
+  principal_id TEXT NOT NULL,
+  stop_requested INTEGER NOT NULL DEFAULT 0,
+  stop_reason TEXT,
+  steer_json TEXT NOT NULL DEFAULT '[]',
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (session_id, principal_id)
+);
+"""

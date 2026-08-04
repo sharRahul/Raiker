@@ -198,10 +198,14 @@ change it can neither commit nor propose. **Work:** governed
 `git_branch` / `git_commit` (high risk, approval, diff preview) and a
 `github_write` bound to the existing connector credential and egress allowlist.
 
-**B12. No web access.** No fetch and no search anywhere in `_TOOL_RISK`, so the
-agent cannot read the documentation for a library it is being asked to use.
-**Work:** an egress-allowlisted `web_fetch` returning sanitised text as
-untrusted data; search behind the same gate, off by default.
+**B12. No web access.** ✅ **Done — see FIXED-101.** `web_fetch` returns one page
+as bounded, sanitised text framed as untrusted data, governed by the `web_fetch`
+capability gate, the per-capability decision mode (default `ask` withholds), and
+the owner egress allowlist `RAIKER_WEB_EGRESS_ALLOWLIST` (empty ⇒ fail closed).
+Because the URL is model-supplied it is checked as well as the host — HTTPS only,
+no embedded credentials, a destination that resolves to a public address, and
+every redirect hop re-checked. `web_search` sits behind the same gate and is off
+until the owner configures an endpoint.
 
 ### Tier 3 — the workspace surface (UI/UX)
 
@@ -232,11 +236,13 @@ governance `details`, so during a long turn the transcript looks idle.
 matched, command started — with a progress affordance, keeping the full
 governed record in the disclosure.
 
-**B17. No way to stop or steer a running turn.** `POST /api/interrupts` exists
-and `api.interrupt` is already in `apps/web/src/lib/api.ts`, but no view calls
-it. A turn heading the wrong way must be waited out. **Work:** a Stop control on
-the composer while streaming, and a queued-steer input that appends to the
-running turn at the next safe boundary.
+**B17. No way to stop or steer a running turn.** ✅ **Done — see FIXED-102.**
+While a turn streams, the composer becomes its control surface: **Stop** ends the
+turn at its next safe boundary and it reports as `stopped` — a decision, not a
+failure — keeping the text it had already produced, and a steer field queues the
+owner's own words into the running turn, where they arrive as a user message
+before the model is asked anything else. Both go through the same governed
+`POST /api/interrupts` the top-bar STOP switch uses.
 
 **B18. No checkpoint or rewind control where the work happens.** Checkpoints are
 recorded and browsable in their own route, but Build offers no "rewind to before
@@ -301,9 +307,11 @@ B1 → B2 → B3 make Build an agent. **B1, B2, and B3's defined core scope are
 now landed**: an approved change is really made, the turn continues through
 it, and B3 uses strict, hunk-level editing instead of a whole-file rewrite.
 B3's multi-file patch transaction has landed. **B4–B8 are now complete**, so the
-loop is efficient, legible, and reaches the ecosystem. B13–B16 make the result
-reviewable. Everything else is depth. B20 is a *policy* decision before it is an
-engineering one and belongs to the owner, not to an implementer.
+loop is efficient, legible, and reaches the ecosystem. **B12 and B17 have since
+landed too** — the agent can read a page it is told to read, and the owner can
+stop or correct a turn while it runs rather than waiting it out. B13–B16 make the
+result reviewable. Everything else is depth. B20 is a *policy* decision before it
+is an engineering one and belongs to the owner, not to an implementer.
 
 ---
 
@@ -388,8 +396,12 @@ which one. For an assistant acting on the owner's real data this is a
 correctness feature, not a nicety. **Work:** carry source ids through the tool
 result into the response and render an inline, clickable provenance chip.
 
-**C7. No web access.** As B12 — the assistant cannot look anything up. For a
-work assistant this is the difference between answering and guessing.
+**C7. No web access.** ✅ **Done — as B12 (FIXED-101).** `web_fetch` and
+`web_search` are callable in Chat under the same gate, decision mode, egress
+allowlist and audit path, and what they return is untrusted data. Verified live:
+withheld with its reason, then — once the owner enabled the capability and raised
+the mode — a real page read and quoted back, with a non-allowlisted host still
+refused.
 
 **C8. MCP tools unreachable.** ✅ **Done — as B8 (FIXED-17, FIXED-96).** A
 connected server's tools are callable in Chat under the same gate, decision mode,
@@ -427,8 +439,9 @@ owner, so this is a genuine architectural decision rather than a missing screen 
 
 ### Tier 3 — conversation surface (UI/UX)
 
-**C13. No stop or steer.** As B17: `POST /api/interrupts` and `api.interrupt`
-exist; nothing calls them. A long turn cannot be stopped.
+**C13. No stop or steer.** ✅ **Done — as B17 (FIXED-102).** Chat's composer
+carries the same Stop and steer controls as Build's, on the same governed
+endpoint, and a stopped turn says so in the transcript instead of simply ending.
 
 **C14. No message-level actions.** No copy, no edit-and-resend, no regenerate,
 no branch-from-here, no per-message feedback. Editing a prompt and re-running is
@@ -454,8 +467,10 @@ threads a routine is advancing.
 C1 and C2 make Chat capable of work — C1's blocking half has landed (FIXED-08),
 leaving document output; C3 makes it feel like it knows the owner;
 C10/C11 make it present when the owner is not watching. C4–C6 and C13–C15 are
-the daily-use polish that determines whether any of it gets used. C2, C3(3),
-C10 and C12 are owner policy decisions before they are implementation tasks.
+the daily-use polish that determines whether any of it gets used; **C7 and C13
+have landed** — Chat can look something up instead of guessing, and a turn can be
+stopped or steered while it runs. C2, C3(3), C10 and C12 are owner policy
+decisions before they are implementation tasks.
 
 ---
 

@@ -347,7 +347,11 @@ class AgentGateway:
                         request_id=prompt_envelope.request_id,
                         session_id=prompt_envelope.session_id,
                         turn_id=prompt_envelope.turn_id,
-                        status="failed",
+                        # B17/C13 — a turn the owner stopped is `stopped`, not
+                        # `failed`. The runtime did what it was told; saying it
+                        # failed put the blame in the wrong place and made Chat
+                        # render the owner's own decision as an error.
+                        status="stopped",
                         message="Stopped by user at a safe boundary.",
                         client=prompt_envelope.client,
                     )

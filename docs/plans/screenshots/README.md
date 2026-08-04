@@ -112,3 +112,24 @@ unchanged for the owner using it.
 | `bug-50-host-before-many-instances.png` | The owner's Workbench on the host before it serves any of them |
 | `bug-50-instance-creation-surface.png` | The login screen's instance form — the product surface behind the endpoint the run drives |
 | `bug-50-host-after-many-instances.png` | The same Workbench after 30 more instance workspaces: every route still rendering, 0 console errors, status resolved from the database the cache was evicting around |
+
+`b12-*` and `b17-*` are the live evidence for FIXED-101 and FIXED-102, captured
+on **2026-08-04** by
+[`apps/web/e2e/web-access-turn-control-live.spec.ts`](../../../apps/web/e2e/web-access-turn-control-live.spec.ts)
+against a running `raiker-web` holding an owner-entered Anthropic credential and
+answering live `claude-haiku-4-5-20251001` turns. The page the agent reads is
+fetched from the real internet; that host was started with
+`RAIKER_WEB_EGRESS_ALLOWLIST=pypi.org`, which is an owner setting and not a
+shipped default — the allowlist ships empty.
+
+| File | Records |
+|---|---|
+| `b12-web-fetch-withheld.png` | The first `web_fetch` call, refused with `gate_disabled` and the control that changes it |
+| `b12-web-fetch-capability.png` | Permissions → Web fetch after the owner turned it on and set it to Allow |
+| `b12-web-fetch-live-page.png` | The same request answering from a real page — the model quotes pypi.org's own summary of httpx back |
+| `b12-web-fetch-egress-denied.png` | A host that is not on the owner allowlist, refused before any packet leaves the machine |
+| `b17-turn-control-visible.png` | The composer while a turn streams: it becomes the turn's Stop and steer surface |
+| `b17-steer-queued.png` | One instruction queued for the running turn, with what happens to it stated |
+| `b17-steered-answer.png` | The model obeying the mid-turn correction — it answers **STEERED MIDTURN**, which was never in the original prompt |
+| `b17-stop-requested.png` | Stop pressed mid-turn: a request applied at a safe boundary, never claimed as already done |
+| `b17-turn-stopped.png` | The turn ended as **stopped** — a decision, not a failure — keeping what it had already produced |

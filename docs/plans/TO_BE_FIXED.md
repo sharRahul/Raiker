@@ -144,6 +144,17 @@ and is the only part that needs a provider credential; **it skipped in this run*
 credential and not about the host. Nothing else in the file depends on a model,
 because what FIXED-100 changes sits below the model entirely.
 
+FIXED-101 and FIXED-102 were verified on **2026-08-04** against a running
+`raiker-web` holding an owner-entered Anthropic credential and answering live
+`claude-haiku-4-5-20251001` turns. The live scenario is
+[`e2e/web-access-turn-control-live.spec.ts`](../../apps/web/e2e/web-access-turn-control-live.spec.ts),
+and its screenshots are `working/b12-*` and `working/b17-*`. The page the agent
+reads is fetched from the real internet; the host was started with
+`RAIKER_WEB_EGRESS_ALLOWLIST=pypi.org` because that is what the machine the run
+happened on could reach, and the spec says so rather than implying the allowlist
+is a shipped default — it ships **empty**. The credential was entered through the
+product UI and is not stored in the repository or test artifacts.
+
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | FIXED-01 | High | Models | Fixed |
@@ -246,6 +257,8 @@ because what FIXED-100 changes sits below the model entirely.
 | FIXED-98 | High | Policy / advertised tools with no verdict | Fixed (found while implementing B6/B7) |
 | FIXED-99 | Medium | Runtime / batched policy refusal | Fixed (was BUG-52) |
 | FIXED-100 | Medium | Storage / connection cache holds every workspace open | Fixed (was BUG-50) |
+| FIXED-101 | High | Chat / Build — governed web access | Fixed (was B12/C7) |
+| FIXED-102 | High | Chat / Build — stop and steer a running turn | Fixed (was B17/C13) |
 | BUG-46 | Medium | Storage / Windows locked memory | Open (found while verifying FIXED-91) |
 | BUG-48 | Medium | Distribution / setup wizard and native tray | Open (split out of BUG-44) |
 | BUG-49 | Low | CI / release workflow action pinning | Open (found while building the release workflow) |
@@ -254,6 +267,8 @@ because what FIXED-100 changes sits below the model entirely.
 | BUG-54 | Medium | Web e2e / the live stub model is not in the repository | Open (found while writing FIXED-99's live scenario) |
 | BUG-55 | Low | Chat / a disabled transcript block reads as live code | Open (found while verifying FIXED-99) |
 | BUG-56 | Low | Tests / a shipped-skill check breaks after `compileall` | Open (found while verifying FIXED-100) |
+| BUG-57 | Medium | Context / stale capability flags mislead the model | Open (found while verifying FIXED-101) |
+| BUG-58 | Low | Documentation / README known limits are stale | Open (found while writing FIXED-101) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8 complete; 12 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -3803,6 +3818,137 @@ of eventually failing to open files.
 
 ---
 
+## FIXED-101 — The agent could not read a page it was told to read *(was B12/C7)*
+
+**Status: fixed in this change.**
+
+**Observed.** Nothing in the model-facing tool surface reached the web. There was
+no `web_fetch` and no search anywhere in `_TOOL_RISK`
+(`raiker/models/tool_call_validation.py`), so an agent asked to use a library
+could not read that library's documentation — it could only answer from training
+and hope. A `WebFetchExecutor` existed under the `web_fetch` *capability*
+(`raiker/runtime/executors/tier2_web.py`), reachable only through
+`route_action`, and it returned byte counts rather than the page, so even that
+path could not have handed a model anything to read.
+
+**Fix applied.** `raiker/runtime/web_access.py` — `WebAccessService`, brokered as
+the `web_fetch` and `web_search` tools (`raiker/tools/web_tools.py`). It is
+governed exactly like the service connectors beside it, for the same reason: it
+is network egress, and here the destination is chosen by a **model**.
+
+Enforced in order, on every call:
+
+1. the `web_fetch` capability gate — disabled ⇒ fail closed;
+2. the per-capability decision mode — **default `ask` withholds**, `deny` blocks,
+   and `auto` withholds too, because reaching the open internet on a model's
+   say-so is never low-risk;
+3. the owner egress allowlist `RAIKER_WEB_EGRESS_ALLOWLIST` — empty ⇒ fail
+   closed, and deliberately separate from `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, so
+   allowing a connector's API host does not also allow the agent to fetch
+   arbitrary pages from it;
+4. URL safety, because the URL itself is model-supplied: HTTPS only, no embedded
+   credentials, and a destination that resolves to a **public** address — an
+   owner can allowlist a *name*, and a name can still point at the loopback
+   interface, a metadata service, or a machine on the home network;
+5. every redirect hop re-checked against 3 and 4. Redirects are followed manually
+   rather than by urllib's handler, because a redirect is a second destination
+   the owner never allowlisted.
+
+The page comes back reduced to text — script, style and template bodies dropped
+rather than flattened — bounded to 20 000 characters and framed as *untrusted
+data, not instructions*, the same framing the connectors use. Broker events keep
+the URL, the query and the sizes; the fetched content never enters an audit
+payload (`_CONTENT_RESULT_TOOLS`).
+
+`web_search` sits behind the same gate and is **off until the owner configures a
+provider**: Raiker ships no search endpoint, so an unconfigured host answers
+`web_search_not_configured` rather than quietly reaching somebody's API.
+
+**One policy set had to be reconciled, not added to.** `web_fetch` names a *tool*
+and a *capability*, and `allowed_read_actions` is checked before
+`approval_required_actions` — leaving the string in both sets would have let the
+read branch silently decide the capability path too, which is exactly the "two
+lists that have to agree" defect this document keeps finding. The tool name now
+lives in `allowed_read_actions` only. The capability path is unchanged by that:
+`route_action` gates it on the capability gate and on the decision mode, whose
+default `ask` forces approval for any AI-proposed action.
+
+**Live evidence.** Screenshots `working/b12-web-fetch-withheld.png`,
+`working/b12-web-fetch-capability.png`, `working/b12-web-fetch-live-page.png` and
+`working/b12-web-fetch-egress-denied.png`, from
+[`e2e/web-access-turn-control-live.spec.ts`](../../apps/web/e2e/web-access-turn-control-live.spec.ts).
+The first attempt is refused with `gate_disabled` and the control that changes
+it; after the owner turns the capability on and sets it to Allow, the same
+request fetches `https://pypi.org/project/httpx/` and the model quotes the
+page's own summary — *"The next generation HTTP client."* — back. A request for
+`https://example.com/`, which is not on that host's allowlist, is refused with
+`web_egress_denied` before any packet leaves the machine.
+
+**UI when closed.** Permissions lists **Web fetch** with its four decision modes,
+its description names the owner egress allowlist, and a withheld call tells the
+owner in the transcript which control would change it.
+
+---
+
+## FIXED-102 — A running turn could not be stopped or corrected *(was B17/C13)*
+
+**Status: fixed in this change.**
+
+**Observed.** `POST /api/interrupts` cancels *tasks*, and the top-bar STOP switch
+called it — but a Chat or Build turn heading the wrong way had to be waited out
+and then re-prompted. The one control that makes an autonomous agent safe to
+leave running was the one control the conversation did not have.
+
+**Fix applied.** Three parts, all on the existing governed path:
+
+* **A durable control channel.** A `turn_controls` row per (session, principal)
+  holds a stop request and an ordered list of steer messages
+  (`RAIKER-1037-turn-controls`). Durable rather than in-process because the
+  request that asks for the stop and the loop that honours it need not share a
+  worker.
+* **A safe boundary that reads it.** `_arun_agent_loop` checks the channel
+  between the last tool batch and the next question to the model. A steer is
+  appended as a **user message** — the owner's own words, entering their own
+  conversation — and a stop ends the turn there. During a long answer the loop
+  also polls once a second so Stop feels immediate; the half-streamed tool call
+  is discarded rather than reconstructed, because the owner stopped the turn.
+  Controls are consumed on read, and cleared at the start of every turn, so one
+  stop cannot end two turns and an instruction left between turns is never
+  applied to work the owner had not asked for yet.
+* **An honest outcome.** `stopped` is now a response status of its own. A turn
+  the owner ended did not fail and was not denied: it kept the text it had
+  already produced and stopped because it was told to. Reporting that as
+  `failed` blamed the runtime for the owner's decision.
+
+The composer is where both live. While a turn streams it becomes the turn's
+control surface — a Stop button and a field that queues an instruction — and both
+call the same `POST /api/interrupts` the STOP switch uses, still human-only,
+still owner-scoped, still applied at a safe boundary rather than as a force-kill.
+Steering grants nothing: every call the model makes after reading one is governed
+exactly as it was before.
+
+Two small things had to be true first. Every SSE chunk now carries its
+`session_id` and `turn_id`, because a brand-new chat had no session id until its
+first turn *ended* — which made the very turn most worth stopping the one turn
+that could not be. And a stopped turn says so in the transcript, rather than
+simply ending early and leaving the owner to wonder whether Raiker stopped or
+broke.
+
+**Live evidence.** Screenshots `working/b17-turn-control-visible.png`,
+`working/b17-steer-queued.png`, `working/b17-steered-answer.png`,
+`working/b17-stop-requested.png` and `working/b17-turn-stopped.png`, from the
+same live scenario. The steer is typed while the turn is streaming and the model
+obeys it — it answers **STEERED MIDTURN**, which was never in the original
+prompt. The stop is pressed mid-turn and the transcript ends with *"Stopped at
+your request — this turn ended at a safe boundary and kept what it had already
+done."*
+
+**UI when closed.** Chat and Build show a Stop control and a steer field while a
+turn is running, and a turn that was stopped reads as stopped rather than as an
+answer that trailed off.
+
+---
+
 ## BUG-46 — SQLCipher cannot lock key-bearing pages on this Windows host
 
 **Status: open; found while verifying FIXED-91.**
@@ -4004,6 +4150,75 @@ what it means to assert and stops depending on command order. Do not weaken the
 rule itself: an unreferenced *source* file in a skill bundle is still a defect.
 
 **UI when closed.** None — this is a test-suite reliability defect.
+
+---
+
+## BUG-57 — The context bundle's fixed capability flags talk a model out of tools it can use
+
+**Status: open; found while verifying FIXED-101.**
+
+**Observed.** With the `web_fetch` capability enabled and its decision mode set
+to Allow, one live turn declined to call `web_fetch` at all and explained why:
+
+> I cannot call web_fetch because the web_fetch capability gate is disabled in
+> the current runtime environment. According to the capability status in the
+> workspace context, `network_execution_enabled` is false…
+
+Nothing was disabled. `network_execution` is a **different** capability, and the
+model reasoned from it to a neighbouring one.
+
+**Root cause.** `CAPABILITY_FLAGS` in `raiker/context/gatherer.py` is a fixed
+list of eighteen `*_enabled` names the gatherer reports as `False` on every turn,
+regardless of what the owner has actually enabled. They were added so a model and
+the event log could see the runtime was gated, and they are now stale in two
+directions at once: they never reflect a gate the owner turned on, and they name
+capabilities that no longer correspond one-to-one to the tools in the schema.
+
+**Why it matters.** It is the same failure mode as BUG-51 and FIXED-98 — two
+lists that have to agree and nothing holding them together — except this one is
+read by the *model*, so the cost is a refusal the owner cannot see the cause of.
+A capability an owner has deliberately enabled should not be argued away by
+context that has not been true since it was written.
+
+**Required fix.** Report the real, per-principal gate state for the capabilities
+the bundle names, or stop naming them. If the flags stay, they must be derived
+from the same store the gates live in, and a test must assert that a capability
+enabled by the owner is reported as enabled.
+
+**UI when closed.** A tool the owner has enabled is not refused by the model on
+the strength of a stale context line, and the transcript's stated reason for any
+refusal matches what governance actually decided.
+
+---
+
+## BUG-58 — README's "Known limits" describes behaviour that has since shipped
+
+**Status: open; found while writing FIXED-101.**
+
+**Observed.** `README.md` → **Known limits**, stamped *"As of 2026-07-27"*, still
+tells a reader:
+
+> **A model proposing several tool calls at once gets one of them.** The
+> orchestrator takes the first and drops the rest without telling the model.
+
+B4 (FIXED-39) made every validated read-only call in a batch run concurrently;
+ADD-02 parks the calls behind an approval boundary as an ordered queue; FIXED-99
+made a refusal end its own call rather than the batch. The same section's
+multi-file patch limit was closed by FIXED-34, and its "approved network actions
+still do not run" line predates FIXED-101.
+
+**Why it matters.** This is FIXED-24's defect returning by a different route: a
+document that describes shipped behaviour as missing costs a reader trust in
+everything around it, and Known limits is the section a careful reader checks
+*first*.
+
+**Required fix.** Re-derive the section from the current tree, restamp the date,
+and state each remaining limit against the entry that closed or bounded it. Do
+not simply delete the lines — a limit that is genuinely still there must survive
+the pass.
+
+**UI when closed.** None — this is documentation accuracy for the first thing a
+new reader is told about the product's edges.
 
 ---
 

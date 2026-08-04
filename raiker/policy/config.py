@@ -41,6 +41,23 @@ class StaticPolicyConfig:
                 # owner credential + egress allowlist + manifest-driven
                 # operation allowlist); the proposal is read-shaped.
                 "connector_read",
+                # B12/C7 — the agent's own web reads. Read-shaped here for the
+                # same reason `connector_read` is: what governs them is enforced
+                # inside the tool — the `web_fetch` capability gate, the decision
+                # mode (default `ask` withholds), the owner egress allowlist, and
+                # HTTPS-only, public-address, re-governed-redirect URL checks.
+                #
+                # `web_fetch` names a *tool* here and a *capability* in
+                # `CAPABILITY_GATE_MAP`; the two vocabularies share the string on
+                # purpose, because one gate governs both paths. It is deliberately
+                # not also listed in `approval_required_actions` below: with the
+                # same name in both sets the read branch would silently win, which
+                # is the "two lists that have to agree" defect this codebase keeps
+                # finding. The capability path is unchanged by that — `route_action`
+                # gates it on the capability gate and on the decision mode, whose
+                # default `ask` forces approval for any AI-proposed action.
+                "web_fetch",
+                "web_search",
                 "create_document",
                 "run_command",
                 # B6 — recording the agent's plan writes one owner-scoped row of
@@ -70,7 +87,7 @@ class StaticPolicyConfig:
             # Checkpoint restore (Workstream B / B2) is itself a workspace
             # mutation — approval-required, routed through its own governed gate.
             "checkpoint_restore", "checkpoint_restore_execution",
-            "process", "network", "web_fetch",
+            "process", "network",
             "graph_indexing", "semantic_memory", "vector_embedding", "model_provider",
             "plugin_install", "plugin_execution_cap", "plugin_revocation_cap",
             "plugin_runtime_cap", "plugin_sandboxed_runtime_cap", "plugin_sandbox_image_pull_cap",

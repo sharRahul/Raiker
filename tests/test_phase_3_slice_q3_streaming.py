@@ -152,7 +152,10 @@ def test_gateway_stream_stops_when_its_tracked_task_is_cancelled() -> None:
 
     final = asyncio.run(main())
     assert final is not None and final.response is not None
-    assert final.response.status == "failed"
+    # B17/C13 — a turn the owner stopped reports `stopped`, not `failed`: the
+    # runtime did what it was told, and calling that a failure blamed it for the
+    # owner's decision.
+    assert final.response.status == "stopped"
     assert final.response.message == "Stopped by user at a safe boundary."
     assert gateway.store.list_tasks(session_id=env.session_id)[0].status == "cancelled"
 

@@ -155,6 +155,21 @@ happened on could reach, and the spec says so rather than implying the allowlist
 is a shipped default — it ships **empty**. The credential was entered through the
 product UI and is not stored in the repository or test artifacts.
 
+FIXED-103 was verified on **2026-08-04** against a running `raiker-web` on a
+**fresh** workspace, holding an owner-entered Anthropic credential and answering
+live `claude-haiku-4-5-20251001` turns. The live scenario is
+[`e2e/bug-58-known-limits-live.spec.ts`](../../apps/web/e2e/bug-58-known-limits-live.spec.ts),
+and its screenshots are `working/bug-58-*`. The workspace has to be fresh because
+two of the claims are about what a capability gate does *before* the owner has
+touched it, and the run itself turns `web_fetch` on. What a re-derived
+documentation section needs is not a new feature but a check that each surviving
+sentence still describes the running product, so every test in the file is named
+for the README bullet it holds up. The one clause not covered there — patch
+context matching — is stated in the entry, with the regression that does cover
+it, because the turn parks at the approval boundary before a hunk is resolved.
+The credential was entered through the product UI and is not stored in the
+repository or test artifacts.
+
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | FIXED-01 | High | Models | Fixed |
@@ -259,6 +274,7 @@ product UI and is not stored in the repository or test artifacts.
 | FIXED-100 | Medium | Storage / connection cache holds every workspace open | Fixed (was BUG-50) |
 | FIXED-101 | High | Chat / Build — governed web access | Fixed (was B12/C7) |
 | FIXED-102 | High | Chat / Build — stop and steer a running turn | Fixed (was B17/C13) |
+| FIXED-103 | Low | Documentation / README known limits are stale | Fixed (was BUG-58) |
 | BUG-46 | Medium | Storage / Windows locked memory | Open (found while verifying FIXED-91) |
 | BUG-48 | Medium | Distribution / setup wizard and native tray | Open (split out of BUG-44) |
 | BUG-49 | Low | CI / release workflow action pinning | Open (found while building the release workflow) |
@@ -268,7 +284,9 @@ product UI and is not stored in the repository or test artifacts.
 | BUG-55 | Low | Chat / a disabled transcript block reads as live code | Open (found while verifying FIXED-99) |
 | BUG-56 | Low | Tests / a shipped-skill check breaks after `compileall` | Open (found while verifying FIXED-100) |
 | BUG-57 | Medium | Context / stale capability flags mislead the model | Open (found while verifying FIXED-101) |
-| BUG-58 | Low | Documentation / README known limits are stale | Open (found while writing FIXED-101) |
+| BUG-59 | Low | Runtime / a governed refusal names a page that does not exist | Open (found while verifying FIXED-103) |
+| BUG-60 | Low | Chat / a withheld call is narrated by the model, not disclosed | Open (found while verifying FIXED-103) |
+| BUG-61 | Medium | Documentation / the user guide's "Known limits" are entirely stale | Open (found while writing FIXED-103) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8 complete; 12 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -4191,9 +4209,9 @@ refusal matches what governance actually decided.
 
 ---
 
-## BUG-58 — README's "Known limits" describes behaviour that has since shipped
+## FIXED-103 — README's "Known limits" described behaviour that has since shipped *(was BUG-58)*
 
-**Status: open; found while writing FIXED-101.**
+**Status: fixed in this change; found while writing FIXED-101.**
 
 **Observed.** `README.md` → **Known limits**, stamped *"As of 2026-07-27"*, still
 tells a reader:
@@ -4217,8 +4235,183 @@ and state each remaining limit against the entry that closed or bounded it. Do
 not simply delete the lines — a limit that is genuinely still there must survive
 the pass.
 
+**Fix applied.** The section is re-derived from the tree, restamped
+*"As of 2026-08-04"*, and every line is now a limit that a reader can still hit:
+
+* **The approval line names the two capabilities that really are record-only.**
+  `EXECUTABLE_ON_APPROVAL` in `raiker/approvals/execution.py` carries
+  `file_write_execution`, `patch_apply_execution`, `shell_execution`,
+  `remote_execution_cap` and `cloud_execution_cap`; `network` and `process` map
+  to capabilities that are not in it. Shell stopped being record-only in
+  FIXED-90, and the same sentence had gone stale twice more in the body of the
+  README — the intro paragraph and the "Owner-authoritative and monitored"
+  section both still said shell approvals execute nothing. All three now agree,
+  and the reason the asymmetry exists is stated rather than asserted: a shell
+  command is allowlisted, workspace-contained, time- and output-bounded and
+  captured, and the other two are not.
+* **The parallel line states what is still bounded, rather than being deleted.**
+  "A model proposing several tool calls at once gets one of them" is simply
+  false — `_arun_agent_loop` runs a validated read-only batch through
+  `asyncio.gather`, and ADD-02/FIXED-99 park the remainder of a mixed batch
+  instead of dropping it. What survives the pass is the real bound: the
+  concurrent path is taken only when *nothing* in the batch requires approval
+  (`read_only = all(not action.requires_approval …)`), so a batch of three edits
+  is three decisions.
+* **The patching line moves from scope to matching.** Multi-file, create and
+  delete patches shipped in FIXED-34; `_patch_candidates` walks every file
+  section of one diff and `apply_patch_content` applies them as one transaction
+  with rollback. The strictness that genuinely remains is in `_patch_candidate`
+  and `_replace_candidate` — one `old_text` match, exact and unambiguous hunk
+  context, existing text targets, no duplicate target, no fuzz.
+* **A limit the section never carried has been added.** Web access shipped in
+  FIXED-101, but it ships *closed*: the gate is off, the decision mode withholds
+  at `ask`, an empty `RAIKER_WEB_EGRESS_ALLOWLIST` reaches nothing, and
+  `web_search` has no endpoint to call at all. A reader who took "the agent can
+  read the web" from the release notes and nothing else would be surprised, and
+  Known limits is where that belongs.
+* **The closing line no longer over-promises.** It used to say each limit is
+  written up with a reproduction and a proposed fix; several of these are
+  deliberate boundaries with no such entry. It now says which, and names the
+  entries that closed the ones this section used to list.
+
+**Live evidence.** [`e2e/bug-58-known-limits-live.spec.ts`](../../apps/web/e2e/bug-58-known-limits-live.spec.ts),
+run against a `raiker-web` on a fresh workspace holding a real Anthropic
+credential entered through the product's own Models page —
+`claude-haiku-4-5-20251001` answering every turn, not a stub and not a
+route-mocked shell. Each test holds up the bullet it is named for:
+
+| Screenshot | What it shows |
+|---|---|
+| `working/bug-58-model-connected.png` | the credential added through Models, Haiku 4.5 selected |
+| `working/bug-58-parallel-read-batch.png` | one turn, three `read_file` calls, all three markers quoted back — the old "gets one of them" line disproved |
+| `working/bug-58-multi-file-patch.png` | **one** pending approval, `alpha.md, beta.md`, both file diffs under it |
+| `working/bug-58-web-fetch-withheld.png` | `web_gate_disabled` before the owner has touched the gate |
+| `working/bug-58-web-search-unconfigured.png` | gate enabled and set to Allow, and search still answers `web_search_not_configured` |
+| `working/bug-58-execution-capabilities.png` | Shell commands as an owner control with its four decision modes |
+
+Matching strictness is not live-checked, because the turn parks at the approval
+boundary before a hunk is ever resolved; it stays covered by
+`tests/test_filesystem_tools.py`, whose `hunk_context_mismatch` case is the
+assertion behind that clause.
+
+**Found while verifying this.** Two defects in the refusal the web bullet is
+about, recorded as BUG-59 and BUG-60 rather than fixed here.
+
 **UI when closed.** None — this is documentation accuracy for the first thing a
 new reader is told about the product's edges.
+
+---
+
+## BUG-59 — A governed refusal sends the owner to a page that does not exist
+
+**Status: open; found while verifying FIXED-103.**
+
+**Observed.** With the `web_fetch` gate off — the shipped default — the refusal
+in `raiker/runtime/web_access.py:309` reads:
+
+> Web fetch denied: the web_fetch capability gate is disabled (fail closed).
+> **Enable it in Settings → Capabilities.**
+
+There is no Capabilities section under Settings. The control is its own
+destination, **Permissions** (`#/capabilities`, labelled `Permissions` in
+`apps/web/src/lib/nav.ts`), and Settings is a separate one. `working/bug-58-web-fetch-withheld.png`
+and `working/bug-58-web-search-unconfigured.png` show the owner being sent
+there, in the model's own words.
+
+**Why it matters.** This is FIXED-01's defect in miniature and the reason
+FIXED-101 promised "a withheld call tells the owner *which control* would change
+it". Naming the wrong control is worse than naming none: the owner goes to
+Settings, does not find it, and concludes the gate cannot be turned on from the
+app. It is the only route-naming string of its kind in the runtime, so the fix is
+one line — but the same string is what the model reads and relays, so it is also
+the only thing standing between the refusal and the owner acting on it.
+
+**Required fix.** Name the destination the product ships: **Permissions**. A
+test should assert the refusal text against the nav's own label rather than a
+hand-written string, so a future rename cannot re-open this.
+
+**UI when closed.** A withheld web call names Permissions, and following it
+reaches the control that changes the outcome.
+
+---
+
+## BUG-60 — A withheld tool call is narrated by the model, not disclosed by the runtime
+
+**Status: open; found while verifying FIXED-103.**
+
+**Observed.** FIXED-99 added `model_tool_call_refused` and, with it, Chat's
+**Policy refused one call in this turn** card, so an owner watching a transcript
+learns of a refusal from the runtime rather than from the model's goodwill. A
+*withheld* governed result — the `web_gate_disabled` and
+`web_search_not_configured` refusals above — does not travel that path. It comes
+back as an ordinary tool result, so no card renders and the only thing that told
+the owner anything in `working/bug-58-web-fetch-withheld.png` is that the prompt
+had explicitly asked the model to report what the tool returned. A model that
+answered "I couldn't reach that page" would have left a governed refusal with no
+disclosure anywhere in the conversation.
+
+The same screenshot shows the second half: because the model quotes the tool's
+JSON payload verbatim, the owner reads `Settings → Capabilities` — the
+escape sequence, not the arrow. The payload is serialised with `ensure_ascii`
+and nothing between the tool and the bubble un-escapes it.
+
+**Why it matters.** The distinction between "denied by policy" and "withheld by a
+gate" is one the runtime makes internally and the owner has no reason to know.
+Both are the product refusing on the owner's behalf, and FIXED-99's argument —
+that a refusal only the model can see is a refusal that can silently disappear —
+applies to both.
+
+**Required fix.** Emit the same streamed refusal event for a withheld governed
+tool result, so Chat and Build disclose it the way they disclose a policy denial;
+and render tool-result text as text, so an owner never reads a `\uXXXX` escape.
+
+**UI when closed.** A withheld call raises the same **Policy refused** card as a
+denied one, naming the tool and its reason, whatever the model chooses to say.
+
+---
+
+## BUG-61 — The user guide's "Known limits" are stale in every line
+
+**Status: open; found while writing FIXED-103.**
+
+**Observed.** FIXED-103 re-derived the README's Known limits. The user guide has
+two more of these sections, reached from the README's own Documentation list, and
+**not one entry in either is still true**:
+
+`docs/guide/working-in-chat.md` → *Known limits* — "Three things do not work yet":
+
+| It says | Actually |
+|---|---|
+| Markdown is not rendered (BUG-03) — headings, tables, lists and fenced code appear as raw text | shipped in **FIXED-06** |
+| No export (BUG-08) — no download, PDF or print control | shipped in **FIXED-12**, superseded by **FIXED-19** |
+| an approved file write does not create a file on disk (BUG-06) | shipped in **FIXED-08**, the entry this document calls *Critical* |
+
+`docs/guide/tasks-and-projects.md` → *Known limits*:
+
+| It says | Actually |
+|---|---|
+| a background-agent run can end `failed` with no user-visible reason (BUG-09) | shipped in **FIXED-13** |
+| task runs appear in the sidebar's RECENT CHATS alongside real conversations (BUG-10) | shipped in **FIXED-15** |
+| creating a task by asking for one in Chat is specified but not shipped | not re-verified here — the only line that may still hold |
+
+**Why it matters.** This is worse than BUG-58 was. The README's section had drifted
+in part; these two have not been touched since the entries that closed them, so a
+reader following the README's own link to the user guide is told that Markdown
+rendering, transcript export, and — most damagingly — *approved file writes
+reaching the disk* are all missing from a product that ships all three. The guide
+is where a new owner goes after the README, and it currently reads as an argument
+that the product does less than its front page claims.
+
+**Required fix.** Re-derive both sections the way FIXED-103 re-derived the
+README's: check each line against the tree, keep what is genuinely still a limit
+and say what bounds it, and drop nothing without replacing it with the entry that
+closed it. Verify the one unchecked claim — conversational task creation — rather
+than carrying it forward on trust. While there, look for the same drift in the
+rest of `docs/guide/`; two sections found by inspection is not evidence that the
+other pages are current.
+
+**UI when closed.** None — this is documentation accuracy, in the pages a new
+owner reads immediately after the README.
 
 ---
 

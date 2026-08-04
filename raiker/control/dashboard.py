@@ -4378,6 +4378,20 @@ class DashboardService:
         )
         if connector_write:
             notice = "Approving this connector write executes this exact action once."
+        elif relays and view.tool_name == "create_task":
+            # BUG-62 — the file wording below promises a checkpointed diff, which
+            # a task row does not have. Saying where it lands is the useful part.
+            notice = (
+                "Approving this creates the task above in Tasks, once, under a fresh "
+                "capability, policy and posture check. It is a local row you can stop "
+                "and delete there; nothing else runs until the task itself does."
+            )
+        elif relays and view.tool_name == "assign_session_project":
+            notice = (
+                "Approving this moves the proposing conversation into the project above, "
+                "once. A project is an organizing scope: the move grants nothing, changes "
+                "no gate, and is reversed in Projects."
+            )
         elif relays:
             notice = (
                 "Approving this performs the change shown above, once, in your "

@@ -87,6 +87,15 @@ def _build_registry() -> dict[str, ActivationRequirement]:
         r[cap] = _req(cap, "1", notes="First-slice caps; executor registered.")
     for cap in ("memory_write_execution", "memory_forget_execution"):
         r[cap] = _req(cap, "1", notes="Memory mutation caps; executor pending.")
+    # BUG-62 — the two local planning mutations an approval carries out, plus the
+    # rewind that was in the same position: a real executor, a gate the owner can
+    # see, and no entry here, so *"Activation is blocked. Satisfy the activation
+    # requirement first."* was the whole answer. A capability with a registered
+    # executor and no requirement entry cannot be turned on at all; the invariant
+    # is now asserted by a test rather than left to care.
+    for cap in ("checkpoint_restore_execution", "task_management_runtime",
+                "project_assignment_runtime"):
+        r[cap] = _req(cap, "1", notes="Local, reversible, owner-scoped; executor registered.")
 
     # Tier 2
     for cap in ("shell_execution", "process_execution", "network_execution", "web_fetch"):

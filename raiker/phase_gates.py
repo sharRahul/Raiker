@@ -55,6 +55,8 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "memory_write_execution",
     "memory_forget_execution",
     "checkpoint_restore_execution",
+    "task_management_runtime",
+    "project_assignment_runtime",
     "approval_execution_relay",
     "admin_mutation",
     "policy_mutation",
@@ -160,7 +162,9 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
             gates[name] = CapabilityGate(name, 4, CapabilityState.DISABLED)
     _TIER1_EXECUTED_CAPS = ("approval_execution_relay", "file_write_execution", "patch_apply_execution",
                          "memory_write_execution", "memory_forget_execution",
-                         "checkpoint_restore_execution")
+                         "checkpoint_restore_execution",
+                         # BUG-62 — local, reversible, owner-scoped planning rows.
+                         "task_management_runtime", "project_assignment_runtime")
     for name in _TIER1_EXECUTED_CAPS:
         gates[name] = CapabilityGate(
             name, 1, CapabilityState.DISABLED,

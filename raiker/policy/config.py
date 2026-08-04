@@ -112,6 +112,11 @@ class StaticPolicyConfig:
             # because neither name appeared in either set. They mutate owner
             # data, so they belong on the approval path they were built for.
             "create_task", "assign_session_project",
+            # BUG-62 — and the capability names the runtime authority routes on,
+            # for the same reason `remote_execution_cap` is listed below: the
+            # relay re-governs the target, and a capability in neither set would
+            # be hard-denied on its way to the executor that carries it out.
+            "task_management_runtime", "project_assignment_runtime",
             # Same finding, same cause: the *tool names* the model proposes.
             # `remote_execution_cap` / `cloud_execution_cap` below are the
             # capability names the runtime authority routes on, which is a

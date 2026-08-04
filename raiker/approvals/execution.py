@@ -18,10 +18,11 @@ and policy review *at execution time*). The relay is itself entered through
 
 What is relayed, and what is not:
 
-* only :data:`EXECUTABLE_ON_APPROVAL` — checkpointed file mutations and the
-  owner-configured remote/cloud command capabilities, plus bounded local
-  ``shell`` commands. ``process``, ``network`` and every other capability keep
-  metadata-only resolution.
+* only :data:`EXECUTABLE_ON_APPROVAL` — checkpointed file mutations, the
+  owner-configured remote/cloud command capabilities, bounded local ``shell``
+  commands, and the two local planning mutations (a task row, a project label).
+  ``process``, ``network`` and every other capability keep metadata-only
+  resolution.
 * **critical** approvals never come here. They keep the human-only, step-up
   gated lifecycle in :meth:`RuntimeAuthority.resolve_critical_approval`.
 * if either gate is off — the relay's own ``approval_execution_relay`` or the
@@ -56,6 +57,12 @@ EXECUTABLE_ON_APPROVAL: frozenset[str] = frozenset({
     "shell_execution",
     "remote_execution_cap",
     "cloud_execution_cap",
+    # BUG-62 — a task row and a project label are local, reversible and
+    # owner-scoped, which is the same argument that put file mutations here.
+    # Leaving them out meant the owner was shown a high-risk decision, told what
+    # approving would do, approved it, and got nothing.
+    "task_management_runtime",
+    "project_assignment_runtime",
 })
 
 

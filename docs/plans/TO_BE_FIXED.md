@@ -170,8 +170,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-59 | Low | Runtime / a governed refusal names a page that does not exist | Open (found while verifying FIXED-103) |
 | BUG-60 | Low | Chat / a withheld call is narrated by the model, not disclosed | Open (found while verifying FIXED-103) |
 | FIXED-105 | Medium | Documentation / the user guide's "Known limits" are entirely stale | Fixed (was BUG-61) |
-| BUG-62 | Medium | Tasks / the agent proposes a task it can never create | Open (found while verifying FIXED-105) |
+| FIXED-106 | Medium | Tasks / an approved task is really created | Fixed (was BUG-62) |
 | BUG-63 | Low | Web / a composer permission control ships unused | Open (found while verifying FIXED-105) |
+| BUG-64 | Low | Chat / a task the agent creates is queued for a run nobody asked for | Open (found while verifying FIXED-106) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8 complete; 12 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -4328,7 +4329,7 @@ two more of these sections, reached from the README's own Documentation list, an
 |---|---|
 | a background-agent run can end `failed` with no user-visible reason (BUG-09) | shipped in **FIXED-13** |
 | task runs appear in the sidebar's RECENT CHATS alongside real conversations (BUG-10) | shipped in **FIXED-15** |
-| creating a task by asking for one in Chat is specified but not shipped | not re-verified here — the only line that may still hold |
+| creating a task by asking for one in Chat is specified but not shipped | the one line that still held when FIXED-105 shipped; closed since in **FIXED-106** |
 
 **Why it matters.** This is worse than BUG-58 was. The README's section had drifted
 in part; these two have not been touched since the entries that closed them, so a
@@ -4409,45 +4410,108 @@ owner reads immediately after the README.
 
 ---
 
-## BUG-62 — The agent can propose a task it can never create
+## FIXED-106 — The agent could propose a task it could never create *(was BUG-62)*
 
-**Status: open; found while verifying FIXED-105.**
+**Status: fixed in this change; found while verifying FIXED-105.**
 
-**Observed.** Asked in Chat to call `create_task`, the model calls it, the
-runtime raises a real **Create task** approval at *high* risk naming the task,
-and approving it answers:
+**Observed.** Asked in Chat to call `create_task`, the model called it, the
+runtime raised a real **Create task** approval at *high* risk naming the task,
+and approving it answered:
 
 > Recorded: approved. The action was NOT executed (metadata-only).
 
-No task is created. `working/bug-61-chat-created-task.png` and
+No task was created. `working/bug-61-chat-created-task.png` and
 `working/bug-61-chat-task-record-only.png`.
 
-**Root cause.** `create_task` reaches the approval path correctly — FIXED-98 put
+**Root cause.** `create_task` reached the approval path correctly — FIXED-98 put
 it in `approval_required_actions` precisely so it would stop being answered
-`unknown_or_denied_tool`. What it never reached is
+`unknown_or_denied_tool`. What it never reached was
 `EXECUTABLE_ON_APPROVAL` in `raiker/approvals/execution.py`, whose five members
-are the file, patch, shell, remote and cloud capabilities. So the approval is
+were the file, patch, shell, remote and cloud capabilities. So the approval was
 record-only, and `ToolBroker._create_task` — which is written, returns a receipt
 `{"kind": "task", "href": "#/tasks", "label": "Review in Tasks"}`, and would
-work — is never called.
+work — was never called.
 
-**Why it matters.** This is a worse shape than a missing feature. The owner is
-shown a high-risk decision, told what approving will do, approves it, and gets
-nothing — and the receipt the broker was built to return names a Tasks page that
-will not have the task on it. Every other tool in this position either executes
+**Why it mattered.** This is a worse shape than a missing feature. The owner was
+shown a high-risk decision, told what approving would do, approved it, and got
+nothing — and the receipt the broker was built to return named a Tasks page that
+would not have the task on it. Every other tool in this position either executes
 on approval or is honestly described as record-only *before* the decision;
-`create_task` is neither, because a task is exactly the kind of local, reversible,
-owner-scoped row the relay exists for.
+`create_task` was neither, because a task is exactly the kind of local,
+reversible, owner-scoped row the relay exists for.
 
-**Required fix.** Either add `create_task` (and `assign_session_project`, which
-has the same shape) to the executable set with its own capability gate, so
-approving creates the task and the broker's receipt means something; or state
-record-only in the approval detail before the owner decides, and stop the model
-being offered a tool whose success it cannot bring about. The first is the one
-that matches the posture — a task row is reversible and local.
+**What shipped.** Both tools now execute on approval, each under a capability
+gate of its own that the owner holds:
+
+* **Two capabilities, named for what they govern.** `task_management_runtime`
+  and `project_assignment_runtime` (`raiker/phase_gates.py`,
+  `CAPABILITY_GATE_MAP` in `raiker/runtime/authority/router.py`) appear in
+  **Permissions → Workspace** as *Task creation* and *Project assignment*. An
+  unmapped tool has no gate to consult and no capability to relay into, so
+  naming them is what makes both the switch and the execution possible.
+* **Two real executors** (`raiker/runtime/executors/tier1_tasks.py`). Each goes
+  through the same `DashboardService` entry point the **Tasks → Plan work** form
+  uses, so a task the agent asked for and a task the owner typed are one row
+  with one stop control. Both are added to `EXECUTABLE_ON_APPROVAL`, so the
+  relay re-governs them at execution time — gate, decision mode, a fresh policy
+  review, and the posture check on the approving session — exactly as it does a
+  file write.
+* **The proposing conversation is carried, not guessed.** An approval resolved
+  from the inbox executes under the *inbox's* session, so
+  `assign_session_project` would have had no way to name the chat it was asked
+  to move. `GovernedAction.origin_session_id` carries the approval row's own
+  session across, so the conversation moved is the one the owner saw named — and
+  it still cannot be chosen by the model.
+* **The sentence before the decision is per-capability.** The file wording
+  promises a checkpointed diff, which a task row does not have.
+  `_approval_detail` (`raiker/control/dashboard.py`) and `_expected_effect`
+  (`raiker/tools/broker.py`) now state what each one actually does: *"Approving
+  this creates the task above in Tasks, once…"*.
+* **The surface links to what now exists.** The executor returns the broker's
+  receipt, the resolve route passes it through, and the Approvals inbox and
+  Build both say *Executed once — “…” now exists* with **Review in Tasks**
+  beside it, instead of *Executed once: executed*.
+* **The off switch still wins, and says so first.** With *Task creation*
+  disabled the approval detail reads *"Approval resolution is metadata-only"*,
+  the button reads **Approve (record only)**, and resolving it creates nothing.
+
+**Found while closing it — a capability nobody could turn on.**
+`ACTIVATION_REQUIREMENTS` (`raiker/runtime/authority/activation.py`) had no entry
+for either new capability, so **Permissions** offered the switch and answered
+*"Activation is blocked. Satisfy the activation requirement first."* with no
+requirement to satisfy. `checkpoint_restore_execution` — a registered executor
+since Workstream B — was in exactly the same position and had been all along. All
+three now have entries, and a test asserts the invariant directly: no capability
+with a real executor may lack an activation requirement. It is the same failure
+mode this document keeps recording — two lists that have to agree, held together
+by care rather than by a test. `docs/guide/permissions-and-runtime-modes.md`
+listed checkpoint restore among the **deferred** capabilities — *"no governed
+executor exists"* — which was never true of it; that page now says what it is,
+and its gate count moves 62 → 64 for the two capabilities added here.
+
+**Tests.** [`tests/test_bug_62_task_approval_executes.py`](../../tests/test_bug_62_task_approval_executes.py)
+covers the task really existing afterwards, the resumed turn being told so, a
+rejection creating nothing, a title-less proposal failing closed, the notice the
+owner reads before deciding, the disabled gate returning it to record-only, the
+project assignment landing on the proposing conversation, and the two
+list-agreement invariants.
+
+**Live evidence.** [`e2e/bug-62-task-approval-executes-live.spec.ts`](../../apps/web/e2e/bug-62-task-approval-executes-live.spec.ts),
+run against a `raiker-web` on a fresh workspace holding a real Anthropic
+credential entered through the product's own Models page —
+`claude-haiku-4-5-20251001` proposing every task.
+
+| Screenshot | What it shows |
+|---|---|
+| `working/bug-62-model-connected.png` | the credential added through Models, Haiku 4.5 selected |
+| `working/bug-62-capability-control.png` | **Task creation** as an owner control on Permissions, turned on through the product |
+| `working/bug-62-approval-will-create.png` | the decision stating *"Approving this creates the task above in Tasks, once"*, with **Approve and execute once** |
+| `working/bug-62-approved-and-executed.png` | **the defect itself, closed** — *Executed once — “Draft the weekly summary” now exists* with **Review in Tasks** |
+| `working/bug-62-task-in-tasks.png` | the task on the Tasks page, carrying the objective the model wrote |
+| `working/bug-62-gate-off-record-only.png` | the same prompt with the capability turned off: *metadata-only*, **Approve (record only)** — the owner's off switch, stated before the decision |
 
 **UI when closed.** Approving a **Create task** proposal from Chat puts the task
-in **Tasks**, and the transcript's receipt links to it.
+in **Tasks**, and the inbox that took the decision links straight to it.
 
 ---
 
@@ -4473,6 +4537,38 @@ step-up path a bulk decision-mode change deserves. Do not leave a third state.
 
 **UI when closed.** Either the control is reachable and governed, or the tree
 does not carry a permission mutation nothing can call.
+
+---
+
+## BUG-64 — Approving a proposed task also schedules a turn nobody asked for
+
+**Status: open; found while verifying FIXED-106.**
+
+**Observed.** Approving a **Create task** proposal creates the task and leaves it
+**queued** for immediate execution: `working/bug-62-task-in-tasks.png` shows the
+new row already *queued* and *"Scheduled for 8/4/2026, 2:48:11 PM"* — the moment
+it was approved. `DashboardService.create_task` stamps `scheduled_at = utc_now()`
+for any task with no explicit time ("an unscheduled task is work requested now"),
+and `TaskScheduler.run_due` claims it on the resident host's next tick and runs
+it as a governed agent turn.
+
+**Why it matters.** It is the right default for **Tasks → Plan work**, where the
+owner is deliberately asking for work to start. It is a different thing when the
+decision on screen says *"Approving this creates the task above in Tasks, once"*:
+the owner approves a **creation** and gets a **run**. Nothing escapes governance
+— the run's own tool calls are brokered exactly as any other turn's, and it can
+be stopped from Tasks — but the consequence is larger than the sentence, and this
+document's own standard is that the owner is told what approving does before they
+press it, not after.
+
+**Required fix.** Say it, or stop doing it. Either the approval detail states
+that the task will start on the next scheduler tick and offers the owner the
+choice, or a task created through an approval is parked rather than queued and
+starts when the owner starts it. Do not leave the sentence and the effect
+disagreeing.
+
+**UI when closed.** The **Create task** decision names both consequences — the
+row and the run — or approving creates a row that waits for the owner.
 
 ---
 

@@ -60,20 +60,39 @@ is visual only — it does not mean the agent is working.
 **Observability → Audit log** is the append-only record of every governed step,
 filterable by session and event type.
 
+## Asking for a task in Chat
+
+You can also ask Raiker for a task instead of filling the form in. The model
+calls the governed `create_task` tool, which raises a real high-risk **Create
+task** approval naming exactly what it would create, and approving it creates the
+task here — the inbox answers *Executed once — “…” now exists* with a **Review in
+Tasks** link beside it (**FIXED-106**).
+
+Two things decide whether that happens, and both are yours:
+
+- **Permissions → Workspace → Task creation** must be on, along with **Approval
+  execution relay**. Until they are, the approval detail says *"Approval
+  resolution is metadata-only"* and the button reads **Approve (record only)** —
+  so you are told which of the two you are about to do **before** you decide, not
+  after.
+- **Project assignment** is the same control for the sibling tool,
+  `assign_session_project`, which moves the conversation that proposed it into a
+  project. A project is an organising label, so the move grants nothing.
+
 ## Known limits
 
 As of 2026-08-04, one edge remains here:
 
-- **Asking for a task in Chat gets you an approval, not a task.** The model can
-  call the governed `create_task` tool, and doing so raises a real high-risk
-  **Create task** approval naming what it would create. But `create_task` is not
-  one of the capabilities an approval carries out, so approving it records your
-  decision and creates nothing — the notice says *"Recorded: approved. The action
-  was NOT executed (metadata-only)"*, and the task does not appear here. Use
-  **Tasks → Plan work** to actually create one. Tracked as BUG-62 in
-  [To be fixed](../plans/TO_BE_FIXED.md).
+- **A task created by approving a proposal starts on its own.** A task with no
+  explicit time is work requested now, so approving a **Create task** proposal
+  both creates the row and queues it: the resident host claims it on its next
+  tick and runs it as a governed turn. That is the same behaviour as **Tasks →
+  Plan work**, and the run is brokered and stoppable like any other — but the
+  decision you are shown says "creates the task", not "creates and starts it".
+  Tracked as BUG-64 in [To be fixed](../plans/TO_BE_FIXED.md).
 
-Two limits this section used to list have shipped and are gone from it: a
-background-agent run now ends with a user-visible reason (**FIXED-13**), and a
+Three limits this section used to list have shipped and are gone from it: a
+background-agent run now ends with a user-visible reason (**FIXED-13**), a
 task run no longer appears in the sidebar's **RECENT CHATS** — that list is
-conversations, and task sessions are in Observability → Sessions (**FIXED-15**).
+conversations, and task sessions are in Observability → Sessions (**FIXED-15**) —
+and approving a task the agent proposed now creates it (**FIXED-106**).

@@ -71,6 +71,13 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "memory_forget": "memory_forget_execution",
     "checkpoint_restore": "checkpoint_restore_execution",
     "checkpoint_restore_execution": "checkpoint_restore_execution",
+    # BUG-62 — the two local planning mutations. Naming them here is what gives
+    # the owner a switch over them and what lets an approval carry them out: an
+    # unmapped tool has no gate to consult and no capability to relay into.
+    "create_task": "task_management_runtime",
+    "task_management_runtime": "task_management_runtime",
+    "assign_session_project": "project_assignment_runtime",
+    "project_assignment_runtime": "project_assignment_runtime",
     "shell": "shell_execution",
     "remote_execute": "remote_execution_cap",
     "cloud_execute": "cloud_execution_cap",
@@ -158,6 +165,12 @@ class GovernedAction:
     requires_risk_acceptance: bool = False
     session_id: str = ""
     turn_id: str | None = None
+    # The conversation this action *came from*, when that is not the session
+    # executing it. An approval resolved from the inbox executes under the
+    # inbox's API session, so a capability whose subject is the proposing chat —
+    # `project_assignment_runtime` moves that chat — would otherwise have no way
+    # to name it. Set only by the approval relay, from the approval row.
+    origin_session_id: str = ""
     critical_confirmation: CriticalConfirmation | None = None
 
 

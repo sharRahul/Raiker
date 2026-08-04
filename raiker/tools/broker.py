@@ -412,16 +412,24 @@ class ToolBroker:
         if not title:
             return {"status": "failed", "error": {"type": "task_title_required"}}
         service = DashboardService(self.workspace_root)
-        task = service.create_task(
-            title=title,
-            objective=str(args.get("description", "")).strip(),
-            user_id=self.store.principal_user_id(context.principal_id) if self.store else None,
-            principal_id=context.principal_id,
-            scheduled_at=str(args["scheduled_at"]) if args.get("scheduled_at") else None,
-            reminder_at=str(args["reminder_at"]) if args.get("reminder_at") else None,
-            recurrence=str(args["recurrence"]) if args.get("recurrence") else None,
-            project_id=str(args["project_id"]) if args.get("project_id") else None,
-        )
+        # `objective` is a required contract field. This path and the approval
+        # relay's `TaskManagementExecutor` are the two ways a model-proposed task
+        # is created, so they must agree on what a title-only proposal means:
+        # a task to do what its title says.
+        objective = str(args.get("description", "")).strip() or title
+        try:
+            task = service.create_task(
+                title=title,
+                objective=objective,
+                user_id=self.store.principal_user_id(context.principal_id) if self.store else None,
+                principal_id=context.principal_id,
+                scheduled_at=str(args["scheduled_at"]) if args.get("scheduled_at") else None,
+                reminder_at=str(args["reminder_at"]) if args.get("reminder_at") else None,
+                recurrence=str(args["recurrence"]) if args.get("recurrence") else None,
+                project_id=str(args["project_id"]) if args.get("project_id") else None,
+            )
+        except ValueError as exc:
+            return {"status": "failed", "error": {"type": str(exc)}}
         return {
             "status": "success",
             "receipt": {"kind": "task", "title": task.title, "href": "#/tasks", "label": "Review in Tasks"},
@@ -581,6 +589,18 @@ class ToolBroker:
             ):
                 if action.tool_name == "shell":
                     return "Approving executes this exact bounded shell command once."
+                # BUG-62 — neither planning mutation has a path, and describing
+                # one as a write to "the proposed path" was how this sentence
+                # would have started lying the moment they became executable.
+                if action.tool_name == "create_task":
+                    title = str(self._redact_value(str(action.arguments.get("title", ""))))
+                    return (
+                        f"Approving creates the task “{title}” in Tasks, once."
+                        if title
+                        else "Approving creates this task in Tasks, once."
+                    )
+                if action.tool_name == "assign_session_project":
+                    return "Approving moves this conversation into the named project, once."
                 # The sentence is stored in events and returned to the client, so
                 # the model-supplied path is scrubbed by credential shape first —
                 # the same treatment every other argument gets on the way out.

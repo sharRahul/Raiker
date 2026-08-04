@@ -33,17 +33,22 @@ and are compatible with it:
 
 | ID | GAP | Tier| Status |
 |---|---|---|---|
-| B1 | BUILD | TIER 0 | Complete |
-| B2 | BUILD | TIER 0 | Complete |
+| B1 | BUILD | TIER 0 | Done |
+| B2 | BUILD | TIER 0 | Done |
 | B3 | BUILD | TIER 0 | Complete |
-| B4 | BUILD | TIER 1 | Complete |
-| B5 | BUILD | TIER 1 | Complete |
-| B6 | BUILD | TIER 1 | Complete |
-| B7 | BUILD | TIER 1 | Complete |
+| B4 | BUILD | TIER 1 | Done |
+| B5 | BUILD | TIER 1 | Done |
+| B6 | BUILD | TIER 1 | Done |
+| B7 | BUILD | TIER 1 | Done |
 | B8 | BUILD | TIER 1 | Complete |
-| C1 | BUILD | TIER 0 | Complete |
+| B12 | BUILD | TIER 2 | Done |
+| B17 | BUILD | TIER 2 | Done |
+| C1 | BUILD | TIER 0 | Done |
 | C2 | BUILD | TIER 0 | Complete |
-| C3 | BUILD | TIER 0 | Complete |
+| C3 | BUILD | TIER 0 | Done |
+| C7 | BUILD | TIER 0 | Done |
+| C8 | BUILD | TIER 0 | Done |
+| C13 | BUILD | TIER 0 | Done |
 
 docs/TO_BE_FIXED.md — are defects. Defects found while executing
 [the live manual test plan](RAIKER_LIVE_MANUAL_TEST_PLAN.md) against a running

@@ -65,6 +65,7 @@
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
+  import TurnControl from "../components/TurnControl.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
   import { thinkingSteps } from "../chatPresentation";
@@ -102,6 +103,8 @@
   let promptText = $state("");
   let turns = $state<BuildTurn[]>([]);
   let streaming = $state(false);
+  // B17/C13 — whether the owner has already asked this turn to stop.
+  let stopping = $state(false);
   let sessionId = $state<string | null>(null);
   // Build runs the same governed turns as Chat against the same providers, so
   // it gets the same read-only context and spend panel rather than a variant.
@@ -353,6 +356,7 @@
     promptText = "";
     attachStore.clear();
     streaming = true;
+    stopping = false;
     void scrollToEnd();
     try {
       await streamPrompt(
@@ -382,6 +386,11 @@
             turn.events = [...turn.events, event];
             const streamed = planFromEvent(event);
             if (streamed !== null) plan = streamed;
+          }
+          // B17/C13 — as in Chat: the first streamed chunk names the session, so
+          // a first Build turn can be stopped or steered like any later one.
+          if (sessionId === null && typeof event.session_id === "string" && event.session_id !== "") {
+            sessionId = event.session_id;
           }
           void scrollToEnd();
         },
@@ -808,6 +817,15 @@
               {/if}
             {/if}
 
+            <!-- B17/C13 — as in Chat: a turn the owner stopped says so, rather
+                 than simply ending early. -->
+            {#if !turn.streaming && turn.response?.status === "stopped"}
+              <p class="stopped-line" role="status">
+                Stopped at your request — this turn ended at a safe boundary and kept what it had
+                already done.
+              </p>
+            {/if}
+
             {#if answer !== ""}
               <div class="answer"><Markdown text={answer} /></div>
               {#if !turn.streaming}
@@ -956,6 +974,14 @@
 
         {#if attachOpen}
           <ComposerAttachPanel store={attachStore} disabled={streaming} idPrefix="build" />
+        {/if}
+
+        {#if streaming}
+          <!-- B17/C13 — while a turn runs, the composer is where it is stopped
+               or corrected rather than where the next question is written. -->
+          <div class="composer-bar">
+            <TurnControl sessionId={sessionId} bind:stopping />
+          </div>
         {/if}
 
         <div class="composer-bar">
@@ -1523,6 +1549,11 @@
     margin: 0;
     font-size: 0.78rem;
     color: var(--danger);
+  }
+  .stopped-line {
+    margin: 0 0 0.4rem;
+    font-size: 0.82rem;
+    color: var(--text-2);
   }
   .composer-bar {
     display: flex;

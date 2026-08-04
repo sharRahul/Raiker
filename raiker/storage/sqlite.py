@@ -278,6 +278,8 @@ from raiker.storage.migrations import (
     TASK_MODEL_CHOICES_SQL,
     THREAT_MODEL_ACKS_MIGRATION_ID,
     THREAT_MODEL_ACKS_SQL,
+    TURN_CONTROLS_MIGRATION_ID,
+    TURN_CONTROLS_SQL,
 )
 
 # SQLCipher performs its key derivation when a connection is opened. API routes
@@ -898,6 +900,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(SKILLS_MIGRATION_ID, SKILLS_SQL, connection)
             self._apply_migration(AGENT_PLANS_MIGRATION_ID, AGENT_PLANS_SQL, connection)
+            self._apply_migration(TURN_CONTROLS_MIGRATION_ID, TURN_CONTROLS_SQL, connection)
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -3277,6 +3280,97 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (session_id, principal_id),
             )
             return cursor.rowcount > 0
+
+    # ── turn controls (B17/C13 — stop or steer a turn that is running) ───────
+
+    def request_turn_stop(
+        self, session_id: str, principal_id: str, *, reason: str
+    ) -> str:
+        """Ask the turn running in this conversation to stop at its next boundary."""
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO turn_controls
+                     (session_id, principal_id, stop_requested, stop_reason, steer_json, updated_at)
+                   VALUES (?, ?, 1, ?, '[]', ?)
+                   ON CONFLICT(session_id, principal_id) DO UPDATE SET
+                     stop_requested = 1, stop_reason = excluded.stop_reason,
+                     updated_at = excluded.updated_at""",
+                (session_id, principal_id, reason, now),
+            )
+        return now
+
+    def queue_turn_steer(self, session_id: str, principal_id: str, *, text: str) -> int:
+        """Append one owner instruction for the running turn; returns the queue depth.
+
+        Appending rather than replacing is deliberate: an owner who types two
+        corrections while a turn runs meant both of them.
+        """
+        now = utc_now()
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT steer_json FROM turn_controls WHERE session_id = ? AND principal_id = ?",
+                (session_id, principal_id),
+            ).fetchone()
+            queued: list[str] = []
+            if row is not None:
+                try:
+                    parsed = json.loads(str(row["steer_json"]))
+                    if isinstance(parsed, list):
+                        queued = [str(item) for item in parsed]
+                except ValueError:
+                    queued = []
+            queued.append(text)
+            connection.execute(
+                """INSERT INTO turn_controls
+                     (session_id, principal_id, stop_requested, stop_reason, steer_json, updated_at)
+                   VALUES (?, ?, 0, NULL, ?, ?)
+                   ON CONFLICT(session_id, principal_id) DO UPDATE SET
+                     steer_json = excluded.steer_json, updated_at = excluded.updated_at""",
+                (session_id, principal_id, json.dumps(queued), now),
+            )
+        return len(queued)
+
+    def take_turn_control(self, session_id: str, principal_id: str) -> dict[str, Any]:
+        """Read and clear this conversation's pending controls, atomically.
+
+        Consuming on read is what keeps a control from applying twice: a stop the
+        loop has honoured must not also end the *next* turn, and a steer must
+        reach the model once.
+        """
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM turn_controls WHERE session_id = ? AND principal_id = ?",
+                (session_id, principal_id),
+            ).fetchone()
+            if row is None:
+                return {"stop_requested": False, "stop_reason": None, "steer_texts": []}
+            connection.execute(
+                "DELETE FROM turn_controls WHERE session_id = ? AND principal_id = ?",
+                (session_id, principal_id),
+            )
+        try:
+            parsed = json.loads(str(row["steer_json"]))
+            steer = [str(item) for item in parsed] if isinstance(parsed, list) else []
+        except ValueError:
+            steer = []
+        return {
+            "stop_requested": bool(row["stop_requested"]),
+            "stop_reason": row["stop_reason"],
+            "steer_texts": steer,
+        }
+
+    def clear_turn_control(self, session_id: str, principal_id: str) -> None:
+        """Drop anything left over before a new turn starts.
+
+        A stop or steer that arrived between turns had no turn to act on; keeping
+        it would apply the owner's decision to work they had not yet asked for.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM turn_controls WHERE session_id = ? AND principal_id = ?",
+                (session_id, principal_id),
+            )
 
     # ── suspended turns (B2 — resume the same turn after an approval) ─────────
 

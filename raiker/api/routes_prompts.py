@@ -27,6 +27,7 @@ from raiker.contracts.models import (
     UserMetadata,
 )
 from raiker.contracts.streaming import FINAL, StreamEvent
+from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.runtime.attachments import (
@@ -294,13 +295,20 @@ async def submit_prompt(
     return response.to_dict()
 
 
-def _sse(event: StreamEvent) -> str:
+def _sse(event: StreamEvent, *, session_id: str | None = None, turn_id: str | None = None) -> str:
     data = {
         "kind": event.kind,
         "text": event.text,
         "event_type": event.event_type,
         "payload": event.payload,
         "response": event.response.to_dict() if event.response is not None else None,
+        # B17/C13 — which conversation and turn this chunk belongs to, on every
+        # chunk. A brand-new chat has no session id until its first turn ends, so
+        # without this the owner could not stop or steer the very turn most worth
+        # stopping. It names work the caller is already streaming; it exposes
+        # nothing they could not already see.
+        "session_id": session_id,
+        "turn_id": turn_id,
     }
     # Per-chunk redaction keeps the SSE stream scrubbed without buffering (the buffering
     # RedactionMiddleware is bypassed for this path so streaming works).
@@ -335,7 +343,7 @@ async def stream_prompt(
         async for event in gateway.astream_prompt(envelope):
             if event.kind == FINAL:
                 _record_generated_file_attachments(_ws(request), envelope, session.principal_id)
-            yield _sse(event)
+            yield _sse(event, session_id=envelope.session_id, turn_id=envelope.turn_id)
 
     return StreamingResponse(gen(), media_type="text/event-stream")
 
@@ -390,4 +398,40 @@ async def interrupts(
         result = controller.apply_at_safe_boundary(action)
         applied.append({"task_id": task.task_id, "result": result})
 
-    return {"applied": applied, "safe_boundary": True}
+    # B17/C13 — the same governed request also reaches the *turn* streaming in
+    # this conversation, which is not a task the owner scheduled and so was never
+    # in `targets`. Cancelling a task could only ever stop background work; this
+    # is what lets the owner stop or steer the answer they are watching.
+    #
+    # It stays on this endpoint rather than growing a second one because it is
+    # the same decision under the same rules: human principals only, owner's own
+    # session only, applied at a safe boundary and never as a force-kill.
+    turn_control: dict[str, Any] | None = None
+    if not body.task_id:
+        if body.action_type == "steer" and (body.steer_text or "").strip():
+            queued = store.queue_turn_steer(
+                body.session_id, principal.principal_id, text=(body.steer_text or "").strip()
+            )
+            turn_control = {"action": "steer", "queued": queued}
+        elif body.action_type == "cancel":
+            store.request_turn_stop(body.session_id, principal.principal_id, reason=reason)
+            turn_control = {"action": "stop", "queued": 0}
+        if turn_control is not None:
+            writer.append(
+                make_event(
+                    session_id=body.session_id,
+                    turn_id=None,
+                    event_type="interrupt_received",
+                    actor="runtime",
+                    payload={
+                        "target": "live_turn",
+                        "action_type": body.action_type,
+                        "reason": reason,
+                        # The steer text itself is the owner's message to their own
+                        # conversation; the audit trail keeps its size, not its words.
+                        "steer_chars": len((body.steer_text or "").strip()),
+                    },
+                )
+            )
+
+    return {"applied": applied, "safe_boundary": True, "turn_control": turn_control}

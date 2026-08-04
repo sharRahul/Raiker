@@ -911,6 +911,12 @@ export interface StreamEvent {
   event_type: string;
   payload: Record<string, unknown>;
   response: AgentResponse | null;
+  // B17/C13 — the conversation and turn this chunk belongs to, present on every
+  // chunk of a prompt stream. A brand-new chat learns its own session id from
+  // the first event, which is what lets Stop and steer reach the very first
+  // turn instead of only later ones.
+  session_id?: string | null;
+  turn_id?: string | null;
 }
 
 // raiker/control/dashboard.py TaskView.to_dict()
@@ -943,6 +949,10 @@ export interface TaskView {
 export interface InterruptResult {
   applied: { task_id: string; result: string }[];
   safe_boundary: boolean;
+  // B17/C13 — what the same request did to the *turn* streaming in this
+  // conversation, which is not one of the tasks in `applied`. Null when the
+  // request named a specific task, or when the action reaches tasks only.
+  turn_control?: { action: "stop" | "steer"; queued: number } | null;
 }
 
 // One prompt attachment: a workspace path, or an image/document previously

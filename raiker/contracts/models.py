@@ -251,6 +251,14 @@ EVENT_TYPES = {
     "interrupt_received",
     "safe_boundary_reached",
     "task_steered",
+    # B17/C13 — the owner's two controls over a turn that is already running.
+    # `turn_stopped` records that a running turn ended early because the owner
+    # asked it to, with the boundary it stopped at and how much it had done;
+    # `turn_steered` records that the owner's own words entered the running turn
+    # at that boundary. Character counts only — the instruction itself is a user
+    # message and lives in the conversation, not in the audit payload.
+    "turn_stopped",
+    "turn_steered",
     "checkpoint_restore_planned",
     "checkpoint_fork_planned",
     "phase3.workspace.inspection.requested",
@@ -406,7 +414,11 @@ TOOLS = {
 POLICY_DECISIONS = {"allow", "deny", "needs_approval", "allow_managed"}
 MANAGED_POLICY_EFFECTS = {"allow", "deny"}
 TOOL_STATUSES = {"success", "failed", "denied", "approval_required"}
-RESPONSE_STATUSES = {"completed", "needs_approval", "denied", "failed"}
+# B17/C13 — `stopped` is its own outcome. A turn the owner ended at a safe
+# boundary did not fail and was not denied: it did some of the work, kept what it
+# had already said, and stopped because it was told to. Reporting that as
+# `failed` would have blamed the runtime for the owner's decision.
+RESPONSE_STATUSES = {"completed", "needs_approval", "denied", "failed", "stopped"}
 INTERFACE_STATUS = {"equal_primary_when_enabled"}
 
 

@@ -77,6 +77,9 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "process": "process_execution",
     "network": "network_execution",
     "web_fetch": "web_fetch",
+    # B12/C7 — search is the same capability pointed at an owner-configured
+    # endpoint, so it answers to the same gate and the same decision mode.
+    "web_search": "web_fetch",
     "graph_indexing": "graph_indexing_runtime",
     "semantic_memory": "semantic_memory_runtime",
     "vector_embedding": "vector_embedding_runtime",

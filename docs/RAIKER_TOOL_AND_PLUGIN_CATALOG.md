@@ -173,6 +173,36 @@ the subagent is created. Its findings reach the calling model as untrusted data,
 never as instructions, and the audit trail keeps the contract, the steps, and the
 tools used rather than the content.
 
+## Model-facing web reads
+
+| Tool Name | Descriptions | Permissions | Implemented |
+|---|---|---|---|
+| `web_fetch` | Read one web page and return it as bounded text | `web_fetch` gate + decision mode (default `ask` withholds) + owner egress allowlist | Yes, read-only |
+| `web_search` | Query the owner-configured search endpoint for pages to read | same gate and mode; **off** until the owner configures an endpoint | Yes, read-only |
+
+Both are read-shaped at the policy layer for the same reason `connector_read` is:
+what governs them is enforced inside the tool. `raiker/runtime/web_access.py`
+checks, in order, the `web_fetch` capability gate (disabled ⇒ fail closed), the
+per-capability decision mode (**default `ask` ⇒ withheld**; `auto` withholds too,
+because reaching the open internet on a model's say-so is never low-risk), and
+the owner egress allowlist `RAIKER_WEB_EGRESS_ALLOWLIST` (empty ⇒ fail closed).
+
+This is the one egress boundary where the URL itself is **model-supplied**, so
+the URL is checked as well as the host: HTTPS only, no embedded credentials, and
+a destination that resolves to a public address — an allowlisted *name* can still
+point at the loopback interface or a home network, and that is refused. Every
+redirect hop is re-checked the same way, because a redirect is a second
+destination the owner never allowlisted. The allowlist is deliberately separate
+from `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`: allowing a connector's API host must
+not also allow the agent to fetch arbitrary pages from it.
+
+Raiker ships no search provider. `web_search` refuses with
+`web_search_not_configured` until the owner sets `RAIKER_WEB_SEARCH_ENDPOINT`
+(and, if the provider needs one, `RAIKER_WEB_SEARCH_KEY`) and allowlists that
+host. Both tools return their content framed as untrusted data, never
+instructions, and broker events keep the URL, the query, and the sizes rather
+than the fetched content.
+
 A projected MCP tool is callable only while the `mcp_connector_runtime` gate is
 enabled **and** the decision mode permits it; a mode that would withhold every
 call projects no tools at all, so the model is never offered one the runtime

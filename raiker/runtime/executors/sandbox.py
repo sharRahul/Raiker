@@ -139,6 +139,25 @@ def connector_egress_allowlist() -> frozenset[str]:
     return frozenset(part.strip() for part in raw.split(",") if part.strip())
 
 
+def web_egress_allowlist() -> frozenset[str]:
+    """Owner-controlled outbound host allowlist for the agent's own web reads.
+
+    Read from ``RAIKER_WEB_EGRESS_ALLOWLIST`` (comma-separated host globs, e.g.
+    ``docs.python.org,*.readthedocs.io``). Defaults to **empty** so the agent
+    cannot reach the network until the owner explicitly allowlists a host —
+    fail-closed by default even when the ``web_fetch`` capability gate is on.
+
+    This is the one egress boundary where the URL itself is *model-supplied*
+    rather than built from validated components, so it is the boundary that
+    decides where a model may send the owner's machine. It is deliberately
+    separate from ``RAIKER_CONNECTOR_EGRESS_ALLOWLIST``: allowing a connector's
+    API host must not also allow the agent to fetch arbitrary pages from it.
+    """
+    import os
+    raw = os.environ.get("RAIKER_WEB_EGRESS_ALLOWLIST", "")
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
 def get_url(
     url: str,
     *,

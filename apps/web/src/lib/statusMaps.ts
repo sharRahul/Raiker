@@ -86,8 +86,13 @@ export function responseBadge(status: string): BadgeVariant {
       return "active";
     case "needs_approval":
       return "needs-approval";
+    // `stopped` (B17/C13) is a turn the owner ended at a safe boundary. It
+    // shares this badge with a denial because both are decisions rather than
+    // completions, and it is deliberately not `failed`: the runtime did what it
+    // was told.
     case "denied":
     case "failed":
+    case "stopped":
       return "stopped";
     default:
       return "idle";

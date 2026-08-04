@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import time
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
@@ -52,6 +54,11 @@ from raiker.tools.broker import ToolBroker
 from raiker.tools.mcp_tools import mcp_tool_specs
 from raiker.verification.models import VerificationResult
 from raiker.verification.verifier import Verifier
+
+# How often a streaming turn checks whether the owner asked it to stop. One
+# cheap indexed read a second: fast enough that Stop feels immediate, rare
+# enough that it costs nothing across a long answer.
+_STOP_POLL_SECONDS = 1.0
 
 _SYSTEM_PROMPT = (
     "You are Raiker, a local-first coding agent. Use the provided tools to inspect and change "
@@ -500,6 +507,51 @@ class RuntimeOrchestrator:
             },
         )
 
+    def _turn_control_principal(self, envelope: PromptEnvelope) -> str:
+        """Whose controls this turn answers to — the owner running it."""
+        return envelope.user.id or self.tool_broker.principal_id
+
+    def _clear_turn_control(self, envelope: PromptEnvelope) -> None:
+        """Drop any stop/steer left over from before this turn started (B17/C13)."""
+        store = getattr(self.tool_broker, "store", None)
+        if store is None:
+            return
+        with contextlib.suppress(Exception):
+            store.clear_turn_control(envelope.session_id, self._turn_control_principal(envelope))
+
+    def _take_turn_control(self, envelope: PromptEnvelope) -> dict[str, Any]:
+        """Read and consume the owner's pending controls for this turn."""
+        store = getattr(self.tool_broker, "store", None)
+        if store is None:
+            return {"stop_requested": False, "stop_reason": None, "steer_texts": []}
+        try:
+            return dict(
+                store.take_turn_control(
+                    envelope.session_id, self._turn_control_principal(envelope)
+                )
+            )
+        except Exception:  # noqa: BLE001 — a control channel that cannot be read
+            # must never take the turn down with it; the turn simply carries on.
+            return {"stop_requested": False, "stop_reason": None, "steer_texts": []}
+
+    def _stop_requested(self, envelope: PromptEnvelope) -> str | None:
+        """Peek at a stop without consuming a queued steer (used mid-stream)."""
+        store = getattr(self.tool_broker, "store", None)
+        if store is None:
+            return None
+        try:
+            with store.connect() as connection:
+                row = connection.execute(
+                    "SELECT stop_requested, stop_reason FROM turn_controls "
+                    "WHERE session_id = ? AND principal_id = ?",
+                    (envelope.session_id, self._turn_control_principal(envelope)),
+                ).fetchone()
+        except Exception:  # noqa: BLE001 — see `_take_turn_control`
+            return None
+        if row is None or not row["stop_requested"]:
+            return None
+        return str(row["stop_reason"] or "user requested stop")
+
     def _refusal_event(
         self, envelope: PromptEnvelope, action: ToolAction, decision: PolicyDecision
     ) -> None:
@@ -794,6 +846,8 @@ class RuntimeOrchestrator:
                     if reasoning is not None
                     else self.model_router.astream(provider, model, messages, self._turn_tool_specs())
                 )
+                stopped_mid_stream = False
+                next_stop_check = time.monotonic() + _STOP_POLL_SECONDS
                 async for provider_event in stream:
                     if provider_event.text_delta:
                         output_committed = True
@@ -807,6 +861,24 @@ class RuntimeOrchestrator:
                         usage = stream_usage
                     if provider_event.event_type == "finish":
                         finish = provider_event.finish_reason
+                    # B17/C13 — an owner who presses Stop during a long answer
+                    # should not have to wait out the rest of it. The control row
+                    # is only *peeked* at here (polled, not per-delta, so this
+                    # costs one cheap read a second); the loop above consumes it
+                    # and ends the turn honestly with the text already shown.
+                    if time.monotonic() >= next_stop_check:
+                        next_stop_check = time.monotonic() + _STOP_POLL_SECONDS
+                        if self._stop_requested(envelope) is not None:
+                            stopped_mid_stream = True
+                            break
+                if stopped_mid_stream:
+                    with contextlib.suppress(Exception):
+                        await stream.aclose()  # type: ignore[attr-defined]
+                    # Any half-streamed tool call is discarded rather than
+                    # reconstructed: the owner stopped the turn, so nothing the
+                    # model was in the middle of asking for should run.
+                    yield ModelResponse(text="".join(text_parts), finish_reason="stop")
+                    return
             except Exception as exc:  # noqa: BLE001
                 last_error_code = provider_error_code(exc)
                 self._event(
@@ -886,6 +958,10 @@ class RuntimeOrchestrator:
         self, envelope: PromptEnvelope, *, stream: bool
     ) -> AsyncIterator[StreamEvent]:
         machine = RuntimeStateMachine()
+        # B17/C13 — a stop or steer that arrived between turns had no turn to act
+        # on. Clearing here means the owner's control always applies to the work
+        # they were watching, never to the next thing they ask for.
+        self._clear_turn_control(envelope)
         self._state(machine, envelope, "NORMALISED")
         self._event(
             envelope, "prompt_normalised", {"text_length": len(envelope.prompt.text)}
@@ -1202,6 +1278,38 @@ class RuntimeOrchestrator:
         # the model here would ask it to think past a decision the owner has not
         # made yet.
         while status is None:
+            # B17/C13 — the safe boundary. The owner's two controls over a turn
+            # that is already running are read here, between the last tool batch
+            # and the next question to the model: a stop ends the turn with what
+            # it has, and a steer enters the conversation as the owner's own
+            # words before the model is asked anything else. Neither grants
+            # anything — every call the model makes afterwards is governed
+            # exactly as it was before.
+            control = self._take_turn_control(envelope)
+            for steer_text in control["steer_texts"]:
+                messages.append(ModelMessage(role="user", content=steer_text))
+                self._event(
+                    envelope,
+                    "turn_steered",
+                    {"steer_chars": len(steer_text), "boundary": "before_model_call"},
+                )
+            if control["stop_requested"]:
+                self._state(machine, envelope, "RESPONDING")
+                self._event(
+                    envelope,
+                    "turn_stopped",
+                    {
+                        "reason": control["stop_reason"] or "user requested stop",
+                        "boundary": "before_model_call",
+                        "tool_calls_made": tool_calls_made,
+                    },
+                )
+                status = "stopped"
+                message = final_text or "Stopped at your request, at a safe boundary."
+                break
+            for pending in self._drain_sink():
+                yield pending
+
             if stream and hasattr(self.model_router, "astream"):
                 response: ModelResponse | None = None
                 async for item in self._astream_model_call(envelope, messages):
@@ -1215,6 +1323,30 @@ class RuntimeOrchestrator:
 
             for pending in self._drain_sink():
                 yield pending
+            # B17/C13 — a stop that arrived while the model was answering (or
+            # while its tools ran) is honoured here, before the turn can decide
+            # it finished normally. The text the owner already saw is kept: a
+            # stopped turn is not a failed one and not an empty one.
+            stop_reason = self._stop_requested(envelope)
+            if stop_reason is not None:
+                self._take_turn_control(envelope)
+                self._state(machine, envelope, "RESPONDING")
+                self._event(
+                    envelope,
+                    "turn_stopped",
+                    {
+                        "reason": stop_reason,
+                        "boundary": "after_model_response",
+                        "tool_calls_made": tool_calls_made,
+                    },
+                )
+                status = "stopped"
+                message = (
+                    response.text.strip()
+                    or final_text
+                    or "Stopped at your request, at a safe boundary."
+                )
+                break
             if response.finish_reason == "error":
                 status = "failed"
                 message = response.text or f"model_unavailable: {UNCLASSIFIED_PROVIDER_ERROR}"

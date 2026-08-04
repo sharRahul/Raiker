@@ -437,6 +437,21 @@ npm run build     # exit 0
   out of file descriptors. A thread only ever closes a handle it owns, or one
   whose owning thread has exited — `connect` has no release point, so another
   live worker's handle may be mid-query.
+- The agent can read the web (FIXED-101). `raiker/runtime/web_access.py` brokers
+  `web_fetch` and `web_search` under the `web_fetch` capability gate, its decision
+  mode (default `ask` withholds), and the owner egress allowlist
+  `RAIKER_WEB_EGRESS_ALLOWLIST` — which ships **empty**, so nothing is reachable
+  until the owner names a host. Because the URL is model-supplied it is validated
+  as well as the host: HTTPS only, no embedded credentials, a destination that
+  resolves to a public address, and every redirect hop re-checked. `web_search`
+  needs `RAIKER_WEB_SEARCH_ENDPOINT`; Raiker ships no search provider.
+- A running turn can be stopped or steered (FIXED-102). `turn_controls` is a
+  durable per-(session, principal) row the agent loop reads at its safe boundary:
+  a stop ends the turn as the `stopped` response status, keeping what it has, and
+  a steer enters the turn as a user message before the model is asked anything
+  else. Controls are consumed on read and cleared at the start of each turn, so
+  neither can apply twice or leak into the next turn. Both are requested through
+  the existing human-only `POST /api/interrupts`.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

@@ -42,6 +42,10 @@ const EVENT_PHASE: Record<string, PhaseId> = {
   // B7 — a delegated read-only investigation. Metadata only: the findings go to
   // the model, never to the transcript.
   subagent_completed: "act",
+  // C6 — the material this turn read, ledgered so the answer can name it. The
+  // Sources strip under the answer is the surface; this line is the governance
+  // record that the ledger was written and how much went into it.
+  turn_sources_recorded: "act",
   verification_started: "verify",
   verification_completed: "verify",
 };
@@ -108,6 +112,10 @@ export function summarizeEvent(ev: StreamEvent): string {
     case "subagent_completed": {
       const tools = Array.isArray(p.tools_used) ? p.tools_used.join(", ") : "";
       return `Subagent ${str(p.name) || "run"} finished ${str(p.steps_executed)} read-only step(s)${tools ? ` (${tools})` : ""}.`;
+    }
+    case "turn_sources_recorded": {
+      const kinds = Array.isArray(p.kinds) ? p.kinds.join(", ") : "";
+      return `Recorded ${str(p.recorded)} source(s) this turn${kinds ? ` (${kinds})` : ""}; ${str(p.total)} in total.`;
     }
     case "model_tool_calls_dropped":
       return `${str(p.accepted)} of ${str(p.proposed)} tool call(s) accepted — ${str(p.reason)}.`;

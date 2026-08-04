@@ -51,4 +51,21 @@ describe("turnPhases", () => {
       "Policy refused read_file — path_outside_workspace. The other calls in this batch were decided separately.",
     );
   });
+
+  // C6 — the Sources strip is the surface, but the governance record has to say
+  // the ledger was written too. An event the runtime streams and the timeline
+  // silently drops is the invisible product surface this backlog exists to stop.
+  it("reports the source ledger as the act phase, with counts and no content", () => {
+    const recorded = lifecycle("turn_sources_recorded", {
+      recorded: 2,
+      total: 3,
+      source_ids: ["s2", "s3"],
+      kinds: ["file", "web"],
+      tools: ["read_file", "web_fetch"],
+    });
+    expect(phaseForEvent("turn_sources_recorded")).toBe("act");
+    expect(summarizeEvent(recorded)).toBe(
+      "Recorded 2 source(s) this turn (file, web); 3 in total.",
+    );
+  });
 });

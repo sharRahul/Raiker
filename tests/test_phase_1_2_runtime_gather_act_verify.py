@@ -182,8 +182,8 @@ def test_existing_terminal_commands_still_work(tmp_path: Path, monkeypatch) -> N
     assert isinstance(handle_approvals(workspace_root=tmp_path), str)
 
 
-def test_disabled_runtime_flags_remain_false(tmp_path: Path) -> None:
-    from raiker.context.gatherer import CAPABILITY_FLAGS, ContextGatherer
+def test_capability_gates_report_disabled_until_an_owner_enables_one(tmp_path: Path) -> None:
+    from raiker.context.gatherer import CAPABILITY_GATE_TOOLS, ContextGatherer
 
     bundle = ContextGatherer().gather(
         workspace_root=tmp_path,
@@ -192,5 +192,5 @@ def test_disabled_runtime_flags_remain_false(tmp_path: Path) -> None:
         prompt_text="x",
     )
     caps = [i for i in bundle.included_items if i.source.source_type == "capability_status"][0]
-    for flag in CAPABILITY_FLAGS:
-        assert caps.metadata[flag] is False
+    for capability in CAPABILITY_GATE_TOOLS:
+        assert caps.metadata[capability]["enabled"] is False  # type: ignore[index]

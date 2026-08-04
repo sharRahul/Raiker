@@ -38,9 +38,8 @@ data**, never as instructions.
 Raiker can build, connect to, and monitor Model Context Protocol servers.
 
 **Prerequisites:** both `mcp_builder_runtime` and `mcp_connector_runtime` must
-be at a **runtime** state, which means a runtime-enablement mode must be active
-first (see [Permissions and runtime modes](permissions-and-runtime-modes.md)).
-Until then the form is disabled.
+be at a **runtime** state — turn each on in **Permissions**. Until then the form
+is disabled and the page says which of the two is missing.
 
 To create one:
 
@@ -57,9 +56,29 @@ and recent monitored sessions. Controls: **Test**, **Stop** / **Resume**,
 **Rename**, **Delete**. Stop is an instant containment switch — it refuses all
 sessions for that connection and is revocable.
 
-**Current limit (BUG-12):** a connected server's tools are **not** offered to
-the model in Chat. MCP works today as a management and monitoring surface, not
-yet as an agent capability. See [To be fixed](../plans/TO_BE_FIXED.md).
+### Can Raiker actually call it?
+
+A connected server's tools are callable in Chat and Build as
+`mcp__<server>__<tool>`, under the same policy review, containment, and audit
+path as everything else. **Two owner controls stand between "connected" and
+"callable", and the page states both** rather than leaving you to infer the
+second from the first:
+
+- the `mcp_connector_runtime` **capability gate**; and
+- that capability's **decision mode**. The default `ask` withholds a tool call
+  for a decision a running turn cannot wait for, so tools are projected only at
+  **Allow** (or at **Auto** with a low-risk floor).
+
+When Raiker cannot call them, a banner names the exact reason and links to the
+control that changes it. When it can, the same place says how many tools are
+available and in what form. Each connected card carries the matching **Callable
+by Raiker** / **Not callable yet** chip, so a card can no longer disagree with
+the runtime.
+
+A call's arguments stay out of the audit trail — the record keeps
+`arguments_length` and `content_redacted: true`, not the payload. Reaching a
+registered server runs code Raiker does not own, which is why the call carries
+the same risk band as a connector read.
 
 ## Skills
 

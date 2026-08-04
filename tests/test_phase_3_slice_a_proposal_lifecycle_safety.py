@@ -5,7 +5,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from raiker.context.gatherer import CAPABILITY_FLAGS, ContextGatherer
+from raiker.context.gatherer import CAPABILITY_GATE_TOOLS, ContextGatherer
 from raiker.review.lifecycle import (
     ProposalLifecycleStore,
     record_to_json,
@@ -205,13 +205,13 @@ def test_review_and_lifecycle_modules_no_unsafe_imports() -> None:
                     assert module not in _FORBIDDEN_IMPORTS, source_file
 
 
-def test_disabled_runtime_flags_remain_false(tmp_path: Path) -> None:
+def test_a_proposal_never_turns_a_capability_gate_on(tmp_path: Path) -> None:
     _init_repo(tmp_path)
     store = _store(tmp_path)
     store.save_proposals([_proposal()], review_id="rev_1")
-    item = ContextGatherer()._capability_status(tmp_path)
-    for flag in CAPABILITY_FLAGS:
-        assert item.metadata[flag] is False
+    item = ContextGatherer()._capability_status(tmp_path, SQLiteStore(tmp_path), None)
+    for capability in CAPABILITY_GATE_TOOLS:
+        assert item.metadata[capability]["enabled"] is False  # type: ignore[index]
 
 
 def test_no_apply_or_execute_command_introduced() -> None:

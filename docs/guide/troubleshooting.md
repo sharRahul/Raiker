@@ -19,7 +19,7 @@ itself. They remain below because they can still appear for a provider you have
 | `private_network_provider_requires_explicit_policy` | Same, for a home-lab endpoint | As above, via **Home-lab models** |
 | `model_egress_denied:<host>` | That host is not the endpoint of any provider you configured | Connect the provider whose endpoint it is, or pre-authorise it with `RAIKER_MODEL_EGRESS_ALLOWLIST=<host>` |
 | `model_egress_denied:no_allowlist` | An off-machine endpoint with no configured connection and no environment allowlist | Connect the provider, or set `RAIKER_MODEL_EGRESS_ALLOWLIST` |
-| `connector_vault_key_invalid` | The stored key is not a valid Fernet key | Settings → Security & Login → Generate key |
+| `connector_vault_key_invalid` | The stored key is not a valid Fernet key | Settings → Security & sign-in → Generate key |
 | `connector_vault_key_unset` | Only on a **read**: credentials exist but the key is gone, so they cannot be decrypted | Restore the key, or clear and re-enter the affected credentials. Writes provision a key automatically; reads deliberately do not, because minting a new key would hide a real problem. |
 | `hosted_api_key_missing` | Hosted provider needs a key | Paste it into the sign-in dialog |
 | `provider_api_key_missing:<VAR>` | Key absent from dialog and environment | Paste it, or set `<VAR>` before starting |
@@ -39,7 +39,8 @@ in the process environment.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| A surface says "enable it in Capabilities" but the gate **is** on | The gate is at `enabled_policy_gated`, not `enabled_runtime` | Settings → General → Runtime mode → activate a mode, then turn the gate on again |
+| A surface says "enable it in Capabilities" but the gate **is** on | The gate is at `enabled_policy_gated`, not `enabled_runtime` | Turn it on again from **Permissions** and pick the runtime level. If it still will not go, the agent runtime itself is disabled — Settings → Runtime configuration → Enable |
+| `activation_blocked: runtime_mode_not_active` | The agent runtime is disabled. It no longer names one of five modes — there is one runtime | Settings → Runtime configuration → **Enable agent runtime** |
 | **Turn on** is missing entirely | Deferred capability — no governed executor exists | Nothing to do. Observability → Diagnostics lists all deferred capabilities |
 | `Confirm change` stays greyed out | Reason, confirmation token, or threat-model tick missing | The confirmation token is **any phrase you type** — it records intent, it is not a credential |
 | `disabled_by_capability_gate` from an API call | Gate off for your account | Permissions → find the capability → Turn on |
@@ -50,10 +51,11 @@ in the process environment.
 |---|---|
 | "No model is selected yet, so the runtime will refuse the turn" | Choose a profile in Models, or the Chat model selector |
 | Raiker forgets what you said one message ago | **Fixed.** Prior completed turns of the session are replayed to the model, bounded by the model's context window. A turn with no reply is skipped, and other chats are never mixed in. |
-| Reply shows `# heading` and `\|table\|` as raw text | **Known defect BUG-03** — markdown is not rendered |
+| Reply shows `# heading` and `\|table\|` as raw text | **Fixed** (FIXED-06). Replies render as Markdown, with each code block labelled by language and carrying a keyboard-reachable **Copy code**. Your own prompts are deliberately shown exactly as typed. |
 | Part of a reply reads `[REDACTED_TOKEN]` or `[REDACTED_EMAIL]` | Working as intended — the response layer masks the matched span of anything credential-shaped. Prose that merely *mentions* a secret is left alone (**fixed**, FIXED-07). |
 | "Context capacity is not configured for this model" | That profile has no documented context window. Honest, not an error. |
-| An approved file write produced no file | By design — approval is metadata-only (`executes_action: false`). See BUG-06. |
+| An approved file write produced no file | **Fixed** (FIXED-08). An approved `write_file`/`edit_file`/`apply_patch` is carried out once, re-governed at execution time and checkpointed first. If it still records only, one of `approval_execution_relay` or the target's own capability is off in Permissions, and the approval detail says so before you decide. |
+| An approved **network** or **process** action produced nothing | By design — those two keep metadata-only resolution (`executes_action: false`). The parked turn still continues, with an honest "approved, but not executed" result. |
 | `provider_connection_failed` | The provider was unreachable — check network, endpoint, and the fallback sequence |
 
 ## Server and session
@@ -64,7 +66,7 @@ in the process environment.
 | `Refusing to bind to non-loopback host … without --allow-public` | Add `--allow-public` **and** set `RAIKER_OWNER_TOKEN` |
 | Dashboard is blank or stale | `npm --prefix apps/web run build`, then restart `raiker-web` |
 | Backend change has no effect | Restart `raiker-web` — Python is not hot-reloaded |
-| Too many device sessions listed | Settings → Security & Login → revoke individually, or change your password to sign out all other devices |
+| Too many device sessions listed | Settings → Security & sign-in → revoke individually, or change your password to sign out all other devices |
 
 ## Environment variables
 

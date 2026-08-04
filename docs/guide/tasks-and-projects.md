@@ -62,10 +62,18 @@ filterable by session and event type.
 
 ## Known limits
 
-- A background-agent run can end `failed` in the audit log without a
-  user-visible reason (BUG-09).
-- Task runs create sessions that appear in the sidebar's **RECENT CHATS**
-  alongside real conversations (BUG-10).
-- Creating a task by asking for one in Chat is specified but not shipped — the
-  governed `create_task` tool exists, the conversational flow around it does
-  not.
+As of 2026-08-04, one edge remains here:
+
+- **Asking for a task in Chat gets you an approval, not a task.** The model can
+  call the governed `create_task` tool, and doing so raises a real high-risk
+  **Create task** approval naming what it would create. But `create_task` is not
+  one of the capabilities an approval carries out, so approving it records your
+  decision and creates nothing — the notice says *"Recorded: approved. The action
+  was NOT executed (metadata-only)"*, and the task does not appear here. Use
+  **Tasks → Plan work** to actually create one. Tracked as BUG-62 in
+  [To be fixed](../plans/TO_BE_FIXED.md).
+
+Two limits this section used to list have shipped and are gone from it: a
+background-agent run now ends with a user-visible reason (**FIXED-13**), and a
+task run no longer appears in the sidebar's **RECENT CHATS** — that list is
+conversations, and task sessions are in Observability → Sessions (**FIXED-15**).

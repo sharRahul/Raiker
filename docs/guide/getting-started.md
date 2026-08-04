@@ -133,11 +133,19 @@ The sidebar groups every destination:
 | Group | Destinations |
 |---|---|
 | Home | Workbench — resume work, see what needs attention |
-| Work | Chat, Build, Search Chat, Tasks, Projects, Sessions |
-| Knowledge | Memory, Brain |
+| Work | Chat, Build, Search Chat, Tasks, Projects |
+| Knowledge | Memory, Knowledge Map |
 | Control | Approvals, Permissions, Models, Extensions |
-| Observe | Observability (readiness, audit log, checkpoints, live work, notifications) |
+| Observe | Observability — overview, sessions, activity, checkpoints, diagnostics, live work, notifications |
 | Utilities | Settings |
+
+**Sessions is inside Observability**, not a destination of its own: it is the
+complete record of every conversation *and* every task run, which is why the
+sidebar's RECENT CHATS list stays conversations only. **Models** and
+**Extensions** are tabbed the same way — Models by Providers / Routing /
+Pricing / Posture, Extensions by Connectors / MCP servers / Skills / Plugins /
+Channels. Old links to the pages these absorbed still resolve and open the right
+tab.
 
 The top bar carries the notification bell, the theme toggle
 (system → light → dark), and the **STOP** switch, which requests cancellation of

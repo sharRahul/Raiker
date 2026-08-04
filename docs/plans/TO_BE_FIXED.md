@@ -166,10 +166,12 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-54 | Medium | Web e2e / the live stub model is not in the repository | Open (found while writing FIXED-99's live scenario) |
 | BUG-55 | Low | Chat / a disabled transcript block reads as live code | Open (found while verifying FIXED-99) |
 | BUG-56 | Low | Tests / a shipped-skill check breaks after `compileall` | Open (found while verifying FIXED-100) |
-| BUG-57 | Medium | Context / stale capability flags mislead the model | Open (found while verifying FIXED-101) |
+| FIXED-104 | Medium | Context / stale capability flags mislead the model | Fixed (was BUG-57) |
 | BUG-59 | Low | Runtime / a governed refusal names a page that does not exist | Open (found while verifying FIXED-103) |
 | BUG-60 | Low | Chat / a withheld call is narrated by the model, not disclosed | Open (found while verifying FIXED-103) |
-| BUG-61 | Medium | Documentation / the user guide's "Known limits" are entirely stale | Open (found while writing FIXED-103) |
+| FIXED-105 | Medium | Documentation / the user guide's "Known limits" are entirely stale | Fixed (was BUG-61) |
+| BUG-62 | Medium | Tasks / the agent proposes a task it can never create | Open (found while verifying FIXED-105) |
+| BUG-63 | Low | Web / a composer permission control ships unused | Open (found while verifying FIXED-105) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8 complete; 12 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -4054,9 +4056,9 @@ rule itself: an unreferenced *source* file in a skill bundle is still a defect.
 
 ---
 
-## BUG-57 — The context bundle's fixed capability flags talk a model out of tools it can use
+## FIXED-104 — The context bundle's fixed capability flags talked a model out of tools it can use *(was BUG-57)*
 
-**Status: open; found while verifying FIXED-101.**
+**Status: fixed in this change; found while verifying FIXED-101.**
 
 **Observed.** With the `web_fetch` capability enabled and its decision mode set
 to Allow, one live turn declined to call `web_fetch` at all and explained why:
@@ -4085,6 +4087,57 @@ context that has not been true since it was written.
 the bundle names, or stop naming them. If the flags stay, they must be derived
 from the same store the gates live in, and a test must assert that a capability
 enabled by the owner is reported as enabled.
+
+**Fix applied.** The bundle now reads the owner's own decisions rather than
+asserting a fixed answer, and it says them in the vocabulary the model proposes
+in.
+
+* **`CAPABILITY_GATE_TOOLS` replaces `CAPABILITY_FLAGS`.** Twelve capabilities,
+  each keyed to the model-exposed tools it governs, read per principal through
+  `SQLiteStore.account_scope` → `get_principal_capability_gate_state` /
+  `get_principal_capability_decision_mode` — the same resolution
+  `raiker/runtime/web_access.py` uses to enforce them, so the bundle cannot
+  report one answer while the runtime enforces another. Each line reads
+  `web_fetch: enabled (state=enabled_runtime, decision_mode=allow) — governs
+  web_fetch, web_search`.
+* **Naming the tools is half the fix, not decoration.** The old list gave the
+  model eighteen capability names and a schema full of tool names, with nothing
+  holding the two vocabularies together — so it bridged them itself, from
+  `network_execution` to `web_fetch`. There is now nothing left to infer across,
+  and the item's own preamble says so: read each line for the tools it names and
+  nothing else. A tool no line names is not gated by a capability.
+* **The decision mode is reported beside the gate,** because a gate that is on
+  and a mode that withholds are two different refusals and the model was being
+  told about neither.
+* **A second stale assertion, one function up, was doing the same damage.**
+  `_workspace_summary` hardcoded `runtime_mode: local_read_only_planning` and
+  `disabled_runtime: all unsafe runtime flags remain false`. The first named one
+  of the five modes FIXED-63 replaced with a single runtime; the second told
+  every model that everything the owner had switched on was off. Both are now
+  one line, `agent_runtime: active|disabled`, resolved the way
+  `evaluate_activation_requirement` resolves it.
+* **A failed read reports the fail-closed default rather than dropping the
+  line,** because silence would read to the model as "not gated".
+
+Three tests hold it: a fresh workspace reports every gate disabled *and* names
+its tools; a gate the owner enables is reported as enabled while a neighbouring
+one is not; and `ENABLED_GATE_STATES` is asserted equal to the frozensets in
+`web_access.py` and `connectors.py`, so the bundle and the tools cannot drift
+into two definitions of "on".
+
+**Live evidence.** [`e2e/bug-57-capability-context-live.spec.ts`](../../apps/web/e2e/bug-57-capability-context-live.spec.ts),
+run against a `raiker-web` on a fresh workspace holding a real Anthropic
+credential entered through the product's own Models page —
+`claude-haiku-4-5-20251001` answering every turn.
+
+| Screenshot | What it shows |
+|---|---|
+| `working/bug-57-model-connected.png` | the credential added through Models, Haiku 4.5 selected |
+| `working/bug-57-gate-disabled-named.png` | before the owner touches anything, the model quotes back a `web_fetch` line that says *disabled* — and cannot quote `network_execution_enabled`, because it no longer exists |
+| `working/bug-57-runtime-status-live.png` | the model quotes `agent_runtime: active`, not the deleted `local_read_only_planning` |
+| `working/bug-57-web-fetch-enabled.png` | the gate turned on and its mode raised to Allow, through the product's own Permissions page |
+| `working/bug-57-web-fetch-used.png` | **the defect itself, closed** — the same prompt that used to be refused now calls `web_fetch` and quotes the page back verbatim |
+| `working/bug-57-gates-read-back.png` | `web_fetch: enabled (…decision_mode=allow)` and `shell_execution: disabled (…decision_mode=ask)` in one answer: turning one gate on did not read as turning its neighbour on |
 
 **UI when closed.** A tool the owner has enabled is not refused by the model on
 the strength of a stale context line, and the transcript's stated reason for any
@@ -4253,9 +4306,9 @@ denied one, naming the tool and its reason, whatever the model chooses to say.
 
 ---
 
-## BUG-61 — The user guide's "Known limits" are stale in every line
+## FIXED-105 — The user guide's "Known limits" were stale in every line *(was BUG-61)*
 
-**Status: open; found while writing FIXED-103.**
+**Status: fixed in this change; found while writing FIXED-103.**
 
 **Observed.** FIXED-103 re-derived the README's Known limits. The user guide has
 two more of these sections, reached from the README's own Documentation list, and
@@ -4293,8 +4346,133 @@ than carrying it forward on trust. While there, look for the same drift in the
 rest of `docs/guide/`; two sections found by inspection is not evidence that the
 other pages are current.
 
+**Fix applied.** Both sections are re-derived from the tree, and the rest of
+`docs/guide/` was read for the same drift — which found more than the two
+sections this entry was opened for.
+
+**`working-in-chat.md` → Known limits.** All three entries had shipped, so all
+three are gone and named: Markdown rendering (**FIXED-06**), export
+(**FIXED-12**, superseded by **FIXED-19** and **FIXED-54**), and an approved
+file write reaching the disk (**FIXED-08**). What replaces them is the set of
+edges a Chat user can still hit, each checked against the tree: `network` and
+`process` approvals are still record-only (`EXECUTABLE_ON_APPROVAL` in
+`raiker/approvals/execution.py` carries neither); a batch runs concurrently only
+while nothing in it needs a decision; `web_fetch` ships closed and `web_search`
+has no endpoint at all; conversational task creation stops at an approval (below);
+and compaction at 90 % and weekly quota remain specified but not shipped. The
+duplicate statement of that last one at the foot of the page is gone — one
+document stating the same limit twice is how this drift starts.
+
+**`tasks-and-projects.md` → Known limits.** Two of three had shipped
+(**FIXED-13**, **FIXED-15**) and are named. The third — *"creating a task by
+asking for one in Chat is specified but not shipped"* — was the line this entry
+said must be verified rather than carried forward on trust, and verifying it
+found it half true in a way worth writing down. It is now the section's only
+limit, stated as what actually happens, and recorded separately as **BUG-62**.
+
+**The drift was not confined to the two sections.** Reading the rest of the guide
+against the running product found five more:
+
+| Page | Said | Actually |
+|---|---|---|
+| `permissions-and-runtime-modes.md` | Five runtime modes, activated in *Settings → General*, as a ceiling over every gate | One runtime (**FIXED-63**). Settings → **Runtime configuration** states what is running; the only control is Disable/Enable |
+| `permissions-and-runtime-modes.md` | Chat has a **Permissions** control offering *Ask every time* / *Approve safe actions* / *Custom permissions…* | No composer renders it — see **BUG-63** |
+| `getting-started.md` | Sidebar: **Sessions** under Work, **Brain** under Knowledge | Sessions is a tab inside Observability; Brain is the **Knowledge Map** |
+| `extensions-and-mcp.md` | *"Current limit (BUG-12): a connected server's tools are not offered to the model in Chat"* | Callable since **FIXED-17**, and the page states gate *and* decision mode since **FIXED-96** |
+| `troubleshooting.md` | Rows pointing at BUG-03, BUG-06, a runtime-mode picker, and *Settings → Security & Login* | All four shipped or renamed; the section is now *Security & sign-in* and one runtime |
+
+The guide's index page went with them: its "work in this order" list opened with
+a runtime mode and a vault key, neither of which an owner has to touch — a
+saved credential is the authorization, and the vault key provisions itself.
+
+**Live evidence.** [`e2e/bug-61-guide-accuracy-live.spec.ts`](../../apps/web/e2e/bug-61-guide-accuracy-live.spec.ts),
+against a `raiker-web` on a fresh workspace holding a real Anthropic credential
+entered through the product's own Models page. Each test holds up a claim the
+rewritten guide now makes:
+
+| Screenshot | What it shows |
+|---|---|
+| `working/bug-61-markdown-rendered.png` | a real turn rendering a heading, a list, and a `TypeScript`-labelled code block with **Copy code** — the "Markdown is not rendered" line disproved |
+| `working/bug-61-export-review.png` | **Export conversation…** offering HTML, Markdown and PDF — the "no export" line disproved |
+| `working/bug-61-single-runtime.png` | Settings with **Runtime configuration** and no mode picker; none of the five mode names on the page |
+| `working/bug-61-navigation.png` | the sidebar the guide's table now lists — no Sessions, no Brain |
+| `working/bug-61-mcp-agent-access.png` | Extensions → MCP naming the exact reason the agent cannot call a server, with the link that changes it |
+| `working/bug-61-task-not-in-recents.png` | a created task absent from RECENT CHATS |
+| `working/bug-61-chat-created-task.png` | asking in Chat raising a real high-risk **Create task** approval |
+| `working/bug-61-chat-task-record-only.png` | and approving it answering *"Recorded: approved. The action was NOT executed (metadata-only)"* — the honest half of the claim the guide now makes |
+
+**Found while verifying this.** BUG-62 and BUG-63, recorded rather than fixed
+here.
+
 **UI when closed.** None — this is documentation accuracy, in the pages a new
 owner reads immediately after the README.
+
+---
+
+## BUG-62 — The agent can propose a task it can never create
+
+**Status: open; found while verifying FIXED-105.**
+
+**Observed.** Asked in Chat to call `create_task`, the model calls it, the
+runtime raises a real **Create task** approval at *high* risk naming the task,
+and approving it answers:
+
+> Recorded: approved. The action was NOT executed (metadata-only).
+
+No task is created. `working/bug-61-chat-created-task.png` and
+`working/bug-61-chat-task-record-only.png`.
+
+**Root cause.** `create_task` reaches the approval path correctly — FIXED-98 put
+it in `approval_required_actions` precisely so it would stop being answered
+`unknown_or_denied_tool`. What it never reached is
+`EXECUTABLE_ON_APPROVAL` in `raiker/approvals/execution.py`, whose five members
+are the file, patch, shell, remote and cloud capabilities. So the approval is
+record-only, and `ToolBroker._create_task` — which is written, returns a receipt
+`{"kind": "task", "href": "#/tasks", "label": "Review in Tasks"}`, and would
+work — is never called.
+
+**Why it matters.** This is a worse shape than a missing feature. The owner is
+shown a high-risk decision, told what approving will do, approves it, and gets
+nothing — and the receipt the broker was built to return names a Tasks page that
+will not have the task on it. Every other tool in this position either executes
+on approval or is honestly described as record-only *before* the decision;
+`create_task` is neither, because a task is exactly the kind of local, reversible,
+owner-scoped row the relay exists for.
+
+**Required fix.** Either add `create_task` (and `assign_session_project`, which
+has the same shape) to the executable set with its own capability gate, so
+approving creates the task and the broker's receipt means something; or state
+record-only in the approval detail before the owner decides, and stop the model
+being offered a tool whose success it cannot bring about. The first is the one
+that matches the posture — a task row is reversible and local.
+
+**UI when closed.** Approving a **Create task** proposal from Chat puts the task
+in **Tasks**, and the transcript's receipt links to it.
+
+---
+
+## BUG-63 — A composer permission control ships and is rendered by nothing
+
+**Status: open; found while verifying FIXED-105.**
+
+**Observed.** `apps/web/src/lib/components/PermissionModeControl.svelte` offers
+*Permissions: ask* / *Permissions: safe auto* / *Custom permissions…* and writes
+every capability's decision mode through `api.setCapabilityDecisionMode`. No
+file imports it. The user guide documented it as a Chat control for as long as
+it has existed.
+
+**Why it matters.** It is a live component with real authority — one selection
+rewrites the decision mode of *every* capability the account has — sitting in the
+build with no route to it. That is two risks in one: a documented control an
+owner cannot find, and a bulk permission mutation one import away from shipping
+unreviewed. It is also how the guide came to describe a control that was never
+on screen, which is the same class of defect as BUG-61 itself.
+
+**Required fix.** Delete it, or mount it and hold it to the same governed
+step-up path a bulk decision-mode change deserves. Do not leave a third state.
+
+**UI when closed.** Either the control is reachable and governed, or the tree
+does not carry a permission mutation nothing can call.
 
 ---
 

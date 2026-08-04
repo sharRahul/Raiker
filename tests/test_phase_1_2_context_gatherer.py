@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raiker.context.gatherer import CAPABILITY_FLAGS, ContextGatherer
+from raiker.context.gatherer import (
+    CAPABILITY_GATE_TOOLS,
+    ENABLED_GATE_STATES,
+    ContextGatherer,
+)
 from raiker.context.models import SOURCE_TYPES, ContextBundle, ContextGathererConfig
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
@@ -28,6 +32,51 @@ def _included_types(bundle: ContextBundle) -> list[str]:
     return [item.source.source_type for item in bundle.included_items]
 
 
+def _account(store: SQLiteStore) -> str:
+    """Seed the minimal credential row that makes a principal a real account.
+
+    Capability gates resolve per principal only for an account, so a test about
+    an owner's own gates has to be one.
+    """
+    principal_id = new_id("usr_")
+    now = utc_now()
+    with store.connect() as connection:
+        connection.execute(
+            """INSERT INTO account_credentials
+               (principal_id, username, password_hash, hash_algo, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (principal_id, principal_id, "x", "argon2id", now, now),
+        )
+    return principal_id
+
+
+def _enable_principal_gate(
+    store: SQLiteStore, principal_id: str, capability: str, *, decision_mode: str
+) -> None:
+    now = utc_now()
+    store.upsert_principal_capability_gate_state(principal_id, {
+        "capability": capability,
+        "state": "enabled_runtime",
+        "requested_by": principal_id,
+        "requested_at": now,
+        "activated_by": principal_id,
+        "activated_at": now,
+        "reason": "test",
+        "readiness_snapshot_json": "",
+        "created_at": now,
+        "updated_at": now,
+    })
+    store.upsert_principal_capability_decision_mode(principal_id, {
+        "capability": capability,
+        "decision_mode": decision_mode,
+        "set_by": principal_id,
+        "set_at": now,
+        "reason": "test",
+        "created_at": now,
+        "updated_at": now,
+    })
+
+
 def test_current_prompt_item_is_always_included(tmp_path: Path) -> None:
     bundle = _gather(tmp_path, prompt="hello raiker")
     prompts = [i for i in bundle.included_items if i.source.source_type == "current_prompt"]
@@ -45,14 +94,80 @@ def test_workspace_summary_item_is_included(tmp_path: Path) -> None:
     assert "workspace_root:" in summaries[0].content
 
 
-def test_capability_status_confirms_unsafe_flags_false(tmp_path: Path) -> None:
+def test_workspace_summary_reports_the_live_runtime_rather_than_a_fixed_string(
+    tmp_path: Path,
+) -> None:
+    """BUG-57: two hardcoded lines told every model the runtime was off."""
+
+    store = SQLiteStore(tmp_path)
+    principal_id = _account(store)
+    now = utc_now()
+
+    bundle = _gather(tmp_path, owner_principal_id=principal_id)
+    summary = [
+        i for i in bundle.included_items if i.source.source_type == "workspace_summary"
+    ][0]
+    # A fresh install has no stored row and the runtime is on.
+    assert "agent_runtime: active" in summary.content
+    assert "local_read_only_planning" not in summary.content
+    assert "all unsafe runtime flags remain false" not in summary.content
+
+    store.upsert_principal_runtime_mode(principal_id, {
+        "mode_name": "raiker_runtime",
+        "status": "disabled",
+        "activated_by": principal_id,
+        "activated_at": now,
+        "reason": "test",
+        "updated_at": now,
+    })
+    disabled = _gather(tmp_path, owner_principal_id=principal_id)
+    summary = [
+        i for i in disabled.included_items if i.source.source_type == "workspace_summary"
+    ][0]
+    assert "agent_runtime: disabled" in summary.content
+    assert summary.metadata["agent_runtime"] == "disabled"
+
+
+def test_capability_status_reports_every_gate_disabled_on_a_fresh_workspace(
+    tmp_path: Path,
+) -> None:
     bundle = _gather(tmp_path)
     caps = [i for i in bundle.included_items if i.source.source_type == "capability_status"]
     assert len(caps) == 1
     content = caps[0].content
-    for flag in CAPABILITY_FLAGS:
-        assert f"{flag}: false" in content
-    assert caps[0].metadata["runtime_execution_enabled"] is False
+    for capability, tools in CAPABILITY_GATE_TOOLS.items():
+        assert f"{capability}: disabled" in content
+        # BUG-57: naming the tools each gate governs is what stops a model
+        # reasoning from one capability's state to a neighbouring one.
+        for tool in tools:
+            assert tool in content
+        assert caps[0].metadata[capability]["enabled"] is False  # type: ignore[index]
+
+
+def test_capability_status_reports_a_gate_the_owner_enabled(tmp_path: Path) -> None:
+    """BUG-57's required assertion: an owner's decision reaches the model."""
+
+    store = SQLiteStore(tmp_path)
+    principal_id = _account(store)
+    _enable_principal_gate(store, principal_id, "web_fetch", decision_mode="allow")
+
+    bundle = _gather(tmp_path, owner_principal_id=principal_id)
+    caps = [i for i in bundle.included_items if i.source.source_type == "capability_status"][0]
+
+    assert "web_fetch: enabled (state=enabled_runtime, decision_mode=allow)" in caps.content
+    assert caps.metadata["web_fetch"]["enabled"] is True  # type: ignore[index]
+    # A neighbouring capability is untouched by that decision and still says so.
+    assert "shell_execution: disabled" in caps.content
+    assert caps.metadata["shell_execution"]["enabled"] is False  # type: ignore[index]
+
+
+def test_capability_status_agrees_with_the_gate_states_the_tools_enforce() -> None:
+    """The bundle and the tools must not hold two copies of "enabled"."""
+
+    from raiker.runtime.connectors import _ENABLED_GATE_STATES as connector_states
+    from raiker.runtime.web_access import _ENABLED_GATE_STATES as web_states
+
+    assert ENABLED_GATE_STATES == web_states == connector_states
 
 
 def test_recent_events_are_bounded(tmp_path: Path) -> None:

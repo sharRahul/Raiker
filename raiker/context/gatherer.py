@@ -18,28 +18,44 @@ from raiker.memory.semantic import semantic_memory_status
 from raiker.memory.store import list_memory
 from raiker.storage.sqlite import SQLiteStore
 
-# Disabled runtime capability flags surfaced as Phase 1/2-safe context. These must all stay
-# False; the gatherer reports them so the model and event log can see the runtime is gated.
-CAPABILITY_FLAGS = (
-    "plugin_execution_enabled",
-    "graph_indexing_enabled",
-    "semantic_memory_writes_enabled",
-    "vector_writes_enabled",
-    "embedding_creation_enabled",
-    "approval_execution_enabled",
-    "approval_relay_runtime_enabled",
-    "cleanup_execution_enabled",
-    "rollback_execution_enabled",
-    "external_channels_enabled",
-    "notifications_enabled",
-    "remote_execution_enabled",
-    "container_execution_enabled",
-    "cloud_execution_enabled",
-    "process_execution_enabled",
-    "shell_execution_enabled",
-    "network_execution_enabled",
-    "runtime_execution_enabled",
+# Capability gates the bundle reports, keyed by the capability the owner actually
+# switches and valued by the model-exposed tools that capability governs.
+#
+# BUG-57: this used to be a fixed tuple of eighteen `*_enabled` names reported as
+# `False` on every turn. Two things were wrong with that at once. It never
+# reflected a gate the owner had turned on, so a live turn declined to call
+# `web_fetch` with the gate enabled and its decision mode at Allow; and it named
+# capabilities in a vocabulary that no longer lined up one-to-one with the tools
+# in the schema, so the model reasoned from `network_execution` — a different
+# capability — to a neighbouring one. Naming the governed tools beside each gate
+# is what removes the second half: there is nothing left to infer across.
+#
+# Every capability here is read per principal from the same store the Permissions
+# page writes, so an owner's decision is what the model is told.
+CAPABILITY_GATE_TOOLS: dict[str, tuple[str, ...]] = {
+    "file_write_execution": ("write_file", "edit_file", "create_document"),
+    "patch_apply_execution": ("apply_patch",),
+    "shell_execution": ("shell",),
+    "remote_execution_cap": ("remote_execute",),
+    "cloud_execution_cap": ("cloud_execute",),
+    "web_fetch": ("web_fetch", "web_search"),
+    "connector_github_runtime": ("github_read",),
+    "connector_gmail_runtime": ("gmail_read",),
+    "connector_gcal_runtime": ("gcal_read",),
+    "connector_slack_runtime": ("slack_read",),
+    "advisor_model_runtime": ("consult_advisor",),
+    "mcp_connector_runtime": ("mcp__<server>__<tool>",),
+}
+
+# The gate states the runtime treats as on. Kept in step with the same frozenset
+# in `raiker/runtime/web_access.py` and `raiker/runtime/connectors.py`; a test
+# asserts the three agree rather than trusting that they were copied correctly.
+ENABLED_GATE_STATES = frozenset(
+    {"enabled_read_only", "enabled_policy_gated", "enabled_runtime"}
 )
+
+DEFAULT_GATE_STATE = "disabled"
+DEFAULT_DECISION_MODE_NAME = "ask"
 
 
 def _token_estimate(content: str) -> int:
@@ -83,8 +99,10 @@ class ContextGatherer:
 
         builders: dict[str, Callable[[], ContextItem | None]] = {
             "current_prompt": lambda: self._current_prompt(root, prompt_text),
-            "workspace_summary": lambda: self._workspace_summary(root, store, scoped_session_id),
-            "capability_status": lambda: self._capability_status(root),
+            "workspace_summary": lambda: self._workspace_summary(
+                root, store, scoped_session_id, owner_principal_id
+            ),
+            "capability_status": lambda: self._capability_status(root, store, owner_principal_id),
             "connector_status": lambda: self._connector_status(root, store, owner_principal_id),
             "project_context": lambda: self._project_context(root, store, session_id, owner_principal_id),
             "memory_recall": lambda: self._memory_recall(store, prompt_text, session_id, owner_principal_id),
@@ -597,11 +615,46 @@ class ContextGatherer:
             metadata={"char_length": len(prompt_text)},
         )
 
-    def _workspace_summary(self, root: Path, store: SQLiteStore, session_id: str | None) -> ContextItem:
+    def _runtime_status(self, store: SQLiteStore, principal_id: str | None) -> str:
+        """Is the agent runtime accepting executions?
+
+        Resolved exactly the way ``evaluate_activation_requirement`` resolves it
+        (``raiker/runtime/authority/activation.py``): the principal's own row for
+        an account, the latest row otherwise, and no row at all means a fresh
+        install with the runtime on. FIXED-63 left one runtime and one question,
+        so this is a status, not a mode name.
+        """
+        try:
+            scoped = store.account_scope(principal_id)
+            record = (
+                store.get_principal_runtime_mode(scoped)
+                if scoped is not None
+                else store.get_latest_runtime_mode()
+            )
+        except Exception:  # noqa: BLE001 — a broken read must not claim the runtime is on
+            return "unknown"
+        if record is None:
+            return "active"
+        return str(record.get("status") or "active")
+
+    def _workspace_summary(
+        self,
+        root: Path,
+        store: SQLiteStore,
+        session_id: str | None,
+        owner_principal_id: str | None,
+    ) -> ContextItem:
         event_count = store.count_events(session_id)
         checkpoint_count = store.count_checkpoints(session_id)
         task_count = store.count_tasks(session_id)
         pending_approvals = store.count_pending_approvals(session_id)
+        # BUG-57: this used to assert `runtime_mode: local_read_only_planning`
+        # and `disabled_runtime: all unsafe runtime flags remain false` on every
+        # turn. Both were fixed strings. The first named one of the five modes
+        # FIXED-63 replaced with a single runtime; the second told the model that
+        # everything the owner had switched on was off. A model reading them had
+        # been argued out of the whole tool set before it saw its own schema.
+        runtime_status = self._runtime_status(store, owner_principal_id)
         lines = [
             f"workspace_root: {root}",
             f"database: {store.db_path}",
@@ -609,8 +662,7 @@ class ContextGatherer:
             f"checkpoint_count: {checkpoint_count}",
             f"task_count: {task_count}",
             f"pending_approval_count: {pending_approvals}",
-            "runtime_mode: local_read_only_planning",
-            "disabled_runtime: all unsafe runtime flags remain false",
+            f"agent_runtime: {runtime_status}",
         ]
         return self._make_item(
             source_type="workspace_summary",
@@ -624,19 +676,75 @@ class ContextGatherer:
                 "checkpoint_count": checkpoint_count,
                 "task_count": task_count,
                 "pending_approval_count": pending_approvals,
+                "agent_runtime": runtime_status,
             },
         )
 
-    def _capability_status(self, root: Path) -> ContextItem:
-        lines = [f"{flag}: false" for flag in CAPABILITY_FLAGS]
+    def _gate_reading(
+        self, store: SQLiteStore, principal_id: str | None, capability: str
+    ) -> tuple[str, str]:
+        """Read one capability's live gate state and decision mode.
+
+        Scoped to the principal exactly the way the tools themselves scope it
+        (``raiker/runtime/web_access.py``), so the bundle cannot report one
+        answer while the runtime enforces another. A read that fails is reported
+        as the fail-closed default rather than dropped: silence would read to the
+        model as "not gated".
+        """
+        try:
+            scoped = store.account_scope(principal_id)
+            if scoped is not None:
+                record = store.get_principal_capability_gate_state(scoped, capability)
+                mode = store.get_principal_capability_decision_mode(scoped, capability)
+            else:
+                record = store.get_capability_gate_state(capability)
+                mode = store.get_capability_decision_mode(capability)
+        except Exception:  # noqa: BLE001 — a broken read fails closed, like the gate itself
+            return DEFAULT_GATE_STATE, DEFAULT_DECISION_MODE_NAME
+        state = str((record or {}).get("state") or DEFAULT_GATE_STATE)
+        return state, str(mode or DEFAULT_DECISION_MODE_NAME)
+
+    def _capability_status(
+        self, root: Path, store: SQLiteStore, owner_principal_id: str | None
+    ) -> ContextItem:
+        """Report the owner's live capability gates, named beside the tools they govern.
+
+        BUG-57: a fixed list of ``*_enabled: false`` lines used to be reported on
+        every turn whatever the owner had enabled, and a live turn talked itself
+        out of a tool it had. Each line below is read from the same store the
+        Permissions page writes, so what the model is told is what the owner
+        decided.
+        """
+        lines = [
+            "The owner's capability gates for this account, as they are right now. "
+            "A gate is one owner switch and a decision mode is a second; a tool is "
+            "callable only when its own gate is enabled. Read each line for the "
+            "tools it names and nothing else — one capability's state says nothing "
+            "about another's. A tool named by no line here is not governed by a "
+            "capability gate.",
+        ]
+        metadata: dict[str, object] = {}
+        for capability, tools in CAPABILITY_GATE_TOOLS.items():
+            state, mode = self._gate_reading(store, owner_principal_id, capability)
+            enabled = state in ENABLED_GATE_STATES
+            lines.append(
+                f"{capability}: {'enabled' if enabled else 'disabled'} "
+                f"(state={state}, decision_mode={mode}) — governs {', '.join(tools)}"
+            )
+            metadata[capability] = {
+                "enabled": enabled,
+                "state": state,
+                "decision_mode": mode,
+                "tools": list(tools),
+            }
         return self._make_item(
             source_type="capability_status",
             trust_level="local_metadata",
             sensitivity="low",
-            provenance={"origin": "phase_gates"},
-            title="Capability status (disabled runtime flags)",
+            provenance={"origin": "capability_gates"},
+            title="Capability gates (live, this account)",
             content="\n".join(lines),
-            metadata={flag: False for flag in CAPABILITY_FLAGS},
+            metadata=metadata,
         )
 
     def _approvals(self, root: Path, store: SQLiteStore, session_id: str | None) -> ContextItem | None:

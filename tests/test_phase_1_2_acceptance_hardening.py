@@ -3,35 +3,36 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from raiker.context.gatherer import CAPABILITY_FLAGS, ContextGatherer
+from raiker.context.gatherer import CAPABILITY_GATE_TOOLS, ContextGatherer
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import PolicyDecision, ToolAction, ToolResult
 from raiker.verification.verifier import Verifier
 
-REQUIRED_DISABLED_FLAGS = (
-    "plugin_execution_enabled",
-    "graph_indexing_enabled",
-    "semantic_memory_writes_enabled",
-    "vector_writes_enabled",
-    "embedding_creation_enabled",
-    "approval_execution_enabled",
-    "approval_relay_runtime_enabled",
-    "cleanup_execution_enabled",
-    "rollback_execution_enabled",
-    "external_channels_enabled",
-    "notifications_enabled",
-    "remote_execution_enabled",
-    "container_execution_enabled",
-    "cloud_execution_enabled",
-    "process_execution_enabled",
-    "shell_execution_enabled",
-    "network_execution_enabled",
-    "runtime_execution_enabled",
+# The capabilities whose gates the context bundle is required to report. BUG-57
+# replaced a fixed list of `*_enabled: false` lines with a live per-principal
+# reading, so what this test hardens has changed with it: not that a flag is
+# permanently false, but that a fresh workspace — where the owner has enabled
+# nothing — is reported as gated, in the tool vocabulary the model proposes in.
+REQUIRED_GATED_CAPABILITIES = (
+    "file_write_execution",
+    "patch_apply_execution",
+    "shell_execution",
+    "remote_execution_cap",
+    "cloud_execution_cap",
+    "web_fetch",
+    "connector_github_runtime",
+    "connector_gmail_runtime",
+    "connector_gcal_runtime",
+    "connector_slack_runtime",
+    "advisor_model_runtime",
+    "mcp_connector_runtime",
 )
 
 
-def test_required_disabled_runtime_flags_are_directly_reported_false(tmp_path: Path) -> None:
-    assert set(REQUIRED_DISABLED_FLAGS).issubset(set(CAPABILITY_FLAGS))
+def test_required_capability_gates_are_reported_disabled_on_a_fresh_workspace(
+    tmp_path: Path,
+) -> None:
+    assert set(REQUIRED_GATED_CAPABILITIES).issubset(set(CAPABILITY_GATE_TOOLS))
 
     bundle = ContextGatherer().gather(
         workspace_root=tmp_path,
@@ -43,9 +44,11 @@ def test_required_disabled_runtime_flags_are_directly_reported_false(tmp_path: P
         item for item in bundle.included_items if item.source.source_type == "capability_status"
     ][0]
 
-    for flag in REQUIRED_DISABLED_FLAGS:
-        assert capability.metadata[flag] is False
-        assert f"{flag}: false" in capability.content
+    for name in REQUIRED_GATED_CAPABILITIES:
+        assert capability.metadata[name]["enabled"] is False  # type: ignore[index]
+        assert f"{name}: disabled" in capability.content
+        for tool in CAPABILITY_GATE_TOOLS[name]:
+            assert tool in capability.content
 
 
 def test_context_gathered_event_payload_is_metadata_only_and_redacted(tmp_path: Path) -> None:

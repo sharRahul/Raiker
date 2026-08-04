@@ -87,8 +87,9 @@ project, Pin, Archive, and Delete.
 **Search Chat** searches conversation titles *and* message text, and each result
 offers *"Open conversation →"* to resume exactly where you left off.
 
-**Sessions** is the complete record: every conversation with its turn count,
-status, tags, and the governed events behind each turn.
+**Observability → Sessions** is the complete record: every conversation with its
+turn count, status, tags, and the governed events behind each turn. Task runs
+live there too, which is why they are not in RECENT CHATS.
 
 ## Attachments
 
@@ -188,13 +189,37 @@ counts only — how many messages and how many characters — never the transcri
 
 ## Known limits
 
-Three things do not work yet. They are tracked in
-[To be fixed](../plans/TO_BE_FIXED.md):
+Raiker's documentation does not run ahead of its code. As of 2026-08-04, these
+are the edges a Chat user can still hit:
 
-- **Markdown is not rendered (BUG-03).** Headings, tables, lists, and fenced
-  code blocks appear as raw text.
-- **No export (BUG-08).** There is no download, PDF, or print control, and an
-  approved file write does not create a file on disk (BUG-06).
+- **An approved network or process action is recorded, not run.** Approving a
+  proposed file change, patch, bounded `shell` command, or an owner-configured
+  SSH/Daytona command carries it out once. `network` and `process` approvals
+  record your decision and execute nothing, and the approval detail says which
+  you are about to do **before** you decide. The turn continues either way — the
+  model is handed an honest "approved, but not executed" result to react to.
+- **A batch of tool calls runs in parallel only when nothing in it needs a
+  decision.** Several reads in one turn run concurrently. The moment one call in
+  the batch requires approval, the batch is walked one call at a time and pauses
+  there; nothing behind the pause is lost, but a turn proposing three edits is
+  three decisions.
+- **The agent reaches the web only where you have allowed it, and cannot search
+  at all until you configure a provider.** `web_fetch` is off by default,
+  withholds at its default `ask` decision mode, and fetches nothing while
+  `RAIKER_WEB_EGRESS_ALLOWLIST` is empty. `web_search` answers the same gate but
+  has no endpoint shipped with Raiker: it reports `web_search_not_configured`
+  until you point it at one.
+- **Asking for a task in Chat gets you an approval, not a task.** See
+  [Tasks and projects](tasks-and-projects.md) → Known limits.
+- Automatic context compaction at 90 % and weekly quota display are specified
+  but not shipped.
+
+Three limits this section used to list have shipped and are gone from it:
+Markdown rendering (**FIXED-06**), conversation export (**FIXED-12**, superseded
+by **FIXED-19** and **FIXED-54**), and — the one that mattered most — an
+approved file write really reaching the disk (**FIXED-08**). Where a limit above
+is tracked as work rather than a deliberate boundary, it has a reproduction and
+a proposed fix in [To be fixed](../plans/TO_BE_FIXED.md).
 
 ## Context and API cost
 
@@ -256,6 +281,3 @@ source, when it took effect, its full change history, and — per provider — w
 prices were last synchronised, when the next refresh is due, and whether the
 current reading is stale. Recording an override needs the runtime gate-manager
 role and a reason; both are kept with the rate.
-
-Automatic compaction at 90 % and weekly quota display remain specified but not
-shipped.

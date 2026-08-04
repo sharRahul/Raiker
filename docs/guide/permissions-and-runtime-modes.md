@@ -1,12 +1,14 @@
-# Permissions and runtime modes
+# Permissions and the runtime
 
-Raiker has two independent controls, and a capability needs **both**:
+Raiker has two controls over what the agent may do:
 
-1. **Runtime mode** — the ceiling. How far any capability may be enabled at all.
-2. **Capability gate** — the individual switch, per capability, per account.
+1. **Capability gate** — the individual switch, per capability, per account.
+2. **Decision mode** — per capability, how the agent must ask before doing
+   something it is already allowed to do.
 
-On top of those sits a third, softer control: the **decision mode**, which says
-how the agent must ask before doing something it is already allowed to do.
+Behind both sits one runtime, and one question about it: is it accepting
+executions at all? That is the danger-zone switch, not a fifth thing to
+configure before your gates mean anything.
 
 ---
 
@@ -36,26 +38,27 @@ What that does *not* change:
 
 ---
 
-## Runtime modes
+## The runtime
 
-**Settings → General → Runtime mode.** Modes, least to most permissive:
+**Settings → Runtime configuration** states what is running rather than asking
+you to pick. There is no mode list: Raiker ships **one runtime**, and a fresh
+install has it on, so a gate you turn on means what it says immediately.
 
-| Mode | Effect |
-|---|---|
-| Development preview *(default)* | Everything stays off. Gates can reach a policy-gated state but never a true runtime state. |
-| Local single user safe | Conservative local operation. |
-| Local single user runtime | The normal single-user working mode. |
-| Multi user local runtime | Several local principals. |
-| Hosted or networked runtime | Off-machine operation. |
+The only runtime-level control is **Disable agent runtime** (and **Enable** once
+disabled), behind the same step-up dialog every high-risk change uses. Disabling
+really disables: while it is off, no capability can reach a runtime state, and
+the refusal reads `activation_blocked: runtime_mode_not_active`, which now means
+*the agent runtime is disabled* and nothing else.
 
-Activating a mode is governed: it asks for a reason and records the change
-against your principal.
-
-**Why this matters in practice.** With *Development preview* active, turning a
-gate on gets you `enabled_policy_gated`, not `enabled_runtime`. Surfaces that
-check for a true runtime capability — MCP is the clearest example — stay
-disabled and say "enable it in Capabilities", even though you just did. The
-missing piece is the runtime mode, not the gate.
+**This replaced five modes** — Development preview, Local single user safe,
+Local single user runtime, Multi user local runtime, and Hosted or networked
+runtime. They were a fifth answer in front of four that already decided
+everything: the capability's own gate, its threat-model acknowledgement, its
+human confirmation token, and whether a real executor is registered for it.
+Every capability copy that used to send you to a runtime mode now points at
+**Permissions**, because that is where every runtime-level block resolves. If
+you have an older bookmark or a stored audit row naming one of the five, it
+still resolves to the single runtime rather than failing.
 
 ---
 
@@ -111,11 +114,9 @@ Independently of whether a capability is on, each has a decision mode:
 | **Auto** | Runs automatically. |
 | **Deny** | Always refused, whatever the gate says. |
 
-Chat's **Permissions** control is a shortcut over the same audited machinery:
-
-- *Ask every time* → sets eligible capabilities to Ask;
-- *Approve safe actions* → sets eligible capabilities to Auto;
-- *Custom permissions…* → opens this page.
+Expand a capability's row on **Permissions** to change its mode. A change is
+governed like any other: it asks for a reason and is recorded against your
+principal.
 
 There is no unrestricted mode, by design.
 
@@ -126,10 +127,9 @@ There is no unrestricted mode, by design.
 The **approval** pill in the Chat and Build composers is a per-account shared
 composer preference that persists across sessions and both surfaces. It decides
 how the agent presents actions that are already otherwise eligible to run. It is
-separate from the runtime mode, capability gate, and per-capability decision mode
-above: those controls decide
-whether an action may run at all; the composer policy decides whether the user
-is paused for an ordinary eligible action.
+separate from the capability gate and the per-capability decision mode above:
+those controls decide whether an action may run at all; the composer policy
+decides whether the user is paused for an ordinary eligible action.
 
 | Policy | Behaviour |
 |---|---|
@@ -145,8 +145,9 @@ An action rejected by any of those protections remains rejected; Raiker does
 not guess a malformed edit or force an action through.
 
 The selected policy is remembered for later composer sessions. It does not
-change the standing capability configuration in **Permissions**, nor does it
-raise the ceiling set by **Settings → General → Runtime mode**.
+change the standing capability configuration in **Permissions**, and it cannot
+run anything while the agent runtime is disabled in
+**Settings → Runtime configuration**.
 
 ---
 

@@ -5,10 +5,11 @@ import json
 import subprocess
 from pathlib import Path
 
-from raiker.context.gatherer import CAPABILITY_FLAGS, ContextGatherer
+from raiker.context.gatherer import CAPABILITY_GATE_TOOLS, ContextGatherer
 from raiker.review.proposals import generate_action_proposals
 from raiker.review.render import render_json, render_text
 from raiker.review.workflow import CodeReviewWorkflow
+from raiker.storage.sqlite import SQLiteStore
 
 _FORBIDDEN_IMPORTS = {"subprocess", "socket", "requests", "httpx", "urllib", "asyncio"}
 
@@ -134,12 +135,12 @@ def test_review_package_introduces_no_unsafe_runtime_imports() -> None:
                 assert module not in _FORBIDDEN_IMPORTS, source_file
 
 
-def test_disabled_runtime_flags_remain_false(tmp_path: Path) -> None:
+def test_a_review_never_turns_a_capability_gate_on(tmp_path: Path) -> None:
     _init_repo(tmp_path)
     CodeReviewWorkflow().review(workspace_root=tmp_path, propose_fixes=True)
-    item = ContextGatherer()._capability_status(tmp_path)
-    for flag in CAPABILITY_FLAGS:
-        assert item.metadata[flag] is False
+    item = ContextGatherer()._capability_status(tmp_path, SQLiteStore(tmp_path), None)
+    for capability in CAPABILITY_GATE_TOOLS:
+        assert item.metadata[capability]["enabled"] is False  # type: ignore[index]
 
 
 def test_no_apply_or_execute_command_introduced() -> None:

@@ -173,6 +173,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-106 | Medium | Tasks / an approved task is really created | Fixed (was BUG-62) |
 | BUG-63 | Low | Web / a composer permission control ships unused | Open (found while verifying FIXED-105) |
 | BUG-64 | Low | Chat / a task the agent creates is queued for a run nobody asked for | Open (found while verifying FIXED-106) |
+| FIXED-107 | High | Chat / Build — source citations and the passage used | Fixed (was C6 and the last of C4) |
+| FIXED-108 | Medium | Storage / session-keyed rows outliving the conversation | Fixed (found while implementing FIXED-107) |
+| BUG-65 | Low | Export / a transcript keeps citation markers it cannot resolve | Open (found while verifying FIXED-107) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8 complete; 12 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -4569,6 +4572,192 @@ disagreeing.
 
 **UI when closed.** The **Create task** decision names both consequences — the
 row and the run — or approving creates a row that waits for the owner.
+
+---
+
+## FIXED-107 — An answer drawn from the owner's own material named no source
+
+**Status: fixed in this change. Closes GAP-CHAT C6 and the last of C4.**
+
+**Observed.** Chat reads a workspace file, an email, a calendar entry, a fetched
+page, a stored memory or an attached document, and then answers. The transcript
+says nothing about which of them the answer rests on. An answer drawn from a real
+contract and an answer invented whole are the same shape on screen.
+
+**Reproduce.** Attach a document, or ask a question that makes the agent call
+`read_file`. The answer arrives with a correct fact in it and no way to check
+where the fact came from short of re-reading the file yourself.
+
+**Why it is a defect and not a nicety.** Everything else in this product is built
+so a claim can be checked — FIXED-61 exists because a memory that printed
+*"chat — Weekly planning"* and could not open it was *worse* than one that
+claimed nothing. An assistant acting on somebody's actual mail and files owes the
+same. A claim you cannot check reads exactly like a claim you can.
+
+**Root cause.** There was no per-turn record of what a turn read. The broker
+executed the call, the audit trail recorded that it had, and the result went to
+the model — but nothing tied the material to the answer, so no surface could name
+it and the model had no id to cite even if it wanted to.
+
+**Fix applied — a source ledger, and the two claims kept apart.**
+
+* **The ledger is derived from what really ran.** `raiker/runtime/turn_sources.py`
+  turns each executed read call into one `TurnSource` (`source_from_tool_result`),
+  and each attachment the context gatherer really included into another
+  (`attachment_sources`). A failed call, a tool that reads nothing (`update_plan`,
+  `write_file`), and a denied attachment all produce no source, because a citation
+  pointing at a call that produced nothing is worse than no citation.
+* **One source per executed call.** Not per match or per result row. A call is the
+  unit the runtime governed and audited, so it is the unit whose provenance can be
+  stated honestly; `detail` carries the count when a call returned several things.
+* **The model is handed the ids, not asked to invent them.**
+  `RuntimeOrchestrator._cite_result` adds `source_id` and `cite_as` to the tool
+  result the model is about to read, an attachment's marker is printed on the very
+  context block it names, and one standing system message asks for `[s1]` after a
+  sentence that rests on it. The ids are `s1`, `s2`, … per turn, continuing across
+  an approval so a resumed turn does not reuse `s1` for something else.
+* **A marker the ledger does not know is not a citation.** `renderMarkdown` takes
+  an *allowlist* of ids (`apps/web/src/lib/markdown.ts`); anything else stays the
+  characters it is. A model that writes `[s9]`, and a file that happens to contain
+  `[s1]`, both produce plain text — which is what stops a citation being something
+  a model can simply assert.
+* **The ledger is a fact; a citation is a claim.** `SourceChips.svelte` shows every
+  source the turn recorded under the answer, cited or not, and marks — in words as
+  well as colour — the ones the model actually cited. Collapsing the two would be
+  the dishonest version of provenance.
+* **Content is stored, never broadcast.** `turn_sources`
+  (`RAIKER-1038-turn-sources`) keeps each source's bounded `passage`; the streamed
+  `turn_sources_recorded` event carries counts, ids, kinds and tool names only.
+  Titles and passages reach the client solely over
+  `GET /api/sessions/{id}/sources` and the excerpt route, both owner-scoped by the
+  row's own `principal_id`, so another account resolves to an empty list rather
+  than to a refusal that would confirm the conversation exists.
+
+**The last of C4 — opening a source *at the passage used*.** A chip resolves
+through `GET …/sources/{source_id}/excerpt`, and resolution is re-run at read time
+rather than served from what was true at capture:
+
+* An **attachment** goes through the attachment reader, so authorisation is
+  re-checked against this caller now. It opens in the existing inspector with the
+  passage marked.
+* A **workspace file** is re-read and the run located inside it. A file that has
+  since changed answers `source_changed` and is shown *without* a highlight rather
+  than with one near where the passage used to be.
+* **Which part of a whole-file read?** Only the sentence carrying the marker knows,
+  so the client sends it (`sentenceAround`) and `locate_answer_quote` finds the
+  longest run of the answer's *own words* that occurs verbatim in the source.
+  Exact runs only, a floor on fragment length, and nothing scored or approximated:
+  a paraphrase matches nothing and the pane says so. The needle is cleaned of the
+  model's own presentation (the marker, inline emphasis); the haystack is never
+  touched, so nothing can be marked that the source does not literally contain.
+* **Material Raiker holds no second copy of** — a page, an email, a connector
+  response — is shown as the exact text that reached the model, labelled as such.
+* Every outcome is one of the named statuses `source_provenance` already
+  established, so the inspector renders one vocabulary whether a passage was opened
+  from a memory record or from a citation chip.
+
+**Build gets the same account.** Build receives the same markers, so it owed the
+same answer. It has no inspector pane (B13/B14), so a cited source opens *inline*
+under the citation — `SourceExcerptPanel.svelte`, same bounded text, same slicing
+highlight, same named states.
+
+**Found while doing it.** `FileInspector`'s **Open document** offered a link to
+`#/new-chat?session=…` for a *file* source — the pane is already the document, so
+it sent the owner back to the chat they were standing in. The link is now offered
+only for a conversation source, which is the only thing it ever did.
+
+**Deliberately not changed.** A citation is not evidence that the sentence beside
+it was drawn from the source — only the model knows that, and it is asked rather
+than trusted. That is exactly why the whole ledger is shown alongside the markers,
+and why an uncited source is still listed.
+
+**Tests.** [`tests/test_turn_sources.py`](../../tests/test_turn_sources.py) covers
+derivation from real results, the tools that must never become sources, attachment
+inclusion, id ordering across batches, the per-turn bound, owner scoping, the
+client view never carrying a passage, every resolution status, the quote locator
+(including the paraphrase and short-fragment refusals), and retention.
+[`citations.test.ts`](../../apps/web/src/lib/citations.test.ts),
+[`markdown.test.ts`](../../apps/web/src/lib/markdown.test.ts) and
+[`SourceChips.test.ts`](../../apps/web/src/lib/components/SourceChips.test.ts)
+cover the allowlist, the code-span and fence exclusions, the per-render reset, the
+sentence extraction on both sides of a full stop, and the cited/recorded
+distinction.
+
+**Live evidence.** [`e2e/c6-c4-source-citations-live.spec.ts`](../../apps/web/e2e/c6-c4-source-citations-live.spec.ts),
+run against a `raiker-web` on a fresh workspace holding a real Anthropic
+credential entered through the product's own Models page —
+`claude-haiku-4-5-20251001`, seven scenarios, all passing.
+
+| Screenshot | What it shows |
+|---|---|
+| `working/c6-source-ledger-under-answer.png` | the answer with its inline `1` chip, and **SOURCES · contracts/meridian.md** under it |
+| `working/c4-source-opened-at-passage.png` | the chip opening the file at the cited sentence, *Located by matching this answer's own words* |
+| `working/c4-attachment-opened-at-passage.png` | an attached document previewed **and** marked at the passage it contributed |
+| `working/c6-build-source-inline.png` | Build's inline source panel, the same passage marked where Build has no pane |
+| `working/c6-uncited-marker-stays-text.png` | **the property the feature rests on** — a model writing `[s7]` for a source that does not exist produces plain text and no strip |
+
+**UI when closed.** An answer drawn from the owner's material names what it read,
+under the answer and inline where the model cited it, and one click opens that
+source at the words the answer used.
+
+---
+
+## FIXED-108 — A deleted conversation left its plan, its controls and its sources behind
+
+**Status: fixed in this change; found while implementing FIXED-107.**
+
+**Observed.** `SQLiteStore._delete_session_rows` cascades nine tables. Three
+session-keyed tables written after that list — `agent_plans` (B6),
+`turn_controls` (B17/C13) and `turn_sources` (FIXED-107) — were in none of them,
+so deleting a conversation left them in the store.
+
+**Why it matters.** `turn_sources` holds recorded *passages*: real text from the
+owner's files, mail and pages. "Delete this conversation" is a claim the product
+makes to its owner, and a cascade that silently misses the newest content-bearing
+table does not keep it. `agent_plans` and `turn_controls` are smaller — intent and
+a parked stop — but they are equally the conversation's, and a stale plan keyed to
+a dead session id is a resurrection waiting for a reused id.
+
+**Root cause.** The same shape this document keeps recording: two lists that have
+to agree — the tables that are session-keyed, and the tables the cascade names —
+with nothing holding them together. `purge_account` does not have the problem
+because it sweeps `sqlite_master` generically by column name; the per-session
+cascade is hand-written.
+
+**Fix applied.** All three are in the cascade, with a comment saying why the list
+exists. Covered by `tests/test_turn_sources.py::TestRetention`, which asserts the
+ledger and the plan are both gone after `delete_session`.
+
+**Still worth a maintainer decision:** the per-session cascade should probably be
+derived the way `purge_account` derives its sweep, rather than being a list a
+future table has to remember to join.
+
+---
+
+## BUG-65 — An exported transcript keeps citation markers it cannot resolve
+
+**Status: open; found while verifying FIXED-107.**
+
+**Observed.** FIXED-107 makes an answer carry `[s1]` markers, and the transcript
+resolves them against the turn's source ledger. The conversation export
+(FIXED-54, FIXED-19) carries the answer *text*, so an exported Markdown or PDF
+transcript contains `[s1]` with nothing anywhere in the file that says what `s1`
+was.
+
+**Why it matters.** The export is what leaves the machine — it is the copy that
+gets mailed, filed, or read six months later, and it is the copy where "where did
+this come from" is hardest to answer any other way. A marker with no referent is
+worse than no marker: it looks like a citation and resolves to nothing, which is
+exactly the failure mode FIXED-61 and FIXED-107 exist to end.
+
+**Required fix.** The export writes each turn's ledger alongside its answer — a
+numbered source list per turn, carrying title, locator and kind — or it strips the
+markers on the way out. Do not export a citation the document cannot resolve. The
+passage itself should stay behind: an export is a transcript, not a copy of the
+owner's mail.
+
+**UI when closed.** An exported conversation either explains its markers or does
+not carry them.
 
 ---
 

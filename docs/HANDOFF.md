@@ -452,6 +452,18 @@ npm run build     # exit 0
   else. Controls are consumed on read and cleared at the start of each turn, so
   neither can apply twice or leak into the next turn. Both are requested through
   the existing human-only `POST /api/interrupts`.
+- An answer says what it was drawn from (FIXED-107). `raiker/runtime/turn_sources.py`
+  ledgers one `TurnSource` per governed read call that really returned material,
+  and per attachment the context gatherer really included; the model receives the
+  id as a `cite_as` marker (`[s1]`) in the tool result itself. Two invariants make
+  it worth trusting: a source exists because the runtime ran something, never
+  because the model said so, and a marker the ledger does not know renders as
+  plain text rather than as a chip. Passages are stored in `turn_sources`
+  (`RAIKER-1038-turn-sources`) and served only over the session-authorized read
+  routes; the streamed `turn_sources_recorded` event carries counts, ids, kinds
+  and tool names only. Opening a citation re-resolves it *now* — a changed file
+  reports `source_changed` and is shown without a highlight rather than with one
+  near where the passage used to be.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

@@ -597,6 +597,10 @@ class ContextGatherer:
             header + text,
             {
                 "kind": "document",
+                # C4 — the name the owner knows this file by. The citation
+                # ledger labels a chip with it, and a chip labelled with an
+                # opaque attachment id would be provenance nobody can read.
+                "filename": str(record.get("filename") or ""),
                 "media_type": str(record.get("media_type")),
                 "byte_size": int(record.get("byte_size") or 0),
                 "char_length": len(text),

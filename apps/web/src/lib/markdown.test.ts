@@ -207,3 +207,42 @@ describe("markdown — sanitisation", () => {
     expect(html).not.toContain("<b>");
   });
 });
+
+// C6 — citation markers become inert chips, and only for ids the turn's source
+// ledger actually recorded. The point of the allowlist is that a citation is a
+// thing the runtime knows about, never a thing model output can assert.
+describe("citation markers", () => {
+  const ledger = new Set(["s1", "s2"]);
+
+  it("renders a recorded marker as an inert, labelled button", () => {
+    const html = renderMarkdown("Renews in March [s1].", { citations: ledger });
+    expect(html).toContain('data-md-cite="s1"');
+    expect(html).toContain('class="md-cite"');
+    expect(html).toContain('aria-label="Open source 1"');
+    // The renderer emits no handler: Markdown.svelte delegates the click.
+    expect(html).not.toContain("onclick");
+  });
+
+  it("leaves a marker the ledger does not know as the characters it is", () => {
+    const html = renderMarkdown("Invented [s9].", { citations: ledger });
+    expect(html).not.toContain("md-cite");
+    expect(html).toContain("[s9]");
+  });
+
+  it("rewrites nothing at all when no ledger is supplied", () => {
+    expect(renderMarkdown("Plain [s1].")).not.toContain("md-cite");
+  });
+
+  it("does not rewrite a marker inside a code span or a fence", () => {
+    const inline = renderMarkdown("The config reads `[s1]` verbatim.", { citations: ledger });
+    expect(inline).toContain("<code>[s1]</code>");
+    expect(inline).not.toContain("md-cite");
+    const fenced = renderMarkdown("```\n[s1]\n```", { citations: ledger });
+    expect(fenced).not.toContain("md-cite");
+  });
+
+  it("does not leak the allowlist into the next render", () => {
+    renderMarkdown("Cited [s1].", { citations: ledger });
+    expect(renderMarkdown("Cited [s1].")).not.toContain("md-cite");
+  });
+});

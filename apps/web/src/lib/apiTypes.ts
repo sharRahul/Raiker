@@ -1048,8 +1048,47 @@ export interface SourceExcerptView {
   turn_id: string;
   attachment_id: string;
   truncated: boolean;
-  resolution_method: "stored_coordinates" | "matching_text" | "";
+  // How the passage was located. C6/C4 adds three: `answer_quote` (the sentence
+  // carrying the citation found verbatim in the source — the narrowest honest
+  // claim available), `recorded_passage` (material Raiker holds no second copy
+  // of, shown as the exact text that reached the model), and `whole_source`
+  // (the turn read all of it, so marking every character would say nothing).
+  resolution_method:
+    | "stored_coordinates"
+    | "matching_text"
+    | "answer_quote"
+    | "recorded_passage"
+    | "whole_source"
+    | "";
 }
+
+// C6/C4 — raiker/runtime/turn_sources.py TurnSource.to_view(). One thing a turn
+// actually read: a governed tool result, or a file the owner attached. Labels
+// and locators only — the passage behind a source is fetched on open, so a
+// history load never carries a transcript's worth of read material.
+export interface TurnSourceView {
+  source_id: string; // "s1", "s2", … — the marker the model was handed
+  ordinal: number;
+  kind: string; // file | attachment | email | calendar | web | memory | …
+  title: string;
+  locator: string;
+  tool_name: string;
+  detail: string;
+  attachment_id: string;
+  turn_id: string;
+  openable: boolean;
+}
+
+// GET /api/sessions/{id}/sources
+export interface TurnSourcesView {
+  session_id: string;
+  sources: TurnSourceView[];
+}
+
+// GET /api/sessions/{id}/turns/{turn}/sources/{source}/excerpt — the source view
+// above plus the resolved passage, in the same shape (and with the same honest
+// statuses) as SourceExcerptView.
+export type TurnSourceExcerptView = TurnSourceView & SourceExcerptView & { ok: boolean };
 
 // GET /api/sessions/{id}/attachments — metadata only, so a reloaded chat can
 // redraw the attachment chips its transcript does not persist.

@@ -77,11 +77,57 @@ const BLOCK_MARKERS = {
   listItem: /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(.*)$/,
 };
 
+/**
+ * C6 — the citation ids this render is allowed to turn into chips.
+ *
+ * Module-scoped because `renderInline` is reached from a dozen block emitters
+ * and threading an option through all of them would be worse than one variable
+ * a single synchronous pass sets and clears. It is an *allowlist*, never a
+ * pattern: only an id the turn's source ledger actually recorded becomes a
+ * button, so a `[s1]` that a model invented — or that happened to be sitting in
+ * a file it read back — stays the literal characters it was.
+ */
+let activeCitations: ReadonlySet<string> = new Set();
+
+/** A citation marker: `[s1]`. The digits are bounded so the scan cannot run away. */
+const CITATION_RE = /\[(s\d{1,3})\]/g;
+
+export interface MarkdownOptions {
+  /** Source ids that may render as clickable chips. Anything else stays text. */
+  citations?: ReadonlySet<string>;
+}
+
 /** Render a Markdown document to a safe HTML fragment. */
-export function renderMarkdown(source: string): string {
+export function renderMarkdown(source: string, options: MarkdownOptions = {}): string {
   if (source.trim() === "") return "";
   const lines = source.replace(/\r\n?/g, "\n").replace(/\t/g, "    ").split("\n");
-  return renderBlocks(lines);
+  activeCitations = options.citations ?? new Set();
+  try {
+    return renderBlocks(lines);
+  } finally {
+    activeCitations = new Set();
+  }
+}
+
+/**
+ * Turn recognised `[s1]` markers into inert citation buttons.
+ *
+ * Runs on text that has already been escaped, so nothing here can widen the
+ * closed tag set: the only attributes emitted are a fixed `class`, `type`, a
+ * `data-md-cite` carrying an id that matched `^s\d{1,3}$`, and an accessible
+ * name built from that same id. The button has no handler of its own —
+ * `Markdown.svelte` delegates the click, exactly as it does for code copy.
+ */
+function renderCitations(text: string): string {
+  if (activeCitations.size === 0) return text;
+  return text.replace(CITATION_RE, (whole, id: string) => {
+    if (!activeCitations.has(id)) return whole;
+    const label = id.slice(1);
+    return (
+      `<button type="button" class="md-cite" data-md-cite="${id}" ` +
+      `aria-label="Open source ${label}" title="Open source ${label}">${label}</button>`
+    );
+  });
 }
 
 function renderBlocks(lines: string[]): string {
@@ -413,6 +459,10 @@ export function renderInline(source: string): string {
   });
 
   text = applyEmphasis(text);
+
+  // 5. Citation markers, last: by now code spans and links are placeholders, so
+  // a `[s1]` inside either cannot be rewritten — only prose is scanned.
+  text = renderCitations(text);
 
   return text.replace(PLACEHOLDER_RE, (_whole, index: string) => tokens[Number(index)] ?? "");
 }

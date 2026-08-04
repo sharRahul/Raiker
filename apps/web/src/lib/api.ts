@@ -69,6 +69,8 @@ import type {
   TaskView,
   TranscriptExportManifest,
   TurnDetail,
+  TurnSourceExcerptView,
+  TurnSourcesView,
   UploadedAttachment,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
@@ -564,6 +566,23 @@ export const api = {
   attachmentProvenance: (sessionId: string, attachmentId: string) =>
     request<SourceExcerptView>(
       `/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/provenance`,
+    ),
+  // C6 — what the turns in this conversation actually read. Labels and
+  // locators only; the material behind a chip is fetched when it is opened.
+  sessionSources: (sessionId: string) =>
+    request<TurnSourcesView>(`/api/sessions/${encodeURIComponent(sessionId)}/sources`),
+  // C4 — one cited source, opened at the passage the turn used. Resolution is
+  // re-run now, so a changed or unreadable source says so instead of showing a
+  // passage that is no longer there.
+  // `quote` is the answer sentence an inline marker terminated, when there is
+  // one: it locates the run inside a source the turn read whole.
+  turnSourceExcerpt: (sessionId: string, turnId: string, sourceId: string, quote = "") =>
+    request<TurnSourceExcerptView>(
+      withQuery(
+        `/api/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}` +
+          `/sources/${encodeURIComponent(sourceId)}/excerpt`,
+        quote === "" ? {} : { quote },
+      ),
     ),
   // BUG-27 — the passage a memory was drawn from. Every non-resolvable case
   // comes back as a named status rather than an error.

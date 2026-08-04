@@ -2318,3 +2318,46 @@ CREATE TABLE IF NOT EXISTS turn_controls (
   PRIMARY KEY (session_id, principal_id)
 );
 """
+
+
+# C6 / C4 — where a turn's answer came from.
+#
+# A turn that reads an email, a calendar entry, a web page or an attached
+# document produced an answer with nothing in the transcript naming the material
+# behind it. The owner was asked to trust a claim they could not check, which is
+# exactly the provenance failure `source_provenance.py` was written to end for
+# memory records.
+#
+# One row per source a turn actually used, in the order the turn used it. The
+# ids (`s1`, `s2`, …) are what the model is handed as `cite_as` markers and what
+# the transcript renders as clickable chips, so this table is the single place
+# the citation vocabulary is defined — a chip that names `s2` and a marker the
+# model wrote as `[s2]` resolve to the same row or to nothing at all.
+#
+# `passage` is the bounded text the source contributed. It is stored because
+# opening a source *at the passage that was used* (C4) needs the text that was
+# used, and re-running the tool later would answer a different question. It is
+# never written to the durable event log: the streamed record is counts and
+# tool names, and the passage is served only over the session-authorized read
+# route, to the account that owns the conversation.
+TURN_SOURCES_MIGRATION_ID = "RAIKER-1038-turn-sources"
+TURN_SOURCES_SQL = """
+CREATE TABLE IF NOT EXISTS turn_sources (
+  session_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  principal_id TEXT NOT NULL,
+  ordinal INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  locator TEXT NOT NULL DEFAULT '',
+  tool_name TEXT NOT NULL DEFAULT '',
+  detail TEXT NOT NULL DEFAULT '',
+  attachment_id TEXT NOT NULL DEFAULT '',
+  passage TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (session_id, turn_id, source_id)
+);
+CREATE INDEX IF NOT EXISTS idx_turn_sources_turn
+  ON turn_sources(session_id, turn_id, ordinal);
+"""

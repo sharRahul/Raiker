@@ -30,6 +30,8 @@
   import RepoConnector from "../components/RepoConnector.svelte";
   import PlanChecklist from "../components/PlanChecklist.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
+  import SourceChips from "../components/SourceChips.svelte";
+  import SourceExcerptPanel from "../components/SourceExcerptPanel.svelte";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
   import {
     alreadyResumedElsewhere,
@@ -46,6 +48,8 @@
     ContextUsage,
     ProjectsList,
     StreamEvent,
+    TurnSourceExcerptView,
+    TurnSourceView,
   } from "../apiTypes";
   import {
     BUILD_MODES,
@@ -69,6 +73,12 @@
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
   import { thinkingSteps } from "../chatPresentation";
+  import {
+    citedSourceIds,
+    renderableCitations,
+    sentenceAround,
+    sourcesForTurn,
+  } from "../citations";
   import { chatProfiles, refreshModels } from "../models.svelte";
 
   let {
@@ -124,6 +134,73 @@
         4,
     ),
   );
+
+  // ── C6/C4: the turn source ledger ─────────────────────────────────────────
+  //
+  // Build reads the same material Chat does and receives the same `cite_as`
+  // markers, so it owes the same account of where an answer came from. Build has
+  // no inspector pane (B13/B14), so a cited source opens inline, under the
+  // answer that cited it, rather than in a pane that does not exist.
+  let turnSources = $state<TurnSourceView[]>([]);
+  // Which source is open, as (turn, id): ids restart at `s1` in every turn, so
+  // the id alone would open the panel under every turn that happens to have one.
+  let openSourceId = $state<string | null>(null);
+  let openSourceTurnId = $state<string | null>(null);
+  let openSource = $state<TurnSourceExcerptView | null>(null);
+  let openSourceLoading = $state(false);
+
+  async function refreshTurnSources(id: string) {
+    try {
+      turnSources = (await api.sessionSources(id)).sources;
+    } catch {
+      // Provenance for an answer that already arrived: losing it must not cost
+      // the transcript, so the chips simply do not appear.
+      turnSources = [];
+    }
+  }
+
+  function closeSource() {
+    openSourceId = null;
+    openSourceTurnId = null;
+    openSource = null;
+    openSourceLoading = false;
+  }
+
+  function isOpen(source: TurnSourceView): boolean {
+    return openSourceId === source.source_id && openSourceTurnId === source.turn_id;
+  }
+
+  async function showSource(source: TurnSourceView, quote = "") {
+    if (sessionId === null || !source.openable) return;
+    if (isOpen(source)) {
+      closeSource();
+      return;
+    }
+    openSourceId = source.source_id;
+    openSourceTurnId = source.turn_id;
+    openSource = null;
+    openSourceLoading = true;
+    try {
+      const resolved = await api.turnSourceExcerpt(sessionId, source.turn_id, source.source_id, quote);
+      if (isOpen(source)) openSource = resolved;
+    } catch {
+      if (isOpen(source)) openSource = null;
+    } finally {
+      if (isOpen(source)) openSourceLoading = false;
+    }
+  }
+
+  /**
+   * A `[s1]` chip inside the answer opens the same source the strip does — and,
+   * unlike the strip, it knows which sentence rests on it, so the panel can open
+   * at that part of the source rather than at the whole of it.
+   */
+  function showSourceById(turnId: string, sourceId: string, answer: string) {
+    const match = turnSources.find(
+      (source) => source.turn_id === turnId && source.source_id === sourceId,
+    );
+    if (match !== undefined) void showSource(match, sentenceAround(answer, sourceId));
+  }
 
   async function refreshContextUsage() {
     if (sessionId === null) {
@@ -377,6 +454,9 @@
           if (event.kind === "final" && event.response !== null) {
             turn.response = event.response;
             sessionId = event.response.session_id;
+            // C6 — the citation markers this answer just wrote need the ledger
+            // they resolve against, so it is refreshed with the turn.
+            void refreshTurnSources(event.response.session_id);
             if (contextOpen) void refreshContextUsage();
             if (plan === null) void loadPlan();
             window.dispatchEvent(new Event("raiker:chats-changed"));
@@ -439,6 +519,7 @@
           turn.response = event.response;
           turn.resumeState = null;
           turn.resumeNote = null;
+          void refreshTurnSources(event.response.session_id);
           if (contextOpen) void refreshContextUsage();
           void loadApprovals();
         } else {
@@ -763,6 +844,7 @@
       {#each turns as turn (turn.id)}
         {@const answer = answerText(turn)}
         {@const thinking = thinkingSteps(turn.events)}
+        {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
         <article class="turn">
           <div class="user-message">
             <div class="from-you">
@@ -830,7 +912,15 @@
             {/if}
 
             {#if answer !== ""}
-              <div class="answer"><Markdown text={answer} /></div>
+              <div class="answer">
+                <!-- C6 — `[s1]` becomes a chip only when this turn's ledger has
+                     an s1. A marker the model invented stays literal text. -->
+                <Markdown
+                  text={answer}
+                  citations={renderableCitations(turnSourceList)}
+                  oncite={(sourceId) => showSourceById(turn.response?.turn_id ?? "", sourceId, answer)}
+                />
+              </div>
               {#if !turn.streaming}
                 <!-- Parity with Chat: the same glyph, the same behaviour, so a
                      response reads the same way in either conversation. -->
@@ -845,6 +935,25 @@
               {/if}
             {:else if !turn.streaming && turn.error === null && turn.response !== null}
               <div class="answer"><p class="bubble-text muted">(No answer text was returned.)</p></div>
+            {/if}
+
+            <!-- C6 — everything this turn actually read, under the answer that
+                 used it, and C4 — the passage it used, opened where the citation
+                 is rather than in a pane Build does not have yet. -->
+            {#if !turn.streaming && turnSourceList.length > 0}
+              <SourceChips
+                sources={turnSourceList}
+                citedIds={citedSourceIds(answer, turnSourceList)}
+                openSourceId={openSourceTurnId === turn.response?.turn_id ? openSourceId : null}
+                onopen={(source) => void showSource(source, sentenceAround(answer, source.source_id))}
+              />
+              {#if openSourceId !== null && openSourceTurnId === turn.response?.turn_id}
+                <SourceExcerptPanel
+                  source={openSource}
+                  loading={openSourceLoading}
+                  onclose={closeSource}
+                />
+              {/if}
             {/if}
 
             {#if copyNotice !== null}<p class="error" role="alert">{copyNotice}</p>{/if}

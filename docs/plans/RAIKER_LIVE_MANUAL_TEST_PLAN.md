@@ -29,6 +29,7 @@ the repository, so the promise each one made is restated here:
 | Adaptive navigation | phone/tablet/desktop navigation | §9 |
 | Conversational Chat | bubbles, streaming labels, no governance metadata in Chat | §5 |
 | Chat composer and file inspector | configured-model selector, context meter, permission control, file inspector | §5.4–5.6 |
+| Chat source citations | what an answer read, and opening it at the passage used | §5.8 |
 | Chat tasks and project assignment | governed `create_task` / `assign_session_project` | §7 |
 
 The composer and task designs both carried implementation notes stating that the
@@ -232,6 +233,26 @@ export or print actions. When a governed chat turn creates a supported file,
 Raiker stores a validated owner-scoped preview copy and adds a chip to that
 turn; selecting it opens the read-only file inspector beside the conversation.
 Unsupported files are not exposed as generic workspace downloads. FIXED-19.
+
+### 5.8 Source citations (FIXED-107 — GAP-CHAT C6, C4)
+
+Verified on **2026-08-04** against hosted Anthropic `claude-haiku-4-5-20251001`,
+driven end to end by
+[`e2e/c6-c4-source-citations-live.spec.ts`](../../apps/web/e2e/c6-c4-source-citations-live.spec.ts).
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 5.8.1 | Put a file in the workspace, then ask Chat to read it and cite the source | The answer carries an inline numbered chip, and a **SOURCES** strip under it names the file | ✅ `c6-source-ledger-under-answer.png` |
+| 5.8.2 | Click the inline chip | The inspector opens the file with the cited sentence marked, labelled *Located by matching this answer's own words* | ✅ `c4-source-opened-at-passage.png` |
+| 5.8.3 | Click the same source in the **SOURCES** strip | The same file, marked at the same passage — which control was used does not change what is shown | ✅ |
+| 5.8.4 | Attach a document, ask a question it answers, then open its chip | The document previews **and** the passage it contributed is marked | ✅ `c4-attachment-opened-at-passage.png` |
+| 5.8.5 | Repeat 5.8.1 in **Build** | The same strip, with the passage opening inline (Build has no inspector pane — B13/B14) | ✅ `c6-build-source-inline.png` |
+| 5.8.6 | Ask for a reply containing `[s7]` with no tool call | The marker stays plain text, no strip appears — a citation is what the runtime recorded, never what the model asserts | ✅ `c6-uncited-marker-stays-text.png` |
+
+**What is deliberately *not* claimed.** A citation says the turn had that
+material in front of it. It does not prove the sentence beside it was drawn from
+that material. That is why the strip lists every source the turn read, cited or
+not, and marks only the ones the model itself cited.
 
 ---
 

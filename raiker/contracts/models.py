@@ -88,6 +88,12 @@ EVENT_TYPES = {
     # silent about a call the model asked for and never got. Tool name and
     # governed reason codes only; no arguments and no workspace content.
     "model_tool_call_refused",
+    # C6/C4 — the material this turn read, ledgered so the answer can name it.
+    # Metadata only: how many sources were recorded, their ids, their kinds and
+    # the tools that produced them. The titles the transcript renders and the
+    # passages the inspector opens are content and stay in the encrypted store,
+    # served only over the session-authorized read route.
+    "turn_sources_recorded",
     "action_proposed",
     "action_validated",
     "policy_decision",

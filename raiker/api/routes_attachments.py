@@ -322,6 +322,79 @@ def download_attachment(
     )
 
 
+# ── Turn sources (C6/C4: what the answer was drawn from) ────────────────────
+#
+# The same 404-for-everything-you-may-not-see rule as the preview routes above,
+# and the same authorization shape: a source row is keyed by the owner
+# principal, so another account's conversation resolves to an empty list rather
+# than to a refusal that would confirm the conversation exists.
+
+
+@router.get("/api/sessions/{session_id}/sources")
+def list_session_sources(
+    session_id: str,
+    request: Request,
+    turn_id: str = "",
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """What this conversation's turns actually read (C6).
+
+    Labels and locators, never passages: a transcript redraws its provenance
+    chips from this, and the material behind a chip is fetched only when the
+    owner opens one.
+    """
+    from raiker.runtime.turn_sources import load_sources
+
+    store = SQLiteStore(_ws(request))
+    sources = load_sources(
+        store, session_id, auth_data[0].principal_id, turn_id or None
+    )
+    return {
+        "session_id": session_id,
+        "sources": [source.to_view() for source in sources],
+    }
+
+
+@router.get("/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt")
+def get_turn_source_excerpt(
+    session_id: str,
+    turn_id: str,
+    source_id: str,
+    request: Request,
+    quote: str = "",
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Open one cited source at the passage the turn used (C4).
+
+    Resolution is re-run now rather than served from what was true at capture
+    time: a file that has since changed answers ``source_changed``, an
+    attachment this account may no longer read answers ``not_authorized``, and
+    neither is dressed up as the passage it used to be.
+
+    ``quote`` is the answer sentence the citation marker terminated, when the
+    caller opened this from an inline marker rather than from the strip. It
+    locates the run inside a source the turn read whole, and it is used for
+    exactly one thing — finding an offset — so a caller cannot use it to read
+    anything the source does not already contain.
+    """
+    from raiker.runtime.turn_sources import load_source, resolve_source_excerpt
+
+    store = SQLiteStore(_ws(request))
+    owner_id = auth_data[0].principal_id
+    source = load_source(store, session_id, turn_id, source_id, owner_id)
+    if source is None:
+        raise _not_found("turn_source_not_found")
+    excerpt = resolve_source_excerpt(
+        store,
+        workspace_root=_ws(request),
+        source=source,
+        session_id=session_id,
+        owner_principal_id=owner_id,
+        quote=quote,
+    )
+    return {"ok": True, **source.to_view(), **excerpt}
+
+
 def _download_filename(filename: str) -> str:
     """A safe, path-free name for a downloaded file.
 

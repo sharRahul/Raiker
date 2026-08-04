@@ -95,7 +95,7 @@ class SourceExcerpt:
         }
 
 
-def _normalise(text: str) -> str:
+def normalise_whitespace(text: str) -> str:
     """Collapse whitespace so a passage matches across re-wrapping."""
     return re.sub(r"\s+", " ", text).strip()
 
@@ -111,7 +111,7 @@ def locate_passage(source: str, passage: str) -> tuple[int, int]:
     if not source or not passage:
         return (-1, 0)
 
-    needle = _normalise(passage).lower()
+    needle = normalise_whitespace(passage).lower()
     if not needle:
         return (-1, 0)
 

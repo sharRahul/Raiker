@@ -63,6 +63,8 @@ that proves it, what is missing, and the concrete work.
 | C1 | BUILD | TIER 0 | Done |
 | C2 | BUILD | TIER 0 | Complete |
 | C3 | BUILD | TIER 0 | Done |
+| C4 | CHAT | TIER 1 | Complete |
+| C6 | CHAT | TIER 1 | Done |
 | C7 | BUILD | TIER 0 | Done |
 | C8 | BUILD | TIER 0 | Done |
 | C13 | BUILD | TIER 0 | Done |
@@ -380,15 +382,17 @@ remembering.
 
 ### Tier 1 — working with the owner's material
 
-**C4. File inspector — done for attachments and generated files.** FIXED-10
+**C4. File inspector.** ✅ **Complete — see FIXED-107.** FIXED-10
 shipped the first two tasks of the chat file inspector: chips are buttons and
 open a session-authorized, view-only pane, reusing the sanitising renderer from
 FIXED-06 for the Markdown case. FIXED-19 and FIXED-20 record a supported,
 newly generated file against its exact session and turn so it uses that same
 pane. FIXED-45 revalidated uploaded and newly generated files across supported,
-unsupported, unavailable, cross-account, and cross-session cases. **Remaining
-work:** an assistant that reads a document should also be able to show and
-highlight *the passage it used*.
+unsupported, unavailable, cross-account, and cross-session cases. The last of it
+— *showing and highlighting the passage the assistant used* — landed with C6: a
+citation chip opens the source **at the run the citing sentence rests on**,
+located by exact match against the source's own text, and every case that cannot
+be located says which one it is instead of marking something near it.
 
 **C5. Chat file output — done.** FIXED-19 keeps per-response copy but removes
 per-chat Markdown download and browser print/Save as PDF. Generated artifacts
@@ -397,11 +401,14 @@ download surface; FIXED-20/FIXED-22 preserve artifacts once without automatic
 deletion. FIXED-45 adds the response-linked generated-document card and explicit
 preview action.
 
-**C6. No citations on tool-derived answers.** When an answer comes from an
-email, a calendar entry or an attached document, the transcript does not say
-which one. For an assistant acting on the owner's real data this is a
-correctness feature, not a nicety. **Work:** carry source ids through the tool
-result into the response and render an inline, clickable provenance chip.
+**C6. No citations on tool-derived answers.** ✅ **Done — see FIXED-107.** Every
+governed call that really returned material, and every file the owner attached,
+enters a per-turn **source ledger** and is handed to the model as a `cite_as`
+marker (`[s1]`). The transcript shows the ledger under the answer as clickable
+provenance chips, and a marker the model wrote inside the answer renders as the
+same chip inline. The two claims are kept apart on purpose: the ledger is a fact
+the runtime recorded, a citation is the model's claim about which sentence rests
+on it, and a marker the ledger does not know stays the characters it is.
 
 **C7. No web access.** ✅ **Done — as B12 (FIXED-101).** `web_fetch` and
 `web_search` are callable in Chat under the same gate, decision mode, egress
@@ -463,7 +470,10 @@ read-back.
 
 **C17. Recall is invisible.** Once C3 lands, the owner must be able to see what
 was remembered, why it was injected, and correct or forget it inline. The
-Memory route exists for management; the *moment of use* is in Chat.
+Memory route exists for management; the *moment of use* is in Chat. C6 has since
+closed the *reading* half for one class of recall — a `memory_search` that really
+returned rows is a citable source like any other — but correcting or forgetting a
+memory from the transcript is still only available on the Memory route.
 
 **C18. No cross-chat surface.** Chat search covers titles and message text only.
 There is no "what am I working on", no cross-project view, no resumption of the
@@ -474,8 +484,9 @@ threads a routine is advancing.
 C1 and C2 make Chat capable of work — C1's blocking half has landed (FIXED-08),
 leaving document output; C3 makes it feel like it knows the owner;
 C10/C11 make it present when the owner is not watching. C4–C6 and C13–C15 are
-the daily-use polish that determines whether any of it gets used; **C7 and C13
-have landed** — Chat can look something up instead of guessing, and a turn can be
+the daily-use polish that determines whether any of it gets used; **C4, C6, C7
+and C13 have landed** — an answer says what it was drawn from and opens it at the
+passage used, Chat can look something up instead of guessing, and a turn can be
 stopped or steered while it runs. C2, C3(3), C10 and C12 are owner policy
 decisions before they are implementation tasks.
 

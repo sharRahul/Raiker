@@ -76,6 +76,29 @@ an error. Authorisation is re-checked against the caller at read time — owning
 memory is not owning its source — and `not_authorized` reveals nothing about
 whether the source exists.
 
+`GET /api/sessions/{session_id}/sources` lists what the turns in one
+conversation actually read — one entry per governed read call that returned
+material, and per file the owner attached — carrying `source_id` (`s1`, `s2`, …,
+the marker the model was handed), `kind`, `title`, `locator`, `tool_name`,
+`detail`, `turn_id` and `openable`. It never carries the passage: a history load
+must not ship a transcript's worth of read material. Optional `turn_id` narrows
+it to one turn. Scoping is the row's own `principal_id`, so another account's
+conversation answers an empty list rather than a refusal that would confirm it
+exists.
+
+`GET /api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt`
+opens one of them at the passage that was used, answering in the same shape and
+with the same `status` contract as the two provenance routes above.
+`resolution_method` adds three values here: `answer_quote` when the optional
+`quote` parameter — the answer sentence the citation marker terminated — was
+found verbatim in the source and that run is marked; `whole_source` when the
+turn read all of it, so marking every character would say nothing; and
+`recorded_passage` for material Raiker holds no second copy of (a fetched page,
+an email), shown as the exact text that reached the model. `quote` is used for
+one thing only, finding an offset, so it can never surface text the source does
+not already contain — and a paraphrase that matches nothing yields no highlight
+rather than a confident mark in the wrong place.
+
 The skill routes (`GET|POST /api/skills`, `POST /api/skills/verify`,
 `POST /api/skills/import`, `POST /api/skills/build`,
 `GET /api/skills/{skill_id}/download`, `PUT /api/skills/{skill_id}`,

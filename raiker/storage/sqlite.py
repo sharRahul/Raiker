@@ -280,6 +280,8 @@ from raiker.storage.migrations import (
     THREAT_MODEL_ACKS_SQL,
     TURN_CONTROLS_MIGRATION_ID,
     TURN_CONTROLS_SQL,
+    TURN_SOURCES_MIGRATION_ID,
+    TURN_SOURCES_SQL,
 )
 
 # SQLCipher performs its key derivation when a connection is opened. API routes
@@ -901,6 +903,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(SKILLS_MIGRATION_ID, SKILLS_SQL, connection)
             self._apply_migration(AGENT_PLANS_MIGRATION_ID, AGENT_PLANS_SQL, connection)
             self._apply_migration(TURN_CONTROLS_MIGRATION_ID, TURN_CONTROLS_SQL, connection)
+            self._apply_migration(TURN_SOURCES_MIGRATION_ID, TURN_SOURCES_SQL, connection)
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -2899,6 +2902,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         for table in (
             "events_index", "tool_actions", "checkpoints", "tasks", "turns",
             "model_session_state", "model_fallback_sequence", "model_advisor", "session_tags",
+            # Session-keyed rows added after this cascade was written, each of
+            # which holds conversation content or state that must not outlive the
+            # conversation: the source ledger and its recorded passages (C6/C4),
+            # the agent's standing plan (B6), and any parked stop/steer (B17/C13).
+            "turn_sources", "agent_plans", "turn_controls",
         ):
             connection.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
         connection.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
@@ -3280,6 +3288,83 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (session_id, principal_id),
             )
             return cursor.rowcount > 0
+
+    # ── turn sources (C6/C4 — where a turn's answer came from) ───────────────
+
+    def record_turn_sources(
+        self, *, session_id: str, turn_id: str, principal_id: str, rows: list[dict[str, Any]]
+    ) -> None:
+        """Append this turn's newly used sources, keeping the order they arrived.
+
+        ``INSERT OR IGNORE`` rather than ``REPLACE``: a source id is assigned
+        once per turn and a re-run of the same turn (a resumed one, say) must
+        not rewrite the row a chip is already pointing at.
+        """
+        if not rows:
+            return
+        now = utc_now()
+        with self.connect() as connection:
+            connection.executemany(
+                """INSERT OR IGNORE INTO turn_sources
+                   (session_id, turn_id, source_id, principal_id, ordinal, kind, title,
+                    locator, tool_name, detail, attachment_id, passage, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                [
+                    (
+                        session_id,
+                        turn_id,
+                        str(row["source_id"]),
+                        principal_id,
+                        int(row["ordinal"]),
+                        str(row.get("kind", "")),
+                        str(row.get("title", "")),
+                        str(row.get("locator", "")),
+                        str(row.get("tool_name", "")),
+                        str(row.get("detail", "")),
+                        str(row.get("attachment_id", "")),
+                        str(row.get("passage", "")),
+                        now,
+                    )
+                    for row in rows
+                ],
+            )
+
+    def count_turn_sources(self, session_id: str, turn_id: str, principal_id: str) -> int:
+        """How many sources this turn has already recorded, for the next id."""
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT COUNT(*) AS n FROM turn_sources "
+                "WHERE session_id = ? AND turn_id = ? AND principal_id = ?",
+                (session_id, turn_id, principal_id),
+            ).fetchone()
+        return int(row["n"]) if row is not None else 0
+
+    def load_turn_sources(
+        self, session_id: str, principal_id: str, turn_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """This conversation's recorded sources. Owner-scoped: never cross-account."""
+        query = (
+            "SELECT * FROM turn_sources WHERE session_id = ? AND principal_id = ?"
+        )
+        params: list[Any] = [session_id, principal_id]
+        if turn_id:
+            query += " AND turn_id = ?"
+            params.append(turn_id)
+        query += " ORDER BY created_at ASC, ordinal ASC"
+        with self.connect() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [dict(row) for row in rows]
+
+    def load_turn_source(
+        self, session_id: str, turn_id: str, source_id: str, principal_id: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM turn_sources WHERE session_id = ? AND turn_id = ? "
+                "AND source_id = ? AND principal_id = ?",
+                (session_id, turn_id, source_id, principal_id),
+            ).fetchone()
+        return dict(row) if row is not None else None
 
     # ── turn controls (B17/C13 — stop or steer a turn that is running) ───────
 

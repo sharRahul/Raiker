@@ -29,6 +29,7 @@
     SessionDetail,
     SourceExcerptView,
     StreamEvent,
+    TurnSourceView,
   } from "../apiTypes";
   import AttachmentCard from "../components/AttachmentCard.svelte";
   import ComposerAttach from "../components/ComposerAttach.svelte";
@@ -36,12 +37,19 @@
   import ComposerChips from "../components/ComposerChips.svelte";
   import PlanChecklist from "../components/PlanChecklist.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
+  import SourceChips from "../components/SourceChips.svelte";
   import TurnControl from "../components/TurnControl.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
   import { humanize, relativeTime } from "../format";
   import { hasSteps, planFromEvent } from "../agentPlan";
   import { reactionForPrompt, refusedCalls, thinkingSteps } from "../chatPresentation";
+  import {
+    citedSourceIds,
+    renderableCitations,
+    sentenceAround,
+    sourcesForTurn,
+  } from "../citations";
   import { chatProfiles, refreshModels } from "../models.svelte";
 
   interface ChatTurn {
@@ -257,6 +265,8 @@
     previewLoading = false;
     inspectorSource = null;
     sourceLoading = false;
+    openSourceId = null;
+    openSourceTurnId = null;
     downloadState = "idle";
     downloadError = null;
   }
@@ -266,6 +276,88 @@
   // the file was written.
   let inspectorSource = $state<SourceExcerptView | null>(null);
   let sourceLoading = $state(false);
+
+  // ── C6/C4: the turn source ledger ─────────────────────────────────────────
+  //
+  // What each turn in this conversation actually read. Fetched as labels only —
+  // opening a chip is what fetches the passage behind it — and refreshed
+  // whenever a turn lands, so a citation the model just wrote has something to
+  // resolve against by the time the answer finishes rendering.
+  let turnSources = $state<TurnSourceView[]>([]);
+  // Which source is open, as (turn, id): ids restart at `s1` in every turn, so
+  // the id alone would mark a chip open under every turn that happens to have one.
+  let openSourceId = $state<string | null>(null);
+  let openSourceTurnId = $state<string | null>(null);
+
+  async function refreshTurnSources(id: string) {
+    try {
+      turnSources = (await api.sessionSources(id)).sources;
+    } catch {
+      // The ledger is provenance for an answer that already arrived. Losing it
+      // must not cost the transcript, so the chips simply do not appear.
+      turnSources = [];
+    }
+  }
+
+  /**
+   * Open one cited source at the passage the turn used (C4).
+   *
+   * An attachment is opened in the file pane *and* marked at its passage, so
+   * "which document" and "which part of it" are the same action. Everything
+   * else — a web page, an email, a connector response — has no second copy on
+   * this machine, so what is shown is the exact text that reached the model.
+   */
+  async function openSource(source: TurnSourceView, quote = "") {
+    if (sessionId === null || !source.openable) return;
+    const opened = sessionId;
+    openSourceId = source.source_id;
+    openSourceTurnId = source.turn_id;
+    if (source.attachment_id !== "") {
+      await openInspector(source.attachment_id, source.title);
+    } else {
+      releaseObjectUrl();
+      inspecting = { attachmentId: "", filename: source.title };
+      preview = null;
+      previewError = null;
+      previewLoading = false;
+    }
+    inspectorSource = null;
+    sourceLoading = true;
+    try {
+      const resolved = await api.turnSourceExcerpt(opened, source.turn_id, source.source_id, quote);
+      if (openSourceId === source.source_id) inspectorSource = resolved;
+    } catch {
+      if (openSourceId === source.source_id) {
+        inspectorSource = {
+          status: "source_deleted",
+          kind: source.kind,
+          title: source.title,
+          excerpt: "",
+          highlight_start: -1,
+          highlight_length: 0,
+          session_id: opened,
+          turn_id: source.turn_id,
+          attachment_id: source.attachment_id,
+          truncated: false,
+          resolution_method: "",
+        };
+      }
+    } finally {
+      if (openSourceId === source.source_id) sourceLoading = false;
+    }
+  }
+
+  /**
+   * A `[s1]` chip inside the answer opens the same source the strip does — and,
+   * unlike the strip, it knows which sentence rests on it, so the pane can open
+   * at that part of the source rather than at the whole of it.
+   */
+  function openSourceById(turnId: string, sourceId: string, answer: string) {
+    const match = turnSources.find(
+      (source) => source.turn_id === turnId && source.source_id === sourceId,
+    );
+    if (match !== undefined) void openSource(match, sentenceAround(answer, sourceId));
+  }
 
   async function openGeneratedFile(attachmentId: string, label: string) {
     await openInspector(attachmentId, label);
@@ -401,6 +493,7 @@
       turns = detail.turns.map((t) => restoredTurn(t, id, parked.get(t.turn_id)));
       nextId = turns.length + 1;
       await restoreAttachmentChips(id);
+      await refreshTurnSources(id);
       void scrollToEnd();
     } catch (e) {
       historyError =
@@ -551,6 +644,9 @@
             // chips here makes the generated file immediately openable in the
             // existing right-hand inspector, without exposing the workspace.
             void restoreAttachmentChips(event.response.session_id);
+            // C6 — the citation markers this answer just wrote need the ledger
+            // they resolve against, so it is refreshed with the turn.
+            void refreshTurnSources(event.response.session_id);
             if (contextOpen) void refreshContextUsage();
             if (plan === null) void loadPlan();
             window.dispatchEvent(new Event("raiker:chats-changed"));
@@ -731,6 +827,7 @@
           turn.resumeState = null;
           turn.resumeNote = null;
           void restoreAttachmentChips(event.response.session_id);
+          void refreshTurnSources(event.response.session_id);
           if (contextOpen) void refreshContextUsage();
         } else if (event.kind === "error") {
           turn.error = event.text || "The continuation reported an error.";
@@ -918,6 +1015,7 @@
       {@const reaction = reactionForPrompt(turn.prompt)}
       {@const uploadedAttachments = turn.attachments.filter((a) => a.source !== "generated")}
       {@const generatedFiles = turn.attachments.filter((a) => a.source === "generated")}
+      {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
       <div class="turn">
         <div class="message-group message-group-user">
           <div class="message-bubble message-bubble-user">
@@ -1066,7 +1164,13 @@
 
           {#if answer !== ""}
             <div class="message-bubble message-bubble-raiker">
-              <Markdown text={answer} />
+              <!-- C6 — `[s1]` becomes a chip only when this turn's ledger has an
+                   s1. A marker the model invented stays the characters it is. -->
+              <Markdown
+                text={answer}
+                citations={renderableCitations(turnSourceList)}
+                oncite={(sourceId) => openSourceById(turn.response?.turn_id ?? "", sourceId, answer)}
+              />
             </div>
             {#if !turn.streaming}
               <!-- A glyph, like the code-block copy action, so the transcript
@@ -1082,6 +1186,23 @@
             {/if}
           {:else if !turn.streaming && turn.error === null && turn.response !== null}
             <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">(No answer text was returned.)</p></div>
+          {/if}
+
+          <!-- C6 — everything this turn actually read, under the answer that
+               used it. Shown whether or not the model cited: the ledger is what
+               the runtime recorded, the citation is only what the model claims. -->
+          <!-- `sentenceAround` on open: when the model cited this source inline,
+               the strip opens it at the same place the marker does. The sentence
+               is the claim, and which control the owner clicked should not
+               change what they are shown. It is empty for an uncited source, and
+               the pane then says the whole of it was read. -->
+          {#if !turn.streaming && turnSourceList.length > 0}
+            <SourceChips
+              sources={turnSourceList}
+              citedIds={citedSourceIds(answer, turnSourceList)}
+              openSourceId={openSourceTurnId === turn.response?.turn_id ? openSourceId : null}
+              onopen={(source) => void openSource(source, sentenceAround(answer, source.source_id))}
+            />
           {/if}
 
           {#if generatedFiles.length > 0}
@@ -1367,7 +1488,7 @@
     objectUrl={objectUrl}
     source={inspectorSource}
     {sourceLoading}
-    ondownload={downloadInspected}
+    ondownload={inspecting.attachmentId === "" ? null : downloadInspected}
     {downloadState}
     {downloadError}
     onclose={closeInspector}

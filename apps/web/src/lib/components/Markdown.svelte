@@ -5,8 +5,20 @@
   // only here: the renderer escapes every run of source text *before* it emits
   // any tag, emits a closed tag set, and never copies an attribute out of the
   // source. See the module header in ../markdown.ts for the full argument.
-  let { text, muted = false }: { text: string; muted?: boolean } = $props();
-  const html = $derived(renderMarkdown(text));
+  let {
+    text,
+    muted = false,
+    citations,
+    oncite,
+  }: {
+    text: string;
+    muted?: boolean;
+    // C6 — source ids this answer is allowed to render as chips. Omitted (the
+    // usual case) means no marker is ever rewritten.
+    citations?: ReadonlySet<string>;
+    oncite?: (sourceId: string) => void;
+  } = $props();
+  const html = $derived(renderMarkdown(text, citations ? { citations } : {}));
 
   // BUG-23 — the copy action for rendered code blocks.
   //
@@ -43,6 +55,16 @@
 
   async function onWrapperClick(event: MouseEvent) {
     const target = event.target as HTMLElement | null;
+    // C6 — a citation chip. Same delegation as code copy, for the same reason:
+    // `{@html}` output is inert markup, so the button the renderer emitted has
+    // no handler of its own and a marker that arrives mid-stream is operable
+    // the moment it renders.
+    const chip = target?.closest?.("[data-md-cite]") as HTMLElement | null;
+    if (chip !== null && chip !== undefined) {
+      const sourceId = chip.getAttribute("data-md-cite");
+      if (sourceId !== null) oncite?.(sourceId);
+      return;
+    }
     const button = target?.closest?.("[data-md-copy]") as HTMLElement | null;
     if (button === null || button === undefined) return;
     const block = button.closest(".md-code")?.querySelector("code");
@@ -94,6 +116,31 @@
   .markdown :global(p) {
     margin: 0 0 0.6rem;
     white-space: pre-wrap;
+  }
+  /* C6 — an inline provenance chip. Sized and raised like a footnote marker so
+     a cited sentence still reads as a sentence, not as a row of buttons. */
+  .markdown :global(.md-cite) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.05rem;
+    height: 1.05rem;
+    padding: 0 0.22rem;
+    margin: 0 0.08rem;
+    vertical-align: super;
+    border: 1px solid var(--accent-border);
+    border-radius: var(--r-pill);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-size: 0.66em;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .markdown :global(.md-cite:hover),
+  .markdown :global(.md-cite:focus-visible) {
+    background: var(--accent);
+    color: var(--text-inverse);
   }
   .markdown :global(h1),
   .markdown :global(h2),

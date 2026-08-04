@@ -57,6 +57,46 @@ Raiker. Nothing is fetched to colour a keyword, and a code block can never
 execute — the renderer escapes every character of model output before it emits
 any markup.
 
+### Where the answer came from
+
+When a turn reads something — a file in your workspace, an email, a calendar
+entry, a page it fetched, a memory, or a document you attached — a **Sources**
+strip appears under the reply naming each one, and Raiker asks the model to mark
+the sentences that rest on them with a small numbered chip.
+
+Two different things are on screen, and Raiker keeps them apart on purpose:
+
+- **The strip is a fact.** Every source in it is something the runtime really
+  ran and recorded. It is listed whether or not the model mentioned it.
+- **A chip is the model's claim.** A source the model actually cited is marked
+  as cited. Raiker cannot verify that the sentence beside it was drawn from that
+  source — only the model knows that — so it is shown as a claim rather than
+  promoted to a fact.
+
+A number the runtime never recorded is not a citation. If a reply contains
+`[s7]` and no seventh source exists, it stays those five characters: nothing
+becomes clickable, and no source is invented to match it.
+
+**Click any of them to open the source at the passage that was used.** A file or
+an attached document opens in the file preview with the passage marked; a page
+or an email — which Raiker holds no second copy of — is shown as the exact text
+that reached the model. What happens when it cannot be marked is stated rather
+than guessed:
+
+| What you see | What it means |
+|---|---|
+| *Located by matching this answer's own words* | The sentence you clicked from occurs verbatim in the source, and that run is marked |
+| *The whole of this source was read* | The turn read all of it, so marking every character would say nothing |
+| *Exactly what this turn received* | Material that lives outside Raiker, shown as the text the model actually got |
+| *The source no longer contains this passage* | The file changed since the turn read it, so it is shown **without** a highlight rather than with one near where the passage used to be |
+
+Only the ids and counts reach the durable event log. The titles and the passages
+are content: they stay in the encrypted store and are served only to the account
+that owns the conversation.
+
+**Build does the same thing**, except that a cited source opens *inline* under
+the answer rather than in a side pane — Build does not have one yet.
+
 ## Exporting a conversation
 
 The `⋯` menu above the transcript offers **Export conversation…** in both Chat
@@ -211,6 +251,9 @@ are the edges a Chat user can still hit:
   until you point it at one.
 - **Asking for a task in Chat gets you an approval, not a task.** See
   [Tasks and projects](tasks-and-projects.md) → Known limits.
+- **An exported conversation carries citation numbers it cannot explain.** The
+  transcript resolves `[s1]` against the turn's sources; an export carries the
+  answer text only, so the numbers travel without the list they refer to.
 - Automatic context compaction at 90 % and weekly quota display are specified
   but not shipped.
 

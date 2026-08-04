@@ -33,6 +33,7 @@
   import Icon from "./Icon.svelte";
   import ImageViewport from "./ImageViewport.svelte";
   import Markdown from "./Markdown.svelte";
+  import { splitExcerpt } from "../citations";
   import type { AttachmentPreview, SourceExcerptView } from "../apiTypes";
 
   let {
@@ -119,21 +120,32 @@
     source === null ? "" : (SOURCE_STATUS_TEXT[source.status] ?? "This source could not be resolved."),
   );
 
+  // How the passage on screen was located. Each phrasing states exactly what
+  // was checked, because "verified" and "found by searching for the words" are
+  // genuinely different guarantees and a reader is entitled to know which one
+  // they have. C6/C4 adds the two the citation ledger produces.
+  const RESOLUTION_TEXT: Record<string, string> = {
+    stored_coordinates: "Verified from stored coordinates",
+    matching_text: "Located by matching text",
+    answer_quote: "Located by matching this answer's own words",
+    recorded_passage: "Exactly what this turn received",
+    whole_source: "The whole of this source was read",
+  };
+
   /** The excerpt split into before / passage / after, so the marked run is a
    *  slice of the text rather than markup the source got to choose. */
-  const sourceParts = $derived.by(() => {
-    if (source === null) return null;
-    const { excerpt, highlight_start: start, highlight_length: length } = source;
-    if (start < 0 || length <= 0) return { before: excerpt, passage: "", after: "" };
-    return {
-      before: excerpt.slice(0, start),
-      passage: excerpt.slice(start, start + length),
-      after: excerpt.slice(start + length),
-    };
-  });
+  const sourceParts = $derived(
+    source === null
+      ? null
+      : splitExcerpt(source.excerpt, source.highlight_start, source.highlight_length),
+  );
 
+  // Only a *conversation* source gets a link, because opening a conversation is
+  // the only thing this link does. A file source is already open — the pane is
+  // the document — so offering "Open document" there would send the owner back
+  // to the chat they are standing in (found while verifying C6/C4).
   const sourceHref = $derived(
-    source === null || source.session_id === ""
+    source === null || source.session_id === "" || source.kind !== "conversation"
       ? null
       : `#/new-chat?session=${encodeURIComponent(source.session_id)}`,
   );
@@ -252,9 +264,7 @@
         </div>
         {#if source.status === "resolved" && source.resolution_method}
           <span class="resolution-badge" class:verified={source.resolution_method === "stored_coordinates"}>
-            {source.resolution_method === "stored_coordinates"
-              ? "Verified from stored coordinates"
-              : "Located by matching text"}
+            {RESOLUTION_TEXT[source.resolution_method] ?? "Located by matching text"}
           </span>
         {/if}
         {#if sourceNote}<p class="muted source-note">{sourceNote}</p>{/if}
@@ -267,9 +277,7 @@
           {/if}
         {/if}
         {#if sourceHref !== null}
-          <a class="btn btn-ghost btn-sm" href={sourceHref}>
-            Open {source.kind === "file" ? "document" : "conversation"}
-          </a>
+          <a class="btn btn-ghost btn-sm" href={sourceHref}>Open conversation</a>
         {/if}
       </section>
     {/if}

@@ -31,6 +31,23 @@ last resort and justify it against this posture. Full statement:
 `docs/SECURITY_AND_POLICY.md` → "Security Philosophy". The rules below still hold
 and are compatible with it:
 
+docs/TO_BE_FIXED.md — are defects. Defects found while executing
+[the live manual test plan](RAIKER_LIVE_MANUAL_TEST_PLAN.md) against a running
+`raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
+
+Each entry states what was observed, the reproduction, the root cause in code,
+and the proposed fix. Fixed entries remain as evidence; every deferred item
+found by the FIXED-01 through FIXED-48 audit is now an explicit BUG with a
+required user-interface outcome, so closing backend work cannot leave an
+invisible or misleading product surface.
+
+docs/GAP_BUILD_CHAT.md — GAP-BUILD and GAP-CHAT — are not defects. They are the itemised
+distance between what Build and Chat ship today and what each is meant to be:
+Build as an autonomous coding agent that closes its own loop, Chat as a general
+agentic work assistant that acts across the owner's tools and files. They are
+written to the same standard as the defects: what exists today with the file
+that proves it, what is missing, and the concrete work.
+
 | ID | GAP | Tier| Status |
 |---|---|---|---|
 | B1 | BUILD | TIER 0 | Done |
@@ -50,22 +67,7 @@ and are compatible with it:
 | C8 | BUILD | TIER 0 | Done |
 | C13 | BUILD | TIER 0 | Done |
 
-docs/TO_BE_FIXED.md — are defects. Defects found while executing
-[the live manual test plan](RAIKER_LIVE_MANUAL_TEST_PLAN.md) against a running
-`raiker-web` on **2026-07-26**, hosted Anthropic `claude-haiku-4-5-20251001`.
-
-Each entry states what was observed, the reproduction, the root cause in code,
-and the proposed fix. Fixed entries remain as evidence; every deferred item
-found by the FIXED-01 through FIXED-48 audit is now an explicit BUG with a
-required user-interface outcome, so closing backend work cannot leave an
-invisible or misleading product surface.
-
-docs/GAP_BUILD_CHAT.md — GAP-BUILD and GAP-CHAT — are not defects. They are the itemised
-distance between what Build and Chat ship today and what each is meant to be:
-Build as an autonomous coding agent that closes its own loop, Chat as a general
-agentic work assistant that acts across the owner's tools and files. They are
-written to the same standard as the defects: what exists today with the file
-that proves it, what is missing, and the concrete work.
+---
 
 ## GAP-BUILD — What Build needs to stand against a class-leading coding agent
 

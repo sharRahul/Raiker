@@ -221,17 +221,23 @@ remain account-scoped, but action, proposal, and event attribution stays with
 the machine. Model arguments cannot substitute another owner, and missing,
 tampered, expired, inactive, or context-mismatched identity fails closed with a
 stable reason code. No bearer or signature enters approval, action, event, or API
-storage.
+storage. Auto/skip execution preserves that machine actor through
+`RuntimeAuthority`; owner resolution is used only for account resources and
+control settings.
 
 **Governed outcome.** Permissions shows editable Owner controls beside the
-agent's derived `Direct`, `Ask`, `Denied`, or `Unavailable` posture. Approvals
-name the machine proposer and later human authorizer; Activity names the
-turn-bound machine actor. Machines cannot mint identities, change roles, gates,
+agent's readiness-aware derived `Direct`, `Ask`, `Denied`, or `Unavailable`
+posture. Approvals name the machine proposer and later human authorizer;
+Activity names the literal event actor separately from its contextual
+turn-bound identity. Machines cannot mint identities, change roles, gates,
 or modes, approve work, satisfy step-up, or retrieve raw credentials.
 
-**Evidence.** Migrations `RAIKER-1039-machine-identities` and
-`RAIKER-1040-machine-action-attribution` persist the encrypted issuer and public
-attribution. Cryptographic, lifecycle, broker, connector, approval, dashboard,
+**Evidence.** Migrations `RAIKER-1039-machine-identities`,
+`RAIKER-1040-machine-action-attribution`, and
+`RAIKER-1041-machine-action-identity-snapshot` persist the encrypted issuer,
+public attribution, and immutable approval-time claims. Terminal, exception,
+abandoned-stream, CLI, plugin, subagent, and resume tests prove identity
+deactivation. Cryptographic, lifecycle, broker, connector, approval, dashboard,
 subagent, and UI tests cover the boundary. The architecture and residual host
 compromise risk are recorded in
 [`docs/threat-models/machine-identity.md`](../threat-models/machine-identity.md).

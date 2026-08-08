@@ -246,9 +246,8 @@ class PluginExecutionCapExecutor:
         )
         session_id = action.session_id or "plugin_execution"
         turn_id = action.turn_id or new_id("turn_")
-        identity = TurnMachineIdentityLifecycle(
-            self._workspace_root, self._store
-        ).start(
+        lifecycle = TurnMachineIdentityLifecycle(self._workspace_root, self._store)
+        identity = lifecycle.start(
             owner_principal_id=owner_principal_id,
             session_id=session_id,
             turn_id=turn_id,
@@ -256,22 +255,26 @@ class PluginExecutionCapExecutor:
             parent_principal_id=principal.principal_id,
         )
 
+        def finish(result: ExecutionResult) -> ExecutionResult:
+            lifecycle.finish(identity)
+            return result
+
         plugin_id = action.arguments.get("plugin_id")
         tool_name = action.arguments.get("tool_name")
         tool_args = action.arguments.get("tool_args", {})
         entrypoint = action.arguments.get("entrypoint")
         if not isinstance(plugin_id, str) or not plugin_id.strip():
-            return self._record_and_fail(
+            return finish(self._record_and_fail(
                 action, principal, "", "", "missing_argument:plugin_id", tool_args={}
-            )
+            ))
         if not isinstance(tool_name, str) or not tool_name.strip():
-            return self._record_and_fail(
+            return finish(self._record_and_fail(
                 action, principal, plugin_id, "", "missing_argument:tool_name", tool_args={}
-            )
+            ))
         if not isinstance(tool_args, dict):
-            return self._record_and_fail(
+            return finish(self._record_and_fail(
                 action, principal, plugin_id, tool_name, "invalid_argument:tool_args", tool_args={}
-            )
+            ))
 
         install = self._latest_install(plugin_id)
         if install is None:
@@ -280,13 +283,13 @@ class PluginExecutionCapExecutor:
                 if self._latest_record_status(plugin_id) == "revoked"
                 else "plugin_not_installed"
             )
-            return self._record_and_fail(
+            return finish(self._record_and_fail(
                 action, principal, plugin_id, tool_name, reason, tool_args=tool_args
-            )
+            ))
 
         permissions = self._permissions(install)
         if tool_name not in _BROKERED_PLUGIN_TOOLS:
-            return self._record_and_fail(
+            return finish(self._record_and_fail(
                 action,
                 principal,
                 plugin_id,
@@ -294,9 +297,9 @@ class PluginExecutionCapExecutor:
                 f"plugin_tool_not_brokered:{tool_name}",
                 tool_args=tool_args,
                 install=install,
-            )
+            ))
         if f"tool:{tool_name}" not in permissions:
-            return self._record_and_fail(
+            return finish(self._record_and_fail(
                 action,
                 principal,
                 plugin_id,
@@ -304,7 +307,7 @@ class PluginExecutionCapExecutor:
                 f"plugin_permission_not_granted:tool:{tool_name}",
                 tool_args=tool_args,
                 install=install,
-            )
+            ))
 
         tool_action = ToolAction(
             action_id=new_id("tool_"),
@@ -321,12 +324,16 @@ class PluginExecutionCapExecutor:
             writer=None,
             principal_id=owner_principal_id,
         )
-        tool_result, decision = broker.execute(
-            tool_action,
-            session_id=session_id,
-            turn_id=turn_id,
-            machine_identity=identity,
-        )
+        try:
+            tool_result, decision = broker.execute(
+                tool_action,
+                session_id=session_id,
+                turn_id=turn_id,
+                machine_identity=identity,
+            )
+        except BaseException:
+            lifecycle.finish(identity)
+            raise
         execution_status = (
             "succeeded"
             if tool_result.status == "success"
@@ -346,7 +353,7 @@ class PluginExecutionCapExecutor:
                 if decision.decision != "allow" or tool_result.status == "denied"
                 else "plugin_tool_failed"
             )
-            return ExecutionResult(
+            return finish(ExecutionResult(
                 ok=False,
                 capability=self.capability,
                 action_id=action.action_id,
@@ -359,9 +366,9 @@ class PluginExecutionCapExecutor:
                     "tool_status": tool_result.status,
                     "policy_decision": decision.decision,
                 },
-            )
+            ))
 
-        return ExecutionResult(
+        return finish(ExecutionResult(
             ok=True,
             capability=self.capability,
             action_id=action.action_id,
@@ -374,7 +381,7 @@ class PluginExecutionCapExecutor:
                 "policy_decision": decision.decision,
                 "output_redacted": True,
             },
-        )
+        ))
 
     def _latest_install(self, plugin_id: str) -> dict[str, object] | None:
         for record in self._store.list_plugin_install_records(status="installed"):

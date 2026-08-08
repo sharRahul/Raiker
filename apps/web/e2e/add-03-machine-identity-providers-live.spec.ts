@@ -26,7 +26,14 @@ async function connectProvider(provider: string, keyLabel: string, key: string):
 async function chooseModel(card: Locator, preferred?: string): Promise<void> {
   await card.getByRole("button", { name: /Choose model|Change model/ }).click();
   const catalogue = card.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 60_000 });
+  const custom = card.getByLabel("Custom model name");
+  await expect(catalogue.or(custom)).toBeVisible({ timeout: 60_000 });
+  if (await custom.isVisible()) {
+    expect(preferred, `${await card.innerText()} needs an explicit model id`).toBeTruthy();
+    await custom.fill(preferred!);
+    await card.getByRole("button", { name: "Use model" }).click();
+    return;
+  }
   const values = await catalogue.locator("option").evaluateAll((options) =>
     options.map((option) => (option as HTMLOptionElement).value).filter(Boolean),
   );
@@ -43,13 +50,76 @@ async function runAttributedTurn(marker: string, screenshotName: string): Promis
   await prompt.fill(`Reply with exactly: ${marker}`);
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByRole("button", { name: "Copy response" }).last()).toBeVisible({ timeout: 240_000 });
-  await expect(page.locator(".message-group-raiker").last()).toContainText(marker);
+  await expect(page.locator(".message-group-raiker").last()).toContainText(marker, { timeout: 240_000 });
 
   await page.goto(`${BASE}/#/activity`);
   const machine = page.locator(".identity-chip.machine").first();
+  for (let retry = 0; retry < 8 && !(await machine.isVisible().catch(() => false)); retry += 1) {
+    if (await page.getByText(/Unavailable \(429\)/).isVisible().catch(() => false)) {
+      await page.waitForTimeout(5_000);
+      await page.getByRole("button", { name: "Refresh events" }).click();
+    } else {
+      await page.waitForTimeout(500);
+    }
+  }
   await expect(machine).toBeVisible({ timeout: 30_000 });
   await expect(machine).toContainText("Raiker agent");
   await expect(machine).toContainText(/Agent · (active|inactive|expired)/);
+  await page.screenshot({ path: join(SHOTS, screenshotName), fullPage: true });
+}
+
+async function waitForApprovalRow(status: "pending" | "denied"): Promise<Locator> {
+  const row = page
+    .getByRole("row")
+    .filter({ has: page.getByRole("cell", { name: status, exact: true }) })
+    .first();
+  for (let retry = 0; retry < 8 && !(await row.isVisible().catch(() => false)); retry += 1) {
+    if (await page.getByText(/Unavailable \(429\)/).isVisible().catch(() => false)) {
+      await page.waitForTimeout(5_000);
+      await page.getByRole("button", { name: "Refresh approvals" }).click();
+    } else {
+      await page.waitForTimeout(500);
+    }
+  }
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  return row;
+}
+
+async function runGovernedProposal(marker: string, screenshotName: string): Promise<void> {
+  await page.goto(`${BASE}/#/new-chat`);
+  const prompt = page.getByPlaceholder("How can I help you today?");
+  await prompt.fill(
+    `Use the write_file tool now to create add03-${marker.toLowerCase()}.txt containing exactly ${marker}. Do not answer without calling the tool.`,
+  );
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 240_000 });
+
+  await page.goto(`${BASE}/#/approvals`);
+  await page.getByLabel("Sort approvals").selectOption({ label: "Newest first" });
+  const row = await waitForApprovalRow("pending");
+  await row.getByRole("button", { name: "Review" }).click();
+  await expect(page.getByRole("heading", { name: /^Review / })).toBeVisible({ timeout: 30_000 });
+  let detail = page.getByLabel(/^Review /);
+  await expect(detail.getByText("Proposed by", { exact: true })).toBeVisible();
+  await expect(detail.locator(".identity-chip.machine")).toContainText("Raiker agent");
+  await page.getByRole("button", { name: "Deny", exact: true }).click();
+  await expect(page.getByText(/Recorded: denied/i)).toBeVisible({ timeout: 30_000 });
+  for (let queued = 0; queued < 3; queued += 1) {
+    const moreQueued = page.getByText(/more call.*queued behind it/i);
+    if (!(await moreQueued.isVisible().catch(() => false))) break;
+    await page.getByRole("tab", { name: "pending", exact: true }).click();
+    const queuedRow = await waitForApprovalRow("pending");
+    await queuedRow.getByRole("button", { name: "Review" }).click();
+    await page.getByRole("button", { name: "Deny", exact: true }).click();
+    await expect(page.getByText(/Recorded: denied/i)).toBeVisible({ timeout: 30_000 });
+  }
+  await page.getByRole("tab", { name: "denied", exact: true }).click();
+  await page.getByRole("button", { name: "Refresh approvals" }).click();
+  const deniedRow = await waitForApprovalRow("denied");
+  await deniedRow.getByRole("button", { name: "Review" }).click();
+  detail = page.getByLabel(/^Review /);
+  await expect(detail.getByText("Authorized by", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(detail.locator(".identity-chip").filter({ hasText: "Human" })).toBeVisible();
   await page.screenshot({ path: join(SHOTS, screenshotName), fullPage: true });
 }
 
@@ -83,23 +153,26 @@ test("Permissions separates owner controls from signed-turn authority", async ()
 });
 
 test("Anthropic turn records a signed machine actor", async () => {
-  test.setTimeout(360_000);
+  test.setTimeout(600_000);
   const card = await connectProvider("Anthropic", "Anthropic API key", ANTHROPIC_KEY);
   await chooseModel(card, "claude-haiku-4-5-20251001");
   await runAttributedTurn("ADD03 ANTHROPIC LIVE", "add03-anthropic-identity-live.png");
+  await runGovernedProposal("anthropic", "add03-anthropic-approval-attribution-live.png");
 });
 
 test("OpenRouter turn records a signed machine actor", async () => {
-  test.setTimeout(360_000);
+  test.setTimeout(600_000);
   const card = await connectProvider("OpenRouter", "OpenRouter API key", OPENROUTER_KEY);
-  await chooseModel(card);
+  await chooseModel(card, "openai/gpt-oss-20b:free");
   await runAttributedTurn("ADD03 OPENROUTER LIVE", "add03-openrouter-identity-live.png");
+  await runGovernedProposal("openrouter", "add03-openrouter-approval-attribution-live.png");
 });
 
 test("Ollama gemma4:31b-cloud turn records a signed machine actor", async () => {
-  test.setTimeout(360_000);
+  test.setTimeout(600_000);
   await page.goto(`${BASE}/#/models`);
   const ollama = page.locator(".local-row").filter({ hasText: "Ollama" });
   await chooseModel(ollama, "gemma4:31b-cloud");
   await runAttributedTurn("ADD03 OLLAMA LIVE", "add03-ollama-identity-live.png");
+  await runGovernedProposal("ollama", "add03-ollama-approval-attribution-live.png");
 });

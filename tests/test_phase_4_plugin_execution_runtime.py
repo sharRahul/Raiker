@@ -148,6 +148,11 @@ def test_installed_plugin_invokes_allowed_read_only_tool_without_output_artifact
     assert payload is not None
     assert "TOPSECRET" not in json.dumps(payload)
     assert payload["payload"]["artifacts"]["output_redacted"] is True
+    with store.connect() as connection:
+        active = connection.execute(
+            "SELECT COUNT(*) AS count FROM turn_machine_identities WHERE is_active = 1"
+        ).fetchone()
+    assert active is not None and active["count"] == 0
 
 
 def test_plugin_execution_requires_installed_plugin(tmp_path: Path) -> None:

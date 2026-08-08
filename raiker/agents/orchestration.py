@@ -226,6 +226,7 @@ class SubagentRunner:
         effective_session_id = session_id or f"sess_{subagent_id}"
         owner_id = owner_principal_id or self._store.account_scope(principal_id) or principal_id
         lifecycle = TurnMachineIdentityLifecycle(self._ws, self._store)
+        owns_parent_identity = parent_identity is None
         if parent_identity is None:
             parent_identity = lifecycle.start(
                 owner_principal_id=owner_id,
@@ -281,6 +282,9 @@ class SubagentRunner:
 
         def finish(status: str, ok: bool, reason_code: str | None, summary: str, executed: int) -> OrchestrationOutcome:
             self._store.insert_subagent_contract(replace(contract, status=status))
+            lifecycle.finish(child_identity)
+            if owns_parent_identity:
+                lifecycle.finish(parent_identity)
             return OrchestrationOutcome(
                 ok=ok,
                 ref_id=subagent_id,

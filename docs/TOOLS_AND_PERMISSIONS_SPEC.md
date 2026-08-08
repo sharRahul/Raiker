@@ -12,6 +12,10 @@ credential references. A missing or mismatched identity is refused before any
 policy, hook, credential, or executor side effect. The Permissions view therefore
 shows owner controls separately from the agent's derived `Direct`, `Ask`,
 `Denied`, or `Unavailable` authority; the agent cannot edit either column.
+Approval proposals snapshot the verified machine key and validity fields at
+creation, so key rotation or later turn cleanup cannot change who proposed an
+already-reviewed action. Activity preserves the literal event actor and adds the
+turn identity only as separate context.
 
 | Tool class | Posture |
 |---|---|

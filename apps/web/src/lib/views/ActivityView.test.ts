@@ -79,7 +79,8 @@ describe("ActivityView", () => {
     render(ActivityView);
 
     expect(await screen.findByText("Raiker agent · turn_1")).toBeInTheDocument();
-    expect(screen.queryByText("tool_broker")).not.toBeInTheDocument();
+    expect(screen.getByText("tool_broker")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Turn identity" })).toBeInTheDocument();
   });
 
   it("loads the audit log scoped to a linked session", async () => {

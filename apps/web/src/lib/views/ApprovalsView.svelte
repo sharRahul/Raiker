@@ -625,14 +625,16 @@
   }
   .meta {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
     gap: 0.4rem 1rem;
     margin: var(--space-3) 0;
   }
   .meta div {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 0.4rem;
-    align-items: baseline;
+    align-items: center;
+    min-width: 0;
   }
   .meta dt {
     font-size: 0.72rem;
@@ -644,6 +646,8 @@
   .meta dd {
     margin: 0;
     font-size: 0.86rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .diff-path {
     color: var(--text-2);

@@ -95,6 +95,11 @@ def test_budget_record_persisted_on_contract(tmp_path: Path) -> None:
     )
     outcome = SubagentRunner(ws, store).run(spec, principal_id="principal_owner")
     assert outcome.ok, outcome.reason_code
+    with store.connect() as connection:
+        active = connection.execute(
+            "SELECT COUNT(*) AS count FROM turn_machine_identities WHERE is_active = 1"
+        ).fetchone()
+    assert active is not None and active["count"] == 0
     contract = store.list_subagent_contracts()[0]
     assert contract["max_steps"] == 7
     assert contract["max_tool_calls"] == 4

@@ -36,6 +36,22 @@ human owner scope: the owner selects account resources and credentials, while
 the machine remains the recorded proposer and actor. Missing, expired, tampered,
 inactive, or context-mismatched identities fail closed.
 
+Owner scope is resolved inside storage/runtime control lookup; it never replaces
+the machine principal passed to `RuntimeAuthority` or an executor. Auto/skip
+turns therefore preserve machine-attributed posture and execution evidence.
+Every terminal path (success, refusal, exception, cancelled stream, CLI helper,
+plugin relay, subagent, and completed resume) deactivates its identity; only a
+turn parked for approval stays active until rotation or terminal completion.
+Approval proposals snapshot key/token IDs and issue/expiry timestamps on the
+action, so later token rotation cannot rewrite historical proposal identity.
+Activity exposes the literal event actor and the contextual turn identity as
+separate fields.
+
+The deterministic owner-invoked `/review` command performs bounded, read-only
+local git inspection and is not an agentic turn. It cannot mutate, access
+credentials, or invoke model-selected paths. Model-proposed repository reads
+remain brokered under a signed turn identity.
+
 ## Current Backend Capability Matrix
 
 | Area | Current posture |

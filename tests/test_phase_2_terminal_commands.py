@@ -181,6 +181,11 @@ class TestTerminalCommands:
         )
         assert "status: approval_required" in store_output
         assert "does not execute the action" in store_output
+        with SQLiteStore(tmp_path).connect() as connection:
+            active = connection.execute(
+                "SELECT COUNT(*) AS count FROM turn_machine_identities WHERE is_active = 1"
+            ).fetchone()
+        assert active is not None and active["count"] == 0
         assert handle_slash_command("/memory-forget mem_missing", workspace_root=str(tmp_path)).startswith(
             "Memory forget:\n  status: approval_required"
         )

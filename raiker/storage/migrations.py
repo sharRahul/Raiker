@@ -2418,6 +2418,17 @@ CREATE INDEX IF NOT EXISTS idx_tool_actions_owner_time
 """
 
 
+# ADD-03 -- snapshot the public identity claims on the action itself. A resumed
+# turn rotates its bearer token, but an approval must continue to describe the
+# exact machine credential that proposed it.
+MACHINE_ACTION_IDENTITY_SNAPSHOT_MIGRATION_ID = "RAIKER-1041-machine-action-identity-snapshot"
+MACHINE_ACTION_IDENTITY_SNAPSHOT_SQL = """
+ALTER TABLE tool_actions ADD COLUMN machine_key_id TEXT;
+ALTER TABLE tool_actions ADD COLUMN machine_issued_at TEXT;
+ALTER TABLE tool_actions ADD COLUMN machine_expires_at TEXT;
+"""
+
+
 # B9 — the repository code map.
 #
 # Every turn used to start cold: no symbol index, no map of the tree, so on a

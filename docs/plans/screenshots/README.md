@@ -151,17 +151,20 @@ and the index is derived from it locally.
 | `b9-code-map-gate-off.png` | The owner's off switch, quoted back verbatim by the model: `{"type": "code_map_gate_disabled", …}` |
 | `b9-code-map-refreshed-after-write.png` | An approved `write_file`, then the same tool finding `audit_meridian_trail` in `services/audit.py` — the index caught up with the change the agent made |
 
-`201`–`204` are the live evidence for **ADD-03** per-turn machine identity,
+`201`–`207` are the live evidence for **ADD-03** per-turn machine identity,
 captured on **2026-08-08** by
 [`apps/web/e2e/add-03-machine-identity-providers-live.spec.ts`](../../../apps/web/e2e/add-03-machine-identity-providers-live.spec.ts)
 against an isolated real `raiker-web` on `127.0.0.1:8765`. Anthropic and
 OpenRouter credentials were entered through the Models UI and closed before
-screenshots; Ollama used the local `gemma4:31b-cloud` catalogue entry. All four
+screenshots; Ollama used the local `gemma4:31b-cloud` catalogue entry. All seven
 images were inspected at original resolution and contain no credential value.
 
 | File | Records |
 |---|---|
 | `201-ADD-03-owner-agent-authority-live.png` | Permissions separates editable Owner controls from the signed turn's derived, read-only authority |
-| `202-ADD-03-anthropic-identity-live.png` | A real Anthropic turn's issued/deactivated identity and machine-attributed audit rows |
+| `202-ADD-03-anthropic-identity-live.png` | A real Anthropic turn's issued/deactivated identity, with literal event actors and contextual turn identities shown separately |
 | `203-ADD-03-openrouter-identity-live.png` | The same identity contract on a real OpenRouter turn |
 | `204-ADD-03-ollama-identity-live.png` | The same identity contract on local Ollama `gemma4:31b-cloud` |
+| `205-ADD-03-anthropic-approval-attribution-live.png` | Anthropic proposed a governed file write as the machine actor; the human owner denied it |
+| `206-ADD-03-openrouter-approval-attribution-live.png` | OpenRouter proposed a governed file write as the machine actor; the human owner denied it |
+| `207-ADD-03-ollama-approval-attribution-live.png` | Ollama proposed a governed file write as the machine actor; the human owner denied it |

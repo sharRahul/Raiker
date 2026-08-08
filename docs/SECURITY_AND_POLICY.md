@@ -48,6 +48,12 @@ Model-controlled arguments cannot change that owner scope. Machines cannot mint
 identities, grant roles, change gates or modes, resolve approvals, satisfy
 step-up, or read raw credentials. Approval records preserve the machine proposer
 and later human authorizer without persisting the bearer token or signature.
+The public key/token IDs and issue/expiry timestamps are snapshotted on the
+proposed action, so a resume rotation cannot rewrite approval history. Runtime
+execution always receives the machine principal; owner resolution is limited to
+resource and control lookup. Activity reports the event emitter separately from
+the turn identity, preventing human authorization or runtime events from being
+presented as if the agent emitted them.
 See [the machine-identity threat model](threat-models/machine-identity.md).
 
 Strict non-allow blocking, role revoke governed, and capability gate per action are enforced.

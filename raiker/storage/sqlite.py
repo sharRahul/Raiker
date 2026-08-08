@@ -99,6 +99,8 @@ from raiker.storage.migrations import (
     LOCK_SCREEN_SQL,
     MACHINE_ACTION_ATTRIBUTION_MIGRATION_ID,
     MACHINE_ACTION_ATTRIBUTION_SQL,
+    MACHINE_ACTION_IDENTITY_SNAPSHOT_MIGRATION_ID,
+    MACHINE_ACTION_IDENTITY_SNAPSHOT_SQL,
     MACHINE_IDENTITIES_MIGRATION_ID,
     MACHINE_IDENTITIES_SQL,
     MCP_CONTAINMENT_MIGRATION_ID,
@@ -917,6 +919,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MACHINE_ACTION_ATTRIBUTION_MIGRATION_ID,
                 MACHINE_ACTION_ATTRIBUTION_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MACHINE_ACTION_IDENTITY_SNAPSHOT_MIGRATION_ID,
+                MACHINE_ACTION_IDENTITY_SNAPSHOT_SQL,
                 connection,
             )
             self._rebuild_memory_fts(connection)
@@ -3373,6 +3380,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         owner_principal_id: str | None = None,
         machine_subject: str | None = None,
         machine_token_id: str | None = None,
+        machine_key_id: str | None = None,
+        machine_issued_at: str | None = None,
+        machine_expires_at: str | None = None,
     ) -> None:
         with self.connect() as connection:
             connection.execute(
@@ -3380,13 +3390,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                   INSERT OR REPLACE INTO tool_actions
                   (action_id, session_id, turn_id, task_id, tool_name, arguments_json,
                    risk_level, status, proposed_at, completed_at, proposed_by,
-                   owner_principal_id, machine_subject, machine_token_id)
+                   owner_principal_id, machine_subject, machine_token_id,
+                   machine_key_id, machine_issued_at, machine_expires_at)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?,
                           COALESCE((SELECT proposed_at FROM tool_actions WHERE action_id = ?), ?),
                           ?, ?,
                           COALESCE(?, (SELECT owner_principal_id FROM tool_actions WHERE action_id = ?)),
                           COALESCE(?, (SELECT machine_subject FROM tool_actions WHERE action_id = ?)),
-                          COALESCE(?, (SELECT machine_token_id FROM tool_actions WHERE action_id = ?)))
+                          COALESCE(?, (SELECT machine_token_id FROM tool_actions WHERE action_id = ?)),
+                          COALESCE(?, (SELECT machine_key_id FROM tool_actions WHERE action_id = ?)),
+                          COALESCE(?, (SELECT machine_issued_at FROM tool_actions WHERE action_id = ?)),
+                          COALESCE(?, (SELECT machine_expires_at FROM tool_actions WHERE action_id = ?)))
                 """,
                 (
                     action.action_id,
@@ -3408,6 +3422,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                       machine_subject,
                       action.action_id,
                       machine_token_id,
+                      action.action_id,
+                      machine_key_id,
+                      action.action_id,
+                      machine_issued_at,
+                      action.action_id,
+                      machine_expires_at,
                       action.action_id,
                   ),
             )
@@ -4533,9 +4553,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                    tool_actions.machine_token_id,
                    proposer.principal_type AS proposer_principal_type,
                    proposer.display_name AS proposer_display_name,
-                   machine.key_id AS machine_key_id,
-                   machine.issued_at AS machine_issued_at,
-                   machine.expires_at AS machine_expires_at,
+                   tool_actions.machine_key_id,
+                   tool_actions.machine_issued_at,
+                   tool_actions.machine_expires_at,
                    machine.is_active AS machine_is_active,
                    authorizer.principal_type AS authorizer_principal_type,
                    authorizer.display_name AS authorizer_display_name
@@ -4617,9 +4637,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                        tool_actions.machine_token_id,
                        proposer.principal_type AS proposer_principal_type,
                        proposer.display_name AS proposer_display_name,
-                       machine.key_id AS machine_key_id,
-                       machine.issued_at AS machine_issued_at,
-                       machine.expires_at AS machine_expires_at,
+                       tool_actions.machine_key_id,
+                       tool_actions.machine_issued_at,
+                       tool_actions.machine_expires_at,
                        machine.is_active AS machine_is_active,
                        authorizer.principal_type AS authorizer_principal_type,
                        authorizer.display_name AS authorizer_display_name
@@ -6827,16 +6847,34 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return dict(row) if row is not None else None
 
     def account_scope(self, principal_id: str | None) -> str | None:
-        """Return the principal id only when it names a real local account.
+        """Resolve a real local account for a human or delegated machine actor.
 
         Reads are owner-scoped for accounts and unscoped otherwise. The terminal
         client sends ``UserMetadata``'s default ``local_user``, which is truthy
         but is not a principal — scoping on mere truthiness silently hides the
         CLI's own project, connectors, memory, and model selection.
         """
-        if not principal_id or self.get_account(principal_id) is None:
+        if not principal_id:
             return None
-        return principal_id
+        if self.get_account(principal_id) is not None:
+            return principal_id
+        principal = self.get_principal(principal_id)
+        if principal is None or principal.get("principal_type") != "ai_agent":
+            return None
+        user_id = principal.get("delegated_by_user_id")
+        if not user_id:
+            return None
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT account_credentials.principal_id
+                   FROM account_credentials
+                   JOIN principals
+                     ON principals.principal_id = account_credentials.principal_id
+                   WHERE principals.delegated_by_user_id = ?
+                   ORDER BY account_credentials.principal_id LIMIT 2""",
+                (user_id,),
+            ).fetchall()
+        return str(rows[0]["principal_id"]) if len(rows) == 1 else None
 
     def set_account_failed(
         self, principal_id: str, failed_attempts: int, locked_until: str | None

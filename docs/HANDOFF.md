@@ -635,7 +635,10 @@ contradictions are recorded honestly. File:line citations are in
    - ✅ Agentic turns use short-lived signed machine identities, enforced before
      policy, credentials, approvals, hooks, and tools. Owner credential scope and
      machine actor are separate, and Permissions exposes the derived access
-     review. Approvals and Activity preserve machine/human attribution.
+     review. Approvals snapshot the verified proposal identity, while Activity
+     separates the literal event actor from contextual turn identity. Terminal,
+     exceptional, plugin-relay, CLI, and child-agent paths close identity
+     lifecycle state; approval suspension keeps it active for resume.
    - ℹ️ Relationship-based per-principal/per-tool grants remain the separate
      future ReBAC proposal ADD-18; they are not an unfinished ADD-03 control.
 
@@ -675,7 +678,8 @@ governed vertical slice at a time.
    with configurable prompt/content redaction before making autonomy broader.
 7. **Agent identity and least privilege:** ADD-03 is complete: distinct signed
    turn and child-agent identities, owner/actor scope separation, broker-first
-   verification, and user-facing access review and attribution. Durable
+   verification, immutable approval attribution, lifecycle cleanup, and
+   user-facing access review and attribution. Durable
    non-human principals remain governable through `/principal create`.
 8. **Reusable governed workflows:** project/user skills and plugin-packaged
    playbooks with clear scope, provenance, review, and versioning. Add

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -15,15 +17,18 @@ from raiker.contracts.models import (
     ToolAction,
     UserMetadata,
 )
+from raiker.contracts.streaming import TEXT_DELTA, StreamEvent
 from raiker.control.dashboard import DashboardService
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.identity.contracts import IDENTITY_AUDIENCE, MachineIdentityError
 from raiker.runtime.identity.lifecycle import (
     TrustedTurnIdentity,
     TurnMachineIdentityLifecycle,
 )
+from raiker.runtime.identity.verifier import MachineIdentityVerifier
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.broker import ToolBroker, ToolExecutionContext
 
@@ -96,6 +101,52 @@ async def test_gateway_passes_machine_identity_to_runtime_and_deactivates_termin
     assert attributed[0].machine_identity.principal_id == identity.claims.principal_id
 
 
+@pytest.mark.anyio
+async def test_gateway_deactivates_identity_when_runtime_raises(tmp_path: Path) -> None:
+    workspace = _workspace(tmp_path)
+    gateway = AgentGateway(workspace, principal_id="principal_owner")
+
+    async def fails(
+        _prompt: PromptEnvelope, *, identity: TrustedTurnIdentity | None = None
+    ) -> AgentResponse:
+        assert identity is not None
+        raise RuntimeError("boom")
+
+    gateway.runtime.ahandle = fails  # type: ignore[assignment]
+    with pytest.raises(RuntimeError, match="boom"):
+        await gateway.submit_prompt_async(_envelope())
+
+    with SQLiteStore(workspace).connect() as connection:
+        active = connection.execute(
+            "SELECT COUNT(*) AS count FROM turn_machine_identities WHERE is_active = 1"
+        ).fetchone()
+    assert active is not None and active["count"] == 0
+
+
+@pytest.mark.anyio
+async def test_gateway_deactivates_identity_when_stream_consumer_closes(tmp_path: Path) -> None:
+    workspace = _workspace(tmp_path)
+    gateway = AgentGateway(workspace, principal_id="principal_owner")
+
+    async def partial(
+        _prompt: PromptEnvelope, *, identity: TrustedTurnIdentity | None = None
+    ) -> AsyncIterator[StreamEvent]:
+        assert identity is not None
+        yield StreamEvent(kind=TEXT_DELTA, text="partial")
+
+    gateway.runtime.astream_handle = partial  # type: ignore[assignment]
+    stream = gateway.astream_prompt(_envelope()).__aiter__()
+    event = await anext(stream)
+    assert event.kind == TEXT_DELTA
+    await stream.aclose()
+
+    with SQLiteStore(workspace).connect() as connection:
+        active = connection.execute(
+            "SELECT COUNT(*) AS count FROM turn_machine_identities WHERE is_active = 1"
+        ).fetchone()
+    assert active is not None and active["count"] == 0
+
+
 def test_suspended_turn_rotates_token_without_changing_subject(tmp_path: Path) -> None:
     workspace = _workspace(tmp_path)
     lifecycle = TurnMachineIdentityLifecycle(workspace)
@@ -118,6 +169,26 @@ def test_suspended_turn_rotates_token_without_changing_subject(tmp_path: Path) -
     assert second.claims.principal_id == first.claims.principal_id
     assert second.claims.token_id != first.claims.token_id
     assert second.token != first.token
+
+
+def test_verifier_rejects_identity_at_exact_expiry_boundary(tmp_path: Path) -> None:
+    workspace = _workspace(tmp_path)
+    identity = TurnMachineIdentityLifecycle(workspace).start(
+        owner_principal_id="principal_owner",
+        session_id="sess_1",
+        turn_id="turn_1",
+        role_ids=("assistant",),
+    )
+
+    with pytest.raises(MachineIdentityError, match="machine_identity_expired"):
+        MachineIdentityVerifier(workspace, SQLiteStore(workspace)).verify(
+            identity.token,
+            expected_owner_principal_id="principal_owner",
+            expected_session_id="sess_1",
+            expected_turn_id="turn_1",
+            expected_audience=IDENTITY_AUDIENCE,
+            now=datetime.fromisoformat(identity.claims.expires_at.replace("Z", "+00:00")),
+        )
 
 
 def test_child_identity_records_parent_without_widening_roles(tmp_path: Path) -> None:
@@ -258,3 +329,39 @@ def test_broker_rejects_identity_bound_to_another_turn(tmp_path: Path) -> None:
 
     assert result.error == {"type": "machine_identity_turn_mismatch"}
     assert decision.reasons == ["machine_identity_turn_mismatch"]
+
+
+def test_approval_keeps_original_machine_claims_after_turn_token_rotation(tmp_path: Path) -> None:
+    workspace = _workspace(tmp_path)
+    broker = _broker(workspace)
+    lifecycle = TurnMachineIdentityLifecycle(workspace)
+    identity = lifecycle.start(
+        owner_principal_id="principal_owner",
+        session_id="sess_1",
+        turn_id="turn_1",
+        role_ids=("assistant",),
+    )
+    action = ToolAction(
+        new_id("act_"), "write_file", {"path": "proposal.txt", "text": "pending"}, "medium", True
+    )
+
+    result, _ = broker.execute(
+        action, session_id="sess_1", turn_id="turn_1", machine_identity=identity
+    )
+    assert result.status == "approval_required"
+    before = SQLiteStore(workspace).list_approvals(status="pending")[0]
+
+    rotated = lifecycle.rotate(
+        owner_principal_id="principal_owner",
+        session_id="sess_1",
+        turn_id="turn_1",
+        principal_id=identity.claims.principal_id,
+        role_ids=("assistant",),
+    )
+    after = SQLiteStore(workspace).list_approvals(status="pending")[0]
+
+    assert rotated.claims.token_id != identity.claims.token_id
+    assert after["machine_token_id"] == before["machine_token_id"] == identity.claims.token_id
+    assert after["machine_key_id"] == before["machine_key_id"] == identity.claims.key_id
+    assert after["machine_issued_at"] == before["machine_issued_at"] == identity.claims.issued_at
+    assert after["machine_expires_at"] == before["machine_expires_at"] == identity.claims.expires_at

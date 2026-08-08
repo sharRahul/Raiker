@@ -191,6 +191,12 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-122 | High | Windows host status / destructive PID probe | Fixed (found during ADD-03 full verification) |
 | FIXED-123 | Medium | Plugin execution / invalid fallback turn id | Fixed (found during ADD-03 full verification) |
 | FIXED-124 | Medium | Project export / unstable same-second event order | Fixed (found during ADD-03 full verification) |
+| FIXED-125 | High | Auto/skip runtime / human principal replaced the signed machine actor | Fixed (found during ADD-03 independent review) |
+| FIXED-126 | High | Machine identity / abnormal and delegated paths leaked active principals | Fixed (found during ADD-03 independent review) |
+| FIXED-127 | Medium | Activity / contextual turn identity hid the literal event actor | Fixed (found during ADD-03 independent review) |
+| FIXED-128 | High | Approvals / resume rotation rewrote proposal identity timestamps | Fixed (found during ADD-03 independent review) |
+| FIXED-129 | Low | Permissions / authority matrix ignored readiness failures | Fixed (found during ADD-03 independent review) |
+| FIXED-130 | Low | Approvals / identity metadata overlapped at desktop width | Fixed (found during ADD-03 screenshot review) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -5348,6 +5354,103 @@ with equal timestamps had no deterministic insertion-order tie-breaker.
 **Fix applied.** Event-index reads now order equal timestamps by SQLite row ID
 descending; the export reversal therefore restores chronological insertion
 order. The project export regression and the complete affected test set pass.
+
+---
+
+## FIXED-125 â€” Auto and skip execution replaced the machine actor with the owner
+
+**Status: fixed in this change; found during ADD-03 independent review.**
+
+**Observed.** Tool actions named the signed machine proposer, but the ordinary
+auto/skip route constructed downstream authority and execution evidence with the
+human owner principal.
+
+**Root cause.** The preapproved helper reused its former human-bypass principal
+instead of the verified action proposer.
+
+**Fix applied.** RuntimeAuthority now receives the machine principal. Storage
+resolves its delegated owner only for account resources and control settings;
+execution posture remains machine-attributed. A regression proves this through
+a real file executor.
+
+---
+
+## FIXED-126 â€” Non-terminal exits leaked active machine principals
+
+**Status: fixed in this change; found during ADD-03 independent review.**
+
+**Observed.** Gateway exceptions and abandoned streams, terminal memory
+helpers, plugin relays, and subagent completion could leave short-lived
+principals active until expiry.
+
+**Root cause.** Those owning paths issued identities without a common terminal
+cleanup boundary.
+
+**Fix applied.** Each owner now closes its lifecycle in `finally` or its single
+terminal helper. Approval suspension remains deliberately active for rotation.
+Exception, stream-close, CLI, plugin, subagent, and resume regressions cover it.
+
+---
+
+## FIXED-127 â€” Activity hid the event actor behind a contextual turn identity
+
+**Status: fixed in this change; found during ADD-03 independent review.**
+
+**Observed.** Every event joined to a turn identity displayed the agent chip in
+the Actor column, including broker, executor, issuer, and human-driven events.
+
+**Root cause.** The UI treated turn context as event authorship.
+
+**Fix applied.** Activity now has separate Actor and Turn identity columns. The
+literal audit emitter is always visible; the signed identity remains contextual
+and copyable.
+
+---
+
+## FIXED-128 â€” Resume rotation could rewrite approval identity metadata
+
+**Status: fixed in this change; found during ADD-03 independent review.**
+
+**Observed.** Approval reads joined the machine principal's current issue and
+expiry timestamps, so rotating a suspended turn changed what an old proposal
+appeared to have used.
+
+**Root cause.** Only subject and token ID were stored on the action; remaining
+claims came from the mutable current identity row.
+
+**Fix applied.** Migration `RAIKER-1041-machine-action-identity-snapshot` stores
+key ID, issue time, and expiry with the existing token ID on each proposal.
+Approval reads use that immutable snapshot, verified by a rotate-after-proposal
+regression.
+
+---
+
+## FIXED-129 â€” Authority matrix ignored failed readiness facts
+
+**Status: fixed in this change; found during ADD-03 independent review.**
+
+**Observed.** An enabled gate with a false readiness fact appeared Direct.
+
+**Root cause.** Derived authority considered gate state and decision mode only.
+
+**Fix applied.** Any false readiness fact now yields owner `Not ready` and agent
+`Unavailable`; a component regression covers the distinction.
+
+---
+
+## FIXED-130 â€” Approval identity metadata overlapped at desktop width
+
+**Status: fixed in this change; found during ADD-03 screenshot review.**
+
+**Observed.** The machine proposer chip, expiry timestamp, and batch copy could
+overlap in the approval detail grid at 1440 px.
+
+**Root cause.** Auto-fit columns allowed ten-rem cells even though the identity
+chip needs a wider intrinsic area.
+
+**Fix applied.** Metadata cells now use a responsive sixteen-rem minimum and a
+bounded label/value subgrid with safe wrapping. Provider approval screenshots
+were visually reviewed after the change.
 
 ---
 

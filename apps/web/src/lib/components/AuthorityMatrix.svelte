@@ -3,8 +3,12 @@
 
   let { gates }: { gates: CapabilityGate[] } = $props();
 
+  function isReady(gate: CapabilityGate): boolean {
+    return Object.values(gate.readiness).every(Boolean);
+  }
+
   function agentAuthority(gate: CapabilityGate): "Direct" | "Ask" | "Denied" | "Unavailable" {
-    if (gate.state !== "enabled_runtime") return "Unavailable";
+    if (gate.state !== "enabled_runtime" || !isReady(gate)) return "Unavailable";
     if (gate.decision_mode === "deny") return "Denied";
     if (gate.decision_mode === "ask") return "Ask";
     return "Direct";
@@ -12,6 +16,7 @@
 
   function ownerControl(gate: CapabilityGate): string {
     if (gate.state !== "enabled_runtime") return "Off";
+    if (!isReady(gate)) return "Not ready";
     return gate.decision_mode === "auto" ? "Auto-approved" : "Enabled";
   }
 </script>

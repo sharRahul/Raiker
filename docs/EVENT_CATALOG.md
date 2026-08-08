@@ -3,6 +3,11 @@
 Raiker emits structured audit metadata for governed work. Events must not carry
 secrets, raw prompts, private reasoning, or unbounded tool output.
 
+The event envelope's `actor` is always the principal that literally emitted the
+event. For agentic work, APIs and Activity may additionally resolve and display
+the signed turn identity as context; that contextual identity never replaces a
+human authorizer, runtime authority, or other literal actor.
+
 | Event | Meaning |
 |---|---|
 | `machine_identity_issued` | A signed machine identity was minted for a turn (public IDs, audience, timestamps, and parent principal only) |

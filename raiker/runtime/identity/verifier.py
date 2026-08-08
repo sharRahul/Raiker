@@ -88,7 +88,7 @@ class MachineIdentityVerifier:
         current = (now or datetime.now(UTC)).astimezone(UTC)
         if current < _parse_timestamp(claims.issued_at):
             raise MachineIdentityError("machine_identity_malformed")
-        if current > _parse_timestamp(claims.expires_at):
+        if current >= _parse_timestamp(claims.expires_at):
             raise MachineIdentityError("machine_identity_expired")
 
         principal = self.store.get_principal(claims.principal_id)

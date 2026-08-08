@@ -192,6 +192,9 @@ class GovernedAction:
     # to name it. Set only by the approval relay, from the approval row.
     origin_session_id: str = ""
     critical_confirmation: CriticalConfirmation | None = None
+    # Internal broker-only override after the owner's per-turn approval mode has
+    # already selected auto/skip. It changes the decision path, never the actor.
+    decision_mode_override: str | None = None
 
 
 @dataclass(frozen=True)
@@ -315,7 +318,11 @@ class RuntimeAuthority:
         return posture
 
     def _uses_principal_controls(self, principal_id: str | None) -> bool:
-        return bool(principal_id and self.store.get_account(principal_id) is not None)
+        return self.store.account_scope(principal_id) is not None
+
+    def _control_scope(self, principal_id: str | None) -> str | None:
+        """Return the owner's control scope without changing the acting principal."""
+        return self.store.account_scope(principal_id)
 
     def _event(
         self,
@@ -410,9 +417,10 @@ class RuntimeAuthority:
         cap_name = CAPABILITY_GATE_MAP.get(action_type) or CAPABILITY_GATE_MAP.get(tool_or_service_name)
         if cap_name is None:
             return None
+        control_scope = self._control_scope(principal_id)
         persisted = (
-            self.store.get_principal_capability_gate_state(str(principal_id), cap_name)
-            if self._uses_principal_controls(principal_id)
+            self.store.get_principal_capability_gate_state(control_scope, cap_name)
+            if control_scope is not None
             else self.store.get_capability_gate_state(cap_name)
         )
         if persisted is not None:
@@ -436,9 +444,10 @@ class RuntimeAuthority:
     def get_persisted_capability_state(
         self, cap_name: str, principal_id: str | None = None
     ) -> dict[str, Any] | None:
+        control_scope = self._control_scope(principal_id)
         return (
-            self.store.get_principal_capability_gate_state(str(principal_id), cap_name)
-            if self._uses_principal_controls(principal_id)
+            self.store.get_principal_capability_gate_state(control_scope, cap_name)
+            if control_scope is not None
             else self.store.get_capability_gate_state(cap_name)
         )
 
@@ -462,9 +471,10 @@ class RuntimeAuthority:
         return {"capability": cap_name, "state": gate.state.value, "source": "static_default"}
 
     def _resolve_decision_mode(self, capability: str, principal_id: str | None = None) -> DecisionMode:
+        control_scope = self._control_scope(principal_id)
         persisted = (
-            self.store.get_principal_capability_decision_mode(str(principal_id), capability)
-            if self._uses_principal_controls(principal_id)
+            self.store.get_principal_capability_decision_mode(control_scope, capability)
+            if control_scope is not None
             else self.store.get_capability_decision_mode(capability)
         )
         mode = parse_decision_mode(persisted) if persisted else None
@@ -533,9 +543,10 @@ class RuntimeAuthority:
         choice that no longer exists. With no stored row at all the runtime is
         active — there is nothing left to select, so a fresh install is ready.
         """
+        control_scope = self._control_scope(principal_id)
         stored = (
-            self.store.get_principal_runtime_mode(str(principal_id))
-            if self._uses_principal_controls(principal_id) else self.store.get_latest_runtime_mode()
+            self.store.get_principal_runtime_mode(control_scope)
+            if control_scope is not None else self.store.get_latest_runtime_mode()
         )
         if stored is not None:
             record = dict(stored)
@@ -1287,7 +1298,13 @@ class RuntimeAuthority:
         cap_for_mode = CAPABILITY_GATE_MAP.get(action.action_type) or CAPABILITY_GATE_MAP.get(
             action.tool_or_service_name
         )
-        mode = self._resolve_decision_mode(cap_for_mode, principal.principal_id) if cap_for_mode else None
+        mode = (
+            parse_decision_mode(action.decision_mode_override)
+            if action.decision_mode_override is not None
+            else self._resolve_decision_mode(cap_for_mode, principal.principal_id)
+            if cap_for_mode
+            else None
+        )
         if mode == DecisionMode.DENY:
             return GovernedActionResult(
                 action_id=action.action_id,

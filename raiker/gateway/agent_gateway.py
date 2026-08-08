@@ -347,11 +347,13 @@ class AgentGateway:
             assert error is not None
             return error
         identity = self._prepare_turn(prompt_envelope)
-        response = await self.runtime.ahandle(prompt_envelope, identity=identity)
-        finalized = self._finalize_turn(prompt_envelope, response)
-        if response.status != "needs_approval":
-            self.machine_identities.finish(identity)
-        return finalized
+        response: AgentResponse | None = None
+        try:
+            response = await self.runtime.ahandle(prompt_envelope, identity=identity)
+            return self._finalize_turn(prompt_envelope, response)
+        finally:
+            if response is None or response.status != "needs_approval":
+                self.machine_identities.finish(identity)
 
     async def astream_prompt(self, envelope: PromptEnvelope | dict[str, object]):  # type: ignore[no-untyped-def]
         """Yield :class:`StreamEvent`s for one turn (text deltas, lifecycle, final).
@@ -398,10 +400,10 @@ class AgentGateway:
                 yield event
             assert final is not None
             enriched = self._finalize_turn(prompt_envelope, final)
-            if final.status != "needs_approval":
-                self.machine_identities.finish(identity)
             yield StreamEvent(kind=FINAL, response=enriched)
         finally:
+            if final is None or final.status != "needs_approval":
+                self.machine_identities.finish(identity)
             current = tasks.get_task(task.task_id)
             if current is not None and current.status != "cancelled":
                 if final is None or final.status == "failed":
@@ -513,10 +515,10 @@ class AgentGateway:
                     final = event.response
             assert final is not None
             finalized = self._finalize_turn(envelope, final)
-            if final.status != "needs_approval":
-                self.machine_identities.finish(identity)
             return finalized
         finally:
+            if final is None or final.status != "needs_approval":
+                self.machine_identities.finish(identity)
             self.store.finalize_suspended_turn(
                 approval_id, status="resumed" if final is not None else "resume_failed"
             )
@@ -552,10 +554,10 @@ class AgentGateway:
                 yield event
             assert final is not None
             finalized = self._finalize_turn(envelope, final)
-            if final.status != "needs_approval":
-                self.machine_identities.finish(identity)
             yield StreamEvent(kind=FINAL, response=finalized)
         finally:
+            if final is None or final.status != "needs_approval":
+                self.machine_identities.finish(identity)
             self.store.finalize_suspended_turn(
                 approval_id, status="resumed" if final is not None else "resume_failed"
             )

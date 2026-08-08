@@ -97,6 +97,7 @@
         <tr>
           <th>Type</th>
           <th>Actor</th>
+          <th>Turn identity</th>
           <th>Risk</th>
           <th>Summary</th>
           <th>Session / turn</th>
@@ -108,10 +109,13 @@
           <tr>
             <td title={ev.event_type}>{humanize(ev.event_type)}</td>
             <td class="actor">
+              <span class="mono">{ev.actor}</span>
+            </td>
+            <td class="actor">
               {#if ev.machine_identity}
                 <IdentityChip identity={ev.machine_identity} />
               {:else}
-                <span class="mono">{ev.actor}</span>
+                <span aria-label="No turn identity">â€”</span>
               {/if}
             </td>
             <td>

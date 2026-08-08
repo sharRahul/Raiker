@@ -1456,7 +1456,8 @@ def _run_terminal_tool_action(
                 timestamp=now,
             ),
         )
-    identity = TurnMachineIdentityLifecycle(workspace_root, store).start(
+    lifecycle = TurnMachineIdentityLifecycle(workspace_root, store)
+    identity = lifecycle.start(
         owner_principal_id=principal.principal_id,
         session_id=session_id,
         turn_id=turn_id,
@@ -1469,13 +1470,16 @@ def _run_terminal_tool_action(
         writer=EventLogWriter(store),
         principal_id=principal.principal_id,
     )
-    return broker.execute(
-        action,
-        session_id=session_id,
-        turn_id=turn_id,
-        machine_identity=identity,
-        client=terminal_client(),
-    )
+    try:
+        return broker.execute(
+            action,
+            session_id=session_id,
+            turn_id=turn_id,
+            machine_identity=identity,
+            client=terminal_client(),
+        )
+    finally:
+        lifecycle.finish(identity)
 
 
 def handle_memory_store(command: str, *, workspace_root: str | Path = ".") -> str:

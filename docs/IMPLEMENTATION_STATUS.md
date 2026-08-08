@@ -33,7 +33,11 @@ scheduled, plugin-relay, CLI-agentic, and child-agent tool call reaches the
 broker with a short-lived Ed25519-signed identity. Verification precedes policy,
 credential resolution, approvals, hooks, and execution. Owner resource scope is
 carried separately from the machine actor; the API and dashboard expose the
-machine proposer/actor and human authorizer without exposing bearer material.
+literal event actor, contextual turn identity, machine proposer, and human
+authorizer without exposing bearer material. Terminal and exceptional paths
+deactivate their identities; a parked approval keeps its identity active until
+resume. Approval rows snapshot the verified key and validity metadata so later
+key rotation cannot rewrite historical attribution.
 
 Daytona execution additionally reserves cumulative owner/profile budget in an
 append-only ledger before launch. Provider actuals reconcile reservations when

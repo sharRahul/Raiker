@@ -304,6 +304,16 @@ def test_auto_approval_executes_an_ordinary_file_write_with_preview_evidence(tmp
     assert "approval_auto_executed" in events
     auto_event = _event_record(orchestrator, envelope.session_id, "approval_auto_executed")
     assert auto_event["payload"]["proposal_preview"]["status"] == "proposal"  # type: ignore[index]
+    assert orchestrator.tool_broker.store is not None
+    with orchestrator.tool_broker.store.connect() as connection:
+        stored_actor = connection.execute(
+            "SELECT proposed_by FROM tool_actions WHERE session_id = ? ORDER BY proposed_at DESC LIMIT 1",
+            (envelope.session_id,),
+        ).fetchone()
+    assert stored_actor is not None
+    assert str(stored_actor["proposed_by"]).startswith("principal_turn_agent_")
+    executed = _event_record(orchestrator, envelope.session_id, "action_executed")
+    assert executed["payload"]["posture"]["principal_id"] == stored_actor["proposed_by"]  # type: ignore[index]
 
 
 def test_skip_approval_executes_an_ordinary_file_write_without_preview(tmp_path: Path) -> None:

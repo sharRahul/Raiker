@@ -937,9 +937,14 @@ class ToolBroker:
         """
         if approval_mode not in {"auto", "skip"} or not self._is_ordinary_approval_decision(action, decision):
             return None
-        principal = self._approval_mode_principal()
-        if principal is None or self.store is None:
+        if self.store is None:
             return None
+        raw_principal = self.store.get_principal(action.proposed_by)
+        if raw_principal is None:
+            return None
+        from raiker.runtime.authority.models import Principal
+
+        principal = Principal(**raw_principal)
 
         preview = self._approval_preview(action) if approval_mode == "auto" else None
         self._event(
@@ -967,6 +972,9 @@ class ToolBroker:
             risk_level=action.risk_level,
             session_id=session_id,
             turn_id=turn_id,
+            # This path is reached only after the broker has proved the action is
+            # ordinary and the owner selected auto/skip for this turn.
+            decision_mode_override="always_allow",
         )
         governed_result = authority.route_action(governed, principal)
         if governed_result.decision != "allow" or governed_result.error is not None:
@@ -1171,6 +1179,9 @@ class ToolBroker:
                 owner_principal_id=verified.claims.owner_principal_id,
                 machine_subject=verified.claims.subject,
                 machine_token_id=verified.claims.token_id,
+                machine_key_id=verified.claims.key_id,
+                machine_issued_at=verified.claims.issued_at,
+                machine_expires_at=verified.claims.expires_at,
             )
         self._event(
             session_id=session_id,

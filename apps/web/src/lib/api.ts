@@ -608,7 +608,7 @@ export const api = {
     request<BrainSourceResult>(withQuery("/api/brain/sources", { path }), { method: "DELETE" }),
   executionEnvironments: () => request<ExecutionEnvironmentsView>("/api/execution-environments"),
   configureExecutionEnvironment: (body: {
-    profile_id?: string; kind: "ssh" | "daytona"; name: string; config: Record<string, unknown>; enabled: boolean;
+    profile_id?: string; kind: "ssh" | "daytona" | "container"; name: string; config: Record<string, unknown>; enabled: boolean;
   }) => request<{ ok: boolean; profile_id: string }>("/api/execution-environments/configure", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   }),

@@ -1273,11 +1273,22 @@ export interface ExecutionEnvironment {
     }>;
   } | null;
   config?: Record<string, unknown>;
+  runtime?: "docker" | "podman";
+  image?: string | null;
+  repository_access?: "none" | "read_only";
+  writable_output?: boolean;
+  assigned_tool_count?: number;
+  availability_reason?: string | null;
 }
 
 export interface ExecutionEnvironmentsView {
   selected_profile_id: string;
   environments: ExecutionEnvironment[];
+  container_options?: {
+    runtimes: Array<"docker" | "podman">;
+    images: string[];
+    supported_tools: string[];
+  };
 }
 
 export interface ModelCapacityEntry {

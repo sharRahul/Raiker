@@ -14,11 +14,15 @@
     } catch { selected = null; unavailable = true; }
   }
   onMount(load);
+
+  function runtimeName(runtime: string | undefined): string {
+    return runtime ? runtime.charAt(0).toUpperCase() + runtime.slice(1) : "Container";
+  }
 </script>
 
-<a class="environment-badge" class:unavailable href="#/settings/runtime" aria-label="Execution environment">
+<a class="environment-badge" class:unavailable={unavailable || selected?.available === false} href="#/settings/runtime" aria-label="Execution environment">
   <span class="dot"></span>
-  {#if unavailable}Environment unavailable{:else if selected}{selected.name} · {selected.available ? "Ready" : "Setup required"}{:else}Loading environment…{/if}
+  {#if unavailable}Environment unavailable{:else if selected}{selected.name}{selected.kind === "container" ? ` · ${runtimeName(selected.runtime)}` : ""} · {selected.available ? "Ready" : "Setup required"}{:else}Loading environment…{/if}
 </a>
 
 <style>

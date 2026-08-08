@@ -33,13 +33,16 @@
   let busy = $state(false);
   let dialogError = $state<string | null>(null);
   let environments = $state<ExecutionEnvironmentsView | null>(null);
-  let environmentKind = $state<"ssh" | "daytona">("ssh");
+  let environmentKind = $state<"ssh" | "daytona" | "container">("ssh");
   let environmentName = $state("");
   let host = $state("");
   let remoteUser = $state("");
   let credentialEnv = $state("RAIKER_SSH_IDENTITY_FILE");
   let sandboxId = $state("");
   let maxCost = $state(10);
+  let containerRuntime = $state<"docker" | "podman">("docker");
+  let containerImage = $state("");
+  let selectedContainerTools = $state<string[]>([]);
 
   // The runtime is on unless the owner switched it off. An unreadable state is
   // never reported as running — the card says it could not be read instead.
@@ -49,7 +52,12 @@
     loadError = null;
     try {
       mode = await api.runtimeMode();
-      try { environments = await api.executionEnvironments(); } catch { environments = null; }
+      try {
+        environments = await api.executionEnvironments();
+        const options = environments.container_options;
+        if (options?.runtimes.length && !options.runtimes.includes(containerRuntime)) containerRuntime = options.runtimes[0];
+        if (options?.images.length && !options.images.includes(containerImage)) containerImage = options.images[0];
+      } catch { environments = null; }
     } catch (e) {
       mode = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
@@ -60,13 +68,31 @@
     try {
       const config = environmentKind === "ssh"
         ? { host, user: remoteUser, credential_env: credentialEnv, max_runtime_seconds: 300 }
-        : { sandbox_id: sandboxId, api_key_env: credentialEnv, max_cost: maxCost, max_runtime_seconds: 300 };
+        : environmentKind === "daytona"
+          ? { sandbox_id: sandboxId, api_key_env: credentialEnv, max_cost: maxCost, max_runtime_seconds: 300 }
+          : { runtime: containerRuntime, image: containerImage, tools: selectedContainerTools, repository_access: "read_only", writable_output: true };
       await api.configureExecutionEnvironment({ kind: environmentKind, name: environmentName, config, enabled: true });
-      notice = { kind: "ok", text: `${environmentKind === "ssh" ? "SSH" : "Daytona"} environment saved. Credential values remain in the named environment variable.` };
+      notice = { kind: "ok", text: environmentKind === "container" ? "Container execution profile saved." : `${environmentKind === "ssh" ? "SSH" : "Daytona"} environment saved. Credential values remain in the named environment variable.` };
       environmentName = ""; host = ""; remoteUser = ""; sandboxId = "";
+      selectedContainerTools = [];
       await load();
     } catch { notice = { kind: "error", text: "The execution profile could not be saved." }; }
     finally { busy = false; }
+  }
+  function runtimeName(runtime: string | undefined): string {
+    return runtime ? runtime.charAt(0).toUpperCase() + runtime.slice(1) : "Container";
+  }
+  function containerReason(reason: string | null | undefined): string | null {
+    if (!reason) return null;
+    if (reason.startsWith("container_runtime_unavailable:")) return `${runtimeName(reason.split(":", 2)[1])} is not available on this host.`;
+    if (reason === "container_gate_disabled") return "Enable container execution in Permissions.";
+    if (reason === "container_image_not_allowlisted") return "Choose an operator-approved container image.";
+    return "This container profile is not ready.";
+  }
+  function toggleContainerTool(tool: string, checked: boolean) {
+    selectedContainerTools = checked
+      ? [...selectedContainerTools, tool]
+      : selectedContainerTools.filter((item) => item !== tool);
   }
   async function selectEnvironment(profileId: string) {
     try { await api.selectExecutionEnvironment(profileId); await load(); }
@@ -142,20 +168,40 @@
     <div class="environment-grid">
       {#each environments.environments as environment}
         <article class:selected={environment.selected}>
-          <div><strong>{environment.name}</strong><span>{environment.kind} · {environment.status.replaceAll("_", " ")}</span>{#if environment.cost}<small>USD {environment.cost.committed_cost.toFixed(2)} committed · {environment.cost.remaining_cost?.toFixed(2) ?? "0.00"} remaining · {environment.cost.reconciliation_status.replaceAll("_", " ")}</small>{/if}</div>
+          <div>
+            <strong>{environment.name}</strong>
+            {#if environment.kind === "container"}
+              <span class="container-runtime">{runtimeName(environment.runtime)} · {environment.image ?? "No approved image"}</span>
+              <span class="boundary">Read-only repository → writable output</span>
+              <small>{environment.assigned_tool_count ?? 0} tools</small>
+              {#if containerReason(environment.availability_reason)}<small class="remediation">{containerReason(environment.availability_reason)}</small>{/if}
+            {:else}
+              <span>{environment.kind} · {environment.status.replaceAll("_", " ")}</span>
+              {#if environment.cost}<small>USD {environment.cost.committed_cost.toFixed(2)} committed · {environment.cost.remaining_cost?.toFixed(2) ?? "0.00"} remaining · {environment.cost.reconciliation_status.replaceAll("_", " ")}</small>{/if}
+            {/if}
+          </div>
           <button class="btn btn-ghost btn-sm" disabled={!environment.available || environment.selected} onclick={() => void selectEnvironment(environment.profile_id)}>{environment.selected ? "Selected" : "Select"}</button>
         </article>
       {/each}
     </div>
   {/if}
   <details>
-    <summary>Add SSH or Daytona profile</summary>
+    <summary>Add execution profile</summary>
     <form class="environment-form" onsubmit={(event) => { event.preventDefault(); void saveEnvironment(); }}>
-      <label>Environment type<select bind:value={environmentKind} onchange={() => credentialEnv = environmentKind === "ssh" ? "RAIKER_SSH_IDENTITY_FILE" : "DAYTONA_API_KEY"}><option value="ssh">SSH remote host</option><option value="daytona">Daytona cloud sandbox</option></select></label>
+      <label>Environment type<select bind:value={environmentKind} onchange={() => credentialEnv = environmentKind === "ssh" ? "RAIKER_SSH_IDENTITY_FILE" : "DAYTONA_API_KEY"}><option value="ssh">SSH remote host</option><option value="daytona">Daytona cloud sandbox</option><option value="container">Container boundary</option></select></label>
       <label>Display name<input bind:value={environmentName} required placeholder="Build host" /></label>
-      {#if environmentKind === "ssh"}<label>Host<input bind:value={host} required placeholder="build.example.com" /></label><label>Remote user<input bind:value={remoteUser} required placeholder="raiker" /></label>{:else}<label>Sandbox ID<input bind:value={sandboxId} required placeholder="sandbox-id" /></label><label>Maximum run cost (USD)<input type="number" min="0.01" step="0.01" bind:value={maxCost} /></label>{/if}
-      <label>Credential environment variable<input bind:value={credentialEnv} required pattern={"[A-Z][A-Z0-9_]{2,127}"} /></label>
-      <small>{environmentKind === "ssh" ? "The variable must contain the path to an OpenSSH private key; known-host verification stays strict." : "The variable must contain the Daytona API key. Every run reserves against cumulative spend; estimates remain reserved when provider billing data is unavailable."}</small>
+      {#if environmentKind === "ssh"}
+        <label>Host<input bind:value={host} required placeholder="build.example.com" /></label><label>Remote user<input bind:value={remoteUser} required placeholder="raiker" /></label>
+      {:else if environmentKind === "daytona"}
+        <label>Sandbox ID<input bind:value={sandboxId} required placeholder="sandbox-id" /></label><label>Maximum run cost (USD)<input type="number" min="0.01" step="0.01" bind:value={maxCost} /></label>
+      {:else}
+        <label>Container runtime<select bind:value={containerRuntime}>{#each environments?.container_options?.runtimes ?? [] as runtime}<option value={runtime}>{runtimeName(runtime)}</option>{/each}</select></label>
+        <label>Approved image<select bind:value={containerImage}>{#each environments?.container_options?.images ?? [] as image}<option value={image}>{image}</option>{/each}</select></label>
+        <fieldset><legend>Container tools</legend>{#each environments?.container_options?.supported_tools ?? [] as tool}<label class="tool-choice"><input type="checkbox" checked={selectedContainerTools.includes(tool)} onchange={(event) => toggleContainerTool(tool, event.currentTarget.checked)} /> {tool}</label>{/each}</fieldset>
+        <div class="boundary-preview"><span>Repository</span><strong>Read only</strong><i>→</i><span>Output</span><strong>Writable</strong></div>
+      {/if}
+      {#if environmentKind !== "container"}<label>Credential environment variable<input bind:value={credentialEnv} required pattern={"[A-Z][A-Z0-9_]{2,127}"} /></label>
+      <small>{environmentKind === "ssh" ? "The variable must contain the path to an OpenSSH private key; known-host verification stays strict." : "The variable must contain the Daytona API key. Every run reserves against cumulative spend; estimates remain reserved when provider billing data is unavailable."}</small>{/if}
       <button class="btn btn-primary" disabled={busy}>Save environment</button>
     </form>
   </details>
@@ -190,7 +236,7 @@
 <style>
   .section-heading { margin-bottom: var(--space-4); } .section-heading h2, h3, h4 { margin: 0; } .section-heading p, .description, .danger-zone p { color: var(--text-2); }
   .settings-card, .danger-zone { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: clamp(1.25rem, 3vw, 2rem); }
-  .environment-settings { margin-top:var(--space-5); } .environment-grid { display:grid; gap:var(--space-2); margin:var(--space-4) 0; } .environment-grid article { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-grid article.selected { border-color:var(--accent-border); background:var(--accent-soft); } .environment-grid article div { display:grid; gap:.2rem; } .environment-grid article span { color:var(--text-3); font-size:.75rem; text-transform:capitalize; } .environment-grid article small { color:var(--text-2); font-size:.72rem; text-transform:capitalize; } details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; color:var(--text-2); font-size:.78rem; } .environment-form input,.environment-form select { min-height:40px; padding:0 .65rem; border:1px solid var(--border); border-radius:var(--r-md); background:var(--sunken); color:var(--text-1); } .environment-form small,.environment-form button { grid-column:1/-1; }
+  .environment-settings { margin-top:var(--space-5); } .environment-grid { display:grid; gap:var(--space-2); margin:var(--space-4) 0; } .environment-grid article { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-grid article.selected { border-color:var(--accent-border); background:var(--accent-soft); } .environment-grid article div { display:grid; gap:.2rem; } .environment-grid article span { color:var(--text-3); font-size:.75rem; text-transform:capitalize; } .environment-grid article .container-runtime { color:var(--text-2); font-family:var(--font-mono); text-transform:none; } .environment-grid article .boundary { width:fit-content; padding:.18rem .45rem; border-left:2px solid var(--accent); background:var(--sunken); color:var(--text-2); text-transform:none; } .environment-grid article small { color:var(--text-2); font-size:.72rem; text-transform:capitalize; } .environment-grid article .remediation { color:var(--warn); text-transform:none; } details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; color:var(--text-2); font-size:.78rem; } .environment-form input,.environment-form select { min-height:40px; padding:0 .65rem; border:1px solid var(--border); border-radius:var(--r-md); background:var(--sunken); color:var(--text-1); } .environment-form small,.environment-form button,.environment-form fieldset,.boundary-preview { grid-column:1/-1; } .environment-form fieldset { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-form fieldset legend { padding:0 .35rem; color:var(--text-2); font-size:.78rem; } .environment-form .tool-choice { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.35rem; color:var(--text-1); font-family:var(--font-mono); } .environment-form .tool-choice input { min-height:0; } .boundary-preview { display:grid; grid-template-columns:auto auto 1fr auto auto; align-items:center; gap:.55rem; padding:.7rem .8rem; border-left:3px solid var(--accent); background:var(--sunken); color:var(--text-3); font-size:.75rem; } .boundary-preview strong { color:var(--text-1); } .boundary-preview i { text-align:center; color:var(--accent); font-style:normal; }
   .status { color: var(--ok); font-size: .85rem; } .status.stopped { color: var(--warn); }
   .eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; font-weight: 700; }
   dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); padding: var(--space-4) 0; border-block: 1px solid var(--border); } dl div { display: grid; gap: .2rem; } dt { color: var(--text-3); font-size: .75rem; } dd { margin: 0; }

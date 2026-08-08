@@ -5,6 +5,7 @@ import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 
 class SandboxError(Exception):
@@ -34,7 +35,8 @@ def run_command(
     allowlist: frozenset[str] | None = None,
     cwd: str | Path | None = None,
     env: dict[str, str] | None = None,
-) -> dict:
+    stdin_text: str | None = None,
+) -> dict[str, Any]:
     if allowlist is not None:
         check_command_allowlist(command, allowlist)
     try:
@@ -45,6 +47,7 @@ def run_command(
             timeout=timeout,
             cwd=cwd,
             env={**os.environ, **env} if env else None,
+            input=stdin_text.encode("utf-8") if stdin_text is not None else None,
         )
     except subprocess.TimeoutExpired:
         raise SandboxError(f"command_timeout:{timeout}s") from None

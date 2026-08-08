@@ -35,6 +35,12 @@ from raiker.storage.sqlite import SQLiteStore
 CAPABILITY_GATE_TOOLS: dict[str, tuple[str, ...]] = {
     "file_write_execution": ("write_file", "edit_file", "create_document"),
     "patch_apply_execution": ("apply_patch",),
+    # B11/BUG-67 — the git write path. The model is told whether it may commit
+    # and whether it may publish *separately*, because they are separate owner
+    # decisions: an agent that can commit and cannot push should propose the
+    # commit and say so, not attempt a push it will be refused.
+    "git_write_execution": ("git_branch", "git_commit"),
+    "git_push_execution": ("git_push",),
     "shell_execution": ("shell",),
     "remote_execution_cap": ("remote_execute",),
     "cloud_execution_cap": ("cloud_execute",),

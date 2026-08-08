@@ -244,8 +244,12 @@ def test_a_write_into_the_governance_directory_fails_instead_of_being_proposed(t
         session_id=new_id("sess_"),
         turn_id=new_id("turn_"),
     )
-    preview = result.output["proposal_preview"]  # type: ignore[index]
-    assert preview == {"status": "failed", "error": {"type": "protected_workspace_path"}}
+    # BUG-67 — and it fails rather than being proposed. A snapshot that already
+    # refused is not a decision the owner has anything to weigh: raising an
+    # approval for it would ask them to approve something the runtime has
+    # established it will not do, and tell them so only afterwards.
+    assert result.status == "failed"
+    assert result.error == {"type": "protected_workspace_path"}
     assert not (tmp_path / ".raiker" / "hooks.json").exists()
 
 

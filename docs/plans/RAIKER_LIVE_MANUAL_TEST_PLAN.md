@@ -273,6 +273,12 @@ not, and marks only the ones the model itself cited.
 | 6.12 | **Approve and execute once** | The notice names the commit and branch; `git log -1` matches, status is clean, `.raiker` is not tracked | ✅ FIXED-109 (`b11-commit-executed`) |
 | 6.13 | Ask Chat to `github_write` a pull request with the GitHub connector off | Detail shows the exact redacted outbound request and **Approve (record only)** | ✅ FIXED-109 (`b11-github-write-approval`) |
 | 6.14 | Turn **Git writes** off, propose another commit | Detail says the decision does NOT execute the action; approving records nothing in git | ✅ FIXED-109 (`b11-gate-off-record-only`) |
+| 6.15 | Connect a repository at `projects/service` in Build, press **Use**, ask for `git_log` | The answer is that repository's own history, not the workspace's | ✅ FIXED-110 (`bug66-subfolder-repository`, `bug66-subfolder-git-log`) |
+| 6.16 | Permissions → search **Git push** | A capability separate from Git writes, stating the connector egress allowlist it also needs and that it never forces or deletes | ✅ FIXED-111 (`bug67-git-push-capability`) |
+| 6.17 | Turn on **Git push**, commit a change, ask Chat to `git_push`, then **Review** | Detail names the repository, the remote and its host, the branch, and the commits it would send; the notice says it leaves this machine | ✅ FIXED-111 (`bug67-push-approval`) |
+| 6.18 | **Approve and execute once** | The notice names the commits pushed; `git ls-remote` reports the branch at exactly the local commit | ✅ FIXED-111 (`bug67-push-executed`) |
+| 6.19 | Ask for `git_push` again with nothing new | The tool answers `nothing_to_push` and **no approval is raised** | ✅ FIXED-112 (`bug67-nothing-to-push`) |
+| 6.20 | Turn **Git push** off, commit again, propose another push | Detail says the decision does NOT execute the action; the remote does not move | ✅ FIXED-111 (`bug67-gate-off-record-only`) |
 
 The 2026-07-28 focused re-check used a disposable workspace and a fresh owner
 account. Ollama `gemma4:31b-cloud` proposed one new Markdown file;

@@ -44,7 +44,14 @@ from raiker.tools.filesystem import (
     proposed_patch_snapshot,
     proposed_write_snapshot,
 )
-from raiker.tools.git import proposed_branch_snapshot, proposed_commit_snapshot
+from raiker.tools.git import (
+    proposed_branch_snapshot,
+    proposed_commit_snapshot,
+    proposed_push_snapshot,
+    repository_label,
+    resolve_repository_root,
+    selected_repository_subpath,
+)
 
 # Capability states that mean the gate is off / fail-closed.
 _DISABLED_STATES = {"disabled", "planned"}
@@ -4368,7 +4375,9 @@ class DashboardService:
         except (ValueError, TypeError):
             raw_args = {}
         arguments = self._redact_arguments(raw_args)
-        diff, diff_path, kind = self._build_preview(view.tool_name, raw_args)
+        diff, diff_path, kind = self._build_preview(
+            view.tool_name, raw_args, principal_id=principal_id
+        )
         connector_write = view.tool_name == "connector_write"
         # BUG-06 — the notice is derived from what the server will actually do,
         # not from a constant. A file mutation executes only when the relay and
@@ -4407,6 +4416,16 @@ class DashboardService:
                 "Approving this creates the branch above and checks it out, once, "
                 "under a fresh capability, policy and posture check. No commit is "
                 "made and no file is changed; delete the branch in git to undo it."
+            )
+        elif relays and view.tool_name == "git_push":
+            # BUG-67 — the branch and the commit above are local and the owner
+            # can undo them in git. This one leaves the machine, so it is worded
+            # like the GitHub write below rather than like its own siblings.
+            notice = (
+                "Approving this sends the commits above to the remote shown, once, "
+                "with your own credential. It never forces and never deletes a "
+                "branch, but it leaves this machine and git cannot take it back — "
+                "undo it on the remote."
             )
         elif relays and view.tool_name == "github_write":
             notice = (
@@ -4480,8 +4499,25 @@ class DashboardService:
             return {str(k): cls._redact_value(v) for k, v in value.items()}
         return value
 
+    def _git_root(self, principal_id: str | None) -> Path:
+        """The repository a git approval was computed against (BUG-66).
+
+        The same resolution the broker and the executor use, so the diff the
+        owner reviews, the sentence they are shown, and the repository the change
+        lands in are one answer rather than three.
+        """
+        scope: str | None = None
+        if principal_id:
+            try:
+                scope = self.store.account_scope(principal_id) or principal_id
+            except Exception:  # noqa: BLE001 — a storage failure falls back to the workspace
+                scope = None
+        return resolve_repository_root(
+            self.workspace_root, selected_repository_subpath(self.store, scope)
+        )
+
     def _build_preview(
-        self, tool_name: str, args: dict[str, Any]
+        self, tool_name: str, args: dict[str, Any], *, principal_id: str | None = None
     ) -> tuple[str | None, str | None, str]:
         """Return (diff, path, preview_kind). File mutations get a unified diff; never executes."""
         if tool_name == "write_file":
@@ -4560,9 +4596,11 @@ class DashboardService:
         # is, as a diff; a branch is reviewed as the two refs it moves between,
         # because there is no diff to show and pretending otherwise would be
         # worse than saying so.
+        repo_root = self._git_root(principal_id)
+        repository = repository_label(self.workspace_root, repo_root)
         if tool_name == "git_commit":
             snapshot = proposed_commit_snapshot(
-                self.workspace_root, str(args.get("message", "")), args.get("paths")
+                repo_root, str(args.get("message", "")), args.get("paths")
             )
             if snapshot["status"] != "success":
                 return None, None, "arguments"
@@ -4578,19 +4616,21 @@ class DashboardService:
             body = redact_secret_like_text(str(snapshot["diff"]))
             truncated = "\n\n(diff truncated)" if snapshot["truncated"] else ""
             return (
-                f"{snapshot['file_count']} file(s) on {snapshot['branch']}\n{header}\n\n{body}{truncated}",
+                f"{snapshot['file_count']} file(s) on {snapshot['branch']} "
+                f"in repository {repository}\n{header}\n\n{body}{truncated}",
                 str(snapshot["branch"]),
                 "git_change",
             )
         if tool_name == "git_branch":
             snapshot = proposed_branch_snapshot(
-                self.workspace_root,
+                repo_root,
                 str(args.get("name", "")),
                 str(args["base"]) if args.get("base") else None,
             )
             if snapshot["status"] != "success":
                 return None, None, "arguments"
             lines = [
+                f"repository    {repository}",
                 f"new branch    {snapshot['name']}",
                 f"branch from   {snapshot['base'] or snapshot['current_branch'] or snapshot['head']}",
                 f"checked out   {snapshot['current_branch'] or '(detached HEAD)'} → {snapshot['name']}",
@@ -4600,6 +4640,38 @@ class DashboardService:
                     f"carried over  {snapshot['uncommitted_files']} uncommitted file(s)"
                 )
             return "\n".join(lines), str(snapshot["name"]), "git_change"
+        # BUG-67 — a push has no diff either. What the owner needs before
+        # deciding is where it goes and what it carries, so that is what is
+        # shown: the remote and its host, the branch, and the commits that are
+        # not there yet.
+        if tool_name == "git_push":
+            snapshot = proposed_push_snapshot(
+                repo_root,
+                str(args["remote"]) if args.get("remote") else None,
+                str(args["branch"]) if args.get("branch") else None,
+            )
+            if snapshot["status"] != "success":
+                return None, None, "arguments"
+            lines = [
+                f"repository    {repository}",
+                f"remote        {snapshot['remote']} ({snapshot['host']})",
+                f"branch        {snapshot['branch']}"
+                + ("  — new on the remote" if snapshot["creates_remote_branch"] else ""),
+                f"sending       {snapshot['commit_count']} commit(s)",
+            ]
+            if snapshot["behind"]:
+                lines.append(
+                    f"remote ahead  {snapshot['behind']} commit(s) this branch does not have"
+                )
+            lines.append("")
+            lines.extend(f"  {line}" for line in snapshot["commits"])
+            if snapshot["truncated"]:
+                lines.append("  …")
+            return (
+                "\n".join(lines),
+                f"{snapshot['remote']}/{snapshot['branch']}",
+                "git_change",
+            )
         if tool_name == "github_write":
             request_arguments = self._redact_value(
                 {k: v for k, v in args.items() if k not in ("operation", "repo")}

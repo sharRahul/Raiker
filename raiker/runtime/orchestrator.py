@@ -1552,7 +1552,10 @@ class RuntimeOrchestrator:
                     # refusal ends its own call, so the calls behind it are still
                     # brokered and governed on their own terms rather than dying
                     # with it.
-                    if execution[1].decision == "needs_approval":
+                    if (
+                        execution[1].decision == "needs_approval"
+                        and execution[0].status == "approval_required"
+                    ):
                         break
             self._state(machine, envelope, "POLICY_REVIEWED")
             # Every call in this batch that reached an outcome, in the order the
@@ -1569,7 +1572,18 @@ class RuntimeOrchestrator:
                 zip(actions, executions, strict=False)
             ):
                 candidate_result, candidate_decision = execution
-                if candidate_decision.decision == "needs_approval":
+                # BUG-67 — an approval-bearing call the broker *answered itself*.
+                # Its own proposal already refused, so no approval was raised and
+                # there is nothing for the owner to decide. It is a completed call
+                # with a failed outcome: parking on it would strand the turn on an
+                # approval that does not exist, and calling it a policy refusal
+                # would replace the named, correctable reason with a verdict that
+                # is not what happened.
+                answered_by_broker = (
+                    candidate_decision.decision == "needs_approval"
+                    and candidate_result.status != "approval_required"
+                )
+                if candidate_decision.decision == "needs_approval" and not answered_by_broker:
                     # Approval-bearing calls remain deliberately serial: stop at
                     # the first decision boundary instead of executing later
                     # mutations, and queue the remainder (ADD-02).
@@ -1581,7 +1595,7 @@ class RuntimeOrchestrator:
                         candidate_decision,
                     )
                     break
-                if candidate_decision.decision != "allow":
+                if candidate_decision.decision != "allow" and not answered_by_broker:
                     # BUG-52 — a refusal is reported against its own call and the
                     # batch carries on, exactly as it already did inside a drained
                     # queue. The same refusal must not produce two different

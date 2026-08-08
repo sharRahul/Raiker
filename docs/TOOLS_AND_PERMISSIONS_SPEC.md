@@ -10,6 +10,7 @@ capability state, and routed only through RuntimeAuthority.
 | Local supported executors | Policy-gated; decision mode and approvals apply |
 | Approval resolution | Metadata-only by default |
 | Repository writes (`git_branch`, `git_commit`) | Approval-required; the reviewed change set is what executes, and repository hooks never run |
+| Repository push (`git_push`) | Approval-required under its own capability; the remote's host must be on the owner egress allowlist and the owner's credential must be set; never forces and never deletes |
 | Remote/cloud and sensitive domains | Disabled and fail-closed |
 
 Executors must validate arguments, keep output safe for audit, and refuse work

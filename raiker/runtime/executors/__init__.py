@@ -30,7 +30,7 @@ from raiker.runtime.executors.scheduled import ScheduledRoutinesExecutor
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.runtime.executors.tier1_checkpoint import CheckpointRestoreExecutor
 from raiker.runtime.executors.tier1_files import FileWriteExecutor, PatchApplyExecutor
-from raiker.runtime.executors.tier1_git import GitWriteExecutor
+from raiker.runtime.executors.tier1_git import GitPushExecutor, GitWriteExecutor
 from raiker.runtime.executors.tier1_memory import MemoryForgetExecutor, MemoryWriteExecutor
 from raiker.runtime.executors.tier1_tasks import (
     ProjectAssignmentExecutor,
@@ -73,7 +73,7 @@ __all__ = [
     "Executor", "ExecutionResult", "ExecutorRegistry", "SandboxError", "not_implemented",
     "REAL_EXECUTOR_CAPABILITIES", "build_default_executor_registry",
     "ApprovalExecutionRelay", "CheckpointRestoreExecutor", "FileWriteExecutor", "PatchApplyExecutor",
-    "GitWriteExecutor",
+    "GitWriteExecutor", "GitPushExecutor",
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "TaskManagementExecutor", "ProjectAssignmentExecutor",
     "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "NetworkExecutor",
@@ -134,6 +134,10 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "process_execution",
     "web_fetch",
     "network_execution",
+    # BUG-67 — the governed push. Egress like the four above it, bounded by the
+    # owner's connector egress allowlist and the owner's own credential; it never
+    # forces and never deletes a ref.
+    "git_push_execution",
     # Tier 3 — local code-intelligence runtime
     "graph_indexing_runtime",
     "semantic_memory_runtime",
@@ -228,7 +232,8 @@ def build_default_executor_registry(
     registry.register("approval_execution_relay", ApprovalExecutionRelay(ws, store))
     registry.register("file_write_execution", FileWriteExecutor(ws))
     registry.register("patch_apply_execution", PatchApplyExecutor(ws))
-    registry.register("git_write_execution", GitWriteExecutor(ws))
+    registry.register("git_write_execution", GitWriteExecutor(ws, store))
+    registry.register("git_push_execution", GitPushExecutor(ws, store))
     registry.register("checkpoint_restore_execution", CheckpointRestoreExecutor(ws, store))
     registry.register("memory_write_execution", MemoryWriteExecutor(ws, store))
     registry.register("memory_forget_execution", MemoryForgetExecutor(ws))

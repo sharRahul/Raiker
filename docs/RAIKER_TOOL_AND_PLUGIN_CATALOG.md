@@ -11,7 +11,8 @@ executor availability.
 
 Approval resolution is `metadata_only` except for an approved local file
 mutation (`write_file` / `edit_file` / `apply_patch`), an approved repository
-change (`git_branch` / `git_commit`), an approved GitHub write (`github_write`),
+change (`git_branch` / `git_commit`), an approved push (`git_push`), an approved
+GitHub write (`github_write`),
 or an owner-configured
 SSH/Daytona command, which is executed once through the governed approval execution relay.
 A supported durable mutation is

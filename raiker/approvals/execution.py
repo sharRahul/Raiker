@@ -69,6 +69,11 @@ EXECUTABLE_ON_APPROVAL: frozenset[str] = frozenset({
     # host it already reaches for reads. Leaving them out would have raised a
     # high-risk decision that said what approving would do and then did nothing.
     "git_write_execution",
+    # BUG-67 — the push. It is egress rather than a local write, which is why it
+    # has its own capability and its own gate; but the approval question is the
+    # same one, and an approval that said "approving sends this" and then sent
+    # nothing would be the defect this list exists to prevent.
+    "git_push_execution",
     "connector_github_runtime",
 })
 

@@ -3,6 +3,7 @@
   import Badge from "../components/Badge.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import IdentityChip from "../components/IdentityChip.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, auth, getToken, setToken, ApiError } from "../api";
   import { alreadyResumedElsewhere, publishApprovalResolved } from "../approvalResume";
@@ -333,6 +334,7 @@
       <thead>
         <tr>
           <th>Action</th>
+          <th>Proposed by</th>
           <th>Capability</th>
           <th>Risk</th>
           <th>Status</th>
@@ -351,6 +353,7 @@
                 </span>
               {/if}
             </td>
+            <td><IdentityChip identity={a.proposed_by} /></td>
             <td>{capabilityLabel(a.capability)}</td>
             <td><Badge variant={a.risk_level === "critical" || a.risk_level === "high" ? "blocked" : "metadata-only"} label={a.risk_level} /></td>
             <td><Badge variant={approvalBadge(a.is_expired ? "expired" : a.status)} label={a.is_expired ? "expired" : a.status} /></td>
@@ -390,6 +393,7 @@
       <div><dt>Risk</dt><dd>{selected.approval.risk_level}</dd></div>
       <div><dt>Session</dt><dd><a class="mono" href={`#/sessions?session=${encodeURIComponent(selected.approval.session_id)}`}>View session</a></dd></div>
       <div><dt>Requested</dt><dd>{relativeTime(selected.approval.created_at)}</dd></div>
+      <div><dt>Proposed by</dt><dd><IdentityChip identity={selected.approval.proposed_by} /></dd></div>
       {#if selected.approval.queue_total > 1}
         <div>
           <dt>Batch</dt>
@@ -402,8 +406,8 @@
       {#if selected.approval.expires_at}
         <div><dt>Expires</dt><dd>{formatTimestamp(selected.approval.expires_at)}</dd></div>
       {/if}
-      {#if selected.approval.resolved_by}
-        <div><dt>Resolved by</dt><dd class="mono">{selected.approval.resolved_by}</dd></div>
+      {#if selected.approval.approved_by}
+        <div><dt>Authorized by</dt><dd><IdentityChip identity={selected.approval.approved_by} /></dd></div>
       {/if}
     </dl>
 

@@ -605,6 +605,7 @@ export interface EventEntry {
   timestamp: string;
   risk_level: string | null;
   summary: string | null;
+  machine_identity?: IdentityView | null;
   priority: string | null;
   scheduled_at: string | null;
   recurrence: string | null;
@@ -803,6 +804,18 @@ export interface AuthSession {
 }
 
 // raiker/control/dashboard.py ApprovalView.to_dict()
+export interface IdentityView {
+  principal_id: string;
+  principal_type: string;
+  display_name: string;
+  subject: string | null;
+  turn_id: string | null;
+  key_id: string | null;
+  issued_at: string | null;
+  expires_at: string | null;
+  state: string;
+}
+
 export interface ApprovalView {
   approval_id: string;
   action_id: string;
@@ -820,6 +833,9 @@ export interface ApprovalView {
   executes_action: boolean; // true only for an approved, single-use connector write intent
   critical: boolean; // server-supplied: needs elevated, human-only lifecycle
   resolved_by: string | null;
+  proposed_by?: IdentityView;
+  approved_by?: IdentityView | null;
+  machine_identity?: IdentityView | null;
   // ADD-02 — where this decision sits in the batch of tool calls its turn
   // proposed. 1 / 1 for an ordinary approval; 2 / 3 means two more decisions are
   // queued behind this one on the same turn.
@@ -860,6 +876,9 @@ export interface ResolveApprovalResult {
   status: string;
   executes_action: boolean;
   reason: string;
+  proposed_by?: IdentityView | null;
+  approved_by?: IdentityView | null;
+  machine_identity?: IdentityView | null;
   connector_result?: Record<string, unknown>;
   // Present when an approved mutation was carried out by the execution relay.
   execution?: {

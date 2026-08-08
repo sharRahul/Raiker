@@ -59,6 +59,7 @@ REDACTED_VALUE = "***REDACTED***"
 # Checked *after* the secret-key sweep, so a key naming a credential is still
 # discarded whole even if it also ends in one of these.
 _LOCATOR_KEY_SUFFIXES = ("_url", "_urls", "_uri", "_path", "_paths", "_subpath")
+_LOCATOR_KEYS = frozenset({"subject"})
 
 # Field names whose values are server-issued record identifiers. Same failure as
 # the locators above and the same cure: `sess_inbox_principal_user_<16 hex>` is
@@ -72,7 +73,7 @@ _IDENTIFIER_KEY_SUFFIXES = ("_id", "_ids")
 def is_locator_field(key: str) -> bool:
     """True when a field's name says its value is a URL or filesystem path."""
     lower = key.lower()
-    return lower.endswith(_LOCATOR_KEY_SUFFIXES)
+    return lower in _LOCATOR_KEYS or lower.endswith(_LOCATOR_KEY_SUFFIXES)
 
 
 def is_identifier_field(key: str) -> bool:

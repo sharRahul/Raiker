@@ -9,6 +9,7 @@ from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.models import ToolAction
+from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -55,6 +56,36 @@ def _pending_approval(
     )
     store.insert_tool_action(action, session_id="sess_a", turn_id="turn_a", status="approval_required")
     store.insert_approval(approval_id, action)
+
+
+def _pending_machine_approval(workspace: Path) -> str:
+    store = SQLiteStore(workspace)
+    store.create_session("sess_machine", str(workspace))
+    identity = TurnMachineIdentityLifecycle(workspace, store).start(
+        owner_principal_id="principal_owner",
+        session_id="sess_machine",
+        turn_id="turn_machine",
+        role_ids=("assistant",),
+    )
+    action = ToolAction(
+        action_id="act_machine",
+        tool_name="write_file",
+        arguments={"path": "agent.txt", "text": "hello"},
+        risk_level="high",
+        requires_approval=True,
+        proposed_by=identity.claims.principal_id,
+    )
+    store.insert_tool_action(
+        action,
+        session_id="sess_machine",
+        turn_id="turn_machine",
+        status="approval_required",
+        owner_principal_id="principal_owner",
+        machine_subject=identity.claims.subject,
+        machine_token_id=identity.claims.token_id,
+    )
+    store.insert_approval("appr_machine", action)
+    return identity.claims.principal_id
 
 
 class TestApprovalsRead:
@@ -159,6 +190,34 @@ class TestApprovalsRead:
     def test_detail_unknown_is_404(self, client: TestClient) -> None:
         token = _token(client)
         assert client.get("/api/approvals/nope", headers=_headers(token)).status_code == 404
+
+    def test_detail_names_machine_proposer_without_exposing_bearer(
+        self, workspace: Path, client: TestClient
+    ) -> None:
+        machine_principal_id = _pending_machine_approval(workspace)
+        token = _token(client)
+
+        body = client.get(
+            "/api/approvals/appr_machine", headers=_headers(token)
+        ).json()
+
+        proposed = body["approval"]["proposed_by"]
+        assert proposed["principal_id"] == machine_principal_id
+        assert proposed["principal_type"] == "ai_agent"
+        assert proposed["turn_id"] == "turn_machine"
+        assert body["approval"]["machine_identity"]["subject"].startswith(
+            "spiffe://raiker/"
+        )
+        assert "token" not in str(body).lower()
+
+        resolved = client.post(
+            "/api/approvals/appr_machine/resolve",
+            json={"approve": False, "reason": "not this time"},
+            headers=_headers(token),
+        ).json()
+        assert resolved["proposed_by"]["principal_id"] == machine_principal_id
+        assert resolved["approved_by"]["principal_id"] == "principal_owner"
+        assert resolved["approved_by"]["principal_type"] == "human"
 
 
 class TestApprovalsResolve:

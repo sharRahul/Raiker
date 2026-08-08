@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import AuthorityMatrix from "../components/AuthorityMatrix.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import StepUpDialog from "../components/StepUpDialog.svelte";
@@ -143,6 +144,9 @@
       : actionable;
     return groupByDomain(matches);
   });
+  const authorityGates = $derived(
+    (gates ?? []).filter((gate) => !isDeferred(gate) && !isInherent(gate)).slice(0, 8),
+  );
 
   function toggleExpand(capability: string) {
     expanded = expanded === capability ? null : capability;
@@ -291,6 +295,10 @@
 
 {#if notice}
   <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>
+{/if}
+
+{#if gates !== null && authorityGates.length > 0}
+  <AuthorityMatrix gates={authorityGates} />
 {/if}
 
 {#if integratedButOff > 0}

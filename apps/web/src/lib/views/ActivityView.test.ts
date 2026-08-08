@@ -50,6 +50,38 @@ describe("ActivityView", () => {
     expect(screen.getByText("high")).toBeInTheDocument();
   });
 
+  it("shows the signed turn identity for attributed events", async () => {
+    stubFetch({
+      "GET /api/events": [
+        {
+          event_id: "ev_machine",
+          event_type: "tool_completed",
+          actor: "tool_broker",
+          risk_level: "low",
+          summary: "Read completed",
+          session_id: "sess_1",
+          turn_id: "turn_1",
+          timestamp: "2026-07-18T00:00:00Z",
+          machine_identity: {
+            principal_id: "principal_turn_agent_1",
+            principal_type: "ai_agent",
+            display_name: "Raiker agent · turn_1",
+            subject: "spiffe://raiker/ws/agent/turn/turn_1",
+            turn_id: "turn_1",
+            key_id: "mkey_1",
+            issued_at: "2026-07-18T00:00:00Z",
+            expires_at: "2026-07-18T00:15:00Z",
+            state: "inactive",
+          },
+        },
+      ],
+    });
+    render(ActivityView);
+
+    expect(await screen.findByText("Raiker agent · turn_1")).toBeInTheDocument();
+    expect(screen.queryByText("tool_broker")).not.toBeInTheDocument();
+  });
+
   it("loads the audit log scoped to a linked session", async () => {
     const fetchMock = stubFetch({ "GET /api/events": [] });
     render(ActivityView, { sessionId: "sess_alpha" });

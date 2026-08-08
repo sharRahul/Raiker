@@ -1,6 +1,7 @@
 <script lang="ts">
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
+  import IdentityChip from "../components/IdentityChip.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import type { EventEntry } from "../apiTypes";
@@ -106,7 +107,13 @@
         {#each events as ev (ev.event_id)}
           <tr>
             <td title={ev.event_type}>{humanize(ev.event_type)}</td>
-            <td class="mono actor">{ev.actor}</td>
+            <td class="actor">
+              {#if ev.machine_identity}
+                <IdentityChip identity={ev.machine_identity} />
+              {:else}
+                <span class="mono">{ev.actor}</span>
+              {/if}
+            </td>
             <td>
               <span class={`risk ${riskTone(ev.risk_level)}`}>{ev.risk_level ?? "—"}</span>
             </td>

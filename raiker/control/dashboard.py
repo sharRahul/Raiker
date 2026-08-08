@@ -310,6 +310,7 @@ class EventView:
     timestamp: str
     risk_level: str | None
     summary: str | None
+    machine_identity: IdentityView | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -845,6 +846,22 @@ class DiagnosticsView:
 
 
 @dataclass(frozen=True)
+class IdentityView:
+    principal_id: str
+    principal_type: str
+    display_name: str
+    subject: str | None = None
+    turn_id: str | None = None
+    key_id: str | None = None
+    issued_at: str | None = None
+    expires_at: str | None = None
+    state: str = "unknown"
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ApprovalView:
     approval_id: str
     action_id: str
@@ -861,6 +878,9 @@ class ApprovalView:
     # re-checks the TTL before recording any decision.
     expires_at: str | None
     is_expired: bool
+    proposed_by: IdentityView
+    approved_by: IdentityView | None
+    machine_identity: IdentityView | None
     # Resolving an approval records a decision; it never executes the action.
     executes_action: bool = False
     # Critical approvals use the elevated, human-only RuntimeAuthority lifecycle.
@@ -4530,6 +4550,11 @@ class DashboardService:
 
     @staticmethod
     def _event_view(row: dict[str, Any]) -> EventView:
+        machine_identity = (
+            DashboardService._proposal_identity(row)
+            if row.get("proposed_by")
+            else None
+        )
         return EventView(
             event_id=str(row["event_id"]),
             session_id=str(row.get("session_id", "")),
@@ -4539,6 +4564,7 @@ class DashboardService:
             timestamp=str(row.get("timestamp", "")),
             risk_level=row.get("risk_level"),
             summary=row.get("summary"),
+            machine_identity=machine_identity,
         )
 
     @staticmethod
@@ -4567,6 +4593,49 @@ class DashboardService:
         delta = datetime.now(UTC) - then
         return max(0, int(delta.total_seconds()))
 
+    @staticmethod
+    def _proposal_identity(row: dict[str, Any]) -> IdentityView:
+        principal_id = str(row.get("proposed_by") or "agent_runtime")
+        principal_type = str(row.get("proposer_principal_type") or "unknown")
+        turn_id = str(row.get("turn_id") or "") or None
+        expires_at = str(row.get("machine_expires_at") or "") or None
+        if row.get("machine_is_active") is not None and not bool(
+            row.get("machine_is_active")
+        ):
+            state = "inactive"
+        elif expires_at and expires_at < utc_now():
+            state = "expired"
+        elif principal_type == "ai_agent":
+            state = "active"
+        else:
+            state = "unknown"
+        display_name = str(row.get("proposer_display_name") or "")
+        if not display_name and principal_type == "ai_agent":
+            display_name = f"Raiker agent · {turn_id or 'turn'}"
+        return IdentityView(
+            principal_id=principal_id,
+            principal_type=principal_type,
+            display_name=display_name or principal_id,
+            subject=str(row.get("machine_subject") or "") or None,
+            turn_id=turn_id,
+            key_id=str(row.get("machine_key_id") or "") or None,
+            issued_at=str(row.get("machine_issued_at") or "") or None,
+            expires_at=expires_at,
+            state=state,
+        )
+
+    @staticmethod
+    def _authorizer_identity(row: dict[str, Any]) -> IdentityView | None:
+        principal_id = str(row.get("approved_by") or "")
+        if not principal_id:
+            return None
+        return IdentityView(
+            principal_id=principal_id,
+            principal_type=str(row.get("authorizer_principal_type") or "human"),
+            display_name=str(row.get("authorizer_display_name") or principal_id),
+            state="active",
+        )
+
     @classmethod
     def _approval_view(
         cls, row: dict[str, Any], *, queue: dict[str, tuple[int, int]] | None = None
@@ -4578,6 +4647,8 @@ class DashboardService:
         # An approval with no parked turn behind it is a batch of one, which is
         # what the defaults say.
         queue_position, queue_total = (queue or {}).get(str(row["approval_id"]), (1, 1))
+        proposed_by = cls._proposal_identity(row)
+        approved_by = cls._authorizer_identity(row)
         return ApprovalView(
             approval_id=str(row["approval_id"]),
             action_id=str(row.get("action_id", "")),
@@ -4592,6 +4663,11 @@ class DashboardService:
             requires_approval=status == "pending",
             expires_at=expires_at,
             is_expired=status == "pending" and bool(expires_at and utc_now() > expires_at),
+            proposed_by=proposed_by,
+            approved_by=approved_by,
+            machine_identity=(
+                proposed_by if proposed_by.principal_type == "ai_agent" else None
+            ),
             critical=bool(row.get("critical")),
             resolved_by=(str(row["approved_by"]) if row.get("approved_by") else None),
             queue_position=queue_position,

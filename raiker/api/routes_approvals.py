@@ -93,6 +93,32 @@ def _record_resume_outcome(
     }
 
 
+def _approval_attribution(
+    request: Request,
+    approval_id: str,
+    *,
+    user_id: str | None,
+    principal_id: str,
+) -> dict[str, Any]:
+    detail = _service(request).get_approval(
+        approval_id, user_id=user_id, principal_id=principal_id
+    )
+    if detail is None:
+        return {"proposed_by": None, "approved_by": None, "machine_identity": None}
+    approval = detail.approval
+    return {
+        "proposed_by": approval.proposed_by.to_dict(),
+        "approved_by": (
+            approval.approved_by.to_dict() if approval.approved_by is not None else None
+        ),
+        "machine_identity": (
+            approval.machine_identity.to_dict()
+            if approval.machine_identity is not None
+            else None
+        ),
+    }
+
+
 def _nudge_scheduler(request: Request, session_id: str) -> None:
     """Tell the resident scheduler an approval it was waiting on has been decided.
 
@@ -269,6 +295,12 @@ async def resolve_approval(
             "status": execution.status,
             "executes_action": True,
             "reason": body.reason,
+            **_approval_attribution(
+                request,
+                approval_id,
+                user_id=owner_user_id,
+                principal_id=session.principal_id,
+            ),
             "execution": {
                 "capability": execution.capability,
                 "path": execution.artifacts.get("path"),
@@ -371,6 +403,12 @@ async def resolve_approval(
                 "status": "executed",
                 "executes_action": True,
                 "reason": body.reason,
+                **_approval_attribution(
+                    request,
+                    approval_id,
+                    user_id=owner_user_id,
+                    principal_id=session.principal_id,
+                ),
                 "connector_result": output,
                 "resume": _record_resume_outcome(
                     request,
@@ -387,6 +425,12 @@ async def resolve_approval(
         "status": resolution.status,
         "executes_action": resolution.executes_action,
         "reason": body.reason,
+        **_approval_attribution(
+            request,
+            approval_id,
+            user_id=owner_user_id,
+            principal_id=session.principal_id,
+        ),
         # B2 — the decision closes the tool call the model is still waiting on,
         # so a parked turn can pick up from here. Rejection is carried through as
         # a refusal rather than silence, which is what lets the model react.

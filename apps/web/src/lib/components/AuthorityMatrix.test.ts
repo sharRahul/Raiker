@@ -1,0 +1,18 @@
+import { render, screen } from "@testing-library/svelte";
+import { expect, it } from "vitest";
+import { makeGate } from "../test-helpers";
+import AuthorityMatrix from "./AuthorityMatrix.svelte";
+
+it("separates owner control from the agent's derived authority", () => {
+  render(AuthorityMatrix, {
+    gates: [
+      makeGate({ capability: "shell_execution", state: "enabled_runtime", decision_mode: "ask" }),
+      makeGate({ capability: "web_fetch", state: "disabled", decision_mode: "allow" }),
+    ],
+  });
+
+  expect(screen.getByRole("columnheader", { name: "Owner control" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Raiker agent" })).toBeInTheDocument();
+  expect(screen.getByText("Ask")).toBeInTheDocument();
+  expect(screen.getByText("Unavailable")).toBeInTheDocument();
+});

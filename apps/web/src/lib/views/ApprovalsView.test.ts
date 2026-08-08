@@ -83,6 +83,44 @@ describe("ApprovalsView", () => {
     expect(screen.getByText("medium")).toBeInTheDocument();
   });
 
+  it("names the machine proposer separately from the human authorizer", async () => {
+    const proposed = {
+      principal_id: "principal_turn_agent_1",
+      principal_type: "ai_agent",
+      display_name: "Raiker agent · turn_1",
+      subject: "spiffe://raiker/ws/agent/turn/turn_1",
+      turn_id: "turn_1",
+      key_id: "mkey_1",
+      issued_at: "2026-07-07T00:00:00Z",
+      expires_at: "2026-07-07T00:15:00Z",
+      state: "inactive",
+    };
+    const approved = {
+      ...proposed,
+      principal_id: "principal_owner",
+      principal_type: "human",
+      display_name: "Owner",
+      subject: null,
+      turn_id: null,
+      key_id: null,
+      issued_at: null,
+      expires_at: null,
+      state: "active",
+    };
+    const attributed = { ...PENDING, proposed_by: proposed, approved_by: approved };
+    stubFetch({
+      "GET /api/approvals": [attributed],
+      "GET /api/approvals/appr_1": { ...DETAIL, approval: attributed },
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+
+    expect(screen.getAllByText("Raiker agent · turn_1").length).toBeGreaterThan(0);
+    expect(screen.getByText("Owner")).toBeInTheDocument();
+    expect(screen.getByText("Authorized by")).toBeInTheDocument();
+  });
+
   it("triages approvals by risk by default and can switch to newest first", async () => {
     const critical = {
       ...PENDING,

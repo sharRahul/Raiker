@@ -4382,40 +4382,60 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         user_id: str | None = None,
         apply_user_visibility_filter: bool = False,
     ) -> list[dict]:
-        query = "SELECT * FROM events_index"
+        query = """
+            SELECT events_index.*, machine.principal_id AS proposed_by,
+                   machine.subject AS machine_subject,
+                   machine.key_id AS machine_key_id,
+                   machine.issued_at AS machine_issued_at,
+                   machine.expires_at AS machine_expires_at,
+                   machine.is_active AS machine_is_active,
+                   proposer.principal_type AS proposer_principal_type,
+                   proposer.display_name AS proposer_display_name
+            FROM events_index
+            LEFT JOIN turn_machine_identities AS machine
+              ON machine.principal_id = (
+                SELECT identity.principal_id
+                FROM turn_machine_identities AS identity
+                WHERE identity.session_id = events_index.session_id
+                  AND identity.turn_id = events_index.turn_id
+                ORDER BY identity.issued_at DESC LIMIT 1
+              )
+            LEFT JOIN principals AS proposer
+              ON proposer.principal_id = machine.principal_id
+        """
         params: list[Any] = []
         conditions: list[str] = []
         if session_id is not None:
-            conditions.append("session_id = ?")
+            conditions.append("events_index.session_id = ?")
             params.append(session_id)
         if turn_id is not None:
-            conditions.append("turn_id = ?")
+            conditions.append("events_index.turn_id = ?")
             params.append(turn_id)
         if task_id is not None:
-            conditions.append("task_id = ?")
+            conditions.append("events_index.task_id = ?")
             params.append(task_id)
         if event_type is not None:
-            conditions.append("event_type = ?")
+            conditions.append("events_index.event_type = ?")
             params.append(event_type)
         if project_id is not None:
             conditions.append(
-                "session_id IN (SELECT session_id FROM sessions WHERE project_id = ?)"
+                "events_index.session_id IN (SELECT session_id FROM sessions WHERE project_id = ?)"
             )
             params.append(project_id)
         if apply_user_visibility_filter:
             if user_id is None:
                 conditions.append(
-                    "session_id IN (SELECT session_id FROM sessions WHERE user_id IS NULL)"
+                    "events_index.session_id IN (SELECT session_id FROM sessions WHERE user_id IS NULL)"
                 )
             else:
                 conditions.append(
-                    "session_id IN (SELECT session_id FROM sessions "
+                    "events_index.session_id IN (SELECT session_id FROM sessions "
                     "WHERE user_id = ? OR user_id IS NULL)"
                 )
                 params.append(user_id)
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
-        query += " ORDER BY timestamp DESC LIMIT ?"
+        query += " ORDER BY events_index.timestamp DESC LIMIT ?"
         params.append(str(limit))
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
@@ -4506,9 +4526,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         # store writes are deliberately sessionless, so their immutable intent
         # binds ownership to the proposing principal instead.
         query = """
-            SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id, tool_actions.tool_name, tool_actions.arguments_json, tool_actions.risk_level
+            SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id,
+                   tool_actions.tool_name, tool_actions.arguments_json,
+                   tool_actions.risk_level, tool_actions.proposed_by,
+                   tool_actions.owner_principal_id, tool_actions.machine_subject,
+                   tool_actions.machine_token_id,
+                   proposer.principal_type AS proposer_principal_type,
+                   proposer.display_name AS proposer_display_name,
+                   machine.key_id AS machine_key_id,
+                   machine.issued_at AS machine_issued_at,
+                   machine.expires_at AS machine_expires_at,
+                   machine.is_active AS machine_is_active,
+                   authorizer.principal_type AS authorizer_principal_type,
+                   authorizer.display_name AS authorizer_display_name
             FROM approvals
             JOIN tool_actions ON approvals.action_id = tool_actions.action_id
+            LEFT JOIN principals AS proposer
+              ON proposer.principal_id = tool_actions.proposed_by
+            LEFT JOIN turn_machine_identities AS machine
+              ON machine.principal_id = tool_actions.proposed_by
+            LEFT JOIN principals AS authorizer
+              ON authorizer.principal_id = approvals.approved_by
         """
         params: list[Any] = []
         clauses: list[str] = []
@@ -4572,9 +4610,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             row = connection.execute(
                 """
-                SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id, tool_actions.tool_name, tool_actions.arguments_json, tool_actions.risk_level
+                SELECT approvals.*, tool_actions.session_id, tool_actions.turn_id,
+                       tool_actions.tool_name, tool_actions.arguments_json,
+                       tool_actions.risk_level, tool_actions.proposed_by,
+                       tool_actions.owner_principal_id, tool_actions.machine_subject,
+                       tool_actions.machine_token_id,
+                       proposer.principal_type AS proposer_principal_type,
+                       proposer.display_name AS proposer_display_name,
+                       machine.key_id AS machine_key_id,
+                       machine.issued_at AS machine_issued_at,
+                       machine.expires_at AS machine_expires_at,
+                       machine.is_active AS machine_is_active,
+                       authorizer.principal_type AS authorizer_principal_type,
+                       authorizer.display_name AS authorizer_display_name
                 FROM approvals
                 JOIN tool_actions ON approvals.action_id = tool_actions.action_id
+                LEFT JOIN principals AS proposer
+                  ON proposer.principal_id = tool_actions.proposed_by
+                LEFT JOIN turn_machine_identities AS machine
+                  ON machine.principal_id = tool_actions.proposed_by
+                LEFT JOIN principals AS authorizer
+                  ON authorizer.principal_id = approvals.approved_by
                 """ + owner_join + """
                 WHERE approvals.approval_id = ?
                 """ + owner_filter,

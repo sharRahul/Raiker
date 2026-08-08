@@ -15,6 +15,7 @@ from raiker.contracts.models import (
     ToolAction,
     UserMetadata,
 )
+from raiker.control.dashboard import DashboardService
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.policy.config import StaticPolicyConfig
@@ -87,6 +88,11 @@ async def test_gateway_passes_machine_identity_to_runtime_and_deactivates_termin
         )
     }
     assert {"machine_identity_issued", "machine_identity_deactivated"} <= event_types
+    views = DashboardService(workspace).list_events(session_id=envelope.session_id)
+    attributed = [view for view in views if view.machine_identity is not None]
+    assert attributed
+    assert attributed[0].machine_identity is not None
+    assert attributed[0].machine_identity.principal_id == identity.claims.principal_id
 
 
 def test_suspended_turn_rotates_token_without_changing_subject(tmp_path: Path) -> None:

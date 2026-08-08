@@ -295,6 +295,35 @@ deep link), and FIXED-119 (ambient Ollama in offline tests).
 
 ## Repeatable procedure
 
+## Result — 2026-08-08 (ADD-03 per-turn machine identity)
+
+| Check | Result |
+|---|---|
+| Isolated host | ✅ fresh workspace, built SPA, real FastAPI runtime on `127.0.0.1:8765` |
+| Owner/agent authority | ✅ Permissions rendered distinct Owner control and Raiker agent columns plus the Owner → Signed turn delegation rail |
+| Anthropic | ✅ credential entered through Models UI; real Haiku 4.5 turn completed and Activity attributed every turn event to its inactive terminal machine principal |
+| OpenRouter | ✅ credential entered through Models UI; provider catalogue model completed a real turn with the same signed-machine attribution |
+| Ollama | ✅ local `gemma4:31b-cloud` completed a real turn with the same signed-machine attribution |
+| Lifecycle evidence | ✅ `machine_identity_issued` and `machine_identity_deactivated` visible for each terminal turn; actor chip retained full audit ID in its tooltip |
+| Browser suite | ✅ 4/4 in `add-03-machine-identity-providers-live.spec.ts` after the visual correction |
+| Visual review | ✅ four 1440×1000 screenshots inspected at original resolution; no credential dialog/value or bearer material visible |
+
+The first screenshot pass exposed FIXED-120: full turn IDs made every machine
+chip dominate the Activity actor column. A failing component regression was
+added before the chip was changed to a compact visible turn ID; the complete
+principal remains in the title and API. Focused component/view tests (28),
+Svelte check, ESLint, production build, and the complete three-provider live
+suite then passed.
+
+Evidence:
+`docs/plans/screenshots/working/201-ADD-03-owner-agent-authority-live.png`
+through `204-ADD-03-ollama-identity-live.png`.
+
+The repeatable command shape is
+`RAIKER_LIVE_ANTHROPIC_KEY=<ephemeral> RAIKER_LIVE_OPENROUTER_KEY=<ephemeral> npm --prefix apps/web run test:e2e:live -- e2e/add-03-machine-identity-providers-live.spec.ts`.
+Values are supplied only to the Playwright process and entered into password
+fields; they are never written to source, docs, screenshots, or test fixtures.
+
 1. **Bootstrap + enable the backend's gate** (human owner). For a hosted
    provider this means: activate `local_single_user_runtime`, record the
    threat-model ack, and enable the runtime gate with a confirmation token. See

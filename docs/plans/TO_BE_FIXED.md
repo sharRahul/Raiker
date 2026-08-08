@@ -186,6 +186,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-117 | High | Container tools / cold start and stdin bridge | Fixed (found during ADD-01 live Docker verification) |
 | FIXED-118 | Medium | Web / execution-environment deep link | Fixed (found during ADD-01 Playwright verification) |
 | FIXED-119 | Low | Tests / live Ollama leaked into offline scenarios | Fixed (found during ADD-01 baseline verification) |
+| FIXED-120 | Low | Activity / machine identity density | Fixed (found during ADD-03 screenshot review) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -5249,6 +5250,27 @@ of naming the unavailable model boundary they were testing.
 **Fix applied.** An opt-in `offline_default_model` fixture gives only those
 scenarios a deterministic unreachable default. Ordinary tests and live runs keep
 the real Ollama default, so the fixture cannot conceal a product regression.
+
+---
+
+## FIXED-120 — Machine identity chips overwhelmed the Activity actor column
+
+**Status: fixed in this change; found during ADD-03 screenshot review.**
+
+**Observed.** Every event for a signed turn repeated the complete machine turn
+ID inside the visible actor chip. At realistic UUID length the actor column
+became wider than the event summary and made a dense audit table difficult to
+scan.
+
+**Root cause.** `IdentityChip` rendered the API's audit-grade `display_name`
+verbatim even though the component already retained the complete principal ID
+in its title.
+
+**Fix applied.** Machine chips now render `shortId(turn_id)` while retaining the
+full principal in the title and the unchanged API contract. A component test
+first reproduced the long-ID layout behavior, then focused Activity/Approvals
+tests, Svelte check, ESLint, production build, screenshot review, and all three
+provider live turns verified the correction.
 
 ---
 

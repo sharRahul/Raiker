@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { IdentityView } from "../apiTypes";
+  import { shortId } from "../format";
 
   let { identity }: { identity?: IdentityView | null } = $props();
   const view = $derived(identity ?? {
@@ -14,12 +15,17 @@
     state: "unknown",
   });
   const kind = $derived(view.principal_type === "ai_agent" ? "Agent" : view.principal_type === "human" ? "Human" : "Actor");
+  const displayName = $derived(
+    view.principal_type === "ai_agent" && view.turn_id
+      ? `Raiker agent · ${shortId(view.turn_id)}`
+      : view.display_name,
+  );
 </script>
 
 <span class:machine={view.principal_type === "ai_agent"} class="identity-chip" title={view.principal_id}>
   <span class="identity-mark" aria-hidden="true">{view.principal_type === "ai_agent" ? "◇" : "●"}</span>
   <span class="identity-copy">
-    <strong>{view.display_name}</strong>
+    <strong>{displayName}</strong>
     <small>{kind} · {view.state}</small>
   </span>
 </span>

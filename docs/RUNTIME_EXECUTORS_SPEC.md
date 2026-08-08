@@ -71,9 +71,10 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 
 | Capability | Tier | What it does |
 |---|---|---|
-| `approval_execution_relay` | 1 | Turns a recorded human approval into a real execution, re-governing the target at execution time. Reached from the Approvals API for file mutations only (`raiker/approvals/execution.py`); disabling this gate returns those approvals to metadata-only. |
+| `approval_execution_relay` | 1 | Turns a recorded human approval into a real execution, re-governing the target at execution time. Reached from the Approvals API for the capabilities in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) — file mutations, bounded commands, the local planning rows, and the git write path; disabling this gate returns those approvals to metadata-only. |
 | `file_write_execution` | 1 | Writes a file in the workspace. Path-safe **and** refuses the `.raiker/` and `.git/` trees; the pre-image is checkpointed first. |
 | `patch_apply_execution` | 1 | Writes new file content for an approved change, under the same path rules. |
+| `git_write_execution` | 1 | Creates a branch or records a commit in the workspace repository (B11). Re-derives its own proposal before mutating, so a repository that moved since the approval fails closed with a named reason. Stages exactly the paths the owner reviewed — never `--all` — so `.raiker/` and `.git/` can never be swept into a commit, and disables the repository's own hooks for the invocation. |
 | `memory_write_execution` | 1 | Durable governed memory write. |
 | `memory_forget_execution` | 1 | Durable memory forget. |
 | `shell_execution` | 2 | Runs an allowlisted command in the sandbox. |

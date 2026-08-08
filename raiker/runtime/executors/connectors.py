@@ -70,6 +70,32 @@ class GithubConnectorExecutor:
                     "content_redacted": True,
                 },
             )
+        if operation == "create_pull_request":
+            outcome = service.create_pull_request(
+                str(action.arguments.get("repo", "")),
+                str(action.arguments.get("title", "")),
+                str(action.arguments.get("head", "")),
+                str(action.arguments.get("base", "")),
+                str(action.arguments.get("body", "")),
+                enforce_modes=False,
+            )
+            if outcome.get("status") != "success":
+                error = outcome.get("error", {})
+                return self._fail(action.action_id, str(error.get("type", "connector_failed")))
+            return ExecutionResult(
+                ok=True,
+                capability=self.capability,
+                action_id=action.action_id,
+                summary="GitHub pull request opened; content withheld from artifacts (metadata only).",
+                artifacts={
+                    "repo": outcome.get("repo"),
+                    "number": outcome.get("number"),
+                    "head": outcome.get("head"),
+                    "base": outcome.get("base"),
+                    "html_url": outcome.get("html_url"),
+                    "content_redacted": True,
+                },
+            )
         if operation != "read":
             return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
         outcome = service.read(

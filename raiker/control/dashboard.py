@@ -44,6 +44,7 @@ from raiker.tools.filesystem import (
     proposed_patch_snapshot,
     proposed_write_snapshot,
 )
+from raiker.tools.git import proposed_branch_snapshot, proposed_commit_snapshot
 
 # Capability states that mean the gate is off / fail-closed.
 _DISABLED_STATES = {"disabled", "planned"}
@@ -4392,6 +4393,27 @@ class DashboardService:
                 "once. A project is an organizing scope: the move grants nothing, changes "
                 "no gate, and is reversed in Projects."
             )
+        elif relays and view.tool_name == "git_commit":
+            # B11 — the file wording below promises a checkpointed rewind, and a
+            # commit is not a file the checkpoint store holds a pre-image of.
+            notice = (
+                "Approving this records the change set above as one commit, once, "
+                "under a fresh capability, policy and posture check. Repository "
+                "hooks do not run. It is git history rather than a checkpointed "
+                "file write, so undo it in git."
+            )
+        elif relays and view.tool_name == "git_branch":
+            notice = (
+                "Approving this creates the branch above and checks it out, once, "
+                "under a fresh capability, policy and posture check. No commit is "
+                "made and no file is changed; delete the branch in git to undo it."
+            )
+        elif relays and view.tool_name == "github_write":
+            notice = (
+                "Approving this sends the request above to GitHub with your own "
+                "token, once. It leaves this machine and cannot be unsent — close "
+                "or delete it on GitHub to undo it."
+            )
         elif relays:
             notice = (
                 "Approving this performs the change shown above, once, in your "
@@ -4534,6 +4556,53 @@ class DashboardService:
             operation = str(args.get("operation_id", "operation"))
             request_arguments = self._redact_value(args.get("arguments", {}))
             return json.dumps(request_arguments, indent=2, sort_keys=True), f"{connector} / {operation}", "connector_request"
+        # B11 — the git write path. A commit is reviewed the way a file change
+        # is, as a diff; a branch is reviewed as the two refs it moves between,
+        # because there is no diff to show and pretending otherwise would be
+        # worse than saying so.
+        if tool_name == "git_commit":
+            snapshot = proposed_commit_snapshot(
+                self.workspace_root, str(args.get("message", "")), args.get("paths")
+            )
+            if snapshot["status"] != "success":
+                return None, None, "arguments"
+            header = "\n".join(
+                f"{entry['state']:>10}  {entry['path']}" for entry in snapshot["files"]
+            )
+            body = redact_secret_like_text(str(snapshot["diff"]))
+            truncated = "\n\n(diff truncated)" if snapshot["truncated"] else ""
+            return (
+                f"{snapshot['file_count']} file(s) on {snapshot['branch']}\n{header}\n\n{body}{truncated}",
+                str(snapshot["branch"]),
+                "git_change",
+            )
+        if tool_name == "git_branch":
+            snapshot = proposed_branch_snapshot(
+                self.workspace_root,
+                str(args.get("name", "")),
+                str(args["base"]) if args.get("base") else None,
+            )
+            if snapshot["status"] != "success":
+                return None, None, "arguments"
+            lines = [
+                f"new branch    {snapshot['name']}",
+                f"branch from   {snapshot['base'] or snapshot['current_branch'] or snapshot['head']}",
+                f"checked out   {snapshot['current_branch'] or '(detached HEAD)'} → {snapshot['name']}",
+            ]
+            if snapshot["uncommitted_files"]:
+                lines.append(
+                    f"carried over  {snapshot['uncommitted_files']} uncommitted file(s)"
+                )
+            return "\n".join(lines), str(snapshot["name"]), "git_change"
+        if tool_name == "github_write":
+            request_arguments = self._redact_value(
+                {k: v for k, v in args.items() if k not in ("operation", "repo")}
+            )
+            return (
+                json.dumps(request_arguments, indent=2, sort_keys=True),
+                f"{args.get('repo', 'repository')} / {args.get('operation', 'write')}",
+                "connector_request",
+            )
         return None, None, "arguments"
 
     @staticmethod

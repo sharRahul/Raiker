@@ -30,6 +30,7 @@ from raiker.runtime.executors.scheduled import ScheduledRoutinesExecutor
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
 from raiker.runtime.executors.tier1_checkpoint import CheckpointRestoreExecutor
 from raiker.runtime.executors.tier1_files import FileWriteExecutor, PatchApplyExecutor
+from raiker.runtime.executors.tier1_git import GitWriteExecutor
 from raiker.runtime.executors.tier1_memory import MemoryForgetExecutor, MemoryWriteExecutor
 from raiker.runtime.executors.tier1_tasks import (
     ProjectAssignmentExecutor,
@@ -72,6 +73,7 @@ __all__ = [
     "Executor", "ExecutionResult", "ExecutorRegistry", "SandboxError", "not_implemented",
     "REAL_EXECUTOR_CAPABILITIES", "build_default_executor_registry",
     "ApprovalExecutionRelay", "CheckpointRestoreExecutor", "FileWriteExecutor", "PatchApplyExecutor",
+    "GitWriteExecutor",
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "TaskManagementExecutor", "ProjectAssignmentExecutor",
     "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "NetworkExecutor",
@@ -111,6 +113,11 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "approval_execution_relay",
     "file_write_execution",
     "patch_apply_execution",
+    # B11 — a governed branch or commit in the workspace repository. Local, and
+    # bounded by the same workspace confinement the file caps use; repository
+    # hooks are disabled for the invocation so an approved commit cannot run
+    # workspace code the agent may itself have written.
+    "git_write_execution",
     "memory_write_execution",
     "memory_forget_execution",
     # Workstream B — reversible checkpoint restore. Rewinds workspace files to a
@@ -221,6 +228,7 @@ def build_default_executor_registry(
     registry.register("approval_execution_relay", ApprovalExecutionRelay(ws, store))
     registry.register("file_write_execution", FileWriteExecutor(ws))
     registry.register("patch_apply_execution", PatchApplyExecutor(ws))
+    registry.register("git_write_execution", GitWriteExecutor(ws))
     registry.register("checkpoint_restore_execution", CheckpointRestoreExecutor(ws, store))
     registry.register("memory_write_execution", MemoryWriteExecutor(ws, store))
     registry.register("memory_forget_execution", MemoryForgetExecutor(ws))

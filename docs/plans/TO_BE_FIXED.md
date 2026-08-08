@@ -176,7 +176,10 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-107 | High | Chat / Build — source citations and the passage used | Fixed (was C6 and the last of C4) |
 | FIXED-108 | Medium | Storage / session-keyed rows outliving the conversation | Fixed (found while implementing FIXED-107) |
 | BUG-65 | Low | Export / a transcript keeps citation markers it cannot resolve | Open (found while verifying FIXED-107) |
-| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8 complete; 12 items remain) |
+| FIXED-109 | High | Build / Chat — the governed git write path | Fixed (was B11) |
+| BUG-66 | Low | Build / git tools cannot reach a sub-folder repository | Open (found while implementing FIXED-109) |
+| BUG-67 | Medium | Build / a committed branch cannot be pushed | Open (found while implementing FIXED-109) |
+| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8, B11, B12, B17 complete; 11 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
 ---
@@ -4758,6 +4761,158 @@ owner's mail.
 
 **UI when closed.** An exported conversation either explains its markers or does
 not carry them.
+
+---
+
+## FIXED-109 — The agent could describe a change it could neither commit nor propose
+
+**Status: fixed in this change. Closes GAP-BUILD B11.**
+
+**Observed.** Build's git surface was `git_status`, `git_diff` and `git_log`. The
+agent could read a repository, edit files in it through the approved file path,
+and then stop: there was no way for it to record what it had done or to put it in
+front of anyone. Asking for a commit produced prose about a commit.
+
+**Reproduce.** Connect a repository, have the agent make an approved edit, then
+ask it to commit the change. It explains what `git commit` would do.
+
+**Why it is a gap and not a nicety.** Every coding agent this product is measured
+against closes its loop with a commit — it is how the work becomes reviewable,
+and how an autonomous run leaves something a human can accept or throw away as a
+unit. Without it the file writes accumulate in a working tree nobody has agreed
+to, which is a *worse* position than not writing at all.
+
+**Root cause.** `raiker/tools/git.py` allowlisted exactly three read
+subcommands. There was no write tool, no capability, and no executor — so there
+was also nothing for the policy engine or the approval relay to route.
+
+**Fix applied — a proposal that is the same computation as the mutation.**
+
+* **Two tools, one owner switch.** `git_branch` and `git_commit` are high-risk,
+  approval-required, and both map to `git_write_execution` — Permissions →
+  Workspace → **Git writes**. One control answers "may the agent change my
+  repository", and turning it off returns those approvals to record-only with
+  the detail view saying so *before* the decision.
+* **The preview is the execution's own computation.**
+  `proposed_branch_snapshot` / `proposed_commit_snapshot` compute what the
+  mutation would do and touch nothing — no staging, no index change, no ref
+  written. The transcript, the Approvals inbox and
+  `GitWriteExecutor` all read the same function, and the executor re-derives it
+  before mutating, so a repository that moved between the approval and the
+  execution fails closed with a named reason instead of recording something the
+  owner never saw.
+* **A commit is reviewed as a diff; a branch is reviewed as its refs.** The
+  commit preview carries the exact file list with each file's state and the whole
+  diff, *including files git does not track yet* — built against empty, because
+  `git diff` has nothing to say about them and a new file shown as a name alone
+  is not a review. A branch has no diff, so its preview states the two refs it
+  moves between rather than pretending otherwise (`preview_kind: "git_change"`).
+* **The commit is the reviewed change set and nothing else.** Execution stages
+  the snapshot's own path list and commits path-limited (`git commit -- <paths>`)
+  — never `git add --all`. This is not tidiness: the Raiker workspace *contains*
+  `.raiker/`, which holds the vault key, the encrypted store and the audit log, so
+  a commit that swept the working tree would have written the owner's key
+  material into git history. `.raiker/` and `.git/` are dropped from every
+  proposal, and a path naming one is refused as `protected_workspace_path`.
+* **A governed write is not a code-execution path.** Every invocation carries
+  `-c core.hooksPath=raiker-no-such-hooks`. `.git/hooks` is workspace content the
+  agent may itself have written; running it on commit would have turned an
+  approved commit into arbitrary local execution. Signing is disabled for the
+  same class of reason — a configured key would block the commit on a passphrase
+  prompt this process can never answer.
+* **The owner's identity is kept.** A committer identity is supplied only when
+  the repository has none; a configured `user.name`/`user.email` is never
+  overridden.
+* **Refusals are named.** Not a git repository, a name `git check-ref-format`
+  rejects, a branch that exists, an unknown base, an in-progress
+  merge/rebase/cherry-pick/revert/bisect, an empty message, nothing to commit, a
+  path outside the repository. A branch created *from a named base* moves the
+  working tree, so it is refused while there are uncommitted changes; without a
+  base there is nothing to move to and the proposal states how many files it
+  carries across.
+* **The outward half.** `github_write` proposes the work to the repository —
+  `create_pull_request` (new) and `create_comment` (already in the connector
+  service, previously reachable only through `connector_write`) — under the
+  existing `connector_github_runtime` gate, the env-only owner credential and the
+  owner egress allowlist. It is approval-required because it leaves the machine
+  and cannot be unsent, and the approval shows the exact redacted outbound
+  request.
+* **The notice names what now exists.** Approving a git write used to end at
+  *"Executed once: executed."* — true and useless. The executor's summary now
+  travels with the artifacts, so the inbox reads *"Executed once — Committed 1
+  file(s) as 75f310f on feature/subtract."*
+
+**Also fixed here.** `ApprovalDetailView.preview_kind` in
+`apps/web/src/lib/apiTypes.ts` declared `"file_diff" | "patch" | "arguments"`
+while the server had been returning `connector_request` for a `connector_write`
+since FIXED-41. The union now names every shape the server produces, and a
+connector request renders as its own labelled block instead of falling through to
+the raw-arguments branch.
+
+**Verified live** against a running `raiker-web` on **2026-08-08**, hosted
+Anthropic `claude-haiku-4-5-20251001`, with the workspace a real git repository:
+the capability control (`working/b11-git-write-capability.png`), the branch
+approval naming its refs (`b11-branch-approval.png`) and its execution
+(`b11-branch-executed.png`), the commit approval carrying the file list and diff
+(`b11-commit-approval.png`) and its execution (`b11-commit-executed.png`), the
+GitHub write held at the connector gate (`b11-github-write-approval.png`), and
+the off switch returning it honestly to record-only
+(`b11-gate-off-record-only.png`). Each claim was then checked against git itself
+rather than against the product — branch, log subject, clean status, and
+`.raiker` absent from `ls-files`. Spec:
+`apps/web/e2e/b11-git-write-path-live.spec.ts`; unit coverage:
+`tests/test_git_write_path.py`. Threat model:
+`docs/threat-models/git-write.md`.
+
+---
+
+## BUG-66 — The git tools cannot reach a repository connected as a sub-folder
+
+**Status: open. Found while implementing FIXED-109.**
+
+**Observed.** `git_status`, `git_diff`, `git_log`, and now `git_branch` and
+`git_commit`, all run against the workspace root. Build lets an owner connect a
+repository that is a *folder inside* the workspace (`POST /api/code/repos`, kind
+`local`), and none of the git tools can see it: they report the workspace's own
+repository, or `not_a_git_repository` when the workspace root is not one.
+
+**Why it matters.** The connection surface promises the agent is working in the
+repository the owner picked. For every git tool, it is not. This pre-dates B11 —
+the read tools have always been root-scoped — but B11 makes it consequential,
+because a commit against the wrong repository is a mutation rather than a
+confusing read.
+
+**Required fix.** Resolve the git tools against the *selected* code repository
+when there is one, falling back to the workspace root, and name the repository in
+the approval preview so the owner can see which one a commit lands in.
+
+**UI when closed.** A commit approval states the repository it will be recorded
+in, and a connected sub-folder repository is the one the git tools read.
+
+---
+
+## BUG-67 — A committed branch cannot be pushed
+
+**Status: open. Found while implementing FIXED-109.**
+
+**Observed.** FIXED-109 lets the agent create a branch and record a commit on it.
+There is no push. `github_write` opens a pull request through the connector, and
+GitHub can only open one for a head branch that already exists on the remote — so
+the outward half is only usable for a branch somebody else pushed.
+
+**Why it matters.** "Make the change, commit it, open the PR" is one motion in
+every product this is measured against, and it currently breaks in the middle.
+
+**Required fix.** A governed `git_push` under its own capability, bound to the
+owner's credential and the connector egress allowlist, approval-required and
+naming remote, branch and commit range in the preview. It is a genuinely
+different question from the local writes — it is egress carrying repository
+content off the machine — so it belongs in its own gate rather than inside
+`git_write_execution`.
+
+**UI when closed.** After approving a commit, the owner can approve a push to a
+named remote and branch, and the pull-request proposal then has a head to point
+at.
 
 ---
 

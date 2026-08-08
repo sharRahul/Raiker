@@ -58,6 +58,7 @@ that proves it, what is missing, and the concrete work.
 | B6 | BUILD | TIER 1 | Done |
 | B7 | BUILD | TIER 1 | Done |
 | B8 | BUILD | TIER 1 | Complete |
+| B11 | BUILD | TIER 2 | Done |
 | B12 | BUILD | TIER 2 | Done |
 | B17 | BUILD | TIER 2 | Done |
 | C1 | BUILD | TIER 0 | Done |
@@ -201,11 +202,26 @@ definition/reference navigation, no type or lint feedback loop. **Work:** an
 LSP-backed read tool set (`find_definition`, `find_references`,
 `document_symbols`, `diagnostics`) — read-only, so it needs no approval path.
 
-**B11. No git write path.** `git_status`, `git_diff` and `git_log` are exposed;
-branch, commit, push and pull-request creation are not. The agent can describe a
-change it can neither commit nor propose. **Work:** governed
-`git_branch` / `git_commit` (high risk, approval, diff preview) and a
-`github_write` bound to the existing connector credential and egress allowlist.
+**B11. No git write path.** ✅ **Done — see FIXED-109.** `git_branch` and
+`git_commit` are governed, approval-required proposals whose preview *is* the
+computation the execution re-derives: for a commit the exact file list and the
+whole diff — including files git does not track yet — and for a branch the two
+refs it moves between, because there is no diff to show and pretending otherwise
+would be worse than saying so. Both answer to one owner switch,
+`git_write_execution` (Permissions → Workspace → **Git writes**), and both fail
+closed with a named reason on every case a later execution could not honour.
+Execution stages exactly the reviewed paths rather than `git add --all`, so
+`.raiker/` — the vault key, the encrypted store, the audit log — can never be
+swept into a commit, and repository hooks are disabled for the invocation so a
+governed write cannot become an un-governed code-execution path. `github_write`
+proposes the work outward (`create_pull_request`, `create_comment`) under the
+existing `connector_github_runtime` gate, owner credential and egress allowlist.
+
+**What is left of B11:** there is no **push**, so the agent can commit on a
+branch it cannot publish and `github_write` is only useful for a branch already
+on the remote. A governed push is a separate credential and egress question and
+is tracked as BUG-67. The read and write tools are also repository-root scoped
+and cannot target a repository connected as a sub-folder (BUG-66).
 
 **B12. No web access.** ✅ **Done — see FIXED-101.** `web_fetch` returns one page
 as bounded, sanitised text framed as untrusted data, governed by the `web_fetch`
@@ -316,10 +332,10 @@ B1 → B2 → B3 make Build an agent. **B1, B2, and B3's defined core scope are
 now landed**: an approved change is really made, the turn continues through
 it, and B3 uses strict, hunk-level editing instead of a whole-file rewrite.
 B3's multi-file patch transaction has landed. **B4–B8 are now complete**, so the
-loop is efficient, legible, and reaches the ecosystem. **B12 and B17 have since
-landed too** — the agent can read a page it is told to read, and the owner can
-stop or correct a turn while it runs rather than waiting it out. B13–B16 make the
-result reviewable. Everything else is depth. B20 is a *policy* decision before it
+loop is efficient, legible, and reaches the ecosystem. **B11, B12 and B17 have
+since landed too** — the agent can commit the change it made and propose it, it
+can read a page it is told to read, and the owner can stop or correct a turn
+while it runs rather than waiting it out. B13–B16 make the result reviewable. Everything else is depth. B20 is a *policy* decision before it
 is an engineering one and belongs to the owner, not to an implementer.
 
 ---

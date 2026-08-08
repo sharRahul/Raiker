@@ -267,6 +267,12 @@ not, and marks only the ones the model itself cited.
 | 6.5 | Check the filesystem | `report.md` exists with the reviewed contents | ✅ FIXED-08 |
 | 6.6 | Filters Pending / Approved / Executed / Denied, sort by risk / recency | All work | ✅ FIXED-08 |
 | 6.7 | Review and approve a unique `edit_file`, then an `apply_patch` unified diff | Each detail shows the calculated diff; each action changes only its matched line | ✅ FIXED-23 (`98`–`101`) |
+| 6.9 | Turn on **Git writes**, ask Chat to `git_branch`, then **Review** | Detail shows the new branch, the ref it branches from, and the checkout it performs; the notice says approving creates it | ✅ FIXED-109 (`b11-git-write-capability`, `b11-branch-approval`) |
+| 6.10 | **Approve and execute once** | The notice names the branch; `git rev-parse --abbrev-ref HEAD` reports it | ✅ FIXED-109 (`b11-branch-executed`) |
+| 6.11 | Change a tracked file, ask Chat to `git_commit`, then **Review** | Detail shows the exact file list and the whole diff, untracked files included | ✅ FIXED-109 (`b11-commit-approval`) |
+| 6.12 | **Approve and execute once** | The notice names the commit and branch; `git log -1` matches, status is clean, `.raiker` is not tracked | ✅ FIXED-109 (`b11-commit-executed`) |
+| 6.13 | Ask Chat to `github_write` a pull request with the GitHub connector off | Detail shows the exact redacted outbound request and **Approve (record only)** | ✅ FIXED-109 (`b11-github-write-approval`) |
+| 6.14 | Turn **Git writes** off, propose another commit | Detail says the decision does NOT execute the action; approving records nothing in git | ✅ FIXED-109 (`b11-gate-off-record-only`) |
 
 The 2026-07-28 focused re-check used a disposable workspace and a fresh owner
 account. Ollama `gemma4:31b-cloud` proposed one new Markdown file;
@@ -283,7 +289,8 @@ accepted. **B3's defined strict, single-file scope is complete (FIXED-23); its
 broader patch-format expansion is not completed and is deliberately deferred.**
 
 Metadata-only resolution remains the safety model for network, process, and
-every other non-relayed capability. Approved local file mutations and bounded
+every other non-relayed capability. Approved local file mutations, approved
+repository changes (`git_branch` / `git_commit`, FIXED-109), and bounded
 shell commands are the deliberate exceptions: they execute once through the
 governed relay, with a fresh gate, policy, posture, and checkpoint check. A
 terminal shell approval additionally requires a live control/elevated API

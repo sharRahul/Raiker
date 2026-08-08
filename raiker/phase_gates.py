@@ -52,6 +52,7 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "web_fetch",
     "file_write_execution",
     "patch_apply_execution",
+    "git_write_execution",
     "memory_write_execution",
     "memory_forget_execution",
     "checkpoint_restore_execution",
@@ -164,7 +165,9 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
                          "memory_write_execution", "memory_forget_execution",
                          "checkpoint_restore_execution",
                          # BUG-62 — local, reversible, owner-scoped planning rows.
-                         "task_management_runtime", "project_assignment_runtime")
+                         "task_management_runtime", "project_assignment_runtime",
+                         # B11 — a branch and a commit are local and repository-scoped.
+                         "git_write_execution")
     for name in _TIER1_EXECUTED_CAPS:
         gates[name] = CapabilityGate(
             name, 1, CapabilityState.DISABLED,

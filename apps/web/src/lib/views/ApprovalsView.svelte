@@ -109,7 +109,9 @@
             ? `Executed once — wrote ${result.execution.path}. The previous contents were checkpointed.`
             : receipt
               ? `Executed once — “${receipt.title}” now exists.`
-              : `Executed once: ${result.status}.`
+              : result.execution?.summary
+                ? `Executed once — ${result.execution.summary}`
+                : `Executed once: ${result.status}.`
           : `Recorded: ${result.status}. The action was NOT executed (metadata-only).`,
         ...(result.executes_action && receipt
           ? { link: { href: receipt.href, label: receipt.label } }
@@ -439,6 +441,21 @@
         <p class="diff-path mono">{selected.diff_path}</p>
       {/if}
       <pre class="diff">{selected.diff ?? "(empty diff)"}</pre>
+    {:else if selected.preview_kind === "git_change"}
+      <!-- B11 — a repository change is reviewed where the decision is made:
+           the exact file list and diff a commit would record, or the refs a
+           branch moves between. -->
+      <h3>Proposed repository change</h3>
+      {#if selected.diff_path}
+        <p class="diff-path mono">{selected.diff_path}</p>
+      {/if}
+      <pre class="diff">{selected.diff ?? "(nothing to record)"}</pre>
+    {:else if selected.preview_kind === "connector_request"}
+      <h3>Proposed outbound request (redacted)</h3>
+      {#if selected.diff_path}
+        <p class="diff-path mono">{selected.diff_path}</p>
+      {/if}
+      <pre class="diff">{selected.diff ?? "{}"}</pre>
     {:else}
       <h3>Proposed arguments (redacted)</h3>
       <pre class="diff">{JSON.stringify(selected.arguments, null, 2)}</pre>

@@ -9,6 +9,7 @@ capability state, and routed only through RuntimeAuthority.
 | Read-only workspace and diagnostic access | Governed and auditable |
 | Local supported executors | Policy-gated; decision mode and approvals apply |
 | Approval resolution | Metadata-only by default |
+| Repository writes (`git_branch`, `git_commit`) | Approval-required; the reviewed change set is what executes, and repository hooks never run |
 | Remote/cloud and sensitive domains | Disabled and fail-closed |
 
 Executors must validate arguments, keep output safe for audit, and refuse work

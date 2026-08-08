@@ -34,7 +34,11 @@ from raiker.tools.filesystem import (
     read_file,
     stat_path,
 )
-from raiker.tools.git import run_git
+from raiker.tools.git import (
+    proposed_branch_snapshot,
+    proposed_commit_snapshot,
+    run_git,
+)
 from raiker.tools.mcp_tools import is_mcp_tool, mcp_call
 from raiker.tools.memory_tools import (
     memory_get,
@@ -559,6 +563,18 @@ class ToolBroker:
                 )
             except FilesystemSafetyError as exc:
                 return {"status": "failed", "error": {"type": str(exc)}}
+        if action.tool_name == "git_branch":
+            return proposed_branch_snapshot(
+                self.workspace_root,
+                str(action.arguments.get("name", "")),
+                str(action.arguments["base"]) if action.arguments.get("base") else None,
+            )
+        if action.tool_name == "git_commit":
+            return proposed_commit_snapshot(
+                self.workspace_root,
+                str(action.arguments.get("message", "")),
+                action.arguments.get("paths"),
+            )
         if action.tool_name == "apply_patch":
             try:
                 return proposed_patch_snapshot(
@@ -601,6 +617,34 @@ class ToolBroker:
                     )
                 if action.tool_name == "assign_session_project":
                     return "Approving moves this conversation into the named project, once."
+                # B11 — none of the three writes a path, and the file sentence
+                # below would have named one that does not exist. Each says the
+                # thing it actually changes.
+                if action.tool_name == "git_branch":
+                    name = str(self._redact_value(str(action.arguments.get("name", ""))))
+                    return (
+                        f"Approving creates the branch “{name}” and checks it out, once."
+                        if name
+                        else "Approving creates and checks out this branch, once."
+                    )
+                if action.tool_name == "git_commit":
+                    return (
+                        "Approving records this exact change set as one commit on the "
+                        "current branch, once."
+                    )
+                if action.tool_name == "github_write":
+                    repo = str(self._redact_value(str(action.arguments.get("repo", ""))))
+                    operation = str(action.arguments.get("operation", ""))
+                    noun = (
+                        "pull request"
+                        if operation == "create_pull_request"
+                        else "comment" if operation == "create_comment" else "write"
+                    )
+                    return (
+                        f"Approving sends this exact {noun} to {repo} on GitHub, once."
+                        if repo
+                        else f"Approving sends this exact GitHub {noun}, once."
+                    )
                 # The sentence is stored in events and returned to the client, so
                 # the model-supplied path is scrubbed by credential shape first —
                 # the same treatment every other argument gets on the way out.
@@ -984,8 +1028,11 @@ class ToolBroker:
                     "expected_effect": expected_effect,
                     "state_changes": {
                         "files": action.tool_name in {"write_file", "create_document", "edit_file", "apply_patch"},
+                        # B11 — the repository's own history, which no file-level
+                        # checkpoint rewinds.
+                        "repository": action.tool_name in {"git_branch", "git_commit", "github_write"},
                         "memory": action.tool_name in {"memory_write", "memory_forget"},
-                        "network": action.tool_name in {"shell", "remote_execute", "cloud_execute", "connector_write"},
+                        "network": action.tool_name in {"shell", "remote_execute", "cloud_execute", "connector_write", "github_write"},
                         "shell": action.tool_name in {"shell", "remote_execute", "cloud_execute"},
                         "provider": False,
                         "export": False,

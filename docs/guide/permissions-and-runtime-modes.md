@@ -64,11 +64,11 @@ still resolves to the single runtime rather than failing.
 
 ## Capability gates
 
-**Permissions** lists all 64 gates, grouped:
+**Permissions** lists all 65 gates, grouped:
 
 | Group | Examples |
 |---|---|
-| Workspace | Audit export, File writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
+| Workspace | Audit export, File writes, Git writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
 | Local execution | Shell commands, Processes, Container execution, Subagents, Multi-agent teams |
 | Network | Network requests, Web fetch, External channels, Channel approval relay |
 | Models | Hosted models, Home-lab models, Advisor model, Provider embeddings |
@@ -178,6 +178,16 @@ gates, not assumed:
   as *Task creation* and *Project assignment*. Each is a local, reversible,
   owner-scoped row rather than a file, so the notice names what it creates
   instead of promising a checkpointed diff, and the inbox links to the result.
+- **Approve and record it once.** A proposed branch (`git_branch`) or commit
+  (`git_commit`) is carried out under `git_write_execution`, listed in
+  Permissions under **Workspace** as *Git writes*. Before you decide you see the
+  change git itself would record — for a commit the exact file list and the
+  whole diff, including files git does not track yet; for a branch the two refs
+  it moves between. Approving stages exactly those paths and nothing else:
+  `.raiker/` and `.git/` are never swept in, whatever else is in your working
+  tree, and the repository's own hooks do not run. The notice names the branch
+  or the commit that now exists. This is git history rather than a checkpointed
+  file write, so undo it in git.
 - **Approve (record only).** Everything else — network, process, and any
   capability outside that set — records your decision and executes nothing. The
   response carries `executes_action: false`.

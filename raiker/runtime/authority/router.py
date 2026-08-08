@@ -78,6 +78,15 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "task_management_runtime": "task_management_runtime",
     "assign_session_project": "project_assignment_runtime",
     "project_assignment_runtime": "project_assignment_runtime",
+    # B11 — the git write path. Both tools answer to one capability, so the
+    # owner has a single switch over "may the agent change my repository".
+    "git_branch": "git_write_execution",
+    "git_commit": "git_write_execution",
+    "git_write_execution": "git_write_execution",
+    # B11 — a GitHub write is the same credential reaching the same host as
+    # `github_read`, so it answers to the connector's own gate rather than
+    # inventing a second one.
+    "github_write": "connector_github_runtime",
     "shell": "shell_execution",
     "remote_execute": "remote_execution_cap",
     "cloud_execute": "cloud_execution_cap",

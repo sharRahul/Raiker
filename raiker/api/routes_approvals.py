@@ -286,6 +286,10 @@ async def resolve_approval(
                         # lives, so the surface that took the decision can link
                         # to it instead of saying only that it ran.
                         "receipt",
+                        # B11 — what the execution did, in one sentence, for a
+                        # capability whose result is neither a file nor a row:
+                        # the branch that now exists, the commit that was made.
+                        "summary",
                     )
                     if key in execution.artifacts
                 },

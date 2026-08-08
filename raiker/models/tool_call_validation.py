@@ -20,6 +20,15 @@ _TOOL_RISK: dict[str, tuple[str, bool]] = {
     "git_status": ("medium", False),
     "git_diff": ("medium", False),
     "git_log": ("medium", False),
+    # B11 — the git write path. A branch and a commit change the repository's
+    # own history, which no file-level checkpoint rewinds, so both take the
+    # approval path and neither is ever proposed as read-shaped.
+    "git_branch": ("high", True),
+    "git_commit": ("high", True),
+    # B11 — proposing the work to the world. Governed inside the connector
+    # (connector_github_runtime gate + owner credential + egress allowlist) and
+    # approval-gated here, because it leaves the machine and cannot be unsent.
+    "github_write": ("high", True),
     "write_file": ("high", True),
     "create_document": ("medium", False),
     "edit_file": ("high", True),
@@ -92,6 +101,11 @@ _REQUIRED_ARGS: dict[str, tuple[str, ...]] = {
     "git_status": (),
     "git_diff": (),
     "git_log": (),
+    "git_branch": ("name",),
+    "git_commit": ("message",),
+    # Per-operation arguments (number/title/head/base/body) are validated by the
+    # connector, which is where a correctable reason can name the operation.
+    "github_write": ("operation", "repo"),
     "write_file": ("path", "text"),
     "create_document": ("path", "text"),
     "edit_file": ("path", "old_text", "new_text"),
@@ -135,6 +149,16 @@ _REQUIRED_LIST_ARGS: dict[str, tuple[str, ...]] = {
 # these a model has no way to learn that `steps` is a list of objects, and would
 # send a stringified plan the tool must then refuse.
 _ARG_SCHEMAS: dict[str, dict[str, Any]] = {
+    "git_commit": {
+        "paths": {
+            "type": "array",
+            "description": (
+                "Repository-relative paths to commit. Omit to commit every change in "
+                "the working tree."
+            ),
+            "items": {"type": "string"},
+        },
+    },
     "web_search": {
         "max_results": {
             "type": "integer",
@@ -205,6 +229,9 @@ _OPTIONAL_ARGS: dict[str, tuple[str, ...]] = {
     "skill_load": ("file",),
     "spawn_subagent": ("name",),
     "web_search": ("max_results",),
+    "git_branch": ("base",),
+    "git_commit": ("paths",),
+    "github_write": ("number", "body", "title", "head", "base"),
 }
 
 _TOOL_DESCRIPTIONS: dict[str, str] = {
@@ -217,6 +244,23 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
     "git_status": "Show short git status for the workspace.",
     "git_diff": "Show git diff for the workspace.",
     "git_log": "Show recent git log entries.",
+    "git_branch": (
+        "Propose creating a branch and checking it out (approval required). Requires "
+        "name; optional base names the ref to branch from, which is refused while the "
+        "working tree has uncommitted changes."
+    ),
+    "git_commit": (
+        "Propose committing the current change set (approval required). Requires "
+        "message; optional paths limits the commit to those repository-relative files. "
+        "The owner sees the exact file list and diff before deciding, and repository "
+        "hooks do not run."
+    ),
+    "github_write": (
+        "Propose one GitHub write (approval required). Arguments: operation "
+        "('create_pull_request' or 'create_comment'), repo ('owner/name'), then "
+        "title/head/base/body for a pull request or number/body for a comment. Only "
+        "available when the owner enabled the GitHub connector."
+    ),
     "write_file": "Propose writing a file (approval required).",
     "create_document": (
         "Create a first-class Markdown, DOCX, XLSX, or PDF document in the session workspace "

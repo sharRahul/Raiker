@@ -13,7 +13,6 @@ from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.authority.models import RAIKER_RUNTIME
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.broker import ToolBroker
 
 # Subagents may only be delegated read-only / inspection tools. Mutating and
 # egress tools are intentionally excluded: a subagent must never widen the
@@ -198,6 +197,11 @@ class SubagentRunner:
     """
 
     def __init__(self, workspace_root: str | Path, store: SQLiteStore) -> None:
+        # The broker imports container execution. Defer this dependency until a
+        # runner is constructed so container tooling has a clean cold-import
+        # path through the executor package.
+        from raiker.tools.broker import ToolBroker
+
         self._ws = Path(workspace_root).resolve()
         self._store = store
         self._broker = ToolBroker(

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +19,17 @@ PROFILE = ExecutionProfile(
     repository_access="read_only",
     writable_output=True,
 )
+
+
+def test_container_executor_has_a_clean_cold_import() -> None:
+    result = subprocess.run(
+        [sys.executable, "-c", "from raiker.execution.container_tools import ContainerToolExecutor"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_bridge_executes_static_safe_tool_against_repository(tmp_path: Path) -> None:
@@ -79,6 +92,7 @@ def test_executor_sends_payload_on_stdin_and_cleans_scratch(
     assert payload["repository"] == "/repository"
     assert "list_directory" not in captured["command"]
     command = captured["command"]
+    assert "--interactive" in command
     assert command[command.index("--workdir") + 1] == "/repository"
     assert command[command.index("--env") + 1] == "PYTHONDONTWRITEBYTECODE=1"
     assert captured["allowlist"] == frozenset({"podman"})

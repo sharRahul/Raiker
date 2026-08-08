@@ -8,6 +8,7 @@ from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.runtime.executors.sandbox import SandboxError
 
 if TYPE_CHECKING:
+    from raiker.runtime.executors.orchestration import MultiAgentTeamExecutor, SubagentExecutor
     from raiker.storage.sqlite import SQLiteStore
 from raiker.runtime.executors.channels import ChannelApprovalRelayExecutor, ExternalChannelExecutor
 from raiker.runtime.executors.connectors import (
@@ -24,7 +25,6 @@ from raiker.runtime.executors.models_runtime import (
     ModelProviderExecutor,
     PrivateNetworkModelRuntimeExecutor,
 )
-from raiker.runtime.executors.orchestration import MultiAgentTeamExecutor, SubagentExecutor
 from raiker.runtime.executors.reminders import ReminderRuntimeExecutor
 from raiker.runtime.executors.scheduled import ScheduledRoutinesExecutor
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
@@ -94,6 +94,15 @@ __all__ = [
     "HardwareOperatorRuntimeExecutor",
     "McpBuilderExecutor", "McpConnectorExecutor",
 ]
+
+
+def __getattr__(name: str) -> object:
+    """Load broker-dependent orchestration exports without creating an import cycle."""
+    if name in {"SubagentExecutor", "MultiAgentTeamExecutor"}:
+        from raiker.runtime.executors import orchestration
+
+        return getattr(orchestration, name)
+    raise AttributeError(name)
 
 
 # ── Default executor registry ────────────────────────────────────────────────
@@ -233,6 +242,10 @@ def build_default_executor_registry(
     ``execution_unavailable:no_executor``.
     """
     ws = Path(workspace_root)
+    # Orchestration imports the broker. Keep it out of package initialisation so
+    # the broker's container executor can itself import this package cleanly.
+    from raiker.runtime.executors.orchestration import MultiAgentTeamExecutor, SubagentExecutor
+
     registry = ExecutorRegistry()
     registry.register("approval_execution_relay", ApprovalExecutionRelay(ws, store))
     registry.register("file_write_execution", FileWriteExecutor(ws))

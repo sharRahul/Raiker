@@ -50,6 +50,7 @@ def build_container_command(request: ContainerRunRequest) -> list[str]:
         request.runtime,
         "run",
         "--rm",
+        "--interactive",
         "--network",
         "none",
         "--memory",

@@ -323,6 +323,10 @@ _DEFAULT_CONNECTION_CACHE_LIMIT = 8
 _CONNECTION_CACHE_CEILING_FACTOR = 8
 _CONNECTIONS: OrderedDict[tuple[Path, int], sqlite3.Connection] = OrderedDict()
 _CONNECTIONS_LOCK = threading.RLock()
+# Schema/FTS bootstrap uses multiple statements and must not race another store
+# instance in this process. SQLite's busy timeout cannot resolve two deferred
+# transactions that both try to upgrade to writers.
+_BOOTSTRAP_LOCK = threading.RLock()
 
 
 def connection_cache_limit() -> int:
@@ -436,7 +440,8 @@ class SQLiteStore:
         self.paths = RuntimePaths(Path(workspace_root).resolve())
         self.paths.ensure()
         self.db_path = self.paths.db_path
-        self.bootstrap()
+        with _BOOTSTRAP_LOCK:
+            self.bootstrap()
 
     def connect(self) -> sqlite3.Connection:
         owner = threading.get_ident()
@@ -5072,7 +5077,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def _rebuild_memory_fts(connection: sqlite3.Connection) -> None:
         try:
             connection.execute("DELETE FROM approved_memory_fts")
-        except sqlite3.OperationalError:
+        except sqlite3.OperationalError as exc:
+            if "locked" in str(exc).lower():
+                raise
             # Repair a legacy FTS5 dump that was imported by an older SQLCipher
             # migration. The FTS table is a rebuildable projection, never source.
             connection.execute("DROP TABLE IF EXISTS approved_memory_fts")

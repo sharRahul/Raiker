@@ -197,6 +197,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-128 | High | Approvals / resume rotation rewrote proposal identity timestamps | Fixed (found during ADD-03 independent review) |
 | FIXED-129 | Low | Permissions / authority matrix ignored readiness failures | Fixed (found during ADD-03 independent review) |
 | FIXED-130 | Low | Approvals / identity metadata overlapped at desktop width | Fixed (found during ADD-03 screenshot review) |
+| FIXED-131 | High | SQLite bootstrap / concurrent first-use FTS rebuild deadlocked | Fixed (found in ADD-03 GitHub CI) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -5451,6 +5452,25 @@ chip needs a wider intrinsic area.
 **Fix applied.** Metadata cells now use a responsive sixteen-rem minimum and a
 bounded label/value subgrid with safe wrapping. Provider approval screenshots
 were visually reviewed after the change.
+
+---
+
+## FIXED-131 â€” Concurrent first-use store bootstrap deadlocked in FTS repair
+
+**Status: fixed in this change; found in ADD-03 GitHub CI.**
+
+**Observed.** Two first-use identity issuers constructed stores concurrently.
+On Linux SQLCipher, both deferred bootstrap transactions reached the memory FTS
+rebuild and one failed with `database is locked`.
+
+**Root cause.** Process-local store bootstrap was not serialized, and the FTS
+repair handler treated every operational error—including a transient lock—as
+legacy projection corruption before attempting a destructive table rebuild.
+
+**Fix applied.** Store construction now serializes schema/FTS bootstrap within
+the process, and the repair path re-raises lock errors instead of interpreting
+them as corruption. The existing concurrent first-use issuer regression covers
+the hosted failure.
 
 ---
 

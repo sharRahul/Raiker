@@ -258,3 +258,75 @@ class VectorEmbeddingExecutor:
             summary="Vector embedding runtime failed closed.",
             artifacts={},
         )
+
+
+class CodeMapIndexExecutor:
+    """B9 — build or refresh the repository code map, under the owner's switch.
+
+    This is what makes ``graph_codemap_indexing`` a capability the owner can turn
+    on rather than a name on a matrix. A capability with no executor is stripped
+    of its enable targets by the activation layer and reads as *deferred* in the
+    interface, which is exactly what this one was: a real gate in front of a scan
+    that did not exist.
+
+    It executes nothing outside the workspace and returns nothing but counts.
+    The map it writes is derived from files the agent may already read, and
+    reading one at the coordinates it records still goes through ``read_file``,
+    workspace containment, and the policy engine — so indexing adds no authority
+    to the turn that asked for it.
+    """
+
+    capability = "code_map_indexing"
+
+    def __init__(self, workspace_root: str | Path, store: SQLiteStore) -> None:
+        self._workspace_root = Path(workspace_root).resolve()
+        self._store = store
+
+    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        from raiker.graph.codemap_service import CodeMapService
+
+        service = CodeMapService(
+            self._workspace_root, self._store, principal_id=principal.principal_id
+        )
+        operation = str(action.arguments.get("operation", "build"))
+        if operation == "refresh":
+            raw = action.arguments.get("paths", [])
+            paths = [str(item) for item in raw] if isinstance(raw, (list, tuple)) else []
+            if not paths:
+                return ExecutionResult(
+                    ok=False, capability=self.capability, action_id=action.action_id,
+                    reason_code="missing_argument:paths",
+                    summary="Code map refresh needs the paths that changed.",
+                )
+            result = service.refresh_paths(paths)
+            return ExecutionResult(
+                ok=result.get("status") == "refreshed",
+                capability=self.capability, action_id=action.action_id,
+                reason_code="" if result.get("status") == "refreshed" else str(result.get("reason", "")),
+                summary=f"Code map refreshed {result.get('refreshed', 0)} file(s).",
+                artifacts={k: v for k, v in result.items() if k != "paths"},
+            )
+        if operation != "build":
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=f"unknown_operation:{operation}",
+                summary="Code map executor supports 'build' and 'refresh'.",
+            )
+        result = service.build()
+        status = str(result.get("status", ""))
+        if status in ("indexed", "partial"):
+            return ExecutionResult(
+                ok=True, capability=self.capability, action_id=action.action_id,
+                summary=(
+                    f"Code map {status}: {result['file_count']} files, "
+                    f"{result['symbol_count']} symbols in {result['repository']}."
+                ),
+                artifacts=result,
+            )
+        error = result.get("error", {}) if isinstance(result.get("error"), dict) else {}
+        return ExecutionResult(
+            ok=False, capability=self.capability, action_id=action.action_id,
+            reason_code=str(error.get("type", "code_map_failed")),
+            summary=str(error.get("message", "Code map indexing failed closed.")),
+            artifacts={},
+        )

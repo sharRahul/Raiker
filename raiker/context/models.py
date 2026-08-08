@@ -18,6 +18,9 @@ SOURCE_TYPES = (
     "connector_status",
     "project_context",
     "memory_recall",
+    # B9 — the repository code map: which files declare what, ranked against this
+    # turn's prompt. Derived from workspace files, so it is untrusted data.
+    "code_map",
 )
 
 # Deterministic priority order used by the gatherer when applying the budget. Higher in the
@@ -30,6 +33,10 @@ PRIORITY_ORDER = (
     "project_context",
     "memory_recall",
     "workspace_summary",
+    # B9 — orientation in the repository outranks the runtime's own bookkeeping:
+    # a turn that knows where the code is can act, and one that does not greps
+    # blind however many gate lines it was handed.
+    "code_map",
     "capability_status",
     "connector_status",
     "approvals",

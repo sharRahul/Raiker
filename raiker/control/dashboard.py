@@ -1251,8 +1251,17 @@ class DashboardService:
             user_id,
             {"repo_id": repo_id, "kind": "local", "local_subpath": relative_path},
         )
+        indexed = self._index_code_map(
+            relative_path, repo_id, owner_principal_id, user_id
+        )
         return ControlResult(
-            ok=True, data={"repo_id": repo_id, "kind": "local", "local_subpath": relative_path}
+            ok=True,
+            data={
+                "repo_id": repo_id,
+                "kind": "local",
+                "local_subpath": relative_path,
+                "code_map": indexed,
+            },
         )
 
     def connect_github_repo(
@@ -1324,10 +1333,104 @@ class DashboardService:
         self, repo_id: str | None, *, owner_principal_id: str
     ) -> ControlResult:
         """Point the Build workspace at one repository, or at none with ``None``."""
-        if repo_id is not None and self.store.load_code_repo(owner_principal_id, repo_id) is None:
-            return ControlResult(ok=False, reason_code="unknown_repo")
+        row = None
+        if repo_id is not None:
+            row = self.store.load_code_repo(owner_principal_id, repo_id)
+            if row is None:
+                return ControlResult(ok=False, reason_code="unknown_repo")
         self.store.select_code_repo(owner_principal_id, repo_id)
-        return ControlResult(ok=True, data={"selected_repo_id": repo_id})
+        # B9 — selecting a repository that was connected before the code map
+        # existed (or before the owner turned it on) is the other moment the map
+        # should be built. Already-indexed repositories are left alone: selecting
+        # is not a request to re-scan.
+        indexed = None
+        if row is not None and str(row.get("kind", "")) == "local":
+            from raiker.graph.codemap_service import CodeMapService
+
+            subpath = str(row.get("local_subpath") or "")
+            service = CodeMapService(
+                self.workspace_root, self.store, principal_id=owner_principal_id
+            )
+            if subpath and service.index_row(subpath) is None:
+                indexed = self._index_code_map(subpath, repo_id or "", owner_principal_id, None)
+        return ControlResult(
+            ok=True, data={"selected_repo_id": repo_id, "code_map": indexed}
+        )
+
+    # ── B9: the repository code map ──────────────────────────────────────────
+
+    def code_map_status(self, *, owner_principal_id: str) -> dict[str, Any]:
+        """What Build shows about the index: the gate, the repository, the counts."""
+        from raiker.graph.codemap_service import CodeMapService
+
+        return CodeMapService(
+            self.workspace_root, self.store, principal_id=owner_principal_id
+        ).status()
+
+    def rebuild_code_map(
+        self, *, owner_principal_id: str, user_id: str | None = None
+    ) -> ControlResult:
+        """Re-scan the selected repository on the owner's explicit request."""
+        from raiker.graph.codemap_service import CodeMapService
+
+        service = CodeMapService(
+            self.workspace_root, self.store, principal_id=owner_principal_id
+        )
+        result = service.build()
+        if str(result.get("status", "")) not in ("indexed", "partial"):
+            error = result.get("error", {}) if isinstance(result.get("error"), dict) else {}
+            return ControlResult(
+                ok=False, reason_code=str(error.get("type", "code_map_failed"))
+            )
+        self._record_repo_event(
+            "code_map_indexed", owner_principal_id, user_id,
+            {k: v for k, v in result.items() if k not in ("languages", "skipped")},
+        )
+        return ControlResult(ok=True, data=result)
+
+    def _index_code_map(
+        self,
+        relative_path: str,
+        repo_id: str,
+        owner_principal_id: str,
+        user_id: str | None,
+    ) -> dict[str, Any] | None:
+        """Index a just-connected folder, and say so in the audit trail.
+
+        Best-effort by design: connecting a repository is bookkeeping that must
+        succeed whether or not a scan can. A gate that is off, a folder that
+        cannot be read, or a scan that raises leaves the reference connected and
+        the map simply not built — which is what the Build panel then reports.
+        """
+        from raiker.graph.codemap_service import CodeMapService, CodeMapTarget
+        from raiker.tools.git import resolve_repository_root
+
+        try:
+            service = CodeMapService(
+                self.workspace_root, self.store, principal_id=owner_principal_id
+            )
+            if service.governance_refusal("Code map indexing") is not None:
+                return None
+            root = resolve_repository_root(self.workspace_root, relative_path)
+            # `resolve_repository_root` falls back to the workspace root for a
+            # sub-path it cannot contain. Indexing the whole workspace under the
+            # folder's name would be a quietly wrong answer, so refuse instead.
+            if root == self.workspace_root.resolve() and relative_path not in ("", "."):
+                return None
+            result = service.build(
+                target=CodeMapTarget(
+                    repo_path=relative_path, root=root, repo_id=repo_id, label=relative_path
+                )
+            )
+        except Exception:  # noqa: BLE001 — a derived index never blocks the reference
+            return None
+        if str(result.get("status", "")) not in ("indexed", "partial"):
+            return None
+        self._record_repo_event(
+            "code_map_indexed", owner_principal_id, user_id,
+            {k: v for k, v in result.items() if k not in ("languages", "skipped")},
+        )
+        return result
 
     def _record_repo_event(
         self,

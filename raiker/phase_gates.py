@@ -99,6 +99,17 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "mcp_builder_runtime",
     "mcp_connector_runtime",
     "audit_export",
+    # B9 — the repository code map: a local, derived symbol index over the
+    # repository Build points at.
+    #
+    # Deliberately *not* `graph_codemap_indexing`. That capability names the
+    # Phase-3 durable governed graph store — nodes and edges with provenance,
+    # approval previews, rollback plans, lifecycle retention records — and that
+    # subsystem is still a dry-run planner (`raiker/graph/planner.py`). Making
+    # one switch mean both a derived cache and a governed record store is exactly
+    # the "two lists that have to agree" defect this codebase keeps finding, so
+    # the code map answers to its own name and the Phase-3 contract stays true.
+    "code_map_indexing",
 }
 
 ALL_CAPABILITIES = (
@@ -188,7 +199,12 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
         )
     _EXECUTED_CAPS_ALL: list[str] = list(_TIER1_EXECUTED_CAPS + _TIER2_EXECUTED_CAPS)
     _TIER3_EXECUTED_CAPS = ("graph_indexing_runtime", "semantic_memory_runtime",
-                             "vector_embedding_runtime", "model_provider_runtime")
+                             "vector_embedding_runtime", "model_provider_runtime",
+                             # B9 — the repository code map. Tier 3 with the rest
+                             # of the local code-intelligence runtime: it reads
+                             # workspace files and writes a derived index, and it
+                             # reaches nothing outside the machine.
+                             "code_map_indexing")
     _TIER4_EXECUTED_CAPS = ("plugin_install", "plugin_execution_cap", "plugin_revocation_cap",
                             "plugin_runtime_cap", "plugin_sandboxed_runtime_cap",
                             "plugin_sandbox_image_pull_cap")

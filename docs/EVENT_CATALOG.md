@@ -29,6 +29,8 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 | `tool_failed` | A governed executor failed safely |
 | `code_repo_connected` | A repository reference was added to the Build workspace (workspace-relative subpath, or a GitHub `owner/repo` coordinate) |
 | `code_repo_disconnected` | A repository reference was removed; the folder and the remote are untouched |
+| `code_map_indexed` | A repository's code map was built — file, symbol and edge totals, what the scan skipped and why, and which bound it hit if it stopped short. Counts and reasons only; never a path's content and never a symbol's text |
+| `code_map_refreshed` | The code map was re-parsed for exactly the paths an approved write touched — how many files were re-read and how many rows went away |
 | `attachment_downloaded` | A file this conversation holds was downloaded; metadata only — attachment id, filename, media type, byte size |
 | `task_created` | A task or schedule was queued (title, objective, and status only) |
 | `task_progress` | A running task reported a step and a percentage |

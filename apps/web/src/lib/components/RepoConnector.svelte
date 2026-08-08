@@ -11,7 +11,7 @@
    */
   import Icon from "./Icon.svelte";
   import { api, ApiError } from "../api";
-  import type { CodeRepo, CodeReposView } from "../apiTypes";
+  import type { CodeMapStatus, CodeRepo, CodeReposView } from "../apiTypes";
   import { humanize } from "../format";
 
   let {
@@ -23,6 +23,13 @@
     onchanged: () => void | Promise<void>;
     onclose: () => void;
   } = $props();
+
+  // B9 — the code map over the selected repository. Loaded here rather than
+  // threaded down from Build, because this panel is where a repository is chosen
+  // and the index belongs to whichever one is active.
+  let codeMap = $state<CodeMapStatus | null>(null);
+  let indexing = $state(false);
+  let indexNotice = $state<string | null>(null);
 
   let source = $state<"local" | "github">("local");
   let localPath = $state("");
@@ -60,6 +67,57 @@
     if (parsed === null) return;
     owner = parsed.owner;
     repo = parsed.repo;
+  }
+
+  $effect(() => {
+    // Re-read whenever the repository list changes: selecting a different
+    // repository changes which index this panel is describing.
+    void view;
+    void loadCodeMap();
+  });
+
+  async function loadCodeMap() {
+    try {
+      codeMap = await api.codeMap();
+    } catch {
+      codeMap = null;
+    }
+  }
+
+  async function rebuildCodeMap() {
+    if (indexing) return;
+    indexing = true;
+    indexNotice = null;
+    try {
+      const result = await api.rebuildCodeMap();
+      indexNotice = `Indexed ${result.file_count} files and ${result.symbol_count} declarations.`;
+      await loadCodeMap();
+    } catch (e) {
+      indexNotice =
+        e instanceof ApiError && e.reasonCode === "code_map_gate_disabled"
+          ? "Code map indexing is turned off. Turn it on in Permissions → Workspace."
+          : "Could not index this repository.";
+    } finally {
+      indexing = false;
+    }
+  }
+
+  /** What the index card says, in one sentence, without claiming more than it knows. */
+  function indexSummary(map: CodeMapStatus): string {
+    if (!map.enabled) {
+      return "Code map indexing is off, so the agent searches this repository by pattern only.";
+    }
+    if (map.status === "not_indexed") {
+      return "Not indexed yet. Build the map so the agent can find a definition instead of grepping for it.";
+    }
+    if (map.status === "failed") {
+      return `Could not be indexed (${humanize(map.reason_code || "unknown")}).`;
+    }
+    const partial =
+      map.status === "partial"
+        ? ` Partial — the scan stopped at ${map.limits_hit.map(humanize).join(", ")}.`
+        : "";
+    return `${map.file_count.toLocaleString()} files, ${map.symbol_count.toLocaleString()} declarations.${partial}`;
   }
 
   async function connect() {
@@ -192,6 +250,32 @@
         </li>
       {/each}
     </ul>
+  {/if}
+
+  {#if codeMap !== null}
+    <section class="code-map" aria-label="Code map">
+      <div class="code-map-body">
+        <span class="code-map-title">
+          <Icon name="search" size={14} />
+          Code map · {codeMap.repository}
+        </span>
+        <span class="code-map-detail" class:warn={!codeMap.enabled || codeMap.status === "failed"}>
+          {indexSummary(codeMap)}
+        </span>
+        {#if codeMap.enabled && codeMap.status !== "not_indexed" && codeMap.updated_at}
+          <span class="code-map-detail">Updated {codeMap.updated_at}</span>
+        {/if}
+        {#if indexNotice !== null}<span class="code-map-detail" role="status">{indexNotice}</span>{/if}
+      </div>
+      <button
+        type="button"
+        class="btn btn-soft btn-sm"
+        disabled={indexing || !codeMap.enabled}
+        onclick={rebuildCodeMap}
+      >
+        {indexing ? "Indexing…" : codeMap.status === "not_indexed" ? "Build index" : "Rebuild index"}
+      </button>
+    </section>
   {/if}
 
   <div class="source-toggle chip-row" role="group" aria-label="Repository source">
@@ -350,6 +434,37 @@
     letter-spacing: 0.03em;
     text-transform: uppercase;
     color: var(--accent);
+  }
+  .code-map {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 0.55rem 0.65rem;
+    background: var(--raised);
+  }
+  .code-map-body {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+  .code-map-title {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    font-weight: 650;
+    color: var(--text-1);
+  }
+  .code-map-detail {
+    font-size: 0.74rem;
+    color: var(--text-3);
+    overflow-wrap: anywhere;
+  }
+  .code-map-detail.warn {
+    color: var(--warn);
   }
   .connect-form {
     display: grid;

@@ -17,6 +17,7 @@ from raiker.memory.governance import GovernedMemoryService
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.advisor_tools import consult_advisor
+from raiker.tools.codemap_tools import code_map_search
 from raiker.tools.connector_tools import (
     connector_read,
     gcal_read,
@@ -258,6 +259,13 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("query", "")),
                 args.get("max_results", 5),
+                store=self.store,
+                principal_id=self.principal_id,
+            ),
+            "code_map_search": lambda args: code_map_search(
+                self.workspace_root,
+                str(args.get("query", "")),
+                args.get("max_results", 10),
                 store=self.store,
                 principal_id=self.principal_id,
             ),

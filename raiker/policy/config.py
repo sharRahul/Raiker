@@ -24,6 +24,12 @@ class StaticPolicyConfig:
                 "memory_search",
                 "memory_list",
                 "memory_get",
+                # B9 — reading the repository code map. Read-shaped for the same
+                # reason `connector_read` is: what governs it is enforced inside
+                # the tool — the `code_map_indexing` capability gate and the
+                # decision mode — and it returns coordinates into files the agent
+                # may already open with `read_file`, so it adds no authority.
+                "code_map_search",
                 # Reading an installed skill is a local, owner-scoped read of
                 # the owner's own instruction document. Nothing is executed.
                 "skill_load",

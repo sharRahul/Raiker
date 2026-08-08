@@ -1042,6 +1042,39 @@ async def select_code_repo(
     return {"ok": True, **result.data}
 
 
+@router.get("/api/code/map")
+async def get_code_map_status(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """B9 — the code map's state for the repository Build is pointed at.
+
+    Metadata only: the gate, the decision mode, the repository, and the counts.
+    Never a path, never a symbol, so the status call cannot become a listing of
+    the owner's tree over a route meant to describe an index.
+    """
+    return _service(request).code_map_status(owner_principal_id=auth_data[0].principal_id)
+
+
+@router.post("/api/code/map/rebuild")
+async def rebuild_code_map(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Re-scan the selected repository. Fails closed when the gate is off."""
+    session, principal = auth_data
+    result = _service(request).rebuild_code_map(
+        owner_principal_id=session.principal_id,
+        user_id=principal.delegated_by_user_id,
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
 @router.delete("/api/code/repos/{repo_id}")
 async def disconnect_code_repo(
     repo_id: str,

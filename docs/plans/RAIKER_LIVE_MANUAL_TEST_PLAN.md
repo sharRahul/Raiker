@@ -256,6 +256,24 @@ not, and marks only the ones the model itself cited.
 
 ---
 
+### 5.9 The repository code map (FIXED-113 — GAP-BUILD B9)
+
+Driven end to end by
+[`apps/web/e2e/b9-repository-code-map-live.spec.ts`](../../apps/web/e2e/b9-repository-code-map-live.spec.ts);
+run it with `RAIKER_LIVE_ANTHROPIC_KEY` and `RAIKER_LIVE_WORKSPACE` set against a
+host started on that same workspace.
+
+| Step | Expected |
+|---|---|
+| Open Build → the repository button, with **Code map** off in Permissions | The panel says indexing is off and offers nothing to press |
+| Turn **Code map** on (Permissions → Workspace), return to Build | The panel re-reads its state rather than showing the posture from before you left |
+| Connect a workspace folder holding a known declaration | **Code map · &lt;folder&gt; — N files, M declarations**, built by the connect itself |
+| Ask Build to `code_map_search` for that declaration | The answer names the real file and its line range, and the code map appears in the turn's **SOURCES** strip |
+| Turn **Code map** off, ask again | Refused verbatim as `code_map_gate_disabled` — not answered from the stored index |
+| Turn it back on, have the agent write a new file, approve it, search for the new declaration | The tool reports the new path: the index caught up with the change |
+
+---
+
 ## 6. Approvals
 
 | # | Step | Expected | Result |

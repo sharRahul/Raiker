@@ -84,7 +84,21 @@
   let {
     projects = null,
     onProjectsChanged,
-  }: { projects?: ProjectsList | null; onProjectsChanged?: () => void } = $props();
+    // Build keeps its transcript when the owner navigates away — the view is
+    // hidden, not unmounted — so anything it read once would otherwise stay as
+    // it was. Knowing when it comes back is what lets repository state (and the
+    // code map that follows the selected repository) be re-read rather than
+    // shown as it stood before a visit to Permissions.
+    visible = true,
+  }: {
+    projects?: ProjectsList | null;
+    onProjectsChanged?: () => void;
+    visible?: boolean;
+  } = $props();
+
+  $effect(() => {
+    if (visible) void loadRepos();
+  });
 
   interface BuildTurn {
     id: number;

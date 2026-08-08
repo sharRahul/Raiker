@@ -118,6 +118,9 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   semantic_memory_writes: "Workspace",
   semantic_memory_review_queue: "Workspace",
   graph_codemap_indexing: "Workspace",
+  // B9 — the repository code map. Workspace, beside the file capabilities, because
+  // it reads workspace files and writes a derived index and reaches nothing else.
+  code_map_indexing: "Workspace",
   graph_codemap_planning: "Workspace",
   graph_indexing_runtime: "Workspace",
   semantic_memory_runtime: "Workspace",
@@ -328,13 +331,20 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     label: "Plugin execution (legacy gate)",
     description: "Phase-3 plugin execution contract gate.",
   },
+  code_map_indexing: {
+    label: "Code map",
+    description:
+      "Index this repository's files and what they declare, so the agent can find a definition instead of guessing a search pattern. Local and read-derived: it reads files the agent may already open, returns coordinates rather than code, and never leaves this machine.",
+  },
   graph_codemap_indexing: {
-    label: "Code map indexing",
-    description: "Build a graph index of the workspace codebase.",
+    label: "Graph memory indexing (not implemented)",
+    description:
+      "The Phase-3 durable code-graph store — nodes and edges with provenance, approval previews and rollback plans. Still a dry-run planner; the working repository index is Code map, above.",
   },
   graph_codemap_planning: {
-    label: "Code map planning",
-    description: "Use the code graph to inform plans.",
+    label: "Graph memory planning (not implemented)",
+    description:
+      "The Phase-3 dry-run planner over the durable code-graph store. Named for that subsystem rather than for Code map, so the two are not mistaken for each other in this list.",
   },
   semantic_memory_writes: {
     label: "Semantic memory writes",

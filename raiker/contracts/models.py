@@ -223,6 +223,12 @@ EVENT_TYPES = {
     # GitHub reads stay governed by the `connector_github_runtime` gate.
     "code_repo_connected",
     "code_repo_disconnected",
+    # B9 — the repository code map was built from scratch, or refreshed for the
+    # paths an approved write touched. The payload is counts and reasons only —
+    # file/symbol/edge totals, what the scan skipped, and which bound it hit —
+    # never a path's content and never a symbol's text.
+    "code_map_indexed",
+    "code_map_refreshed",
     # Per-session MCP monitoring (Phase B). A governed MCP session completed —
     # redacted telemetry only (counts, hosts, byte totals, outcome). An anomaly
     # rule tripped — a redacted finding was raised (never a payload or token).
@@ -411,6 +417,7 @@ TOOLS = {
     "git_log",
     "memory_write",
     "memory_search",
+    "code_map_search",
     "memory_forget",
     "memory_list",
     "memory_get",

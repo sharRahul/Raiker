@@ -256,6 +256,16 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-08:
   `RAIKER_WEB_EGRESS_ALLOWLIST` is empty. `web_search` answers the same gate,
   but Raiker ships no search endpoint: it reports `web_search_not_configured`
   until you point it at one.
+- **The code map finds declarations, not every reference, and it is exact only
+  for Python.** Turning on **Code map** lets Raiker index the repository Build
+  points at, so the agent can ask where something is defined instead of guessing
+  a search pattern; it is rebuilt on demand and refreshed for the files an
+  approved change touched. Python is parsed with a real parser; fifteen other
+  languages are matched with bounded patterns, which finds most declarations and
+  misses unusual ones — each file records which extractor produced it. A scan
+  that hits one of its bounds reports `partial` and names the bound rather than
+  presenting a partial map as a complete one. There is no reference or
+  call-graph search and no embeddings over the tree.
 - Automatic context compaction at 90 % and weekly quota display are specified
   but not shipped. The view-only file inspector is shipped.
 - **Shipped list prices are unverified defaults.** `config/model-profiles.json`

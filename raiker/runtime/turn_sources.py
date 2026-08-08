@@ -78,6 +78,7 @@ TOOL_SOURCE_KINDS: dict[str, str] = {
     "git_status": "repository",
     "git_diff": "repository",
     "git_log": "repository",
+    "code_map_search": "repository",
     "memory_search": "memory",
     "memory_list": "memory",
     "memory_get": "memory",
@@ -241,6 +242,16 @@ def source_from_tool_result(
         return SourceDraft(
             kind=kind, title=f"Repository: {tool_name.replace('_', ' ')}",
             locator=tool_name, tool_name=tool_name, passage=passage,
+        )
+    if tool_name == "code_map_search":
+        query = _text(args.get("query"))
+        return SourceDraft(
+            kind=kind,
+            title=f"Code map: {query}" if query else "Code map",
+            locator=_text(output.get("repository")),
+            tool_name=tool_name,
+            detail=_count_detail(output.get("count", 0), "declarations"),
+            passage=passage,
         )
     if tool_name in ("memory_search", "memory_list"):
         results = output.get("results", []) or []

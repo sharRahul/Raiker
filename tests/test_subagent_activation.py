@@ -172,9 +172,9 @@ def test_subagent_has_its_own_principal_and_parks_mutation_for_parent(tmp_path: 
     subagent = store.get_principal(outcome.ref_id)
     assert subagent is not None and subagent["principal_type"] == "ai_agent"
     assert json.loads(contract["allowed_tools_json"]) == sorted(
-        ["diff_files", "git_diff", "git_log", "git_status", "glob", "grep", "list_directory",
-         "memory_get", "memory_list", "memory_search", "read_file", "skill_load", "stat_path",
-         "vector_get"]
+        ["code_map_search", "diff_files", "git_diff", "git_log", "git_status", "glob", "grep",
+         "list_directory", "memory_get", "memory_list", "memory_search", "read_file",
+         "skill_load", "stat_path", "vector_get"]
     )
     assert store.list_approvals(status="pending")
     assert not (ws / "x.txt").exists()

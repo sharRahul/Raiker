@@ -13,6 +13,7 @@
 | Local runtime executors | implemented_policy_gated | Gate and decision mode checked per action |
 | Memory MVP | implemented_verified | Proposal decisions, scope/expiry changes, forget/purge, and owner-scoped history are governed |
 | Build workspace (coding surface) | implemented_policy_gated | Composer modes set real decision modes; repository references grant nothing and fail closed |
+| Repository code map | implemented_policy_gated | Local, derived symbol index behind `code_map_indexing`; built on connect and on request, refreshed for the paths an approved write touched, returned to the model as coordinates and carried into the turn as untrusted context |
 | Scheduled background agents | implemented_policy_gated | One governed turn per cycle; unknown cadences refused |
 | SSH/Daytona execution | implemented_approval_required | Owner profile and env-only credential references; no local-to-remote fallback |
 | Sensitive domains | disabled_deferred | Finance, medical, CCTV, hardware, and similar domains fail closed without an executor |

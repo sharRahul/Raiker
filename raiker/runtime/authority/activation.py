@@ -82,6 +82,15 @@ def _build_registry() -> dict[str, ActivationRequirement]:
         r[cap] = _req(cap, "5", threat_ack=True, human_confirm=True,
                       notes="Alias for remote_execution_cap / container_execution_cap.")
 
+    # B9 — the repository code map. A real executor exists, so this is a switch
+    # the owner can throw rather than a name on the matrix: Tier 1 because the
+    # scan reads workspace files and writes a derived index, and reaches nothing
+    # outside the machine.
+    r["code_map_indexing"] = _req(
+        "code_map_indexing", "1",
+        notes="Local read-derived symbol index; no egress, no mutation outside the index.",
+    )
+
     # Runtime domain — Tier 1
     for cap in ("approval_execution_relay", "file_write_execution", "patch_apply_execution"):
         r[cap] = _req(cap, "1", notes="First-slice caps; executor registered.")

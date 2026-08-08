@@ -176,6 +176,30 @@ the subagent is created. Its findings reach the calling model as untrusted data,
 never as instructions, and the audit trail keeps the contract, the steps, and the
 tools used rather than the content.
 
+## Model-facing repository index
+
+| Tool Name | Descriptions | Permissions | Implemented |
+|---|---|---|---|
+| `code_map_search` | Find where a class, function, component or type is declared in the selected repository, and get its path and line range | `code_map_indexing` gate + decision mode (`deny` refuses) | Yes, read-only |
+
+`code_map_search` is read-shaped at the policy layer for the same reason
+`connector_read` is: what governs it is enforced inside the tool
+(`raiker/graph/codemap_service.py`), and what it returns adds no authority. The
+map is a projection of files the agent may already open with `read_file`, and the
+tool returns **coordinates rather than code** — a path, a line range, a
+signature, a docstring's first line — so reading the source still goes through
+workspace containment and the policy engine.
+
+Unlike the web and connector reads, `ask` and `auto` do **not** withhold it: this
+is a local read of the owner's own workspace, and requiring an approval per
+lookup would be friction with nothing behind it. `deny` refuses, and the gate is
+the owner's real off switch — off means no scan runs and no stored map is read.
+
+What it returns is **untrusted data**: symbol names and docstrings are copied out
+of repository files, which is exactly where an injected instruction would sit.
+The same material reaches the turn bundle as a `code_map` context item under the
+same label.
+
 ## Model-facing web reads
 
 | Tool Name | Descriptions | Permissions | Implemented |

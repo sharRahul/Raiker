@@ -58,6 +58,7 @@ that proves it, what is missing, and the concrete work.
 | B6 | BUILD | TIER 1 | Done |
 | B7 | BUILD | TIER 1 | Done |
 | B8 | BUILD | TIER 1 | Complete |
+| B9 | BUILD | TIER 2 | Done |
 | B11 | BUILD | TIER 2 | Complete |
 | B12 | BUILD | TIER 2 | Done |
 | B17 | BUILD | TIER 2 | Done |
@@ -186,16 +187,38 @@ trail.
 
 ### Tier 2 — what the agent can see
 
-**B9. No repository index.** Every turn starts cold: no symbol index, no code
-map, no embeddings over the tree. `graph_indexing_enabled` and
-`semantic_memory_writes_enabled` are hardcoded `False`
-(`raiker/context/gatherer.py`), and `retrieve_hybrid_memory` — lexical + vector
-+ graph, already written in `raiker/memory/retrieval.py` — is called only by the
-evaluation harness. On a large repository the agent greps blind.
-**Work:** build the code map described in
-`docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md` on repository connect, refresh it
-incrementally on approved writes, and inject the top-ranked slices into the turn
-bundle as scoped, untrusted context.
+**B9. No repository index.** ✅ **Done — see FIXED-113.** A bounded, deterministic
+scan (`raiker/graph/codemap.py`) records what each file is and what it declares —
+Python exactly via `ast`, fifteen other languages approximately via bounded
+patterns, with each file recording which extractor produced it. It is built when
+a repository is connected, when one that has never been indexed is selected, and
+on the owner's own **Rebuild index** control — never on a turn, because indexing
+the owner's tree is their decision. After an approved file mutation really lands,
+the relay re-parses exactly the paths it touched, so a line number the map hands
+out is the line the declaration is on now.
+
+`code_map_search` puts it in front of the model as **coordinates, not code**, and
+a `code_map` context item carries the ranked files and their declarations into
+the turn as `untrusted_external` — a symbol name and a docstring come out of
+repository files, which is exactly where an injected instruction would sit.
+Reading the code still goes through `read_file`, workspace containment and the
+policy engine, so the map grants nothing.
+
+The switch is `code_map_indexing` (Permissions → Workspace → **Code map**), with
+a real executor and an activation requirement. It is deliberately **not**
+`graph_codemap_indexing`: that capability names the Phase-3 durable governed
+graph store — nodes and edges with provenance, approval previews, rollback plans
+— which is still the dry-run planner in `raiker/graph/planner.py`. Making one
+switch mean both a derived cache and a governed record store is the "two lists
+that have to agree" defect this document keeps recording, so that capability and
+every readiness flag under it are left exactly as they were.
+
+**What B9 did not do.** The embeddings half. There is no vector index over the
+tree and no semantic retrieval of code: ranking is lexical over an index of real
+declarations, which is what makes it find a *definition* rather than a mention.
+`retrieve_hybrid_memory` remains what it always was — retrieval over approved
+memories, and it is called on every turn by the context gatherer, not only by the
+evaluation harness as this entry used to claim.
 
 **B10. No language intelligence.** No symbol lookup, no
 definition/reference navigation, no type or lint feedback loop. **Work:** an
@@ -342,7 +365,11 @@ B3's multi-file patch transaction has landed. **B4–B8 are now complete**, so t
 loop is efficient, legible, and reaches the ecosystem. **B11, B12 and B17 have
 since landed too** — the agent can commit the change it made and propose it, it
 can read a page it is told to read, and the owner can stop or correct a turn
-while it runs rather than waiting it out. B13–B16 make the result reviewable. Everything else is depth. B20 is a *policy* decision before it
+while it runs rather than waiting it out. **B9 has landed**: the agent can find
+where something is defined instead of guessing a search pattern, and the index
+follows the code as the agent changes it. B10 is the natural next step in the
+same tier — a code map says where a declaration *is*, an LSP says what refers to
+it. B13–B16 make the result reviewable. Everything else is depth. B20 is a *policy* decision before it
 is an engineering one and belongs to the owner, not to an implementer.
 
 ---

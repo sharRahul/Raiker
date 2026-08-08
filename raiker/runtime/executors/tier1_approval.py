@@ -95,6 +95,50 @@ class ApprovalExecutionRelay:
 
     # ── execution ─────────────────────────────────────────────────────────────
 
+    # ── B9: keep the code map honest after an approved write ────────────────
+    #
+    # An index that describes the tree as it was before the agent changed it is
+    # worse than no index: it sends the next turn to a line number that has
+    # moved. Refreshing happens *here*, once, at the single point an approved
+    # file mutation is known to have really landed — not in the executors, where
+    # it would have to be repeated for every write path that exists now or later.
+    #
+    # It re-parses only the paths the write touched, and it is best-effort in the
+    # strict sense: a refresh that fails, or a gate that is off, changes nothing
+    # about the write that already succeeded. The owner's approved change is
+    # never rolled back because a derived cache could not be updated.
+
+    _WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch", "create_document"})
+
+    def _refresh_code_map(
+        self,
+        action: GovernedAction,
+        principal: Principal,
+        tool_name: str,
+        artifacts: dict[str, Any] | None,
+    ) -> None:
+        if tool_name not in self._WRITE_TOOLS or not artifacts:
+            return
+        raw = artifacts.get("paths") or ([artifacts["path"]] if artifacts.get("path") else [])
+        paths = [str(item) for item in raw] if isinstance(raw, (list, tuple)) else []
+        if not paths:
+            return
+        try:
+            from raiker.graph.codemap_service import CodeMapService
+
+            outcome = CodeMapService(
+                self._workspace_root, self._store, principal_id=principal.principal_id
+            ).refresh_paths(paths)
+        except Exception:  # noqa: BLE001 — a derived cache must never cost a write
+            return
+        if outcome.get("status") == "refreshed":
+            self._emit(action, "code_map_refreshed", {
+                "repository": outcome.get("repository", ""),
+                "refreshed": outcome.get("refreshed", 0),
+                "removed": outcome.get("removed", 0),
+                "tool_name": tool_name,
+            })
+
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         approval_id = str(action.arguments.get("approval_id", ""))
         if not approval_id:
@@ -255,6 +299,10 @@ class ApprovalExecutionRelay:
                 "result": result.artifacts,
                 "posture": posture,
             })
+            # After the execution is recorded, never before: the refresh is a
+            # consequence of the change having landed, and an audit trail that
+            # showed it first would read as though the index led the write.
+            self._refresh_code_map(action, principal, tool_name, result.artifacts)
             return ExecutionResult(
                 ok=True, capability=self.capability, action_id=action.action_id,
                 summary=f"Approval executed: {tool_name} via {target_cap}.",

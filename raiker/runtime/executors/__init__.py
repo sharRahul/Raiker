@@ -39,6 +39,7 @@ from raiker.runtime.executors.tier1_tasks import (
 from raiker.runtime.executors.tier2_shell import ProcessExecutor, ShellExecutor
 from raiker.runtime.executors.tier2_web import NetworkExecutor, WebFetchExecutor
 from raiker.runtime.executors.tier3_core import (
+    CodeMapIndexExecutor,
     GraphIndexingExecutor,
     SemanticMemoryExecutor,
     VectorEmbeddingExecutor,
@@ -77,7 +78,8 @@ __all__ = [
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "TaskManagementExecutor", "ProjectAssignmentExecutor",
     "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "NetworkExecutor",
-    "GraphIndexingExecutor", "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
+    "GraphIndexingExecutor", "CodeMapIndexExecutor",
+    "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
     "SubagentExecutor", "MultiAgentTeamExecutor",
     "PluginInstallExecutor", "PluginExecutionCapExecutor", "PluginRevocationExecutor",
     "PluginRuntimeExecutor", "PluginSandboxedRuntimeExecutor", "PluginSandboxImagePullExecutor",
@@ -140,6 +142,9 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "git_push_execution",
     # Tier 3 — local code-intelligence runtime
     "graph_indexing_runtime",
+    # B9 — the repository code map. A local, read-derived symbol index the owner
+    # switches on; it executes nothing outside the workspace and grants nothing.
+    "code_map_indexing",
     "semantic_memory_runtime",
     # Tier 3 — local deterministic embedding (hashing trick; no model download /
     # no network).
@@ -244,6 +249,7 @@ def build_default_executor_registry(
     registry.register("web_fetch", WebFetchExecutor(ws))
     registry.register("network_execution", NetworkExecutor(ws))
     registry.register("graph_indexing_runtime", GraphIndexingExecutor(ws))
+    registry.register("code_map_indexing", CodeMapIndexExecutor(ws, store))
     registry.register("semantic_memory_runtime", SemanticMemoryExecutor(ws))
     registry.register("vector_embedding_runtime", VectorEmbeddingExecutor(ws, store))
     registry.register("model_provider_runtime", ModelProviderExecutor(ws, store))

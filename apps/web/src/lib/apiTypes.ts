@@ -549,6 +549,28 @@ export interface CodeReposView {
   note: string;
 }
 
+// B9 — the repository code map's own state. Counts and governance only: this
+// shape deliberately carries no path and no symbol, so the status call cannot
+// become a listing of the owner's tree.
+export interface CodeMapStatus {
+  capability: string;
+  gate_state: string;
+  decision_mode: string;
+  enabled: boolean;
+  repository: string;
+  repo_id: string;
+  status: "indexed" | "partial" | "not_indexed" | "failed";
+  reason_code: string;
+  file_count: number;
+  symbol_count: number;
+  edge_count: number;
+  languages: Record<string, number>;
+  skipped: Record<string, number>;
+  limits_hit: string[];
+  built_at: string | null;
+  updated_at: string | null;
+}
+
 export interface ProjectDetail {
   project: ProjectView;
   sessions: SessionSummary[];

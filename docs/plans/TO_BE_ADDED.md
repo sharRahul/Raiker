@@ -114,10 +114,13 @@ grant is not permission to escape the boundary. `raiker/tools/broker.py` routes
 granted commands through it.
 
 **Missing.** The boundary covers *commands granted under B5*. It does not yet
-cover the general tool surface, and `container_execution_enabled` remains one of
-the hardcoded-`False` capability flags in `raiker/context/gatherer.py`. There is
-no per-tool container profile, no read-only mount of the repository with a single
-writable workspace subdirectory, and no Podman path.
+cover the general tool surface, and `container_execution_enabled` is still
+reported `False` by the readiness views (`raiker/workspace/views.py`,
+`raiker/storage/lifecycle_evidence.py`). It is no longer one of the gatherer's
+own hardcoded flags — FIXED-104 deleted that fixed list, so the turn context now
+reports what the owner actually enabled. There is no per-tool container profile,
+no read-only mount of the repository with a single writable workspace
+subdirectory, and no Podman path.
 
 **Work.** Extend `raiker/execution/profiles.py` with per-tool container profiles
 so any tool call — not only a granted command — can be routed into an ephemeral
@@ -426,7 +429,7 @@ without recording the value.
 desktop, dashboard, ide, apple_mobile, android_mobile and webhooks, and
 `raiker/channels/registry.py` loads them — but `external_channels_enabled` and
 `notifications_enabled` are both hardcoded `False` in
-`raiker/context/gatherer.py`. Raiker binds to the local host. Scheduled routines
+`raiker/channels/readiness.py`. Raiker binds to the local host. Scheduled routines
 run and finish with nobody told (GAP-CHAT C10).
 
 **Missing.** Any surface where the assistant reaches the owner who is not at the

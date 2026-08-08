@@ -72,6 +72,8 @@ from raiker.storage.migrations import (
     CHECKPOINT_CAPTURE_MANIFEST_SQL,
     CLOUD_EXECUTION_COST_LEDGER_MIGRATION_ID,
     CLOUD_EXECUTION_COST_LEDGER_SQL,
+    CODE_MAP_MIGRATION_ID,
+    CODE_MAP_SQL,
     CODE_REPOS_MIGRATION_ID,
     CODE_REPOS_SQL,
     CONFIGURED_MODELS_MIGRATION_ID,
@@ -860,6 +862,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 SUBAGENT_BUDGETS_MIGRATION_ID, SUBAGENT_BUDGETS_SQL, connection
             )
             self._apply_migration(CODE_REPOS_MIGRATION_ID, CODE_REPOS_SQL, connection)
+            self._apply_migration(CODE_MAP_MIGRATION_ID, CODE_MAP_SQL, connection)
             self._apply_migration(
                 MODEL_USAGE_LEDGER_MIGRATION_ID, MODEL_USAGE_LEDGER_SQL, connection
             )
@@ -1327,6 +1330,281 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     "UPDATE code_repos SET selected = 1 WHERE owner_principal_id = ? AND repo_id = ?",
                     (owner_principal_id, repo_id),
                 )
+
+    # ── Repository code map (B9) ────────────────────────────────────────────
+    # A derived projection of files the agent may already read: what each file
+    # is and what it declares, keyed by owner and by the workspace-relative
+    # repository path the turn works in. It is storage for *coordinates* — the
+    # rows say where to look, and looking still goes through `read_file`, the
+    # workspace containment check, and the policy engine.
+
+    def load_code_map_index(
+        self, owner_principal_id: str, repo_path: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM code_map_indexes WHERE owner_principal_id = ? AND repo_path = ?",
+                (owner_principal_id, repo_path),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def list_code_map_indexes(self, owner_principal_id: str) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM code_map_indexes WHERE owner_principal_id = ? ORDER BY repo_path",
+                (owner_principal_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def record_code_map_index(
+        self,
+        *,
+        owner_principal_id: str,
+        repo_path: str,
+        repo_id: str,
+        label: str,
+        status: str,
+        reason_code: str,
+        file_count: int,
+        symbol_count: int,
+        edge_count: int,
+        skipped: str,
+        limits_hit: str,
+        languages: str,
+        schema_version: str,
+    ) -> None:
+        """Write the index's own state row, preserving the first ``built_at``."""
+        now = utc_now()
+        with self.connect() as connection:
+            existing = connection.execute(
+                "SELECT built_at FROM code_map_indexes WHERE owner_principal_id = ? AND repo_path = ?",
+                (owner_principal_id, repo_path),
+            ).fetchone()
+            built_at = str(existing["built_at"]) if existing is not None else now
+            connection.execute(
+                """INSERT INTO code_map_indexes
+                   (owner_principal_id, repo_path, repo_id, label, status, reason_code,
+                    file_count, symbol_count, edge_count, skipped, limits_hit, languages,
+                    schema_version, built_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(owner_principal_id, repo_path) DO UPDATE SET
+                     repo_id=excluded.repo_id, label=excluded.label, status=excluded.status,
+                     reason_code=excluded.reason_code, file_count=excluded.file_count,
+                     symbol_count=excluded.symbol_count, edge_count=excluded.edge_count,
+                     skipped=excluded.skipped, limits_hit=excluded.limits_hit,
+                     languages=excluded.languages, schema_version=excluded.schema_version,
+                     updated_at=excluded.updated_at""",
+                (
+                    owner_principal_id, repo_path, repo_id, label, status, reason_code,
+                    file_count, symbol_count, edge_count, skipped, limits_hit, languages,
+                    schema_version, built_at, now,
+                ),
+            )
+
+    def replace_code_map(
+        self,
+        *,
+        owner_principal_id: str,
+        repo_path: str,
+        files: list[tuple[Any, ...]],
+        symbols: list[tuple[Any, ...]],
+        edges: list[tuple[Any, ...]],
+    ) -> None:
+        """Swap a repository's whole map in one transaction.
+
+        All-or-nothing on purpose: a half-written map would answer some searches
+        from the new scan and some from the old one, and nothing in the result
+        would say which.
+        """
+        with self.connect() as connection:
+            self._delete_code_map_rows(connection, owner_principal_id, repo_path)
+            self._insert_code_map_rows(connection, owner_principal_id, repo_path, files, symbols, edges)
+
+    def refresh_code_map_paths(
+        self,
+        *,
+        owner_principal_id: str,
+        repo_path: str,
+        paths: list[str],
+        files: list[tuple[Any, ...]],
+        symbols: list[tuple[Any, ...]],
+        edges: list[tuple[Any, ...]],
+    ) -> None:
+        """Replace the rows for exactly *paths*, in one transaction.
+
+        A path in *paths* with no row in *files* was deleted or became
+        unreadable, so its rows go and nothing replaces them.
+        """
+        if not paths:
+            return
+        with self.connect() as connection:
+            for path in paths:
+                connection.execute(
+                    "DELETE FROM code_map_files WHERE owner_principal_id = ? AND repo_path = ? AND path = ?",
+                    (owner_principal_id, repo_path, path),
+                )
+                connection.execute(
+                    "DELETE FROM code_map_symbols WHERE owner_principal_id = ? AND repo_path = ? AND path = ?",
+                    (owner_principal_id, repo_path, path),
+                )
+                connection.execute(
+                    "DELETE FROM code_map_edges WHERE owner_principal_id = ? AND repo_path = ? AND from_path = ?",
+                    (owner_principal_id, repo_path, path),
+                )
+            self._insert_code_map_rows(connection, owner_principal_id, repo_path, files, symbols, edges)
+
+    def delete_code_map(self, owner_principal_id: str, repo_path: str) -> None:
+        with self.connect() as connection:
+            self._delete_code_map_rows(connection, owner_principal_id, repo_path)
+            connection.execute(
+                "DELETE FROM code_map_indexes WHERE owner_principal_id = ? AND repo_path = ?",
+                (owner_principal_id, repo_path),
+            )
+
+    @staticmethod
+    def _delete_code_map_rows(
+        connection: sqlite3.Connection, owner_principal_id: str, repo_path: str
+    ) -> None:
+        for table in ("code_map_files", "code_map_symbols", "code_map_edges"):
+            connection.execute(
+                f"DELETE FROM {table} WHERE owner_principal_id = ? AND repo_path = ?",  # noqa: S608 — fixed table names
+                (owner_principal_id, repo_path),
+            )
+
+    @staticmethod
+    def _insert_code_map_rows(
+        connection: sqlite3.Connection,
+        owner_principal_id: str,
+        repo_path: str,
+        files: list[tuple[Any, ...]],
+        symbols: list[tuple[Any, ...]],
+        edges: list[tuple[Any, ...]],
+    ) -> None:
+        now = utc_now()
+        connection.executemany(
+            """INSERT OR REPLACE INTO code_map_files
+               (owner_principal_id, repo_path, path, language, sha256, size_bytes,
+                line_count, symbol_count, title, extractor, indexed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [(owner_principal_id, repo_path, *row, now) for row in files],
+        )
+        connection.executemany(
+            """INSERT INTO code_map_symbols
+               (owner_principal_id, repo_path, path, kind, name, name_lower,
+                qualified_name, line_start, line_end, parent, signature, doc)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [(owner_principal_id, repo_path, *row) for row in symbols],
+        )
+        connection.executemany(
+            """INSERT INTO code_map_edges
+               (owner_principal_id, repo_path, from_path, relationship, target, line)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            [(owner_principal_id, repo_path, *row) for row in edges],
+        )
+
+    def code_map_file_hashes(self, owner_principal_id: str, repo_path: str) -> dict[str, str]:
+        """``path -> sha256`` for every indexed file, so a refresh can skip the unchanged."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT path, sha256 FROM code_map_files WHERE owner_principal_id = ? AND repo_path = ?",
+                (owner_principal_id, repo_path),
+            ).fetchall()
+        return {str(row["path"]): str(row["sha256"]) for row in rows}
+
+    def match_code_map_symbols(
+        self, owner_principal_id: str, repo_path: str, term: str, *, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        """Candidate symbol rows for one search term. Ranking happens above this."""
+        like = f"%{term.lower()}%"
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM code_map_symbols
+                   WHERE owner_principal_id = ? AND repo_path = ?
+                     AND (name_lower LIKE ? OR LOWER(qualified_name) LIKE ? OR LOWER(doc) LIKE ?)
+                   ORDER BY LENGTH(name), path, line_start
+                   LIMIT ?""",
+                (owner_principal_id, repo_path, like, like, like, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def match_code_map_files(
+        self, owner_principal_id: str, repo_path: str, term: str, *, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        like = f"%{term.lower()}%"
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM code_map_files
+                   WHERE owner_principal_id = ? AND repo_path = ?
+                     AND (LOWER(path) LIKE ? OR LOWER(title) LIKE ?)
+                   ORDER BY symbol_count DESC, path
+                   LIMIT ?""",
+                (owner_principal_id, repo_path, like, like, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def top_code_map_files(
+        self, owner_principal_id: str, repo_path: str, *, limit: int = 12
+    ) -> list[dict[str, Any]]:
+        """The files with the most declarations — the overview when nothing matched."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM code_map_files
+                   WHERE owner_principal_id = ? AND repo_path = ?
+                   ORDER BY symbol_count DESC, path LIMIT ?""",
+                (owner_principal_id, repo_path, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def code_map_totals(self, owner_principal_id: str, repo_path: str) -> dict[str, Any]:
+        """File/symbol totals and a language histogram, aggregated in SQL.
+
+        An incremental refresh has to re-derive the index's counts, and doing
+        that by loading every file row would make a one-file write cost a scan of
+        the whole table.
+        """
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT COUNT(*) AS files, COALESCE(SUM(symbol_count), 0) AS symbols
+                   FROM code_map_files WHERE owner_principal_id = ? AND repo_path = ?""",
+                (owner_principal_id, repo_path),
+            ).fetchone()
+            languages = connection.execute(
+                """SELECT language, COUNT(*) AS files FROM code_map_files
+                   WHERE owner_principal_id = ? AND repo_path = ?
+                   GROUP BY language""",
+                (owner_principal_id, repo_path),
+            ).fetchall()
+        return {
+            "file_count": int(row["files"]) if row else 0,
+            "symbol_count": int(row["symbols"]) if row else 0,
+            "languages": {str(item["language"]): int(item["files"]) for item in languages},
+        }
+
+    def code_map_file_symbols(
+        self, owner_principal_id: str, repo_path: str, path: str, *, limit: int = 40
+    ) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM code_map_symbols
+                   WHERE owner_principal_id = ? AND repo_path = ? AND path = ?
+                   ORDER BY line_start LIMIT ?""",
+                (owner_principal_id, repo_path, path, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def code_map_dependents(
+        self, owner_principal_id: str, repo_path: str, target: str, *, limit: int = 20
+    ) -> list[dict[str, Any]]:
+        """Files whose imports name *target* — the impact-analysis question."""
+        like = f"%{target}%"
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT DISTINCT from_path, relationship, target FROM code_map_edges
+                   WHERE owner_principal_id = ? AND repo_path = ? AND target LIKE ?
+                   ORDER BY from_path LIMIT ?""",
+                (owner_principal_id, repo_path, like, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def original_account_principal_id(self) -> str | None:
         """Return the sole destination for unattributed legacy data, if one exists."""

@@ -64,11 +64,11 @@ still resolves to the single runtime rather than failing.
 
 ## Capability gates
 
-**Permissions** lists all 66 gates, grouped:
+**Permissions** lists all 67 gates, grouped:
 
 | Group | Examples |
 |---|---|
-| Workspace | Audit export, File writes, Git writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
+| Workspace | Audit export, Code map, File writes, Git writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
 | Local execution | Shell commands, Processes, Container execution, Subagents, Multi-agent teams |
 | Network | Network requests, Web fetch, Git push, External channels, Channel approval relay |
 | Models | Hosted models, Home-lab models, Advisor model, Provider embeddings |
@@ -105,6 +105,30 @@ entry in the activation registry — a block with no requirement to satisfy. Tha
 entry landed with **FIXED-106**, so it turns on like any other Tier-1 capability.
 Observability → Diagnostics lists them under *"Disabled / deferred
 capabilities"*.
+
+### Code map
+
+**Code map** is the switch over the repository index Build uses to find where
+something is defined. It is off until you turn it on, and off means nothing is
+scanned and nothing stored is read — Raiker does not index your tree because it
+could.
+
+With it on, the map is built when you connect a repository, when you point Build
+at one that has never been indexed, and whenever you press **Rebuild index** in
+Build → Repositories. It is refreshed for the files an approved change touched,
+so the line numbers it hands out stay the line numbers the code is on. It is
+never built during a turn.
+
+The map records what each file is and what it declares — no file contents — and
+what the agent gets back from it is coordinates: a path, a line range, a
+signature. Reading the code still goes through the same file read, the same
+workspace containment, and the same policy check as any other read, so turning
+the map on does not widen what the agent may open. Turn it off and the agent
+falls back to searching by pattern.
+
+*Not to be confused with* **Graph memory indexing**, further down the same group.
+That is a separate, unimplemented subsystem — a durable governed store of code
+relationships — and it shows no **Turn on**.
 
 ---
 

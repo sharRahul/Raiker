@@ -3,7 +3,7 @@
 // something a person can act on, and never imply that connecting granted access.
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CodeReposView } from "../apiTypes";
+import type { CodeMapStatus, CodeReposView } from "../apiTypes";
 import { stubFetch } from "../test-helpers";
 import RepoConnector from "./RepoConnector.svelte";
 
@@ -17,6 +17,29 @@ function view(partial: Partial<CodeReposView> = {}): CodeReposView {
     github_decision_mode: "ask",
     github_token_configured: true,
     note: "References only.",
+    ...partial,
+  };
+}
+
+// B9 — the code map's state, as the panel reads it back from /api/code/map.
+function codeMap(partial: Partial<CodeMapStatus> = {}): CodeMapStatus {
+  return {
+    capability: "code_map_indexing",
+    gate_state: "enabled_runtime",
+    decision_mode: "ask",
+    enabled: true,
+    repository: "projects/my-app",
+    repo_id: "repo_1",
+    status: "indexed",
+    reason_code: "",
+    file_count: 412,
+    symbol_count: 3120,
+    edge_count: 900,
+    languages: { python: 300, typescript: 112 },
+    skipped: {},
+    limits_hit: [],
+    built_at: "2026-08-08T09:00:00Z",
+    updated_at: "2026-08-08T09:30:00Z",
     ...partial,
   };
 }
@@ -90,6 +113,41 @@ describe("RepoConnector", () => {
     await fireEvent.click(screen.getByRole("button", { name: /github/i }));
 
     expect(screen.getByText(/no owner token is configured yet/i)).toBeInTheDocument();
+  });
+
+  it("states what the code map holds and offers a rebuild", async () => {
+    stubFetch({ "GET /api/code/map": codeMap() });
+    mount();
+
+    expect(await screen.findByText(/412 files, 3,120 declarations/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /rebuild index/i })).toBeEnabled();
+  });
+
+  it("offers to build the index when the repository has never been scanned", async () => {
+    stubFetch({ "GET /api/code/map": codeMap({ status: "not_indexed", file_count: 0, symbol_count: 0 }) });
+    mount();
+
+    expect(await screen.findByRole("button", { name: /build index/i })).toBeEnabled();
+    expect(screen.getByText(/not indexed yet/i)).toBeInTheDocument();
+  });
+
+  it("says the owner turned indexing off, and does not offer to run it anyway", async () => {
+    // The gate is the owner's. A control that pretends to work while the
+    // runtime would refuse is the failure this codebase keeps closing.
+    stubFetch({ "GET /api/code/map": codeMap({ enabled: false, gate_state: "disabled" }) });
+    mount();
+
+    expect(await screen.findByText(/indexing is off/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /build index|rebuild index/i })).toBeDisabled();
+  });
+
+  it("names the bound a partial scan stopped at instead of reporting it as complete", async () => {
+    stubFetch({
+      "GET /api/code/map": codeMap({ status: "partial", limits_hit: ["max_files"] }),
+    });
+    mount();
+
+    expect(await screen.findByText(/partial — the scan stopped at max files/i)).toBeInTheDocument();
   });
 
   it("marks a local folder that has gone missing from the workspace", async () => {

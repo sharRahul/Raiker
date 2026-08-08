@@ -2361,3 +2361,92 @@ CREATE TABLE IF NOT EXISTS turn_sources (
 CREATE INDEX IF NOT EXISTS idx_turn_sources_turn
   ON turn_sources(session_id, turn_id, ordinal);
 """
+
+
+# B9 — the repository code map.
+#
+# Every turn used to start cold: no symbol index, no map of the tree, so on a
+# large repository the agent grepped blind. These four tables are the projection
+# that ends that, and each column exists for a stated reason.
+#
+# `code_map_indexes` is one row per indexed repository *path* rather than per
+# `code_repos` row, because the repository a turn works in is the selected folder
+# **or the workspace root when nothing is selected** — the same resolution the
+# git tools use. Keying on the path means the unselected case has a home instead
+# of a special case. `status`, `reason_code` and `limits_hit` are what stop a
+# partial scan reading as a complete one.
+#
+# `sha256` on a file row is what makes a refresh incremental: after an approved
+# write, only the paths whose content actually changed are re-parsed.
+#
+# Nothing here is authoritative. Every row is derived from a file the agent may
+# already read, and reading one at the coordinates recorded here still goes
+# through `read_file`, workspace containment, and the policy engine. The map
+# grants no access; it only says where to look.
+CODE_MAP_MIGRATION_ID = "RAIKER-2040-repository-code-map"
+CODE_MAP_SQL = """
+CREATE TABLE IF NOT EXISTS code_map_indexes (
+  owner_principal_id TEXT NOT NULL,
+  repo_path TEXT NOT NULL,
+  repo_id TEXT NOT NULL DEFAULT '',
+  label TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL,
+  reason_code TEXT NOT NULL DEFAULT '',
+  file_count INTEGER NOT NULL DEFAULT 0,
+  symbol_count INTEGER NOT NULL DEFAULT 0,
+  edge_count INTEGER NOT NULL DEFAULT 0,
+  skipped TEXT NOT NULL DEFAULT '{}',
+  limits_hit TEXT NOT NULL DEFAULT '',
+  languages TEXT NOT NULL DEFAULT '{}',
+  schema_version TEXT NOT NULL DEFAULT '1.0',
+  built_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, repo_path)
+);
+CREATE TABLE IF NOT EXISTS code_map_files (
+  owner_principal_id TEXT NOT NULL,
+  repo_path TEXT NOT NULL,
+  path TEXT NOT NULL,
+  language TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL DEFAULT 0,
+  line_count INTEGER NOT NULL DEFAULT 0,
+  symbol_count INTEGER NOT NULL DEFAULT 0,
+  title TEXT NOT NULL DEFAULT '',
+  extractor TEXT NOT NULL DEFAULT 'none',
+  indexed_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, repo_path, path)
+);
+CREATE INDEX IF NOT EXISTS idx_code_map_files_repo
+  ON code_map_files(owner_principal_id, repo_path, symbol_count DESC);
+CREATE TABLE IF NOT EXISTS code_map_symbols (
+  owner_principal_id TEXT NOT NULL,
+  repo_path TEXT NOT NULL,
+  path TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  name TEXT NOT NULL,
+  name_lower TEXT NOT NULL,
+  qualified_name TEXT NOT NULL,
+  line_start INTEGER NOT NULL DEFAULT 1,
+  line_end INTEGER NOT NULL DEFAULT 1,
+  parent TEXT NOT NULL DEFAULT '',
+  signature TEXT NOT NULL DEFAULT '',
+  doc TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_code_map_symbols_name
+  ON code_map_symbols(owner_principal_id, repo_path, name_lower);
+CREATE INDEX IF NOT EXISTS idx_code_map_symbols_path
+  ON code_map_symbols(owner_principal_id, repo_path, path);
+CREATE TABLE IF NOT EXISTS code_map_edges (
+  owner_principal_id TEXT NOT NULL,
+  repo_path TEXT NOT NULL,
+  from_path TEXT NOT NULL,
+  relationship TEXT NOT NULL,
+  target TEXT NOT NULL,
+  line INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_code_map_edges_from
+  ON code_map_edges(owner_principal_id, repo_path, from_path);
+CREATE INDEX IF NOT EXISTS idx_code_map_edges_target
+  ON code_map_edges(owner_principal_id, repo_path, target);
+"""

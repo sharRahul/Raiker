@@ -4,6 +4,36 @@ Graph memory lets Raiker understand relationships between files, symbols, tasks,
 
 The graph is not a replacement for grep, semantic search, or LSP. It complements them by making relationships queryable.
 
+## What is implemented today
+
+This specification describes two things that have since been built to different
+depths, and the difference matters when reading it.
+
+**The codemap is shipped** (GAP-BUILD B9 / FIXED-113). `raiker/graph/codemap.py`
+scans one repository and records files, symbols and `imports` edges;
+`raiker/graph/codemap_service.py` governs it under the `code_map_indexing`
+capability; the rows live in `code_map_files`, `code_map_symbols`,
+`code_map_edges` and `code_map_indexes`. It is built on repository connect, on
+selecting a never-indexed repository, and on the owner's **Rebuild index**
+control, and it is refreshed incrementally for the paths an approved write
+touched. The model reaches it through `code_map_search`, and the turn bundle
+carries the ranked slices as untrusted context. It emits `code_map_indexed` and
+`code_map_refreshed` rather than the `graph_index_created` named below.
+
+**The durable governed graph store is not.** The node/edge schema, the entity and
+relationship taxonomies, provenance, approval previews, rollback plans and
+lifecycle retention below describe the Phase-3 subsystem behind the separate
+`graph_codemap_indexing` capability, which remains a dry-run planner
+(`raiker/graph/planner.py`). The codemap deliberately does **not** claim that
+name: it is a derived cache that can be deleted and rebuilt, not a governed
+record store, and one capability must not mean both.
+
+The codemap implements a subset of what follows — `file`, `directory`, `module`,
+`class`, `function`, `method` and `component` entities, and `contains`, `defines`
+and `imports` relationships. `calls`, `tests`, `implements`, `documents`,
+`emits_event`, `requires_policy`, `uses_tool`, `owned_by`, `supersedes` and
+`derived_from` are still specification.
+
 ---
 
 ## Graph Goals

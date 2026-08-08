@@ -165,7 +165,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-53 | Low | Chat / multi-call answer text runs together | Open (found while verifying FIXED-99) |
 | BUG-54 | Medium | Web e2e / the live stub model is not in the repository | Open (found while writing FIXED-99's live scenario) |
 | BUG-55 | Low | Chat / a disabled transcript block reads as live code | Open (found while verifying FIXED-99) |
-| BUG-56 | Low | Tests / a shipped-skill check breaks after `compileall` | Open (found while verifying FIXED-100) |
+| FIXED-115 | Low | Tests / a shipped-skill check breaks after `compileall` | Fixed (was BUG-56) |
 | FIXED-104 | Medium | Context / stale capability flags mislead the model | Fixed (was BUG-57) |
 | BUG-59 | Low | Runtime / a governed refusal names a page that does not exist | Open (found while verifying FIXED-103) |
 | BUG-60 | Low | Chat / a withheld call is narrated by the model, not disclosed | Open (found while verifying FIXED-103) |
@@ -180,7 +180,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-110 | Low | Build / git tools and the selected repository | Fixed (was BUG-66) |
 | FIXED-111 | Medium | Build / Chat — the governed push | Fixed (was BUG-67) |
 | FIXED-112 | Medium | Runtime / an unperformable proposal raised as a decision | Fixed (found while verifying FIXED-111) |
-| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8, B11, B12, B17 complete; 11 items remain) |
+| FIXED-113 | High | Build / Chat — the repository code map | Fixed (was B9) |
+| FIXED-114 | Low | Build / stale repository state after a visit elsewhere | Fixed (found while verifying FIXED-113) |
+| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
 ---
@@ -3716,7 +3718,8 @@ process has ever opened.
 command this repository's own CI runs — leaves `__pycache__` directories inside
 the shipped skill folders, after which
 `tests/test_skills.py::TestShippedSkills::test_bundled_files_are_linked_from_the_body`
-fails on a compiled artefact it was never meant to see. Recorded as BUG-56.
+fails on a compiled artefact it was never meant to see. Recorded as BUG-56, and
+closed since as **FIXED-115**.
 
 **UI when closed.** No user-visible change under normal use, and the live run
 holds that claim to its word: after the host served 30 more instance workspaces,
@@ -4035,9 +4038,9 @@ auditability defect.
 
 ---
 
-## BUG-56 — A shipped-skill check fails after `compileall`, which CI itself runs
+## FIXED-115 — A shipped-skill check failed after `compileall`, which CI itself runs *(was BUG-56)*
 
-**Status: open; found while verifying FIXED-100.**
+**Status: fixed in this change; reproduced while verifying FIXED-113.**
 
 **Observed.** Running `python -m compileall raiker apps tests` and then the test
 suite fails:
@@ -4055,10 +4058,12 @@ trees; it survives only because it runs it *after* `pytest`. A developer who run
 the two in the other order sees a failure that has nothing to do with their
 change, in a test whose message points at a shipped skill.
 
-**Required fix.** Skip generated artefacts when walking a skill folder —
-`__pycache__` and compiled bytecode at minimum — so the check keeps asserting
-what it means to assert and stops depending on command order. Do not weaken the
-rule itself: an unreferenced *source* file in a skill bundle is still a defect.
+**Fix applied.** The walk skips generated directories (`__pycache__` and the
+tool caches) and compiled bytecode, and says in the test's own docstring why. The
+rule itself is untouched: an unreferenced *source* file in a skill bundle is
+still a defect, which is what the check was written to catch. Verified by running
+`compileall` over the three trees and then `pytest tests/test_skills.py` — the
+order that used to fail.
 
 **UI when closed.** None — this is a test-suite reliability defect.
 
@@ -5042,6 +5047,115 @@ never reaches an executor either.
 **Verified live** — `bug67-nothing-to-push.png`, and unit coverage in
 `tests/test_git_push_path.py::TestUnperformableProposal` and
 `tests/test_tool_broker.py`.
+
+---
+
+## FIXED-113 — Every turn started cold: the repository had no index
+
+**Status: fixed in this change. Was GAP-BUILD B9.**
+
+**Observed.** Build knew the workspace root and nothing about what was inside it.
+Asked where `reconcile_meridian_ledger` was defined, the agent's only move was to
+guess a `grep` pattern and read the misses — and on a repository of any size, a
+guess that matches a mention rather than a declaration sends the next several
+tool calls to the wrong file. There was no symbol index, no map of the tree, and
+nothing in the turn bundle that said what the repository contained.
+
+**Why it matters.** This is the whole distance between an agent that can act in a
+codebase and one that has to be told where everything is first. Every capability
+Build already had — the governed write (FIXED-08), the hunk-level patch
+(FIXED-23), the commit (FIXED-109) — assumes the agent can *find* the code it is
+about to change. Finding it by pattern-matching is the step that fails silently:
+`grep` returns something, so nothing reports a miss.
+
+**Root cause.** `raiker/graph/indexer.py` held a Python-only AST walker that
+persisted nothing and was reachable only through a Phase-3 executor that indexed
+into memory and discarded the result. `retrieve_hybrid_memory` searched *approved
+memories*, not code. Nothing scanned a repository, nothing stored what it found,
+and nothing put any of it in front of the model.
+
+**Fix applied.** A real, governed, incremental code map:
+
+1. **The scan** (`raiker/graph/codemap.py`). A bounded, deterministic walk of one
+   repository: dot-directories, vendored trees, symlinks, binaries and oversized
+   files are skipped and *counted*; Python is parsed with `ast` (exact) and
+   fifteen other languages with bounded per-line patterns (approximate, and each
+   file records which extractor produced it). Every limit in `CodeMapLimits` is
+   enforced during the walk, and a scan that hits one reports `partial` naming
+   the bound — a partial map can never present itself as a complete one.
+2. **The store** (`RAIKER-2040-repository-code-map`). Four owner-scoped tables
+   keyed by the workspace-relative repository path, so the unselected case — the
+   workspace root — has a home rather than a special case. A file row carries its
+   `sha256`, which is what makes a refresh incremental.
+3. **The switch.** `code_map_indexing` is a capability with a real executor
+   (`CodeMapIndexExecutor`), an activation requirement, and a control on
+   Permissions → Workspace. It is deliberately **not** `graph_codemap_indexing`:
+   that name belongs to the Phase-3 durable governed graph store — records with
+   provenance, approval previews, rollback plans — which is still a dry-run
+   planner. One switch must not mean two subsystems, so that capability, its
+   readiness flags, and every assertion about it are left exactly as they were.
+4. **When it is built.** On repository connect, on selecting a repository that
+   has never been indexed, and on the owner's own **Rebuild index** control.
+   Never on a turn: indexing is the owner's decision, not the runtime's.
+5. **Staying honest.** After an approved file mutation really lands,
+   `ApprovalExecutionRelay` re-parses exactly the paths it touched
+   (`code_map_refreshed`). It is best-effort in the strict sense — a refresh that
+   fails changes nothing about the write that succeeded, because an approved
+   change is never rolled back for a derived cache.
+6. **Reaching the model.** `code_map_search` is advertised, read-shaped in the
+   policy engine, delegable to a subagent, and citable as a turn source. It
+   returns **coordinates, not code** — path, line range, signature, docstring
+   first line — so reading the file still goes through `read_file`, workspace
+   containment and the policy engine. The map grants nothing.
+7. **Reaching the turn.** A `code_map` context item carries the ranked files and
+   their declarations, marked `untrusted_external`: symbol names and docstrings
+   are copied out of repository files, which is exactly where an injected
+   instruction would sit. A prompt that matches nothing gets the
+   most-declaration files as orientation; a gate that is off, or a repository
+   never indexed, contributes **nothing** rather than a placeholder.
+
+**Verified live** against a running `raiker-web` on hosted Anthropic
+`claude-haiku-4-5-20251001` —
+`apps/web/e2e/b9-repository-code-map-live.spec.ts`, six scenarios, all passing —
+and by `tests/test_repository_code_map.py` (21 cases) and
+`apps/web/src/lib/components/RepoConnector.test.ts`.
+
+| Screenshot | What it shows |
+|---|---|
+| `working/b9-model-connected.png` | the credential added through Models, Haiku 4.5 selected |
+| `working/b9-code-map-off-by-default.png` | the resting state — indexing off, the panel saying so, and nothing to press |
+| `working/b9-code-map-built-on-connect.png` | **Code map · ledger-app — 2 files, 3 declarations**, built by connecting the repository |
+| `working/b9-code-map-search-answer.png` | **the gap itself, closed** — *"`reconcile_meridian_ledger` is defined in `services/ledger.py` at lines 11–13"*, with the code map in the answer's source ledger |
+| `working/b9-code-map-gate-off.png` | the owner's off switch, quoted back verbatim: `{"type": "code_map_gate_disabled", …}` |
+| `working/b9-code-map-refreshed-after-write.png` | an approved `write_file`, then the same tool finding `audit_meridian_trail` in `services/audit.py` — the index caught up with the change |
+
+**UI when closed.** Build states what its repository's index holds and offers to
+rebuild it; an answer about where code lives names the file and the lines, and
+says the code map is where it looked.
+
+---
+
+## FIXED-114 — Build showed repository state as it stood before a visit to Permissions
+
+**Status: fixed in this change; found while verifying FIXED-113.**
+
+**Observed.** Turning **Code map** on in Permissions and returning to Build left
+the repositories panel still saying indexing was off. Pressing the control it
+offered would have been refused by a gate that was no longer closed.
+
+**Root cause.** `App.svelte` keeps Build mounted and merely `hidden` — that is
+deliberate, and it is what preserves a transcript across navigation. But
+`loadRepos()` ran only in `onMount`, so everything the panel showed was as it
+stood the first time Build was opened, however long ago that was.
+
+**Fix applied.** `App.svelte` passes `visible={current === "build"}` and BuildView
+re-reads its repository state whenever it becomes visible. The transcript is
+untouched — it is the state read from the server that is refreshed.
+
+**Why it is filed here rather than shipped silently.** It is the same class as the
+defects this document keeps recording: a surface stating a posture that stopped
+being true, with nothing holding the two together.
+
 
 ---
 

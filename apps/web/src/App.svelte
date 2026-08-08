@@ -155,7 +155,11 @@
         {/if}
         {#if buildVisited}
           <div hidden={current !== "build"}>
-            <BuildView {projects} onProjectsChanged={refreshProjects} />
+            <BuildView
+              {projects}
+              onProjectsChanged={refreshProjects}
+              visible={current === "build"}
+            />
           </div>
         {/if}
         {#if current === "home"}

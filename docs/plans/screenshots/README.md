@@ -133,3 +133,20 @@ shipped default — the allowlist ships empty.
 | `b17-steered-answer.png` | The model obeying the mid-turn correction — it answers **STEERED MIDTURN**, which was never in the original prompt |
 | `b17-stop-requested.png` | Stop pressed mid-turn: a request applied at a safe boundary, never claimed as already done |
 | `b17-turn-stopped.png` | The turn ended as **stopped** — a decision, not a failure — keeping what it had already produced |
+
+`b9-*` is the live evidence for **FIXED-113** (GAP-BUILD B9 — the repository code
+map), captured on **2026-08-08** by
+[`apps/web/e2e/b9-repository-code-map-live.spec.ts`](../../../apps/web/e2e/b9-repository-code-map-live.spec.ts)
+against a running `raiker-web` holding an owner-entered Anthropic credential and
+answering live `claude-haiku-4-5-20251001` turns. Nothing here reaches the
+network on the agent's behalf: the repository is a folder inside the workspace,
+and the index is derived from it locally.
+
+| File | Records |
+|---|---|
+| `b9-model-connected.png` | The credential added through Models, Haiku 4.5 selected |
+| `b9-code-map-off-by-default.png` | The resting state — indexing off, Build saying so, and nothing to press |
+| `b9-code-map-built-on-connect.png` | **Code map · ledger-app — 2 files, 3 declarations**, built by connecting the repository, with **Rebuild index** beside it |
+| `b9-code-map-search-answer.png` | The gap itself, closed — *"`reconcile_meridian_ledger` is defined in `services/ledger.py` at lines 11–13"*, cited to the code map in the answer's own source ledger |
+| `b9-code-map-gate-off.png` | The owner's off switch, quoted back verbatim by the model: `{"type": "code_map_gate_disabled", …}` |
+| `b9-code-map-refreshed-after-write.png` | An approved `write_file`, then the same tool finding `audit_meridian_trail` in `services/audit.py` — the index caught up with the change the agent made |

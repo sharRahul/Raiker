@@ -23,6 +23,10 @@ from raiker.tools.broker import ToolBroker
 DELEGABLE_TOOLS: frozenset[str] = frozenset({
     "read_file", "list_directory", "glob", "grep", "stat_path", "diff_files",
     "git_status", "git_diff", "git_log", "memory_search", "memory_list", "memory_get",
+    # B9 — a code map read is local, read-only and egress-free, which is exactly
+    # the delegable set's rule. It is also the tool a wide investigation most
+    # wants: finding where things are defined is the search a subagent is for.
+    "code_map_search",
     "vector_get", "skill_load",
 })
 

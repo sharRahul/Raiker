@@ -226,12 +226,26 @@ class TestShippedSkills:
             assert len(package.description) > 200
 
     def test_bundled_files_are_linked_from_the_body(self) -> None:
+        """Every file shipped inside a skill must be reachable from its body.
+
+        BUG-56: build output is not a bundled file. Running `compileall` — which
+        CI itself runs over the same trees — leaves `__pycache__` beside a
+        skill's `scripts/`, and walking it blindly turned "you shipped a file
+        nothing loads" into a failure that depended on the order two commands
+        were run in. The rule is unchanged for *sources*: an unreferenced source
+        file in a skill bundle is still a defect.
+        """
         from raiker.skills.service import BUILTIN_ROOT
 
+        generated_dirs = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+        generated_suffixes = {".pyc", ".pyo"}
         for folder in sorted(p for p in BUILTIN_ROOT.iterdir() if p.is_dir()):
             body = (folder / "SKILL.md").read_text(encoding="utf-8")
             for extra in sorted(folder.rglob("*")):
                 if not extra.is_file() or extra.name == "SKILL.md":
+                    continue
+                parts = extra.relative_to(folder).parts
+                if generated_dirs.intersection(parts) or extra.suffix in generated_suffixes:
                     continue
                 relative = extra.relative_to(folder).as_posix()
                 # A bundled file nothing points at is a file that never loads.

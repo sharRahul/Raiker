@@ -15,6 +15,7 @@ import type {
   ContextUsage,
   Checkpoint,
   ComposerApprovalModeSettings,
+  CodeMapStatus,
   CodeReposView,
   CredentialLifecycle,
   ConnectionsView,
@@ -790,6 +791,16 @@ export const api = {
     request<{ ok: boolean; repo_id: string }>(
       `/api/code/repos/${encodeURIComponent(repoId)}`,
       { method: "DELETE" },
+    ),
+
+  // B9 — the code map over the selected repository. Reading its state is
+  // metadata only; rebuilding fails closed with a reason when the owner has the
+  // `code_map_indexing` capability turned off.
+  codeMap: () => request<CodeMapStatus>("/api/code/map"),
+  rebuildCodeMap: () =>
+    postJson<{ ok: boolean; status: string; file_count: number; symbol_count: number }>(
+      "/api/code/map/rebuild",
+      {},
     ),
 
   // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
